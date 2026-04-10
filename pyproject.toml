@@ -26,6 +26,7 @@ dependencies = [
     "python-multipart>=0.0.24",
     "email-validator>=2.3.0",
     "pydantic-extra-types>=2.11.2",
+    "inquirerpy>=0.3.4",
 ]
 
 [project.optional-dependencies]

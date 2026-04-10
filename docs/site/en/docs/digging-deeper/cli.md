@@ -17,7 +17,7 @@ Running `arvel` with no subcommand prints the banner and help. Core groups inclu
 - **`health`** — probe configured subsystems from the command line
 - **`serve`** — run the development server
 - **`about`**, **`config`**, **`tinker`**, **`publish`** — ergonomics and introspection
-- **`new`** — scaffold a new project
+- **`new`** — scaffold a new project (interactive stack selector with presets)
 - **`up` / `down`** — maintenance mode toggles
 
 That list mirrors how Arvel thinks about an application: data, background work, time-based work, HTTP surface, and observability—all reachable under one name.

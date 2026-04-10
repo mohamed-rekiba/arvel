@@ -29,21 +29,239 @@ TEMPLATES_ASSET = "templates.json"
 
 DATABASE_CONFIGS: dict[str, dict[str, str]] = {
     "sqlite": {
-        "driver": "sqlite+aiosqlite",
+        "driver": "sqlite",
+        "sa_driver": "sqlite+aiosqlite",
         "url_template": "sqlite+aiosqlite:///database/database.sqlite",
-        "package": "aiosqlite",
+        "extra": "sqlite",
+        "db_host": "127.0.0.1",
+        "db_port": "",
+        "db_username": "",
+        "db_database": "database/database.sqlite",
     },
     "postgres": {
-        "driver": "postgresql+asyncpg",
+        "driver": "pgsql",
+        "sa_driver": "postgresql+asyncpg",
         "url_template": "postgresql+asyncpg://localhost:5432/{app_name}",
-        "package": "asyncpg",
+        "extra": "pg",
+        "db_host": "127.0.0.1",
+        "db_port": "5432",
+        "db_username": "arvel",
+        "db_database": "{app_name}",
     },
     "mysql": {
-        "driver": "mysql+aiomysql",
+        "driver": "mysql",
+        "sa_driver": "mysql+aiomysql",
         "url_template": "mysql+aiomysql://localhost:3306/{app_name}",
-        "package": "aiomysql",
+        "extra": "mysql",
+        "db_host": "127.0.0.1",
+        "db_port": "3306",
+        "db_username": "arvel",
+        "db_database": "{app_name}",
     },
 }
+
+CACHE_CONFIGS: dict[str, dict[str, str]] = {
+    "memory": {"driver": "memory", "extra": ""},
+    "redis": {"driver": "redis", "extra": "redis"},
+}
+
+QUEUE_CONFIGS: dict[str, dict[str, str]] = {
+    "sync": {"driver": "sync", "extra": ""},
+    "redis": {"driver": "redis", "extra": "redis"},
+    "taskiq": {"driver": "taskiq", "extra": "taskiq"},
+}
+
+MAIL_CONFIGS: dict[str, dict[str, str]] = {
+    "log": {"driver": "log", "extra": ""},
+    "smtp": {"driver": "smtp", "extra": "smtp"},
+}
+
+STORAGE_CONFIGS: dict[str, dict[str, str]] = {
+    "local": {"driver": "local", "extra": ""},
+    "s3": {"driver": "s3", "extra": "s3"},
+}
+
+SEARCH_CONFIGS: dict[str, dict[str, str]] = {
+    "collection": {"driver": "collection", "extra": ""},
+    "meilisearch": {"driver": "meilisearch", "extra": "meilisearch"},
+    "elasticsearch": {"driver": "elasticsearch", "extra": "elasticsearch"},
+}
+
+BROADCAST_CONFIGS: dict[str, dict[str, str]] = {
+    "memory": {"driver": "memory", "extra": ""},
+    "redis": {"driver": "redis", "extra": "redis"},
+    "log": {"driver": "log", "extra": ""},
+    "null": {"driver": "null", "extra": ""},
+}
+
+_VALID_CHOICES: dict[str, dict[str, dict[str, str]]] = {
+    "database": DATABASE_CONFIGS,
+    "cache": CACHE_CONFIGS,
+    "queue": QUEUE_CONFIGS,
+    "mail": MAIL_CONFIGS,
+    "storage": STORAGE_CONFIGS,
+    "search": SEARCH_CONFIGS,
+    "broadcast": BROADCAST_CONFIGS,
+}
+
+
+PRESETS: dict[str, dict[str, str]] = {
+    "minimal": {
+        "database": "sqlite",
+        "cache": "memory",
+        "queue": "sync",
+        "mail": "log",
+        "storage": "local",
+        "search": "collection",
+        "broadcast": "memory",
+    },
+    "standard": {
+        "database": "postgres",
+        "cache": "redis",
+        "queue": "redis",
+        "mail": "smtp",
+        "storage": "local",
+        "search": "collection",
+        "broadcast": "memory",
+    },
+    "full": {
+        "database": "postgres",
+        "cache": "redis",
+        "queue": "taskiq",
+        "mail": "smtp",
+        "storage": "s3",
+        "search": "meilisearch",
+        "broadcast": "redis",
+    },
+}
+
+_SERVICE_LABELS: dict[str, str] = {
+    "database": "Database",
+    "cache": "Cache",
+    "queue": "Queue",
+    "mail": "Mail",
+    "storage": "Storage",
+    "search": "Search",
+    "broadcast": "Broadcast",
+}
+
+
+def _collect_extras(choices: dict[str, str]) -> list[str]:
+    """Collect unique arvel extras from all driver choices."""
+    extras: set[str] = set()
+    for option_name, chosen_value in choices.items():
+        configs = _VALID_CHOICES[option_name]
+        cfg = configs[chosen_value]
+        extra = cfg.get("extra", "")
+        if extra:
+            extras.add(extra)
+    return sorted(extras)
+
+
+def _prompt_select(message: str, choices: list[dict[str, str]], default: str | None = None) -> str:
+    """Arrow-key select prompt powered by InquirerPy."""
+    from InquirerPy import inquirer
+
+    return inquirer.select(  # type: ignore[no-any-return]
+        message=message,
+        choices=choices,
+        default=default,
+        pointer="❯",  # noqa: RUF001
+        show_cursor=False,
+    ).execute()
+
+
+def _preset_summary(preset_name: str) -> str:
+    """Build a short summary string for a preset."""
+    p = PRESETS[preset_name]
+    return ", ".join(f"{p[k]}" for k in _SERVICE_LABELS)
+
+
+def _run_interactive_prompts(
+    *,
+    cli_database: str,
+    cli_cache: str,
+    cli_queue: str,
+    cli_mail: str,
+    cli_storage: str,
+    cli_search: str,
+    cli_broadcast: str,
+    cli_preset: str | None,
+) -> dict[str, str]:
+    """Run the interactive stack selection flow.
+
+    Any value explicitly passed on the CLI is locked and not prompted.
+    Returns a dict with keys matching ``_SERVICE_LABELS``.
+    """
+    cli_overrides: dict[str, str] = {}
+    defaults = PRESETS["minimal"]
+    service_to_cli = {
+        "database": cli_database,
+        "cache": cli_cache,
+        "queue": cli_queue,
+        "mail": cli_mail,
+        "storage": cli_storage,
+        "search": cli_search,
+        "broadcast": cli_broadcast,
+    }
+
+    for svc, cli_val in service_to_cli.items():
+        if cli_val != defaults[svc]:
+            cli_overrides[svc] = cli_val
+
+    if cli_preset and cli_preset in PRESETS:
+        choices = {**PRESETS[cli_preset], **cli_overrides}
+    elif cli_overrides:
+        choices = {**defaults, **cli_overrides}
+        return choices
+    else:
+        preset_choices = [
+            {"name": f"Minimal    — {_preset_summary('minimal')}", "value": "minimal"},
+            {"name": f"Standard   — {_preset_summary('standard')}", "value": "standard"},
+            {"name": f"Full       — {_preset_summary('full')}", "value": "full"},
+            {"name": "Custom     — choose each service individually", "value": "custom"},
+        ]
+
+        selected = _prompt_select(
+            "Choose your stack:",
+            preset_choices,
+            default="minimal",
+        )
+
+        if selected == "custom":
+            choices = _run_custom_prompts(cli_overrides)
+        else:
+            choices = {**PRESETS[selected], **cli_overrides}
+
+    _print_summary(choices)
+    return choices
+
+
+def _run_custom_prompts(cli_overrides: dict[str, str]) -> dict[str, str]:
+    """Prompt for each service individually, skipping those already set via CLI."""
+    choices: dict[str, str] = {}
+    defaults = PRESETS["minimal"]
+
+    for svc, label in _SERVICE_LABELS.items():
+        if svc in cli_overrides:
+            choices[svc] = cli_overrides[svc]
+            continue
+        configs = _VALID_CHOICES[svc]
+        option_list = [{"name": k, "value": k} for k in configs]
+        choices[svc] = _prompt_select(f"{label}:", option_list, default=defaults[svc])
+
+    return choices
+
+
+def _print_summary(choices: dict[str, str]) -> None:
+    """Print a compact summary of the selected stack."""
+    parts = [f"[green]{choices[svc]}[/green]" for svc in _SERVICE_LABELS]
+    summary = " · ".join(parts)
+    typer.echo()
+    from rich.console import Console
+
+    Console().print(f"  [bold]Stack:[/bold] {summary}")
+    typer.echo()
 
 
 def validate_project_name(name: str) -> bool:
@@ -174,7 +392,7 @@ def _download_skeleton_tarball(owner_repo: str, branch: str) -> Path | None:
     try:
         with urlopen(req, timeout=30) as response:  # noqa: S310
             data = response.read()
-    except (URLError, OSError):
+    except URLError, OSError:
         return None
 
     import tempfile
@@ -203,7 +421,7 @@ def _download_skeleton_git_clone(repo_url: str, branch: str) -> Path | None:
     target = clone_dir / "skeleton"
 
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             ["git", "clone", "--depth", "1", "--branch", branch, repo_url, str(target)],  # noqa: S607
             capture_output=True,
             timeout=60,
@@ -211,7 +429,7 @@ def _download_skeleton_git_clone(repo_url: str, branch: str) -> Path | None:
         )
         if result.returncode != 0:
             # Branch/tag might not exist — retry with default branch
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603
                 ["git", "clone", "--depth", "1", repo_url, str(target)],  # noqa: S607
                 capture_output=True,
                 timeout=60,
@@ -222,7 +440,7 @@ def _download_skeleton_git_clone(repo_url: str, branch: str) -> Path | None:
             if git_dir.exists():
                 shutil.rmtree(git_dir)
             return target
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except FileNotFoundError, subprocess.TimeoutExpired:
         pass
     return None
 
@@ -283,9 +501,11 @@ def render_skeleton(
 
 
 def _setup_env(target_dir: Path, context: dict[str, Any]) -> None:
-    """Create .env from .env.example if it exists."""
-    env_example = target_dir / ".env.example"
+    """Ensure .env exists. Prefer the rendered .env (from .env.j2); fall back to .env.example."""
     env_file = target_dir / ".env"
+    if env_file.exists():
+        return
+    env_example = target_dir / ".env.example"
     if env_example.exists():
         shutil.copy2(env_example, env_file)
 
@@ -321,6 +541,60 @@ def _git_init(target_dir: Path) -> None:
         typer.echo("Warning: git initialization failed.", err=True)
 
 
+def _validate_choice(option: str, value: str, configs: dict[str, dict[str, str]]) -> None:
+    """Validate a CLI option value against its config map."""
+    if value not in configs:
+        choices = ", ".join(configs)
+        typer.echo(f"Unknown {option} '{value}'. Choose: {choices}.")
+        raise typer.Exit(code=1)
+
+
+def _build_context(driver_choices: dict[str, str], package_name: str) -> dict[str, Any]:
+    """Build the full Jinja2 template context from driver choices."""
+    db_cfg = DATABASE_CONFIGS[driver_choices["database"]]
+    arvel_extras = _collect_extras(driver_choices)
+    extras_suffix = f"[{','.join(arvel_extras)}]" if arvel_extras else ""
+
+    cache = driver_choices["cache"]
+    queue = driver_choices["queue"]
+    broadcast_drv = driver_choices["broadcast"]
+
+    use_redis = cache == "redis" or queue in ("redis", "taskiq") or broadcast_drv == "redis"
+
+    return {
+        "app_name": package_name,
+        "app_name_title": to_pascal_case(package_name),
+        "python_version": "3.14",
+        "arvel_version": _get_arvel_version(),
+        "secret_key": _generate_secret_key(),
+        # Database
+        "database_driver": db_cfg["driver"],
+        "database_sa_driver": db_cfg["sa_driver"],
+        "database_url": db_cfg["url_template"].format(app_name=package_name),
+        "db_host": db_cfg["db_host"],
+        "db_port": db_cfg["db_port"],
+        "db_username": db_cfg["db_username"],
+        "db_database": db_cfg["db_database"].format(app_name=package_name),
+        # Service drivers
+        "cache_driver": CACHE_CONFIGS[cache]["driver"],
+        "queue_driver": QUEUE_CONFIGS[queue]["driver"],
+        "mail_driver": MAIL_CONFIGS[driver_choices["mail"]]["driver"],
+        "storage_driver": STORAGE_CONFIGS[driver_choices["storage"]]["driver"],
+        "search_driver": SEARCH_CONFIGS[driver_choices["search"]]["driver"],
+        "broadcast_driver": BROADCAST_CONFIGS[broadcast_drv]["driver"],
+        # Dependency extras
+        "arvel_extras": extras_suffix,
+        # Docker Compose conditionals
+        "use_postgres": driver_choices["database"] == "postgres",
+        "use_mysql": driver_choices["database"] == "mysql",
+        "use_redis": use_redis,
+        "use_smtp": driver_choices["mail"] == "smtp",
+        "use_s3": driver_choices["storage"] == "s3",
+        "use_meilisearch": driver_choices["search"] == "meilisearch",
+        "use_elasticsearch": driver_choices["search"] == "elasticsearch",
+    }
+
+
 @new_app.command(name="project")
 def new_project(
     name: str = typer.Argument(help="Project name (directory name)."),
@@ -329,6 +603,42 @@ def new_project(
         "--database",
         "-d",
         help="Database driver: sqlite, postgres, mysql.",
+    ),
+    cache: str = typer.Option(
+        "memory",
+        "--cache",
+        help="Cache driver: memory, redis.",
+    ),
+    queue: str = typer.Option(
+        "sync",
+        "--queue",
+        help="Queue driver: sync, redis, taskiq.",
+    ),
+    mail: str = typer.Option(
+        "log",
+        "--mail",
+        help="Mail driver: log, smtp.",
+    ),
+    storage: str = typer.Option(
+        "local",
+        "--storage",
+        help="Storage driver: local, s3.",
+    ),
+    search: str = typer.Option(
+        "collection",
+        "--search",
+        help="Search driver: collection, meilisearch, elasticsearch.",
+    ),
+    broadcast: str = typer.Option(
+        "memory",
+        "--broadcast",
+        help="Broadcast driver: memory, redis, log, null.",
+    ),
+    preset: str | None = typer.Option(
+        None,
+        "--preset",
+        "-p",
+        help="Stack preset: minimal, standard, full.",
     ),
     no_git: bool = typer.Option(False, "--no-git", help="Skip git initialization."),
     branch: str | None = typer.Option(None, "--branch", "-b", help="Template repo branch or tag."),
@@ -352,13 +662,47 @@ def new_project(
         typer.echo(f"Directory '{name}' already exists. Use --force to overwrite.")
         raise typer.Exit(code=1)
 
-    if database not in DATABASE_CONFIGS:
-        typer.echo(f"Unknown database '{database}'. Choose: sqlite, postgres, mysql.")
+    if preset and preset not in PRESETS:
+        valid = ", ".join(PRESETS)
+        typer.echo(f"Unknown preset '{preset}'. Choose: {valid}.")
         raise typer.Exit(code=1)
 
-    if not no_input and database == "sqlite":
-        pass
+    _validate_choice("database", database, DATABASE_CONFIGS)
+    _validate_choice("cache", cache, CACHE_CONFIGS)
+    _validate_choice("queue", queue, QUEUE_CONFIGS)
+    _validate_choice("mail", mail, MAIL_CONFIGS)
+    _validate_choice("storage", storage, STORAGE_CONFIGS)
+    _validate_choice("search", search, SEARCH_CONFIGS)
+    _validate_choice("broadcast", broadcast, BROADCAST_CONFIGS)
 
+    # Resolve driver choices: interactive prompts, preset, or CLI flags
+    if no_input:
+        base = PRESETS[preset] if preset else PRESETS["minimal"]
+        # CLI flags override the preset/defaults
+        driver_choices = {
+            "database": database if database != "sqlite" or not preset else base["database"],
+            "cache": cache if cache != "memory" or not preset else base["cache"],
+            "queue": queue if queue != "sync" or not preset else base["queue"],
+            "mail": mail if mail != "log" or not preset else base["mail"],
+            "storage": storage if storage != "local" or not preset else base["storage"],
+            "search": search if search != "collection" or not preset else base["search"],
+            "broadcast": broadcast if broadcast != "memory" or not preset else base["broadcast"],
+        }
+    else:
+        driver_choices = _run_interactive_prompts(
+            cli_database=database,
+            cli_cache=cache,
+            cli_queue=queue,
+            cli_mail=mail,
+            cli_storage=storage,
+            cli_search=search,
+            cli_broadcast=broadcast,
+            cli_preset=preset,
+        )
+
+    from arvel.cli.app import BANNER
+
+    typer.echo(typer.style(BANNER, fg=typer.colors.CYAN, bold=True))
     typer.echo(f"Creating project '{name}'...")
 
     if using:
@@ -370,24 +714,13 @@ def new_project(
     skeleton_dir = _download_skeleton(repo_url, branch)
 
     package_name = to_package_name(name)
-    db_cfg = DATABASE_CONFIGS[database]
-    secret_key = _generate_secret_key()
-
-    context: dict[str, Any] = {
-        "app_name": package_name,
-        "app_name_title": to_pascal_case(package_name),
-        "database_driver": db_cfg["driver"],
-        "database_url": db_cfg["url_template"].format(app_name=package_name),
-        "python_version": "3.14",
-        "arvel_version": _get_arvel_version(),
-        "secret_key": secret_key,
-    }
+    context = _build_context(driver_choices, package_name)
 
     render_skeleton(skeleton_dir=skeleton_dir, target_dir=target, context=context)
 
     _setup_env(target, context)
 
-    if database == "sqlite":
+    if driver_choices["database"] == "sqlite":
         db_dir = target / "database"
         db_dir.mkdir(exist_ok=True)
         (db_dir / "database.sqlite").touch()
@@ -400,10 +733,15 @@ def new_project(
         typer.echo("Initializing git repository...")
         _git_init(target)
 
-    typer.echo("")
-    typer.echo("Application ready! Build something amazing.")
-    typer.echo("")
-    typer.echo(f"  cd {name}")
-    typer.echo("  arvel serve")
-    typer.echo("  arvel make module <your-first-module>")
-    typer.echo("")
+    green = typer.colors.GREEN
+    dim = typer.colors.BRIGHT_BLACK
+
+    typer.echo()
+    typer.echo(
+        typer.style("  ✓ Application ready!", fg=green, bold=True) + " Build something amazing."
+    )
+    typer.echo()
+    typer.echo(f"  {typer.style('$', fg=dim)} cd {name}")
+    typer.echo(f"  {typer.style('$', fg=dim)} arvel serve")
+    typer.echo(f"  {typer.style('$', fg=dim)} arvel make module <your-first-module>")
+    typer.echo()

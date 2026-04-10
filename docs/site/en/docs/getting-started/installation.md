@@ -36,19 +36,61 @@ The fastest path is the built-in scaffold. It pulls the starter template, render
 arvel new my-app
 ```
 
-That creates a directory named `my-app` in the current working directory. Prefer a different database up front? Pass `--database` (short: `-d`):
+Without flags, the CLI walks you through an interactive stack selector. Pick a preset or choose each service individually:
 
-```bash
-arvel new my-app --database postgres
+```
+? Choose your stack:
+❯ Minimal    — sqlite, memory, sync, log, local, collection, memory
+  Standard   — postgres, redis, redis, smtp, local, collection, memory
+  Full       — postgres, redis, taskiq, smtp, s3, meilisearch, redis
+  Custom     — choose each service individually
 ```
 
-Valid values are `sqlite` (default), `postgres`, and `mysql`.
+### Presets
 
-**All options:**
+Presets bundle common driver choices so you don't configure each service by hand:
+
+| Preset | Database | Cache | Queue | Mail | Storage | Search | Broadcast |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **minimal** (default) | sqlite | memory | sync | log | local | collection | memory |
+| **standard** | postgres | redis | redis | smtp | local | collection | memory |
+| **full** | postgres | redis | taskiq | smtp | s3 | meilisearch | redis |
+
+```bash
+arvel new my-app --preset standard
+```
+
+### Service flags
+
+Override any service individually. These work on their own or on top of a preset:
+
+```bash
+arvel new my-app --database postgres --cache redis --mail smtp
+arvel new my-app --preset standard --search meilisearch
+```
+
+### Non-interactive mode
+
+For CI or scripts, pass `--no-input` to skip prompts. Combine with `--preset` or individual flags:
+
+```bash
+arvel new my-app --no-input                           # uses minimal defaults
+arvel new my-app --preset full --no-input             # uses full preset
+arvel new my-app -d postgres --cache redis --no-input # explicit choices
+```
+
+### All options
 
 | Flag | Short | Description |
 | --- | --- | --- |
 | `--database` | `-d` | Database driver: `sqlite`, `postgres`, `mysql` (default: `sqlite`) |
+| `--cache` | | Cache driver: `memory`, `redis` (default: `memory`) |
+| `--queue` | | Queue driver: `sync`, `redis`, `taskiq` (default: `sync`) |
+| `--mail` | | Mail driver: `log`, `smtp` (default: `log`) |
+| `--storage` | | Storage driver: `local`, `s3` (default: `local`) |
+| `--search` | | Search driver: `collection`, `meilisearch`, `elasticsearch` (default: `collection`) |
+| `--broadcast` | | Broadcast driver: `memory`, `redis`, `log`, `null` (default: `memory`) |
+| `--preset` | `-p` | Stack preset: `minimal`, `standard`, `full` |
 | `--template` | `-t` | Template name from the registry (default: `default`) |
 | `--using` | | Custom template repo URL (bypasses the registry) |
 | `--branch` | `-b` | Template repo branch or tag |
@@ -58,6 +100,8 @@ Valid values are `sqlite` (default), `postgres`, and `mysql`.
 | `--no-input` | | Skip interactive prompts |
 
 Run `arvel new --help` for the latest options.
+
+The scaffold auto-installs the right arvel extras based on your choices. For example, choosing `--database postgres --cache redis` adds `arvel[pg,redis]` to your `pyproject.toml`.
 
 Once the command finishes, step into the project and start the server (next section).
 
