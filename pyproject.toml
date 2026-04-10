@@ -1,0 +1,215 @@
+[project]
+name = "arvel"
+version = "0.1.0"
+description = "Async-first, type-safe Python web framework inspired by Laravel."
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "Mohamed Rekiba" }]
+dependencies = [
+    "alembic>=1.18.4",
+    "anyio>=4.13.0",
+    "bcrypt>=5.0.0",
+    "croniter>=6.2.2",
+    "fastapi>=0.135.3",
+    "jinja2>=3.1.6",
+    "orjson>=3.11.8",
+    "pydantic[email]>=2.12.5",
+    "pydantic-settings>=2.13.1",
+    "pyjwt>=2.12.1",
+    "python-dotenv>=1.2.2",
+    "sqlalchemy[asyncio]>=2.0.49",
+    "structlog>=25.5.0",
+    "typer>=0.24.1",
+    "uvicorn[standard]>=0.44.0",
+    "ipython>=9.12.0",
+    "httpx>=0.28.1",
+    "python-multipart>=0.0.24",
+    "email-validator>=2.3.0",
+    "pydantic-extra-types>=2.11.2",
+]
+
+[project.optional-dependencies]
+sqlite = ["aiosqlite>=0.22.1"]
+pg = ["asyncpg>=0.31.0"]
+mysql = ["asyncmy>=0.2.11", "pymysql>=1.1.2"]
+argon2 = ["argon2-cffi>=25.1.0"]
+redis = ["redis[hiredis]>=7.4.0"]
+smtp = ["aiosmtplib>=5.1.0"]
+s3 = ["aiobotocore>=3.4.0"]
+media = ["pillow>=12.2.0"]
+meilisearch = ["meilisearch-python-sdk>=7.1.2"]
+elasticsearch = ["elasticsearch[async]>=9.3.0"]
+taskiq = ["taskiq>=0.12.1", "taskiq-redis>=1.2.2"]
+otel = [
+    "opentelemetry-api>=1.40.0",
+    "opentelemetry-sdk>=1.40.0",
+    "opentelemetry-instrumentation-fastapi>=0.61b0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.40.0",
+]
+sentry = ["sentry-sdk[fastapi]>=2.57.0"]
+dev = [
+    "pytest>=9.0.0,<10.0",
+    "pytest-cov>=7.0.0,<8.0",
+    "pytest-timeout>=2.4.0,<3.0",
+    "pytest-xdist>=3.8.0,<4.0",
+    "dirty-equals>=0.11,<1.0",
+    "anyio[trio]>=4.13.0,<5.0",
+    "httpx>=0.28.0,<1.0",
+    "ruff>=0.15.0,<1.0",
+    "polyfactory>=3.3.0",
+    "pre-commit>=4.5.1",
+    "ty>=0.0.27",
+    "coverage>=7.13.5",
+]
+docs = [
+    "cairosvg>=2.9.0",
+    "mkdocs>=1.6.1,<2.0",
+    "mkdocs-material>=9.7.6",
+    "mkdocstrings[python]>=1.0.3,<2.0",
+    "pillow>=12.2.0",
+    "ruff>=0.15.10",
+]
+
+[project.scripts]
+arvel = "arvel.cli.app:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/arvel"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+minversion = "9.0"
+addopts = ["--strict-config", "--strict-markers", "-x", "--tb=short"]
+xfail_strict = true
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:aiosqlite.*",
+    "ignore::DeprecationWarning:asyncmy.*",
+    "ignore::DeprecationWarning:sentry_sdk.*",
+]
+timeout = 30
+markers = [
+    "db: marks tests that require database (deselect with '-m \"not db\"')",
+    "pg_only: marks tests that require PostgreSQL (skipped on SQLite)",
+    "mysql_only: marks tests that require MySQL (skipped on non-MySQL databases)",
+    "cli: marks CLI integration tests",
+    "redis: marks tests requiring a live Redis server",
+    "smtp: marks tests requiring a live SMTP server",
+    "s3: marks tests requiring a live S3/MinIO server",
+    "rabbitmq: marks tests requiring a live RabbitMQ server",
+    "oidc: marks tests requiring a live OIDC provider (Keycloak)",
+    "integration: marks all live-service integration tests",
+    "slow: marks tests that take > 1 second",
+    "docs: marks documentation site tests (deselect with '-m \"not docs\"')",
+]
+
+[tool.coverage.run]
+parallel = true
+branch = true
+data_file = ".coverage"
+source = ["src/arvel", "tests"]
+relative_files = true
+omit = ["tests/benchmarks/*", "src/arvel/cli/templates/*"]
+
+[tool.coverage.report]
+show_missing = true
+sort = "-Cover"
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "@overload",
+    'if __name__ == "__main__":',
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
+[tool.coverage.html]
+show_contexts = true
+
+[tool.ty.analysis]
+allowed-unresolved-imports = [
+    "argon2.**",
+    "taskiq.**",
+    "taskiq_nats.**",
+    "taskiq_aio_pika.**",
+    "taskiq_redis.**",
+    "cryptography.**",
+    "arvel.cache.drivers.**",
+    "arvel.lock.drivers.**",
+    "arvel.lock.fakes",
+    "arvel.mail.drivers.**",
+    "arvel.mail.fakes",
+    "arvel.media.fakes",
+    "arvel.notifications.fakes",
+    "opentelemetry.**",
+    "sentry_sdk.**",
+    "meilisearch_python_sdk.**",
+    "elasticsearch.**",
+    "redis.**",
+    "aiosmtplib.**",
+    "botocore.**",
+]
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "F",     # pyflakes (unused imports, undefined names)
+    "W",     # pycodestyle warnings
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "A",     # flake8-builtins
+    "SIM",   # flake8-simplify
+    "TCH",   # flake8-type-checking (move imports into TYPE_CHECKING blocks)
+    "RUF",   # ruff-specific rules
+    "ASYNC", # flake8-async catches async anti-patterns (critical for async-first framework)
+    "S",     # flake8-bandit security checks
+    "PTH",   # flake8-use-pathlib enforce pathlib over os.path
+    "C90",   # mccabe flag overly complex functions
+    "ANN",   # flake8-annotations (missing type annotations on public functions)
+]
+ignore = [
+    "ANN401", # Any in internal signatures is acceptable per type-safety guide
+]
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",    # assert is fine in tests
+    "S105",    # hardcoded passwords/tokens are fine in fixtures
+    "S106",    # hardcoded password args are fine in test fixtures
+    "PLR2004", # magic values are fine in assertions
+    "ANN",     # test functions don't need type annotations
+]
+"src/arvel/testing/client.py" = [
+    "ASYNC109", # timeout param mirrors httpx.AsyncClient API — not an asyncio timeout
+]
+"src/arvel/data/__init__.py" = [
+    "I001", # migration re-exports appended after package imports per public API layout
+]
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
+suppress-none-returning = true
+
+[tool.ruff.lint.flake8-type-checking]
+strict = true
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint.isort]
+known-first-party = ["arvel"]

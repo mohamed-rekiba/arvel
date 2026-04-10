@@ -1,0 +1,17 @@
+"""{{ class_name }} — event listener."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from arvel.events.listener import Listener
+
+if TYPE_CHECKING:
+    from arvel.events.event import Event
+
+
+class {{ class_name }}(Listener):
+    """Handles the {{ event_name }} event."""
+
+    async def handle(self, event: Event) -> None:
+        pass

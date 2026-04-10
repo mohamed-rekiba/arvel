@@ -1,0 +1,22 @@
+"""{{ class_name }} — authorization policy."""
+
+from __future__ import annotations
+
+
+class {{ class_name }}:
+    """Authorization policy for {{ resource }}.
+
+    Each method returns True if the user is authorized for that action.
+    """
+
+    async def view(self, user: object, resource: object) -> bool:
+        return False
+
+    async def create(self, user: object) -> bool:
+        return False
+
+    async def update(self, user: object, resource: object) -> bool:
+        return False
+
+    async def delete(self, user: object, resource: object) -> bool:
+        return False

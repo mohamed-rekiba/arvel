@@ -1,0 +1,124 @@
+{
+  "id": "arvel-test",
+  "realm": "arvel-test",
+  "displayName": "Arvel Test Realm",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": false,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Administrator role for testing"
+      },
+      {
+        "name": "user",
+        "description": "Standard user role for testing"
+      }
+    ],
+    "client": {
+      "arvel-test-client": [
+        {
+          "name": "client_admin",
+          "description": "Client-level admin role"
+        }
+      ]
+    }
+  },
+  "groups": [
+    {
+      "name": "engineering",
+      "path": "/engineering",
+      "realmRoles": ["user"]
+    },
+    {
+      "name": "platform",
+      "path": "/platform",
+      "realmRoles": ["admin", "user"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "arvel-test-client",
+      "name": "Arvel Test Client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "arvel-test-secret",
+      "redirectUris": [
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "webOrigins": [
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "roles",
+        "groups"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "access.token.lifespan": "300",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.session.required": "true"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "testuser",
+      "email": "testuser@arvel.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Test",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "testpassword",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin", "user", "default-roles-arvel-test"],
+      "groups": ["/engineering"],
+      "clientRoles": {
+        "arvel-test-client": ["client_admin"]
+      }
+    },
+    {
+      "username": "viewer",
+      "email": "viewer@arvel.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "View",
+      "lastName": "Only",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "viewerpassword",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user", "default-roles-arvel-test"],
+      "groups": ["/engineering"]
+    }
+  ]
+}

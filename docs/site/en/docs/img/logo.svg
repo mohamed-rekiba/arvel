@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="arvel-logo-title">
+  <title id="arvel-logo-title">Arvel logo</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0%" stop-color="#F44336"/>
+      <stop offset="100%" stop-color="#F44336"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- Back peak -->
+  <path d="M32 16 L50 48 L14 48 Z" fill="white" opacity="0.3"/>
+  <!-- Middle peak -->
+  <path d="M26 22 L42 48 L10 48 Z" fill="white" opacity="0.6"/>
+  <!-- Front peak -->
+  <path d="M38 24 L54 48 L22 48 Z" fill="white" opacity="0.95"/>
+  <!-- Amber accent base -->
+  <line x1="10" y1="50" x2="54" y2="50" stroke="#ffc107" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

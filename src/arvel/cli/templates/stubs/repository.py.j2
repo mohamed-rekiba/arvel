@@ -1,0 +1,11 @@
+"""{{ class_name }} — data access for {{ model_name }}."""
+
+from __future__ import annotations
+
+from arvel.data.repository import Repository
+
+from {{ module_import }}.models.{{ model_file }} import {{ model_name }}
+
+
+class {{ class_name }}(Repository[{{ model_name }}]):
+    """Typed repository for {{ model_name }} persistence."""

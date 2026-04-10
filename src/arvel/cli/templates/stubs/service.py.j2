@@ -1,0 +1,34 @@
+"""{{ class_name }} — business logic for {{ resource }}."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from {{ module_import }}.repositories.{{ repo_file }} import {{ repo_name }}
+
+
+class {{ class_name }}:
+    """Encapsulates business rules for {{ resource }}."""
+
+    def __init__(self, repository: {{ repo_name }}) -> None:
+        self._repository = repository
+
+    async def list_all(self) -> list[dict]:
+        items = await self._repository.all()
+        return [item.model_dump() for item in items]
+
+    async def find(self, id: int) -> dict:
+        item = await self._repository.find_or_fail(id)
+        return item.model_dump()
+
+    async def create(self, data: dict) -> dict:
+        item = await self._repository.create(**data)
+        return item.model_dump()
+
+    async def update(self, id: int, data: dict) -> dict:
+        item = await self._repository.update(id, **data)
+        return item.model_dump()
+
+    async def delete(self, id: int) -> None:
+        await self._repository.delete(id)

@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+.tests/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Arvel cache
+.config_cache
+
+# IDE
+.idea/
+# .vscode/
+*.swp
+*.swo
+
+# Linting / Testing
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+coverage/
+htmlcov/
+.mypy_cache/
+
+# Environment
+.env
+.env.*
+!.env.example
+!.env.testing
+!.env.docker
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database files
+**/*.db
+**/*.db.lock
+**/*.sqlite
+**/*.sqlite3
+
+# MkDocs build output
+docs/site/*/site/
+docs/site/*/.cache/
