@@ -33,7 +33,7 @@ DATABASE_CONFIGS: dict[str, dict[str, str]] = {
         "sa_driver": "sqlite+aiosqlite",
         "url_template": "sqlite+aiosqlite:///database/database.sqlite",
         "extra": "sqlite",
-        "db_host": "127.0.0.1",
+        "db_host": "",
         "db_port": "",
         "db_username": "",
         "db_database": "database/database.sqlite",

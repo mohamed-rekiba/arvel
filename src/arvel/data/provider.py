@@ -1,18 +1,13 @@
-"""DatabaseServiceProvider — wires async engine + session factory into DI.
+"""DatabaseServiceProvider — async engine + session factory DI bindings.
 
-Each provider instance owns its own engine and session factory so that
-multiple ``Application`` instances (common in tests) don't interfere
-with each other through shared module-level globals.
-
-Shutdown is scope-aware: the class-level resolvers on ``ArvelModel``
-are only cleared if this provider instance was the last one to set
-them.  This prevents a short-lived Application (e.g. in a test) from
-wiping the resolver that a long-lived session-scoped Application
-registered.
+Each instance owns its engine/session so parallel Application instances
+(common in tests) don't stomp on each other. Shutdown only clears the
+ArvelModel resolver if this instance was the one that set it.
 """
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import (
@@ -23,11 +18,13 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from arvel.data.config import DatabaseSettings
+from arvel.foundation.config import get_module_settings
 from arvel.foundation.container import Scope
 from arvel.foundation.provider import ServiceProvider
 from arvel.logging import Log
 
 if TYPE_CHECKING:
+    from arvel.app.config import AppSettings
     from arvel.foundation.application import Application
     from arvel.foundation.container import ContainerBuilder
 
@@ -35,19 +32,13 @@ _logger = Log.named("arvel.data.provider")
 
 
 class DatabaseServiceProvider(ServiceProvider):
-    """Registers the async database engine and session factory.
-
-    Priority 5 — boots before infrastructure (10) so the database
-    is available for health checks and other providers.
-
-    Also sets the default session resolver on ``ArvelModel`` so that
-    ``User.query()`` works without passing a session explicitly.
-    """
+    """Async engine + session factory. Priority 5 (before infra at 10)."""
 
     priority: int = 5
 
     _engine: AsyncEngine | None
     _session_factory: async_sessionmaker[AsyncSession] | None
+    _settings: DatabaseSettings | None
     _own_session_resolver: Any
     _own_observer_resolver: Any
 
@@ -55,8 +46,18 @@ class DatabaseServiceProvider(ServiceProvider):
         super().__init__()
         self._engine = None
         self._session_factory = None
+        self._settings = None
         self._own_session_resolver = None
         self._own_observer_resolver = None
+
+    def configure(self, config: AppSettings) -> None:
+        with contextlib.suppress(Exception):
+            self._settings = get_module_settings(config, DatabaseSettings)
+
+    def _get_settings(self) -> DatabaseSettings:
+        if self._settings is not None:
+            return self._settings
+        return DatabaseSettings()
 
     def _make_engine(self) -> AsyncEngine:
         if self._engine is not None:
@@ -64,7 +65,7 @@ class DatabaseServiceProvider(ServiceProvider):
 
         import logging
 
-        settings = DatabaseSettings()
+        settings = self._get_settings()
         kwargs: dict[str, Any] = {
             "echo": False,
             "pool_pre_ping": settings.pool_pre_ping,
@@ -87,7 +88,7 @@ class DatabaseServiceProvider(ServiceProvider):
         if self._session_factory is not None:
             return self._session_factory
 
-        settings = DatabaseSettings()
+        settings = self._get_settings()
         engine = self._make_engine()
         self._session_factory = async_sessionmaker(
             engine,
@@ -96,7 +97,7 @@ class DatabaseServiceProvider(ServiceProvider):
         return self._session_factory
 
     def _make_session(self) -> AsyncSession:
-        """Create a fresh (unmanaged) session for CRUD write operations."""
+        """Fresh unmanaged session for write operations."""
         factory = self._make_session_factory()
         return factory()
 
