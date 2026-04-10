@@ -1,8 +1,4 @@
-"""Config cache CLI commands: arvel config cache / clear.
-
-Serializes the root AppSettings to a JSON file for faster boot.
-SecretStr fields are excluded so secrets always reload from env.
-"""
+"""Config cache and export — serialize settings to JSON for faster boot."""
 
 from __future__ import annotations
 
@@ -22,7 +18,7 @@ def _cache_path() -> Path:
 
 
 def _render_config_file(settings_cls: type[object], _file_stem: str) -> str:
-    """Render config/<module>.py by copying framework module source verbatim."""
+    """Copy framework config module source verbatim as a rendered file."""
     module = sys.modules.get(settings_cls.__module__)
     if module is None:
         raise ValueError(f"Module not loaded for {settings_cls.__module__}")
@@ -33,7 +29,7 @@ def _render_config_file(settings_cls: type[object], _file_stem: str) -> str:
 
 @config_app.command("cache")
 def cache_config() -> None:
-    """Cache the application configuration to a JSON file."""
+    """Write config to a JSON cache file (0600 permissions)."""
     from arvel.foundation.config import cache_config as _cache
     from arvel.foundation.config import load_config
 
@@ -51,7 +47,7 @@ def cache_config() -> None:
 
 @config_app.command("clear")
 def clear_config() -> None:
-    """Remove the cached configuration file."""
+    """Delete the cached config file."""
     cache_file = _cache_path()
     if cache_file.exists():
         cache_file.unlink()
@@ -68,7 +64,7 @@ def export(
         bool, typer.Option("--force", help="Overwrite existing config files.")
     ] = False,
 ) -> None:
-    """Export framework default config files and skip existing ones."""
+    """Export framework default config files. Skips existing unless --force."""
     from arvel.app.config import AppSettings
     from arvel.foundation.config import default_module_settings, settings_file_candidates
 

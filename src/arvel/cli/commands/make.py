@@ -1,4 +1,4 @@
-"""Generator CLI commands: make module/model/controller/service/repository and more."""
+"""Code generators — module, model, controller, service, repository, and more."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from arvel.support.utils import to_snake_case as _to_snake_case
 
 
 def _render(template_name: str, context: dict[str, object]) -> str:
-    """Render with project_dir so user stubs/ overrides take effect."""
+    """Render a stub template, respecting project-level stubs/ overrides."""
     return _render_raw(template_name, context, project_dir=Path.cwd())
 
 
@@ -35,7 +35,7 @@ def _module_base(module: str) -> Path:
 def module(
     name: str = typer.Argument(help="Module name (e.g., users)."),
 ) -> None:
-    """Scaffold a complete module directory with provider and routes."""
+    """Scaffold a full module with provider, routes, and subdirectories."""
     module_dir = _module_base(name)
     if module_dir.exists():
         typer.echo(f"Error: Module '{name}' already exists at {module_dir}")

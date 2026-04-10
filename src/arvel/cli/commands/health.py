@@ -1,4 +1,4 @@
-"""Health check CLI command — probes database, cache, and queue connectivity."""
+"""Health checks — probe database, cache, and queue connectivity."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ health_app = typer.Typer(name="health", help="Health check commands.")
 
 @health_app.command("check")
 def check() -> None:
-    """Run health checks against configured subsystems."""
+    """Probe each subsystem and report pass/fail with timing."""
     results: list[tuple[str, bool, float]] = []
 
     results.append(_check_database())

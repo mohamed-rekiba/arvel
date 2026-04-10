@@ -1,4 +1,4 @@
-"""Database CLI commands: migrate, rollback, fresh, seed, status, publish."""
+"""Database commands — migrate, rollback, fresh, seed, status, publish."""
 
 from __future__ import annotations
 
@@ -18,12 +18,7 @@ db_app = typer.Typer(name="db", help="Database migration and seeding commands.")
 
 
 def _run_db_operation(coro_fn: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
-    """Run an async database operation with user-friendly error handling.
-
-    Catches common connection/auth errors from SQLAlchemy, asyncpg, and
-    the stdlib and prints a single-line message instead of a 60-frame
-    traceback.
-    """
+    """Run an async DB operation, printing friendly errors instead of tracebacks."""
     try:
         asyncio.run(coro_fn(*args, **kwargs))
     except Exception as exc:
@@ -35,7 +30,7 @@ def _run_db_operation(coro_fn: Callable[..., Any], *args: Any, **kwargs: Any) ->
 
 
 def _friendly_db_error(exc: Exception) -> str | None:
-    """Extract a one-liner from known DB exceptions, or return None."""
+    """Human-friendly message for known DB errors, or None."""
     name = type(exc).__name__
     text = str(exc)
 
@@ -142,12 +137,7 @@ def seed(
 def publish(
     force: bool = typer.Option(False, "--force", help="Overwrite existing migration files."),
 ) -> None:
-    """Publish framework migrations into database/migrations/.
-
-    Copies canonical migration files shipped by the framework (auth, media,
-    notifications, audit, activity) into the project's migration directory.
-    Existing files are skipped unless --force is passed.
-    """
+    """Copy framework migrations into the project. Skips existing unless --force."""
     from arvel.data.migrations import publish_framework_migrations
 
     _ensure_framework_migrations_registered()
@@ -177,12 +167,7 @@ def publish(
 
 
 def _ensure_framework_migrations_registered() -> None:
-    """Import framework modules that register migrations.
-
-    Each module's ``__init__.py`` triggers ``register_framework_migration``
-    at import time.  We import them here to guarantee all registrations
-    happen before ``publish_framework_migrations`` reads the registry.
-    """
+    """Import framework modules so their migrations get registered before publish."""
     import arvel.activity
     import arvel.audit
     import arvel.auth

@@ -28,11 +28,36 @@ def _elapsed_ms(start: float) -> float:
 
 
 def _sanitize_error_message(exc: Exception) -> str:
-    """Error class name only — never leaks secrets."""
+    """Class name + short message — never leaks secrets like URLs or keys."""
+    cls_name = exc.__class__.__name__
     message = str(exc).strip()
     if not message:
-        return exc.__class__.__name__
-    return exc.__class__.__name__
+        return cls_name
+    truncated = message[:120] + "…" if len(message) > 120 else message
+    return f"{cls_name}: {truncated}"
+
+
+async def _redis_ping_check(redis_url: str, start: float) -> HealthResult:
+    """Shared Redis PING probe used by cache, broadcast, and lock checks."""
+    import redis.asyncio as aioredis
+
+    client = aioredis.from_url(redis_url)
+    try:
+        ping_result = client.ping()
+        if inspect.isawaitable(ping_result):
+            result = await ping_result
+        else:
+            result = ping_result
+        if not result:
+            msg = "Redis ping failed"
+            raise RuntimeError(msg)
+    finally:
+        await client.aclose()
+    return HealthResult(
+        status=HealthStatus.HEALTHY,
+        message="ok",
+        duration_ms=_elapsed_ms(start),
+    )
 
 
 class DatabaseHealthCheck:
@@ -82,23 +107,9 @@ class CacheHealthCheck:
         settings = self._settings if self._settings is not None else CacheSettings()
         try:
             if settings.driver == "redis":
-                import redis.asyncio as aioredis
-
-                client = aioredis.from_url(settings.redis_url)
-                try:
-                    ping_result = client.ping()
-                    if inspect.isawaitable(ping_result):
-                        result = await ping_result
-                    else:
-                        result = ping_result
-                    if not result:
-                        raise Exception("Redis ping failed")
-                finally:
-                    await client.aclose()
-                return HealthResult(
-                    status=HealthStatus.HEALTHY,
-                    message="ok",
-                    duration_ms=_elapsed_ms(start),
+                return await _redis_ping_check(
+                    getattr(settings, "redis_url", "redis://localhost:6379/0"),
+                    start,
                 )
 
             return HealthResult(
@@ -356,23 +367,9 @@ class BroadcastHealthCheck:
         settings = self._settings if self._settings is not None else BroadcastSettings()
         try:
             if settings.driver == "redis":
-                import redis.asyncio as aioredis
-
-                client = aioredis.from_url(settings.redis_url)
-                try:
-                    ping_result = client.ping()
-                    if inspect.isawaitable(ping_result):
-                        result = await ping_result
-                    else:
-                        result = ping_result
-                    if not result:
-                        raise Exception("Redis ping failed")
-                finally:
-                    await client.aclose()
-                return HealthResult(
-                    status=HealthStatus.HEALTHY,
-                    message="ok",
-                    duration_ms=_elapsed_ms(start),
+                return await _redis_ping_check(
+                    getattr(settings, "redis_url", "redis://localhost:6379/0"),
+                    start,
                 )
             return HealthResult(
                 status=HealthStatus.HEALTHY,
@@ -400,23 +397,9 @@ class LockHealthCheck:
         settings = self._settings if self._settings is not None else LockSettings()
         try:
             if settings.driver == "redis":
-                import redis.asyncio as aioredis
-
-                client = aioredis.from_url(settings.redis_url)
-                try:
-                    ping_result = client.ping()
-                    if inspect.isawaitable(ping_result):
-                        result = await ping_result
-                    else:
-                        result = ping_result
-                    if not result:
-                        raise Exception("Redis ping failed")
-                finally:
-                    await client.aclose()
-                return HealthResult(
-                    status=HealthStatus.HEALTHY,
-                    message="ok",
-                    duration_ms=_elapsed_ms(start),
+                return await _redis_ping_check(
+                    getattr(settings, "redis_url", "redis://localhost:6379/0"),
+                    start,
                 )
             return HealthResult(
                 status=HealthStatus.HEALTHY,

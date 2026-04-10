@@ -1,4 +1,4 @@
-"""Schedule CLI commands: schedule run, schedule work, schedule list."""
+"""Scheduler commands — run, work (daemon), and list entries."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ schedule_app = typer.Typer(name="schedule", help="Task scheduler management comm
 
 
 def _load_scheduler(app_dir: str) -> Scheduler:
-    """Create a Scheduler and load registrations from app/schedule.py if it exists."""
+    """Build a Scheduler, loading registrations from app/schedule.py when present."""
     queue_settings = QueueSettings()
     manager = QueueManager()
     queue = manager.create_driver(queue_settings)
@@ -52,7 +52,7 @@ def _load_scheduler(app_dir: str) -> Scheduler:
 def run(
     app_dir: str = typer.Option(".", "--app-dir", help="Application root directory."),
 ) -> None:
-    """Evaluate all scheduled entries once, dispatch due jobs, and exit."""
+    """Dispatch due jobs once and exit."""
     scheduler = _load_scheduler(app_dir)
     count = asyncio.run(scheduler.run())
     typer.echo(f"Scheduler run complete: {count} job(s) dispatched.")
@@ -63,7 +63,7 @@ def work(
     app_dir: str = typer.Option(".", "--app-dir", help="Application root directory."),
     interval: int = typer.Option(60, "--interval", help="Tick interval in seconds."),
 ) -> None:
-    """Run the scheduler as a daemon with a configurable tick interval."""
+    """Run the scheduler as a long-lived daemon."""
     scheduler = _load_scheduler(app_dir)
     shutdown = False
 
