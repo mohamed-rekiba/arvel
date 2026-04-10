@@ -30,13 +30,20 @@ def mock_skeleton(tmp_path: Path) -> Path:
     skel.mkdir()
     (skel / "main.py.j2").write_text('APP = "{{ app_name }}"\n')
     (skel / ".env.example.j2").write_text(
-        "APP_KEY={{ secret_key }}\nDATABASE_URL={{ database_url }}\n"
+        "APP_KEY={{ secret_key }}\nDB_DRIVER={{ database_driver }}\n"
+        "DB_URL={{ database_url }}\nCACHE_DRIVER={{ cache_driver }}\n"
+        "QUEUE_DRIVER={{ queue_driver }}\nMAIL_DRIVER={{ mail_driver }}\n"
+        "STORAGE_DRIVER={{ storage_driver }}\nSEARCH_DRIVER={{ search_driver }}\n"
+        "BROADCAST_DRIVER={{ broadcast_driver }}\n"
     )
-    (skel / "pyproject.toml.j2").write_text('[project]\nname = "{{ app_name }}"\n')
+    (skel / "pyproject.toml.j2").write_text(
+        '[project]\nname = "{{ app_name }}"\n'
+        'dependencies = ["arvel{{ arvel_extras }}>={{ arvel_version }}"]\n'
+    )
     (skel / ".gitignore").write_text(".venv/\n.env\n")
     cfg = skel / "config"
     cfg.mkdir()
-    (cfg / "database.py.j2").write_text('DRIVER = "{{ database_driver }}"\n')
+    (cfg / "database.py.j2").write_text('SA_DRIVER = "{{ database_sa_driver }}"\n')
     app_dir = skel / "app" / "modules"
     app_dir.mkdir(parents=True)
     (app_dir / ".gitkeep").write_text("")
@@ -153,6 +160,8 @@ class TestNewCommandScaffold:
             assert result.exit_code == 0
             db_cfg = (tmp_path / "pgapp" / "config" / "database.py").read_text()
             assert "postgresql+asyncpg" in db_cfg
+            env_content = (tmp_path / "pgapp" / ".env").read_text()
+            assert "DB_DRIVER=pgsql" in env_content
         finally:
             os.chdir(old_cwd)
 
@@ -168,7 +177,7 @@ class TestNewCommandScaffold:
                     catch_exceptions=False,
                 )
             assert result.exit_code == 0
-            env_content = (tmp_path / "keyapp" / ".env.example").read_text()
+            env_content = (tmp_path / "keyapp" / ".env").read_text()
             assert "APP_KEY=" in env_content
             key = env_content.split("APP_KEY=")[1].split("\n")[0]
             assert len(key) == 64
