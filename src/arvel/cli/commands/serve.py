@@ -1,4 +1,4 @@
-"""Serve command — wraps uvicorn with proxy-aware defaults."""
+"""Dev server — uvicorn with proxy-aware defaults."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ _ENTRYPOINT = "bootstrap.app:create_app"
 
 
 def _discover_app() -> str:
-    """Verify bootstrap/app.py exists and return the ASGI factory path."""
+    """Ensure bootstrap/app.py exists and return the ASGI import path."""
     if not Path("bootstrap/app.py").is_file():
         raise ArvelCLIError(
             "bootstrap/app.py not found. Every Arvel app must have this file "
@@ -31,7 +31,7 @@ def _discover_app() -> str:
 
 
 def _ensure_cwd_importable() -> None:
-    """Add CWD to sys.path / PYTHONPATH for uvicorn worker imports."""
+    """Put CWD on sys.path so uvicorn workers can import the app."""
     cwd = str(Path.cwd())
     if cwd not in sys.path:
         sys.path.insert(0, cwd)
@@ -55,7 +55,7 @@ def _print_startup_banner(
     use_reload: bool,
     root_path: str,
 ) -> None:
-    """Print startup banner with app name, env, URLs."""
+    """Show the server banner with app name, env, and URLs."""
     from arvel.app.config import AppSettings
     from arvel.cli.app import BANNER
     from arvel.foundation.config import resolve_env_files, with_env_files
@@ -145,7 +145,7 @@ def serve(
         ),
     ] = None,
 ) -> None:
-    """Start the development server using uvicorn."""
+    """Start the dev server via uvicorn."""
     try:
         import uvicorn
     except ImportError:

@@ -1,4 +1,4 @@
-"""Publish stubs command — copy built-in templates to project for customization."""
+"""Copy built-in stub templates into the project for customization."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ publish_app = typer.Typer(name="publish", help="Publish framework resources.")
 def stubs(
     force: bool = typer.Option(False, "--force", help="Overwrite existing stubs."),
 ) -> None:
-    """Copy all built-in stub templates to the project's stubs/ directory."""
+    """Publish all built-in stubs to stubs/. Skips existing unless --force."""
     from arvel.cli.templates.engine import _builtin_stubs_dir
 
     source = _builtin_stubs_dir()

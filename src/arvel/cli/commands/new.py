@@ -1,9 +1,4 @@
-"""arvel new — scaffold a new Arvel project from a GitHub template.
-
-Fetches the starters registry from the latest framework release to resolve
-the template repo URL, downloads the skeleton tarball, renders Jinja2
-templates, and optionally runs uv sync + git init.
-"""
+"""Scaffold a new Arvel project from a GitHub template."""
 
 from __future__ import annotations
 
@@ -46,6 +41,7 @@ DATABASE_CONFIGS: dict[str, dict[str, str]] = {
         "db_host": "127.0.0.1",
         "db_port": "5432",
         "db_username": "arvel",
+        "db_password": "{app_name}",
         "db_database": "{app_name}",
     },
     "mysql": {
@@ -56,6 +52,7 @@ DATABASE_CONFIGS: dict[str, dict[str, str]] = {
         "db_host": "127.0.0.1",
         "db_port": "3306",
         "db_username": "arvel",
+        "db_password": "{app_name}",
         "db_database": "{app_name}",
     },
 }
@@ -147,7 +144,7 @@ _SERVICE_LABELS: dict[str, str] = {
 
 
 def _collect_extras(choices: dict[str, str]) -> list[str]:
-    """Collect unique arvel extras from all driver choices."""
+    """Gather deduplicated pip extras from the chosen drivers."""
     extras: set[str] = set()
     for option_name, chosen_value in choices.items():
         configs = _VALID_CHOICES[option_name]
@@ -159,7 +156,7 @@ def _collect_extras(choices: dict[str, str]) -> list[str]:
 
 
 def _prompt_select(message: str, choices: list[dict[str, str]], default: str | None = None) -> str:
-    """Arrow-key select prompt powered by InquirerPy."""
+    """Arrow-key select prompt via InquirerPy."""
     from InquirerPy import inquirer
 
     return inquirer.select(  # type: ignore[no-any-return]
@@ -172,7 +169,7 @@ def _prompt_select(message: str, choices: list[dict[str, str]], default: str | N
 
 
 def _preset_summary(preset_name: str) -> str:
-    """Build a short summary string for a preset."""
+    """One-line summary of a preset's driver choices."""
     p = PRESETS[preset_name]
     return ", ".join(f"{p[k]}" for k in _SERVICE_LABELS)
 
@@ -188,11 +185,7 @@ def _run_interactive_prompts(
     cli_broadcast: str,
     cli_preset: str | None,
 ) -> dict[str, str]:
-    """Run the interactive stack selection flow.
-
-    Any value explicitly passed on the CLI is locked and not prompted.
-    Returns a dict with keys matching ``_SERVICE_LABELS``.
-    """
+    """Interactive stack selection. CLI-supplied values aren't re-prompted."""
     cli_overrides: dict[str, str] = {}
     defaults = PRESETS["minimal"]
     service_to_cli = {
@@ -238,7 +231,7 @@ def _run_interactive_prompts(
 
 
 def _run_custom_prompts(cli_overrides: dict[str, str]) -> dict[str, str]:
-    """Prompt for each service individually, skipping those already set via CLI."""
+    """Prompt each service one-by-one, skipping CLI overrides."""
     choices: dict[str, str] = {}
     defaults = PRESETS["minimal"]
 
@@ -254,7 +247,7 @@ def _run_custom_prompts(cli_overrides: dict[str, str]) -> dict[str, str]:
 
 
 def _print_summary(choices: dict[str, str]) -> None:
-    """Print a compact summary of the selected stack."""
+    """Print the selected stack as a one-liner."""
     parts = [f"[green]{choices[svc]}[/green]" for svc in _SERVICE_LABELS]
     summary = " · ".join(parts)
     typer.echo()
@@ -265,7 +258,7 @@ def _print_summary(choices: dict[str, str]) -> None:
 
 
 def validate_project_name(name: str) -> bool:
-    """Check that name is a valid directory/package name."""
+    """True if name works as a directory and Python package name."""
     if not name:
         return False
     normalized = name.replace("-", "_")
@@ -273,23 +266,23 @@ def validate_project_name(name: str) -> bool:
 
 
 def to_package_name(name: str) -> str:
-    """Convert kebab-case or raw name to a valid Python package name."""
+    """Kebab-case to snake_case Python package name."""
     return name.replace("-", "_").lower()
 
 
 def to_pascal_case(name: str) -> str:
-    """Convert snake_case or kebab-case to PascalCase."""
+    """snake_case / kebab-case to PascalCase."""
     parts = name.replace("-", "_").split("_")
     return "".join(p.capitalize() for p in parts)
 
 
 def _generate_secret_key() -> str:
-    """Generate a 64-character hex secret key."""
+    """64-char hex secret for APP_KEY."""
     return secrets.token_hex(32)
 
 
 def _get_arvel_version() -> str:
-    """Get the current arvel framework version."""
+    """Current installed arvel version, or '0.1.0' as fallback."""
     try:
         from importlib.metadata import version
 
@@ -299,11 +292,7 @@ def _get_arvel_version() -> str:
 
 
 def _fetch_templates_registry() -> list[dict[str, Any]]:
-    """Fetch templates.json from the latest framework release on GitHub.
-
-    The newest release is always marked as ``latest`` so this URL is stable.
-    Falls back to the bundled templates.json shipped with the framework.
-    """
+    """Fetch templates.json from the latest GitHub release, or fall back to bundled copy."""
     url = f"https://github.com/{FRAMEWORK_REPO}/releases/latest/download/{TEMPLATES_ASSET}"
     req = Request(url, headers={"User-Agent": "arvel-cli"})  # noqa: S310
 
@@ -316,7 +305,7 @@ def _fetch_templates_registry() -> list[dict[str, Any]]:
 
 
 def _load_bundled_registry() -> list[dict[str, Any]]:
-    """Load templates.json bundled inside the arvel package (offline fallback)."""
+    """Offline fallback: load templates.json from the installed package."""
     import importlib.resources
 
     try:
@@ -328,7 +317,7 @@ def _load_bundled_registry() -> list[dict[str, Any]]:
 
 
 def _resolve_template_repo(templates: list[dict[str, Any]], name: str | None = None) -> str:
-    """Find the repo URL for a template by name, or the default template."""
+    """Resolve a template's repo URL by name, or pick the default."""
     if name:
         for t in templates:
             if t.get("name") == name:
@@ -346,7 +335,7 @@ def _resolve_template_repo(templates: list[dict[str, Any]], name: str | None = N
 
 
 def _repo_to_owner_name(repo_url: str) -> str:
-    """Extract 'owner/repo' from a GitHub URL."""
+    """'https://github.com/owner/repo' -> 'owner/repo'."""
     repo_url = repo_url.rstrip("/")
     if repo_url.startswith("https://github.com/"):
         return repo_url.removeprefix("https://github.com/")
@@ -357,12 +346,7 @@ def _download_skeleton(
     repo_url: str,
     branch: str | None = None,
 ) -> Path:
-    """Download and extract the template repo tarball. Returns path to extracted dir.
-
-    Tries the GitHub tarball API first. If that fails (private repo, no network,
-    etc.), falls back to ``git clone``. Raises ``SystemExit`` only when both
-    strategies fail.
-    """
+    """Download the template repo. Tries tarball API, then git clone, then exits."""
     owner_repo = _repo_to_owner_name(repo_url)
 
     if branch is None:
@@ -385,7 +369,7 @@ def _download_skeleton(
 
 
 def _download_skeleton_tarball(owner_repo: str, branch: str) -> Path | None:
-    """Try downloading via the GitHub tarball API. Returns None on failure."""
+    """GitHub tarball API download. Returns None on failure."""
     url = f"https://github.com/{owner_repo}/tarball/{branch}"
     req = Request(url, headers={"User-Agent": "arvel-cli"})  # noqa: S310
 
@@ -414,7 +398,7 @@ def _download_skeleton_tarball(owner_repo: str, branch: str) -> Path | None:
 
 
 def _download_skeleton_git_clone(repo_url: str, branch: str) -> Path | None:
-    """Fall back to ``git clone --depth 1``. Returns None on failure."""
+    """Shallow git clone fallback. Returns None on failure."""
     import tempfile
 
     clone_dir = Path(tempfile.mkdtemp(prefix="arvel-new-"))
@@ -446,7 +430,7 @@ def _download_skeleton_git_clone(repo_url: str, branch: str) -> Path | None:
 
 
 def _resolve_latest_tag(owner_repo: str) -> str:
-    """Query the GitHub API for the latest release tag."""
+    """Latest release tag from GitHub, or 'main' if unavailable."""
     url = f"https://api.github.com/repos/{owner_repo}/releases/latest"
     req = Request(url, headers={"User-Agent": "arvel-cli"})  # noqa: S310
 
@@ -467,11 +451,7 @@ def render_skeleton(
     target_dir: Path,
     context: dict[str, Any],
 ) -> None:
-    """Copy skeleton to target, rendering .j2 files with Jinja2.
-
-    GitHub Actions ``${{ }}`` expressions are escaped before rendering so
-    Jinja2 doesn't try to evaluate them.
-    """
+    """Copy skeleton to target, render .j2 files. GHA ${{ }} expressions are escaped."""
     if target_dir.exists():
         shutil.rmtree(target_dir)
     shutil.copytree(skeleton_dir, target_dir)
@@ -501,7 +481,7 @@ def render_skeleton(
 
 
 def _setup_env(target_dir: Path, context: dict[str, Any]) -> None:
-    """Ensure .env exists. Prefer the rendered .env (from .env.j2); fall back to .env.example."""
+    """Ensure .env exists — prefer rendered .env.j2, fall back to .env.example."""
     env_file = target_dir / ".env"
     if env_file.exists():
         return
@@ -511,7 +491,7 @@ def _setup_env(target_dir: Path, context: dict[str, Any]) -> None:
 
 
 def _run_uv_sync(target_dir: Path) -> None:
-    """Run uv sync in the project directory."""
+    """Install deps with uv sync. Warns if uv is missing or times out."""
     try:
         subprocess.run(
             ["uv", "sync"],  # noqa: S607
@@ -527,7 +507,7 @@ def _run_uv_sync(target_dir: Path) -> None:
 
 
 def _git_init(target_dir: Path) -> None:
-    """Initialize a git repo with an initial commit."""
+    """git init + 'Initial commit'. Warns on failure."""
     try:
         subprocess.run(["git", "init"], cwd=target_dir, check=True, capture_output=True)  # noqa: S607
         subprocess.run(["git", "add", "."], cwd=target_dir, check=True, capture_output=True)  # noqa: S607
@@ -542,7 +522,7 @@ def _git_init(target_dir: Path) -> None:
 
 
 def _validate_choice(option: str, value: str, configs: dict[str, dict[str, str]]) -> None:
-    """Validate a CLI option value against its config map."""
+    """Exit with error if value isn't in configs."""
     if value not in configs:
         choices = ", ".join(configs)
         typer.echo(f"Unknown {option} '{value}'. Choose: {choices}.")
@@ -550,7 +530,7 @@ def _validate_choice(option: str, value: str, configs: dict[str, dict[str, str]]
 
 
 def _build_context(driver_choices: dict[str, str], package_name: str) -> dict[str, Any]:
-    """Build the full Jinja2 template context from driver choices."""
+    """Assemble the Jinja2 template context from driver choices."""
     db_cfg = DATABASE_CONFIGS[driver_choices["database"]]
     arvel_extras = _collect_extras(driver_choices)
     extras_suffix = f"[{','.join(arvel_extras)}]" if arvel_extras else ""
