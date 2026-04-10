@@ -554,6 +554,7 @@ def _build_context(driver_choices: dict[str, str], package_name: str) -> dict[st
         "db_host": db_cfg["db_host"],
         "db_port": db_cfg["db_port"],
         "db_username": db_cfg["db_username"],
+        "db_password": db_cfg["db_password"],
         "db_database": db_cfg["db_database"].format(app_name=package_name),
         # Service drivers
         "cache_driver": CACHE_CONFIGS[cache]["driver"],
