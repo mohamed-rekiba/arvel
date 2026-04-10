@@ -1,0 +1,274 @@
+---
+description: Type safety best practices for Arvel — enforced on all Python files in the framework.
+globs: src/arvel/**/*.py
+alwaysApply: true
+---
+
+# Type Safety Standards (Arvel)
+
+Every public API must give type checkers correct inference. Internal code can use pragmatic `Any` where needed — the boundary is what matters.
+
+Full analysis and rationale: `docs/guides/type-safety-analysis.md`.
+
+---
+
+## Golden Rules
+
+1. **No `Any` in public signatures** — every exported function, method, and class attribute must have a precise type.
+2. **No `dict[str, Any]` for structured data** — use `TypedDict`, Pydantic `BaseModel`, or a dataclass.
+3. **No `setattr` for typed attributes** — if a value should be accessible by name, declare it on the class.
+4. **No silent failures** — raise, don't return `self` or `None` when an operation can't proceed.
+5. **No unsound `cast`** — if you need `cast`, the surrounding code must guarantee the invariant or use a `TypeGuard` instead.
+
+---
+
+## Required Patterns
+
+### `Mapped[T]` for All Model Columns
+
+```python
+# BAD: Legacy Column() in ORM models
+id = Column(Integer, primary_key=True)
+name = Column(String(255))
+
+# GOOD: SA 2.0 Mapped[T] + mapped_column()
+id: Mapped[int] = mapped_column(primary_key=True)
+name: Mapped[str] = mapped_column(String(255))
+bio: Mapped[str | None]  # nullable
+```
+
+### `Generic[T]` on All Model-Scoped Classes
+
+Repositories, query builders, observers, and factories must preserve the model type:
+
+```python
+# BAD: Loses model type
+class UserObserver(ModelObserver):
+    async def creating(self, instance: Any) -> bool: ...
+
+# GOOD: Generic preserves type
+class UserObserver(ModelObserver[User]):
+    async def creating(self, instance: User) -> bool: ...
+```
+
+### `Self` for Methods Returning the Same Type
+
+```python
+# BAD: Returns base class type
+@classmethod
+def model_validate(cls, data: dict) -> ArvelModel: ...
+
+# GOOD: Returns the concrete subclass
+@classmethod
+def model_validate(cls, data: dict[str, Any]) -> Self: ...
+```
+
+### `@overload` When Return Type Depends on Input Type
+
+```python
+# BAD: Single signature → Any
+def has_one(related: type | str, **kw: Any) -> Any: ...
+
+# GOOD: Overloads give precise types per input
+@overload
+def has_one[T](related: type[T], **kw: Any) -> T: ...
+@overload
+def has_one(related: str, **kw: Any) -> Any: ...
+def has_one(related: type | str, **kw: Any) -> Any: ...
+```
+
+### `TypeGuard` for Runtime Type Narrowing
+
+```python
+# BAD: isinstance then manual assertion
+if isinstance(cls, type) and issubclass(cls, ArvelModel):
+    model_cls = cls  # checker doesn't narrow
+
+# GOOD: TypeGuard narrows for the checker
+def is_arvel_model(cls: type) -> TypeGuard[type[ArvelModel]]:
+    return isinstance(cls, type) and issubclass(cls, ArvelModel)
+
+if is_arvel_model(cls):
+    model_cls = cls  # checker knows: type[ArvelModel]
+```
+
+### `TypedDict` for Create/Update Payloads
+
+```python
+# BAD: Unstructured dict
+async def create(self, data: dict[str, Any]) -> User: ...
+
+# GOOD: Typed payload
+class UserCreatePayload(TypedDict):
+    name: str
+    email: str
+
+async def create(self, data: UserCreatePayload) -> User: ...
+```
+
+### `Annotated[T, Meta]` for Metadata Separation
+
+```python
+# BAD: Metadata in function return type
+def Query(default: Any = ...) -> Any: ...
+
+# GOOD: Type in Annotated[T, ...], metadata alongside
+current_user: Annotated[User, Depends(get_current_user)]
+```
+
+### `ParamSpec` for Callback Signature Preservation
+
+```python
+# BAD: Callable[..., Any] erases parameter types
+def dispatch(func: Callable[..., Any], *args: Any) -> None: ...
+
+# GOOD: ParamSpec preserves the callback's signature
+P = ParamSpec("P")
+def dispatch(func: Callable[P, Any], *args: P.args, **kwargs: P.kwargs) -> None: ...
+```
+
+### Explicit `@property` Instead of `__getattr__`
+
+```python
+# BAD: Dynamic attribute access → Any
+class AppTransaction(Transaction):
+    users: UserRepository  # annotation only, __getattr__ resolves it
+
+# GOOD: Explicit typed property
+class AppTransaction(Transaction):
+    @property
+    def users(self) -> UserRepository:
+        return self._get_repo(UserRepository)
+```
+
+### Explicit Re-exports for Public API
+
+```python
+# BAD: Implicit re-export (checkers may ignore)
+from .model import ArvelModel
+
+# GOOD: Explicit re-export (checkers always see it)
+from .model import ArvelModel as ArvelModel
+```
+
+---
+
+## Forbidden Patterns
+
+### `Any` in Public Function Signatures
+
+```python
+# FORBIDDEN
+def order_by(self, *columns: Any) -> QueryBuilder[T]: ...
+def provide(self, interface: type[T], concrete: type, ...) -> None: ...
+def provide_factory(self, interface: type[T], factory: Any, ...) -> None: ...
+
+# REQUIRED
+def order_by(self, *columns: _ColumnExpressionOrStrLabelArgument[Any]) -> QueryBuilder[T]: ...
+def provide(self, interface: type[T], concrete: type[T], ...) -> None: ...
+def provide_factory(self, interface: type[T], factory: Callable[[], T], ...) -> None: ...
+```
+
+### `setattr` for Typed Data on Model Instances
+
+```python
+# FORBIDDEN: Creates attributes invisible to checkers
+for i, (label, _subq) in enumerate(self._count_subqueries, start=1):
+    setattr(instance, label, row[i])
+
+# REQUIRED: Typed result wrapper
+@dataclass
+class WithCount(Generic[T]):
+    instance: T
+    counts: dict[str, int]
+```
+
+### Silent Failures on Resolution Errors
+
+```python
+# FORBIDDEN: Swallows the error
+fk_col = self._find_fk_column(prop, related_table)
+if fk_col is None:
+    return self  # silently skips the filter
+
+# REQUIRED: Raise with context
+if fk_col is None:
+    msg = f"Cannot resolve FK for relationship '{relationship_name}'"
+    raise ValueError(msg)
+```
+
+### Unsound `cast` Without Invariant Guarantee
+
+```python
+# FORBIDDEN: Tuples are not T
+return cast("list[T]", [row._tuple() for row in result.all()])
+
+# REQUIRED: Proper typed result
+@dataclass
+class TreeNode(Generic[T]):
+    data: dict[str, Any]
+    depth: int
+```
+
+### `_python_type_for_column` Falling Back to `Any`
+
+```python
+# FORBIDDEN: Silent Any for unknown types
+except NotImplementedError:
+    return Any
+
+# REQUIRED: Explicit type registry with known mappings
+_SA_TYPE_MAP: dict[type[TypeEngine], type] = {
+    SAInteger: int,
+    SAString: str,
+    SABoolean: bool,
+    SADateTime: datetime,
+    SAFloat: float,
+    SANumeric: Decimal,
+    SAJSON: dict,
+}
+```
+
+---
+
+## DI Container Rules
+
+1. **Unwrap `Annotated`** before resolving — `Annotated[UserService, ...]` resolves `UserService`, not the full annotated type.
+2. **`provide(interface, concrete)`** — both must share the bound `T`. Wrong concrete type is a type error.
+3. **`provide_factory(interface, factory)`** — factory must be `Callable[[], T]`, not `Any`.
+4. **`provide_value(interface, value)`** — value must be `T`, already enforced.
+
+---
+
+## Type Checker Configuration
+
+```toml
+# pyproject.toml
+[tool.ty]
+python-version = "3.14"
+error-on-warnings = true
+
+[tool.ruff.lint]
+select = [
+    "TCH",    # TYPE_CHECKING imports
+    "ANN",    # Missing type annotations
+    "UP",     # pyupgrade — modern syntax
+]
+```
+
+Run `ty check src/arvel/` in CI. Zero errors on the `data/` package is the baseline.
+
+---
+
+## Checklist (Before Merging)
+
+- [ ] No new `Any` in public function signatures
+- [ ] No new `dict[str, Any]` for structured data in public APIs
+- [ ] No new `setattr` for typed attributes
+- [ ] No new `cast` without a comment explaining the invariant
+- [ ] No new `# type: ignore` without a comment explaining why
+- [ ] `@overload` used when return type depends on input type
+- [ ] `TypeGuard` used instead of `isinstance` + manual narrowing
+- [ ] `Self` used on factory/constructor methods
+- [ ] All re-exports use `X as X` pattern
+- [ ] `ty check src/arvel/` passes with zero new errors

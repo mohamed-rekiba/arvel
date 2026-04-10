@@ -1,0 +1,21 @@
+"""{{ class_name }} — mailable message."""
+
+from __future__ import annotations
+
+
+class {{ class_name }}:
+    """Mail message: {{ class_name }}.
+
+    Define subject, recipients, and body content.
+    """
+
+    subject: str = "{{ subject }}"
+
+    def __init__(self, **kwargs: object) -> None:
+        self.data = kwargs
+
+    def build(self) -> dict[str, object]:
+        return {
+            "subject": self.subject,
+            "data": self.data,
+        }

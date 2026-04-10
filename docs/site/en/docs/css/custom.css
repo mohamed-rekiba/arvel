@@ -1,0 +1,38 @@
+/* Arvel brand overrides for Material for MkDocs */
+
+:root {
+  --md-primary-fg-color: #F44336;
+  --md-accent-fg-color: #ffc107;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #F44336;
+  --md-accent-fg-color: #ffca28;
+}
+
+.md-header {
+  background-color: var(--md-primary-fg-color);
+}
+
+.md-tabs {
+  background-color: var(--md-primary-fg-color);
+}
+
+/* Logo */
+.md-header__button.md-logo {
+  margin: unset;
+  padding: unset;
+}
+
+.md-header__inner {
+  align-items: unset;
+}
+
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 2rem;
+}
+
+.md-header__title {
+  margin-inline-start: .2rem !important;
+}

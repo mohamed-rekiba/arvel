@@ -1,0 +1,10 @@
+"""{{ module_name }} module routes."""
+
+from __future__ import annotations
+
+from arvel.http.router import Router
+
+router = Router()
+
+with router.group(prefix="/{{ prefix }}", name="{{ prefix }}."):
+    pass

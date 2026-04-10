@@ -1,0 +1,15 @@
+"""{{ class_name }} model."""
+
+from __future__ import annotations
+
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from arvel.data.model import ArvelModel
+
+
+class {{ class_name }}(ArvelModel):
+    __tablename__ = "{{ table_name }}"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255))

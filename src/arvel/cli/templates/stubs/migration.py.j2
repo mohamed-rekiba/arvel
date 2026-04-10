@@ -1,0 +1,22 @@
+"""{{ message }}"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from arvel.data import Schema
+
+if TYPE_CHECKING:
+    from arvel.data import Blueprint
+
+
+def upgrade() -> None:
+    def {{ table_name }}(table: Blueprint) -> None:
+        table.id()
+        table.timestamps()
+
+    Schema.create("{{ table_name }}", {{ table_name }})
+
+
+def downgrade() -> None:
+    Schema.drop("{{ table_name }}")
