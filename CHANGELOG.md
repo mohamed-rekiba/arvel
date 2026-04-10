@@ -5,6 +5,13 @@ All notable changes to Arvel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4](https://github.com/mohamed-rekiba/arvel/compare/v0.1.3...v0.1.4) (2026-04-10)
+
+
+### Bug Fixes
+
+* **cli:** include db_password in context for new command ([84b77a2](https://github.com/mohamed-rekiba/arvel/commit/84b77a2f37f9edb6d716b6a29dda8f51b741bc5e))
+
 ## [0.1.3](https://github.com/mohamed-rekiba/arvel/compare/v0.1.2...v0.1.3) (2026-04-10)
 
 
