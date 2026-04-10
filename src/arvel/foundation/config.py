@@ -9,7 +9,7 @@ import re
 import sys
 import types  # noqa: TC003 - needed at runtime for get_type_hints resolution
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import SecretStr, ValidationError
 from pydantic_settings import BaseSettings
@@ -515,17 +515,25 @@ def get_module_settings[TModuleSettings: ModuleSettings](
     config: AppSettings,
     settings_type: type[TModuleSettings],
 ) -> TModuleSettings:
-    """Retrieve a module settings slice from this config instance."""
+    """Look up a module settings slice by type, falling back to env_prefix match."""
     result = config._module_settings.get(settings_type)
-    if result is None:
-        raise ConfigurationError(
-            f"Module settings {settings_type.__name__} not loaded — "
-            f"pass it to load_config(extra_settings=[{settings_type.__name__}])",
-            field=settings_type.__name__,
-        )
-    if not isinstance(result, settings_type):
-        raise ConfigurationError(
-            f"Loaded module settings type mismatch for {settings_type.__name__}",
-            field=settings_type.__name__,
-        )
-    return result
+    if result is not None:
+        if not isinstance(result, settings_type):
+            raise ConfigurationError(
+                f"Loaded module settings type mismatch for {settings_type.__name__}",
+                field=settings_type.__name__,
+            )
+        return result
+
+    target_prefix = _settings_env_prefix(settings_type)
+    if target_prefix:
+        for stored_cls, stored_instance in config._module_settings.items():
+            if _settings_env_prefix(stored_cls) == target_prefix:
+                # Same env_prefix = same config namespace (project class shadows framework).
+                return cast("TModuleSettings", stored_instance)
+
+    raise ConfigurationError(
+        f"Module settings {settings_type.__name__} not loaded — "
+        f"pass it to load_config(extra_settings=[{settings_type.__name__}])",
+        field=settings_type.__name__,
+    )

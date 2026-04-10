@@ -1,4 +1,4 @@
-"""Integration health checks for framework subsystems."""
+"""Health checks for framework subsystems (DB, cache, mail, search, etc.)."""
 
 from __future__ import annotations
 
@@ -8,11 +8,15 @@ from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from arvel.broadcasting.config import BroadcastSettings
 from arvel.cache.config import CacheSettings
 from arvel.data.config import DatabaseSettings
+from arvel.lock.config import LockSettings
+from arvel.mail.config import MailSettings
 from arvel.observability.health import HealthResult, HealthStatus
 from arvel.queue.config import QueueSettings
 from arvel.queue.manager import QueueManager
+from arvel.search.config import SearchSettings
 from arvel.storage.config import StorageSettings
 
 if TYPE_CHECKING:
@@ -24,7 +28,7 @@ def _elapsed_ms(start: float) -> float:
 
 
 def _sanitize_error_message(exc: Exception) -> str:
-    """Return an error message that never includes secrets."""
+    """Error class name only — never leaks secrets."""
     message = str(exc).strip()
     if not message:
         return exc.__class__.__name__
@@ -32,9 +36,12 @@ def _sanitize_error_message(exc: Exception) -> str:
 
 
 class DatabaseHealthCheck:
-    """Checks database connectivity with a lightweight SELECT 1 probe."""
+    """SELECT 1 probe against the configured database."""
 
     name = "database"
+
+    def __init__(self, settings: DatabaseSettings | None = None) -> None:
+        self._settings = settings
 
     async def check(self) -> HealthResult:
         start = time.monotonic()
@@ -42,7 +49,7 @@ class DatabaseHealthCheck:
             from sqlalchemy import text
             from sqlalchemy.ext.asyncio import create_async_engine
 
-            settings = DatabaseSettings()
+            settings = self._settings if self._settings is not None else DatabaseSettings()
             engine = create_async_engine(settings.url)
             try:
                 async with engine.connect() as conn:
@@ -63,13 +70,16 @@ class DatabaseHealthCheck:
 
 
 class CacheHealthCheck:
-    """Checks cache backend connectivity based on configured cache driver."""
+    """Redis PING against the configured cache backend."""
 
     name = "cache"
 
+    def __init__(self, settings: CacheSettings | None = None) -> None:
+        self._settings = settings
+
     async def check(self) -> HealthResult:
         start = time.monotonic()
-        settings = CacheSettings()
+        settings = self._settings if self._settings is not None else CacheSettings()
         try:
             if settings.driver == "redis":
                 import redis.asyncio as aioredis
@@ -105,15 +115,18 @@ class CacheHealthCheck:
 
 
 class QueueHealthCheck:
-    """Checks queue driver readiness by calling a minimal size probe."""
+    """Queue size probe against the configured driver."""
 
     name = "queue"
+
+    def __init__(self, settings: QueueSettings | None = None) -> None:
+        self._settings = settings
 
     async def check(self) -> HealthResult:
         start = time.monotonic()
         queue: QueueContract | None = None
         try:
-            settings = QueueSettings()
+            settings = self._settings if self._settings is not None else QueueSettings()
             manager = QueueManager()
             queue = manager.create_driver(settings)
             await queue.size(settings.default)
@@ -138,18 +151,16 @@ class QueueHealthCheck:
 
 
 class StorageHealthCheck:
-    """Checks storage backend connectivity.
-
-    - **local**: Verifies the storage root directory exists and is writable.
-    - **s3**: Performs a lightweight ``head_bucket`` probe against S3/MinIO.
-    - **null**: Always healthy (no-op driver).
-    """
+    """Local dir check or S3 head_bucket probe."""
 
     name = "storage"
 
+    def __init__(self, settings: StorageSettings | None = None) -> None:
+        self._settings = settings
+
     async def check(self) -> HealthResult:
         start = time.monotonic()
-        settings = StorageSettings()
+        settings = self._settings if self._settings is not None else StorageSettings()
         try:
             if settings.driver == "local":
                 return self._check_local(settings, start)
@@ -215,3 +226,206 @@ class StorageHealthCheck:
             message="ok",
             duration_ms=_elapsed_ms(start),
         )
+
+
+class MailHealthCheck:
+    """SMTP connect + quit probe."""
+
+    name = "mail"
+
+    def __init__(self, settings: MailSettings | None = None) -> None:
+        self._settings = settings
+
+    async def check(self) -> HealthResult:
+        start = time.monotonic()
+        settings = self._settings if self._settings is not None else MailSettings()
+        try:
+            import aiosmtplib
+
+            smtp = aiosmtplib.SMTP(
+                hostname=settings.smtp_host,
+                port=settings.smtp_port,
+                use_tls=settings.smtp_use_tls,
+                timeout=5,
+            )
+            await smtp.connect()
+            await smtp.quit()
+            return HealthResult(
+                status=HealthStatus.HEALTHY,
+                message="ok",
+                duration_ms=_elapsed_ms(start),
+            )
+        except ImportError:
+            return HealthResult(
+                status=HealthStatus.HEALTHY,
+                message="aiosmtplib not installed, skipped",
+                duration_ms=_elapsed_ms(start),
+            )
+        except Exception as exc:
+            return HealthResult(
+                status=HealthStatus.UNHEALTHY,
+                message=f"unavailable ({_sanitize_error_message(exc)})",
+                duration_ms=_elapsed_ms(start),
+            )
+
+
+class SearchHealthCheck:
+    """Meilisearch /health or Elasticsearch /_cluster/health probe."""
+
+    name = "search"
+
+    def __init__(self, settings: SearchSettings | None = None) -> None:
+        self._settings = settings
+
+    async def check(self) -> HealthResult:
+        start = time.monotonic()
+        settings = self._settings if self._settings is not None else SearchSettings()
+        try:
+            if settings.driver == "meilisearch":
+                return await self._check_meilisearch(settings, start)
+            if settings.driver == "elasticsearch":
+                return await self._check_elasticsearch(settings, start)
+            return HealthResult(
+                status=HealthStatus.HEALTHY,
+                message=f"driver '{settings.driver}' has no external connection",
+                duration_ms=_elapsed_ms(start),
+            )
+        except Exception as exc:
+            return HealthResult(
+                status=HealthStatus.UNHEALTHY,
+                message=f"unavailable ({_sanitize_error_message(exc)})",
+                duration_ms=_elapsed_ms(start),
+            )
+
+    @staticmethod
+    async def _check_meilisearch(settings: SearchSettings, start: float) -> HealthResult:
+        import httpx
+
+        url = f"{settings.meilisearch_url.rstrip('/')}/health"
+        headers: dict[str, str] = {}
+        if settings.meilisearch_key:
+            headers["Authorization"] = f"Bearer {settings.meilisearch_key}"
+        async with httpx.AsyncClient(timeout=settings.meilisearch_timeout) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                return HealthResult(
+                    status=HealthStatus.HEALTHY,
+                    message="ok",
+                    duration_ms=_elapsed_ms(start),
+                )
+            return HealthResult(
+                status=HealthStatus.UNHEALTHY,
+                message=f"HTTP {resp.status_code}",
+                duration_ms=_elapsed_ms(start),
+            )
+
+    @staticmethod
+    async def _check_elasticsearch(settings: SearchSettings, start: float) -> HealthResult:
+        import httpx
+
+        host = settings.elasticsearch_hosts.split(",")[0].strip()
+        url = f"{host.rstrip('/')}/_cluster/health"
+        async with httpx.AsyncClient(
+            timeout=5,
+            verify=settings.elasticsearch_verify_certs,
+        ) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                return HealthResult(
+                    status=HealthStatus.HEALTHY,
+                    message="ok",
+                    duration_ms=_elapsed_ms(start),
+                )
+            return HealthResult(
+                status=HealthStatus.UNHEALTHY,
+                message=f"HTTP {resp.status_code}",
+                duration_ms=_elapsed_ms(start),
+            )
+
+
+class BroadcastHealthCheck:
+    """Redis PING on the broadcast backend."""
+
+    name = "broadcast"
+
+    def __init__(self, settings: BroadcastSettings | None = None) -> None:
+        self._settings = settings
+
+    async def check(self) -> HealthResult:
+        start = time.monotonic()
+        settings = self._settings if self._settings is not None else BroadcastSettings()
+        try:
+            if settings.driver == "redis":
+                import redis.asyncio as aioredis
+
+                client = aioredis.from_url(settings.redis_url)
+                try:
+                    ping_result = client.ping()
+                    if inspect.isawaitable(ping_result):
+                        result = await ping_result
+                    else:
+                        result = ping_result
+                    if not result:
+                        raise Exception("Redis ping failed")
+                finally:
+                    await client.aclose()
+                return HealthResult(
+                    status=HealthStatus.HEALTHY,
+                    message="ok",
+                    duration_ms=_elapsed_ms(start),
+                )
+            return HealthResult(
+                status=HealthStatus.HEALTHY,
+                message=f"driver '{settings.driver}' has no external connection",
+                duration_ms=_elapsed_ms(start),
+            )
+        except Exception as exc:
+            return HealthResult(
+                status=HealthStatus.UNHEALTHY,
+                message=f"unavailable ({_sanitize_error_message(exc)})",
+                duration_ms=_elapsed_ms(start),
+            )
+
+
+class LockHealthCheck:
+    """Redis PING on the lock backend."""
+
+    name = "lock"
+
+    def __init__(self, settings: LockSettings | None = None) -> None:
+        self._settings = settings
+
+    async def check(self) -> HealthResult:
+        start = time.monotonic()
+        settings = self._settings if self._settings is not None else LockSettings()
+        try:
+            if settings.driver == "redis":
+                import redis.asyncio as aioredis
+
+                client = aioredis.from_url(settings.redis_url)
+                try:
+                    ping_result = client.ping()
+                    if inspect.isawaitable(ping_result):
+                        result = await ping_result
+                    else:
+                        result = ping_result
+                    if not result:
+                        raise Exception("Redis ping failed")
+                finally:
+                    await client.aclose()
+                return HealthResult(
+                    status=HealthStatus.HEALTHY,
+                    message="ok",
+                    duration_ms=_elapsed_ms(start),
+                )
+            return HealthResult(
+                status=HealthStatus.HEALTHY,
+                message=f"driver '{settings.driver}' has no external connection",
+                duration_ms=_elapsed_ms(start),
+            )
+        except Exception as exc:
+            return HealthResult(
+                status=HealthStatus.UNHEALTHY,
+                message=f"unavailable ({_sanitize_error_message(exc)})",
+                duration_ms=_elapsed_ms(start),
+            )
