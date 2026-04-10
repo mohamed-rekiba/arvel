@@ -169,11 +169,12 @@ def _register_driver_health_check(
     except Exception:
         resolved = settings_cls()
     try:
-        if resolved.driver not in noop_drivers:
+        driver = getattr(resolved, "driver", None)
+        if driver is not None and driver not in noop_drivers:
             registry.register(check_cls(settings=resolved))
-    except Exception:  # pragma: no cover
+    except Exception as exc:  # pragma: no cover
         logger.debug(
             "health_check_skipped",
             check=check_cls.__name__,
-            reason=f"{settings_cls.__name__} unavailable",
+            reason=f"{type(exc).__name__}: {exc}",
         )

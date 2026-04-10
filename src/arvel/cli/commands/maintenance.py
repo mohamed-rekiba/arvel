@@ -1,8 +1,4 @@
-"""Maintenance mode CLI commands: arvel down / arvel up.
-
-``arvel down`` creates a JSON signal file that the ASGI middleware reads
-on every request. ``arvel up`` removes it.
-"""
+"""Maintenance mode — down writes a signal file, up removes it."""
 
 from __future__ import annotations
 

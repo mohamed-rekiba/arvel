@@ -74,6 +74,7 @@ def default_module_settings() -> list[type[ModuleSettings]]:
     from arvel.observability.config import ObservabilitySettings
     from arvel.queue.config import QueueSettings
     from arvel.scheduler.config import SchedulerSettings
+    from arvel.search.config import SearchSettings
     from arvel.security.config import SecuritySettings
     from arvel.session.config import SessionSettings
     from arvel.storage.config import StorageSettings
@@ -90,6 +91,7 @@ def default_module_settings() -> list[type[ModuleSettings]]:
         NotificationSettings,
         MediaSettings,
         LockSettings,
+        SearchSettings,
         SessionSettings,
         SchedulerSettings,
         BroadcastSettings,
@@ -244,13 +246,14 @@ def _merge_module_settings_classes(
             continue
 
         existing_cls = merged[existing_index]
-        if existing_cls.__name__ == discovered_cls.__name__:
-            merged[existing_index] = discovered_cls
-            continue
         if issubclass(discovered_cls, existing_cls):
             merged[existing_index] = discovered_cls
             continue
         if issubclass(existing_cls, discovered_cls):
+            continue
+
+        if existing_cls.__name__ == discovered_cls.__name__:
+            merged[existing_index] = _pick_most_complete_class(existing_cls, discovered_cls)
             continue
 
         raise ConfigurationError(
@@ -261,6 +264,20 @@ def _merge_module_settings_classes(
             env_var=prefix,
         )
     return merged
+
+
+def _pick_most_complete_class(
+    framework_cls: type[ModuleSettings],
+    project_cls: type[ModuleSettings],
+) -> type[ModuleSettings]:
+    """Pick the class with more model fields when both share a name and prefix."""
+    fw_fields = set(framework_cls.model_fields)
+    proj_fields = set(project_cls.model_fields)
+
+    proj_only = proj_fields - fw_fields
+    if proj_only:
+        return project_cls
+    return framework_cls
 
 
 def _collect_present_env_vars(env_files: list[str]) -> set[str]:

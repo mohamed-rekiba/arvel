@@ -1,4 +1,4 @@
-"""Materialized view CLI commands: view:refresh."""
+"""Materialized view management — refresh one or all views."""
 
 from __future__ import annotations
 

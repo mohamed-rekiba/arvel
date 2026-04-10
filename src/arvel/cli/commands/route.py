@@ -1,4 +1,4 @@
-"""Route CLI commands: route list, route cache, route clear."""
+"""Route commands — list, cache, and clear the route table."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def list_routes(
     app_dir: str = typer.Option(".", "--app-dir", help="Application root directory."),
     json: bool = typer.Option(False, "--json", help="Output as JSON."),
 ) -> None:
-    """List all registered routes from application modules."""
+    """Print all registered routes."""
     from arvel.http.router import discover_routes
 
     base_path = Path(app_dir).resolve()
@@ -52,7 +52,7 @@ def list_routes(
 
 
 def _collect_route_data(base_path: Path) -> list[dict[str, object]]:
-    """Collect route data from all modules as plain dicts."""
+    """Gather route data from all modules as plain dicts."""
     from arvel.http.router import discover_routes
 
     routers = discover_routes(base_path)
@@ -74,7 +74,7 @@ def _collect_route_data(base_path: Path) -> list[dict[str, object]]:
 def cache_routes(
     app_dir: str = typer.Option(".", "--app-dir", help="Application root directory."),
 ) -> None:
-    """Cache the route table to a JSON file for faster boot."""
+    """Write the route table to a JSON cache for faster boot."""
     base_path = Path(app_dir).resolve()
     rows = _collect_route_data(base_path)
 
@@ -87,7 +87,7 @@ def cache_routes(
 
 @route_app.command("clear")
 def clear_routes() -> None:
-    """Remove the cached route table."""
+    """Delete the cached route table."""
     cache_file = _route_cache_path()
     if cache_file.exists():
         cache_file.unlink()

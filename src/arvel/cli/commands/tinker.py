@@ -1,10 +1,4 @@
-"""Interactive REPL with pre-loaded application context.
-
-Bootstraps the Arvel application and drops into an interactive Python shell
-with ``app``, ``container``, ``session``, and auto-discovered models in the
-namespace. Uses IPython when available, falls back to the standard
-``code.interact``.
-"""
+"""Interactive REPL with app, container, session, and models pre-loaded."""
 
 from __future__ import annotations
 
@@ -29,7 +23,7 @@ logger = Log.named("arvel.cli.tinker")
 
 
 def _discover_models(base_path: Path) -> dict[str, type]:
-    """Auto-discover ArvelModel subclasses from ``app/models/``."""
+    """Find all ArvelModel subclasses in app/models/."""
     from arvel.data.model import ArvelModel
 
     models: dict[str, type] = {}
@@ -54,7 +48,7 @@ def _discover_models(base_path: Path) -> dict[str, type]:
 
 
 def _build_namespace() -> dict[str, Any]:
-    """Bootstrap the Arvel application and build the REPL namespace."""
+    """Boot the app and assemble the REPL namespace."""
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from arvel.foundation.application import Application
@@ -79,7 +73,7 @@ def _build_namespace() -> dict[str, Any]:
 
 
 def _start_repl(namespace: dict[str, Any]) -> None:
-    """Launch IPython (preferred) or stdlib ``code.interact``."""
+    """Open IPython if available, otherwise stdlib code.interact."""
     try:
         from IPython import (
             start_ipython,  # type: ignore[import-untyped]
@@ -93,7 +87,7 @@ def _start_repl(namespace: dict[str, Any]) -> None:
 
 
 def _shutdown(namespace: dict[str, Any]) -> None:
-    """Clean up resources — close DB connections, dispose engine, etc."""
+    """Close DB connections and dispose the engine."""
     session = namespace.get("session")
     if session is not None and hasattr(session, "close"):
         with contextlib.suppress(Exception):
@@ -115,7 +109,7 @@ def tinker(
     ),
     force: bool = typer.Option(False, "--force", help="Allow running in production."),
 ) -> None:
-    """Start an interactive REPL with the application context pre-loaded."""
+    """Drop into a REPL with the full application context."""
     if ctx.invoked_subcommand is not None:
         return
 

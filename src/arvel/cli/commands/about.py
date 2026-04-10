@@ -1,4 +1,4 @@
-"""About command — display framework and environment information."""
+"""Show framework version and environment details."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def _get_version() -> str:
 def about(
     json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
 ) -> None:
-    """Display Arvel framework and environment details."""
+    """Print Arvel version, Python version, and platform info."""
     import json
 
     info = {
