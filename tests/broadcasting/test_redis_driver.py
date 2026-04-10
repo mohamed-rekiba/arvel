@@ -200,9 +200,10 @@ class TestRedisBroadcasterProvider:
         monkeypatch.setenv("BROADCAST_DRIVER", "redis")
         monkeypatch.setenv("BROADCAST_REDIS_URL", "redis://localhost:6379/0")
 
-        from arvel.broadcasting.provider import _make_broadcaster
+        from arvel.broadcasting.provider import BroadcastServiceProvider
 
-        broadcaster = _make_broadcaster()
+        provider = BroadcastServiceProvider()
+        broadcaster = provider._make_broadcaster()
         assert isinstance(broadcaster, RedisBroadcaster)
 
     def test_provider_raises_for_unknown_driver(
@@ -210,8 +211,9 @@ class TestRedisBroadcasterProvider:
     ) -> None:
         monkeypatch.setenv("BROADCAST_DRIVER", "websocket")
 
-        from arvel.broadcasting.provider import _make_broadcaster
+        from arvel.broadcasting.provider import BroadcastServiceProvider
         from arvel.foundation.exceptions import ConfigurationError
 
+        provider = BroadcastServiceProvider()
         with pytest.raises(ConfigurationError, match="websocket"):
-            _make_broadcaster()
+            provider._make_broadcaster()

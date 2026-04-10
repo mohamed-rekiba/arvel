@@ -294,6 +294,9 @@ class Application:
         providers.sort(key=lambda p: p.priority)
 
         for provider in providers:
+            provider.configure(config)
+
+        for provider in providers:
             provider_name = type(provider).__name__
             logger.debug("provider_register_start", provider=provider_name)
             try:

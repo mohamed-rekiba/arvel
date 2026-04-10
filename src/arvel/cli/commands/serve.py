@@ -1,11 +1,9 @@
-"""Serve command — wraps uvicorn with proxy-aware defaults.
-
-Convention: every Arvel app has ``bootstrap/app.py`` with a ``create_app()``
-factory.  The ``--app`` flag overrides this for non-standard layouts.
-"""
+"""Serve command — wraps uvicorn with proxy-aware defaults."""
 
 from __future__ import annotations
 
+import os
+import sys
 from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import Annotated
@@ -23,16 +21,23 @@ _ENTRYPOINT = "bootstrap.app:create_app"
 
 
 def _discover_app() -> str:
-    """Return the ASGI factory import string.
-
-    Checks ``bootstrap/app.py`` exists and returns the conventional entrypoint.
-    """
+    """Verify bootstrap/app.py exists and return the ASGI factory path."""
     if not Path("bootstrap/app.py").is_file():
         raise ArvelCLIError(
             "bootstrap/app.py not found. Every Arvel app must have this file "
             "with a create_app() factory. Use --app to override."
         )
     return _ENTRYPOINT
+
+
+def _ensure_cwd_importable() -> None:
+    """Add CWD to sys.path / PYTHONPATH for uvicorn worker imports."""
+    cwd = str(Path.cwd())
+    if cwd not in sys.path:
+        sys.path.insert(0, cwd)
+    existing = os.environ.get("PYTHONPATH", "")
+    if cwd not in existing.split(os.pathsep):
+        os.environ["PYTHONPATH"] = f"{cwd}{os.pathsep}{existing}" if existing else cwd
 
 
 def _get_arvel_version() -> str:
@@ -50,7 +55,7 @@ def _print_startup_banner(
     use_reload: bool,
     root_path: str,
 ) -> None:
-    """Print a styled startup summary to the terminal."""
+    """Print startup banner with app name, env, URLs."""
     from arvel.app.config import AppSettings
     from arvel.cli.app import BANNER
     from arvel.foundation.config import resolve_env_files, with_env_files
@@ -161,6 +166,8 @@ def serve(
     reload_dirs_str: list[str] | None = None
     if reload_dir:
         reload_dirs_str = [str(d.resolve()) for d in reload_dir]
+
+    _ensure_cwd_importable()
 
     _print_startup_banner(
         host=host,
