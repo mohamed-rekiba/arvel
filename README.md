@@ -86,10 +86,22 @@ pipx install arvel
 arvel new my-app
 ```
 
-Pick your database up front with `--database`:
+Without flags, the CLI walks you through an interactive stack selector — pick a preset or customize each service:
+
+```
+? Choose your stack:
+❯ Minimal    — sqlite, memory, sync, log, local, collection, memory
+  Standard   — postgres, redis, redis, smtp, local, collection, memory
+  Full       — postgres, redis, taskiq, smtp, s3, meilisearch, redis
+  Custom     — choose each service individually
+```
+
+Or skip prompts entirely with `--preset` or individual flags:
 
 ```bash
-arvel new my-app --database postgres
+arvel new my-app --preset standard
+arvel new my-app --database postgres --cache redis --queue taskiq
+arvel new my-app --no-input              # defaults (minimal)
 ```
 
 ### Run the dev server

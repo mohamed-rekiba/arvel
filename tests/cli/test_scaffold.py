@@ -145,15 +145,18 @@ class TestRenderSkeleton:
 class TestDatabaseConfigs:
     def test_sqlite_config(self) -> None:
         cfg = DATABASE_CONFIGS["sqlite"]
-        assert cfg["driver"] == "sqlite+aiosqlite"
+        assert cfg["driver"] == "sqlite"
+        assert cfg["sa_driver"] == "sqlite+aiosqlite"
 
     def test_postgres_config(self) -> None:
         cfg = DATABASE_CONFIGS["postgres"]
-        assert cfg["driver"] == "postgresql+asyncpg"
+        assert cfg["driver"] == "pgsql"
+        assert cfg["sa_driver"] == "postgresql+asyncpg"
 
     def test_mysql_config(self) -> None:
         cfg = DATABASE_CONFIGS["mysql"]
-        assert cfg["driver"] == "mysql+aiomysql"
+        assert cfg["driver"] == "mysql"
+        assert cfg["sa_driver"] == "mysql+aiomysql"
 
     def test_url_contains_app_name(self) -> None:
         cfg = DATABASE_CONFIGS["postgres"]
