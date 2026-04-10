@@ -1,0 +1,4 @@
+# Root MkDocs config — redirects to the English docs.
+# For local development, use: mkdocs serve -f docs/site/en/mkdocs.yml
+# Future languages will add docs/site/fr/, docs/site/es/, etc.
+INHERIT: en/mkdocs.yml

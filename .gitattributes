@@ -1,0 +1,39 @@
+# Normalize line endings
+* text=auto
+
+# Python
+*.py text diff=python
+*.pyi text diff=python
+
+# Config
+*.toml text
+*.yaml text
+*.yml text
+*.cfg text
+*.ini text
+*.env text
+
+# Documentation
+*.md text diff=markdown
+*.rst text
+*.txt text
+
+# Web
+*.json text
+*.html text
+*.css text
+*.js text
+
+# Binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.whl binary
+
+# Lock files (do not diff)
+uv.lock text -diff linguist-generated=true

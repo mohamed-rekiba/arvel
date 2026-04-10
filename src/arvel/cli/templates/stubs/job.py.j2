@@ -1,0 +1,15 @@
+"""{{ class_name }} — background job."""
+
+from __future__ import annotations
+
+from arvel.queue.job import Job
+
+
+class {{ class_name }}(Job):
+    """Background job: {{ class_name }}.
+
+    Configure retries, backoff, and timeout by overriding class attributes.
+    """
+
+    async def handle(self) -> None:
+        pass

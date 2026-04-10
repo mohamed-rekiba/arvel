@@ -1,0 +1,30 @@
+"""{{ class_name }} — HTTP request handler."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from {{ module_import }}.services.{{ service_file }} import {{ service_name }}
+
+
+class {{ class_name }}:
+    """Handles HTTP requests for the {{ resource }} resource."""
+
+    def __init__(self, service: {{ service_name }}) -> None:
+        self._service = service
+
+    async def index(self) -> list[dict]:
+        return await self._service.list_all()
+
+    async def show(self, id: int) -> dict:
+        return await self._service.find(id)
+
+    async def store(self, data: dict) -> dict:
+        return await self._service.create(data)
+
+    async def update(self, id: int, data: dict) -> dict:
+        return await self._service.update(id, data)
+
+    async def destroy(self, id: int) -> None:
+        await self._service.delete(id)

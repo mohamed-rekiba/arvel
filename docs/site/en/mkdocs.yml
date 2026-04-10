@@ -1,0 +1,161 @@
+site_name: Arvel
+site_description: "Async-first, type-safe Python web framework inspired by Laravel"
+site_url: "https://mohamed-rekiba.github.io/arvel/"
+
+repo_name: mohamed-rekiba/arvel
+repo_url: "https://github.com/mohamed-rekiba/arvel"
+
+theme:
+  name: material
+  custom_dir: ../../site/overrides
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/lightbulb-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/lightbulb
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to system preference
+  features:
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - content.tooltips
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github-alt
+  logo: img/logo.svg
+  favicon: img/favicon.png
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [../../../src]
+          options:
+            show_source: true
+            show_root_heading: true
+            members_order: source
+            docstring_style: google
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      line_spans: __span
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.inlinehilite
+  - pymdownx.blocks.admonition
+  - pymdownx.blocks.details
+  - pymdownx.blocks.tab:
+      alternate_style: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github-alt
+      link: https://github.com/mohamed-rekiba/arvel
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/arvel/
+
+extra_css:
+  - css/custom.css
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Prologue:
+      - prologue/release-notes.md
+      - prologue/upgrade-guide.md
+      - prologue/contribution-guide.md
+    - Getting Started:
+      - getting-started/installation.md
+      - getting-started/configuration.md
+      - getting-started/directory-structure.md
+      - getting-started/deployment.md
+    - Architecture Concepts:
+      - architecture/lifecycle.md
+      - architecture/container.md
+      - architecture/providers.md
+  - The Basics:
+    - basics/routing.md
+    - basics/middleware.md
+    - basics/controllers.md
+    - basics/requests.md
+    - basics/responses.md
+    - basics/validation.md
+    - basics/error-handling.md
+    - basics/logging.md
+  - Database:
+    - Database:
+      - database/getting-started.md
+      - database/query-builder.md
+      - database/pagination.md
+      - database/migrations.md
+      - database/seeding.md
+    - Eloquent ORM:
+      - orm/getting-started.md
+      - orm/relationships.md
+      - orm/collections.md
+      - orm/mutators.md
+      - orm/observers.md
+      - orm/factories.md
+      - orm/soft-deletes.md
+      - orm/scopes.md
+  - Advanced:
+    - Digging Deeper:
+      - digging-deeper/cli.md
+      - digging-deeper/cache.md
+      - digging-deeper/events.md
+      - digging-deeper/file-storage.md
+      - digging-deeper/mail.md
+      - digging-deeper/notifications.md
+      - digging-deeper/queues.md
+      - digging-deeper/scheduling.md
+      - digging-deeper/helpers.md
+    - Security:
+      - security/authentication.md
+      - security/authorization.md
+      - security/encryption.md
+      - security/hashing.md
+    - Observability:
+      - observability/logging.md
+      - observability/health-checks.md
+  - Testing:
+    - testing/getting-started.md
+    - testing/http-tests.md
+    - testing/database-testing.md
+    - testing/fakes.md
+  - API Reference:
+    - reference/index.md

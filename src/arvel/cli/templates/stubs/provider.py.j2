@@ -1,0 +1,23 @@
+"""{{ module_name }} module service provider."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from arvel.foundation.provider import ServiceProvider
+
+if TYPE_CHECKING:
+    from arvel.foundation.application import Application
+    from arvel.foundation.container import ContainerBuilder
+
+
+class {{ class_name }}(ServiceProvider):
+    """Service provider for the {{ module_name }} module."""
+
+    priority: int = 50
+
+    async def register(self, container: ContainerBuilder) -> None:
+        pass
+
+    async def boot(self, app: Application) -> None:
+        pass

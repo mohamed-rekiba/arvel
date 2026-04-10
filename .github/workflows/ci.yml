@@ -1,0 +1,244 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  POSTGRES_DB: arvel_test
+  POSTGRES_USER: arvel
+  POSTGRES_PASSWORD: arvel_secret
+  MARIADB_DATABASE: arvel_test
+  MARIADB_USER: arvel
+  MARIADB_PASSWORD: arvel_secret
+  MARIADB_ROOT_PASSWORD: root_secret
+  VALKEY_URL: redis://localhost:6379/0
+  MINIO_ROOT_USER: arvel_minio
+  MINIO_ROOT_PASSWORD: arvel_minio_secret
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Ruff check
+        run: uv run ruff check src/ tests/
+      - name: Ruff format check
+        run: uv run ruff format --check src/ tests/
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Type check
+        run: uv run ty check src/ tests/
+
+  test-fast:
+    name: Unit Tests (fast)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Run unit tests (no DB, no services)
+        run: >-
+          uv run pytest tests/
+          -m "not db and not integration"
+          -n auto --dist loadfile
+          --timeout=10
+          --tb=short
+
+  test-full:
+    name: Full Tests (Python ${{ matrix.python-version }})
+    needs: [test-fast]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.14"]
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: arvel_test
+          POSTGRES_USER: arvel
+          POSTGRES_PASSWORD: arvel_secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arvel"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+      mariadb:
+        image: mariadb:11-ubi
+        env:
+          MARIADB_DATABASE: arvel_test
+          MARIADB_USER: arvel
+          MARIADB_PASSWORD: arvel_secret
+          MARIADB_ROOT_PASSWORD: root_secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+      valkey:
+        image: valkey/valkey:9-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+      mailpit:
+        image: axllent/mailpit:v1.29
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+      rabbitmq:
+        image: rabbitmq:4-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: arvel
+          RABBITMQ_DEFAULT_PASS: arvel_secret
+        ports:
+          - 5672:5672
+          - 15672:15672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q check_running"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Start MinIO (S3-compatible object store)
+        run: |
+          docker run -d --name minio --network host \
+            -e MINIO_ROOT_USER=arvel_minio \
+            -e MINIO_ROOT_PASSWORD=arvel_minio_secret \
+            minio/minio:RELEASE.2025-09-07T16-13-09Z server /data --address :9000
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live > /dev/null 2>&1; then
+              echo "MinIO is ready"
+              break
+            fi
+            echo "Waiting for MinIO... ($i/30)"
+            sleep 2
+          done
+      - name: Create MinIO test bucket
+        run: |
+          curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
+          chmod +x /usr/local/bin/mc
+          mc alias set local http://localhost:9000 arvel_minio arvel_minio_secret
+          mc mb --ignore-existing local/arvel-test
+      - name: Start Keycloak (OIDC provider with test realm)
+        run: |
+          docker run -d --name keycloak --network host \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
+            -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin_secret \
+            -e KC_HEALTH_ENABLED=true \
+            -e KC_HTTP_MANAGEMENT_PORT=9090 \
+            -v "${{ github.workspace }}/.docker/keycloak:/opt/keycloak/data/import:ro" \
+            quay.io/keycloak/keycloak:26.5 start-dev --import-realm
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:9090/health/ready > /dev/null 2>&1; then
+              echo "Keycloak is ready"
+              break
+            fi
+            echo "Waiting for Keycloak... ($i/60)"
+            sleep 5
+          done
+      - name: Configure Keycloak realm scopes
+        env:
+          KC_URL: http://localhost:8080
+          KC_ADMIN: admin
+          KC_ADMIN_PASS: admin_secret
+        run: sh .docker/keycloak/setup-realm.sh
+      - name: Run full tests with coverage
+        env:
+          DB_URL: postgresql+asyncpg://arvel:arvel_secret@localhost:5432/arvel_test
+          CACHE_DRIVER: redis
+          CACHE_REDIS_URL: redis://localhost:6379/0
+          LOCK_DRIVER: redis
+          LOCK_REDIS_URL: redis://localhost:6379/1
+          MAIL_DRIVER: smtp
+          MAIL_SMTP_HOST: localhost
+          MAIL_SMTP_PORT: 1025
+          STORAGE_DRIVER: s3
+          STORAGE_S3_BUCKET: arvel-test
+          STORAGE_S3_ENDPOINT: http://localhost:9000
+          STORAGE_S3_KEY: arvel_minio
+          STORAGE_S3_SECRET_KEY: arvel_minio_secret
+          OIDC_ISSUER_URL: http://localhost:8080/realms/arvel-test
+          OIDC_CLIENT_ID: arvel-test-client
+          OIDC_CLIENT_SECRET: arvel-test-secret
+          COVERAGE_FILE: coverage/.coverage.${{ runner.os }}-py${{ matrix.python-version }}
+        run: >-
+          uv run pytest tests/ -v
+          --cov=src/arvel --cov-report=term-missing --cov-report=xml
+      - name: Enforce coverage threshold
+        run: |
+          uv run coverage combine coverage/ 2>/dev/null || true
+          uv run coverage report --fail-under=80
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install dependencies
+        run: uv pip install pip-audit --system
+      - name: Dependency audit
+        run: pip-audit --requirement <(uv pip compile pyproject.toml --quiet) || true
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
