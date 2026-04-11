@@ -8,6 +8,8 @@ from arvel.validation.exceptions import AuthorizationFailedError
 from arvel.validation.validator import Validator
 
 if TYPE_CHECKING:
+    from starlette.requests import Request
+
     from arvel.validation.rule import AsyncRule, Rule
 
 
@@ -18,7 +20,7 @@ class FormRequest:
     `messages()` and `after_validation()`.
     """
 
-    def authorize(self, request: Any) -> bool:
+    def authorize(self, request: Request | None) -> bool:
         """Return True if the request is authorized, False otherwise."""
         return True
 
@@ -37,7 +39,7 @@ class FormRequest:
     async def validate_request(
         self,
         *,
-        request: Any,
+        request: Request | None,
         data: dict[str, Any],
     ) -> dict[str, Any]:
         """Run authorization, validation, and after-hook in order."""

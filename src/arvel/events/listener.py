@@ -10,6 +10,8 @@ class Listener:
 
     Subclass and implement ``handle(self, event: YourEvent)``. The type
     hint on ``event`` determines which event type this listener handles.
+    The dispatcher inspects the subclass's type hint at runtime to route
+    events, so ``Any`` on the base is intentional — subclasses narrow it.
     """
 
     __queued__: ClassVar[bool] = False

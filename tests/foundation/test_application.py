@@ -165,13 +165,12 @@ class TestGracefulShutdown:
             "providers = [AProvider, BProvider]\n"
         )
         app = await Application.create(tmp_project, testing=True)
+        a_provider_cls = type(app.providers[0])
+        b_provider_cls = type(app.providers[1])
         await app.shutdown()
 
-        from importlib import import_module
-
-        bp = import_module("bootstrap.providers")
-        assert bp.BProvider.calls == ["B"]
-        assert bp.AProvider.calls == ["A"]
+        assert b_provider_cls.calls == ["B"]  # ty: ignore[unresolved-attribute]
+        assert a_provider_cls.calls == ["A"]  # ty: ignore[unresolved-attribute]
 
     async def test_shutdown_continues_when_provider_shutdown_fails(self, tmp_project: Path) -> None:
         (tmp_project / "bootstrap" / "providers.py").write_text(
@@ -186,9 +185,7 @@ class TestGracefulShutdown:
             "providers = [FailingProvider, HealthyProvider]\n"
         )
         app = await Application.create(tmp_project, testing=True)
+        healthy_cls = type(app.providers[1])
         await app.shutdown()
 
-        from importlib import import_module
-
-        bp = import_module("bootstrap.providers")
-        assert bp.HealthyProvider.called is True
+        assert healthy_cls.called is True  # ty: ignore[unresolved-attribute]
