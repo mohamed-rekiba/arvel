@@ -5,6 +5,19 @@ All notable changes to Arvel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6](https://github.com/mohamed-rekiba/arvel/compare/v0.1.5...v0.1.6) (2026-04-11)
+
+
+### Bug Fixes
+
+* **docs:** use dynamic PyPI badge instead of hardcoded version ([6ca3681](https://github.com/mohamed-rekiba/arvel/commit/6ca3681397e8e43616b0c8106685d908404af747))
+
+
+### Documentation
+
+* **guides:** add framework guides documentation ([4e01393](https://github.com/mohamed-rekiba/arvel/commit/4e013935945d38f75b8b6e329f6552b5e3c08a44))
+* remove hardcoded version anchors and wire Release Please to docs ([5b40823](https://github.com/mohamed-rekiba/arvel/commit/5b408235707f77197130056e1f59bde5a51eed8a))
+
 ## [0.1.5](https://github.com/mohamed-rekiba/arvel/compare/v0.1.4...v0.1.5) (2026-04-11)
 
 
