@@ -12,6 +12,7 @@ from urllib.parse import urljoin
 import typer
 
 from arvel.cli.exceptions import ArvelCLIError
+from arvel.cli.logging import get_uvicorn_log_config
 
 serve_app = typer.Typer(
     name="serve", help="Start the development server.", invoke_without_command=True
@@ -20,9 +21,14 @@ serve_app = typer.Typer(
 _ENTRYPOINT = "bootstrap.app:create_app"
 
 
-def _discover_app() -> str:
-    """Ensure bootstrap/app.py exists and return the ASGI import path."""
-    if not Path("bootstrap/app.py").is_file():
+def _discover_app(base_path: Path | None = None) -> str:
+    """Ensure bootstrap/app.py exists and return the ASGI import path.
+
+    Args:
+        base_path: Project root directory. Defaults to CWD.
+    """
+    root = base_path or Path.cwd()
+    if not (root / "bootstrap" / "app.py").is_file():
         raise ArvelCLIError(
             "bootstrap/app.py not found. Every Arvel app must have this file "
             "with a create_app() factory. Use --app to override."
@@ -30,14 +36,14 @@ def _discover_app() -> str:
     return _ENTRYPOINT
 
 
-def _ensure_cwd_importable() -> None:
-    """Put CWD on sys.path so uvicorn workers can import the app."""
-    cwd = str(Path.cwd())
-    if cwd not in sys.path:
-        sys.path.insert(0, cwd)
+def _ensure_cwd_importable(app_dir: Path | None = None) -> None:
+    """Put *app_dir* (or CWD) on sys.path so uvicorn workers can import the app."""
+    target = str((app_dir or Path.cwd()).resolve())
+    if target not in sys.path:
+        sys.path.insert(0, target)
     existing = os.environ.get("PYTHONPATH", "")
-    if cwd not in existing.split(os.pathsep):
-        os.environ["PYTHONPATH"] = f"{cwd}{os.pathsep}{existing}" if existing else cwd
+    if target not in existing.split(os.pathsep):
+        os.environ["PYTHONPATH"] = f"{target}{os.pathsep}{existing}" if existing else target
 
 
 def _get_arvel_version() -> str:
@@ -54,13 +60,14 @@ def _print_startup_banner(
     workers: int,
     use_reload: bool,
     root_path: str,
+    base_path: Path | None = None,
 ) -> None:
     """Show the server banner with app name, env, and URLs."""
     from arvel.app.config import AppSettings
     from arvel.cli.app import BANNER
     from arvel.foundation.config import resolve_env_files, with_env_files
 
-    base_path = Path.cwd()
+    base_path = (base_path or Path.cwd()).resolve()
     env_files = resolve_env_files(base_path)
 
     try:
@@ -108,7 +115,9 @@ def _print_startup_banner(
 @serve_app.callback(invoke_without_command=True)
 def serve(
     host: Annotated[str, typer.Option("--host", "-h", help="Bind address.")] = "127.0.0.1",
-    port: Annotated[int, typer.Option("--port", "-p", help="Bind port.")] = 8000,
+    port: Annotated[
+        int, typer.Option("--port", "-p", help="Bind port.", envvar="PORT")
+    ] = 8000,
     reload: Annotated[
         bool, typer.Option("--reload/--no-reload", help="Auto-reload on file changes.")
     ] = True,
@@ -117,7 +126,16 @@ def serve(
     ] = 1,
     app_path: Annotated[
         str | None, typer.Option("--app", help="ASGI application import path (module:attr).")
-    ] = "bootstrap.app:create_app",
+    ] = None,
+    app_dir: Annotated[
+        Path,
+        typer.Option(
+            "--app-dir",
+            help="Project root directory for import resolution.",
+            exists=True,
+            file_okay=False,
+        ),
+    ] = Path(),
     root_path: Annotated[
         str, typer.Option("--root-path", help="ASGI root_path for apps behind a reverse proxy.")
     ] = "",
@@ -155,9 +173,15 @@ def serve(
         raise typer.Exit(code=1) from None
 
     root_path = root_path or ""
+    resolved_dir = app_dir.resolve()
 
+    use_factory = False
     try:
-        import_string = app_path if app_path else _discover_app()
+        if app_path:
+            import_string = app_path
+        else:
+            import_string = _discover_app(base_path=resolved_dir)
+            use_factory = True
     except ArvelCLIError as e:
         typer.echo(f"Error: {e}")
         raise typer.Exit(code=1) from None
@@ -167,7 +191,7 @@ def serve(
     if reload_dir:
         reload_dirs_str = [str(d.resolve()) for d in reload_dir]
 
-    _ensure_cwd_importable()
+    _ensure_cwd_importable(resolved_dir)
 
     _print_startup_banner(
         host=host,
@@ -175,6 +199,7 @@ def serve(
         workers=workers,
         use_reload=use_reload,
         root_path=root_path,
+        base_path=resolved_dir,
     )
 
     uvicorn.run(
@@ -187,6 +212,6 @@ def serve(
         root_path=root_path,
         proxy_headers=proxy_headers,
         forwarded_allow_ips=forwarded_allow_ips,
-        factory=True,
-        log_config=None,
+        factory=use_factory,
+        log_config=get_uvicorn_log_config(),
     )
