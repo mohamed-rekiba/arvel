@@ -509,7 +509,7 @@ async def load_config(
     return config
 
 
-async def cache_config(config: AppSettings, cache_path: Path) -> None:
+def cache_config(config: AppSettings, cache_path: Path) -> None:
     """Serialize root config to a file for faster subsequent boots.
 
     Only root AppSettings fields are cached. Secret values are excluded
@@ -525,7 +525,7 @@ async def cache_config(config: AppSettings, cache_path: Path) -> None:
             data[field_name] = str(value)
         else:
             data[field_name] = value
-    cache_path.write_text(json.dumps(data))  # noqa: ASYNC240
+    cache_path.write_text(json.dumps(data))
 
 
 def get_module_settings[TModuleSettings: ModuleSettings](
