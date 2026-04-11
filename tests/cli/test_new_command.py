@@ -220,10 +220,10 @@ class TestTemplatesRegistry:
         with pytest.raises(SystemExit, match="Unknown template"):
             _resolve_template_repo(MOCK_REGISTRY, "nonexistent")
 
-    def test_bundled_fallback(self) -> None:
-        from arvel.cli.commands.new import _load_bundled_registry
+    def test_bundled_registry_returns_default_template(self) -> None:
+        from arvel.cli.commands.new import _fetch_templates_registry
 
-        templates = _load_bundled_registry()
+        templates = _fetch_templates_registry()
         assert len(templates) >= 1
         assert templates[0]["name"] == "default"
 
