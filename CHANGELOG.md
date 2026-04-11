@@ -5,6 +5,19 @@ All notable changes to Arvel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5](https://github.com/mohamed-rekiba/arvel/compare/v0.1.4...v0.1.5) (2026-04-11)
+
+
+### Bug Fixes
+
+* **cli:** interpolate db_password template in new project scaffold ([6f1b4cb](https://github.com/mohamed-rekiba/arvel/commit/6f1b4cba3b47246a2a7008202c7480b83365602e))
+* **docs:** use dynamic PyPI badge instead of hardcoded version ([6ca3681](https://github.com/mohamed-rekiba/arvel/commit/6ca3681397e8e43616b0c8106685d908404af747))
+
+
+### Documentation
+
+* remove hardcoded version anchors and wire Release Please to docs ([5b40823](https://github.com/mohamed-rekiba/arvel/commit/5b408235707f77197130056e1f59bde5a51eed8a))
+
 ## [0.1.5](https://github.com/mohamed-rekiba/arvel/compare/v0.1.4...v0.1.5) (2026-04-10)
 
 
