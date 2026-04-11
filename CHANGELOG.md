@@ -5,6 +5,13 @@ All notable changes to Arvel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/mohamed-rekiba/arvel/compare/v0.1.10...v0.2.0) (2026-04-11)
+
+
+### Features
+
+* **cli:** optimize arvel new startup with spinner preload and background download ([2eafb8c](https://github.com/mohamed-rekiba/arvel/commit/2eafb8cd090257d1644280220836931b7fa7fe20))
+
 ## [0.1.10](https://github.com/mohamed-rekiba/arvel/compare/v0.1.9...v0.1.10) (2026-04-11)
 
 
