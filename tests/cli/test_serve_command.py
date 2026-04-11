@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
+import sys
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from arvel.cli.app import app
-from arvel.cli.commands.serve import _discover_app
+from arvel.cli.commands.serve import _activate_project_venv, _discover_app
 from arvel.cli.exceptions import ArvelCLIError
 
 runner = CliRunner()
@@ -346,6 +352,77 @@ class TestDiscoverCommandsLogging:
         from arvel.cli.app import discover_commands
 
         discover_commands(base_path=tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Venv detection — _activate_project_venv()
+# ---------------------------------------------------------------------------
+
+
+class TestServeVenvDetection:
+    """Global arvel serve should detect the project's .venv and add site-packages."""
+
+    def _make_fake_venv(self, base: Path, venv_name: str = ".venv") -> Path:
+        """Create a minimal fake venv directory structure."""
+        sp = base / venv_name / "lib" / "python3.14" / "site-packages"
+        sp.mkdir(parents=True)
+        return sp
+
+    def test_project_venv_site_packages_added_to_sys_path(self, tmp_path, monkeypatch) -> None:
+        sp = self._make_fake_venv(tmp_path)
+        sp_str = str(sp)
+        monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+
+        original_path = sys.path.copy()
+        try:
+            if sp_str in sys.path:
+                sys.path.remove(sp_str)
+            _activate_project_venv(tmp_path)
+            assert sp_str in sys.path
+            assert os.environ.get("VIRTUAL_ENV") == str(tmp_path / ".venv")
+        finally:
+            sys.path[:] = original_path
+
+    def test_no_venv_directory_is_noop(self, tmp_path, monkeypatch) -> None:
+        monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+        original_path = sys.path.copy()
+        try:
+            _activate_project_venv(tmp_path)
+            assert sys.path == original_path
+            assert "VIRTUAL_ENV" not in os.environ
+        finally:
+            sys.path[:] = original_path
+
+    def test_venv_directory_name_fallback(self, tmp_path, monkeypatch) -> None:
+        sp = self._make_fake_venv(tmp_path, venv_name="venv")
+        sp_str = str(sp)
+        monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+
+        original_path = sys.path.copy()
+        try:
+            if sp_str in sys.path:
+                sys.path.remove(sp_str)
+            _activate_project_venv(tmp_path)
+            assert sp_str in sys.path
+            assert os.environ.get("VIRTUAL_ENV") == str(tmp_path / "venv")
+        finally:
+            sys.path[:] = original_path
+
+    def test_already_in_project_venv_is_noop(self, tmp_path, monkeypatch) -> None:
+        sp = self._make_fake_venv(tmp_path)
+        sp_str = str(sp)
+        monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+
+        original_path = sys.path.copy()
+        try:
+            if sp_str not in sys.path:
+                sys.path.insert(0, sp_str)
+            path_before = sys.path.copy()
+            _activate_project_venv(tmp_path)
+            assert sys.path.count(sp_str) == 1
+            assert sys.path == path_before
+        finally:
+            sys.path[:] = original_path
 
 
 # ---------------------------------------------------------------------------

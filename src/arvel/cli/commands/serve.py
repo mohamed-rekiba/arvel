@@ -46,6 +46,31 @@ def _ensure_cwd_importable(app_dir: Path | None = None) -> None:
         os.environ["PYTHONPATH"] = f"{target}{os.pathsep}{existing}" if existing else target
 
 
+def _activate_project_venv(app_dir: Path) -> None:
+    """Add the project's .venv site-packages to sys.path if present.
+
+    When arvel is installed globally but the project has its own virtualenv,
+    the project's dependencies won't be importable unless we inject them.
+    """
+    for venv_name in (".venv", "venv"):
+        venv_dir = app_dir / venv_name
+        if not venv_dir.is_dir():
+            continue
+
+        lib_dir = venv_dir / "lib"
+        if not lib_dir.is_dir():
+            continue
+
+        for child in lib_dir.iterdir():
+            sp = child / "site-packages"
+            if sp.is_dir():
+                sp_str = str(sp)
+                if sp_str not in sys.path:
+                    sys.path.insert(0, sp_str)
+                os.environ["VIRTUAL_ENV"] = str(venv_dir)
+                return
+
+
 def _get_arvel_version() -> str:
     try:
         return pkg_version("arvel")
@@ -115,9 +140,7 @@ def _print_startup_banner(
 @serve_app.callback(invoke_without_command=True)
 def serve(
     host: Annotated[str, typer.Option("--host", "-h", help="Bind address.")] = "127.0.0.1",
-    port: Annotated[
-        int, typer.Option("--port", "-p", help="Bind port.", envvar="PORT")
-    ] = 8000,
+    port: Annotated[int, typer.Option("--port", "-p", help="Bind port.", envvar="PORT")] = 8000,
     reload: Annotated[
         bool, typer.Option("--reload/--no-reload", help="Auto-reload on file changes.")
     ] = True,
@@ -191,6 +214,7 @@ def serve(
     if reload_dir:
         reload_dirs_str = [str(d.resolve()) for d in reload_dir]
 
+    _activate_project_venv(resolved_dir)
     _ensure_cwd_importable(resolved_dir)
 
     _print_startup_banner(
