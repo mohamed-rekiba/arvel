@@ -4,8 +4,7 @@
     ".": {
       "release-type": "python",
       "extra-files": [
-        "docs/site/en/mkdocs.yml",
-        "README.md"
+        "docs/site/en/mkdocs.yml"
       ]
     }
   }
