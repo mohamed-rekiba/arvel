@@ -7,30 +7,7 @@ from pathlib import Path
 
 import typer
 
-from arvel.cli.exceptions import CliValidationError
 from arvel.cli.plugins._base import CliPlugin  # noqa: TC001
-from arvel.cli.ui import BANNER, InquirerPreloader
-
-from .config import (
-    BROADCAST_CONFIGS,
-    CACHE_CONFIGS,
-    DATABASE_CONFIGS,
-    MAIL_CONFIGS,
-    PRESETS,
-    QUEUE_CONFIGS,
-    SEARCH_CONFIGS,
-    STORAGE_CONFIGS,
-)
-from .prompts import _run_interactive_prompts
-from .scaffold import (
-    _build_context,
-    _git_init,
-    _run_uv_sync,
-    _setup_env,
-    render_skeleton,
-    to_package_name,
-)
-from .templates import _await_download, _start_background_download
 
 _new_app = typer.Typer(name="new", help="Create a new Arvel project.")
 
@@ -45,6 +22,8 @@ def validate_project_name(name: str) -> bool:
 
 def _validate_choice(option: str, value: str, configs: dict[str, dict[str, str]]) -> None:
     """Raise CliValidationError if value isn't in configs."""
+    from arvel.cli.exceptions import CliValidationError
+
     if value not in configs:
         choices = ", ".join(configs)
         msg = f"Unknown {option} '{value}'. Choose: {choices}."
@@ -65,6 +44,19 @@ def _validate_inputs(
     broadcast: str,
 ) -> Path:
     """Validate all CLI arguments and return the target directory."""
+    from arvel.cli.exceptions import CliValidationError
+
+    from .config import (
+        BROADCAST_CONFIGS,
+        CACHE_CONFIGS,
+        DATABASE_CONFIGS,
+        MAIL_CONFIGS,
+        PRESETS,
+        QUEUE_CONFIGS,
+        SEARCH_CONFIGS,
+        STORAGE_CONFIGS,
+    )
+
     if not validate_project_name(name):
         msg = "Invalid project name. Use lowercase letters, digits, hyphens, and underscores."
         raise CliValidationError(msg)
@@ -146,7 +138,8 @@ def new_project(
     no_input: bool = typer.Option(False, "--no-input", help="Skip interactive prompts."),
 ) -> None:
     """Create a new Arvel project."""
-    from arvel.cli.plugins.new import templates as _tpl
+    from arvel.cli.exceptions import CliValidationError
+    from arvel.cli.ui import BANNER, InquirerPreloader
 
     preloader = InquirerPreloader() if not no_input else None
 
@@ -168,6 +161,19 @@ def new_project(
             preloader.stop()
         typer.echo(exc.message)
         raise typer.Exit(code=1) from None
+
+    from . import templates as _tpl
+    from .config import PRESETS
+    from .prompts import _run_interactive_prompts
+    from .scaffold import (
+        _build_context,
+        _git_init,
+        _run_uv_sync,
+        _setup_env,
+        render_skeleton,
+        to_package_name,
+    )
+    from .templates import _await_download, _start_background_download
 
     if using:
         repo_url = using
