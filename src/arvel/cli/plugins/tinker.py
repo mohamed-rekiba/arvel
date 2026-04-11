@@ -13,11 +13,13 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from arvel.cli.plugins._base import CliPlugin
+
 import typer
 
 from arvel.logging import Log
 
-tinker_app = typer.Typer(name="tinker", help="Interactive REPL with application context.")
+_app = typer.Typer(name="tinker", help="Interactive REPL with application context.")
 
 logger = Log.named("arvel.cli.tinker")
 
@@ -98,7 +100,7 @@ def _shutdown(namespace: dict[str, Any]) -> None:
         asyncio.run(application.shutdown())
 
 
-@tinker_app.callback(invoke_without_command=True)
+@_app.callback(invoke_without_command=True)
 def tinker(
     ctx: typer.Context,
     execute: str | None = typer.Option(
@@ -129,3 +131,14 @@ def tinker(
         _start_repl(namespace)
     finally:
         _shutdown(namespace)
+
+
+class _Plugin:
+    name = "tinker"
+    help = "Interactive REPL with application context."
+
+    def register(self, app: typer.Typer) -> None:
+        app.add_typer(_app, name=self.name)
+
+
+plugin: CliPlugin = _Plugin()  # type: ignore[assignment]

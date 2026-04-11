@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
 from arvel.cli.templates.engine import builtin_template_names
 
-publish_app = typer.Typer(name="publish", help="Publish framework resources.")
+if TYPE_CHECKING:
+    from arvel.cli.plugins._base import CliPlugin
+
+_app = typer.Typer(name="publish", help="Publish framework resources.")
 
 
-@publish_app.command("stubs")
+@_app.command("stubs")
 def stubs(
     force: bool = typer.Option(False, "--force", help="Overwrite existing stubs."),
 ) -> None:
@@ -39,3 +43,14 @@ def stubs(
     typer.echo(f"\nPublished {copied} stubs to {target}")
     if skipped:
         typer.echo(f"Skipped {skipped} existing stubs (use --force to overwrite)")
+
+
+class _Plugin:
+    name = "publish"
+    help = "Publish framework resources."
+
+    def register(self, app: typer.Typer) -> None:
+        app.add_typer(_app, name=self.name)
+
+
+plugin: CliPlugin = _Plugin()  # type: ignore[assignment]

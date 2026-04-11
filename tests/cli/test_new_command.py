@@ -54,11 +54,11 @@ def _patch_network(mock_skeleton: Path):
     """Patch both registry fetch and skeleton download."""
     return (
         patch(
-            "arvel.cli.commands.new._fetch_templates_registry",
+            "arvel.cli.plugins.new.templates._fetch_templates_registry",
             return_value=MOCK_REGISTRY,
         ),
         patch(
-            "arvel.cli.commands.new._download_skeleton",
+            "arvel.cli.plugins.new.templates._download_skeleton",
             return_value=mock_skeleton,
         ),
     )
@@ -203,32 +203,32 @@ class TestNewCommandScaffold:
 
 class TestTemplatesRegistry:
     def test_resolve_default_template(self) -> None:
-        from arvel.cli.commands.new import _resolve_template_repo
+        from arvel.cli.plugins.new.templates import _resolve_template_repo
 
         repo = _resolve_template_repo(MOCK_REGISTRY)
         assert repo == "https://github.com/mohamed-rekiba/arvel-starter"
 
     def test_resolve_named_template(self) -> None:
-        from arvel.cli.commands.new import _resolve_template_repo
+        from arvel.cli.plugins.new.templates import _resolve_template_repo
 
         repo = _resolve_template_repo(MOCK_REGISTRY, "default")
         assert repo == "https://github.com/mohamed-rekiba/arvel-starter"
 
     def test_resolve_unknown_template_fails(self) -> None:
-        from arvel.cli.commands.new import _resolve_template_repo
+        from arvel.cli.plugins.new.templates import _resolve_template_repo
 
         with pytest.raises(SystemExit, match="Unknown template"):
             _resolve_template_repo(MOCK_REGISTRY, "nonexistent")
 
     def test_bundled_registry_returns_default_template(self) -> None:
-        from arvel.cli.commands.new import _fetch_templates_registry
+        from arvel.cli.plugins.new.templates import _fetch_templates_registry
 
         templates = _fetch_templates_registry()
         assert len(templates) >= 1
         assert templates[0]["name"] == "default"
 
     def test_repo_to_owner_name(self) -> None:
-        from arvel.cli.commands.new import _repo_to_owner_name
+        from arvel.cli.plugins.new.templates import _repo_to_owner_name
 
         assert (
             _repo_to_owner_name("https://github.com/mohamed-rekiba/arvel-starter")

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typer.testing import CliRunner
 
-from arvel.cli.commands.queue import queue_app
+from arvel.cli.plugins.queue import _app as queue_app
 from arvel.queue.failed_job_repository import FailedJobRepository
 
 runner = CliRunner()
