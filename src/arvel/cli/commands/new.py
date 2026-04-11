@@ -2,25 +2,34 @@
 
 from __future__ import annotations
 
-import io
-import json
 import re
 import secrets
-import shutil
-import subprocess
-import tarfile
 from pathlib import Path
-from typing import Any
-from urllib.error import URLError
-from urllib.request import Request, urlopen
+from typing import TYPE_CHECKING, Any
 
 import typer
-from jinja2 import Environment, FileSystemLoader
+
+if TYPE_CHECKING:
+    from concurrent.futures import Future
+
+    from rich.console import Console
 
 new_app = typer.Typer(name="new", help="Create a new Arvel project.")
 
 FRAMEWORK_REPO = "mohamed-rekiba/arvel"
-TEMPLATES_ASSET = "templates.json"
+
+_BUNDLED_TEMPLATES: list[dict[str, Any]] = [
+    {
+        "name": "default",
+        "description": (
+            "Official Arvel starter — full app skeleton with modular"
+            " monolith structure, config, routes, tests, and database"
+            " setup."
+        ),
+        "repo": "https://github.com/mohamed-rekiba/arvel-starter",
+        "default": True,
+    },
+]
 
 DATABASE_CONFIGS: dict[str, dict[str, str]] = {
     "sqlite": {
@@ -156,6 +165,59 @@ def _collect_extras(choices: dict[str, str]) -> list[str]:
     return sorted(extras)
 
 
+class _InquirerPreloader:
+    """Loads InquirerPy in a background thread while showing a spinner instantly."""
+
+    def __init__(self) -> None:
+        import sys
+        import threading
+
+        self._sys = sys
+        self._module: Any = None
+        self._done = threading.Event()
+        self._stop_spinner = threading.Event()
+        self._spinner_exited = threading.Event()
+
+        threading.Thread(target=self._load, daemon=True).start()
+        threading.Thread(target=self._spin, daemon=True).start()
+
+    def _load(self) -> None:
+        from InquirerPy import inquirer
+
+        self._module = inquirer
+        self._done.set()
+        self._stop_spinner.set()
+
+    def _spin(self) -> None:
+        import itertools
+        import time
+
+        frames = itertools.cycle(
+            ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+        )
+        shown = False
+        while not self._stop_spinner.is_set():
+            self._sys.stdout.write(f"\r  {next(frames)} Loading...")
+            self._sys.stdout.flush()
+            shown = True
+            time.sleep(0.08)
+
+        if shown:
+            self._sys.stdout.write("\r\033[2K")
+            self._sys.stdout.flush()
+        self._spinner_exited.set()
+
+    def stop(self) -> None:
+        """Stop the spinner and wait until the line is cleared."""
+        self._stop_spinner.set()
+        self._spinner_exited.wait(timeout=1.0)
+
+    def get(self) -> Any:
+        """Block until InquirerPy is loaded and return the inquirer module."""
+        self._done.wait()
+        return self._module
+
+
 def _prompt_select(message: str, choices: list[dict[str, str]], default: str | None = None) -> str:
     """Arrow-key select prompt via InquirerPy."""
     from InquirerPy import inquirer
@@ -185,6 +247,8 @@ def _run_interactive_prompts(
     cli_search: str,
     cli_broadcast: str,
     cli_preset: str | None,
+    console: Console,
+    preloader: _InquirerPreloader,
 ) -> dict[str, str]:
     """Interactive stack selection. CLI-supplied values aren't re-prompted."""
     cli_overrides: dict[str, str] = {}
@@ -216,18 +280,21 @@ def _run_interactive_prompts(
             {"name": "Custom     — choose each service individually", "value": "custom"},
         ]
 
-        selected = _prompt_select(
-            "Choose your stack:",
-            preset_choices,
+        inquirer = preloader.get()
+        selected: str = inquirer.select(
+            message="Choose your stack:",
+            choices=preset_choices,
             default="minimal",
-        )
+            pointer="❯",  # noqa: RUF001
+            show_cursor=False,
+        ).execute()
 
         if selected == "custom":
             choices = _run_custom_prompts(cli_overrides)
         else:
             choices = {**PRESETS[selected], **cli_overrides}
 
-    _print_summary(choices)
+    _print_summary(choices, console)
     return choices
 
 
@@ -247,15 +314,13 @@ def _run_custom_prompts(cli_overrides: dict[str, str]) -> dict[str, str]:
     return choices
 
 
-def _print_summary(choices: dict[str, str]) -> None:
+def _print_summary(choices: dict[str, str], console: Console) -> None:
     """Print the selected stack as a one-liner."""
     parts = [f"[green]{choices[svc]}[/green]" for svc in _SERVICE_LABELS]
     summary = " · ".join(parts)
-    typer.echo()
-    from rich.console import Console
-
-    Console().print(f"  [bold]Stack:[/bold] {summary}")
-    typer.echo()
+    console.print()
+    console.print(f"  [bold]Stack:[/bold] {summary}")
+    console.print()
 
 
 def validate_project_name(name: str) -> bool:
@@ -293,20 +358,8 @@ def _get_arvel_version() -> str:
 
 
 def _fetch_templates_registry() -> list[dict[str, Any]]:
-    """Load the bundled templates.json shipped with the CLI package."""
-    return _load_bundled_registry()
-
-
-def _load_bundled_registry() -> list[dict[str, Any]]:
-    """Offline fallback: load templates.json from the installed package."""
-    import importlib.resources
-
-    try:
-        ref = importlib.resources.files("arvel").joinpath("templates.json")
-        data = json.loads(ref.read_text(encoding="utf-8"))
-        return data.get("templates", [])
-    except Exception:
-        return []
+    """Return the built-in template registry."""
+    return list(_BUNDLED_TEMPLATES)
 
 
 def _resolve_template_repo(templates: list[dict[str, Any]], name: str | None = None) -> str:
@@ -333,6 +386,29 @@ def _repo_to_owner_name(repo_url: str) -> str:
     if repo_url.startswith("https://github.com/"):
         return repo_url.removeprefix("https://github.com/")
     return repo_url
+
+
+def _start_background_download(
+    repo_url: str,
+    branch: str | None,
+) -> Future[Path]:
+    """Kick off the template download in a background thread."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    return executor.submit(_download_skeleton, repo_url, branch)
+
+
+def _await_download(future: Future[Path], console: Console) -> Path:
+    """Show a spinner while waiting for the background download."""
+    if future.done():
+        return future.result()
+
+    with console.status(
+        "[bold cyan]Downloading template...[/bold cyan]",
+        spinner="dots",
+    ):
+        return future.result()
 
 
 def _download_skeleton(
@@ -363,6 +439,11 @@ def _download_skeleton(
 
 def _download_skeleton_tarball(owner_repo: str, branch: str) -> Path | None:
     """GitHub tarball API download. Returns None on failure."""
+    import io
+    import tarfile
+    from urllib.error import URLError
+    from urllib.request import Request, urlopen
+
     url = f"https://github.com/{owner_repo}/tarball/{branch}"
     req = Request(url, headers={"User-Agent": "arvel-cli"})  # noqa: S310
 
@@ -392,6 +473,8 @@ def _download_skeleton_tarball(owner_repo: str, branch: str) -> Path | None:
 
 def _download_skeleton_git_clone(repo_url: str, branch: str) -> Path | None:
     """Shallow git clone fallback. Returns None on failure."""
+    import shutil
+    import subprocess
     import tempfile
 
     clone_dir = Path(tempfile.mkdtemp(prefix="arvel-new-"))
@@ -424,6 +507,9 @@ def _download_skeleton_git_clone(repo_url: str, branch: str) -> Path | None:
 
 def _resolve_latest_tag(owner_repo: str) -> str:
     """Latest release tag from GitHub, or 'main' if unavailable."""
+    import json
+    from urllib.request import Request, urlopen
+
     url = f"https://api.github.com/repos/{owner_repo}/releases/latest"
     req = Request(url, headers={"User-Agent": "arvel-cli"})  # noqa: S310
 
@@ -445,6 +531,10 @@ def render_skeleton(
     context: dict[str, Any],
 ) -> None:
     """Copy skeleton to target, render .j2 files. GHA ${{ }} expressions are escaped."""
+    import shutil
+
+    from jinja2 import Environment, FileSystemLoader
+
     if target_dir.exists():
         shutil.rmtree(target_dir)
     shutil.copytree(skeleton_dir, target_dir)
@@ -475,6 +565,8 @@ def render_skeleton(
 
 def _setup_env(target_dir: Path, context: dict[str, Any]) -> None:
     """Ensure .env exists — prefer rendered .env.j2, fall back to .env.example."""
+    import shutil
+
     env_file = target_dir / ".env"
     if env_file.exists():
         return
@@ -485,6 +577,8 @@ def _setup_env(target_dir: Path, context: dict[str, Any]) -> None:
 
 def _run_uv_sync(target_dir: Path) -> None:
     """Install deps with uv sync. Warns if uv is missing or times out."""
+    import subprocess
+
     try:
         subprocess.run(
             ["uv", "sync", "--all-extras"],  # noqa: S607
@@ -501,6 +595,8 @@ def _run_uv_sync(target_dir: Path) -> None:
 
 def _git_init(target_dir: Path) -> None:
     """git init + 'Initial commit'. Warns on failure."""
+    import subprocess
+
     try:
         subprocess.run(["git", "init"], cwd=target_dir, check=True, capture_output=True)  # noqa: S607
         subprocess.run(["git", "add", "."], cwd=target_dir, check=True, capture_output=True)  # noqa: S607
@@ -514,12 +610,20 @@ def _git_init(target_dir: Path) -> None:
         typer.echo("Warning: git initialization failed.", err=True)
 
 
+class _ValidationError(Exception):
+    """Raised by input validation to signal an error message before exit."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(message)
+
+
 def _validate_choice(option: str, value: str, configs: dict[str, dict[str, str]]) -> None:
-    """Exit with error if value isn't in configs."""
+    """Raise _ValidationError if value isn't in configs."""
     if value not in configs:
         choices = ", ".join(configs)
-        typer.echo(f"Unknown {option} '{value}'. Choose: {choices}.")
-        raise typer.Exit(code=1)
+        msg = f"Unknown {option} '{value}'. Choose: {choices}."
+        raise _ValidationError(msg)
 
 
 def _build_context(driver_choices: dict[str, str], package_name: str) -> dict[str, Any]:
@@ -567,6 +671,44 @@ def _build_context(driver_choices: dict[str, str], package_name: str) -> dict[st
         "use_meilisearch": driver_choices["search"] == "meilisearch",
         "use_elasticsearch": driver_choices["search"] == "elasticsearch",
     }
+
+
+def _validate_inputs(
+    *,
+    name: str,
+    force: bool,
+    preset: str | None,
+    database: str,
+    cache: str,
+    queue: str,
+    mail: str,
+    storage: str,
+    search: str,
+    broadcast: str,
+) -> Path:
+    """Validate all CLI arguments and return the target directory."""
+    if not validate_project_name(name):
+        msg = "Invalid project name. Use lowercase letters, digits, hyphens, and underscores."
+        raise _ValidationError(msg)
+
+    target = Path.cwd() / name
+    if target.exists() and not force:
+        msg = f"Directory '{name}' already exists. Use --force to overwrite."
+        raise _ValidationError(msg)
+
+    if preset and preset not in PRESETS:
+        valid = ", ".join(PRESETS)
+        msg = f"Unknown preset '{preset}'. Choose: {valid}."
+        raise _ValidationError(msg)
+
+    _validate_choice("database", database, DATABASE_CONFIGS)
+    _validate_choice("cache", cache, CACHE_CONFIGS)
+    _validate_choice("queue", queue, QUEUE_CONFIGS)
+    _validate_choice("mail", mail, MAIL_CONFIGS)
+    _validate_choice("storage", storage, STORAGE_CONFIGS)
+    _validate_choice("search", search, SEARCH_CONFIGS)
+    _validate_choice("broadcast", broadcast, BROADCAST_CONFIGS)
+    return target
 
 
 @new_app.command(name="project")
@@ -627,32 +769,41 @@ def new_project(
     no_input: bool = typer.Option(False, "--no-input", help="Skip interactive prompts."),
 ) -> None:
     """Create a new Arvel project."""
-    if not validate_project_name(name):
-        typer.echo("Invalid project name. Use lowercase letters, digits, hyphens, and underscores.")
-        raise typer.Exit(code=1)
+    preloader = _InquirerPreloader() if not no_input else None
 
-    target = Path.cwd() / name
-    if target.exists() and not force:
-        typer.echo(f"Directory '{name}' already exists. Use --force to overwrite.")
-        raise typer.Exit(code=1)
+    try:
+        target = _validate_inputs(
+            name=name,
+            force=force,
+            preset=preset,
+            database=database,
+            cache=cache,
+            queue=queue,
+            mail=mail,
+            storage=storage,
+            search=search,
+            broadcast=broadcast,
+        )
+    except _ValidationError as exc:
+        if preloader is not None:
+            preloader.stop()
+        typer.echo(exc.message)
+        raise typer.Exit(code=1) from None
 
-    if preset and preset not in PRESETS:
-        valid = ", ".join(PRESETS)
-        typer.echo(f"Unknown preset '{preset}'. Choose: {valid}.")
-        raise typer.Exit(code=1)
+    if using:
+        repo_url = using
+    else:
+        templates = _fetch_templates_registry()
+        repo_url = _resolve_template_repo(templates, template)
 
-    _validate_choice("database", database, DATABASE_CONFIGS)
-    _validate_choice("cache", cache, CACHE_CONFIGS)
-    _validate_choice("queue", queue, QUEUE_CONFIGS)
-    _validate_choice("mail", mail, MAIL_CONFIGS)
-    _validate_choice("storage", storage, STORAGE_CONFIGS)
-    _validate_choice("search", search, SEARCH_CONFIGS)
-    _validate_choice("broadcast", broadcast, BROADCAST_CONFIGS)
+    download_future = _start_background_download(repo_url, branch)
 
-    # Resolve driver choices: interactive prompts, preset, or CLI flags
-    if no_input:
+    from rich.console import Console
+
+    console = Console()
+
+    if no_input or preloader is None:
         base = PRESETS[preset] if preset else PRESETS["minimal"]
-        # CLI flags override the preset/defaults
         driver_choices = {
             "database": database if database != "sqlite" or not preset else base["database"],
             "cache": cache if cache != "memory" or not preset else base["cache"],
@@ -672,50 +823,59 @@ def new_project(
             cli_search=search,
             cli_broadcast=broadcast,
             cli_preset=preset,
+            preloader=preloader,
+            console=console,
         )
 
     from arvel.cli.app import BANNER
 
-    typer.echo(typer.style(BANNER, fg=typer.colors.CYAN, bold=True))
-    typer.echo(f"Creating project '{name}'...")
+    console.print(f"[bold cyan]{BANNER}[/bold cyan]")
+    console.print(f"  Creating [bold]{name}[/bold]\n")
 
-    if using:
-        repo_url = using
-    else:
-        templates = _fetch_templates_registry()
-        repo_url = _resolve_template_repo(templates, template)
-
-    skeleton_dir = _download_skeleton(repo_url, branch)
+    skeleton_dir = _await_download(download_future, console)
+    console.print("  [green]✓[/green] Template downloaded")
 
     package_name = to_package_name(name)
     context = _build_context(driver_choices, package_name)
 
-    render_skeleton(skeleton_dir=skeleton_dir, target_dir=target, context=context)
+    with console.status(
+        "[bold cyan]  Scaffolding project...[/bold cyan]",
+        spinner="dots",
+    ):
+        render_skeleton(
+            skeleton_dir=skeleton_dir,
+            target_dir=target,
+            context=context,
+        )
+        _setup_env(target, context)
 
-    _setup_env(target, context)
+        if driver_choices["database"] == "sqlite":
+            db_dir = target / "database"
+            db_dir.mkdir(exist_ok=True)
+            (db_dir / "database.sqlite").touch()
 
-    if driver_choices["database"] == "sqlite":
-        db_dir = target / "database"
-        db_dir.mkdir(exist_ok=True)
-        (db_dir / "database.sqlite").touch()
+    console.print("  [green]✓[/green] Project scaffolded")
 
     if not no_install:
-        typer.echo("Installing dependencies...")
-        _run_uv_sync(target)
+        with console.status(
+            "[bold cyan]  Installing dependencies...[/bold cyan]",
+            spinner="dots",
+        ):
+            _run_uv_sync(target)
+        console.print("  [green]✓[/green] Dependencies installed")
 
     if not no_git:
-        typer.echo("Initializing git repository...")
-        _git_init(target)
+        with console.status(
+            "[bold cyan]  Initializing git...[/bold cyan]",
+            spinner="dots",
+        ):
+            _git_init(target)
+        console.print("  [green]✓[/green] Git initialized")
 
-    green = typer.colors.GREEN
-    dim = typer.colors.BRIGHT_BLACK
-
-    typer.echo()
-    typer.echo(
-        typer.style("  ✓ Application ready!", fg=green, bold=True) + " Build something amazing."
-    )
-    typer.echo()
-    typer.echo(f"  {typer.style('$', fg=dim)} cd {name}")
-    typer.echo(f"  {typer.style('$', fg=dim)} uv run arvel serve")
-    typer.echo(f"  {typer.style('$', fg=dim)} uv run arvel make module <your-first-module>")
-    typer.echo()
+    console.print()
+    console.print("  [bold green]✓ Application ready![/bold green] Build something amazing.")
+    console.print()
+    console.print(f"  [dim]$[/dim] cd {name}")
+    console.print("  [dim]$[/dim] uv run arvel serve")
+    console.print("  [dim]$[/dim] uv run arvel make module <your-first-module>")
+    console.print()
