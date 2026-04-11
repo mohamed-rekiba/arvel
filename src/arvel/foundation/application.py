@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -142,6 +143,19 @@ class Application:
     # ── Public API ───────────────────────────────────────────
 
     @classmethod
+    def _new_unbooted(cls, base_path: Path, *, testing: bool) -> Application:
+        """Create an unbooted instance with all fields initialized."""
+        instance = cls.__new__(cls)
+        instance.base_path = base_path
+        instance._testing = testing
+        instance._booted = False
+        instance._boot_lock = asyncio.Lock()
+        instance._shutdown_lock = asyncio.Lock()
+        instance._shutting_down = False
+        instance._shutdown_complete = False
+        return instance
+
+    @classmethod
     def configure(
         cls,
         base_path: str | Path = ".",
@@ -154,16 +168,7 @@ class Application:
         heavy async bootstrap (config loading, provider lifecycle) runs
         automatically on the first ASGI event — not at import time.
         """
-        base = Path(base_path).resolve()
-        instance = cls.__new__(cls)
-        instance.base_path = base
-        instance._testing = testing
-        instance._booted = False
-        instance._boot_lock = asyncio.Lock()
-        instance._shutdown_lock = asyncio.Lock()
-        instance._shutting_down = False
-        instance._shutdown_complete = False
-        return instance
+        return cls._new_unbooted(Path(base_path).resolve(), testing=testing)
 
     @classmethod
     async def create(
@@ -177,17 +182,11 @@ class Application:
         Useful for tests or scripts where you need a fully-booted app
         immediately.  For ``arvel serve``, prefer ``configure()``.
         """
-        base = Path(base_path).resolve()  # noqa: ASYNC240
-
-        app_instance = cls.__new__(cls)
-        app_instance.base_path = base
-        app_instance._testing = testing
-        app_instance._shutdown_lock = asyncio.Lock()
-        app_instance._shutting_down = False
-        app_instance._shutdown_complete = False
-
+        app_instance = cls._new_unbooted(
+            Path(base_path).resolve(),  # noqa: ASYNC240
+            testing=testing,
+        )
         await app_instance._bootstrap(testing=testing)
-
         return app_instance
 
     def asgi_app(self) -> FastAPI:
@@ -275,9 +274,11 @@ class Application:
 
     async def _bootstrap(self, *, testing: bool = False) -> None:
         """Shared async bootstrap — load config, register providers, build container."""
+        t_start = time.monotonic()
         base = self.base_path
 
         config = await load_config(base, testing=testing)
+        t_config = time.monotonic()
 
         _apply_early_log_level(config)
 
@@ -315,6 +316,7 @@ class Application:
             logger.debug("provider_register_ok", provider=provider_name)
 
         container = builder.build()
+        t_register = time.monotonic()
 
         self.config = config
         self.container = container
@@ -322,6 +324,7 @@ class Application:
         self._fastapi_app = self._build_fastapi_app(config)
 
         await self._boot_providers()
+        t_boot = time.monotonic()
 
         self._booted = True
         logger.info(
@@ -330,6 +333,10 @@ class Application:
             app_env=config.app_env,
             debug=config.app_debug,
             providers=len(providers),
+            config_ms=round((t_config - t_start) * 1000, 1),
+            register_ms=round((t_register - t_config) * 1000, 1),
+            boot_ms=round((t_boot - t_register) * 1000, 1),
+            total_ms=round((t_boot - t_start) * 1000, 1),
         )
 
     async def _boot(self) -> None:
@@ -391,13 +398,14 @@ class Application:
             msg = "bootstrap/providers.py not found — every Arvel app must define it"
             raise ProviderNotFoundError(msg, module_path=str(providers_file))
 
-        spec = importlib.util.spec_from_file_location("bootstrap.providers", str(providers_file))
+        module_key = f"arvel.bootstrap.providers.{base_path.name}"
+        spec = importlib.util.spec_from_file_location(module_key, str(providers_file))
         if spec is None or spec.loader is None:
             msg = f"Cannot load {providers_file}"
             raise ProviderNotFoundError(msg, module_path=str(providers_file))
 
         module = importlib.util.module_from_spec(spec)
-        sys.modules["bootstrap.providers"] = module
+        sys.modules[module_key] = module
         spec.loader.exec_module(module)
 
         provider_list: list[type[ServiceProvider]] | None = getattr(module, "providers", None)

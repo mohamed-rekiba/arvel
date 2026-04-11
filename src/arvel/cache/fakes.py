@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from arvel.cache.drivers.memory_driver import MemoryCache
 
 
@@ -12,7 +14,7 @@ class CacheFake(MemoryCache):
         super().__init__()
         self._puts: list[str] = []
 
-    async def put(self, key: str, value: str | bytes, *, ttl: int | None = None) -> None:
+    async def put(self, key: str, value: Any, *, ttl: int | None = None) -> None:
         self._puts.append(key)
         await super().put(key, value, ttl=ttl)
 

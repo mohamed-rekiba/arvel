@@ -16,6 +16,10 @@ class CacheContract(ABC):
 
     Implementations: RedisCache (production), MemoryCache (testing/dev),
     NullCache (dry-run).
+
+    Values passed to ``put`` must be JSON-serializable at runtime; the
+    ``Any`` type is intentional because cache drivers call ``json.dumps``
+    and raise ``CacheSerializationError`` for non-serializable values.
     """
 
     @abstractmethod

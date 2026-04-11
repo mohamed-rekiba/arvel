@@ -35,12 +35,9 @@ class TestProviderBindingsAvailableDuringBoot:
             "providers = [ModAProvider, ModBProvider]\n"
         )
 
-        await Application.create(tmp_project, testing=True)
-
-        from importlib import import_module
-
-        bp = import_module("bootstrap.providers")
-        assert bp.ModBProvider.resolved is not None
+        app = await Application.create(tmp_project, testing=True)
+        mod_b_cls = type(app.providers[1])
+        assert mod_b_cls.resolved is not None  # ty: ignore[unresolved-attribute]
 
 
 class TestAutoDiscovery:
@@ -84,19 +81,13 @@ class TestServiceProviderDefaults:
         assert provider.priority == 50
 
     async def test_register_is_noop_by_default(self) -> None:
-        from typing import Any, cast
-
         provider = ServiceProvider()
-        await provider.register(cast("Any", None))
+        await provider.register(None)  # ty: ignore[invalid-argument-type]
 
     async def test_boot_is_noop_by_default(self) -> None:
-        from typing import Any, cast
-
         provider = ServiceProvider()
-        await provider.boot(cast("Any", None))
+        await provider.boot(None)  # ty: ignore[invalid-argument-type]
 
     async def test_shutdown_is_noop_by_default(self) -> None:
-        from typing import Any, cast
-
         provider = ServiceProvider()
-        await provider.shutdown(cast("Any", None))
+        await provider.shutdown(None)  # ty: ignore[invalid-argument-type]

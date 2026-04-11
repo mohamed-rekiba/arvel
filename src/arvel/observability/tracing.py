@@ -2,10 +2,31 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 if TYPE_CHECKING:
+    from fastapi import FastAPI
+
     from arvel.observability.config import ObservabilitySettings
+
+
+@runtime_checkable
+class Tracer(Protocol):
+    """Minimal tracer protocol — compatible with both OTEL and no-op tracers."""
+
+    def start_as_current_span(self, name: str, **kwargs: Any) -> Span: ...
+    def start_span(self, name: str, **kwargs: Any) -> Span: ...
+
+
+@runtime_checkable
+class Span(Protocol):
+    """Minimal span protocol — compatible with both OTEL and no-op spans."""
+
+    def __enter__(self) -> Span: ...
+    def __exit__(self, *args: Any) -> None: ...
+    def set_attribute(self, key: str, value: Any) -> None: ...
+    def add_event(self, name: str, attributes: dict[str, Any] | None = None) -> None: ...
+
 
 _HAS_OTEL = False
 _HAS_OTEL_FASTAPI = False
@@ -43,7 +64,7 @@ class _NoOpSpan:
 
 
 class _NoOpTracer:
-    """Minimal no-op tracer for when OTEL is not installed."""
+    """No-op tracer satisfying the Tracer protocol."""
 
     def start_as_current_span(self, name: str, **kwargs: Any) -> _NoOpSpan:
         return _NoOpSpan()
@@ -56,7 +77,7 @@ def configure_tracing(
     settings: ObservabilitySettings,
     *,
     app_name: str,
-    fastapi_app: Any | None = None,
+    fastapi_app: FastAPI | None = None,
 ) -> bool | None:
     """Configure OpenTelemetry tracing if enabled and installed.
 
@@ -99,8 +120,8 @@ def configure_tracing(
     return True
 
 
-def get_tracer(name: str) -> Any:
+def get_tracer(name: str) -> Tracer:
     """Return an OTEL tracer or a no-op tracer if OTEL is not available."""
     if _HAS_OTEL:
-        return trace.get_tracer(name)
+        return cast("Tracer", trace.get_tracer(name))
     return _NoOpTracer()

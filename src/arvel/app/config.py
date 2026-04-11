@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pydantic import SecretStr
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 if TYPE_CHECKING:
+    from typing import Self
+
     from arvel.foundation.config import ModuleSettings
 
 
@@ -56,8 +59,20 @@ class AppSettings(BaseSettings):
 
     model_config = SettingsConfigDict(extra="ignore")
 
-    # Populated by load_config(); not a pydantic field (underscore prefix).
-    _module_settings: dict[type[ModuleSettings], ModuleSettings] = {}
+    # Populated per-instance by __init__ and load_config(); not a Pydantic field.
+    _module_settings: dict[type[ModuleSettings], ModuleSettings]
+
+    @model_validator(mode="after")
+    def _check_app_key_in_production(self) -> Self:
+        if self.app_env == "production" and not self.app_key.get_secret_value():
+            warnings.warn(
+                "APP_KEY is empty in production — encryption and signed "
+                "cookies will be insecure. Set APP_KEY to a random 32+ "
+                "character string.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return self
 
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)

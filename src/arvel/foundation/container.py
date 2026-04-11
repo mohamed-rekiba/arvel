@@ -7,6 +7,7 @@ factory bindings, and automatic constructor parameter injection.
 from __future__ import annotations
 
 import inspect
+import warnings
 from collections.abc import (
     Callable,  # noqa: TC003 - needed at runtime for get_type_hints resolution
 )
@@ -91,6 +92,12 @@ class ContainerBuilder:
     def build(self) -> Container:
         bindings_map: dict[type, _Binding] = {}
         for b in self._bindings:
+            if b.interface in bindings_map:
+                warnings.warn(
+                    f"Duplicate binding for {b.interface.__name__} — "
+                    f"overriding previous registration",
+                    stacklevel=2,
+                )
             bindings_map[b.interface] = b
         return Container(bindings_map, scope=Scope.APP)
 
@@ -111,6 +118,14 @@ class Container:
             type, Any
         ] = {}  # type-erased storage; resolve() restores T via type[T] key
         self._closed = False
+
+    def has(self, interface: type) -> bool:
+        """Check whether a binding exists without triggering resolution."""
+        if interface in self._bindings:
+            return True
+        if self._parent is not None:
+            return self._parent.has(interface)
+        return False
 
     async def resolve[T](self, interface: type[T]) -> T:
         if self._closed:
@@ -148,7 +163,10 @@ class Container:
 
     async def _create_instance(self, binding: _Binding) -> object:
         if binding.factory is not None:
-            return binding.factory()
+            result = binding.factory()
+            if inspect.isawaitable(result):
+                return await result
+            return result
         if binding.concrete is not None:
             return await self._construct_with_injection(binding.concrete)
         raise DependencyError(

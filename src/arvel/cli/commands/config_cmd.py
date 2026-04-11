@@ -39,7 +39,7 @@ def cache_config() -> None:
     cache_file = _cache_path()
     cache_file.parent.mkdir(parents=True, exist_ok=True)
 
-    asyncio.run(_cache(config, cache_file))
+    _cache(config, cache_file)
     cache_file.chmod(0o600)
 
     typer.echo(f"Configuration cached to {cache_file}")

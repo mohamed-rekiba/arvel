@@ -109,7 +109,7 @@ class TestConfigCache:
         config = await load_config(tmp_project)
 
         cache_path = tmp_project / ".config_cache"
-        await cache_config(config, cache_path)
+        cache_config(config, cache_path)
         assert cache_path.exists()
 
         cached = await load_config(tmp_project, cache_path=cache_path)
@@ -120,7 +120,7 @@ class TestConfigCache:
         config = await load_config(tmp_project)
 
         cache_path = tmp_project / ".config_cache"
-        await cache_config(config, cache_path)
+        cache_config(config, cache_path)
 
         start = time.perf_counter()
         await load_config(tmp_project, cache_path=cache_path)
@@ -132,7 +132,7 @@ class TestConfigCache:
         (tmp_project / ".env").write_text("APP_NAME=CacheTest\nDB_HOST=db-host\n")
         config = await load_config(tmp_project, extra_settings=[DatabaseSettings])
         cache_path = tmp_project / ".config_cache"
-        await cache_config(config, cache_path)
+        cache_config(config, cache_path)
 
         cached = await load_config(
             tmp_project, cache_path=cache_path, extra_settings=[DatabaseSettings]
