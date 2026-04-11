@@ -96,7 +96,7 @@ Bootstrap is the chapter where the framework wakes up:
 - **FastAPI shell** — `_build_fastapi_app` creates the app, wires optional OpenAPI security metadata, and attaches a lifespan that calls `Application.shutdown()` when the server stops.
 - **Boot phase** — Every provider’s `async boot(app: Application)` runs. This is where routes, event subscribers, kernel middleware, and anything that needs a resolved dependency belong.
 
-When the process exits or the lifespan ends, `shutdown()` walks providers in **reverse** order and closes the container.
+When the process exits or the lifespan ends, `shutdown()` walks providers in **reverse** order, logs any failure with the full exception message and traceback, then closes the container (which disposes instances that implement `close()` or `aclose()`). Calling `shutdown()` on an app that never finished booting is safe — it returns immediately.
 
 ## Service providers: register then boot
 
@@ -105,7 +105,7 @@ The two-phase split is intentional:
 - **Register** — Pure binding time. No HTTP stack, no route list yet (framework providers may still enqueue work for boot).
 - **Boot** — Integration time. The HTTP provider discovers routes, mounts routers, and attaches the `HttpKernel`’s global middleware to the FastAPI app.
 
-If `register` fails, you get a `BootError` with the provider name. Same for `boot`. That makes production failures easier to grep than a generic stack trace alone.
+If `register` fails, you get a `BootError` with the provider name. Same for `boot` — and on boot failure, any providers that already completed `boot()` have their `shutdown()` called in reverse order before the error propagates. This prevents resource leaks from partially-booted applications.
 
 ## Middleware execution order
 

@@ -66,7 +66,7 @@ def _configure_channel_handlers(
 
     for channel_name, driver in settings.log_channels.items():
         if driver == "stderr":
-            channel_handler: logging.Handler = logging.StreamHandler(sys.stdout)
+            channel_handler: logging.Handler = logging.StreamHandler(sys.stderr)
         else:
             configured_path = settings.log_channel_paths.get(driver)
             if configured_path is None:

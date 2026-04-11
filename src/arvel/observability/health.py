@@ -65,36 +65,48 @@ class HealthRegistry:
     def register(self, check: HealthCheck) -> None:
         self._checks.append(check)
 
-    async def run_all(self) -> HealthEndpointPayload:
-        """Run all registered checks and return aggregate status."""
-        results: list[HealthCheckPayload] = []
-        overall = HealthStatus.HEALTHY
-
-        for hc in self._checks:
-            start = time.monotonic()
-            try:
-                with anyio.fail_after(self._timeout):
-                    result = await hc.check()
-            except TimeoutError:
-                elapsed = (time.monotonic() - start) * 1000
-                result = HealthResult(
-                    status=HealthStatus.DEGRADED,
-                    message=f"timed out after {self._timeout}s",
-                    duration_ms=elapsed,
-                )
-
-            results.append(
-                HealthCheckPayload(
-                    name=hc.name,
-                    status=result.status,
-                    message=result.message,
-                    duration_ms=round(result.duration_ms, 2),
-                )
+    async def _run_single(self, hc: HealthCheck) -> HealthCheckPayload:
+        start = time.monotonic()
+        try:
+            with anyio.fail_after(self._timeout):
+                result = await hc.check()
+        except TimeoutError:
+            elapsed = (time.monotonic() - start) * 1000
+            result = HealthResult(
+                status=HealthStatus.DEGRADED,
+                message=f"timed out after {self._timeout}s",
+                duration_ms=elapsed,
             )
+        return HealthCheckPayload(
+            name=hc.name,
+            status=result.status,
+            message=result.message,
+            duration_ms=round(result.duration_ms, 2),
+        )
 
-            if result.status == HealthStatus.UNHEALTHY:
+    async def run_all(self) -> HealthEndpointPayload:
+        """Run all registered checks in parallel and return aggregate status."""
+        payloads: list[HealthCheckPayload] = []
+
+        async with anyio.create_task_group() as tg:
+            results_map: dict[str, HealthCheckPayload] = {}
+
+            async def _wrapper(hc: HealthCheck) -> None:
+                payload = await self._run_single(hc)
+                results_map[hc.name] = payload
+
+            for hc in self._checks:
+                tg.start_soon(_wrapper, hc)
+
+        # Preserve registration order in output
+        for hc in self._checks:
+            payloads.append(results_map[hc.name])
+
+        overall = HealthStatus.HEALTHY
+        for p in payloads:
+            if p.status == HealthStatus.UNHEALTHY:
                 overall = HealthStatus.UNHEALTHY
-            elif result.status == HealthStatus.DEGRADED and overall != HealthStatus.UNHEALTHY:
+            elif p.status == HealthStatus.DEGRADED and overall != HealthStatus.UNHEALTHY:
                 overall = HealthStatus.DEGRADED
 
-        return HealthEndpointPayload(status=overall, checks=results)
+        return HealthEndpointPayload(status=overall, checks=payloads)

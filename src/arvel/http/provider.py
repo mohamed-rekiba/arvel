@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from arvel.foundation.config import get_module_settings
+from arvel.foundation.exceptions import ConfigurationError
 from arvel.foundation.provider import ServiceProvider
 from arvel.http.config import HttpSettings
 from arvel.http.kernel import HttpKernel
@@ -46,7 +47,11 @@ class HttpServiceProvider(ServiceProvider):
         config = app.config
         try:
             http_settings = get_module_settings(config, HttpSettings)
-        except Exception:
+        except (ConfigurationError, KeyError) as exc:
+            logger.warning(
+                "http_settings_fallback",
+                error=str(exc),
+            )
             http_settings = HttpSettings()
 
         kernel = HttpKernel()

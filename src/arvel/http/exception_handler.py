@@ -146,6 +146,7 @@ def _register_one(app: FastAPI, exc_type: type[Exception], status_code: int) -> 
 
 def install_exception_handlers(app: FastAPI, *, debug: bool = False) -> None:
     """Register RFC 9457 Problem Details handlers on a FastAPI app."""
+    register_exception(app)
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:

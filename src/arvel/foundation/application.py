@@ -7,7 +7,6 @@ returns an ASGI-compatible app that bootstraps lazily on the first ASGI event
 
 from __future__ import annotations
 
-import asyncio
 import importlib.util
 import sys
 import time
@@ -15,6 +14,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import anyio
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
@@ -24,7 +24,7 @@ from arvel.foundation.container import (  # noqa: TC001
     ContainerBuilder,
     Scope,
 )
-from arvel.foundation.exceptions import BootError, ProviderNotFoundError
+from arvel.foundation.exceptions import BootError, ConfigurationError, ProviderNotFoundError
 from arvel.logging import Log
 
 if TYPE_CHECKING:
@@ -59,7 +59,13 @@ def _apply_early_log_level(config: AppSettings) -> None:
 
     try:
         obs = get_module_settings(config, ObservabilitySettings)
-    except Exception:
+    except (ConfigurationError, KeyError) as exc:
+        import structlog
+
+        structlog.get_logger("arvel.foundation.application").warning(
+            "early_log_level_settings_fallback",
+            error=str(exc),
+        )
         obs = ObservabilitySettings()
 
     level = getattr(logging, obs.log_level.upper(), logging.INFO)
@@ -119,8 +125,8 @@ class Application:
 
     _booted: bool
     _testing: bool
-    _boot_lock: asyncio.Lock
-    _shutdown_lock: asyncio.Lock
+    _boot_lock: anyio.Lock
+    _shutdown_lock: anyio.Lock
     _shutting_down: bool
     _shutdown_complete: bool
 
@@ -149,8 +155,8 @@ class Application:
         instance.base_path = base_path
         instance._testing = testing
         instance._booted = False
-        instance._boot_lock = asyncio.Lock()
-        instance._shutdown_lock = asyncio.Lock()
+        instance._boot_lock = anyio.Lock()
+        instance._shutdown_lock = anyio.Lock()
         instance._shutting_down = False
         instance._shutdown_complete = False
         return instance
@@ -245,6 +251,11 @@ class Application:
         if self._shutdown_complete:
             return
 
+        # FR-013: Safe to call on unbooted app
+        if not self._booted:
+            self._shutdown_complete = True
+            return
+
         async with self._shutdown_lock:
             if self._shutdown_complete or self._shutting_down:
                 return
@@ -257,10 +268,15 @@ class Application:
                     try:
                         await provider.shutdown(self)
                     except Exception as exc:
+                        # FR-021: Log full error message and traceback
+                        import traceback as tb
+
                         logger.error(
                             "provider_shutdown_failed",
                             provider=provider_name,
                             error=type(exc).__name__,
+                            error_message=str(exc),
+                            traceback=tb.format_exc(),
                         )
                     else:
                         logger.debug("provider_shutdown_ok", provider=provider_name)
@@ -369,9 +385,15 @@ class Application:
         if security_schemes:
             _install_openapi_security(app, security_schemes, global_security)
 
+        if config.app_exception_handlers:
+            from arvel.http.exception_handler import install_exception_handlers
+
+            install_exception_handlers(app, debug=config.app_debug)
+
         return app
 
     async def _boot_providers(self) -> None:
+        booted: list[ServiceProvider] = []
         for provider in self.providers:
             provider_name = type(provider).__name__
             logger.debug("provider_boot_start", provider=provider_name)
@@ -382,12 +404,26 @@ class Application:
                     "provider_boot_failed",
                     provider=provider_name,
                     error=type(exc).__name__,
+                    error_message=str(exc),
                 )
+                # FR-009: Rollback already-booted providers in reverse order
+                for booted_provider in reversed(booted):
+                    bp_name = type(booted_provider).__name__
+                    try:
+                        await booted_provider.shutdown(self)
+                    except Exception as shutdown_exc:
+                        logger.warning(
+                            "provider_rollback_shutdown_failed",
+                            provider=bp_name,
+                            error=str(shutdown_exc),
+                        )
+                await self.container.close()
                 raise BootError(
                     f"Provider {provider_name} failed during boot: {exc}",
                     provider_name=provider_name,
                     cause=exc,
                 ) from exc
+            booted.append(provider)
             logger.debug("provider_boot_ok", provider=provider_name)
 
     @staticmethod

@@ -6,7 +6,7 @@ Integrate with **OpenTelemetry** and **Sentry** separately (see tracing and erro
 
 ## Registering checks
 
-Implement **`HealthCheck`**: a **`name`** attribute and async **`check() -> HealthResult`**. Register instances on **`HealthRegistry`**; **`run_all`** executes each check with a **timeout**, marking slow checks as **degraded** rather than hanging forever.
+Implement **`HealthCheck`**: a **`name`** attribute and async **`check() -> HealthResult`**. Register instances on **`HealthRegistry`**; **`run_all`** executes all checks **in parallel** (via `anyio.create_task_group`), each with its own **timeout**, marking slow checks as **degraded** rather than hanging forever. Total latency is approximately the duration of the slowest check, not the sum of all checks.
 
 ```python
 import time

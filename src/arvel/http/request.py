@@ -1,7 +1,7 @@
 """Request-scoped container middleware.
 
 Pure ASGI middleware that creates a REQUEST-scoped child container
-at the start of each HTTP request and closes it after the response.
+at the start of each HTTP or WebSocket connection and closes it afterward.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 class RequestContainerMiddleware:
-    """Creates and closes a REQUEST-scoped child container per HTTP request.
+    """Creates and closes a REQUEST-scoped child container per HTTP request or WebSocket connection.
 
     Stores the child container at ``scope["state"]["container"]`` so that
     controller resolution and DI can access it.
@@ -38,11 +38,11 @@ class RequestContainerMiddleware:
         self._on_close = on_close
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
+        if scope["type"] not in ("http", "websocket"):
             await self.app(scope, receive, send)
             return
 
-        child = await self._container.enter_scope(DIScope.REQUEST)
+        child = self._container.enter_scope(DIScope.REQUEST)
 
         if "state" not in scope:
             scope["state"] = {}
@@ -51,9 +51,11 @@ class RequestContainerMiddleware:
         try:
             await self.app(scope, receive, send)
         finally:
-            await child.close()
-            if self._on_close is not None:
-                self._on_close()
+            try:
+                await child.close()
+            finally:
+                if self._on_close is not None:
+                    self._on_close()
 
     @classmethod
     def install(

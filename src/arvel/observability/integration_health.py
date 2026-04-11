@@ -20,6 +20,8 @@ from arvel.search.config import SearchSettings
 from arvel.storage.config import StorageSettings
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncEngine
+
     from arvel.queue.contracts import QueueContract
 
 
@@ -65,22 +67,33 @@ class DatabaseHealthCheck:
 
     name = "database"
 
-    def __init__(self, settings: DatabaseSettings | None = None) -> None:
+    def __init__(
+        self,
+        settings: DatabaseSettings | None = None,
+        *,
+        engine: AsyncEngine | None = None,
+    ) -> None:
         self._settings = settings
+        self._engine = engine
 
     async def check(self) -> HealthResult:
         start = time.monotonic()
         try:
             from sqlalchemy import text
-            from sqlalchemy.ext.asyncio import create_async_engine
 
-            settings = self._settings if self._settings is not None else DatabaseSettings()
-            engine = create_async_engine(settings.url)
-            try:
-                async with engine.connect() as conn:
+            if self._engine is not None:
+                async with self._engine.connect() as conn:
                     await conn.execute(text("SELECT 1"))
-            finally:
-                await engine.dispose()
+            else:
+                from sqlalchemy.ext.asyncio import create_async_engine
+
+                settings = self._settings if self._settings is not None else DatabaseSettings()
+                engine = create_async_engine(settings.url)
+                try:
+                    async with engine.connect() as conn:
+                        await conn.execute(text("SELECT 1"))
+                finally:
+                    await engine.dispose()
             return HealthResult(
                 status=HealthStatus.HEALTHY,
                 message="ok",

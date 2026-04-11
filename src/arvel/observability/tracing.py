@@ -105,7 +105,14 @@ def configure_tracing(
             exporter = OTLPSpanExporter(endpoint=settings.otel_exporter_endpoint)
             provider.add_span_processor(BatchSpanProcessor(exporter))
         except ImportError:
-            pass
+            import warnings
+
+            warnings.warn(
+                f"OTLP exporter endpoint configured ({settings.otel_exporter_endpoint}) "
+                "but opentelemetry-exporter-otlp is not installed — "
+                "traces will not be exported",
+                stacklevel=2,
+            )
 
     trace.set_tracer_provider(provider)
 

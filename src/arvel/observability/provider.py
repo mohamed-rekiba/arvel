@@ -10,6 +10,7 @@ from arvel.broadcasting.config import BroadcastSettings
 from arvel.cache.config import CacheSettings
 from arvel.data.config import DatabaseSettings
 from arvel.foundation.config import get_module_settings
+from arvel.foundation.exceptions import ConfigurationError
 from arvel.foundation.provider import ServiceProvider
 from arvel.http import Router
 from arvel.lock.config import LockSettings
@@ -63,7 +64,13 @@ class ObservabilityProvider(ServiceProvider):
         config = app.config
         try:
             settings = get_module_settings(config, ObservabilitySettings)
-        except Exception:
+        except (ConfigurationError, KeyError) as exc:
+            from arvel.logging import Log
+
+            Log.named("arvel.observability.provider").warning(
+                "observability_settings_fallback",
+                error=str(exc),
+            )
             settings = ObservabilitySettings()
 
         configure_logging(
@@ -127,7 +134,8 @@ class ObservabilityProvider(ServiceProvider):
 
         try:
             db_settings = get_module_settings(config, DatabaseSettings)
-        except Exception:
+        except (ConfigurationError, KeyError) as exc:
+            logger.debug("db_settings_fallback", error=str(exc))
             db_settings = None
         registry.register(DatabaseHealthCheck(settings=db_settings))
 
@@ -166,7 +174,7 @@ def _register_driver_health_check(
     """Register a health check if the driver has an external connection."""
     try:
         resolved = get_module_settings(config, settings_cls)
-    except Exception:
+    except ConfigurationError, KeyError:
         resolved = settings_cls()
     try:
         driver = getattr(resolved, "driver", None)

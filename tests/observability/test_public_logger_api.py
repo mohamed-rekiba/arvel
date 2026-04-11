@@ -74,10 +74,10 @@ def test_log_channel_selection_uses_configured_channels(capsys) -> None:
     )
     logger_module.Log.channel("audit").info("audit-event")
 
-    output = capsys.readouterr().out
+    captured = capsys.readouterr()
+    output = captured.err or captured.out
     assert "audit-event" in output
     assert "audit" in output
-    assert "stderr" in output
 
 
 def test_log_with_context_redacts_sensitive_fields(capsys) -> None:

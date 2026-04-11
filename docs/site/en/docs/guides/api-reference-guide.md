@@ -20,7 +20,7 @@ from arvel.foundation import Application
 | `create` | `async (base_path: str \| Path, *, testing: bool = False) -> Application` | Async factory — eagerly bootstraps. Use for tests/scripts |
 | `asgi_app` | `() -> FastAPI` | Returns the underlying FastAPI instance |
 | `settings` | `(settings_type: type[T]) -> T` | Returns a typed settings slice |
-| `shutdown` | `async () -> None` | Graceful shutdown — reverse provider order |
+| `shutdown` | `async () -> None` | Graceful shutdown — reverse provider order (safe on unbooted app; logs traceback on failure) |
 | `__call__` | `async (scope, receive, send) -> None` | ASGI interface |
 
 ### `Container`
@@ -33,10 +33,10 @@ from arvel.foundation import Container, Scope
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `resolve` | `async (interface: type[T]) -> T` | Resolve a dependency by type |
-| `enter_scope` | `async (scope: Scope) -> Container` | Create a child container |
+| `resolve` | `async (interface: type[T]) -> T` | Resolve a dependency by type (per-type lock prevents duplicate construction) |
+| `enter_scope` | `(scope: Scope) -> Container` | Create a child container (sync, O(1) via ChainMap) |
 | `instance` | `(interface: type[T], value: T) -> None` | Register a pre-built instance (post-boot) |
-| `close` | `async () -> None` | Close container and clear instances |
+| `close` | `async () -> None` | Dispose instances with `close()`/`aclose()`, then clear |
 
 ### `ContainerBuilder`
 
