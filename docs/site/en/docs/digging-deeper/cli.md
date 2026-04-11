@@ -2,7 +2,7 @@
 
 If you have spent any time with Laravel, you already know the rhythm: one entry point, many subcommands, and generators that keep your hands on the keyboard instead of copy-pasting boilerplate. Arvel brings that same feeling to async Python. The `arvel` command is built on **Typer**, so help text, options, and nested groups feel natural in the terminal.
 
-At **v0.1.0** (Python 3.14+), the CLI is the spine of day-to-day work—migrations, queues, the scheduler, routes, health probes, and more—without leaving your shell.
+The CLI is the spine of day-to-day work—migrations, queues, the scheduler, routes, health probes, and more—without leaving your shell.
 
 ## What ships out of the box
 

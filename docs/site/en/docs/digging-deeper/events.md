@@ -2,7 +2,7 @@
 
 Domain events are the glue between “something happened” and “everything that should react.” Arvel’s event layer will feel familiar if you have used Laravel’s dispatcher: you define **`Event`** subclasses, register **`Listener`** classes, and let the **`EventDispatcher`** fan out work—synchronously by default, or **queued** when you want the request to stay fast.
 
-At **v0.1.0**, events are immutable **Pydantic** models, which keeps payloads structured and serialization-friendly if a listener runs later on the queue.
+Events are immutable **Pydantic** models, which keeps payloads structured and serialization-friendly if a listener runs later on the queue.
 
 ## Events
 

@@ -2,7 +2,7 @@
 
 Every framework ships a grab bag of small utilities that save you from reinventing wheels—dot-notation config access, string casing, pluralization for table names. Arvel exposes these under **`arvel.support`**: **`data_get`**, **`pluralize`**, and **`to_snake_case`**, exported for convenience and used throughout the framework itself (for example when generating code or resolving ORM table names).
 
-At **v0.1.0**, they are plain functions—no magic globals—so you can import them explicitly and keep tests deterministic.
+They are plain functions—no magic globals—so you can import them explicitly and keep tests deterministic.
 
 ## `data_get`
 

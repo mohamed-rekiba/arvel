@@ -2,7 +2,7 @@
 
 Hashing protects passwords; **encryption** protects secrets you must recover—OAuth tokens at rest, integration credentials, PII fields your domain genuinely needs to round-trip. Arvel exposes **`EncrypterContract`** with a default **`AesEncrypter`** implementation (**AES-256-CBC** with **HMAC** for integrity).
 
-At **v0.1.0**, encrypt only what you must—every ciphertext expands operational risk (key rotation, backup exposure). Prefer hashing or tokenization when you do not need the plaintext back.
+Encrypt only what you must—every ciphertext expands operational risk (key rotation, backup exposure). Prefer hashing or tokenization when you do not need the plaintext back.
 
 ## The contract
 

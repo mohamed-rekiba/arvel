@@ -2,7 +2,7 @@
 
 Uploads, exports, private documents, public assets—files show up everywhere. Arvel models storage behind **`StorageContract`**, so your code talks to an abstraction while configuration picks **local disk**, **S3-compatible object storage**, or a **null** driver for tests.
 
-At **v0.1.0**, the same pattern applies as elsewhere in the framework: bind the contract in the container, inject it where you need blobs, and swap drivers per environment without branching business logic.
+The same pattern applies as elsewhere in the framework: bind the contract in the container, inject it where you need blobs, and swap drivers per environment without branching business logic.
 
 ## Drivers you will see
 

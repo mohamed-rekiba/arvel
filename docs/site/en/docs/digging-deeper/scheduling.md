@@ -2,7 +2,7 @@
 
 Cron entries scattered across servers are hard to reason about. Arvel’s **`Scheduler`** keeps recurring work **in code**: you register **`ScheduleEntry`** objects against job classes, evaluate cron expressions, and dispatch due work through **`QueueContract`**—same pattern as Laravel’s task scheduler, with fluent helpers for common intervals.
 
-At **v0.1.0**, expressions use **five-field cron** semantics (minute, hour, day of month, month, day of week), validated through **`croniter`**.
+Expressions use **five-field cron** semantics (minute, hour, day of month, month, day of week), validated through **`croniter`**.
 
 ## Building schedules
 
