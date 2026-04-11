@@ -83,7 +83,7 @@ markdown_extensions:
       alternate_style: true
 
 extra:
-  version: 0.1.6 # x-release-please-version
+  version: 0.1.7 # x-release-please-version
   social:
     - icon: fontawesome/brands/github-alt
       link: https://github.com/mohamed-rekiba/arvel
