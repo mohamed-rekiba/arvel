@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.14%2B-blue" alt="Python 3.14+"></a>
   <a href="https://github.com/Mohamed-Rekiba/arvel/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
-  <a href="https://pypi.org/project/arvel/"><img src="https://img.shields.io/badge/pypi-v0.1.4-orange" alt="PyPI"></a> <!-- x-release-please-version -->
+  <a href="https://pypi.org/project/arvel/"><img src="https://img.shields.io/pypi/v/arvel?color=orange" alt="PyPI"></a>
 </p>
 
 > **Alpha Software** — Arvel is under active development. APIs may change between releases. Use it for experimentation and early projects, and expect breaking changes until a stable 1.0 release. The PyPI package is not published yet — install directly from GitHub (see below).
