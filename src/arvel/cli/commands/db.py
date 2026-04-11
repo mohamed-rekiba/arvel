@@ -9,10 +9,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-import typer
+    from arvel.data.config import DatabaseSettings
 
-from arvel.data.config import DatabaseSettings
-from arvel.foundation.config import resolve_env_files, with_env_files
+import typer
 
 db_app = typer.Typer(name="db", help="Database migration and seeding commands.")
 
@@ -50,6 +49,9 @@ def _friendly_db_error(exc: Exception) -> str | None:
 
 
 def _get_settings() -> DatabaseSettings:
+    from arvel.data.config import DatabaseSettings
+    from arvel.foundation.config import resolve_env_files, with_env_files
+
     env_files = resolve_env_files(Path.cwd())
     return with_env_files(DatabaseSettings, env_files)
 
