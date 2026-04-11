@@ -1,6 +1,6 @@
 # Arvel
 
-**Async-first, type-safe Python web framework inspired by Laravel** — v0.1.0, Python 3.14+.
+**Async-first, type-safe Python web framework inspired by Laravel** — Python 3.14+.
 
 If you have ever wished Laravel’s batteries-included ergonomics could meet modern async Python, you are in the right place. Arvel sits on top of FastAPI and Starlette, brings SQLAlchemy 2.0 for the data layer, and wraps everyday concerns — routing, validation, dependency injection, middleware, and a Typer-powered CLI — in APIs that feel familiar yet stay honest to Python’s type system. Structured logging via structlog and settings through Pydantic round out the story so production apps stay observable and configurable without ceremony.
 

@@ -12,6 +12,16 @@ if TYPE_CHECKING:
     from arvel.foundation.config import ModuleSettings
 
 
+def _default_version() -> str:
+    """Resolve the installed arvel version at import time."""
+    try:
+        from importlib.metadata import version
+
+        return version("arvel")
+    except Exception:
+        return "0.0.0"
+
+
 class AppSettings(BaseSettings):
     """Root application settings loaded from APP_* environment variables.
 
@@ -28,7 +38,7 @@ class AppSettings(BaseSettings):
 
     # -- FastAPI metadata (forwarded to the FastAPI constructor) ---------------
     app_description: str = ""
-    app_version: str = "0.1.0"
+    app_version: str = _default_version()
     app_summary: str = ""
     app_terms_of_service: str = ""
     app_contact: dict[str, str] | None = None

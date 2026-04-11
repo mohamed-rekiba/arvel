@@ -2,7 +2,7 @@
 
 Deploy pipelines and orchestrators need a binary signal: **is this process safe to receive traffic?** Arvel exposes a **`HealthRegistry`**, a **`HealthCheck`** protocol, **`HealthStatus`** (`healthy`, `degraded`, `unhealthy`), and typed payloads for HTTP responses—plus CLI **`arvel health check`** for quick probes from your laptop or jump host.
 
-At **v0.1.0**, integrate with **OpenTelemetry** and **Sentry** separately (see tracing and error reporting docs); health checks focus on **synthetic dependency tests**, not full APM.
+Integrate with **OpenTelemetry** and **Sentry** separately (see tracing and error reporting docs); health checks focus on **synthetic dependency tests**, not full APM.
 
 ## Registering checks
 

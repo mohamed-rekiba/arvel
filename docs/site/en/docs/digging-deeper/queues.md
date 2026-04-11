@@ -2,7 +2,7 @@
 
 Long-running work does not belong on the request thread. Arvel’s queue system wraps **`QueueContract`** with **`Job`** classes, **`Batch`** and **`Chain`** helpers, a central **`JobRunner`** (retries, timeouts, middleware), and first-class **middleware** for rate limiting, overlap protection, and uniqueness.
 
-At **v0.1.0**, drivers include sync (for tests), null, and Taskiq-backed async execution—check your project’s `QueueSettings` for the exact default.
+Drivers include sync (for tests), null, and Taskiq-backed async execution—check your project’s `QueueSettings` for the exact default.
 
 ## Jobs
 

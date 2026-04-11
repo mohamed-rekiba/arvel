@@ -6,7 +6,7 @@ This page gets you from zero to a green first test: dependencies, a minimal `pyt
 
 ## What you need
 
-Arvel **0.1.0** targets **Python 3.14+**. For running the framework’s own test suite style, install the project with dev dependencies (pytest, anyio, httpx, coverage tooling, and friends). If you use `uv`, a typical local install looks like this (adjust groups or extras to match your project):
+Arvel targets **Python 3.14+**. For running the framework’s own test suite style, install the project with dev dependencies (pytest, anyio, httpx, coverage tooling, and friends). If you use `uv`, a typical local install looks like this (adjust groups or extras to match your project):
 
 ```bash
 uv sync --group dev

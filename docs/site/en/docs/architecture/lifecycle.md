@@ -1,6 +1,6 @@
 # Request Lifecycle
 
-If you have ever traced a request through Laravel’s kernel, the shape here will feel familiar — only the transport is ASGI, and the heavy lifting still happens in a clear pipeline. Arvel (v0.1.0, Python 3.14+) sits on **Starlette** and **FastAPI**: your app object *is* the ASGI callable, and everything else hangs off that contract.
+If you have ever traced a request through Laravel’s kernel, the shape here will feel familiar — only the transport is ASGI, and the heavy lifting still happens in a clear pipeline. Arvel sits on **Starlette** and **FastAPI**: your app object *is* the ASGI callable, and everything else hangs off that contract.
 
 ## The big picture
 

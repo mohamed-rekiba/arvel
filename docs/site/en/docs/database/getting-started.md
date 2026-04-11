@@ -1,8 +1,6 @@
 # Database: Getting Started
 
-This chapter applies to **Arvel** (v0.1.0+, **Python 3.14+**): an async-first, type-safe web framework with SQLAlchemy 2.0’s async engine at the core.
-
-Arvel is an async-first framework, and the database layer follows that same rhythm. You configure a single connection (or compose URLs from structured settings), and every query flows through SQLAlchemy 2.0’s async engine and session — no blocking calls on the hot path.
+The database layer follows Arvel’s async-first rhythm. You configure a single connection (or compose URLs from structured settings), and every query flows through SQLAlchemy 2.0’s async engine and session — no blocking calls on the hot path.
 
 This page walks through wiring up SQLite for local work, PostgreSQL or MySQL when you are ready to grow, and how those choices surface in your environment and settings.
 

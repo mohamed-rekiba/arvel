@@ -2,7 +2,7 @@
 
 Transactional email is one of those features that looks simple until it is not—templates, attachments, multi-part HTML, and failure modes all pile up. Arvel’s mail stack centers on **`MailContract`** and typed **`Mailable`** objects, with drivers for **SMTP**, **log** (dump to logs in development), and **null** (silence in tests).
 
-At **v0.1.0**, you inject the mailer from the container and keep message shape in dataclasses—similar to Laravel mailables, with Pythonic defaults.
+You inject the mailer from the container and keep message shape in dataclasses—similar to Laravel mailables, with Pythonic defaults.
 
 ## Mailables
 

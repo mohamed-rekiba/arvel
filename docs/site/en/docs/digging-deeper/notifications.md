@@ -2,7 +2,7 @@
 
 Sometimes email alone is not enough—you want an in-app feed, a database row for auditing, or a future Slack hook without rewriting the feature. Arvel’s **`NotificationContract`** and **`Notification`** base class follow the Laravel pattern: one object describes **how** to reach a user across **channels**, and the dispatcher routes it.
 
-At **v0.1.0**, channels include **mail** (built on `MailContract`) and **database** (structured payloads you persist with your own models), with room to extend toward Slack-style payloads in userland.
+Channels include **mail** (built on `MailContract`) and **database** (structured payloads you persist with your own models), with room to extend toward Slack-style payloads in userland.
 
 ## Defining a notification
 

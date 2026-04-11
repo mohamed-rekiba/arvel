@@ -2,7 +2,7 @@
 
 Logs are not an afterthought—they are how you reconstruct incidents, prove compliance, and debug race conditions under load. Arvel configures **`structlog`** with opinionated processors: context variables, request IDs, optional **redaction**, and channel-aware handlers (console, single file, daily rotation) driven by **`ObservabilitySettings`**.
 
-At **v0.1.0**, call **`configure_logging`** during application bootstrap so workers, the HTTP stack, and CLI share the same pipeline.
+Call **`configure_logging`** during application bootstrap so workers, the HTTP stack, and CLI share the same pipeline.
 
 ## Why structlog
 

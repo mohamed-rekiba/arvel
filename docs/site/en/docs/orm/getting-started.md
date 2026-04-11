@@ -1,6 +1,6 @@
 # ORM: Getting Started
 
-**Arvel** v0.1.0+ targets **Python 3.14+** and maps database rows with SQLAlchemy 2.0 style `Mapped[T]` columns — the same mental model as the rest of this documentation.
+Arvel maps database rows with SQLAlchemy 2.0 style `Mapped[T]` columns — the same mental model as the rest of this documentation.
 
 Arvel’s ORM sits on **SQLAlchemy 2.0** with async sessions throughout. The centerpiece is `ArvelModel`: a declarative base that knows how to relate models, cast attributes, honor mass-assignment guards, and expose a fluent `query()` entry point that returns a typed `QueryBuilder`.
 
