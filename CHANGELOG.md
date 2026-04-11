@@ -5,6 +5,13 @@ All notable changes to Arvel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8](https://github.com/mohamed-rekiba/arvel/compare/v0.1.7...v0.1.8) (2026-04-11)
+
+
+### Bug Fixes
+
+* **cli:** wire app discovery chain and add --app-dir option ([8f17cc3](https://github.com/mohamed-rekiba/arvel/commit/8f17cc335ae7f5903a63829e45560566be664402))
+
 ## [0.1.7](https://github.com/mohamed-rekiba/arvel/compare/v0.1.6...v0.1.7) (2026-04-11)
 
 
