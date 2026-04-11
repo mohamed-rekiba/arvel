@@ -158,5 +158,11 @@ nav:
     - testing/http-tests.md
     - testing/database-testing.md
     - testing/fakes.md
+  - Guides:
+    - guides/architecture-overview.md
+    - guides/api-reference-guide.md
+    - guides/type-safety-analysis.md
+    - guides/orm-best-practices.md
+    - guides/testing-best-practices.md
   - API Reference:
     - reference/index.md
