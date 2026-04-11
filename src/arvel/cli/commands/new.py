@@ -293,16 +293,8 @@ def _get_arvel_version() -> str:
 
 
 def _fetch_templates_registry() -> list[dict[str, Any]]:
-    """Fetch templates.json from the latest GitHub release, or fall back to bundled copy."""
-    url = f"https://github.com/{FRAMEWORK_REPO}/releases/latest/download/{TEMPLATES_ASSET}"
-    req = Request(url, headers={"User-Agent": "arvel-cli"})  # noqa: S310
-
-    try:
-        with urlopen(req, timeout=15) as response:  # noqa: S310
-            data = json.loads(response.read())
-            return data.get("templates", [])
-    except Exception:
-        return _load_bundled_registry()
+    """Load the bundled templates.json shipped with the CLI package."""
+    return _load_bundled_registry()
 
 
 def _load_bundled_registry() -> list[dict[str, Any]]:
@@ -495,7 +487,7 @@ def _run_uv_sync(target_dir: Path) -> None:
     """Install deps with uv sync. Warns if uv is missing or times out."""
     try:
         subprocess.run(
-            ["uv", "sync"],  # noqa: S607
+            ["uv", "sync", "--all-extras"],  # noqa: S607
             cwd=target_dir,
             check=False,
             capture_output=True,
@@ -724,6 +716,6 @@ def new_project(
     )
     typer.echo()
     typer.echo(f"  {typer.style('$', fg=dim)} cd {name}")
-    typer.echo(f"  {typer.style('$', fg=dim)} arvel serve")
-    typer.echo(f"  {typer.style('$', fg=dim)} arvel make module <your-first-module>")
+    typer.echo(f"  {typer.style('$', fg=dim)} uv run arvel serve")
+    typer.echo(f"  {typer.style('$', fg=dim)} uv run arvel make module <your-first-module>")
     typer.echo()

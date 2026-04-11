@@ -10,6 +10,33 @@ After boot, each request walks through global middleware (the HTTP kernel’s st
 
 ## How a request flows
 
+```mermaid
+flowchart TD
+    Client(["Client (browser / cURL)"])
+    ASGI["Application.__call__()"]
+    Boot{"Booted?"}
+    Bootstrap["_bootstrap()"]
+    FastAPI["FastAPI / Starlette ASGI app"]
+    GlobalMW["Global middleware stack\n(priority-sorted onion)"]
+    Router["Router — path + verb match"]
+    RouteMW["Per-route middleware\n(if declared)"]
+    ReqScope["RequestContainerMiddleware\n→ enter_scope(REQUEST)"]
+    Controller["Controller / endpoint\n(Inject → container.resolve)"]
+    Response(["Response → Client"])
+
+    Client --> ASGI
+    ASGI --> Boot
+    Boot -- "No (first request)" --> Bootstrap --> FastAPI
+    Boot -- "Yes" --> FastAPI
+    FastAPI --> GlobalMW
+    GlobalMW --> Router
+    Router --> RouteMW
+    RouteMW --> ReqScope
+    ReqScope --> Controller
+    Controller --> Response
+    Response -. "middleware unwind" .-> GlobalMW
+```
+
 Think of it as a short story:
 
 1. **ASGI entry** — The server calls `Application.__call__(scope, receive, send)`. If the app has not booted yet, it acquires a lock and runs the async bootstrap once.
@@ -31,6 +58,33 @@ Think of it as a short story:
 You can sketch the same thing as nested boxes: outer layers are global middleware; the inner box is the route’s ASGI app; inside that sits your controller call.
 
 ## Application bootstrap
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant Cfg as load_config()
+    participant B as ContainerBuilder
+    participant P as ServiceProviders
+    participant C as Container (APP)
+    participant F as FastAPI app
+
+    App->>Cfg: Load config + early log level
+    Cfg-->>App: AppSettings + module settings
+    App->>B: provide_value(AppSettings, …)
+    App->>P: Import bootstrap/providers.py
+    Note over P: Instantiate & sort by priority
+    loop Each provider (low → high priority)
+        P->>P: configure(config)
+        P->>B: register(builder) — declare bindings
+    end
+    App->>B: build()
+    B-->>C: Root Container (APP scope)
+    App->>F: _build_fastapi_app() + lifespan
+    loop Each provider (low → high priority)
+        P->>App: boot(app) — routes, middleware, events
+    end
+    Note over App: _booted = True ✓
+```
 
 Bootstrap is the chapter where the framework wakes up:
 
