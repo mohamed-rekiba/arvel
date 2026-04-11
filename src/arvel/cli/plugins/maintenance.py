@@ -6,8 +6,12 @@ import hashlib
 import ipaddress
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
+
+if TYPE_CHECKING:
+    from arvel.cli.plugins._base import CliPlugin
 
 
 def _maintenance_path() -> Path:
@@ -15,24 +19,11 @@ def _maintenance_path() -> Path:
 
 
 def down(
-    secret: str | None = typer.Option(
-        None,
-        "--secret",
-        "-s",
-        help="Bypass secret token.",
-    ),
+    secret: str | None = typer.Option(None, "--secret", "-s", help="Bypass secret token."),
     allow: list[str] | None = typer.Option(  # noqa: B008
-        None,
-        "--allow",
-        "-a",
-        help="Allowed IP/CIDR (repeatable).",
+        None, "--allow", "-a", help="Allowed IP/CIDR (repeatable)."
     ),
-    retry: int | None = typer.Option(
-        None,
-        "--retry",
-        "-r",
-        help="Retry-After seconds.",
-    ),
+    retry: int | None = typer.Option(None, "--retry", "-r", help="Retry-After seconds."),
 ) -> None:
     """Put the application into maintenance mode."""
     allowed_ips: list[str] = []
@@ -71,3 +62,15 @@ def up() -> None:
         typer.echo("Application is now live.")
     else:
         typer.echo("Application is already live.")
+
+
+class _Plugin:
+    name = "maintenance"
+    help = "Maintenance mode commands."
+
+    def register(self, app: typer.Typer) -> None:
+        app.command(name="down")(down)
+        app.command(name="up")(up)
+
+
+plugin: CliPlugin = _Plugin()  # type: ignore[assignment]

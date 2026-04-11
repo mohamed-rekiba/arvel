@@ -6,11 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from arvel.cli.commands.new import (
-    DATABASE_CONFIGS,
-    _get_arvel_version,
-    render_skeleton,
-)
+from arvel.cli.plugins.new.config import DATABASE_CONFIGS
+from arvel.cli.plugins.new.scaffold import _get_arvel_version, render_skeleton
 
 if TYPE_CHECKING:
     from pathlib import Path

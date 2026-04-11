@@ -4,17 +4,21 @@ from __future__ import annotations
 
 import json as json_lib
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
-route_app = typer.Typer(name="route", help="Route inspection commands.")
+if TYPE_CHECKING:
+    from arvel.cli.plugins._base import CliPlugin
+
+_app = typer.Typer(name="route", help="Route inspection commands.")
 
 
 def _route_cache_path() -> Path:
     return Path.cwd() / "bootstrap" / "cache" / "routes.json"
 
 
-@route_app.command("list")
+@_app.command("list")
 def list_routes(
     app_dir: str = typer.Option(".", "--app-dir", help="Application root directory."),
     json: bool = typer.Option(False, "--json", help="Output as JSON."),
@@ -70,7 +74,7 @@ def _collect_route_data(base_path: Path) -> list[dict[str, object]]:
     return rows
 
 
-@route_app.command("cache")
+@_app.command("cache")
 def cache_routes(
     app_dir: str = typer.Option(".", "--app-dir", help="Application root directory."),
 ) -> None:
@@ -85,7 +89,7 @@ def cache_routes(
     typer.echo(f"Route cache written to {cache_file} ({len(rows)} routes)")
 
 
-@route_app.command("clear")
+@_app.command("clear")
 def clear_routes() -> None:
     """Delete the cached route table."""
     cache_file = _route_cache_path()
@@ -94,3 +98,14 @@ def clear_routes() -> None:
         typer.echo("Route cache cleared.")
     else:
         typer.echo("No route cache to clear.")
+
+
+class _Plugin:
+    name = "route"
+    help = "Route inspection commands."
+
+    def register(self, app: typer.Typer) -> None:
+        app.add_typer(_app, name=self.name)
+
+
+plugin: CliPlugin = _Plugin()  # type: ignore[assignment]

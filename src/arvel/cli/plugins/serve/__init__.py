@@ -2,73 +2,24 @@
 
 from __future__ import annotations
 
-import os
-import sys
 from importlib.metadata import version as pkg_version
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 from urllib.parse import urljoin
 
 import typer
 
 from arvel.cli.exceptions import ArvelCLIError
 from arvel.cli.logging import get_uvicorn_log_config
+from arvel.cli.plugins.serve.discovery import _discover_app, _ensure_cwd_importable
+from arvel.cli.plugins.serve.venv import _activate_project_venv
 
-serve_app = typer.Typer(
+if TYPE_CHECKING:
+    from arvel.cli.plugins._base import CliPlugin
+
+_serve_app = typer.Typer(
     name="serve", help="Start the development server.", invoke_without_command=True
 )
-
-_ENTRYPOINT = "bootstrap.app:create_app"
-
-
-def _discover_app(base_path: Path | None = None) -> str:
-    """Ensure bootstrap/app.py exists and return the ASGI import path.
-
-    Args:
-        base_path: Project root directory. Defaults to CWD.
-    """
-    root = base_path or Path.cwd()
-    if not (root / "bootstrap" / "app.py").is_file():
-        raise ArvelCLIError(
-            "bootstrap/app.py not found. Every Arvel app must have this file "
-            "with a create_app() factory. Use --app to override."
-        )
-    return _ENTRYPOINT
-
-
-def _ensure_cwd_importable(app_dir: Path | None = None) -> None:
-    """Put *app_dir* (or CWD) on sys.path so uvicorn workers can import the app."""
-    target = str((app_dir or Path.cwd()).resolve())
-    if target not in sys.path:
-        sys.path.insert(0, target)
-    existing = os.environ.get("PYTHONPATH", "")
-    if target not in existing.split(os.pathsep):
-        os.environ["PYTHONPATH"] = f"{target}{os.pathsep}{existing}" if existing else target
-
-
-def _activate_project_venv(app_dir: Path) -> None:
-    """Add the project's .venv site-packages to sys.path if present.
-
-    When arvel is installed globally but the project has its own virtualenv,
-    the project's dependencies won't be importable unless we inject them.
-    """
-    for venv_name in (".venv", "venv"):
-        venv_dir = app_dir / venv_name
-        if not venv_dir.is_dir():
-            continue
-
-        lib_dir = venv_dir / "lib"
-        if not lib_dir.is_dir():
-            continue
-
-        for child in lib_dir.iterdir():
-            sp = child / "site-packages"
-            if sp.is_dir():
-                sp_str = str(sp)
-                if sp_str not in sys.path:
-                    sys.path.insert(0, sp_str)
-                os.environ["VIRTUAL_ENV"] = str(venv_dir)
-                return
 
 
 def _get_arvel_version() -> str:
@@ -89,7 +40,7 @@ def _print_startup_banner(
 ) -> None:
     """Show the server banner with app name, env, and URLs."""
     from arvel.app.config import AppSettings
-    from arvel.cli.app import BANNER
+    from arvel.cli.ui import BANNER
     from arvel.foundation.config import resolve_env_files, with_env_files
 
     base_path = (base_path or Path.cwd()).resolve()
@@ -137,7 +88,7 @@ def _print_startup_banner(
     typer.echo()
 
 
-@serve_app.callback(invoke_without_command=True)
+@_serve_app.callback(invoke_without_command=True)
 def serve(
     host: Annotated[str, typer.Option("--host", "-h", help="Bind address.")] = "127.0.0.1",
     port: Annotated[int, typer.Option("--port", "-p", help="Bind port.", envvar="PORT")] = 8000,
@@ -239,3 +190,14 @@ def serve(
         factory=use_factory,
         log_config=get_uvicorn_log_config(),
     )
+
+
+class _Plugin:
+    name = "serve"
+    help = "Start the development server."
+
+    def register(self, app: typer.Typer) -> None:
+        app.add_typer(_serve_app, name=self.name)
+
+
+plugin: CliPlugin = _Plugin()  # type: ignore[assignment]
