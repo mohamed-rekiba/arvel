@@ -8,6 +8,7 @@ Auto-discovers application commands from ``app/Console/Commands/``.
 from __future__ import annotations
 
 import importlib.util
+import logging
 import sys
 from pathlib import Path
 
@@ -27,6 +28,8 @@ from arvel.cli.commands.schedule import schedule_app
 from arvel.cli.commands.serve import serve_app
 from arvel.cli.commands.tinker import tinker_app
 from arvel.cli.commands.view import view_app
+
+logger = logging.getLogger(__name__)
 
 BANNER = r"""
     _                   _
@@ -106,7 +109,8 @@ def discover_commands(base_path: Path | None = None) -> None:
         sys.modules[module_name] = mod
         try:
             spec.loader.exec_module(mod)
-        except Exception:  # noqa: S112
+        except Exception:
+            logger.warning("Failed to load command module %s: %s", f.name, sys.exc_info()[1])
             continue
 
         for attr_name in dir(mod):
