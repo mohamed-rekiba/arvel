@@ -61,11 +61,11 @@ class TestRequestScope:
         builder.provide(ServiceA, ServiceA, scope=Scope.REQUEST)
         container = builder.build()
 
-        req1 = await container.enter_scope(Scope.REQUEST)
+        req1 = container.enter_scope(Scope.REQUEST)
         instance1 = await req1.resolve(ServiceA)
         await req1.close()
 
-        req2 = await container.enter_scope(Scope.REQUEST)
+        req2 = container.enter_scope(Scope.REQUEST)
         instance2 = await req2.resolve(ServiceA)
         await req2.close()
 
@@ -77,7 +77,7 @@ class TestRequestScope:
         builder.provide(ServiceA, ServiceA, scope=Scope.REQUEST)
         container = builder.build()
 
-        req = await container.enter_scope(Scope.REQUEST)
+        req = container.enter_scope(Scope.REQUEST)
         first = await req.resolve(ServiceA)
         second = await req.resolve(ServiceA)
         assert first is second
@@ -93,13 +93,13 @@ class TestSessionScope:
         builder.provide(ServiceA, ServiceA, scope=Scope.SESSION)
         container = builder.build()
 
-        session = await container.enter_scope(Scope.SESSION)
+        session = container.enter_scope(Scope.SESSION)
 
-        req1 = await session.enter_scope(Scope.REQUEST)
+        req1 = session.enter_scope(Scope.REQUEST)
         instance1 = await req1.resolve(ServiceA)
         await req1.close()
 
-        req2 = await session.enter_scope(Scope.REQUEST)
+        req2 = session.enter_scope(Scope.REQUEST)
         instance2 = await req2.resolve(ServiceA)
         await req2.close()
 
@@ -157,7 +157,7 @@ class TestDIPerformance:
         builder.provide(ServiceA, ServiceA, scope=Scope.REQUEST)
         container = builder.build()
 
-        req = await container.enter_scope(Scope.REQUEST)
+        req = container.enter_scope(Scope.REQUEST)
 
         start = time.perf_counter()
         await req.resolve(ServiceA)

@@ -16,7 +16,6 @@ from arvel.logging import Log
 if TYPE_CHECKING:
     from starlette.types import ASGIApp, Receive, Scope, Send
 
-    from arvel.foundation.container import Container
 
 logger = Log.named("arvel.http.middleware")
 
@@ -156,48 +155,3 @@ class MiddlewareStack:
             )
 
         return cls
-
-
-class RouteMiddlewareWrapper:
-    """ASGI app that wraps a route endpoint with resolved per-route middleware.
-
-    Builds an onion around the inner app at construction time so that
-    each request through this wrapper passes through all route-level
-    middleware in declared order.
-    """
-
-    def __init__(self, app: ASGIApp, *, middleware_classes: list[type]) -> None:
-        chain = app
-        for cls in reversed(middleware_classes):
-            chain = cls(chain)
-        self._chain = chain
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        await self._chain(scope, receive, send)
-
-
-class RequestScopeMiddleware:
-    """ASGI middleware that creates a request-scoped DI container per request.
-
-    Enters REQUEST scope on the app container, stores the scoped container
-    in ``scope["state"]["container"]``, and closes it when the request ends.
-    """
-
-    def __init__(self, app: ASGIApp, *, container: Container) -> None:
-        self.app = app
-        self._container = container
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] not in ("http", "websocket"):
-            await self.app(scope, receive, send)
-            return
-
-        from arvel.foundation.container import Scope as DIScope
-
-        request_container = await self._container.enter_scope(DIScope.REQUEST)
-        scope.setdefault("state", {})
-        scope["state"]["container"] = request_container
-        try:
-            await self.app(scope, receive, send)
-        finally:
-            await request_container.close()

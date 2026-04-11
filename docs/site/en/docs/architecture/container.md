@@ -75,12 +75,14 @@ await app.container.instance(CacheContract, shared_cache)
 ```python
 from arvel.foundation.container import Scope
 
-child = await app_container.enter_scope(Scope.REQUEST)
+child = app_container.enter_scope(Scope.REQUEST)  # synchronous — no await needed
 try:
     repo = await child.resolve(OrderRepository)
 finally:
-    await child.close()
+    await child.close()  # disposes instances that implement close()/aclose()
 ```
+
+Child containers use a `ChainMap` under the hood, so creation is O(1) — no dict copy regardless of how many bindings exist. Concurrent calls to `resolve()` on the same container are safe; a per-type lock prevents duplicate construction.
 
 In real apps you rarely write that loop — `RequestContainerMiddleware` installs the scoped container on each request’s ASGI scope for you.
 

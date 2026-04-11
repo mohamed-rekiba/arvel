@@ -341,8 +341,9 @@ class TestFileChannelDrivers:
         logger.info("audit-info-ignored")
         logger.error("audit-error-emitted")
 
-        output_lines = [line for line in capsys.readouterr().out.splitlines() if line.strip()]
-        payloads = [json.loads(line) for line in output_lines]
+        captured = capsys.readouterr()
+        stderr_lines = [line for line in captured.err.splitlines() if line.strip()]
+        payloads = [json.loads(line) for line in stderr_lines]
         events = [payload.get("event") for payload in payloads]
 
         assert "audit-info-ignored" not in events

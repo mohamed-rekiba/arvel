@@ -235,13 +235,13 @@ class TestConstructorInjection:
 # -- Gap 4: Request-scope middleware ------------------------------------------
 
 
-class TestRequestScopeMiddleware:
+class TestRequestContainerMiddleware:
     """Middleware that creates/closes request-scoped containers per HTTP request."""
 
     async def test_middleware_class_exists(self) -> None:
-        from arvel.http.middleware import RequestScopeMiddleware
+        from arvel.http.request import RequestContainerMiddleware
 
-        assert RequestScopeMiddleware is not None
+        assert RequestContainerMiddleware is not None
 
     async def test_request_gets_scoped_container(self, tmp_project_with_modules: Path) -> None:
         """Each HTTP request should get its own request-scoped container."""
