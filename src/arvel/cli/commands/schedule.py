@@ -9,20 +9,24 @@ import signal
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
-from arvel.queue.config import QueueSettings
-from arvel.queue.manager import QueueManager
-from arvel.scheduler.config import SchedulerSettings
-from arvel.scheduler.locks import InMemoryLockBackend, NullLockBackend
-from arvel.scheduler.scheduler import Scheduler
+if TYPE_CHECKING:
+    from arvel.scheduler.scheduler import Scheduler
 
 schedule_app = typer.Typer(name="schedule", help="Task scheduler management commands.")
 
 
 def _load_scheduler(app_dir: str) -> Scheduler:
     """Build a Scheduler, loading registrations from app/schedule.py when present."""
+    from arvel.queue.config import QueueSettings
+    from arvel.queue.manager import QueueManager
+    from arvel.scheduler.config import SchedulerSettings
+    from arvel.scheduler.locks import InMemoryLockBackend, NullLockBackend
+    from arvel.scheduler.scheduler import Scheduler
+
     queue_settings = QueueSettings()
     manager = QueueManager()
     queue = manager.create_driver(queue_settings)
