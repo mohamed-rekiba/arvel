@@ -1,6 +1,6 @@
 [project]
 name = "arvel"
-version = "0.1.7"
+version = "0.1.8"
 description = "Async-first, type-safe Python web framework inspired by Laravel."
 requires-python = ">=3.14"
 license = "MIT"
