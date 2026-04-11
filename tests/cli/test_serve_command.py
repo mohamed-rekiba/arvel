@@ -13,11 +13,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 import pytest
+import typer
 from typer.testing import CliRunner
 
 from arvel.cli.app import app
-from arvel.cli.commands.serve import _activate_project_venv, _discover_app
 from arvel.cli.exceptions import ArvelCLIError
+from arvel.cli.plugins.serve.discovery import _discover_app
+from arvel.cli.plugins.serve.venv import _activate_project_venv
 
 runner = CliRunner()
 
@@ -55,7 +57,7 @@ class TestServeDefaultOptions:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -79,7 +81,7 @@ class TestServeDefaultOptions:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -103,7 +105,7 @@ class TestDiscoveryChainFix:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ) as mock_discover,
         ):
@@ -128,7 +130,7 @@ class TestDiscoveryChainFix:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
             ) as mock_discover,
         ):
             result = runner.invoke(app, ["serve", "--app", "mymodule:myapp"])
@@ -144,7 +146,7 @@ class TestDiscoveryChainFix:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -178,7 +180,7 @@ class TestServeAppDir:
         mock_uvicorn = MagicMock()
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
-            patch("arvel.cli.commands.serve._ensure_cwd_importable") as mock_ensure,
+            patch("arvel.cli.plugins.serve._ensure_cwd_importable") as mock_ensure,
         ):
             result = runner.invoke(app, ["serve", "--app-dir", str(project_dir)])
             assert result.exit_code == 0
@@ -204,7 +206,7 @@ class TestServeAppDir:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -224,7 +226,7 @@ class TestServeLogConfig:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -239,7 +241,7 @@ class TestServeLogConfig:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -264,7 +266,7 @@ class TestServePortEnvVar:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -280,7 +282,7 @@ class TestServePortEnvVar:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -295,7 +297,7 @@ class TestServePortEnvVar:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -319,10 +321,12 @@ class TestDiscoverCommandsLogging:
         commands_dir.mkdir(parents=True)
         (commands_dir / "broken.py").write_text("raise SyntaxError('bad')")
 
-        from arvel.cli.app import discover_commands
+        from arvel.cli.registry import PluginRegistry
 
+        reg = PluginRegistry()
+        test_app = typer.Typer()
         with caplog.at_level(logging.WARNING):
-            discover_commands(base_path=tmp_path)
+            reg.discover_user_commands(test_app, base_path=tmp_path)
 
         warning_messages = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
         assert any("broken" in msg for msg in warning_messages), (
@@ -335,9 +339,11 @@ class TestDiscoverCommandsLogging:
         commands_dir.mkdir(parents=True)
         (commands_dir / "broken.py").write_text("raise RuntimeError('oops')")
 
-        from arvel.cli.app import discover_commands
+        from arvel.cli.registry import PluginRegistry
 
-        discover_commands(base_path=tmp_path)
+        reg = PluginRegistry()
+        test_app = typer.Typer()
+        reg.discover_user_commands(test_app, base_path=tmp_path)
 
     def test_valid_commands_still_discovered_alongside_broken(self, tmp_path) -> None:
         """AC-005c: Other valid command modules are still registered."""
@@ -349,9 +355,11 @@ class TestDiscoverCommandsLogging:
             "@good_app.command()\ndef hello():\n    print('hello')\n"
         )
 
-        from arvel.cli.app import discover_commands
+        from arvel.cli.registry import PluginRegistry
 
-        discover_commands(base_path=tmp_path)
+        reg = PluginRegistry()
+        test_app = typer.Typer()
+        reg.discover_user_commands(test_app, base_path=tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -444,7 +452,7 @@ class TestServeRootPath:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -458,7 +466,7 @@ class TestServeRootPath:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -474,7 +482,7 @@ class TestServeProxyHeaders:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -487,7 +495,7 @@ class TestServeProxyHeaders:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -500,7 +508,7 @@ class TestServeProxyHeaders:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -517,7 +525,7 @@ class TestServeReloadDir:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):
@@ -535,7 +543,7 @@ class TestServeReloadDir:
         with (
             patch.dict("sys.modules", {"uvicorn": mock_uvicorn}),
             patch(
-                "arvel.cli.commands.serve._discover_app",
+                "arvel.cli.plugins.serve._discover_app",
                 return_value="bootstrap.app:create_app",
             ),
         ):

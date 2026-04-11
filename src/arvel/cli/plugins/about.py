@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import platform
 import sys
+from typing import TYPE_CHECKING
 
 import typer
 
-about_app = typer.Typer(
-    name="about", help="Show framework information.", invoke_without_command=True
-)
+if TYPE_CHECKING:
+    from arvel.cli.plugins._base import CliPlugin
+
+_app = typer.Typer(name="about", help="Show framework information.", invoke_without_command=True)
 
 
 def _get_version() -> str:
@@ -21,7 +23,7 @@ def _get_version() -> str:
         return "unknown"
 
 
-@about_app.callback(invoke_without_command=True)
+@_app.callback(invoke_without_command=True)
 def about(
     json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
 ) -> None:
@@ -45,3 +47,14 @@ def about(
     typer.echo(f"  Python:     {info['python']}")
     typer.echo(f"  Platform:   {info['platform']}")
     typer.echo(f"  Executable: {info['executable']}")
+
+
+class _Plugin:
+    name = "about"
+    help = "Show framework information."
+
+    def register(self, app: typer.Typer) -> None:
+        app.add_typer(_app, name=self.name)
+
+
+plugin: CliPlugin = _Plugin()  # type: ignore[assignment]

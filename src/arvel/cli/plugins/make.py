@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
@@ -10,13 +11,16 @@ from arvel.cli.templates.engine import render_template as _render_raw
 from arvel.support.utils import pluralize as _pluralize
 from arvel.support.utils import to_snake_case as _to_snake_case
 
+if TYPE_CHECKING:
+    from arvel.cli.plugins._base import CliPlugin
+
 
 def _render(template_name: str, context: dict[str, object]) -> str:
     """Render a stub template, respecting project-level stubs/ overrides."""
     return _render_raw(template_name, context, project_dir=Path.cwd())
 
 
-make_app = typer.Typer(name="make", help="Code generation commands.")
+_app = typer.Typer(name="make", help="Code generation commands.")
 
 
 def _write_file(filepath: Path, content: str) -> None:
@@ -31,7 +35,7 @@ def _module_base(module: str) -> Path:
     return Path.cwd() / "app" / "modules" / module
 
 
-@make_app.command("module")
+@_app.command("module")
 def module(
     name: str = typer.Argument(help="Module name (e.g., users)."),
 ) -> None:
@@ -82,7 +86,7 @@ def module(
     typer.echo(f"Module created: {module_dir}")
 
 
-@make_app.command("model")
+@_app.command("model")
 def model(
     name: str = typer.Argument(help="Model class name (e.g., User)."),
     module: str = typer.Option(..., "--module", "-m", help="Target module."),
@@ -107,7 +111,7 @@ def model(
         migration(name=f"create_{table}_table")
 
 
-@make_app.command("controller")
+@_app.command("controller")
 def controller(
     name: str = typer.Argument(help="Controller class name (e.g., UserController)."),
     module: str = typer.Option(..., "--module", "-m", help="Target module."),
@@ -132,7 +136,7 @@ def controller(
     typer.echo(f"Controller created: {filepath}")
 
 
-@make_app.command("service")
+@_app.command("service")
 def service(
     name: str = typer.Argument(help="Service class name (e.g., UserService)."),
     module: str = typer.Option(..., "--module", "-m", help="Target module."),
@@ -157,7 +161,7 @@ def service(
     typer.echo(f"Service created: {filepath}")
 
 
-@make_app.command("repository")
+@_app.command("repository")
 def repository(
     name: str = typer.Argument(help="Repository class name (e.g., UserRepository)."),
     module: str = typer.Option(..., "--module", "-m", help="Target module."),
@@ -180,7 +184,7 @@ def repository(
     typer.echo(f"Repository created: {filepath}")
 
 
-@make_app.command("job")
+@_app.command("job")
 def job(
     name: str = typer.Argument(help="Job class name (e.g., SendWelcomeEmail)."),
     module: str = typer.Option(..., "--module", "-m", help="Target module."),
@@ -194,7 +198,7 @@ def job(
     typer.echo(f"Job created: {filepath}")
 
 
-@make_app.command("event")
+@_app.command("event")
 def event(
     name: str = typer.Argument(help="Event class name (e.g., UserRegistered)."),
     module: str = typer.Option(..., "--module", "-m", help="Target module."),
@@ -214,7 +218,7 @@ def event(
     typer.echo(f"Event created: {filepath}")
 
 
-@make_app.command("listener")
+@_app.command("listener")
 def listener(
     name: str = typer.Argument(help="Listener class name (e.g., SendWelcomeEmailListener)."),
     module: str = typer.Option(..., "--module", "-m", help="Target module."),
@@ -235,7 +239,7 @@ def listener(
     typer.echo(f"Listener created: {filepath}")
 
 
-@make_app.command("policy")
+@_app.command("policy")
 def policy(
     name: str = typer.Argument(help="Policy class name (e.g., UserPolicy)."),
     module: str = typer.Option(..., "--module", "-m", help="Target module."),
@@ -256,7 +260,7 @@ def policy(
     typer.echo(f"Policy created: {filepath}")
 
 
-@make_app.command("mail")
+@_app.command("mail")
 def mail(
     name: str = typer.Argument(help="Mail class name (e.g., WelcomeMail)."),
     module: str = typer.Option(..., "--module", "-m", help="Target module."),
@@ -276,7 +280,7 @@ def mail(
     typer.echo(f"Mail created: {filepath}")
 
 
-@make_app.command("migration")
+@_app.command("migration")
 def migration(
     name: str = typer.Argument(help="Migration name (e.g., create_users_table)."),
 ) -> None:
@@ -291,7 +295,7 @@ def migration(
     typer.echo(f"Migration created: {path}")
 
 
-@make_app.command("seeder")
+@_app.command("seeder")
 def seeder(
     name: str = typer.Argument(help="Seeder class name (e.g., UserSeeder)."),
 ) -> None:
@@ -317,3 +321,14 @@ def seeder(
         f"        pass\n"
     )
     typer.echo(f"Seeder created: {filepath}")
+
+
+class _Plugin:
+    name = "make"
+    help = "Code generation commands."
+
+    def register(self, app: typer.Typer) -> None:
+        app.add_typer(_app, name=self.name)
+
+
+plugin: CliPlugin = _Plugin()  # type: ignore[assignment]

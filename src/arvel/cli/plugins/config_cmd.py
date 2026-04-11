@@ -6,11 +6,14 @@ import asyncio
 import inspect
 import sys
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
-config_app = typer.Typer(name="config", help="Configuration cache commands.")
+if TYPE_CHECKING:
+    from arvel.cli.plugins._base import CliPlugin
+
+_app = typer.Typer(name="config", help="Configuration cache commands.")
 
 
 def _cache_path() -> Path:
@@ -27,7 +30,7 @@ def _render_config_file(settings_cls: type[object], _file_stem: str) -> str:
     return f"{source.rstrip()}\n"
 
 
-@config_app.command("cache")
+@_app.command("cache")
 def cache_config() -> None:
     """Write config to a JSON cache file (0600 permissions)."""
     from arvel.foundation.config import cache_config as _cache
@@ -45,7 +48,7 @@ def cache_config() -> None:
     typer.echo(f"Configuration cached to {cache_file}")
 
 
-@config_app.command("clear")
+@_app.command("clear")
 def clear_config() -> None:
     """Delete the cached config file."""
     cache_file = _cache_path()
@@ -56,7 +59,7 @@ def clear_config() -> None:
         typer.echo("No configuration cache to clear.")
 
 
-@config_app.command("export")
+@_app.command("export")
 def export(
     path: Annotated[Path, typer.Option(help="Target config directory.")] = Path("config"),
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show planned changes only.")] = False,
@@ -109,3 +112,14 @@ def export(
         typer.echo("Skipped existing:")
         for config_path in skipped:
             typer.echo(f"- {config_path}")
+
+
+class _Plugin:
+    name = "config"
+    help = "Configuration cache commands."
+
+    def register(self, app: typer.Typer) -> None:
+        app.add_typer(_app, name=self.name)
+
+
+plugin: CliPlugin = _Plugin()  # type: ignore[assignment]

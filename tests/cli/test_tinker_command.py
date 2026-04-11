@@ -43,13 +43,13 @@ class TestTinkerBootstrapsApp:
     """FR-020-01.1: tinker bootstraps the application."""
 
     def test_tinker_imports_from_module(self) -> None:
-        from arvel.cli.commands import tinker  # noqa: F401
+        from arvel.cli.plugins import tinker  # noqa: F401
 
     def test_tinker_starts_repl(self) -> None:
         ns = _tinker_namespace_fixture()
         with (
-            patch("arvel.cli.commands.tinker._build_namespace", return_value=ns),
-            patch("arvel.cli.commands.tinker._start_repl") as mock_repl,
+            patch("arvel.cli.plugins.tinker._build_namespace", return_value=ns),
+            patch("arvel.cli.plugins.tinker._start_repl") as mock_repl,
         ):
             mock_repl.return_value = None
             result = runner.invoke(app, ["tinker"])
@@ -63,8 +63,8 @@ class TestTinkerNamespace:
     def test_tinker_namespace_contains_app(self) -> None:
         ns = _tinker_namespace_fixture()
         with (
-            patch("arvel.cli.commands.tinker._build_namespace", return_value=ns),
-            patch("arvel.cli.commands.tinker._start_repl") as mock_repl,
+            patch("arvel.cli.plugins.tinker._build_namespace", return_value=ns),
+            patch("arvel.cli.plugins.tinker._start_repl") as mock_repl,
         ):
             mock_repl.return_value = None
             runner.invoke(app, ["tinker"])
@@ -75,8 +75,8 @@ class TestTinkerNamespace:
     def test_tinker_namespace_contains_container(self) -> None:
         ns = _tinker_namespace_fixture()
         with (
-            patch("arvel.cli.commands.tinker._build_namespace", return_value=ns),
-            patch("arvel.cli.commands.tinker._start_repl") as mock_repl,
+            patch("arvel.cli.plugins.tinker._build_namespace", return_value=ns),
+            patch("arvel.cli.plugins.tinker._start_repl") as mock_repl,
         ):
             mock_repl.return_value = None
             runner.invoke(app, ["tinker"])
@@ -92,8 +92,8 @@ class TestTinkerIPythonDetection:
         mock_ipython = MagicMock()
         ns = _tinker_namespace_fixture()
         with (
-            patch("arvel.cli.commands.tinker._build_namespace", return_value=ns),
-            patch("arvel.cli.commands.tinker._start_repl") as mock_repl,
+            patch("arvel.cli.plugins.tinker._build_namespace", return_value=ns),
+            patch("arvel.cli.plugins.tinker._start_repl") as mock_repl,
             patch.dict("sys.modules", {"IPython": mock_ipython}),
         ):
             mock_repl.return_value = None
@@ -103,8 +103,8 @@ class TestTinkerIPythonDetection:
     def test_tinker_falls_back_to_stdlib_repl(self) -> None:
         ns = _tinker_namespace_fixture()
         with (
-            patch("arvel.cli.commands.tinker._build_namespace", return_value=ns),
-            patch("arvel.cli.commands.tinker._start_repl") as mock_repl,
+            patch("arvel.cli.plugins.tinker._build_namespace", return_value=ns),
+            patch("arvel.cli.plugins.tinker._start_repl") as mock_repl,
             patch.dict("sys.modules", {"IPython": None}),
         ):
             mock_repl.return_value = None
@@ -142,8 +142,8 @@ class TestTinkerProductionGuard:
         monkeypatch.setenv("APP_ENV", "production")
         ns = _tinker_namespace_fixture()
         with (
-            patch("arvel.cli.commands.tinker._build_namespace", return_value=ns),
-            patch("arvel.cli.commands.tinker._start_repl") as mock_repl,
+            patch("arvel.cli.plugins.tinker._build_namespace", return_value=ns),
+            patch("arvel.cli.plugins.tinker._start_repl") as mock_repl,
         ):
             mock_repl.return_value = None
             result = runner.invoke(app, ["tinker", "--force"])
@@ -153,8 +153,8 @@ class TestTinkerProductionGuard:
         monkeypatch.setenv("APP_ENV", "development")
         ns = _tinker_namespace_fixture()
         with (
-            patch("arvel.cli.commands.tinker._build_namespace", return_value=ns),
-            patch("arvel.cli.commands.tinker._start_repl") as mock_repl,
+            patch("arvel.cli.plugins.tinker._build_namespace", return_value=ns),
+            patch("arvel.cli.plugins.tinker._start_repl") as mock_repl,
         ):
             mock_repl.return_value = None
             result = runner.invoke(app, ["tinker"])
@@ -168,10 +168,10 @@ class TestTinkerGracefulShutdown:
         mock_shutdown = MagicMock()
         ns = _tinker_namespace_fixture()
         with (
-            patch("arvel.cli.commands.tinker._build_namespace", return_value=ns),
-            patch("arvel.cli.commands.tinker._start_repl") as mock_repl,
+            patch("arvel.cli.plugins.tinker._build_namespace", return_value=ns),
+            patch("arvel.cli.plugins.tinker._start_repl") as mock_repl,
         ):
             mock_repl.return_value = None
-            with patch("arvel.cli.commands.tinker._shutdown", mock_shutdown):
+            with patch("arvel.cli.plugins.tinker._shutdown", mock_shutdown):
                 runner.invoke(app, ["tinker"])
                 mock_shutdown.assert_called_once()

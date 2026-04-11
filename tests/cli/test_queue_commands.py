@@ -72,7 +72,7 @@ class TestQueueRestartCommand:
         assert result.exit_code == 0
 
     def test_queue_restart_writes_signal(self) -> None:
-        from arvel.cli.commands.queue import RESTART_SIGNAL_PATH
+        from arvel.cli.plugins.queue import RESTART_SIGNAL_PATH
 
         if RESTART_SIGNAL_PATH.exists():
             RESTART_SIGNAL_PATH.unlink()

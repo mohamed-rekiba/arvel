@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import time
+from typing import TYPE_CHECKING
 
 import typer
 
-health_app = typer.Typer(name="health", help="Health check commands.")
+if TYPE_CHECKING:
+    from arvel.cli.plugins._base import CliPlugin
+
+_app = typer.Typer(name="health", help="Health check commands.")
 
 
-@health_app.command("check")
+@_app.command("check")
 def check() -> None:
     """Probe each subsystem and report pass/fail with timing."""
     results: list[tuple[str, bool, float]] = []
@@ -114,3 +118,14 @@ def _check_queue() -> tuple[str, bool, float]:
     except Exception:
         elapsed = time.monotonic() - start
         return ("Queue", False, elapsed)
+
+
+class _Plugin:
+    name = "health"
+    help = "Health check commands."
+
+    def register(self, app: typer.Typer) -> None:
+        app.add_typer(_app, name=self.name)
+
+
+plugin: CliPlugin = _Plugin()  # type: ignore[assignment]

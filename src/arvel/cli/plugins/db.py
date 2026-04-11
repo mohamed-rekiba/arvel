@@ -9,11 +9,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from arvel.cli.plugins._base import CliPlugin
     from arvel.data.config import DatabaseSettings
 
 import typer
 
-db_app = typer.Typer(name="db", help="Database migration and seeding commands.")
+_app = typer.Typer(name="db", help="Database migration and seeding commands.")
 
 
 def _run_db_operation(coro_fn: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
@@ -60,7 +61,7 @@ def _migrations_dir() -> str:
     return str(Path.cwd() / "database" / "migrations")
 
 
-@db_app.command()
+@_app.command()
 def migrate(
     revision: str = typer.Option("head", help="Target revision."),
     force: bool = typer.Option(False, "--force", help="Allow in production."),
@@ -75,7 +76,7 @@ def migrate(
     typer.echo("Migrations applied.")
 
 
-@db_app.command()
+@_app.command()
 def rollback(
     steps: int = typer.Option(1, "--steps", help="Number of steps to rollback."),
     force: bool = typer.Option(False, "--force", help="Allow in production."),
@@ -90,7 +91,7 @@ def rollback(
     typer.echo(f"Rolled back {steps} step(s).")
 
 
-@db_app.command()
+@_app.command()
 def fresh(
     force: bool = typer.Option(False, "--force", help="Allow in production."),
 ) -> None:
@@ -104,7 +105,7 @@ def fresh(
     typer.echo("Database refreshed.")
 
 
-@db_app.command()
+@_app.command()
 def status() -> None:
     """Show migration status."""
     from arvel.data.migrations import MigrationRunner
@@ -119,7 +120,7 @@ def status() -> None:
         typer.echo(f"  {entry['revision']}: {entry['message']}")
 
 
-@db_app.command()
+@_app.command()
 def seed(
     seeder_class: str | None = typer.Option(None, "--class", help="Run a specific seeder."),
     force: bool = typer.Option(False, "--force", help="Allow in production."),
@@ -135,7 +136,7 @@ def seed(
     typer.echo("Seeding complete.")
 
 
-@db_app.command()
+@_app.command()
 def publish(
     force: bool = typer.Option(False, "--force", help="Overwrite existing migration files."),
 ) -> None:
@@ -175,3 +176,14 @@ def _ensure_framework_migrations_registered() -> None:
     import arvel.auth
     import arvel.media.migration
     import arvel.notifications  # noqa: F401
+
+
+class _Plugin:
+    name = "db"
+    help = "Database migration and seeding commands."
+
+    def register(self, app: typer.Typer) -> None:
+        app.add_typer(_app, name=self.name)
+
+
+plugin: CliPlugin = _Plugin()  # type: ignore[assignment]

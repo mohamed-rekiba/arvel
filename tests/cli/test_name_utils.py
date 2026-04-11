@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from arvel.cli.commands.new import (
-    to_package_name,
-    to_pascal_case,
-    validate_project_name,
-)
+from arvel.cli.plugins.new import validate_project_name
+from arvel.cli.plugins.new.scaffold import to_package_name, to_pascal_case
 
 
 class TestValidateProjectName:

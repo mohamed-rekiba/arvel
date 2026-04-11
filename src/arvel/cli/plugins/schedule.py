@@ -14,9 +14,10 @@ from typing import TYPE_CHECKING
 import typer
 
 if TYPE_CHECKING:
+    from arvel.cli.plugins._base import CliPlugin
     from arvel.scheduler.scheduler import Scheduler
 
-schedule_app = typer.Typer(name="schedule", help="Task scheduler management commands.")
+_app = typer.Typer(name="schedule", help="Task scheduler management commands.")
 
 
 def _load_scheduler(app_dir: str) -> Scheduler:
@@ -52,7 +53,7 @@ def _load_scheduler(app_dir: str) -> Scheduler:
     return scheduler
 
 
-@schedule_app.command("run")
+@_app.command("run")
 def run(
     app_dir: str = typer.Option(".", "--app-dir", help="Application root directory."),
 ) -> None:
@@ -62,7 +63,7 @@ def run(
     typer.echo(f"Scheduler run complete: {count} job(s) dispatched.")
 
 
-@schedule_app.command("work")
+@_app.command("work")
 def work(
     app_dir: str = typer.Option(".", "--app-dir", help="Application root directory."),
     interval: int = typer.Option(60, "--interval", help="Tick interval in seconds."),
@@ -94,7 +95,7 @@ def work(
     typer.echo("Scheduler daemon stopped.")
 
 
-@schedule_app.command("list")
+@_app.command("list")
 def list_entries(
     app_dir: str = typer.Option(".", "--app-dir", help="Application root directory."),
     json: bool = typer.Option(False, "--json", help="Output as JSON."),
@@ -143,3 +144,14 @@ def _next_due(expression: str, tz_name: str) -> str:
     cron = croniter(expression, now)
     next_dt = cron.get_next(datetime)
     return next_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
+class _Plugin:
+    name = "schedule"
+    help = "Task scheduler management commands."
+
+    def register(self, app: typer.Typer) -> None:
+        app.add_typer(_app, name=self.name)
+
+
+plugin: CliPlugin = _Plugin()  # type: ignore[assignment]
