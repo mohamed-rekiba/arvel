@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
-from arvel.queue.config import QueueSettings
+if TYPE_CHECKING:
+    from arvel.queue.config import QueueSettings
 
 queue_app = typer.Typer(name="queue", help="Queue worker management commands.")
 
@@ -14,6 +16,8 @@ RESTART_SIGNAL_PATH = Path("/tmp/arvel-queue-restart")  # noqa: S108
 
 
 def _get_settings() -> QueueSettings:
+    from arvel.queue.config import QueueSettings
+
     return QueueSettings()
 
 
