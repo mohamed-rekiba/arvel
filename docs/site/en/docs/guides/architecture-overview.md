@@ -169,10 +169,11 @@ classDiagram
     }
 
     class Container {
-        -_bindings: dict
+        -_bindings: dict | ChainMap
         -_instances: dict
         -_scope: Scope
         -_parent: Container
+        -_resolve_locks: dict
         +resolve(interface) T
         +enter_scope(scope) Container
         +instance(interface, value)
@@ -196,10 +197,13 @@ classDiagram
 When `resolve(T)` is called:
 
 1. Check local `_instances` cache
-2. Look up `_bindings` for `T`
-3. If binding scope is higher than current scope, delegate to parent
-4. Create instance (factory or constructor injection)
-5. Cache in `_instances`
+2. Acquire per-type `anyio.Lock` (prevents duplicate construction under concurrency)
+3. Look up `_bindings` for `T` (child containers use `ChainMap` — reads delegate to parent automatically)
+4. If binding scope is higher than current scope, delegate to parent
+5. Create instance (factory or constructor injection)
+6. Cache in `_instances`
+
+`enter_scope()` is synchronous and O(1) — child containers share the parent's bindings via `ChainMap` instead of copying the dict.
 
 ```
 APP Container (singleton)

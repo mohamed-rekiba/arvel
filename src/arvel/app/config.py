@@ -52,6 +52,9 @@ class AppSettings(BaseSettings):
     app_openapi_security_schemes: dict[str, dict[str, Any]] | None = None
     app_openapi_global_security: list[dict[str, list[str]]] | None = None
 
+    # -- Exception handling -----------------------------------------------------
+    app_exception_handlers: bool = True
+
     # -- OpenAPI / docs URLs ---------------------------------------------------
     app_docs_url: str | None = "/docs"
     app_redoc_url: str | None = "/redoc"

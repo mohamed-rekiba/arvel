@@ -444,6 +444,12 @@ def _load_cached_root_settings(
             config.app_env = "testing"
         return config
     except json.JSONDecodeError, ValidationError:
+        import structlog
+
+        structlog.get_logger("arvel.foundation.config").warning(
+            "config_cache_fallback",
+            cache_path=str(cache_path),
+        )
         return None
 
 

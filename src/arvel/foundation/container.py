@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import inspect
 import warnings
+from collections import ChainMap
 from collections.abc import (
     Callable,  # noqa: TC003 - needed at runtime for get_type_hints resolution
 )
@@ -16,7 +17,12 @@ from functools import lru_cache
 from types import MappingProxyType
 from typing import Annotated, Any, cast, get_args, get_origin, get_type_hints
 
+import anyio
+
 from arvel.foundation.exceptions import DependencyError
+from arvel.logging import Log
+
+_container_logger = Log.named("arvel.foundation.container")
 
 
 class Scope(Enum):
@@ -107,7 +113,7 @@ class Container:
 
     def __init__(
         self,
-        bindings: dict[type, _Binding],
+        bindings: dict[type, _Binding] | ChainMap[type, _Binding],
         scope: Scope,
         parent: Container | None = None,
     ) -> None:
@@ -118,6 +124,7 @@ class Container:
             type, Any
         ] = {}  # type-erased storage; resolve() restores T via type[T] key
         self._closed = False
+        self._resolve_locks: dict[type, anyio.Lock] = {}
 
     def has(self, interface: type) -> bool:
         """Check whether a binding exists without triggering resolution."""
@@ -148,7 +155,6 @@ class Container:
 
         if binding.is_value:
             self._instances[interface] = binding.value
-            # Sound cast: provide_value(type[T], T) guarantees value is T
             return cast("T", binding.value)
 
         if binding.scope == Scope.APP and self._scope != Scope.APP and self._parent:
@@ -157,9 +163,15 @@ class Container:
         if binding.scope == Scope.SESSION and self._scope == Scope.REQUEST and self._parent:
             return await self._parent.resolve(interface)
 
-        instance = await self._create_instance(binding)
-        self._instances[interface] = instance
-        return cast("T", instance)
+        if interface not in self._resolve_locks:
+            self._resolve_locks[interface] = anyio.Lock()
+
+        async with self._resolve_locks[interface]:
+            if interface in self._instances:
+                return self._instances[interface]
+            instance = await self._create_instance(binding)
+            self._instances[interface] = instance
+            return cast("T", instance)
 
     async def _create_instance(self, binding: _Binding) -> object:
         if binding.factory is not None:
@@ -248,9 +260,24 @@ class Container:
         """
         self._instances[interface] = value
 
-    async def enter_scope(self, scope: Scope) -> Container:
-        return Container(dict(self._bindings), scope=scope, parent=self)
+    def enter_scope(self, scope: Scope) -> Container:
+        """Create a child container with the given scope (O(1) — no dict copy)."""
+        child_bindings: ChainMap[type, _Binding] = ChainMap({}, self._bindings)
+        return Container(child_bindings, scope=scope, parent=self)
 
     async def close(self) -> None:
         self._closed = True
+        for interface, instance in list(self._instances.items()):
+            close_method = getattr(instance, "aclose", None) or getattr(instance, "close", None)
+            if close_method is not None and callable(close_method):
+                try:
+                    result = close_method()
+                    if inspect.isawaitable(result):
+                        await result
+                except Exception as exc:
+                    _container_logger.warning(
+                        "instance_close_failed",
+                        interface=getattr(interface, "__name__", str(interface)),
+                        error=str(exc),
+                    )
         self._instances.clear()
