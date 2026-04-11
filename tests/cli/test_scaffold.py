@@ -8,6 +8,7 @@ import pytest
 
 from arvel.cli.commands.new import (
     DATABASE_CONFIGS,
+    _get_arvel_version,
     render_skeleton,
 )
 
@@ -56,7 +57,7 @@ class TestRenderSkeleton:
                 "database_driver": "sqlite+aiosqlite",
                 "database_url": "sqlite+aiosqlite:///database/database.sqlite",
                 "python_version": "3.14",
-                "arvel_version": "0.1.0",
+                "arvel_version": _get_arvel_version(),
                 "secret_key": "abc123",
             },
         )
@@ -77,7 +78,7 @@ class TestRenderSkeleton:
                 "database_driver": "sqlite+aiosqlite",
                 "database_url": "sqlite+aiosqlite:///database/database.sqlite",
                 "python_version": "3.14",
-                "arvel_version": "0.1.0",
+                "arvel_version": _get_arvel_version(),
                 "secret_key": "abc123",
             },
         )
@@ -95,7 +96,7 @@ class TestRenderSkeleton:
                 "database_driver": "sqlite+aiosqlite",
                 "database_url": "sqlite+aiosqlite:///database/database.sqlite",
                 "python_version": "3.14",
-                "arvel_version": "0.1.0",
+                "arvel_version": _get_arvel_version(),
                 "secret_key": "abc123",
             },
         )
@@ -113,7 +114,7 @@ class TestRenderSkeleton:
                 "database_driver": "sqlite+aiosqlite",
                 "database_url": "sqlite+aiosqlite:///database/database.sqlite",
                 "python_version": "3.14",
-                "arvel_version": "0.1.0",
+                "arvel_version": _get_arvel_version(),
                 "secret_key": "abc123",
             },
         )
@@ -133,7 +134,7 @@ class TestRenderSkeleton:
                 "database_driver": "postgresql+asyncpg",
                 "database_url": "postgresql+asyncpg://localhost:5432/myapp",
                 "python_version": "3.14",
-                "arvel_version": "0.1.0",
+                "arvel_version": _get_arvel_version(),
                 "secret_key": "abc123",
             },
         )

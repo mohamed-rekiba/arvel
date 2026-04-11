@@ -2,7 +2,7 @@
 
 Caching is how you survive traffic spikes without hammering the database on every request. Arvel treats caching as a **contract** (`CacheContract`) with multiple drivers, the same way Laravel swaps `redis`, `file`, or `array` behind a single facade-like surface in the container.
 
-At **v0.1.0**, configuration flows through **`CacheSettings`**: prefix, default TTL, Redis URL, and driver name—all overridable with `CACHE_*` environment variables.
+Configuration flows through **`CacheSettings`**: prefix, default TTL, Redis URL, and driver name—all overridable with `CACHE_*` environment variables.
 
 ## The contract
 

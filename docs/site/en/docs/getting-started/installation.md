@@ -2,27 +2,62 @@
 
 Welcome. If you have ever watched Laravel turn a blank folder into something you can actually ship, you already know the feeling Arvel is going for—only here, the runtime is async Python, the router sits on FastAPI and Starlette, and your settings layer is Pydantic all the way down. This page gets you from zero to a running app: requirements, installing the framework, scaffolding a project, optional drivers, and firing up the dev server.
 
+/// admonition | Alpha Software
+    type: warning
+
+Arvel is under active development. APIs may change between releases. Use it for experimentation and early projects, and expect breaking changes until a stable 1.0 release.
+///
+
 ## Requirements
 
-Arvel **0.1.0** targets **Python 3.14 or newer**. The framework ships with async SQLAlchemy 2.x, structlog, Typer for the CLI, and uvicorn for local serving—so you get a modern stack without assembling it by hand.
+- **Python 3.14+**
+- **[uv](https://docs.astral.sh/uv/)** — fast Python package manager (recommended)
 
-You can use **pip** or any PEP 621–compatible installer. The team **recommends [uv](https://github.com/astral-sh/uv)** for fast installs, lockfiles, and the same workflow the `arvel new` command expects when it runs `uv sync` for you.
+Arvel ships with async SQLAlchemy 2.x, structlog, Typer for the CLI, and uvicorn for local serving—so you get a modern stack without assembling it by hand.
+
+You can use **pip** or any PEP 621–compatible installer, but the team **recommends uv** for fast installs, lockfiles, and the same workflow the `arvel new` command expects when it runs `uv sync` for you.
+
+If you don't have uv yet:
+
+```bash
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
 
 ## Install Arvel
 
-Install the framework into your environment (or add it to an existing project):
+**Add to your project:**
 
-```bash
-pip install arvel
-```
-
-With uv:
-
+/// tab | uv
 ```bash
 uv add arvel
 ```
+///
 
-That gives you the `arvel` CLI entry point. You can confirm everything wired up correctly:
+/// tab | pip
+```bash
+pip install arvel
+```
+///
+
+**Install the CLI as a standalone tool** (available globally without activating a venv):
+
+/// tab | uv
+```bash
+uv tool install arvel
+```
+///
+
+/// tab | pipx
+```bash
+pipx install arvel
+```
+///
+
+Confirm everything wired up correctly:
 
 ```bash
 arvel --help
@@ -101,40 +136,41 @@ arvel new my-app -d postgres --cache redis --no-input # explicit choices
 
 Run `arvel new --help` for the latest options.
 
-The scaffold auto-installs the right arvel extras based on your choices. For example, choosing `--database postgres --cache redis` adds `arvel[pg,redis]` to your `pyproject.toml`.
-
 Once the command finishes, step into the project and start the server (next section).
 
 ## Optional dependencies
 
-Core Arvel stays lean; drivers and integrations are **extras** you opt into. Install them alongside the base package when you need that capability:
-
-```bash
-pip install "arvel[sqlite]"
-pip install "arvel[pg]"
-pip install "arvel[redis]"
-```
-
-Common extras include:
+Core Arvel stays lean; drivers and integrations are **extras** you opt into. The `arvel new` scaffold auto-installs the right extras based on your service choices (for example, `--database postgres --cache redis` adds `arvel[pg,redis]` to your `pyproject.toml`). You can also install them manually:
 
 | Extra | Purpose |
 | --- | --- |
-| `sqlite` | `aiosqlite` for async SQLite |
-| `pg` | `asyncpg` for PostgreSQL |
+| `sqlite` | Async SQLite via aiosqlite |
+| `pg` | PostgreSQL via asyncpg |
 | `mysql` | Async MySQL drivers |
-| `redis` | Redis client (with hiredis) |
+| `redis` | Redis client with hiredis |
 | `smtp` | Async SMTP mail |
 | `s3` | S3-compatible object storage |
-| `media` | Image handling (Pillow) |
-| `taskiq` | Background tasks |
+| `media` | Image handling via Pillow |
+| `argon2` | Argon2 password hashing |
+| `meilisearch` | Meilisearch search engine |
+| `elasticsearch` | Elasticsearch search engine |
+| `taskiq` | Background task processing |
 | `otel` | OpenTelemetry instrumentation |
-| `sentry` | Sentry SDK for FastAPI |
+| `sentry` | Sentry error tracking |
 
-Combine extras with commas inside the quotes, for example:
+Combine extras with commas inside the quotes:
 
+/// tab | uv
 ```bash
 uv add "arvel[pg,redis,smtp]"
 ```
+///
+
+/// tab | pip
+```bash
+pip install "arvel[pg,redis,smtp]"
+```
+///
 
 ## Run the development server
 

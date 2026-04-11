@@ -2,7 +2,7 @@
 
 Authentication proves identity; **authorization** decides what that identity may do. Arvel ships **policy classes**, a **`PolicyRegistry`**, and a **`Gate`** helper so you can express rules once and reuse them from HTTP handlers, jobs, and domain services—Laravel developers will recognize the shape immediately.
 
-At **v0.1.0**, **`Policy`** uses a **method-per-action** pattern (`view`, `update`, `delete`, …) with a **deny-by-default** mindset. **`RoleBasedPolicy`** reads roles from **JWT/OIDC claims** via the claims mapper when you need provider-specific group layouts.
+**`Policy`** uses a **method-per-action** pattern (`view`, `update`, `delete`, …) with a **deny-by-default** mindset. **`RoleBasedPolicy`** reads roles from **JWT/OIDC claims** via the claims mapper when you need provider-specific group layouts.
 
 ## Policies
 

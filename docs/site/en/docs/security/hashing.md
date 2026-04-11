@@ -2,7 +2,7 @@
 
 Passwords belong nowhere near plaintext columns. Arvel’s **`HasherContract`** abstracts password hashing behind **`make`**, **`check`**, and **`needs_rehash`**, with first-class **`BcryptHasher`** and **`Argon2Hasher`** implementations—mirroring Laravel’s `Hash` facade capabilities with explicit typing.
 
-At **v0.1.0**, the security provider selects a driver from **`SecuritySettings`** (for example `bcrypt` vs `argon2`) and constructs the right hasher with cost parameters tuned to your hardware.
+The security provider selects a driver from **`SecuritySettings`** (for example `bcrypt` vs `argon2`) and constructs the right hasher with cost parameters tuned to your hardware.
 
 ## Using the hasher
 

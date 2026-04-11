@@ -283,13 +283,13 @@ def _generate_secret_key() -> str:
 
 
 def _get_arvel_version() -> str:
-    """Current installed arvel version, or '0.1.0' as fallback."""
+    """Current installed arvel version, or '0.0.0' as fallback."""
     try:
         from importlib.metadata import version
 
         return version("arvel")
     except Exception:
-        return "0.1.0"
+        return "0.0.0"
 
 
 def _fetch_templates_registry() -> list[dict[str, Any]]:

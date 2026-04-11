@@ -7,9 +7,9 @@ The full history lives next to the code: use the GitHub release pages and the re
 - [Releases on GitHub](https://github.com/mohamed-rekiba/arvel/releases)
 - [CHANGELOG.md](https://github.com/mohamed-rekiba/arvel/blob/main/CHANGELOG.md) in the main branch
 
-## Current release — v0.1.0
+## Current release — v0.1.x
 
-The inaugural release of Arvel. Everything is new, so there's no migration path — just install and go.
+The 0.1.x series is the inaugural release line of Arvel. Everything is new, so there's no migration path — just install and go.
 
 **Highlights:**
 

@@ -2,7 +2,7 @@
 
 Authentication answers **who is calling**. Arvel’s **`AuthManager`** holds named **`GuardContract`** implementations—**`JwtGuard`** for Bearer tokens, **`ApiKeyGuard`** for header or query API keys—and picks a **default** guard for middleware that does not specify a name.
 
-At **v0.1.0**, the stack lines up with Laravel’s idea of guards and drivers, but stays explicit: you register guards when the app boots, resolve them per request, and combine them with **OAuth2/OIDC** flows where users arrive via an identity provider.
+The stack lines up with Laravel’s idea of guards and drivers, but stays explicit: you register guards when the app boots, resolve them per request, and combine them with **OAuth2/OIDC** flows where users arrive via an identity provider.
 
 ## AuthManager
 
