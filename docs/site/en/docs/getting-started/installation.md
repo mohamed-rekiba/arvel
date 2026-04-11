@@ -33,12 +33,17 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 /// tab | uv
 ```bash
+# From GitHub (available now)
+uv add git+https://github.com/mohamed-rekiba/arvel@main
+
+# From PyPI (once published)
 uv add arvel
 ```
 ///
 
 /// tab | pip
 ```bash
+# From PyPI (once published)
 pip install arvel
 ```
 ///
@@ -47,12 +52,17 @@ pip install arvel
 
 /// tab | uv
 ```bash
+# From GitHub (available now)
+uv tool install --upgrade --force "git+https://github.com/mohamed-rekiba/arvel.git"
+
+# From PyPI (once published)
 uv tool install arvel
 ```
 ///
 
 /// tab | pipx
 ```bash
+# From PyPI (once published)
 pipx install arvel
 ```
 ///
@@ -162,12 +172,17 @@ Combine extras with commas inside the quotes:
 
 /// tab | uv
 ```bash
+# From GitHub
+uv add "git+https://github.com/mohamed-rekiba/arvel@main[pg,redis,smtp]"
+
+# From PyPI (once published)
 uv add "arvel[pg,redis,smtp]"
 ```
 ///
 
 /// tab | pip
 ```bash
+# From PyPI (once published)
 pip install "arvel[pg,redis,smtp]"
 ```
 ///
