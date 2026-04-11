@@ -5,6 +5,14 @@ All notable changes to Arvel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9](https://github.com/mohamed-rekiba/arvel/compare/v0.1.8...v0.1.9) (2026-04-11)
+
+
+### Bug Fixes
+
+* **cli:** auto-detect project .venv site-packages for global arvel serve ([e28ed5e](https://github.com/mohamed-rekiba/arvel/commit/e28ed5e4e7bb93e0ee67c6cf4e3a0bbc67a0871b))
+* **cli:** use bundled templates.json instead of fetching from GitHub ([8f8efe1](https://github.com/mohamed-rekiba/arvel/commit/8f8efe18cbb7b9e4a525d3798c21e9609cc89170))
+
 ## [0.1.8](https://github.com/mohamed-rekiba/arvel/compare/v0.1.7...v0.1.8) (2026-04-11)
 
 
