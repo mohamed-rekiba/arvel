@@ -42,7 +42,7 @@ meilisearch = ["meilisearch-python-sdk>=7.1.2"]
 elasticsearch = ["elasticsearch[async]>=9.3.0"]
 taskiq = ["taskiq>=0.12.1", "taskiq-redis>=1.2.2"]
 otel = [
-    "opentelemetry-api>=1.40.0",
+    "opentelemetry-api>=1.41.0",
     "opentelemetry-sdk>=1.40.0",
     "opentelemetry-instrumentation-fastapi>=0.61b0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.40.0",
