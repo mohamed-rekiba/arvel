@@ -23,7 +23,7 @@ dependencies = [
     "uvicorn[standard]>=0.44.0",
     "ipython>=9.12.0",
     "httpx>=0.28.1",
-    "python-multipart>=0.0.24",
+    "python-multipart>=0.0.26",
     "email-validator>=2.3.0",
     "pydantic-extra-types>=2.11.2",
     "inquirerpy>=0.3.4",
@@ -42,14 +42,14 @@ meilisearch = ["meilisearch-python-sdk>=7.1.2"]
 elasticsearch = ["elasticsearch[async]>=9.3.0"]
 taskiq = ["taskiq>=0.12.1", "taskiq-redis>=1.2.2"]
 otel = [
-    "opentelemetry-api>=1.40.0",
+    "opentelemetry-api>=1.41.0",
     "opentelemetry-sdk>=1.41.0",
     "opentelemetry-instrumentation-fastapi>=0.61b0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.40.0",
 ]
 sentry = ["sentry-sdk[fastapi]>=2.57.0"]
 dev = [
-    "pytest>=9.0.0,<10.0",
+    "pytest>=9.0.3,<10.0",
     "pytest-cov>=7.0.0,<8.0",
     "pytest-timeout>=2.4.0,<3.0",
     "pytest-xdist>=3.8.0,<4.0",
