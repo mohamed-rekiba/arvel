@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Arvel social card">
+  <title>Arvel</title>
+  <desc>Open Graph social card for arvel.dev - the clean stack for Python developers and agents.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0E0E1A" />
+      <stop offset="1" stop-color="#16162A" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.55">
+      <stop offset="0" stop-color="#6D28D9" stop-opacity="0.28" />
+      <stop offset="1" stop-color="#6D28D9" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="glow2" cx="0.85" cy="0.85" r="0.4">
+      <stop offset="0" stop-color="#06B6D4" stop-opacity="0.18" />
+      <stop offset="1" stop-color="#06B6D4" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <rect width="1200" height="630" fill="url(#glow)" />
+  <rect width="1200" height="630" fill="url(#glow2)" />
+
+  <g stroke="#2A2A38" stroke-width="1" opacity="0.5">
+    <line x1="0" y1="120" x2="1200" y2="120" />
+    <line x1="0" y1="510" x2="1200" y2="510" />
+  </g>
+
+  <g transform="translate(80 140) scale(6)">
+    <path fill="#A78BFA" d="M13.58 23.64 L13.58 2.62 L3.07 23.64 Z" />
+    <path fill="#22D3EE" d="M13.58 2.62 L21.84 2.62 L28.92 29.37 L19.20 24.25 Z" />
+    <rect x="4" y="15" width="23" height="2" rx="0.5" fill="#A78BFA" />
+  </g>
+
+  <text x="280" y="270"
+        font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        font-size="120"
+        font-weight="700"
+        letter-spacing="-4"
+        fill="#F4F4F8">arvel</text>
+
+  <text x="80" y="430"
+        font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        font-size="44"
+        font-weight="500"
+        letter-spacing="-1"
+        fill="#E5E5EC">The clean stack for Python developers and agents.</text>
+
+  <g font-family="'JetBrains Mono', ui-monospace, monospace" font-size="22" font-weight="500" fill="#8B8B9F">
+    <text x="80" y="490">FastAPI</text>
+    <text x="220" y="490">&#183;</text>
+    <text x="245" y="490">Pydantic</text>
+    <text x="425" y="490">&#183;</text>
+    <text x="450" y="490">SQLAlchemy</text>
+    <text x="680" y="490">&#183;</text>
+    <text x="705" y="490">end-to-end typed</text>
+  </g>
+
+  <text x="80" y="570"
+        font-family="'JetBrains Mono', ui-monospace, monospace"
+        font-size="24"
+        font-weight="500"
+        fill="#22D3EE">arvel.dev</text>
+
+  <rect x="1100" y="540" width="40" height="4" rx="2" fill="#6D28D9" />
+  <rect x="1148" y="540" width="20" height="4" rx="2" fill="#06B6D4" />
+</svg>

@@ -1,0 +1,159 @@
+"""CartService — cart CRUD with upsert-on-duplicate semantics."""
+
+from __future__ import annotations
+
+import uuid
+from decimal import Decimal
+from typing import Any
+
+from arvel.http.exceptions import NotFoundException, ValidationException
+
+from app.models.cart import Cart
+from app.models.cart_item import CartItem
+from app.models.product_catalog import ProductCatalog
+from app.services.product_service import ProductService
+
+
+class CartService:
+    def __init__(self) -> None:
+        self._products = ProductService()
+
+    async def get_or_create_cart(self, user_id: int) -> uuid.UUID:
+        cart: Cart | None = await Cart.where(user_id=user_id).first()
+        if cart is not None:
+            return cart.id
+        created: Cart | None = await Cart.create(user_id=user_id)
+        if created is None:
+            raise RuntimeError("Cart creation failed.")
+        return created.id
+
+    async def get_cart(self, user_id: int, *, locale: str = "en") -> dict[str, Any]:
+        cart_id = await self.get_or_create_cart(user_id)
+        items = await self._get_items(cart_id)
+        formatted = [await self._format_item(i, locale) for i in items]
+        return {"data": {"id": str(cart_id), "items": formatted}}
+
+    async def add_item(
+        self, user_id: int, product_id: str, quantity: int, *, locale: str = "en"
+    ) -> dict[str, Any]:
+        cart_id = await self.get_or_create_cart(user_id)
+        pid = uuid.UUID(product_id)
+
+        existing: CartItem | None = await CartItem.where(cart_id=cart_id, product_id=pid).first()
+        requested_quantity = quantity + int(existing.quantity) if existing is not None else quantity
+        product: ProductCatalog | None = await ProductCatalog.where(
+            ProductCatalog.id == pid
+        ).first()
+        if product is None:
+            raise NotFoundException(f"Product '{product_id}' not found.")
+        if int(product.stock_qty) < requested_quantity:
+            raise ValidationException("Insufficient stock for cart item.")
+        price = Decimal(str(product.price or 0))
+
+        if existing is not None:
+            existing.quantity += quantity
+            await existing.save()
+        else:
+            await CartItem.create(
+                cart_id=cart_id,
+                product_id=pid,
+                quantity=quantity,
+                unit_price_snapshot=price,
+            )
+        return await self.get_cart(user_id, locale=locale)
+
+    async def update_item(
+        self, user_id: int, item_id: str, quantity: int, *, locale: str = "en"
+    ) -> dict[str, Any]:
+        cart_id = await self.get_or_create_cart(user_id)
+        iid = int(item_id)
+        item: CartItem | None = await CartItem.where(
+            CartItem.id == iid, CartItem.cart_id == cart_id
+        ).first()
+        if item is not None:
+            product: ProductCatalog | None = await ProductCatalog.where(
+                ProductCatalog.id == item.product_id
+            ).first()
+            if product is None:
+                raise NotFoundException(f"Product '{item.product_id}' not found.")
+            if int(product.stock_qty) < quantity:
+                raise ValidationException("Insufficient stock for cart item.")
+            item.quantity = quantity
+            await item.save()
+        return await self.get_cart(user_id, locale=locale)
+
+    async def remove_item(
+        self, user_id: int, item_id: str, *, locale: str = "en"
+    ) -> dict[str, Any]:
+        cart_id = await self.get_or_create_cart(user_id)
+        iid = int(item_id)
+        item: CartItem | None = await CartItem.where(
+            CartItem.id == iid, CartItem.cart_id == cart_id
+        ).first()
+        if item is not None:
+            await item.delete()
+        return await self.get_cart(user_id, locale=locale)
+
+    async def get_cart_for_checkout(self, user_id: int) -> dict[str, Any]:
+        """Returns flat checkout-ready cart data using price snapshots."""
+        cart_id = await self.get_or_create_cart(user_id)
+        items: list[CartItem] = await self._get_items(cart_id)
+        checkout_items = [
+            {
+                "product_id": str(i.product_id),
+                "quantity": int(i.quantity),
+                "unit_price": float(i.unit_price_snapshot),
+            }
+            for i in items
+        ]
+        total = sum(Decimal(str(i.unit_price_snapshot)) * int(i.quantity) for i in items)
+        return {"items": checkout_items, "total": float(total)}
+
+    async def clear_cart(self, user_id: int) -> None:
+        cart_id = await self.get_or_create_cart(user_id)
+        items: list[CartItem] = await CartItem.where(cart_id=cart_id).all()
+        for item in items:
+            await item.delete()
+
+    async def _get_items(self, cart_id: uuid.UUID) -> list[CartItem]:
+        return await CartItem.where(cart_id=cart_id).order_by("created_at").all()
+
+    async def _format_item(self, item: CartItem, locale: str) -> dict[str, Any]:
+        product: ProductCatalog | None = await ProductCatalog.where(
+            ProductCatalog.id == item.product_id
+        ).first()
+        if product is not None:
+            product_data = await self._products.product_to_storefront_with_media(product, locale)
+        else:
+            # Product was unpublished or deleted after being added to the cart.
+            product_data = {
+                "id": str(item.product_id),
+                "name": "",
+                "slug": "",
+                "short_description": "",
+                "price": float(item.unit_price_snapshot),
+                "stock": 0,
+                "original_price": None,
+                "thumbnail_url": None,
+                "image_srcset": "",
+                "image_sizes": "",
+                "rating": None,
+                "rating_count": None,
+                "is_new": False,
+                "is_bestseller": False,
+                "category_id": "",
+                "category_name": "",
+                "category_slug": "",
+                "vendor_id": "",
+                "vendor_name": "",
+                "vendor_slug": "",
+            }
+        return {
+            "id": str(item.id),
+            "product_id": str(item.product_id),
+            "quantity": int(item.quantity),
+            "product": product_data,
+        }
+
+
+__all__ = ["CartService"]

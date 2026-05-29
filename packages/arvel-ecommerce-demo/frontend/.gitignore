@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+dist/
+.vite/
+
+# Environment
+.env
+.env.local
+
+# Editor
+.DS_Store
+*.log
+
+# Generated
+openapi.yaml

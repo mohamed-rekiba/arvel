@@ -1,0 +1,79 @@
+name: Publish
+
+# Publishes the `arvel` package to PyPI when a release tag is pushed
+# (e.g. `arvel-v1.0.1`). Tags are created by release-please when a release
+# PR is merged.
+#
+# Authentication uses PyPI Trusted Publishing (OIDC) — no API token is
+# stored. The `arvel` project must be configured as a Trusted Publisher on
+# PyPI with this repo + this workflow before the first publish:
+# https://docs.pypi.org/trusted-publishers/
+#
+# Fail-closed: until Trusted Publishing is configured on PyPI, the upload
+# step will be rejected by PyPI. No credentials live in this workflow.
+
+on:
+  push:
+    tags:
+      # arvel-v1.0.0 / arvel-v1.0.0-rc.1
+      - "arvel-v[0-9]+.[0-9]+.[0-9]+"
+      - "arvel-v[0-9]+.[0-9]+.[0-9]+-*"
+  workflow_dispatch: {}
+
+env:
+  PYTHON_VERSION: "3.14"
+  UV_VERSION: "0.11.16"
+
+jobs:
+  build:
+    name: Build arvel distribution
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+
+      - name: Sync workspace
+        run: uv sync --all-packages --all-extras --frozen
+
+      - name: Build wheel + sdist for arvel
+        run: uv build --package arvel --out-dir dist
+
+      - name: Validate distribution metadata
+        run: uvx twine check dist/*
+
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-arvel
+          path: dist/
+          retention-days: 30
+
+  publish:
+    name: Publish arvel to PyPI
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/arvel
+    permissions:
+      id-token: write
+    steps:
+      - name: Download built distribution
+        uses: actions/download-artifact@v8
+        with:
+          name: dist-arvel
+          path: dist/
+
+      - name: Publish to PyPI (Trusted Publisher, OIDC)
+        uses: pypa/gh-action-pypi-publish@v1.14.0
+        with:
+          packages-dir: dist/
+          print-hash: true
+          verbose: true

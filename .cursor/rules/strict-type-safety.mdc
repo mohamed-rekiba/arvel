@@ -1,0 +1,57 @@
+---
+description: All Python code must be fully type-safe under strict type checking
+alwaysApply: true
+globs:
+  - "**/*.py"
+  - "**/*.pyi"
+---
+
+# Strict Type Safety
+
+Every feature, change, and code addition must be fully type-safe. Types are not optional documentation — they are part of the contract.
+
+## Requirements
+
+- Annotate every function signature: all parameters and the return type. No exceptions for "obvious" or "small" functions.
+- Annotate all class attributes, module-level variables, and dataclass fields.
+- Never use `Any` as an escape hatch. If a type is genuinely dynamic, use `object`, a `Protocol`, a `TypeVar`, a `Union`, or a properly bounded generic. `Any` is only acceptable when interfacing with a truly untyped third-party library, and must be narrowed at the boundary.
+- Never use bare `# type: ignore`. If a suppression is unavoidable, use `# type: ignore[specific-error-code]` with a one-line comment explaining why.
+- Prefer precise types over permissive ones:
+  - `Sequence[str]` over `list`
+  - `Mapping[str, int]` over `dict`
+  - `Literal[...]` for fixed value sets
+  - `TypedDict` or dataclasses over loose dicts
+  - `NewType` for domain primitives that shouldn't be mixed (e.g. `UserId` vs `int`)
+- Use generics (`TypeVar`, `Generic`, `ParamSpec`) when a function or class is genuinely polymorphic. Don't collapse to `Any` to avoid generics.
+- Public APIs must pass under a strict type checker (`mypy --strict` or `pyright` in strict mode) with **zero errors and zero warnings**.
+- Runtime behavior and static types must agree. If you use `cast()`, the cast must be provably correct, not wishful.
+- No untyped `**kwargs` or `*args` in public APIs unless typed via `Unpack[TypedDict]` or `ParamSpec`.
+
+## Use Pydantic When Applicable
+
+Prefer Pydantic `BaseModel` over plain dataclasses or `TypedDict` whenever runtime validation, parsing, or serialization is involved. Pydantic gives you static types **and** runtime guarantees from the same definition.
+
+**Use Pydantic for:**
+
+- Any data crossing a trust boundary: API request/response bodies, CLI inputs, config files, environment variables, message-queue payloads, webhook bodies, LLM/tool outputs.
+- Domain models that need validation rules (ranges, regexes, cross-field checks, custom validators).
+- Anything that needs to be (de)serialized to/from JSON, YAML, TOML, or dict form.
+- Settings and configuration — use `pydantic-settings` (`BaseSettings`) rather than ad-hoc env parsing.
+
+**Prefer plain dataclasses or `TypedDict` for:**
+
+- Pure internal data structures with no validation needs and no I/O boundary (e.g. a transient tuple-like record passed between two private functions).
+- Hot paths where Pydantic's validation overhead is measurably too expensive — and only after profiling proves it.
+
+**Pydantic conventions:**
+
+- Use Pydantic syntax: `model_config = ConfigDict(...)`, `field_validator`, `model_validator`, `model_dump()`, `model_validate()`. Do not use v1-style `Config` classes, `validator`, `.dict()`, or `.parse_obj()`.
+- Enable strict mode where appropriate: `model_config = ConfigDict(strict=True, extra="forbid", frozen=True)` for models that should not silently coerce or accept unknown fields.
+- Use `Field(...)` for constraints (`ge`, `le`, `min_length`, `pattern`, etc.) rather than hand-written validators when a built-in constraint exists.
+- Reserve `field_validator` / `model_validator` for logic that can't be expressed declaratively.
+- Models exposed at public API boundaries must have `extra="forbid"` to reject unknown fields explicitly.
+- Prefer `Annotated[T, Field(...)]` over assigning `Field(...)` as a default when adding constraints to typed fields.
+
+## Principle
+
+If type-checking forces an awkward design, treat that as a signal to redesign — not to weaken the types.

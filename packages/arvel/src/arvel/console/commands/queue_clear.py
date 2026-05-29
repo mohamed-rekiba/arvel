@@ -1,0 +1,55 @@
+"""queue:clear command (WI-arvel-023)."""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Annotated, ClassVar
+
+import typer
+
+from arvel.console import Command, Context
+from arvel.console._t import Option as _Option
+from arvel.container.errors import BindingResolutionError
+from arvel.queue.manager import QueueManager
+
+
+class QueueClearCommand(Command):
+    name: ClassVar[str] = "queue:clear"
+    help: ClassVar[str] = "Remove all pending jobs from a queue"
+    needs_application: ClassVar[bool] = True
+
+    def register(self, app: typer.Typer) -> None:
+        cmd_self = self
+
+        def _callback(
+            *,
+            queue: Annotated[str, _Option("--queue", help="Queue name to clear")] = "default",
+            connection: Annotated[  # noqa: ARG001 — reserved for multi-connection support
+                str, _Option("--connection", help="Queue connection")
+            ] = "default",
+        ) -> None:
+            try:
+                count = asyncio.run(cmd_self._run(queue=queue))
+            except (BindingResolutionError, RuntimeError) as exc:
+                typer.echo(f"arvel: {exc}", err=True)
+                raise typer.Exit(code=2) from exc
+            typer.echo(f"Cleared {count} job(s) from queue '{queue}'.")
+
+        app.command(name=self.name, help=self.help)(_callback)
+
+    def handle(self, ctx: Context) -> int:
+        raise NotImplementedError
+
+    async def _run(self, *, queue: str) -> int:
+        if self.app is None:
+            msg = "queue:clear requires a bootstrapped Application"
+            raise RuntimeError(msg)
+        manager = self.app.container.make(QueueManager)
+        clear_method = getattr(manager, "clear", None)
+        if clear_method is None:
+            msg = "queue:clear: connection driver does not implement clear()"
+            raise RuntimeError(msg)
+        result = await clear_method(queue)
+        if isinstance(result, int):
+            return result
+        return 0

@@ -27,11 +27,27 @@ ENV/
 # Linting / Testing
 .ruff_cache/
 .pytest_cache/
-.coverage
+.coverage*
+.vite/
+
+# Session context (per 015-context-engineering.mdc — ephemeral, never committed)
+.context/
+
+# Local experiments / scratch
+repos/
 coverage.xml
 coverage/
 htmlcov/
+bootstrap/
 .mypy_cache/
+.pyright/
+.benchmarks/
+.playwright-mcp/
+
+# SBOM / build scratch
+req-*.txt
+sbom-*.cdx.json
+sbom-*.spdx.json
 
 # Environment
 .env
@@ -51,5 +67,9 @@ Thumbs.db
 **/*.sqlite3
 
 # MkDocs build output
-docs/site/*/site/
-docs/site/*/.cache/
+/site/
+/_site/
+.cache/
+
+# Node (pusher-js wire-contract harness)
+**/node_modules/

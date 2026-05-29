@@ -1,0 +1,16 @@
+{
+  "name": "arvel-pusher-js-wire-harness",
+  "version": "0.0.0",
+  "description": "Pusher v7 wire-contract test harness (WI-arvel-014). Local-only; not published.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "smoke": "node client.mjs --url ws://127.0.0.1:6001 --key demo-key --channel demo-channel"
+  },
+  "dependencies": {
+    "pusher-js": "8.5.0"
+  }
+}
