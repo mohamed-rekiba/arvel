@@ -563,19 +563,29 @@ class ActiveRecord(QueryMixin):
         return self
 
     async def force_delete(self) -> Any:
+        from arvel.database.events import fire_after_commit, fire_async, fire_cancellable
+
         session = get_active_session()
+        await fire_cancellable(type(self), "deleting", self)
         await session.delete(self)
         await session.flush()
+        await fire_async(type(self), "deleted", self)
+        fire_after_commit(type(self), self)
         return self
 
     async def restore(self) -> Any:
+        from arvel.database.events import fire_after_commit, fire_async, fire_cancellable
+
         soft_field = getattr(type(self), "__arvel_soft_delete_column__", None)
         if soft_field is None:
             raise AttributeError(f"{type(self).__name__} does not use SoftDeletes.")
+        await fire_cancellable(type(self), "restoring", self)
         setattr(self, soft_field, None)
         session = get_active_session()
         session.add(self)
         await session.flush()
+        await fire_async(type(self), "restored", self)
+        fire_after_commit(type(self), self)
         return self
 
     async def fresh(self) -> Any:
@@ -612,6 +622,12 @@ class ActiveRecord(QueryMixin):
         import inspect
 
         skip = set(except_ or [])
+        # Eloquent drops the PK and timestamps on a fresh copy; don't carry over a
+        # soft-delete flag either, or the clone would start life already trashed.
+        skip.update({"created_at", "updated_at"})
+        soft_field = getattr(type(self), "__arvel_soft_delete_column__", None)
+        if soft_field:
+            skip.add(soft_field)
         pk_cols = {col.key for col in mapper.primary_key}
         # Determine which fields are required by __init__ (no default, init=True).
         init_params = inspect.signature(type(self)).parameters
