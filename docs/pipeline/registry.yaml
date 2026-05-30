@@ -126,3 +126,24 @@ work_items:
       sentinel guarded for pending instances. ADR-128. 4b skipped (L2/Tier2). Gates green:
       arvel 744 db / permission 75 / ecommerce 407; mypy/pyright/ruff/bandit/pip-audit/
       gitleaks clean.
+
+  - id: "WI-arvel-007"
+    name: "streaming + chunking completeness (backlog 005 S10)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T20:40:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      stream() server-side cursor (stream_scalars + yield_per), distinct from keyset lazy();
+      directional keyset via descending= on chunk_by_id + new lazy_by_id; chunk/chunk_by_id/
+      each stop when a callback returns False; offset chunk auto-orders by PK. Shared
+      _keyset_batches generator. ADR-129. 4b skipped (L2/Tier2). Gates green: arvel 751 db
+      tests; mypy/pyright/ruff/bandit/gitleaks clean.

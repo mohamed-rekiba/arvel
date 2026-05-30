@@ -419,7 +419,7 @@ class QueryMixin:
     async def chunk(
         cls,
         size: int,
-        callback: Callable[[list[Self]], Awaitable[None]],
+        callback: Callable[[list[Self]], Awaitable[bool | None]],
     ) -> None:
         await cls.query().chunk(size, callback)
 
@@ -427,24 +427,35 @@ class QueryMixin:
     async def chunk_by_id(
         cls,
         size: int,
-        callback: Callable[[list[Self]], Awaitable[None]],
+        callback: Callable[[list[Self]], Awaitable[bool | None]],
         *,
         column: str = "id",
+        descending: bool = False,
     ) -> None:
-        await cls.query().chunk_by_id(size, callback, column=column)
+        await cls.query().chunk_by_id(size, callback, column=column, descending=descending)
 
     @classmethod
     def lazy(cls, chunk_size: int = 1000, *, column: str = "id") -> AsyncGenerator[Self]:
         return cls.query().lazy(chunk_size, column=column)
 
     @classmethod
+    def lazy_by_id(
+        cls, chunk_size: int = 1000, *, column: str = "id", descending: bool = False
+    ) -> AsyncGenerator[Self]:
+        return cls.query().lazy_by_id(chunk_size, column=column, descending=descending)
+
+    @classmethod
     def cursor(cls, chunk_size: int = 1000, *, column: str = "id") -> AsyncGenerator[Self]:
         return cls.query().cursor(chunk_size, column=column)
 
     @classmethod
+    def stream(cls, *, batch_size: int = 1000) -> AsyncGenerator[Self]:
+        return cls.query().stream(batch_size=batch_size)
+
+    @classmethod
     async def each(
         cls,
-        callback: Callable[[Self], Awaitable[None]],
+        callback: Callable[[Self], Awaitable[bool | None]],
     ) -> None:
         await cls.query().each(callback)
 

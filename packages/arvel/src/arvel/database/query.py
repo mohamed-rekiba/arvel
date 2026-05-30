@@ -1613,17 +1613,60 @@ class QueryBuilder(Generic[T]):
             next_cursor = base64.b64encode(json.dumps(raw).encode()).decode()
         return CursorPaginator(items=items, per_page=per_page, next_cursor=next_cursor)
 
-    async def chunk(self, size: int, callback: Callable[[list[T]], Awaitable[None]]) -> None:
-        page = 1
+    def _ordered_for_offset(self) -> Self:
+        """Enforce a stable order for OFFSET pagination, like Eloquent's chunk().
+
+        OFFSET without an order can skip or repeat rows. If no ``order_by`` is
+        set, fall back to the model's primary key.
+        """
+        if getattr(self._stmt, "_order_by_clauses", ()):
+            return self
+        mapper: Mapper[Any] = cast("Mapper[Any]", sqla_inspect(self._model))
+        return self._clone(self._stmt.order_by(*mapper.primary_key))
+
+    async def _keyset_batches(
+        self, size: int, column: str, descending: bool
+    ) -> AsyncGenerator[list[T]]:
+        """Walk a keyset on ``column`` in batches, in the requested direction.
+
+        Backs chunk_by_id / lazy / lazy_by_id. Stable under concurrent
+        inserts/deletes — rows can't be skipped or seen twice the way
+        OFFSET-based chunk() can.
+        """
+        col = _resolve_column(self._model, column)
+        last_id: Any = None
         while True:
-            stmt = self.apply_global_scopes().limit(size).offset((page - 1) * size)
+            stmt = self.apply_global_scopes()
+            if last_id is not None:
+                stmt = stmt.where(col < last_id if descending else col > last_id)
+            stmt = stmt.order_by(col.desc() if descending else col).limit(size)
             result = await get_active_session().execute(stmt)
             batch: list[T] = cast("list[T]", list(result.scalars().all()))
             if not batch:
                 return
             await self._fire_retrieved(batch)
             await self._eager_load_async(batch)
-            await callback(batch)
+            yield batch
+            if len(batch) < size:
+                return
+            last_id = getattr(batch[-1], column)
+
+    async def chunk(
+        self, size: int, callback: Callable[[list[T]], Awaitable[bool | None]]
+    ) -> None:
+        """Process rows in OFFSET batches. Return ``False`` from the callback to stop."""
+        base = self._ordered_for_offset()
+        page = 1
+        while True:
+            stmt = base.apply_global_scopes().limit(size).offset((page - 1) * size)
+            result = await get_active_session().execute(stmt)
+            batch: list[T] = cast("list[T]", list(result.scalars().all()))
+            if not batch:
+                return
+            await self._fire_retrieved(batch)
+            await self._eager_load_async(batch)
+            if await callback(batch) is False:
+                return
             if len(batch) < size:
                 return
             page += 1
@@ -1631,62 +1674,59 @@ class QueryBuilder(Generic[T]):
     async def chunk_by_id(
         self,
         size: int,
-        callback: Callable[[list[T]], Awaitable[None]],
+        callback: Callable[[list[T]], Awaitable[bool | None]],
         *,
         column: str = "id",
+        descending: bool = False,
     ) -> None:
         """Chunk by a keyset on ``column`` instead of OFFSET.
 
-        Stable under concurrent inserts/deletes — rows can't be skipped or
-        seen twice the way OFFSET-based ``chunk()`` can.
+        ``descending=True`` walks the key high-to-low. Return ``False`` from the
+        callback to stop.
         """
-        col = _resolve_column(self._model, column)
-        last_id: Any = None
-        while True:
-            stmt = self.apply_global_scopes()
-            if last_id is not None:
-                stmt = stmt.where(col > last_id)
-            stmt = stmt.order_by(col).limit(size)
-            result = await get_active_session().execute(stmt)
-            batch: list[T] = cast("list[T]", list(result.scalars().all()))
-            if not batch:
+        async for batch in self._keyset_batches(size, column, descending):
+            if await callback(batch) is False:
                 return
-            await self._fire_retrieved(batch)
-            await self._eager_load_async(batch)
-            await callback(batch)
-            if len(batch) < size:
-                return
-            last_id = getattr(batch[-1], column)
 
     async def lazy(self, chunk_size: int = 1000, *, column: str = "id") -> AsyncGenerator[T]:
-        """Stream rows one at a time, fetching in keyset batches under the hood."""
-        col = _resolve_column(self._model, column)
-        last_id: Any = None
-        while True:
-            stmt = self.apply_global_scopes()
-            if last_id is not None:
-                stmt = stmt.where(col > last_id)
-            stmt = stmt.order_by(col).limit(chunk_size)
-            result = await get_active_session().execute(stmt)
-            batch: list[T] = cast("list[T]", list(result.scalars().all()))
-            if not batch:
-                return
-            await self._fire_retrieved(batch)
-            await self._eager_load_async(batch)
+        """Stream rows one at a time, fetching in ascending keyset batches."""
+        async for row in self.lazy_by_id(chunk_size, column=column):
+            yield row
+
+    async def lazy_by_id(
+        self, chunk_size: int = 1000, *, column: str = "id", descending: bool = False
+    ) -> AsyncGenerator[T]:
+        """Stream rows one at a time over a keyset, in the requested direction."""
+        async for batch in self._keyset_batches(chunk_size, column, descending):
             for row in batch:
                 yield row
-            if len(batch) < chunk_size:
-                return
-            last_id = getattr(batch[-1], column)
 
     def cursor(self, chunk_size: int = 1000, *, column: str = "id") -> AsyncGenerator[T]:
         """Alias for :meth:`lazy` — stream rows without loading them all at once."""
         return self.lazy(chunk_size, column=column)
 
-    async def each(self, callback: Callable[[T], Awaitable[None]]) -> None:
-        async def _per_batch(batch: list[T]) -> None:
+    async def stream(self, *, batch_size: int = 1000) -> AsyncGenerator[T]:
+        """Server-side cursor: one statement, rows fetched incrementally from the driver.
+
+        Distinct from :meth:`lazy` (which issues N keyset queries). Fires ``retrieved``
+        per row and does not batch-eager-load pivots — use :meth:`lazy`/:meth:`chunk`
+        for that.
+        """
+        stmt = self.apply_global_scopes().execution_options(yield_per=batch_size)
+        result = await get_active_session().stream_scalars(stmt)
+        async for row in result:
+            typed = cast("T", row)
+            await self._fire_retrieved((typed,))
+            yield typed
+
+    async def each(self, callback: Callable[[T], Awaitable[bool | None]]) -> None:
+        """Process rows one at a time. Return ``False`` from the callback to stop."""
+
+        async def _per_batch(batch: list[T]) -> bool | None:
             for item in batch:
-                await callback(item)
+                if await callback(item) is False:
+                    return False
+            return None
 
         await self.chunk(100, _per_batch)
 
