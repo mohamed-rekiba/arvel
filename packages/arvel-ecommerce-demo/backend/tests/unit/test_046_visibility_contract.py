@@ -9,6 +9,8 @@ CATEGORY_MODEL = BASE_DIR / "app" / "models" / "category.py"
 VENDOR_MODEL = BASE_DIR / "app" / "models" / "vendor.py"
 PRODUCT_CATALOG_MODEL = BASE_DIR / "app" / "models" / "product_catalog.py"
 PRODUCT_SERVICE = BASE_DIR / "app" / "services" / "product_service.py"
+CART_SERVICE = BASE_DIR / "app" / "services" / "cart_service.py"
+ORDER_SERVICE = BASE_DIR / "app" / "services" / "order_service.py"
 CATEGORY_MIGRATION = (
     BASE_DIR / "database" / "migrations" / "2026_05_23_000002_create_categories_table.py"
 )
@@ -99,6 +101,18 @@ def test_storefront_serializes_locale_aware_category_fields() -> None:
     assert (
         '"category_slug": TranslatableMixin.translate_dict(category_slug_data, locale)' in service
     )
+
+
+def test_cart_only_adds_visible_products() -> None:
+    """Adding to cart must reject draft/hidden products via real_status = 'visible'."""
+    service = _src(CART_SERVICE)
+    assert 'real_status == "visible"' in service or "real_status = 'visible'" in service
+
+
+def test_checkout_only_accepts_visible_products() -> None:
+    """Checkout must validate against real_status = 'visible', not raw status."""
+    service = _src(ORDER_SERVICE)
+    assert 'real_status == "visible"' in service or "real_status = 'visible'" in service
 
 
 def test_products_gin_indexes_cover_all_translation_columns() -> None:

@@ -546,9 +546,9 @@ export async function deleteProductMedia(
   productId: string | number,
   mediaId: string,
 ): Promise<void> {
-  return json<void>(`/api/admin/products/${encodeURIComponent(String(productId))}/media`, {
+  const base = encodeURIComponent(String(productId))
+  return json<void>(`/api/admin/products/${base}/media/${encodeURIComponent(mediaId)}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ media_id: mediaId }),
   })
 }
