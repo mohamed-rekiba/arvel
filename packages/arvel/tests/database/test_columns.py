@@ -43,7 +43,7 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import Mapped, relationship
 
 # ─── helper-shape tests (column type + flags) ────────────────────────────────
 
@@ -165,6 +165,17 @@ class _Account(Model, Timestamps):
     email: Mapped[str] = string(255, unique=True)
     balance: Mapped[int] = big_integer(default=0)
     is_active: Mapped[bool] = boolean(default=True)
+    transactions: Mapped[list[_Transaction]] = relationship(
+        "_Transaction", init=False, default_factory=list
+    )
+
+
+class _Transaction(Model, Timestamps):
+    __tablename__ = "transactions_columns_test"
+
+    id: Mapped[int] = id_()
+    balance: Mapped[int] = big_integer(default=0)
+    account_id: Mapped[int | None] = foreign_id("accounts_columns_test.id", nullable=True)
 
 
 class _SoftAccount(Model, SoftDeletes):

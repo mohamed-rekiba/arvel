@@ -94,6 +94,22 @@ class TestWritePathCoercion:
         m.is_active = 0
         assert _raw(m, "is_active") is False
 
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            pytest.param("0", False, id="string-zero-false"),
+            pytest.param("", False, id="empty-string-false"),
+            pytest.param("1", True, id="string-one-true"),
+            pytest.param("true", True, id="string-true-true"),
+            # PHP's (bool)"false" is True — Laravel parity, not intuition.
+            pytest.param("false", True, id="string-false-still-true"),
+        ],
+    )
+    def test_boolean_cast_matches_php_bool_for_strings(self, raw: str, expected: bool) -> None:
+        m = _build()
+        m.is_active = raw
+        assert _raw(m, "is_active") is expected
+
     def test_assignment_coerces_string_to_int(self) -> None:
         m = _build()
         m.quantity = "42"

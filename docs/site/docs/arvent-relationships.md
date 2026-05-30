@@ -372,6 +372,12 @@ Attribute name pattern: `{relation}_{aggregate}_{column}` — `posts_count`, `or
 
 These only work with descriptor-style relations.
 
+`with_count` accepts both SQLA relationships and `BelongsToMany` descriptors, and raises `UnknownRelationError` if the name isn't a relation on the model. `with_sum`/`with_max` cover SQLA relationships.
+
+### Soft-deletes and relation counts
+
+`has`, `where_has`, `doesnt_have`, and `with_count` honour the related model's soft-delete scope — trashed related rows are never counted or matched. A blog whose only comment has been soft-deleted has zero comments for `has("comments")` and `with_count("comments")`, just like Eloquent.
+
 ## N+1 prevention
 
 The attribute style (`has_many_attr`, `BelongsToMany`, `MorphOne`, `MorphMany`) enforces `lazy="raise_on_sql"`. Accessing a relation without loading it raises `sqlalchemy.exc.InvalidRequestError` immediately — the N+1 bug is visible at the line that caused it:
