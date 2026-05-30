@@ -113,16 +113,21 @@ design; the flag selects LIKE vs ILIKE (case-sensitive on PG).
 **As a** developer running idempotent ingests, **I want** `insert_or_ignore`, a batched dialect-complete `upsert` (returning affected count), `truncate`, `insert_using`, and `increment_each`/`decrement_each`, **so that** sync and bulk flows match Laravel.
 
 **Acceptance Criteria**:
-- [ ] Given `insert_or_ignore(rows)`, then it emits `ON CONFLICT DO NOTHING` (PG/SQLite) / `INSERT IGNORE` (MySQL).
-- [ ] Given `upsert(rows, unique_by, update)`, then it issues a single multi-row statement (not a per-row loop) and returns the affected row count.
-- [ ] Given `truncate()`, then it truncates the mapped table; soft-delete policy interaction is documented.
-- [ ] Given `increment_each({...})`, then multiple columns are bumped in one statement.
+- [x] Given `insert_or_ignore(rows)`, then it emits `ON CONFLICT DO NOTHING` (PG/SQLite) / `INSERT IGNORE` (MySQL).
+- [x] Given `upsert(rows, unique_by, update)`, then it issues a single multi-row statement (not a per-row loop) and returns the affected row count.
+- [x] Given `truncate()`, then it truncates the mapped table; soft-delete policy interaction is documented.
+- [x] Given `increment_each({...})`, then multiple columns are bumped in one statement.
 
 **Security Requirements**:
-- [ ] All values parameterized; `unique_by` columns validated against the model.
+- [x] All values parameterized; `unique_by` columns validated against the model.
 
 **Priority**: Should
 **Complexity**: Large
+**Status**: DONE — WI-arvel-011, ADR-132 (`test_qb_write_path.py`). `insert_or_ignore`
+(ON CONFLICT DO NOTHING / INSERT IGNORE), single-statement `upsert` returning affected
+count (manual fallback when no PK/UNIQUE backs `unique_by`), `truncate` (TRUNCATE on
+PG/MySQL, DELETE on SQLite — hard wipe, bypasses soft-delete), `insert_using` (INSERT …
+SELECT), `increment_each`/`decrement_each` (multi-column in one UPDATE).
 
 ### Story 9: Pagination HTTP + JSON parity
 **As a** frontend consumer, **I want** `paginate`/`simple_paginate`/`cursor_paginate` to support `page_name`, request page resolution, `appends`/`with_query_string`/`fragment`, an `on_each_side` link window, bidirectional cursors, and a Laravel-shaped JSON envelope, **so that** Arvel endpoints are drop-in compatible with Laravel API clients and resources.

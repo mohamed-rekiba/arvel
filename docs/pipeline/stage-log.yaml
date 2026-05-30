@@ -396,3 +396,20 @@ events:
       tests (+8); mypy/pyright/ruff/bandit/gitleaks clean. 4b + release skipped (L2/Tier2).
       005-S12 DONE.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-011"
+    event_id: "EV-032"
+    timestamp: "2026-05-30T22:35:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      005 S8 write-path completeness. ADR-132. insert_or_ignore (ON CONFLICT DO NOTHING /
+      INSERT IGNORE), single-statement upsert returning affected count (manual fallback when
+      unique_by lacks a PK/UNIQUE), truncate (TRUNCATE on PG/MySQL via quoted preparer, DELETE
+      on SQLite; hard wipe), insert_using (INSERT … SELECT honoring source global scopes),
+      increment_each/decrement_each (multi-col single UPDATE). Gates: arvel 794 db tests (+6);
+      mypy/pyright/ruff/bandit (0 issues)/gitleaks clean. 4b + release skipped (L2/Tier2).
+      005-S8 DONE.
+    handoff_id: null

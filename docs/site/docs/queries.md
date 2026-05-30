@@ -208,13 +208,39 @@ await DB.table("users").insert([
 # Update
 affected = await DB.table("users").where(active=False).update({"active": True})
 
-# Upsert
-await DB.table("users").upsert(
+# Upsert — single multi-row statement, returns the affected count
+affected = await User.upsert(
     [{"email": "alice@example.com", "name": "Alice"}],
     unique_by=["email"],
     update=["name"],
 )
 ```
+
+`unique_by` must be backed by a primary key or `UNIQUE` constraint for the native
+`ON CONFLICT` path. Without one, `upsert` falls back to a per-row check-and-write.
+
+### Bulk write helpers
+
+```python
+# Skip rows that hit a unique conflict (ON CONFLICT DO NOTHING / INSERT IGNORE).
+inserted = await User.insert_or_ignore([
+    {"email": "a@x.com", "name": "A"},
+    {"email": "a@x.com", "name": "dupe"},  # ignored
+])
+
+# INSERT INTO … SELECT — copy rows from another query (global scopes honored).
+copied = await Archive.insert_using(["email"], User.query().where("active", False).select("email"))
+
+# Bump several columns in one UPDATE.
+await Post.where(id=post_id).increment_each({"views": 1, "shares": 2})
+await Stock.where("sku", sku).decrement_each({"on_hand": 1, "reserved": 1})
+
+# Empty the table. TRUNCATE on PG/MySQL, DELETE on SQLite. Hard wipe — ignores soft-delete.
+await Session.truncate()
+```
+
+`truncate()` removes every row (and resets identity on PG/MySQL). For a soft-delete-aware
+wipe, use `Model.where(...).delete()` instead.
 
 ## Deletes
 

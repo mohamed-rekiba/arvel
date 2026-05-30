@@ -2045,62 +2045,150 @@ class QueryBuilder(Generic[T]):
             combined = {**where, **values}
             await self.insert([combined])
 
+    def _native_unique_columns(self) -> set[str]:
+        """Column names covered by the table's PK or a UNIQUE constraint."""
+        from sqlalchemy import UniqueConstraint
+
+        table = _table_of(self._model)
+        cols: set[str] = {col.name for col in table.primary_key}
+        for constraint in table.constraints:
+            if isinstance(constraint, UniqueConstraint):
+                cols.update(col.name for col in constraint.columns)
+        return cols
+
+    async def insert_or_ignore(self, rows: list[dict[str, Any]]) -> int:
+        """INSERT rows, skipping any that violate a unique constraint. Returns rows inserted.
+
+        ON CONFLICT DO NOTHING on SQLite/PostgreSQL, INSERT IGNORE on MySQL. Other dialects
+        fall back to a plain insert (no conflict suppression).
+        """
+        self._assert_writable("insert_or_ignore")
+        if not rows:
+            return 0
+        session = get_active_session()
+        table = _table_of(self._model)
+        dialect_name = (await session.connection()).dialect.name
+
+        stmt: Any
+        if dialect_name == "sqlite":
+            from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+            stmt = sqlite_insert(table).values(rows).on_conflict_do_nothing()
+        elif dialect_name in ("postgresql", "postgres"):
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            stmt = pg_insert(table).values(rows).on_conflict_do_nothing()
+        elif dialect_name == "mysql":
+            from sqlalchemy.dialects.mysql import insert as mysql_insert
+
+            stmt = mysql_insert(table).values(rows).prefix_with("IGNORE")
+        else:
+            from sqlalchemy import insert as sqla_insert
+
+            stmt = sqla_insert(table).values(rows)
+
+        result = cast("CursorResult[Any]", await session.execute(stmt))
+        await session.flush()
+        return int(result.rowcount) if result.rowcount != -1 else len(rows)
+
     async def upsert(
         self,
         rows: list[dict[str, Any]],
         *,
         unique_by: list[str],
         update: list[str],
-    ) -> None:
-        """INSERT … ON CONFLICT DO UPDATE — or manual check-and-upsert as fallback."""
+    ) -> int:
+        """INSERT … ON CONFLICT DO UPDATE as a single multi-row statement; returns affected rows.
+
+        Falls back to a per-row check-and-write when ``unique_by`` isn't backed by a PK/UNIQUE
+        constraint or the dialect has no native upsert.
+        """
         self._assert_writable("upsert")
+        if not rows:
+            return 0
         session = get_active_session()
-        conn = await session.connection()
-        dialect_name: str = conn.dialect.name
-
-        # Check if unique_by columns have UNIQUE or PK constraints — required for
-        # dialect-native ON CONFLICT. Fall back to manual if not.
-        from sqlalchemy import UniqueConstraint
-
         table = _table_of(self._model)
-        unique_cols: set[str] = {col.name for col in table.primary_key}
-        for uc in table.constraints:
-            if isinstance(uc, UniqueConstraint):
-                for col in uc.columns:
-                    unique_cols.add(col.name)
+        dialect_name: str = (await session.connection()).dialect.name
+        has_constraint = all(c in self._native_unique_columns() for c in unique_by)
 
-        has_constraint = all(c in unique_cols for c in unique_by)
-
+        stmt: Any
+        base: Any
         if has_constraint and dialect_name == "sqlite":
             from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-            for row in rows:
-                sqlite_stmt = sqlite_insert(table).values(**row)
-                sqlite_stmt = sqlite_stmt.on_conflict_do_update(
-                    index_elements=unique_by,
-                    set_={k: getattr(sqlite_stmt.excluded, k) for k in update},
-                )
-                await session.execute(sqlite_stmt)
+            base = sqlite_insert(table).values(rows)
+            stmt = base.on_conflict_do_update(
+                index_elements=unique_by,
+                set_={k: getattr(base.excluded, k) for k in update},
+            )
         elif has_constraint and dialect_name in ("postgresql", "postgres"):
             from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-            for row in rows:
-                pg_stmt = pg_insert(table).values(**row)
-                pg_stmt = pg_stmt.on_conflict_do_update(
-                    index_elements=unique_by,
-                    set_={k: getattr(pg_stmt.excluded, k) for k in update},
-                )
-                await session.execute(pg_stmt)
+            base = pg_insert(table).values(rows)
+            stmt = base.on_conflict_do_update(
+                index_elements=unique_by,
+                set_={k: getattr(base.excluded, k) for k in update},
+            )
+        elif has_constraint and dialect_name == "mysql":
+            from sqlalchemy.dialects.mysql import insert as mysql_insert
+
+            base = mysql_insert(table).values(rows)
+            stmt = base.on_duplicate_key_update({k: getattr(base.inserted, k) for k in update})
         else:
-            # Manual check-and-upsert for non-unique columns or unsupported dialects
-            for row in rows:
-                where_dict = {k: row[k] for k in unique_by if k in row}
-                qb = type(self)(self._model).where(**where_dict)
-                if await qb.count() > 0:
-                    update_dict = {k: row[k] for k in update if k in row}
-                    await qb.update(update_dict)
-                else:
-                    await type(self)(self._model).insert([row])
+            return await self._upsert_manual(rows, unique_by=unique_by, update=update)
+
+        result = cast("CursorResult[Any]", await session.execute(stmt))
+        await session.flush()
+        return int(result.rowcount) if result.rowcount != -1 else len(rows)
+
+    async def _upsert_manual(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        unique_by: list[str],
+        update: list[str],
+    ) -> int:
+        affected = 0
+        for row in rows:
+            where_dict = {k: row[k] for k in unique_by if k in row}
+            qb = type(self)(self._model).where(**where_dict)
+            if await qb.count() > 0:
+                affected += await qb.update({k: row[k] for k in update if k in row})
+            else:
+                await type(self)(self._model).insert([row])
+                affected += 1
+        return affected
+
+    async def insert_using(self, columns: list[str], query: QueryBuilder[Any]) -> int:
+        """INSERT INTO … (columns) SELECT … — populate from another query. Returns rows inserted."""
+        self._assert_writable("insert_using")
+        from sqlalchemy import insert as sqla_insert
+
+        session = get_active_session()
+        table = _table_of(self._model)
+        stmt = sqla_insert(table).from_select(columns, query.apply_global_scopes())
+        result = cast("CursorResult[Any]", await session.execute(stmt))
+        await session.flush()
+        return int(result.rowcount) if result.rowcount != -1 else 0
+
+    async def truncate(self) -> None:
+        """Empty the mapped table.
+
+        PostgreSQL/MySQL issue ``TRUNCATE`` (resets identity, ignores soft-delete — this is a
+        hard wipe). SQLite has no TRUNCATE, so it falls back to ``DELETE`` without a WHERE.
+        """
+        self._assert_writable("truncate")
+        session = get_active_session()
+        conn = await session.connection()
+        table = _table_of(self._model)
+        dialect_name = conn.dialect.name
+        if dialect_name in ("postgresql", "postgres", "mysql"):
+            quoted = conn.dialect.identifier_preparer.format_table(table)
+            await session.execute(text(f"TRUNCATE TABLE {quoted}"))
+        else:
+            from sqlalchemy import delete as sqla_delete
+
+            await session.execute(sqla_delete(table))
         await session.flush()
 
     async def increment(
@@ -2127,6 +2215,32 @@ class QueryBuilder(Generic[T]):
     ) -> int:
         """Decrement ``col`` by ``amount``, set any ``extra`` columns, return rows affected."""
         return await self.increment(col, -amount, extra=extra)
+
+    async def increment_each(
+        self, amounts: dict[str, int], *, extra: dict[str, Any] | None = None
+    ) -> int:
+        """Bump several columns in one UPDATE: ``{col: delta}``. Returns rows affected."""
+        self._assert_writable("increment_each")
+        from sqlalchemy import update as sqla_update
+
+        session = get_active_session()
+        table = _table_of(self._model)
+        values: dict[str, Any] = {col: table.c[col] + delta for col, delta in amounts.items()}
+        if extra:
+            values.update(extra)
+        stmt = sqla_update(table).values(self._touch_updated_at(values))
+        where_clause = self.apply_global_scopes().whereclause
+        if where_clause is not None:
+            stmt = stmt.where(where_clause)
+        result = cast("CursorResult[Any]", await session.execute(stmt))
+        await session.flush()
+        return int(result.rowcount)
+
+    async def decrement_each(
+        self, amounts: dict[str, int], *, extra: dict[str, Any] | None = None
+    ) -> int:
+        """Decrement several columns in one UPDATE: ``{col: delta}``. Returns rows affected."""
+        return await self.increment_each({c: -d for c, d in amounts.items()}, extra=extra)
 
     async def delete(self) -> int:
         """Delete matching rows. Soft-deletes (UPDATE deleted_at) when the model
