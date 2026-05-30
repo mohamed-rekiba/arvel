@@ -78,7 +78,7 @@ Parity Sprint B: attribute pipeline + write/stream gaps
   ├── 006 Story 1: attribute-level custom cast protocol  [DONE — WI-arvel-005, ADR-127]
   ├── 006 Story 4: cast-aware dirty tracking            [DONE — WI-arvel-006, ADR-128]
   ├── 005 Story 8: write-path completeness (insert_or_ignore, upsert, truncate)
-  ├── 005 Story 10: streaming + chunking completeness
+  ├── 005 Story 10: streaming + chunking completeness    [DONE — WI-arvel-007, ADR-129]
   └── 005 Story 12: transaction retry on deadlock        [PARTIAL — WI-arvel-004, ADR-126: retry done; imperative begin/commit/rollback deferred]
 
 Parity Sprint C: relationship foundation

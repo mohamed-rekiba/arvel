@@ -295,3 +295,43 @@ events:
       (875 files), pyright 0/0/0, ruff + format clean, security clean. 4b + release skipped
       (L2/Tier2). 006-S4 marked DONE. ADR-128.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-007"
+    event_id: "EV-025"
+    timestamp: "2026-05-30T20:45:00+03:00"
+    from_stage: "planning"
+    to_stage: "qa-pre"
+    role: "solution-architect"
+    result: "pass"
+    notes: >
+      005-S10 streaming + chunking completeness. ADR-129: stream() server-side cursor
+      (stream_scalars + yield_per) distinct from lazy(); directional keyset via descending=
+      on chunk_by_id + new lazy_by_id; callbacks stop on False; offset chunk auto-orders by PK
+      (Eloquent parity). TDD: 7 tests in test_streaming_completeness.py, red first (5 fail).
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-007"
+    event_id: "EV-026"
+    timestamp: "2026-05-30T20:55:00+03:00"
+    from_stage: "qa-pre"
+    to_stage: "execution"
+    role: "developer"
+    result: "pass"
+    notes: >
+      query.py: _ordered_for_offset (PK fallback), _keyset_batches shared generator,
+      directional chunk_by_id/lazy_by_id, stream() via stream_scalars, False-callback stop on
+      chunk/chunk_by_id/each. query_mixin forwarders updated + lazy_by_id/stream added.
+      queries.md documented. 12 streaming tests green.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-007"
+    event_id: "EV-027"
+    timestamp: "2026-05-30T21:02:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      Gates: arvel 751 db tests (744 + 7 new), mypy clean, pyright 0/0/0, ruff clean, bandit +
+      gitleaks clean. 4b + release skipped (L2/Tier2). 005-S10 marked DONE. ADR-129.
+    handoff_id: null
