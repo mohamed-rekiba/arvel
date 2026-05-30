@@ -36,7 +36,8 @@ class ModelPruneCommand(Command):
         for model_cls in collect_prunable_models():
             instance: Any = model_cls()
             qb = instance.prunable_query()
-            deleted = await qb.delete()
+            # force_delete: pruning permanently removes rows, even on SoftDeletes models.
+            deleted = await qb.force_delete()
             typer.echo(f"Pruned {deleted} row(s) from {model_cls.__name__}.")
             total += deleted
 

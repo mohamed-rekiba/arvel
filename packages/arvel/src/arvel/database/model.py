@@ -371,6 +371,10 @@ class ActiveRecord(QueryMixin):
     __hidden__: ClassVar[list[str] | None] = None
     __visible__: ClassVar[list[str] | None] = None
 
+    # Column name -> mutator fn, collected from @mutator-decorated methods across
+    # the MRO in __init_subclass__. Empty unless a subclass declares one.
+    __arvel_mutators__: ClassVar[dict[str, Callable[[Any, Any], Any]]] = {}
+
     # Per-instance override set by make_hidden() / make_visible().
     # ClassVar keeps it out of MappedAsDataclass field processing and ORM column
     # mapping.  Instances get their own list via object.__setattr__ on first use.
@@ -697,6 +701,17 @@ class Model(
                         f"recognised cast type. Valid: {sorted(_VALID_CASTS)}"
                     )
 
+        # Collect @mutator-decorated methods. Walk base -> derived so a subclass
+        # mutator overrides an inherited one for the same column.
+        mutators: dict[str, Callable[[Any, Any], Any]] = {}
+        for base in reversed(cls.__mro__):
+            for attr in vars(base).values():
+                if getattr(attr, "__arvel_mutator__", False):
+                    column: str = attr.__arvel_mutator_column__
+                    mutators[column] = attr
+        if mutators:
+            cls.__arvel_mutators__ = mutators
+
     @classmethod
     def add_global_scope(
         cls,
@@ -742,6 +757,11 @@ class Model(
         # Symmetric with __getattribute__: coerce on write so SA persists the cast
         # value, and so Model(field=raw) and m.field = raw both behave the same.
         if value is not None:
+            # Mutators run first (transform), then casts (storage coercion).
+            mutator_fn = type(self).__arvel_mutators__.get(name)
+            if mutator_fn is not None:
+                value = mutator_fn(self, value)
+
             casts: dict[str, str] | None = type(self).__dict__.get("__casts__") or getattr(
                 type(self), "__casts__", None
             )
@@ -906,7 +926,8 @@ class Prunable:
 
     Implement ``prunable_query()`` to return a ``QueryBuilder`` selecting the
     rows that should be deleted. The ``model:prune`` command calls
-    ``prunable_query().delete()`` for every registered prunable model.
+    ``prunable_query().force_delete()`` for every registered prunable model, so
+    rows are permanently removed even when the model uses SoftDeletes.
 
     Example — delete records older than 30 days::
 

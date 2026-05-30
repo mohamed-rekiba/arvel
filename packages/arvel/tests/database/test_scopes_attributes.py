@@ -39,6 +39,17 @@ class Account(Model):
         return qb.where(first_name=name)
 
 
+class Member(Model):
+    __tablename__ = "members_mut"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    password: Mapped[str] = mapped_column(String(200), nullable=False)
+
+    @mutator("password")
+    def set_password(self, value: str) -> str:
+        return f"hashed:{value}"
+
+
 async def _setup(engine: Any) -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -85,3 +96,14 @@ def test_mutator_decorator_stores_metadata() -> None:
     fn: Any = Sample.set_password
     assert fn.__arvel_mutator__ is True
     assert fn.__arvel_mutator_column__ == "password"
+
+
+def test_mutator_transforms_value_on_construction() -> None:
+    member = Member(name="Ada", password="secret")
+    assert member.password == "hashed:secret"
+
+
+def test_mutator_transforms_value_on_assignment() -> None:
+    member = Member(name="Ada", password="secret")
+    member.password = "rotated"
+    assert member.password == "hashed:rotated"

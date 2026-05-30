@@ -37,14 +37,14 @@ class TestPrunableMixin:
 
 
 class TestModelPruneCommand:
-    """model:prune dispatches prunable_query().delete() for each registered model."""
+    """model:prune dispatches prunable_query().force_delete() for each registered model."""
 
     @pytest.mark.asyncio
-    async def test_prune_calls_delete_on_each_model(self) -> None:
+    async def test_prune_force_deletes_on_each_model(self) -> None:
         from arvel.console.commands.model_prune import ModelPruneCommand
 
         mock_qb = MagicMock()
-        mock_qb.delete = AsyncMock(return_value=5)
+        mock_qb.force_delete = AsyncMock(return_value=5)
 
         class FakeModel(Prunable):
             __name__ = "FakeModel"
@@ -63,7 +63,7 @@ class TestModelPruneCommand:
             cmd.app = MagicMock()  # non-None so the guard passes
             await cmd.prune()
 
-        mock_qb.delete.assert_awaited_once()
+        mock_qb.force_delete.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_prune_exits_when_app_not_bound(self) -> None:

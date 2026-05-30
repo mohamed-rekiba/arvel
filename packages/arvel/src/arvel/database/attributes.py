@@ -29,8 +29,10 @@ def mutator(column: str) -> Callable[[Callable[[Any, Any], Any]], Callable[[Any,
         def set_password(self, value: str) -> str:
             return hash_password(value)
 
-    The decorated function is installed as a property setter on the column. We
-    keep the function callable so tests / observers can invoke it directly.
+    The model metaclass collects mutators in ``__init_subclass__`` and applies
+    them in ``__setattr__``, so ``Model(password=raw)`` and ``m.password = raw``
+    both run the transform. None values are passed through untouched. The
+    function stays a plain callable, so tests can invoke it directly.
     """
 
     def decorator(fn: Callable[[Any, Any], Any]) -> Callable[[Any, Any], Any]:
