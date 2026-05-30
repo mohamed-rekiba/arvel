@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from typing import Any, ClassVar, TypeVar, cast
 
-from sqlalchemy import ColumnClause, Select, text
+from sqlalchemy import ColumnClause, Select, event, text
 from sqlalchemy import delete as sqla_delete
 from sqlalchemy import insert as sqla_insert
 from sqlalchemy import select as sqla_select
@@ -245,6 +246,9 @@ class DB:
     _engine: ClassVar[AsyncEngine | None] = None
     _named_makers: ClassVar[dict[str, async_sessionmaker[AsyncSession]]] = {}
     _listeners: ClassVar[list[Any]] = []
+    _query_log: ClassVar[list[dict[str, Any]] | None] = None
+    # A list (not a bare Callable attr) so the type checker doesn't read it as a method.
+    _query_log_removers: ClassVar[list[Callable[[], None]]] = []
 
     @classmethod
     def configure(cls, session_maker: async_sessionmaker[AsyncSession]) -> None:
@@ -367,6 +371,106 @@ class DB:
         for handler in cls._listeners:
             with suppress(Exception):
                 handler(sql, bindings, 0.0)
+
+    @classmethod
+    def enable_query_log(cls) -> None:
+        """Start recording every executed statement as ``{sql, bindings, time_ms}``.
+
+        Captures all ORM/query-builder/raw traffic via engine-level cursor events. Requires
+        ``DB.configure_engine(engine)``.
+        """
+        if cls._engine is None:
+            raise RuntimeError(
+                "DB.enable_query_log() requires DB.configure_engine(engine). "
+                "Register DatabaseServiceProvider or call DB.configure_engine(engine) first."
+            )
+        if cls._query_log is None:
+            cls._query_log = []
+        if not cls._query_log_removers:
+            cls._query_log_removers.append(cls._install_query_capture(cls._query_log))
+
+    @classmethod
+    def disable_query_log(cls) -> None:
+        """Stop recording and detach the cursor listeners."""
+        for remove in cls._query_log_removers:
+            remove()
+        cls._query_log_removers.clear()
+        cls._query_log = None
+
+    @classmethod
+    def get_query_log(cls) -> list[dict[str, Any]]:
+        """Return a copy of the captured statements (empty when logging is off)."""
+        return list(cls._query_log or [])
+
+    @classmethod
+    def flush_query_log(cls) -> None:
+        """Clear captured statements without disabling logging."""
+        if cls._query_log is not None:
+            cls._query_log.clear()
+
+    @classmethod
+    def _install_query_capture(cls, sink: list[dict[str, Any]]) -> Callable[[], None]:
+        if cls._engine is None:
+            raise RuntimeError("DB query capture requires DB.configure_engine(engine).")
+        sync_engine = cls._engine.sync_engine
+
+        def _before(
+            conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, many: Any
+        ) -> None:
+            conn.info.setdefault("_arvel_q_start", []).append(time.perf_counter())
+
+        def _after(
+            conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, many: Any
+        ) -> None:
+            stack: list[float] = conn.info.get("_arvel_q_start", [])
+            start = stack.pop() if stack else time.perf_counter()
+            sink.append(
+                {
+                    "sql": str(statement),
+                    "bindings": parameters,
+                    "time_ms": round((time.perf_counter() - start) * 1000, 3),
+                }
+            )
+
+        event.listen(sync_engine, "before_cursor_execute", _before)
+        event.listen(sync_engine, "after_cursor_execute", _after)
+
+        def _remove() -> None:
+            if event.contains(sync_engine, "before_cursor_execute", _before):
+                event.remove(sync_engine, "before_cursor_execute", _before)
+            if event.contains(sync_engine, "after_cursor_execute", _after):
+                event.remove(sync_engine, "after_cursor_execute", _after)
+
+        return _remove
+
+    @classmethod
+    async def pretend(cls, callback: Callable[[], Awaitable[Any]]) -> list[dict[str, Any]]:
+        """Run ``callback``, capture the SQL it would emit, then roll back so nothing persists.
+
+        Returns the captured ``{sql, bindings, time_ms}`` log. Statements still execute against
+        the connection (inside a transaction) but the rollback discards every change — use it to
+        preview writes without committing them.
+        """
+        if cls._session_maker is None:
+            raise RuntimeError("DB.pretend() called before DB.configure().")
+        if cls._engine is None:
+            raise RuntimeError("DB.pretend() requires DB.configure_engine(engine).")
+        sink: list[dict[str, Any]] = []
+        remove = cls._install_query_capture(sink)
+        try:
+            async with cls._session_maker() as session:
+                token = set_active_session(session)
+                try:
+                    transaction = await session.begin()
+                    try:
+                        await callback()
+                    finally:
+                        await transaction.rollback()
+                finally:
+                    reset_active_session(token)
+        finally:
+            remove()
+        return sink
 
     @classmethod
     def after_commit(cls, fn: Callable[[], Awaitable[Any]]) -> None:
