@@ -165,12 +165,16 @@ SELECT), `increment_each`/`decrement_each` (multi-column in one UPDATE).
 **As a** developer debugging SQL, **I want** session-level query logging (`{sql, bindings, time_ms}`), a `pretend`/dry-run mode, `explain()`, `to_raw_sql()`, and `get_bindings()`, **so that** I can inspect and snapshot all ORM traffic, not just raw-SQL helpers.
 
 **Acceptance Criteria**:
-- [ ] Given query logging enabled, when any `QueryBuilder` executes, then the statement, bindings, and elapsed time are captured.
-- [ ] Given `pretend()`, when writes run inside it, then SQL is recorded but not executed.
-- [ ] Given `explain()`, then it returns the dialect's plan rows.
+- [x] Given query logging enabled, when any `QueryBuilder` executes, then the statement, bindings, and elapsed time are captured.
+- [x] Given `pretend()`, when writes run inside it, then SQL is recorded but not persisted (executed in a rolled-back transaction).
+- [x] Given `explain()`, then it returns the dialect's plan rows.
 
 **Priority**: Could
 **Complexity**: Medium
+**Status**: DONE — WI-arvel-013, ADR-134 (`test_qb_debugging.py`). `DB.enable_query_log`/
+`get_query_log`/`flush_query_log`/`disable_query_log` capture `{sql, bindings, time_ms}` via
+engine cursor events; `DB.pretend(cb)` runs in a rolled-back transaction and returns the log;
+`explain()` (EXPLAIN / EXPLAIN QUERY PLAN on SQLite); `to_raw_sql()` + `get_bindings()`.
 
 ### Story 12: Transaction retry on deadlock
 **As a** developer under concurrent writes, **I want** `DB.transaction(..., attempts=N)` to retry on deadlock/serialization failures, plus imperative `begin`/`commit`/`rollback`, **so that** transient lock conflicts don't surface as hard errors.

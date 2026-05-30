@@ -231,6 +231,26 @@ work_items:
       the existing __with_agg__ row-shaping path. ADR-133. Gates: arvel 799 db tests; mypy/
       pyright/ruff/bandit/gitleaks clean.
 
+  - id: "WI-arvel-013"
+    name: "Debugging + query-log parity (backlog 005 S11)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T23:15:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      DB.enable_query_log/get_query_log/flush_query_log/disable_query_log capture {sql, bindings,
+      time_ms} via engine before/after_cursor_execute events; DB.pretend(cb) runs in a
+      rolled-back transaction and returns the captured log; QueryBuilder to_raw_sql/get_bindings/
+      explain. ADR-134. Gates: arvel 805 db tests; mypy/pyright/ruff/bandit (0)/gitleaks clean.
+
   - id: "WI-arvel-008"
     name: "WHERE predicate engine + clause polish (backlog 005 S13)"
     complexity: "L2"
