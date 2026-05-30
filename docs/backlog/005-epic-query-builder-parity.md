@@ -18,18 +18,20 @@ code expects to find.
 **As a** developer filtering by timestamps, **I want** `where_date`/`where_time`/`where_day`/`where_month`/`where_year` (and `or_*` variants), **so that** I can filter on date parts without hand-writing `func.date()`/`extract()` per dialect.
 
 **Acceptance Criteria**:
-- [ ] Given a datetime column, when I call `where_year("created_at", 2026)`, then the SQL filters by the year using dialect-appropriate extraction (SQLite, PostgreSQL).
-- [ ] Given each helper, when used, then an `or_*` variant exists and composes correctly with other clauses.
-- [ ] Given an invalid column, when called, then it raises the same error type as other `where_*` helpers.
+- [x] Given a datetime column, when I call `where_year("created_at", 2026)`, then the SQL filters by the year using dialect-appropriate extraction (SQLite, PostgreSQL).
+- [x] Given each helper, when used, then an `or_*` variant exists and composes correctly with other clauses.
+- [x] Given an invalid column, when called, then it raises the same error type as other `where_*` helpers.
 
 **Security Requirements**:
-- [ ] All values are parameterized — no string interpolation of user input into SQL.
+- [x] All values are parameterized — no string interpolation of user input into SQL.
 
 **Documentation Requirements**:
-- [ ] `docs/guides/` query builder reference gains a date-filter section.
+- [x] `docs/guides/` query builder reference gains a date-filter section.
 
 **Priority**: Should
 **Complexity**: Medium
+**Status**: DONE — WI-arvel-009, ADR-131 (`test_qb_date_filters.py`). `extract()` compiles to
+EXTRACT (PG) / STRFTIME (SQLite); `where_date`/`where_time` compose year/month/day + h/m/s.
 
 ### Story 2: Nested WHERE groups (closure grouping)
 **As a** developer building dynamic filters, **I want** `where(lambda q: q.where(...).or_where(...))` to produce a parenthesized boolean group, **so that** I can express `(A AND B) OR C` trees without dropping to raw SQLAlchemy.
@@ -70,25 +72,31 @@ code expects to find.
 **As a** developer building search, **I want** `where_like`/`where_not_like` (with case-sensitivity flag) and `where_all`/`where_none` across columns, **so that** search filters don't need manual `or_()`/`ilike` assembly.
 
 **Acceptance Criteria**:
-- [ ] Given `where_like("name", term, case_sensitive=False)`, then it emits `ILIKE` (PG) / `LIKE` with case folding as appropriate.
-- [ ] Given `where_all(cols, op, value)`, then all columns are AND-matched; `where_none` produces the NOR form.
-- [ ] `where_any` is extended to accept the same operator signature as Laravel.
+- [x] Given `where_like("name", term, case_sensitive=False)`, then it emits `ILIKE` (PG) / `LIKE` with case folding as appropriate.
+- [x] Given `where_all(cols, op, value)`, then all columns are AND-matched; `where_none` produces the NOR form.
+- [x] `where_any` is extended to accept the same operator signature as Laravel.
 
 **Security Requirements**:
-- [ ] LIKE wildcards in user input are handled safely (parameterized; document escaping for literal `%`/`_`).
+- [x] LIKE wildcards in user input are handled safely (parameterized; document escaping for literal `%`/`_`).
 
 **Priority**: Should
 **Complexity**: Medium
+**Status**: DONE — WI-arvel-009, ADR-131 (`test_qb_like_and_joins.py`). `where_like`/`not_like`
+(+`or_`), `where_all`/`where_none`/`or_where_any`. SQLite LIKE is ASCII-case-insensitive by
+design; the flag selects LIKE vs ILIKE (case-sensitive on PG).
 
 ### Story 6: Join completeness (right/cross + fluent ON)
 **As a** developer, **I want** `right_join`, `cross_join`, and a closure-based ON builder with `on`/`or_on`, **so that** join construction matches Laravel's `JoinClause`.
 
 **Acceptance Criteria**:
-- [ ] Given `right_join`/`cross_join`, when compiled, then they emit the correct join type.
-- [ ] Given a join closure, when it chains `on(...).or_on(...)`, then the ON clause compiles with the right boolean grouping.
+- [x] Given `right_join`/`cross_join`, when compiled, then they emit the correct join type.
+- [x] Given a join closure, when it chains `on(...).or_on(...)`, then the ON clause compiles with the right boolean grouping.
 
 **Priority**: Could
 **Complexity**: Medium
+**Status**: DONE — WI-arvel-009, ADR-131 (`test_qb_like_and_joins.py`). `cross_join`, fluent
+`join_on(target, lambda j: j.on(...).or_on(...))`; `right_join` rewritten as
+`target LEFT OUTER JOIN model` (SQLAlchemy has no native RIGHT JOIN).
 
 ### Story 7: Efficient `exists()` / `doesnt_exist()`
 **As a** developer doing existence checks, **I want** `exists()` to run `SELECT EXISTS(SELECT 1 ... LIMIT 1)` and a `doesnt_exist()` companion, **so that** auth/validation checks don't pay for a full `COUNT(*)` subquery.
