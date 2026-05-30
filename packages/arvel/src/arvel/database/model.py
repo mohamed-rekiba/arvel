@@ -9,10 +9,13 @@ from contextvars import ContextVar
 from dataclasses import InitVar
 from datetime import UTC, date
 from datetime import datetime as _datetime
+from decimal import ROUND_HALF_UP, Decimal
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    NamedTuple,
     TypeGuard,
     TypeVar,
     cast,
@@ -38,6 +41,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.orm.decl_api import DCTransformDeclarative
 
+from arvel.database.attributes import CastsAttributes
 from arvel.database.columns import (
     big_integer,
     boolean,
@@ -186,6 +190,63 @@ _WRITE_SKIP_CASTS: frozenset[str] = frozenset({"dict", "list", "array"})
 # Write-only casts: applied on assignment, never on read. `hashed` would corrupt a
 # stored digest if re-hashed on every attribute access.
 _READ_SKIP_CASTS: frozenset[str] = frozenset({"hashed"})
+
+# A cast spec is a built-in name ("boolean"), a parameterized name ("decimal:2"),
+# or a CastsAttributes class/instance.
+_CastFn = Callable[[Any, str, Any], Any]
+
+
+class _ResolvedCast(NamedTuple):
+    """Per-field cast pipeline, computed once at class definition. None = passthrough."""
+
+    read: _CastFn | None
+    write: _CastFn | None
+    serialize: _CastFn | None
+
+
+def _make_decimal_cast(scale: int) -> Callable[[Any], Decimal]:
+    quantum = Decimal(1).scaleb(-scale)
+
+    def _coerce(value: Any) -> Decimal:
+        return Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP)
+
+    return _coerce
+
+
+def _value_only(coercer: Callable[[Any], Any], _model: Any, _key: str, value: Any) -> Any:
+    """Adapt a value->value built-in coercer to the (model, key, value) cast signature."""
+    return coercer(value)
+
+
+def _resolve_cast_spec(model_name: str, field: str, spec: Any) -> _ResolvedCast:
+    if isinstance(spec, CastsAttributes):
+        return _ResolvedCast(read=spec.get, write=spec.set, serialize=spec.serialize)
+    if isinstance(spec, type) and issubclass(spec, CastsAttributes):
+        built = spec()
+        return _ResolvedCast(read=built.get, write=built.set, serialize=built.serialize)
+    if isinstance(spec, str):
+        base, sep, param = spec.partition(":")
+        if sep:
+            if base == "decimal":
+                both = partial(_value_only, _make_decimal_cast(int(param)))
+                return _ResolvedCast(read=both, write=both, serialize=None)
+            raise ValueError(
+                f"{model_name}.__casts__['{field}'] = '{spec}': "
+                f"'{base}' takes no parameter or is not a parameterized cast."
+            )
+        coercer = _CAST_DISPATCH.get(base)
+        if coercer is None:
+            raise ValueError(
+                f"{model_name}.__casts__['{field}'] = '{spec}' is not a recognised cast "
+                f"type. Valid: {sorted(_VALID_CASTS)} (or a CastsAttributes subclass)."
+            )
+        read = None if base in _READ_SKIP_CASTS else partial(_value_only, coercer)
+        write = None if base in _WRITE_SKIP_CASTS else partial(_value_only, coercer)
+        return _ResolvedCast(read=read, write=write, serialize=None)
+    raise TypeError(
+        f"{model_name}.__casts__['{field}']: cast spec must be a str or a "
+        f"CastsAttributes class/instance, got {type(cast('object', spec)).__name__}."
+    )
 
 
 def _should_auto_wrap(attr_name: str, annotation: Any, value: Any) -> bool:
@@ -424,6 +485,9 @@ class ActiveRecord(QueryMixin):
     # Column name -> mutator fn, collected from @mutator-decorated methods across
     # the MRO in __init_subclass__. Empty unless a subclass declares one.
     __arvel_mutators__: ClassVar[dict[str, Callable[[Any, Any], Any]]] = {}
+
+    # Field -> resolved cast pipeline, built from __casts__ in __init_subclass__.
+    __arvel_cast_resolvers__: ClassVar[dict[str, _ResolvedCast]] = {}
 
     # Per-instance override set by make_hidden() / make_visible().
     # ClassVar keeps it out of MappedAsDataclass field processing and ORM column
@@ -775,6 +839,12 @@ class ActiveRecord(QueryMixin):
             raise RuntimeError(f"{type(self).__name__} is not a mapped SQLA class.")
         # Build the base dict
         data = {col.key: getattr(self, col.key) for col in mapper.column_attrs}
+        # Let custom casts shape their serialized form (Eloquent's SerializesCastable).
+        resolvers = type(self).__arvel_cast_resolvers__
+        if resolvers:
+            for key, resolved in resolvers.items():
+                if resolved.serialize is not None and key in data:
+                    data[key] = resolved.serialize(self, key, data[key])
         # Append @accessor-backed computed attributes (Eloquent's $appends).
         appends: list[str] = list(type(self).__appends__ or [])
         for name in appends:
@@ -881,15 +951,13 @@ class Model(
 
     def __init_subclass__(cls, **kw: Any) -> None:
         super().__init_subclass__(**kw)
-        # Validate __casts__ entries at class-definition time.
-        casts: dict[str, str] | None = getattr(cls, "__casts__", None)
+        # Resolve + validate __casts__ once at class-definition time.
+        casts: dict[str, Any] | None = getattr(cls, "__casts__", None)
         if casts:
-            for field_name, cast_type in casts.items():
-                if cast_type not in _VALID_CASTS:
-                    raise ValueError(
-                        f"{cls.__name__}.__casts__['{field_name}'] = '{cast_type}' is not a "
-                        f"recognised cast type. Valid: {sorted(_VALID_CASTS)}"
-                    )
+            cls.__arvel_cast_resolvers__ = {
+                field_name: _resolve_cast_spec(cls.__name__, field_name, spec)
+                for field_name, spec in casts.items()
+            }
 
         # Collect @mutator-decorated methods. Walk base -> derived so a subclass
         # mutator overrides an inherited one for the same column.
@@ -935,15 +1003,13 @@ class Model(
     def __getattribute__(self, name: str) -> Any:
         """Apply __casts__ when reading column values."""
         value = super().__getattribute__(name)
-        casts: dict[str, str] | None = type(self).__dict__.get("__casts__") or getattr(
-            type(self), "__casts__", None
-        )
-        if not casts or name not in casts or value is None:
+        if value is None:
             return value
-        if casts[name] in _READ_SKIP_CASTS:
+        resolvers = type(self).__arvel_cast_resolvers__
+        resolved = resolvers.get(name) if resolvers else None
+        if resolved is None or resolved.read is None:
             return value
-        caster = _CAST_DISPATCH.get(casts[name])
-        return caster(value) if caster is not None else value
+        return resolved.read(self, name, value)
 
     def __setattr__(self, name: str, value: Any) -> None:
         # Symmetric with __getattribute__: coerce on write so SA persists the cast
@@ -954,15 +1020,10 @@ class Model(
             if mutator_fn is not None:
                 value = mutator_fn(self, value)
 
-            casts: dict[str, str] | None = type(self).__dict__.get("__casts__") or getattr(
-                type(self), "__casts__", None
-            )
-            if casts and name in casts:
-                cast_type = casts[name]
-                if cast_type not in _WRITE_SKIP_CASTS:
-                    caster = _CAST_DISPATCH.get(cast_type)
-                    if caster is not None:
-                        value = caster(value)
+            resolvers = type(self).__arvel_cast_resolvers__
+            resolved = resolvers.get(name) if resolvers else None
+            if resolved is not None and resolved.write is not None:
+                value = resolved.write(self, name, value)
         super().__setattr__(name, value)
 
     def has_many(
