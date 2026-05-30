@@ -314,6 +314,37 @@ async def test_relation_create(engine: AsyncEngine, session: AsyncSession) -> No
     assert post.id is not None
 
 
+async def test_relation_save_fires_model_events(
+    engine: AsyncEngine, session: AsyncSession
+) -> None:
+    """has_many().save() persists through Model.save(), so lifecycle events fire."""
+    from arvel.database.events import clear_observers
+
+    fired: list[str] = []
+
+    class PostObserver:
+        def creating(self, instance: PostS3) -> None:
+            fired.append("creating")
+
+        def created(self, instance: PostS3) -> None:
+            fired.append("created")
+
+        def saved(self, instance: PostS3) -> None:
+            fired.append("saved")
+
+    await _setup(engine)
+    PostS3.observe(PostObserver())
+    try:
+        u = await UserS3.create(name="RelSaveEvents", country_id=None)
+        await u.has_many(PostS3, foreign_key="user_id").save(PostS3(title="Evented"))
+    finally:
+        clear_observers(PostS3)
+
+    assert "creating" in fired
+    assert "created" in fired
+    assert "saved" in fired
+
+
 async def test_belongs_to_associate(engine: AsyncEngine, session: AsyncSession) -> None:
     """post.belongs_to(UserS3, foreign_key='user_id').associate(user) sets FK."""
     await _setup(engine)
