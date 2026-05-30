@@ -406,9 +406,7 @@ class ActiveRecord(QueryMixin):
     @classmethod
     async def find(cls, pk: Any) -> Any:
         # Route through the query builder so global scopes (e.g. soft-delete)
-        # are applied. Direct session lookups bypass all scopes.
-        from arvel.database.events import fire_async
-
+        # are applied, and first() fires the retrieved event for us.
         mapper: Mapper[Any] = cast("Mapper[Any]", sqla_inspect(cls))
         pk_cols = mapper.primary_key
         if len(pk_cols) == 1:
@@ -416,19 +414,15 @@ class ActiveRecord(QueryMixin):
             if col_key is None:
                 raise TypeError("Primary key column has no key")
             pk_attr = getattr(cls, col_key)
-            instance: Any = await cls.query().where(pk_attr == pk).first()
-        else:
-            # Composite PK: pk must be a tuple matching column order
-            qb = cls.query()
-            pk_values = _coerce_pk_to_tuple(pk)
-            for col, val in zip(pk_cols, pk_values, strict=False):
-                if col.key is None:
-                    raise TypeError("Primary key column has no key")
-                qb = qb.where(getattr(cls, col.key) == val)
-            instance = await qb.first()
-        if instance is not None:
-            await fire_async(cls, "retrieved", instance)
-        return instance
+            return await cls.query().where(pk_attr == pk).first()
+        # Composite PK: pk must be a tuple matching column order
+        qb = cls.query()
+        pk_values = _coerce_pk_to_tuple(pk)
+        for col, val in zip(pk_cols, pk_values, strict=False):
+            if col.key is None:
+                raise TypeError("Primary key column has no key")
+            qb = qb.where(getattr(cls, col.key) == val)
+        return await qb.first()
 
     @classmethod
     async def find_or_fail(cls, pk: Any) -> Any:
