@@ -6,12 +6,19 @@ buffers streaming responses and causes Content-Length mismatches.
 
 from __future__ import annotations
 
+from urllib.parse import parse_qsl
+
 from opentelemetry import trace as otel_trace
 from opentelemetry.propagate import extract as otel_extract
 from opentelemetry.trace import StatusCode
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from arvel.database.paginator import (
+    PaginationRequest,
+    reset_pagination_request,
+    set_pagination_request,
+)
 from arvel.observability.context import (
     RequestContext,
     generate_request_id,
@@ -54,6 +61,14 @@ class ObservabilityMiddleware:
         )
         token = set_request_context(ctx)
 
+        raw_query = scope.get("query_string", b"")
+        pg_token = set_pagination_request(
+            PaginationRequest(
+                path=scope.get("path", "/"),
+                query=dict(parse_qsl(raw_query.decode("latin-1"), keep_blank_values=True)),
+            )
+        )
+
         carrier: dict[str, str] = {
             name.decode("latin-1"): value.decode("latin-1") for name, value in headers_list
         }
@@ -86,6 +101,7 @@ class ObservabilityMiddleware:
                     span.set_status(StatusCode.ERROR, f"HTTP {response_status[0]}")
         finally:
             reset_request_context(token)
+            reset_pagination_request(pg_token)
 
     def _log_5xx(self, exc: BaseException, request_id: str) -> None:
         from arvel.http.exceptions import HttpException

@@ -581,18 +581,29 @@ class QueryMixin:
     # ── pagination ────────────────────────────────────────────────────────
 
     @classmethod
-    async def paginate(cls, per_page: int = 15, *, page: int = 1) -> Paginator[Self]:
-        return await cls.query().paginate(per_page, page=page)
+    async def paginate(
+        cls, per_page: int = 15, *, page: int | None = None, page_name: str = "page"
+    ) -> Paginator[Self]:
+        return await cls.query().paginate(per_page, page=page, page_name=page_name)
 
     @classmethod
-    async def simple_paginate(cls, per_page: int = 15, *, page: int = 1) -> SimplePaginator[Self]:
-        return await cls.query().simple_paginate(per_page, page=page)
+    async def simple_paginate(
+        cls, per_page: int = 15, *, page: int | None = None, page_name: str = "page"
+    ) -> SimplePaginator[Self]:
+        return await cls.query().simple_paginate(per_page, page=page, page_name=page_name)
 
     @classmethod
     async def cursor_paginate(
-        cls, per_page: int = 15, *, cursor: str | None = None
+        cls,
+        per_page: int = 15,
+        *,
+        cursor: str | None = None,
+        cursor_name: str = "cursor",
+        keyset: list[str] | None = None,
     ) -> CursorPaginator[Self]:
-        return await cls.query().cursor_paginate(per_page, cursor=cursor)
+        return await cls.query().cursor_paginate(
+            per_page, cursor=cursor, cursor_name=cursor_name, keyset=keyset
+        )
 
     # ── iteration ─────────────────────────────────────────────────────────
 

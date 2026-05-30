@@ -43,7 +43,13 @@ from arvel.database.exceptions import (
     UnknownRelationError,
 )
 from arvel.database.orm._eager import set_eager_relation
-from arvel.database.paginator import Paginator
+from arvel.database.paginator import (
+    Paginator,
+    build_page_url,
+    resolve_cursor,
+    resolve_page,
+    resolve_path,
+)
 from arvel.database.session import get_active_session
 
 if TYPE_CHECKING:
@@ -625,6 +631,61 @@ def _coerce_cursor_value(raw: Any, attr: InstrumentedAttribute[Any]) -> Any:
     except ValueError, AttributeError:
         pass
     return raw
+
+
+def _serialize_cursor_value(val: Any) -> Any:
+    """JSON-safe form of a keyset value (datetimes → ISO, UUID → str)."""
+    if hasattr(val, "isoformat"):
+        return val.isoformat()
+    if isinstance(val, _uuid.UUID):
+        return str(val)
+    return val
+
+
+def _encode_cursor(params: dict[str, Any], *, points_to_next: bool) -> str:
+    payload: dict[str, Any] = {"_p": params, "_n": points_to_next}
+    return base64.b64encode(json.dumps(payload).encode()).decode()
+
+
+def _decode_cursor(token: str) -> tuple[dict[str, Any], bool]:
+    """Return ``(params, points_to_next)`` from an opaque cursor token."""
+    try:
+        raw = json.loads(base64.b64decode(token.encode()).decode())
+        return dict(raw["_p"]), bool(raw["_n"])
+    except (ValueError, KeyError, TypeError, binascii.Error) as exc:
+        raise InvalidCursorError(str(exc)) from exc
+
+
+def _boundary_cursors(
+    items: list[Any],
+    col_names: list[str],
+    *,
+    backward: bool,
+    has_more: bool,
+    had_cursor: bool,
+) -> tuple[str | None, str | None]:
+    """Compute ``(next_cursor, prev_cursor)`` for the current page of a cursor paginator."""
+    if not items:
+        return None, None
+
+    def _params(row: Any) -> dict[str, Any]:
+        return {name: _serialize_cursor_value(getattr(row, name)) for name in col_names}
+
+    next_cursor: str | None
+    prev_cursor: str | None
+    if backward:
+        # We arrived here walking back, so a next page always exists.
+        next_cursor = _encode_cursor(_params(items[-1]), points_to_next=True)
+        prev_cursor = (
+            _encode_cursor(_params(items[0]), points_to_next=False) if has_more else None
+        )
+        return next_cursor, prev_cursor
+
+    next_cursor = _encode_cursor(_params(items[-1]), points_to_next=True) if has_more else None
+    prev_cursor = (
+        _encode_cursor(_params(items[0]), points_to_next=False) if had_cursor else None
+    )
+    return next_cursor, prev_cursor
 
 
 class QueryBuilder(Generic[T]):
@@ -1803,7 +1864,10 @@ class QueryBuilder(Generic[T]):
 
     # ------------------------------------------------------------------ pagination
 
-    async def paginate(self, per_page: int = 15, *, page: int = 1) -> Paginator[T]:
+    async def paginate(
+        self, per_page: int = 15, *, page: int | None = None, page_name: str = "page"
+    ) -> Paginator[T]:
+        page = page if page is not None else resolve_page(page_name)
         total = await self.count()
         items_stmt = self.apply_global_scopes().limit(per_page).offset((page - 1) * per_page)
         result = await get_active_session().execute(items_stmt)
@@ -1812,10 +1876,20 @@ class QueryBuilder(Generic[T]):
         items: list[T] = cast("list[T]", Collection(result.scalars().all()))
         await self._fire_retrieved(items)
         await self._eager_load_async(items)
-        return Paginator(items=items, total=total, per_page=per_page, current_page=page)
+        return Paginator(
+            items=items,
+            total=total,
+            per_page=per_page,
+            current_page=page,
+            page_name=page_name,
+            path=resolve_path(),
+        )
 
-    async def simple_paginate(self, per_page: int = 15, *, page: int = 1) -> SimplePaginator[T]:
+    async def simple_paginate(
+        self, per_page: int = 15, *, page: int | None = None, page_name: str = "page"
+    ) -> SimplePaginator[T]:
         """No COUNT query — use for large tables or infinite scroll."""
+        page = page if page is not None else resolve_page(page_name)
         items_stmt = self.apply_global_scopes().limit(per_page + 1).offset((page - 1) * per_page)
         result = await get_active_session().execute(items_stmt)
         from arvel.support.collections import Collection
@@ -1829,6 +1903,8 @@ class QueryBuilder(Generic[T]):
             per_page=per_page,
             current_page=page,
             has_more=has_more,
+            page_name=page_name,
+            path=resolve_path(),
         )
 
     async def cursor_paginate(
@@ -1836,83 +1912,52 @@ class QueryBuilder(Generic[T]):
         per_page: int = 15,
         *,
         cursor: str | None = None,
+        cursor_name: str = "cursor",
         keyset: list[str] | None = None,
     ) -> CursorPaginator[T]:
-        """Cursor-based pagination with optional composite keyset support.
+        """Bidirectional cursor pagination with optional composite keyset support.
 
         ``keyset`` is a list of column-direction strings in the same format
         accepted by :meth:`order_by` (prefix ``-`` for descending)::
 
             await Product.query().cursor_paginate(
                 per_page=20,
-                cursor=request.query_params.get("cursor"),
                 keyset=["published_at DESC", "id ASC"],
             )
 
         When ``keyset`` is omitted the method uses a single-PK ascending cursor.
+        ``cursor`` defaults to the request's ``?cursor=`` query param (resolved
+        via ``cursor_name``).
 
-        Cursor tokens are opaque ``base64(json(values))`` strings.  The token
-        encodes a dict mapping each keyset column to the last row's value so
-        the next page starts **after** that position.
-
-        The emitted WHERE clause uses a row-value comparison::
-
-            WHERE (published_at, id) < (:cursor_0, :cursor_1)
-
-        which PostgreSQL evaluates efficiently against a composite index.
+        Cursor tokens are opaque ``base64(json(...))`` strings carrying the
+        keyset values of a boundary row plus a direction flag, so the paginator
+        emits **both** ``next_cursor`` and ``prev_cursor`` and can walk either way.
+        Walking backwards reverses the order, applies the inverse row-value
+        comparison, then flips the page back to display order.
         """
-        if keyset:
-            return await self._keyset_paginate(per_page, cursor=cursor, keyset=keyset)
+        if cursor is None:
+            cursor = resolve_cursor(cursor_name)
 
-        # Default single-PK ascending cursor.
-        mapper = _mapper_of(self._model)
-        pk_col = mapper.primary_key[0]
-        pk_key = pk_col.key
-        if pk_key is None:
-            raise TypeError(f"{self._model.__name__} primary key column has no name.")
-        pk_attr = _resolve_column(self._model, pk_key)
-
-        stmt = self.apply_global_scopes().order_by(pk_attr)
-        if cursor is not None:
-            try:
-                last_pk = json.loads(base64.b64decode(cursor.encode()).decode())
-            except (ValueError, binascii.Error) as exc:
-                raise InvalidCursorError(str(exc)) from exc
-            stmt = stmt.where(pk_attr > last_pk)
-
-        result = await get_active_session().execute(stmt.limit(per_page + 1))
-        from arvel.support.collections import Collection
-
-        rows: list[T] = cast("list[T]", list(result.scalars().all()))
-        has_more = len(rows) > per_page
-        items = Collection(rows[:per_page])
-        await self._eager_load_async(list(items))
-        next_cursor: str | None = None
-        if has_more and items:
-            last_pk_val = getattr(items[-1], pk_key)
-            next_cursor = base64.b64encode(json.dumps(last_pk_val).encode()).decode()
-        return CursorPaginator(items=items, per_page=per_page, next_cursor=next_cursor)
-
-    async def _keyset_paginate(
-        self,
-        per_page: int,
-        *,
-        cursor: str | None,
-        keyset: list[str],
-    ) -> CursorPaginator[T]:
-        """Composite keyset pagination implementation."""
-        parsed = _parse_keyset_columns(self._model, keyset)
+        parsed = self._keyset_or_pk(keyset)
         col_names = [name for name, _, _ in parsed]
 
-        # ORDER BY must match the keyset declaration.
-        order_exprs = [desc(attr) if direction == "desc" else attr for _, attr, direction in parsed]
-        stmt = self.apply_global_scopes().order_by(*order_exprs)
-
+        params: dict[str, Any] | None = None
+        backward = False
         if cursor is not None:
+            params, points_to_next = _decode_cursor(cursor)
+            backward = not points_to_next
+
+        # Backwards traversal flips every column's direction, then we reverse the page.
+        effective = (
+            [(n, a, "asc" if d == "desc" else "desc") for n, a, d in parsed] if backward else parsed
+        )
+        order_exprs = [desc(attr) if d == "desc" else attr for _, attr, d in effective]
+        # Reset any pre-existing ORDER BY so the keyset ordering fully controls direction.
+        stmt = self.apply_global_scopes().order_by(None).order_by(*order_exprs)
+        if params is not None:
             try:
-                cursor_vals: dict[str, Any] = json.loads(base64.b64decode(cursor.encode()).decode())
-                stmt = _apply_keyset_where(stmt, parsed, cursor_vals)
-            except (ValueError, KeyError, binascii.Error) as exc:
+                stmt = _apply_keyset_where(stmt, effective, params)
+            except KeyError as exc:
                 raise InvalidCursorError(str(exc)) from exc
 
         result = await get_active_session().execute(stmt.limit(per_page + 1))
@@ -1920,22 +1965,35 @@ class QueryBuilder(Generic[T]):
 
         rows: list[T] = cast("list[T]", list(result.scalars().all()))
         has_more = len(rows) > per_page
-        items = Collection(rows[:per_page])
+        rows = rows[:per_page]
+        if backward:
+            rows.reverse()
+        items = Collection(rows)
         await self._eager_load_async(list(items))
-        next_cursor: str | None = None
-        if has_more and items:
-            last = items[-1]
-            raw: dict[str, Any] = {}
-            for col_name in col_names:
-                val = getattr(last, col_name)
-                if hasattr(val, "isoformat"):
-                    raw[col_name] = val.isoformat()
-                elif isinstance(val, _uuid.UUID):
-                    raw[col_name] = str(val)
-                else:
-                    raw[col_name] = val
-            next_cursor = base64.b64encode(json.dumps(raw).encode()).decode()
-        return CursorPaginator(items=items, per_page=per_page, next_cursor=next_cursor)
+        next_cursor, prev_cursor = _boundary_cursors(
+            list(items),
+            col_names,
+            backward=backward,
+            has_more=has_more,
+            had_cursor=cursor is not None,
+        )
+        return CursorPaginator(
+            items=items,
+            per_page=per_page,
+            next_cursor=next_cursor,
+            prev_cursor=prev_cursor,
+            cursor_name=cursor_name,
+            path=resolve_path(),
+        )
+
+    def _keyset_or_pk(self, keyset: list[str] | None) -> list[_KeysetEntry]:
+        if keyset:
+            return _parse_keyset_columns(self._model, keyset)
+        mapper = _mapper_of(self._model)
+        pk_key = mapper.primary_key[0].key
+        if pk_key is None:
+            raise TypeError(f"{self._model.__name__} primary key column has no name.")
+        return [(pk_key, _resolve_column(self._model, pk_key), "asc")]
 
     def _ordered_for_offset(self) -> Self:
         """Enforce a stable order for OFFSET pagination, like Eloquent's chunk().
@@ -2365,12 +2423,16 @@ class SimplePaginator(Generic[TItem]):
         per_page: int,
         current_page: int,
         has_more: bool,
+        page_name: str = "page",
+        path: str | None = None,
     ) -> None:
         self.items = items
         self.per_page = per_page
         self.current_page = current_page
         self.has_more = has_more
         self.total: int | None = None  # no count query
+        self.page_name = page_name
+        self.path = path
 
     def links(
         self,
@@ -2386,6 +2448,32 @@ class SimplePaginator(Generic[TItem]):
         return {
             "prev": build_page_url(base_url, prev_page, query=query) if prev_page else None,
             "next": build_page_url(base_url, next_page, query=query) if next_page else None,
+        }
+
+    def to_response(
+        self, items_serializer: Callable[[TItem], Any] | None = None
+    ) -> dict[str, Any]:
+        """Laravel's flat ``Paginator`` (simple) envelope — no ``total``/``last_page``."""
+        path = resolve_path(self.path)
+        from_ = (self.current_page - 1) * self.per_page + 1 if self.items else None
+        to = (self.current_page - 1) * self.per_page + len(self.items) if self.items else None
+        data: list[Any] = (
+            [items_serializer(item) for item in self.items]
+            if items_serializer is not None
+            else list(self.items)
+        )
+        prev_url = build_page_url(path, self.current_page - 1) if self.current_page > 1 else None
+        next_url = build_page_url(path, self.current_page + 1) if self.has_more else None
+        return {
+            "current_page": self.current_page,
+            "data": data,
+            "first_page_url": build_page_url(path, 1),
+            "from": from_,
+            "next_page_url": next_url,
+            "path": path,
+            "per_page": self.per_page,
+            "prev_page_url": prev_url,
+            "to": to,
         }
 
     def to_dict(
@@ -2432,10 +2520,16 @@ class CursorPaginator(Generic[TItem]):
         items: list[TItem],
         per_page: int,
         next_cursor: str | None,
+        prev_cursor: str | None = None,
+        cursor_name: str = "cursor",
+        path: str | None = None,
     ) -> None:
         self.items = items
         self.per_page = per_page
         self.next_cursor = next_cursor
+        self.prev_cursor = prev_cursor
+        self.cursor_name = cursor_name
+        self.path = path
 
     @property
     def has_more(self) -> bool:
@@ -2450,10 +2544,9 @@ class CursorPaginator(Generic[TItem]):
     ) -> dict[str, Any]:
         """Return the paginator as ``{data, meta, links}``.
 
-        Without ``base_url``, ``links.next`` is the raw opaque cursor token
-        (or ``null`` on the last page). With ``base_url``, the cursor is
-        composed into a URL — ``{base_url}?cursor={token}`` — merged with
-        any ``query`` extras.
+        Without ``base_url``, ``links.next``/``links.prev`` are the raw opaque cursor
+        tokens (or ``null`` at the ends). With ``base_url``, each cursor is composed
+        into a URL — ``{base_url}?cursor={token}`` — merged with any ``query`` extras.
         """
         from arvel.database.paginator import build_cursor_url
 
@@ -2462,12 +2555,12 @@ class CursorPaginator(Generic[TItem]):
             if items_serializer is not None
             else list(self.items)
         )
-        if base_url is not None and self.next_cursor is not None:
-            next_link: str | None = build_cursor_url(base_url, self.next_cursor, query=query)
-        elif base_url is not None:
-            next_link = None
-        else:
-            next_link = self.next_cursor
+
+        def _link(token: str | None) -> str | None:
+            if base_url is None:
+                return token
+            return build_cursor_url(base_url, token, query=query) if token is not None else None
+
         return {
             "data": data,
             "meta": {
@@ -2475,8 +2568,37 @@ class CursorPaginator(Generic[TItem]):
                 "has_more": self.has_more,
             },
             "links": {
-                "next": next_link,
+                "prev": _link(self.prev_cursor),
+                "next": _link(self.next_cursor),
             },
+        }
+
+    def to_response(
+        self, items_serializer: Callable[[TItem], Any] | None = None
+    ) -> dict[str, Any]:
+        """Laravel's flat ``CursorPaginator`` envelope with ``next_cursor``/``prev_cursor`` URLs."""
+        from arvel.database.paginator import build_cursor_url
+
+        path = resolve_path(self.path)
+        data: list[Any] = (
+            [items_serializer(item) for item in self.items]
+            if items_serializer is not None
+            else list(self.items)
+        )
+        next_url = (
+            build_cursor_url(path, self.next_cursor) if self.next_cursor is not None else None
+        )
+        prev_url = (
+            build_cursor_url(path, self.prev_cursor) if self.prev_cursor is not None else None
+        )
+        return {
+            "data": data,
+            "path": path,
+            "per_page": self.per_page,
+            "next_cursor": self.next_cursor,
+            "prev_cursor": self.prev_cursor,
+            "next_page_url": next_url,
+            "prev_page_url": prev_url,
         }
 
 
