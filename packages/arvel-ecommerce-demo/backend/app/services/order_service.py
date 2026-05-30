@@ -50,7 +50,7 @@ class OrderService:
         for item in items:
             pid = uuid.UUID(item["product_id"])
             published: ProductCatalog | None = await ProductCatalog.where(
-                ProductCatalog.id == pid
+                ProductCatalog.id == pid, ProductCatalog.real_status == "visible"
             ).first()
             if published is None or int(published.stock_qty) < item["quantity"]:
                 raise InsufficientStockError(item["product_id"])
