@@ -167,12 +167,16 @@ design; the flag selects LIKE vs ILIKE (case-sensitive on PG).
 **As a** developer under concurrent writes, **I want** `DB.transaction(..., attempts=N)` to retry on deadlock/serialization failures, plus imperative `begin`/`commit`/`rollback`, **so that** transient lock conflicts don't surface as hard errors.
 
 **Acceptance Criteria**:
-- [ ] Given `attempts=3`, when a deadlock/serialization error is raised, then the transaction body re-runs up to the limit before propagating.
-- [ ] Given a non-retryable error, then it propagates immediately without retry.
-- [ ] Imperative `begin_transaction`/`commit`/`rollback` exist and interoperate with savepoints.
+- [x] Given `attempts=3`, when a deadlock/serialization error is raised, then the transaction body re-runs up to the limit before propagating.
+- [x] Given a non-retryable error, then it propagates immediately without retry.
+- [x] Imperative `begin_transaction`/`commit`/`rollback` exist and interoperate with savepoints.
 
 **Priority**: Should
 **Complexity**: Medium
+**Status**: DONE — retry: WI-arvel (ADR-126, `test_transaction_retry.py`); imperative
+control: WI-arvel-010, ADR-126-03 (`test_transaction_imperative.py`). Frame-stack
+`begin_transaction`/`commit`/`rollback`; nested calls and calls inside `DB.transaction()`
+open savepoints; after-commit callbacks fire on the outermost imperative commit.
 
 ### Story 13: Clause polish bundle (or_* / having / ordering / pluck)
 **As a** developer, **I want** the remaining clause variants — `or_where_in/null/raw/between`, operator-form `having` + `having_null/between`, `reorder`, `in_random_order`, `order_by_desc`, `group_by_raw`, `pluck(value, key)` returning a dict, `count(column)`, and `sum()` defaulting to 0 — **so that** common Laravel idioms have a direct Arvel equivalent.
