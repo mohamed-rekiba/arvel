@@ -79,7 +79,7 @@ Parity Sprint B: attribute pipeline + write/stream gaps
   ├── 006 Story 4: cast-aware dirty tracking
   ├── 005 Story 8: write-path completeness (insert_or_ignore, upsert, truncate)
   ├── 005 Story 10: streaming + chunking completeness
-  └── 005 Story 12: transaction retry on deadlock
+  └── 005 Story 12: transaction retry on deadlock        [PARTIAL — WI-arvel-004, ADR-126: retry done; imperative begin/commit/rollback deferred]
 
 Parity Sprint C: relationship foundation
   ├── 007 Story 1: morph map foundation

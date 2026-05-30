@@ -60,3 +60,24 @@ work_items:
       design). ADR-125. Stage 4b security review ran (Tier 3, credential hashing):
       PASS, no critical/high. Gates green (723 db tests, mypy/pyright/ruff/bandit/
       pip-audit/gitleaks). Completes Parity Sprint A.
+
+  - id: "WI-arvel-004"
+    name: "transaction retry on deadlock (backlog 005 S12, partial)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T15:45:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      DB.transactional(callback, attempts=N) closure-form retry + is_retryable_db_error
+      predicate (PG SQLSTATE 40001/40P01 + message tokens). ADR-126. S12 PARTIAL:
+      imperative begin/commit/rollback deferred (separate concern, ContextVar lifecycle
+      risk). 4b skipped (L2/Tier2). Gates green (729 db tests, mypy/pyright/ruff/bandit/
+      pip-audit/gitleaks). First increment of Parity Sprint B.
