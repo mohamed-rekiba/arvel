@@ -144,7 +144,7 @@ fail fast.
 
 | Cast name(s) | Returns | Accepts |
 |---|---|---|
-| `boolean`, `bool` | `bool` | anything truthy/falsy |
+| `boolean`, `bool` | `bool` | matches PHP `(bool)`: `"0"` and `""` are `False`, every other non-empty string (including `"false"`) is `True` |
 | `integer`, `int` | `int` | `int`, `str` that `int()` accepts |
 | `float` | `float` | `int`, `float`, `str` that `float()` accepts |
 | `string`, `str` | `str` | anything (`str()` coerces) |

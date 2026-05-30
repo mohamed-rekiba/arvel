@@ -124,6 +124,15 @@ def _date_cast(value: Any) -> date:
     raise CastError("date", value)
 
 
+def _bool_cast(value: Any) -> bool:
+    # Mirrors PHP's (bool) used by Laravel's boolean cast: the string "0" and ""
+    # are False, every other non-empty string (including "false") is True.
+    # Plain bool() would make bool("0") True, diverging from Laravel.
+    if isinstance(value, str):
+        return value not in ("", "0")
+    return bool(value)
+
+
 def _timestamp_cast(value: Any) -> int:
     if isinstance(value, bool):
         # bool is an int subclass — refuse explicitly so booleans don't become 0/1 epochs.
@@ -137,8 +146,8 @@ def _timestamp_cast(value: Any) -> int:
 
 # Dispatch table for __casts__ — maps a cast type name to a value coercer.
 _CAST_DISPATCH: dict[str, Callable[[Any], Any]] = {
-    "boolean": bool,
-    "bool": bool,
+    "boolean": _bool_cast,
+    "bool": _bool_cast,
     "integer": int,
     "int": int,
     "float": float,

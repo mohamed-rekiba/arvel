@@ -219,7 +219,7 @@ class HasManyThrough(QueryBuilder[T], Generic[T]):
     async def all(self) -> Any:
         from arvel.support.collections import Collection
 
-        result = await get_active_session().execute(self._apply_global_scopes())
+        result = await get_active_session().execute(self.apply_global_scopes())
         return Collection(result.scalars().all())
 
 
@@ -227,7 +227,7 @@ class HasOneThrough(HasManyThrough[T], Generic[T]):
     """HasOne via an intermediate model."""
 
     async def first(self) -> T | None:
-        stmt = self._apply_global_scopes().limit(1)
+        stmt = self.apply_global_scopes().limit(1)
         result = await get_active_session().execute(stmt)
         return result.scalars().first()
 

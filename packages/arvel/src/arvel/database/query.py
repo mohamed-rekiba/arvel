@@ -201,6 +201,12 @@ def _primary_key_column(model: type[Any]) -> Any:
     return _mapper_of(model).primary_key[0]
 
 
+def _global_scope_whereclause(related_cls: type[Any]) -> Any:
+    """Related model's global-scope predicate (e.g. soft-delete `deleted_at IS NULL`), or None."""
+    scoped = QueryBuilder(related_cls, select(related_cls)).apply_global_scopes()
+    return scoped.whereclause
+
+
 def _exists_subquery(
     model: type[Any],
     target: _RelationTarget,
@@ -225,11 +231,12 @@ def _exists_subquery(
         remote_col = _primary_key_column(related_cls)
         sub = select(related_cls).join(pivot, pivot_rfk == remote_col).where(pivot_fk == local_col)
 
+    # Honour the related model's global scopes (soft deletes) — Laravel's whereHas/has
+    # never counts trashed related rows.
+    sub_qb: QueryBuilder[Any] = QueryBuilder(related_cls, sub)
     if constraint is not None:
-        sub_qb: QueryBuilder[Any] = QueryBuilder(related_cls, sub)
         sub_qb = constraint(sub_qb)
-        sub = sub_qb.statement
-    return sub
+    return sub_qb.apply_global_scopes()
 
 
 def _selectin_loader_for_path(
@@ -273,24 +280,38 @@ def _count_subquery(model: type[Any], target: _RelationTarget) -> Any:
         rel = target.sa_rel
         if rel is None:
             raise UnknownRelationError(model.__name__, "?")
+        related_cls = rel.mapper.class_
         local_col, remote_col = _local_remote(rel)
-        return (
-            select(sqla_func.count())
-            .where(remote_col == local_col)
-            .correlate(model)
-            .scalar_subquery()
-        )
+        stmt = select(sqla_func.count()).where(remote_col == local_col)
+        scope_where = _global_scope_whereclause(related_cls)
+        if scope_where is not None:
+            stmt = stmt.where(scope_where)
+        return stmt.correlate(model).scalar_subquery()
 
     link = target.btm_link
     if link is None:
         raise UnknownRelationError(model.__name__, "?")
     pivot = link.table
+    related_cls = link.related_model
     local_col = _primary_key_column(model)
     pivot_fk = pivot.c[link.foreign_key]
+    pivot_rfk = pivot.c[link.related_foreign_key]
+    remote_col = _primary_key_column(related_cls)
+    scope_where = _global_scope_whereclause(related_cls)
+    if scope_where is None:
+        return (
+            select(sqla_func.count())
+            .select_from(pivot)
+            .where(pivot_fk == local_col)
+            .correlate(model)
+            .scalar_subquery()
+        )
+    # Soft-deletable pivot target: join the related table so the scope can filter trashed rows.
     return (
         select(sqla_func.count())
-        .select_from(pivot)
+        .select_from(pivot.join(related_cls, pivot_rfk == remote_col))
         .where(pivot_fk == local_col)
+        .where(scope_where)
         .correlate(model)
         .scalar_subquery()
     )
@@ -514,7 +535,7 @@ class QueryBuilder(Generic[T]):
         from sqlalchemy import exists as sqla_exists
 
         sub = subquery_fn(type(self)(self._model))
-        sub_stmt = sub._apply_global_scopes() if hasattr(sub, "_apply_global_scopes") else sub
+        sub_stmt = sub.apply_global_scopes() if hasattr(sub, "apply_global_scopes") else sub
         return self._clone(self._stmt.where(sqla_exists(sub_stmt)))
 
     def where_any(self, columns: list[str], operator: str, value: Any) -> Self:
@@ -707,24 +728,15 @@ class QueryBuilder(Generic[T]):
         return self._clone(stmt)
 
     def with_count(self, *relations: str) -> Self:
-        """Add {relation}_count columns via correlated COUNT subqueries."""
-        from sqlalchemy import func as sqla_func
+        """Add {relation}_count columns via correlated COUNT subqueries.
 
+        Honours the related model's soft-delete scope and supports belongs-to-many.
+        Raises UnknownRelationError for relations the model doesn't define.
+        """
         stmt = self._stmt
-        mapper = _mapper_of(self._model)
-        for rel_path in relations:
-            rel_name = rel_path.partition(".")[0]
-            rel = mapper.relationships.get(rel_name)
-            if rel is None:
-                continue
-            local_col, remote_col = _local_remote(rel)
-            count_sub = (
-                select(sqla_func.count())
-                .where(remote_col == local_col)
-                .correlate(self._model)
-                .scalar_subquery()
-                .label(f"{rel_name}_count")
-            )
+        for rel_name in relations:
+            target = _resolve_relation(self._model, rel_name)
+            count_sub = _count_subquery(self._model, target).label(f"{rel_name}_count")
             stmt = stmt.add_columns(count_sub)
         clone = self._clone()
         clone._stmt = stmt
@@ -865,7 +877,7 @@ class QueryBuilder(Generic[T]):
 
     def union(self, other: QueryBuilder[Any]) -> Self:
         """UNION (deduplicates rows)."""
-        combined = self._apply_global_scopes().union(other._apply_global_scopes())
+        combined = self.apply_global_scopes().union(other.apply_global_scopes())
         # ``Select.from_statement`` is typed by SQLAlchemy as the more general
         # ``ExecutableReturnsRows``; at runtime it returns the originating
         # ``Select`` instance, which is what ``_clone`` consumes.
@@ -873,12 +885,12 @@ class QueryBuilder(Generic[T]):
 
     def union_all(self, other: QueryBuilder[Any]) -> Self:
         """UNION ALL (keeps duplicates)."""
-        combined = self._apply_global_scopes().union_all(other._apply_global_scopes())
+        combined = self.apply_global_scopes().union_all(other.apply_global_scopes())
         return self._clone(cast("Select[Any]", select(self._model).from_statement(combined)))
 
     # ------------------------------------------------------------------ apply scopes
 
-    def _apply_global_scopes(self) -> Select[Any]:
+    def apply_global_scopes(self) -> Select[Any]:
         if self._remove_all_global_scopes:
             stmt = self._stmt
         else:
@@ -937,7 +949,7 @@ class QueryBuilder(Generic[T]):
         return stmt
 
     def to_sql(self, *, dialect: str | None = None) -> str:
-        stmt = self._apply_locks(self._apply_global_scopes())
+        stmt = self._apply_locks(self.apply_global_scopes())
         sqla_dialect = _resolve_sqla_dialect(dialect)
         try:
             compiled = stmt.compile(
@@ -968,7 +980,7 @@ class QueryBuilder(Generic[T]):
         cols: list[Any] = [literal_column(part) for part in _split_select_list(raw_expr)] or [
             literal_column("*")
         ]
-        scoped_stmt = self._apply_global_scopes()
+        scoped_stmt = self.apply_global_scopes()
         raw_stmt: Select[Any] = scoped_stmt.with_only_columns(
             *cols,
             maintain_column_froms=True,
@@ -981,7 +993,7 @@ class QueryBuilder(Generic[T]):
     # === terminal (read) ============================================================
 
     async def first(self) -> T | None:
-        stmt = self._apply_global_scopes().limit(1)
+        stmt = self.apply_global_scopes().limit(1)
         if self._lock_for_update:
             stmt = stmt.with_for_update()
         elif self._lock_shared:
@@ -1037,7 +1049,7 @@ class QueryBuilder(Generic[T]):
 
     async def sole(self) -> T:
         """Return exactly one row. Raises if zero or more than one row matches."""
-        stmt = self._apply_global_scopes()
+        stmt = self.apply_global_scopes()
         if self._lock_for_update:
             stmt = stmt.with_for_update()
         elif self._lock_shared:
@@ -1078,7 +1090,7 @@ class QueryBuilder(Generic[T]):
     async def all(self) -> Any:
         from arvel.support.collections import Collection
 
-        stmt = self._apply_global_scopes()
+        stmt = self.apply_global_scopes()
         if self._lock_for_update:
             stmt = stmt.with_for_update()
         elif self._lock_shared:
@@ -1124,7 +1136,7 @@ class QueryBuilder(Generic[T]):
         return await self.all()
 
     async def count(self) -> int:
-        stmt = self._apply_global_scopes()
+        stmt = self.apply_global_scopes()
         count_stmt = select(func.count()).select_from(stmt.subquery())
         result = await get_active_session().execute(count_stmt)
         return int(result.scalar_one())
@@ -1134,13 +1146,13 @@ class QueryBuilder(Generic[T]):
 
     async def value(self, col: str) -> Any:
         column = _resolve_column(self._model, col)
-        stmt = self._apply_global_scopes().with_only_columns(column).limit(1)
+        stmt = self.apply_global_scopes().with_only_columns(column).limit(1)
         result = await get_active_session().execute(stmt)
         return result.scalar()
 
     async def pluck(self, col: str) -> list[Any]:
         column = _resolve_column(self._model, col)
-        stmt = self._apply_global_scopes().with_only_columns(column)
+        stmt = self.apply_global_scopes().with_only_columns(column)
         result = await get_active_session().execute(stmt)
         return list(result.scalars().all())
 
@@ -1148,25 +1160,25 @@ class QueryBuilder(Generic[T]):
 
     async def sum(self, col: str) -> Any:
         column = _resolve_column(self._model, col)
-        stmt = self._apply_global_scopes().with_only_columns(func.sum(column))
+        stmt = self.apply_global_scopes().with_only_columns(func.sum(column))
         result = await get_active_session().execute(stmt)
         return result.scalar_one_or_none()
 
     async def avg(self, col: str) -> Any:
         column = _resolve_column(self._model, col)
-        stmt = self._apply_global_scopes().with_only_columns(func.avg(column))
+        stmt = self.apply_global_scopes().with_only_columns(func.avg(column))
         result = await get_active_session().execute(stmt)
         return result.scalar_one_or_none()
 
     async def max(self, col: str) -> Any:
         column = _resolve_column(self._model, col)
-        stmt = self._apply_global_scopes().with_only_columns(func.max(column))
+        stmt = self.apply_global_scopes().with_only_columns(func.max(column))
         result = await get_active_session().execute(stmt)
         return result.scalar_one_or_none()
 
     async def min(self, col: str) -> Any:
         column = _resolve_column(self._model, col)
-        stmt = self._apply_global_scopes().with_only_columns(func.min(column))
+        stmt = self.apply_global_scopes().with_only_columns(func.min(column))
         result = await get_active_session().execute(stmt)
         return result.scalar_one_or_none()
 
@@ -1174,7 +1186,7 @@ class QueryBuilder(Generic[T]):
 
     async def paginate(self, per_page: int = 15, *, page: int = 1) -> Paginator[T]:
         total = await self.count()
-        items_stmt = self._apply_global_scopes().limit(per_page).offset((page - 1) * per_page)
+        items_stmt = self.apply_global_scopes().limit(per_page).offset((page - 1) * per_page)
         result = await get_active_session().execute(items_stmt)
         from arvel.support.collections import Collection
 
@@ -1183,7 +1195,7 @@ class QueryBuilder(Generic[T]):
 
     async def simple_paginate(self, per_page: int = 15, *, page: int = 1) -> SimplePaginator[T]:
         """No COUNT query — use for large tables or infinite scroll."""
-        items_stmt = self._apply_global_scopes().limit(per_page + 1).offset((page - 1) * per_page)
+        items_stmt = self.apply_global_scopes().limit(per_page + 1).offset((page - 1) * per_page)
         result = await get_active_session().execute(items_stmt)
         from arvel.support.collections import Collection
 
@@ -1238,7 +1250,7 @@ class QueryBuilder(Generic[T]):
             raise TypeError(f"{self._model.__name__} primary key column has no name.")
         pk_attr = _resolve_column(self._model, pk_key)
 
-        stmt = self._apply_global_scopes().order_by(pk_attr)
+        stmt = self.apply_global_scopes().order_by(pk_attr)
         if cursor is not None:
             last_pk = json.loads(base64.b64decode(cursor.encode()).decode())
             stmt = stmt.where(pk_attr > last_pk)
@@ -1268,7 +1280,7 @@ class QueryBuilder(Generic[T]):
 
         # ORDER BY must match the keyset declaration.
         order_exprs = [desc(attr) if direction == "desc" else attr for _, attr, direction in parsed]
-        stmt = self._apply_global_scopes().order_by(*order_exprs)
+        stmt = self.apply_global_scopes().order_by(*order_exprs)
 
         if cursor is not None:
             try:
@@ -1301,7 +1313,7 @@ class QueryBuilder(Generic[T]):
     async def chunk(self, size: int, callback: Callable[[list[T]], Awaitable[None]]) -> None:
         page = 1
         while True:
-            stmt = self._apply_global_scopes().limit(size).offset((page - 1) * size)
+            stmt = self.apply_global_scopes().limit(size).offset((page - 1) * size)
             result = await get_active_session().execute(stmt)
             batch: list[T] = cast("list[T]", list(result.scalars().all()))
             if not batch:
@@ -1353,7 +1365,7 @@ class QueryBuilder(Generic[T]):
         session = get_active_session()
         table = _table_of(self._model)
         stmt = sqla_update(table)
-        where_clause = self._apply_global_scopes().whereclause
+        where_clause = self.apply_global_scopes().whereclause
         if where_clause is not None:
             stmt = stmt.where(where_clause)
         stmt = stmt.values(**values)
@@ -1438,7 +1450,7 @@ class QueryBuilder(Generic[T]):
         table = _table_of(self._model)
         db_col = table.c[col]
         stmt = sqla_update(table).values({col: db_col + amount})
-        where_clause = self._apply_global_scopes().whereclause
+        where_clause = self.apply_global_scopes().whereclause
         if where_clause is not None:
             stmt = stmt.where(where_clause)
         result = cast("CursorResult[Any]", await session.execute(stmt))
@@ -1462,7 +1474,7 @@ class QueryBuilder(Generic[T]):
             session = get_active_session()
             table = _table_of(self._model)
             stmt = sqla_update(table).values({soft_field: datetime.now(UTC)})
-            where_clause = self._apply_global_scopes().whereclause
+            where_clause = self.apply_global_scopes().whereclause
             if where_clause is not None:
                 stmt = stmt.where(where_clause)
             result = cast("CursorResult[Any]", await session.execute(stmt))
@@ -1483,7 +1495,7 @@ class QueryBuilder(Generic[T]):
         session = get_active_session()
         table = _table_of(self._model)
         stmt = sqla_delete(table)
-        where_clause = self._apply_global_scopes().whereclause
+        where_clause = self.apply_global_scopes().whereclause
         if where_clause is not None:
             stmt = stmt.where(where_clause)
         result = cast("CursorResult[Any]", await session.execute(stmt))
@@ -1656,7 +1668,7 @@ class RecursiveQueryBuilder(QueryBuilder[T]):
         parent_attr = _resolve_column(model, self._parent_key)
         has_depth = self._depth_col is not None
 
-        anchor_where_clauses = self._apply_global_scopes().whereclause
+        anchor_where_clauses = self.apply_global_scopes().whereclause
 
         if has_depth:
             anchor_select = select(
