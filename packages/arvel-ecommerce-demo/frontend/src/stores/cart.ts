@@ -1,0 +1,101 @@
+import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
+import {
+  apiCartItemsAddApiCartItemsPost,
+  apiCartItemsRemoveApiCartItemsItemIdDelete,
+  apiCartItemsUpdateApiCartItemsItemIdPatch,
+  apiCartShowApiCartGet,
+} from '@/api/cart/cart'
+import type { CartOut } from '@/api/schemas'
+import { useAuthStore } from '@/stores/auth'
+
+export const useCartStore = defineStore('cart', () => {
+  const cart = ref<CartOut | null>(null)
+  const loading = ref(false)
+  const error = ref<string | null>(null)
+
+  const itemCount = computed(
+    () => cart.value?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0,
+  )
+
+  const subtotal = computed(
+    () => cart.value?.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0) ?? 0,
+  )
+
+  async function load(): Promise<void> {
+    const auth = useAuthStore()
+    if (!auth.isAuthenticated) {
+      cart.value = null
+      return
+    }
+    loading.value = true
+    error.value = null
+    try {
+      cart.value = (await apiCartShowApiCartGet()).data
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to load cart'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function addItem(productId: string, quantity = 1): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      cart.value = (await apiCartItemsAddApiCartItemsPost({ product_id: productId, quantity })).data
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to add item'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function updateQuantity(itemId: string, quantity: number): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      if (quantity <= 0) {
+        cart.value = (await apiCartItemsRemoveApiCartItemsItemIdDelete(itemId)).data
+      } else {
+        cart.value = (await apiCartItemsUpdateApiCartItemsItemIdPatch(itemId, { quantity })).data
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to update item'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function removeItem(itemId: string): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      cart.value = (await apiCartItemsRemoveApiCartItemsItemIdDelete(itemId)).data
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to remove item'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function clear(): void {
+    cart.value = null
+  }
+
+  return {
+    cart,
+    loading,
+    error,
+    itemCount,
+    subtotal,
+    load,
+    addItem,
+    updateQuantity,
+    removeItem,
+    clear,
+  }
+})

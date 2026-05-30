@@ -1,0 +1,367 @@
+"""Prompt surface contract tests for the Vue storefront/admin shell."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parents[2]
+COMPOSE_FILE = BASE_DIR.parent / "docker-compose.yml"
+FRONTEND_DIR = BASE_DIR.parent / "frontend"
+WEB_ROUTES = BASE_DIR / "routes" / "web.py"
+
+
+def _src(path: Path) -> str:
+    return path.read_text()
+
+
+def test_frontend_has_runnable_vite_entrypoint() -> None:
+    package_json = json.loads((FRONTEND_DIR / "package.json").read_text())
+
+    assert package_json["scripts"]["build"] == "vue-tsc --noEmit && vite build"
+    assert (FRONTEND_DIR / "index.html").exists()
+    assert (FRONTEND_DIR / "src" / "main.ts").exists()
+    assert (FRONTEND_DIR / "src" / "App.vue").exists()
+
+
+def test_compose_starts_frontend_after_backend_health() -> None:
+    compose = _src(COMPOSE_FILE)
+
+    assert "NPM_CONFIG_UPDATE_NOTIFIER" in compose
+    assert "pip install --no-cache-dir --root-user-action=ignore uv==0.11.16" in compose
+    assert (
+        "CACHE_URL: redis://:${REDIS_PASSWORD:-arvel_local_redis_password}@redis:6379/0" in compose
+    )
+    assert "image: postgres:18.4-bookworm" in compose
+    assert "--auth-local=scram-sha-256 --auth-host=scram-sha-256" in compose
+    assert "--requirepass" in compose
+    backend_block = compose[compose.index("  backend:") : compose.index("  frontend:")]
+    assert "start_period: 240s" in backend_block
+    frontend_block = compose[compose.index("  frontend:") : compose.index("  scheduler:")]
+    assert "VITE_DEV_PROXY_TARGET: http://backend:8001" in frontend_block
+    assert "condition: service_healthy" in frontend_block
+    assert (FRONTEND_DIR / "src" / "lib" / "api.ts").exists()
+
+
+def test_frontend_router_declares_prompt_surfaces() -> None:
+    src = _src(FRONTEND_DIR / "src" / "router.ts")
+
+    for route in (
+        "path: '/'",
+        "path: '/login'",
+        "path: '/register'",
+        "path: '/products'",
+        "path: '/search'",
+        "path: '/products/:slug'",
+        "path: '/categories/:slug'",
+        "path: '/cart'",
+        "path: '/checkout'",
+        "path: '/account'",
+        "path: '/account/orders'",
+        "path: '/admin/login'",
+        "path: '/admin'",
+        "path: '/admin/orders'",
+        "path: '/admin/users'",
+        "path: '/admin/:pathMatch(.*)*'",
+    ):
+        assert route in src
+    for page in (
+        "StorefrontCart",
+        "StorefrontCheckout",
+        "StorefrontAccount",
+        "StorefrontAuth",
+        "StorefrontSearch",
+        "AdminCatalogPage",
+        "AdminListPage",
+        "AdminPlaceholderPage",
+    ):
+        assert page in src
+
+
+def test_web_routes_serve_spa_shell_for_storefront_and_admin() -> None:
+    src = _src(WEB_ROUTES)
+
+    for route in (
+        '@Route.get("/", name="web.storefront.home"',
+        '@Route.get("/login", name="web.storefront.login"',
+        '@Route.get("/register", name="web.storefront.register"',
+        '@Route.get("/products", name="web.storefront.products"',
+        '@Route.get("/products/{slug}", name="web.storefront.products.detail"',
+        '@Route.get("/categories/{slug}", name="web.storefront.categories.detail"',
+        '@Route.get("/search", name="web.storefront.search"',
+        '@Route.get("/account", name="web.storefront.account"',
+        '@Route.get("/account/orders", name="web.storefront.account.orders"',
+        '@Route.get("/admin", name="web.admin.dashboard"',
+        '@Route.get("/admin/{path:path}", name="web.admin.catch_all"',
+        '@Route.get("/assets/{path:path}", name="web.assets"',
+    ):
+        assert route in src
+    assert "FileResponse(_INDEX_FILE)" in src
+
+
+def test_storefront_pages_use_backend_api_client() -> None:
+    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
+
+    assert "fetchProductList('/api/products'" in api
+    assert "`/api/categories/${encodeURIComponent(slug)}`" in api
+    assert "`/api/products/${encodeURIComponent(slug)}?${params}`" in api
+
+    for page in (
+        "StorefrontHome.vue",
+        "StorefrontProducts.vue",
+        "StorefrontProductDetail.vue",
+    ):
+        src = _src(FRONTEND_DIR / "src" / "pages" / page)
+        assert "demoProducts" not in src
+        assert "../lib/api" in src
+
+    assert "image_srcset" in api
+    assert ':srcset="product.image_srcset || undefined"' in _src(
+        FRONTEND_DIR / "src" / "components" / "storefront" / "ProductCard.vue"
+    )
+    assert ':srcset="product.image_srcset || undefined"' in _src(
+        FRONTEND_DIR / "src" / "pages" / "StorefrontProductDetail.vue"
+    )
+
+
+def test_customer_pages_call_cart_checkout_and_account_apis() -> None:
+    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
+
+    for snippet in (
+        "authorizedJson<CartResponse>('/api/cart'",
+        "authorizedJson<CartResponse>('/api/cart/items'",
+        "`/api/cart/items/${encodeURIComponent(itemId)}`",
+        "requireStoredAccessToken(",
+        "authorizedJson<DetailResponse<OrderSummary>>",
+        "'/api/checkout'",
+        "authorizedJson<DetailResponse<OrderSummary[]>>",
+        "'/api/account/orders'",
+        "fetch('/api/auth/login'",
+        "fetch('/api/auth/register'",
+        "fetch(`/api/search?${params}`)",
+    ):
+        assert snippet in api
+
+    for page in (
+        "StorefrontCart.vue",
+        "StorefrontCheckout.vue",
+        "StorefrontAccount.vue",
+        "StorefrontAuth.vue",
+        "StorefrontSearch.vue",
+    ):
+        assert (FRONTEND_DIR / "src" / "pages" / page).exists()
+
+    for page in ("StorefrontCart.vue", "StorefrontCheckout.vue", "StorefrontAccount.vue"):
+        src = _src(FRONTEND_DIR / "src" / "pages" / page)
+        assert "Paste a bearer token" not in src
+        assert "requireStoredAccessToken(" in src
+
+
+def test_protected_frontend_routes_use_stored_session_guard() -> None:
+    router = _src(FRONTEND_DIR / "src" / "router.ts")
+    auth_page = _src(FRONTEND_DIR / "src" / "pages" / "StorefrontAuth.vue")
+
+    assert "router.beforeEach(" in router
+    assert "hasStoredSession()" in router
+    assert "loadCurrentUser()" in router
+    assert "hasAdminAccess(user)" in router
+    assert "meta: { requiresAuth: true" in router
+    assert "meta: { requiresAuth: true, requiresAdmin: true }" in router
+    assert "path: '/admin/login'" in router
+    assert "redirectTo: '/admin'" in router
+    assert "route.query.redirect" in auth_page
+
+
+def test_admin_shell_uses_me_endpoint_for_sidebar_user() -> None:
+    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
+    layout = _src(FRONTEND_DIR / "src" / "layouts" / "AdminLayout.vue")
+
+    assert "fetchCurrentUser(" in api
+    assert "'/api/auth/me'" in api
+    assert "loadCurrentUser()" in layout
+    assert "clearSession()" in layout
+
+    for page in (
+        "AdminDashboard.vue",
+        "AdminCatalogPage.vue",
+        "AdminListPage.vue",
+        "AdminPlaceholderPage.vue",
+    ):
+        src = _src(FRONTEND_DIR / "src" / "pages" / page)
+        assert "admin-demo" not in src
+        assert "Demo Admin" not in src
+        assert '<AdminLayout :user="user">' not in src
+
+
+def test_admin_dashboard_uses_backend_rows() -> None:
+    dashboard = _src(FRONTEND_DIR / "src" / "pages" / "AdminDashboard.vue")
+
+    assert "listAdminRows(token, 'orders')" in dashboard
+    assert "listAdminCatalog(token, 'products')" in dashboard
+    assert '@view-order="openOrder"' in dashboard
+    assert "prod-linen-shirt" not in dashboard
+    assert "ord-1001" not in dashboard
+
+
+def test_admin_catalog_pages_use_backend_crud_apis() -> None:
+    router = _src(FRONTEND_DIR / "src" / "router.ts")
+    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
+    page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogPage.vue")
+
+    for route in (
+        "path: '/admin/products'",
+        "path: '/admin/categories'",
+        "path: '/admin/vendors'",
+    ):
+        assert route in router
+    for snippet in (
+        "listAdminCatalog(",
+        "createAdminCatalog(",
+        "updateAdminCatalog(",
+        "deleteAdminCatalog(",
+        "forceDeleteAdminCatalog(",
+        "runAdminCatalogAction(",
+        "`/api/admin/${resource}`",
+        "`/api/admin/${resource}?${params}`",
+        "`/api/admin/${resource}/${encodeURIComponent(id)}/force`",
+    ):
+        assert snippet in api
+    assert "AdminLayout" in page
+    assert "Catalog CRUD" in page
+    assert "Bearer token" not in page
+    assert "requireStoredAccessToken(" in page
+
+
+def test_admin_catalog_uses_translatable_inputs() -> None:
+    page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogPage.vue")
+    translatable = _src(FRONTEND_DIR / "src" / "components" / "admin" / "TranslatableInput.vue")
+
+    assert "TranslatableInput" in page
+    assert "Name translations" in page
+    assert "Description translations" in page
+    assert "updateTranslation('name'" in page
+    assert "'ar', label: 'Arabic', dir: 'rtl'" in translatable
+    assert "'update:modelValue'" in translatable
+
+
+def test_admin_list_pages_use_backend_read_apis() -> None:
+    router = _src(FRONTEND_DIR / "src" / "router.ts")
+    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
+    page = _src(FRONTEND_DIR / "src" / "pages" / "AdminListPage.vue")
+
+    for route in (
+        "path: '/admin/orders'",
+        "path: '/admin/users'",
+        "path: '/admin/roles'",
+        "path: '/admin/permissions'",
+        "path: '/admin/translations'",
+        "path: '/admin/analytics'",
+        "path: '/admin/settings'",
+    ):
+        assert route in router
+    for snippet in (
+        "AdminListResource",
+        "'orders'",
+        "'users'",
+        "'roles'",
+        "'permissions'",
+        "'translations'",
+        "listAdminRows(",
+        "`/api/admin/${resource}`",
+    ):
+        assert snippet in api
+    assert "listAdminRows" in page
+    assert "Bearer token" not in page
+    assert "requireStoredAccessToken(" in page
+    assert (FRONTEND_DIR / "src" / "pages" / "AdminPlaceholderPage.vue").exists()
+
+
+def test_admin_edit_and_order_detail_routes_use_show_apis() -> None:
+    router = _src(FRONTEND_DIR / "src" / "router.ts")
+    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
+    catalog_page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogPage.vue")
+    order_page = _src(FRONTEND_DIR / "src" / "pages" / "AdminOrderDetailPage.vue")
+
+    for route in (
+        "path: '/admin/products/:editId/edit'",
+        "path: '/admin/categories/:editId/edit'",
+        "path: '/admin/vendors/:editId/edit'",
+        "path: '/admin/orders/:orderId'",
+    ):
+        assert route in router
+    assert "getAdminCatalogRecord(" in api
+    assert "getAdminOrder(" in api
+    assert "updateAdminOrderStatus(" in api
+    assert "getAdminCatalogRecord(" in catalog_page
+    assert "getAdminOrder(" in order_page
+    assert "updateAdminOrderStatus(" in order_page
+    assert 'PermissionGate permission="orders.update"' in order_page
+
+
+def test_admin_user_detail_manages_roles_and_permissions() -> None:
+    router = _src(FRONTEND_DIR / "src" / "router.ts")
+    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
+    list_page = _src(FRONTEND_DIR / "src" / "pages" / "AdminListPage.vue")
+    user_page = _src(FRONTEND_DIR / "src" / "pages" / "AdminUserDetailPage.vue")
+    routes = _src(BASE_DIR / "routes" / "api.py")
+    users = _src(BASE_DIR / "app" / "services" / "user_service.py")
+
+    assert "AdminUserDetailPage" in router
+    assert "path: '/admin/users/:userId'" in router
+    for snippet in (
+        "getAdminUser(",
+        "assignAdminUserRole(",
+        "revokeAdminUserRole(",
+        "grantAdminUserPermission(",
+        "revokeAdminUserPermission(",
+        "runAdminUserAction(",
+        "deleteAdminUser(",
+        "forceDeleteAdminUser(",
+        "`/api/admin/users/${encodeURIComponent(userId)}/force`",
+    ):
+        assert snippet in api
+    assert "props.resource === 'users'" in list_page
+    assert 'id="admin-list-trashed-mode"' in list_page
+    assert 'PermissionGate permission="roles.manage"' in user_page
+    assert 'PermissionGate permission="users.manage"' in user_page
+    assert "forceDeleteAdminUser(token, id)" in user_page
+    assert 'Route.get("/{user_id}"' in routes
+    assert '"/{user_id}/force"' in routes
+    assert '"roles": roles' in users
+    assert '"direct_permissions": direct_permissions' in users
+    assert "async def force_delete(self, user_id: int)" in users
+
+
+def test_admin_product_edit_page_manages_media() -> None:
+    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
+    page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogPage.vue")
+
+    for snippet in (
+        "listProductMedia(",
+        "uploadProductMedia(",
+        "deleteProductMedia(",
+        "`/api/admin/products/${encodeURIComponent(productId)}/media`",
+    ):
+        assert snippet in api
+    for snippet in (
+        "Product media",
+        'type="file"',
+        '@change="uploadMedia"',
+        "removeMedia(item.id)",
+    ):
+        assert snippet in page
+
+
+def test_admin_catalog_actions_use_permission_gate() -> None:
+    page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogPage.vue")
+    gate = _src(FRONTEND_DIR / "src" / "components" / "admin" / "PermissionGate.vue")
+    auth = _src(FRONTEND_DIR / "src" / "composables" / "useAuth.ts")
+
+    assert "PermissionGate" in page
+    assert ':permission="publishPermission"' in page
+    assert ':permission="deletePermission"' in page
+    assert ':permission="savePermission"' in page
+    assert 'id="trashed-mode"' in page
+    assert "forceDeleteRecord(record)" in page
+    assert "hasPermission(props.permission)" in gate
+    assert "hasAdminAccess(" in auth

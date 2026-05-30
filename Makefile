@@ -1,157 +1,120 @@
-SHELL := /bin/sh
-UV ?= uv
-COMPOSE ?= docker compose
-COMPOSE_ENV ?= --env-file .env.docker
-TEST_ENV_FILE ?= .env.testing
-
 .DEFAULT_GOAL := help
 
-.PHONY: help install setup run test test-unit test-docker test-integration coverage \
-	lint format format-check typecheck verify pre-commit \
-	migrate seed fresh \
-	compose-up compose-down compose-logs compose-ps compose-build compose-restart clean \
-	docs docs-serve docs-build docs-test docs-clean
+SRC := packages/arvel/src packages/arvel/tests
+PKG_DIRS := packages
+PYTHON_VERSION ?= 3.14
 
-help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
+EMULATOR_IMAGES_SCRIPT := packages/arvel/tests/integration/emulators/_images.py
+# Recursive `=` (lazy) — Python is only invoked when EMULATOR_IMAGES is
+# actually expanded (e.g. by `make pull-emulators`), not on every `make`.
+EMULATOR_IMAGES = $(shell uv run --quiet python $(EMULATOR_IMAGES_SCRIPT))
 
-# ──── Setup ────
+.PHONY: help
+help:  ## Show this help
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-install: ## Install project + dev + all extras
-	$(UV) sync --all-extras
+.PHONY: sync
+sync:  ## Install/sync workspace deps (root extras + every workspace member's extras)
+	uv sync --all-packages --all-extras
 
-setup: install compose-up ## Full setup: install deps, start Docker, configure Keycloak
-	@echo "Waiting for all services to be healthy..."
-	@for i in $$(seq 1 60); do \
-		UNHEALTHY=$$($(COMPOSE) ps --format '{{.Health}}' 2>/dev/null | grep -cv healthy); \
-		if [ "$$UNHEALTHY" -eq 0 ]; then echo "All services healthy."; break; fi; \
-		sleep 5; \
-	done
-	$(COMPOSE) up keycloak-setup
+.PHONY: dev
+dev: sync  ## Alias for sync — install everything a contributor needs (FR-017-005)
 
-run: ## Start Arvel dev server locally
-	$(UV) run arvel serve --host 0.0.0.0 --port 8000
+.PHONY: lock
+lock:  ## Refresh uv.lock
+	uv lock
 
-# ──── Docker Compose ────
+.PHONY: lint
+lint: format ## Ruff check
+	uv run ruff check --fix $(SRC)
 
-compose-up: ## Start Docker services
-	$(COMPOSE) $(COMPOSE_ENV) up -d
-	@echo "Waiting for Keycloak..."
-	@for i in $$(seq 1 60); do \
-		if curl -sf http://localhost:9090/health/ready > /dev/null 2>&1; then \
-			echo "Keycloak healthy."; break; \
-		fi; \
-		sleep 5; \
-	done
-	$(COMPOSE) up keycloak-setup
+.PHONY: format
+format:  ## Ruff format
+	uv run ruff format $(PKG_DIRS)
 
-compose-down: ## Stop Docker services
-	$(COMPOSE) down --remove-orphans
+.PHONY: format-check
+format-check:  ## Ruff format --check
+	uv run ruff format --check $(PKG_DIRS)
 
-compose-logs: ## Follow Docker compose logs
-	$(COMPOSE) logs -f --tail=200
+.PHONY: typecheck
+typecheck:  ## mypy --strict + pyright --strict (scope driven by pyproject.toml)
+	uv run mypy
+	uv run pyright
 
-compose-ps: ## Show Docker service status
-	$(COMPOSE) ps
+.PHONY: test
+test:  ## Fast tests — no Docker, no emulators
+	uv run pytest packages/arvel/tests -m 'not benchmark and not requires_emulator' -n auto --dist=loadfile --tb=short
 
-compose-build: ## Rebuild Docker images
-	$(COMPOSE) $(COMPOSE_ENV) build
+.PHONY: print-emulators
+print-emulators:  ## Print the pinned emulator image list (one per line) from $(EMULATOR_IMAGES_SCRIPT)
+	@uv run --quiet python $(EMULATOR_IMAGES_SCRIPT)
 
-compose-restart: ## Restart all Docker services
-	$(COMPOSE) restart
+.PHONY: pull-emulators
+pull-emulators:  ## Pre-pull emulator images used by test-integration (parallel, no-op if Docker unavailable)
+	@# Single shell recipe — each `make` recipe line is its own shell, so `exit 0`
+	@# would only exit that line. Joining with `\` keeps the early-exit semantics.
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "Docker not installed; skipping pull. Integration tests will skip cleanly."; \
+		exit 0; \
+	fi; \
+	if ! docker info >/dev/null 2>&1; then \
+		echo "Docker daemon not running; skipping pull. Integration tests will skip cleanly."; \
+		exit 0; \
+	fi; \
+	uv run --quiet python $(EMULATOR_IMAGES_SCRIPT) | xargs -n1 -P7 docker pull
 
-clean: compose-down docs-clean ## Stop services, remove volumes, clean caches
-	$(COMPOSE) down -v 2>/dev/null || true
-	rm -rf dist/ build/ *.egg-info/
-	rm -rf .pytest_cache/ .ruff_cache/ .mypy_cache/ .tests/
-	rm -rf htmlcov/ .coverage
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+.PHONY: test-integration
+test-integration: pull-emulators  ## Full tests — boots Docker emulators (S3, Azurite, GCS, Valkey, Mailpit, Postgres, MariaDB)
+	uv run pytest packages/arvel/tests -m 'not benchmark' -n auto --dist=loadfile --tb=short
 
-# ──── Documentation ────
+.PHONY: coverage
+coverage:  ## Tests + coverage (fail-under 90)
+	uv run pytest packages/arvel/tests --cov=arvel --cov-report=term-missing -n auto --dist=loadfile
 
-MKDOCS_CFG := docs/site/en/mkdocs.yml
+.PHONY: bench
+bench:  ## Run smoke benchmark
+	uv run python benchmarks/bench_foundations.py
 
-docs: docs-serve ## Alias for docs-serve
+.PHONY: docs
+docs:  ## Build the docs site (strict mode, same as CI)
+	uv run mkdocs build --strict
 
-docs-serve: ## Serve docs locally with live-reload (http://127.0.0.1:8001)
-	$(UV) run mkdocs serve -f $(MKDOCS_CFG) --dev-addr 127.0.0.1:8001
+.PHONY: docs-serve
+docs-serve:  ## Serve docs locally with live reload
+	uv run mkdocs serve
 
-docs-build: ## Build docs site (strict mode)
-	$(UV) run mkdocs build -f $(MKDOCS_CFG) --strict
+.PHONY: security
+security:  ## bandit + pip-audit + gitleaks
+	uv run bandit -r packages/arvel/src -l --exclude packages/arvel/src/arvel/_skeleton
+	# Unfixed third-party CVEs: docs/security/dependency-exceptions.md
+	uv run pip-audit --skip-editable \
+		--ignore-vuln PYSEC-2026-89 \
+		--ignore-vuln PYSEC-2025-183
+	@command -v gitleaks >/dev/null && gitleaks detect --no-banner --source . --config .gitleaks.toml || echo "gitleaks not installed; install with: brew install gitleaks"
 
-docs-test: ## Run documentation tests
-	$(UV) run pytest tests/docs/ -v --tb=short -m "docs and not integration"
+.PHONY: sbom
+sbom:  ## Generate CycloneDX SBOM (from resolved deps)
+	uv export --no-dev --no-hashes --package arvel --format requirements-txt > req-arvel.txt
+	uv run cyclonedx-py requirements --pyproject packages/arvel/pyproject.toml --output-format JSON --output-file sbom-arvel.cdx.json req-arvel.txt
+	rm -f req-arvel.txt
 
-docs-clean: ## Remove built docs site
-	rm -rf docs/site/en/site
+.PHONY: build
+build:  ## Build sdist + wheel
+	uv build --package arvel --out-dir dist/arvel
 
-# ──── Testing ────
+.PHONY: clean
+clean:  ## Remove build / cache artifacts
+	rm -rf dist build site _site .ruff_cache .pyright .pytest_cache .playwright-mcp htmlcov bootstrap .coverage* coverage.xml
+	find . \( -name "__pycache__" -o -name ".mypy_cache" -o -name ".benchmarks" -o -name "dist" \) -type d -prune -exec rm -rf {} +
 
-test: ## Run full test suite (unit only, no Docker env)
-	$(UV) run pytest tests/ -v --tb=short
+.PHONY: ci
+ci: lint format-check typecheck coverage docs  ## Run the full CI gate locally
 
-test-unit: ## Run unit tests only (no Docker required)
-	$(UV) run pytest tests/ -v --tb=short -m "not (db or redis or smtp or s3 or rabbitmq or oidc or integration)"
+.PHONY: pre-commit
+pre-commit: lint format-check typecheck security  ## Run the full CI gate locally
+	# Skip no-commit-to-branch here: this target is a CI gate, not a commit.
+	# The hook still fires on actual `git commit` to block writes to main/master.
+	SKIP=no-commit-to-branch uv run pre-commit run --all-files
 
-test-docker: ## Run full test suite against Docker services
-	@test -f $(TEST_ENV_FILE) || { echo "ERROR: $(TEST_ENV_FILE) not found. Copy .env.testing.example or run 'make setup'."; exit 1; }
-	@$(COMPOSE) ps --format '{{.Health}}' 2>/dev/null | grep -q healthy || \
-		{ echo "ERROR: Docker services not running. Run 'make compose-up' first."; exit 1; }
-	env $$(grep -v '^\s*#' $(TEST_ENV_FILE) | grep -v '^\s*$$' | xargs) \
-		$(UV) run pytest tests/ -v --tb=short
-
-test-integration: ## Run integration-marked tests only (Docker required)
-	@test -f $(TEST_ENV_FILE) || { echo "ERROR: $(TEST_ENV_FILE) not found."; exit 1; }
-	env $$(grep -v '^\s*#' $(TEST_ENV_FILE) | grep -v '^\s*$$' | xargs) \
-		$(UV) run pytest tests/ -v --tb=short -m "integration or db or redis or smtp or s3 or rabbitmq or oidc"
-
-coverage: ## Run tests with coverage report
-	@if [ -f $(TEST_ENV_FILE) ]; then \
-		env $$(grep -v '^\s*#' $(TEST_ENV_FILE) | grep -v '^\s*$$' | xargs) \
-			$(UV) run pytest tests/ -v --cov=src/arvel --cov-report=term-missing --cov-report=html --cov-fail-under=80; \
-	else \
-		$(UV) run pytest tests/ -v --cov=src/arvel --cov-report=term-missing --cov-report=html; \
-	fi
-
-# ──── Code Quality ────
-
-lint: ## Run linter + format check
-	$(UV) run ruff check src/ tests/
-	$(UV) run ruff format --check src/ tests/
-
-format: ## Auto-format source code
-	$(UV) run ruff format src/ tests/
-
-format-check: ## Check formatting without changes
-	$(UV) run ruff format --check src/ tests/
-
-typecheck: ## Run type checker
-	$(UV) run ty check src/
-
-verify: lint typecheck test ## Run lint + typecheck + test (quick CI gate)
-
-pre-commit: ## Run pre-commit hooks on all files
-	$(UV) run pre-commit run --all-files
-
-# ──── Database ────
-
-migrate: ## Run database migrations
-	$(UV) run arvel db migrate
-
-seed: ## Seed the database
-	$(UV) run arvel db seed
-
-fresh: ## Drop and recreate database + migrate + seed
-	@if [ "$$APP_ENV" != "testing" ] && [ "$$APP_ENV" != "development" ] && [ -z "$$APP_ENV" ]; then \
-		echo ""; \
-		echo "WARNING: APP_ENV is not 'testing' or 'development'."; \
-		echo "This will destroy all data. Are you sure? [y/N]"; \
-		read -r confirm; \
-		if [ "$$confirm" != "y" ] && [ "$$confirm" != "Y" ]; then \
-			echo "Aborted."; \
-			exit 1; \
-		fi; \
-	fi
-	$(UV) run arvel db fresh
+.PHONY: all
+all: sync ci security bench  ## Sync, run CI gate, run security scans, run benchmark

@@ -1,0 +1,50 @@
+# Python build artefacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+
+# Test + coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+
+# Environment secrets — only the templates ship
+.env
+.env.local
+
+# Runtime storage — keep directories via .gitkeep, ignore everything else
+/storage/*
+!/storage/app/
+!/storage/framework/
+!/storage/framework/cache/
+!/storage/framework/sessions/
+!/storage/framework/views/
+!/storage/logs/
+/storage/app/*
+!/storage/app/.gitkeep
+/database/database.sqlite
+/storage/framework/cache/*
+!/storage/framework/cache/.gitkeep
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitkeep
+/storage/framework/views/*
+!/storage/framework/views/.gitkeep
+/storage/logs/*
+!/storage/logs/.gitkeep
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store

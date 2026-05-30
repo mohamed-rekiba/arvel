@@ -1,0 +1,52 @@
+"""ProductCatalog — read-only ORM model backed by the products_catalog materialized view."""
+
+from __future__ import annotations
+
+from datetime import datetime as _datetime
+from typing import Any
+
+from arvel.database import ViewModel, datetime, jsonb, string, uuid
+
+from app.models.product_base import ProductBase
+
+
+class ProductCatalog(ProductBase, ViewModel):
+    """Full product catalog view — all non-deleted products with computed real_status.
+
+    Backed by the ``products_catalog`` materialized view. Write operations raise
+    ``ReadOnlyModelError`` — use ``Product`` for mutations.
+
+    Storefront queries add ``.where(ProductCatalog.real_status == "visible")``.
+    Admin queries use the full table and filter by ``status`` / ``real_status`` as needed.
+
+    ``__media_host_type__`` redirects ``get_media()`` lookups to ``"Product"`` rows in
+    the media table so this view model transparently shares Product's media records.
+    """
+
+    __media_host_type__: str = "Product"
+
+    __tablename__ = "products_catalog"
+    __is_materialized_view__ = True
+
+    # real_status is computed by the view's CASE expression; not on the products table.
+    real_status: str = string()
+
+    # View-specific: denormalised category hierarchy.
+    category_name: dict[str, Any | None] = jsonb(nullable=True, default=None)
+    category_slug: dict[str, Any | None] = jsonb(nullable=True, default=None)
+    # Plain nullable UUID — a denormalised FK reference, not a relational constraint.
+    category_parent_id: str | None = uuid(nullable=True, default=None)
+    parent_category_name: dict[str, Any | None] = jsonb(nullable=True, default=None)
+    parent_category_slug: dict[str, Any | None] = jsonb(nullable=True, default=None)
+    # Storefront-visible description (denormalised from products).
+    description: dict[str, Any | None] = jsonb(nullable=True, default=None)
+    # View-specific: denormalised vendor info.
+    vendor_name: str | None = string(nullable=True, default=None)
+    vendor_slug: str | None = string(nullable=True, default=None)
+    # Timestamps are non-nullable on the products table; the view exposes them as
+    # nullable because a LEFT JOIN can yield NULLs in unusual edge cases.
+    created_at: _datetime | None = datetime(nullable=True, default=None)
+    updated_at: _datetime | None = datetime(nullable=True, default=None)
+
+
+__all__ = ["ProductCatalog"]

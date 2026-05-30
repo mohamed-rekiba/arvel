@@ -1,0 +1,54 @@
+{#-
+Arvel theme override of mkdocs-material's main.html.
+
+Adds:
+- A branded announce bar at the top of every page (pre-alpha status).
+- Open Graph / Twitter card meta tags using assets/brand/og-card.png.
+
+Inherits everything else from the base theme.
+-#}
+{% extends "base.html" %}
+
+{% block extrahead %}
+{%- set site_url = config.site_url | trim('/') -%}
+{%- set og_image = config.extra.og_image -%}
+{%- if og_image and site_url -%}
+{%- set og_image_url = site_url ~ '/' ~ og_image -%}
+{%- elif og_image -%}
+{%- set og_image_url = og_image -%}
+{%- else -%}
+{%- set og_image_url = '' -%}
+{%- endif -%}
+
+{%- if og_image_url %}
+{%- set og_title = config.site_name -%}
+{%- set og_description = config.site_description -%}
+{%- if page is defined and page -%}
+{%- if page.meta and page.meta.title -%}
+{%- set og_title = page.meta.title -%}
+{%- elif page.title -%}
+{%- set og_title = page.title -%}
+{%- endif -%}
+{%- if page.meta and page.meta.description -%}
+{%- set og_description = page.meta.description -%}
+{%- endif -%}
+{%- endif %}
+<meta property="og:type" content="website" />
+<meta property="og:title" content="{{ og_title }}" />
+<meta property="og:description" content="{{ og_description }}" />
+<meta property="og:image" content="{{ og_image_url }}" />
+<meta property="og:image:width" content="{{ config.extra.og_image_width | default(1200) }}" />
+<meta property="og:image:height" content="{{ config.extra.og_image_height | default(630) }}" />
+{%- if site_url and page is defined and page %}
+<meta property="og:url" content="{{ site_url }}/{{ page.url }}" />
+{%- endif %}
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{{ og_title }}" />
+<meta name="twitter:description" content="{{ og_description }}" />
+<meta name="twitter:image" content="{{ og_image_url }}" />
+{%- endif %}
+
+<link rel="apple-touch-icon" sizes="180x180" href="{{ 'assets/brand/apple-touch-icon.png' | url }}" />
+<link rel="alternate icon" type="image/x-icon" href="{{ 'assets/brand/favicon.ico' | url }}" />
+{% endblock %}

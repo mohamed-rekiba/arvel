@@ -1,0 +1,23 @@
+title = "Arvel gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "False positives"
+# Documentation references to framework concepts that match the generic
+# API key heuristic.
+regexes = [
+  '''guest/verified/can''',
+  # SSRF guard fixtures use a harmless URL path named "secret"; no credential is present.
+  '''http://(192\.168\.1\.1|127\.0\.0\.1)/secret''',
+  '''secret", max_bytes''',
+]
+paths = [
+  '''docs/.*\.md$''',
+  # Centralized Docker image pins — version strings like `9.0.4-alpine3.23`
+  # trip the generic-api-key entropy heuristic but are public image tags.
+  '''packages/arvel/tests/integration/emulators/_images\.py$''',
+  # SSRF tests intentionally use "/secret" as a fake blocked URL path.
+  '''packages/arvel-image/tests/test_046_medialibrary_parity\.py$''',
+]
