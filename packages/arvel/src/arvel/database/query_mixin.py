@@ -6,7 +6,7 @@ Model subclass without calling query() explicitly.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Mapping
 from typing import TYPE_CHECKING, Any, Self, cast
 
 if TYPE_CHECKING:
@@ -405,6 +405,24 @@ class QueryMixin:
         callback: Callable[[list[Self]], Awaitable[None]],
     ) -> None:
         await cls.query().chunk(size, callback)
+
+    @classmethod
+    async def chunk_by_id(
+        cls,
+        size: int,
+        callback: Callable[[list[Self]], Awaitable[None]],
+        *,
+        column: str = "id",
+    ) -> None:
+        await cls.query().chunk_by_id(size, callback, column=column)
+
+    @classmethod
+    def lazy(cls, chunk_size: int = 1000, *, column: str = "id") -> AsyncGenerator[Self]:
+        return cls.query().lazy(chunk_size, column=column)
+
+    @classmethod
+    def cursor(cls, chunk_size: int = 1000, *, column: str = "id") -> AsyncGenerator[Self]:
+        return cls.query().cursor(chunk_size, column=column)
 
     @classmethod
     async def each(
