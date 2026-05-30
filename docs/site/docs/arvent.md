@@ -254,6 +254,20 @@ await Post.chunk(100, handle)
 
 The kwarg-shorthand for `where(field=value)` resolves the column via `getattr(Model, field)` and binds the value as a parameter — there's no string interpolation, so SQL injection is structurally impossible. This is verified by the framework's security tests.
 
+A few Eloquent conveniences round out the builder:
+
+```python
+# first_where — add a constraint and grab the first row in one call
+admin = await User.first_where(User.role == "admin")
+
+# where_relation — filter parents by a related model's column
+authors = await Author.where_relation("books", "genre", "scifi").all()
+
+# bulk increment/decrement return rows affected, take extra columns, and
+# touch updated_at on timestamped models (just like Eloquent's bulk update)
+n = await Post.where(published=True).increment("views", 1, extra={"trending": True})
+```
+
 ## Eager loading
 
 ```python

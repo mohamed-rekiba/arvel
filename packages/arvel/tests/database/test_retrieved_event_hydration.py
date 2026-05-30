@@ -15,34 +15,34 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 
-class Tag(Model):
+class RevTag(Model):
     __tablename__ = "rev_tags"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
     name: Mapped[str] = mapped_column(String(80))
 
 
-class Counter(Observer[Tag]):
+class Counter(Observer[RevTag]):
     def __init__(self) -> None:
         self.count = 0
 
-    def retrieved(self, instance: Tag) -> None:
+    def retrieved(self, instance: RevTag) -> None:
         self.count += 1
 
 
 async def _setup(engine: AsyncEngine) -> Counter:
-    clear_observers(Tag)
+    clear_observers(RevTag)
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
     counter = Counter()
-    Tag.observe(counter)
+    RevTag.observe(counter)
     return counter
 
 
 async def test_retrieved_fires_on_first(engine: AsyncEngine, session: AsyncSession) -> None:
     counter = await _setup(engine)
-    await Tag.create(name="a")
+    await RevTag.create(name="a")
     counter.count = 0
-    await Tag.query().first()
+    await RevTag.query().first()
     assert counter.count == 1
 
 
@@ -50,26 +50,26 @@ async def test_retrieved_fires_once_per_row_on_all(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
     counter = await _setup(engine)
-    await Tag.create(name="a")
-    await Tag.create(name="b")
+    await RevTag.create(name="a")
+    await RevTag.create(name="b")
     counter.count = 0
-    rows: Any = await Tag.query().all()
+    rows: Any = await RevTag.query().all()
     assert len(rows) == 2
     assert counter.count == 2
 
 
 async def test_retrieved_fires_on_paginate(engine: AsyncEngine, session: AsyncSession) -> None:
     counter = await _setup(engine)
-    await Tag.create(name="a")
-    await Tag.create(name="b")
+    await RevTag.create(name="a")
+    await RevTag.create(name="b")
     counter.count = 0
-    await Tag.query().paginate(per_page=10)
+    await RevTag.query().paginate(per_page=10)
     assert counter.count == 2
 
 
 async def test_retrieved_fires_once_on_find(engine: AsyncEngine, session: AsyncSession) -> None:
     counter = await _setup(engine)
-    tag = await Tag.create(name="a")
+    tag = await RevTag.create(name="a")
     counter.count = 0
-    await Tag.find(tag.id)
+    await RevTag.find(tag.id)
     assert counter.count == 1

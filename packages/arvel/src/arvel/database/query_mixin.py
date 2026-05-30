@@ -123,6 +123,10 @@ class QueryMixin:
         return cls.query().doesnt_have(relation)
 
     @classmethod
+    def where_relation(cls, relation: str | Any, column: str, value: Any) -> QueryBuilder[Self]:
+        return cls.query().where_relation(relation, column, value)
+
+    @classmethod
     def has(cls, relation: str | Any, operator: str = ">=", count: int = 1) -> QueryBuilder[Self]:
         return cls.query().has(relation, operator, count)
 
@@ -327,6 +331,10 @@ class QueryMixin:
         return await cls.query().first()
 
     @classmethod
+    async def first_where(cls, *clauses: Any, **kwargs: Any) -> Self | None:
+        return await cls.query().first_where(*clauses, **kwargs)
+
+    @classmethod
     async def first_or_fail(cls) -> Self:
         return await cls.query().first_or_fail()
 
@@ -461,12 +469,16 @@ class QueryMixin:
         await cls.query().upsert(rows, unique_by=unique_by, update=update)
 
     @classmethod
-    async def increment(cls, col: str, amount: int = 1) -> None:
-        await cls.query().increment(col, amount)
+    async def increment(
+        cls, col: str, amount: int = 1, *, extra: dict[str, Any] | None = None
+    ) -> int:
+        return await cls.query().increment(col, amount, extra=extra)
 
     @classmethod
-    async def decrement(cls, col: str, amount: int = 1) -> None:
-        await cls.query().decrement(col, amount)
+    async def decrement(
+        cls, col: str, amount: int = 1, *, extra: dict[str, Any] | None = None
+    ) -> int:
+        return await cls.query().decrement(col, amount, extra=extra)
 
 
 __all__ = ["QueryMixin"]
