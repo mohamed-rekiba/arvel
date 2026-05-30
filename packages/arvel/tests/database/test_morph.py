@@ -113,6 +113,29 @@ async def test_morph_one_returns_none_when_no_related(engine: Any, session: Asyn
     assert result is None
 
 
+async def test_morph_one_returns_first_when_multiple_rows(
+    engine: Any, session: AsyncSession
+) -> None:
+    """MorphOne must return the first match, not blow up, when duplicates exist."""
+    await _create_tables(engine)
+    post = await MorphPost.create(title="Two Images")
+    first = await MorphImage.create(
+        url="https://example.com/a.jpg",
+        imageable_type="MorphPost",
+        imageable_id=post.id,
+    )
+    await MorphImage.create(
+        url="https://example.com/b.jpg",
+        imageable_type="MorphPost",
+        imageable_id=post.id,
+    )
+
+    result = await post.image
+
+    assert result is not None
+    assert result.id == first.id
+
+
 # ─── AC-005-018-02: discriminator uses short class name ──────────────────────
 
 

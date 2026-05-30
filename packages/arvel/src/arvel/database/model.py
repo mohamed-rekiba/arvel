@@ -388,6 +388,11 @@ class ActiveRecord(QueryMixin):
     __guarded__: ClassVar[list[str] | None] = None
     __hidden__: ClassVar[list[str] | None] = None
     __visible__: ClassVar[list[str] | None] = None
+    # Accessor names appended to to_dict() output, like Eloquent's $appends.
+    __appends__: ClassVar[list[str] | None] = None
+
+    # Set per-instance at save time: column keys changed by the last save.
+    _arvel_changed: ClassVar[frozenset[str] | None] = None
 
     # Column name -> mutator fn, collected from @mutator-decorated methods across
     # the MRO in __init_subclass__. Empty unless a subclass declares one.
@@ -442,6 +447,7 @@ class ActiveRecord(QueryMixin):
         await fire_cancellable(cls, "creating", instance)
         session = get_active_session()
         session.add(instance)
+        instance._arvel_snapshot_changes()
         await session.flush()
         await fire_async(cls, "created", instance)
         await fire_async(cls, "saved", instance)
@@ -455,6 +461,69 @@ class ActiveRecord(QueryMixin):
             setattr(self, key, value)
         return self
 
+    def _arvel_column_keys(self) -> list[str]:
+        mapper: Mapper[Any] = cast("Mapper[Any]", sqla_inspect(type(self)))
+        return [c.key for c in mapper.column_attrs]
+
+    def is_dirty(self, *attributes: str) -> bool:
+        """True if any (or any of the named) column attributes have unsaved changes."""
+        state = sqla_inspect(self)
+        if state is None:
+            return False
+        keys = list(attributes) if attributes else self._arvel_column_keys()
+        return any(state.attrs[k].history.has_changes() for k in keys if k in state.attrs)
+
+    def is_clean(self, *attributes: str) -> bool:
+        return not self.is_dirty(*attributes)
+
+    def get_dirty(self) -> dict[str, Any]:
+        """Column attributes changed since load/last save, mapped to their new values."""
+        state = sqla_inspect(self)
+        if state is None:
+            return {}
+        return {
+            k: getattr(self, k)
+            for k in self._arvel_column_keys()
+            if k in state.attrs and state.attrs[k].history.has_changes()
+        }
+
+    def get_original(self, key: str | None = None, default: Any = None) -> Any:
+        """Value(s) as loaded from the DB (or last save), ignoring unsaved changes."""
+        state = sqla_inspect(self)
+        if state is None:
+            return default if key is not None else {}
+        if key is not None:
+            if key in state.committed_state:
+                return state.committed_state[key]
+            return getattr(self, key, default)
+        original: dict[str, Any] = {}
+        for k in self._arvel_column_keys():
+            original[k] = state.committed_state.get(k, getattr(self, k))
+        return original
+
+    def was_changed(self, *attributes: str) -> bool:
+        """True if the last save modified any (or any of the named) attributes."""
+        changed: frozenset[str] = self._arvel_changed or frozenset()
+        if not attributes:
+            return bool(changed)
+        return any(a in changed for a in attributes)
+
+    def get_changes(self) -> dict[str, Any]:
+        """Attributes modified by the last save, mapped to their current values."""
+        changed: frozenset[str] = self._arvel_changed or frozenset()
+        return {k: getattr(self, k) for k in changed if hasattr(self, k)}
+
+    def sync_original(self) -> Any:
+        """Reset the original snapshot to the current attribute values."""
+        from sqlalchemy.orm.attributes import set_committed_value
+
+        for key in self._arvel_column_keys():
+            set_committed_value(self, key, getattr(self, key))
+        return self
+
+    def _arvel_snapshot_changes(self) -> None:
+        object.__setattr__(self, "_arvel_changed", frozenset(self.get_dirty().keys()))
+
     async def save(self) -> Any:
         from arvel.database.events import fire_after_commit, fire_async, fire_cancellable
 
@@ -466,6 +535,7 @@ class ActiveRecord(QueryMixin):
         before_event = "creating" if is_new else "updating"
         await fire_cancellable(type(self), before_event, self)
         session.add(self)
+        self._arvel_snapshot_changes()
         await session.flush()
         after_event = "created" if is_new else "updated"
         await fire_async(type(self), after_event, self)
@@ -614,6 +684,10 @@ class ActiveRecord(QueryMixin):
             raise RuntimeError(f"{type(self).__name__} is not a mapped SQLA class.")
         # Build the base dict
         data = {col.key: getattr(self, col.key) for col in mapper.column_attrs}
+        # Append @accessor-backed computed attributes (Eloquent's $appends).
+        appends: list[str] = list(type(self).__appends__ or [])
+        for name in appends:
+            data[name] = getattr(self, name)
         # Apply __visible__ (allowlist)
         visible: list[str] | None = getattr(type(self), "__visible__", None)
         if visible is not None:
