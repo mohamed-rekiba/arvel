@@ -61,12 +61,11 @@ class HasMany(QueryBuilder[T], Generic[T]):
         return new
 
     async def save(self, instance: Any) -> Any:
-        """Set the FK on the instance to this owner's PK and persist."""
+        """Set the FK on the instance to this owner's PK and persist through the model."""
         if self._fk_col:
             setattr(instance, self._fk_col, self._owner_pk)
-        session = get_active_session()
-        session.add(instance)
-        await session.flush()
+        # Route through Model.save() so events, mutators, and timestamps all run.
+        await instance.save()
         return instance
 
     async def create(self, attrs: dict[str, Any]) -> Any:
@@ -103,9 +102,8 @@ class HasOne(QueryBuilder[T], Generic[T]):
     async def save(self, instance: Any) -> Any:
         if self._fk_col:
             setattr(instance, self._fk_col, self._owner_pk)
-        session = get_active_session()
-        session.add(instance)
-        await session.flush()
+        # Route through Model.save() so events, mutators, and timestamps all run.
+        await instance.save()
         return instance
 
     async def create(self, attrs: dict[str, Any]) -> Any:

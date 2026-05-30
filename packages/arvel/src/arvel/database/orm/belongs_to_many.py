@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar, cast, overload
 
-from sqlalchemy import Table, delete, insert, select
+from sqlalchemy import Table, delete, insert, select, update
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Mapper
 
 from arvel.database.session import get_active_session
@@ -16,6 +17,24 @@ if TYPE_CHECKING:
     from arvel.database.model import Model
 
 T = TypeVar("T")
+
+# Either a plain list of related IDs, or {id: {pivot_col: value, ...}}.
+SyncIds = list[int] | Mapping[int, Mapping[str, Any]]
+
+
+class SyncResult(TypedDict):
+    """What sync() changed, mirroring Eloquent's return shape."""
+
+    attached: list[int]
+    detached: list[int]
+    updated: list[int]
+
+
+def _normalize_sync_ids(ids: SyncIds) -> dict[int, dict[str, Any]]:
+    """Coerce list or mapping form into {id: pivot_attrs}."""
+    if isinstance(ids, Mapping):
+        return {int(k): dict(v) for k, v in ids.items()}
+    return {int(i): {} for i in ids}
 
 
 @dataclass(frozen=True)
@@ -107,24 +126,58 @@ class BelongsToManyAccessor(Generic[T]):
         )
         await session.flush()
 
-    async def sync(self, related_ids: list[int]) -> None:
-        """Replace all pivot rows with exactly related_ids."""
+    async def update_pivot(self, related_id: int, attrs: Mapping[str, Any]) -> bool:
+        """Update pivot columns on an existing row. Returns True if a row changed."""
+        if not attrs:
+            return False
         session = get_active_session()
-        stmt = select(self._table.c[self._rfk]).where(self._table.c[self._fk] == self._owner_id)
-        current_ids: set[int] = set((await session.execute(stmt)).scalars())
-        new_ids = set(related_ids)
-        for rid in current_ids - new_ids:
-            await self.detach(rid)
-        for rid in new_ids - current_ids:
-            await self.attach(rid)
+        result = cast(
+            "CursorResult[Any]",
+            await session.execute(
+                update(self._table)
+                .where(self._table.c[self._fk] == self._owner_id)
+                .where(self._table.c[self._rfk] == related_id)
+                .values(**dict(attrs))
+            ),
+        )
+        await session.flush()
+        return int(result.rowcount) > 0
 
-    async def sync_without_detaching(self, related_ids: list[int]) -> None:
-        """Attach related_ids that aren't already attached; never remove existing rows."""
+    async def sync(self, related_ids: SyncIds) -> SyncResult:
+        """Replace pivot rows so they match related_ids, returning what changed.
+
+        Accepts a list of IDs or ``{id: {pivot_col: value}}`` to set pivot data.
+        """
         session = get_active_session()
+        desired = _normalize_sync_ids(related_ids)
         stmt = select(self._table.c[self._rfk]).where(self._table.c[self._fk] == self._owner_id)
         current_ids: set[int] = set((await session.execute(stmt)).scalars())
-        for rid in set(related_ids) - current_ids:
-            await self.attach(rid)
+        result: SyncResult = {"attached": [], "detached": [], "updated": []}
+        for rid in current_ids - set(desired):
+            await self.detach(rid)
+            result["detached"].append(rid)
+        for rid, attrs in desired.items():
+            if rid not in current_ids:
+                await self.attach(rid, **attrs)
+                result["attached"].append(rid)
+            elif await self.update_pivot(rid, attrs):
+                result["updated"].append(rid)
+        return result
+
+    async def sync_without_detaching(self, related_ids: SyncIds) -> SyncResult:
+        """Attach/update related_ids without removing existing rows; report changes."""
+        session = get_active_session()
+        desired = _normalize_sync_ids(related_ids)
+        stmt = select(self._table.c[self._rfk]).where(self._table.c[self._fk] == self._owner_id)
+        current_ids: set[int] = set((await session.execute(stmt)).scalars())
+        result: SyncResult = {"attached": [], "detached": [], "updated": []}
+        for rid, attrs in desired.items():
+            if rid not in current_ids:
+                await self.attach(rid, **attrs)
+                result["attached"].append(rid)
+            elif await self.update_pivot(rid, attrs):
+                result["updated"].append(rid)
+        return result
 
     async def where_pivot(self, column: str, value: Any) -> list[T]:
         """Filter the pivot table by a column value and return related records."""
@@ -246,7 +299,7 @@ class BelongsToMany(Generic[T]):
     # these directly on the descriptor (not through an instance) is a
     # programming error and is reported as such.
 
-    async def sync_without_detaching(self, related_ids: list[int]) -> None:
+    async def sync_without_detaching(self, related_ids: SyncIds) -> SyncResult:
         raise TypeError(
             "BelongsToMany.sync_without_detaching must be called on an instance "
             "(e.g. post.tags.sync_without_detaching([...])), not on the descriptor."

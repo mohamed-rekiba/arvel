@@ -36,6 +36,8 @@ new_post = await user.posts().create(title="hello", body="world")
 await user.posts().save(existing_post)
 ```
 
+`save()` and `create()` both go through `Model.save()` / `Model.create()`, so observer events (`creating` / `created` / `saving` / `saved`), mutators, and timestamps all run — writing through a relation is not a shortcut around the model lifecycle.
+
 The method returns a `QueryBuilder` scoped to `WHERE user_id = user.id` — every builder method chains normally before the terminal `get()` / `first()` / `count()`.
 
 ### Descriptor style (eager loading, existence queries)
@@ -188,10 +190,18 @@ async for tag in post.tags:
     print(tag.name)
 
 # pivot operations
-await post.tags.attach(tag.id)
+await post.tags.attach(tag.id, tagged_at="2026-05-30")   # pivot columns via kwargs
 await post.tags.detach(tag.id)
-await post.tags.sync([tag1.id, tag2.id])      # exact set — adds missing, removes extra
-await post.tags.sync_without_detaching([...]) # add only, never remove
+await post.tags.update_pivot(tag.id, {"tagged_at": "..."})  # update existing pivot row
+
+# sync — make the set exactly this list. Returns what changed.
+changed = await post.tags.sync([tag1.id, tag2.id])
+# changed == {"attached": [...], "detached": [...], "updated": [...]}
+
+# sync with pivot data: {id: {pivot_col: value}}
+await post.tags.sync({tag1.id: {"tagged_at": "2026-05-30"}})
+
+await post.tags.sync_without_detaching([tag3.id])  # add/update only, never remove
 
 # pivot row inspection
 row = await post.tags.pivot(tag.id)           # dict | None
@@ -201,7 +211,7 @@ rows = await post.tags.where_pivot("role", "editor")
 result = await post.tags.toggle(tag.id)       # "attached" | "detached"
 ```
 
-`sync` is the "make the set exactly this list" operation — it detaches IDs no longer in the list and attaches new ones in one transaction.
+`sync` is the "make the set exactly this list" operation — it detaches IDs no longer in the list and attaches new ones in one transaction. It returns a `{"attached", "detached", "updated"}` dict, like Eloquent. Pass `{id: {pivot_col: value}}` instead of a plain list to set or update pivot columns; an ID already attached with different pivot data lands in `updated`.
 
 ## Polymorphic relations
 

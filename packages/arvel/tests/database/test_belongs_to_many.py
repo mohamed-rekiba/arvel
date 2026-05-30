@@ -161,6 +161,53 @@ async def test_btm_sync_with_empty_list_detaches_all(engine: Any, session: Async
     assert related == []
 
 
+async def test_btm_sync_returns_changes(engine: Any, session: AsyncSession) -> None:
+    """sync() reports which IDs were attached and detached, like Eloquent."""
+    await _create_tables(engine)
+    tag_a = await BtmTag.create(name="a")
+    tag_b = await BtmTag.create(name="b")
+    tag_c = await BtmTag.create(name="c")
+    post = await BtmPost.create(title="Sync Returns")
+    await post.tags.attach(tag_a.id)
+    await post.tags.attach(tag_b.id)
+
+    result = await post.tags.sync([tag_b.id, tag_c.id])
+
+    assert result["attached"] == [tag_c.id]
+    assert result["detached"] == [tag_a.id]
+    assert result["updated"] == []
+
+
+async def test_btm_sync_with_pivot_attrs(engine: Any, session: AsyncSession) -> None:
+    """sync() accepts {id: pivot_attrs} and writes pivot columns on attach."""
+    await _create_tables(engine)
+    tag = await BtmTag.create(name="pivoted")
+    post = await BtmPost.create(title="Pivot Sync")
+
+    result = await post.tags.sync({tag.id: {"tagged_at": "2026-05-30"}})
+
+    assert result["attached"] == [tag.id]
+    pivot_data = await post.tags.pivot(tag.id)
+    assert pivot_data is not None
+    assert pivot_data["tagged_at"] == "2026-05-30"
+
+
+async def test_btm_sync_updates_existing_pivot(engine: Any, session: AsyncSession) -> None:
+    """sync() updates pivot columns on already-attached rows and reports them."""
+    await _create_tables(engine)
+    tag = await BtmTag.create(name="reused")
+    post = await BtmPost.create(title="Pivot Update")
+    await post.tags.attach(tag.id, tagged_at="old")
+
+    result = await post.tags.sync({tag.id: {"tagged_at": "new"}})
+
+    assert result["updated"] == [tag.id]
+    assert result["attached"] == []
+    pivot_data = await post.tags.pivot(tag.id)
+    assert pivot_data is not None
+    assert pivot_data["tagged_at"] == "new"
+
+
 # ─── AC-005-016-05: iteration yields related model instances ──────────────────
 
 
