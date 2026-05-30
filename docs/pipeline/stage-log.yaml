@@ -445,3 +445,20 @@ events:
       (+6); mypy/pyright/ruff/bandit (0)/gitleaks clean. 4b + release skipped (L2/Tier2).
       005-S11 DONE.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-014"
+    event_id: "EV-035"
+    timestamp: "2026-05-30T23:55:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      005 S9 pagination HTTP + JSON parity (last 005 story). ADR-135. PaginationRequest
+      contextvar set by ObservabilityMiddleware; paginate/simple_paginate resolve page via
+      page_name; Paginator.to_response() flat Laravel envelope with windowed links array
+      (on_each_side) + Previous/Next bookends; appends/with_query_string/fragment chainable;
+      cursor_paginate bidirectional (next_cursor + prev_cursor, walks both ways, token carries
+      direction flag) + flat to_response(). Gates: arvel full suite 3606 passed; demo backend
+      407 passed; mypy/pyright/ruff/bandit (0)/gitleaks clean. EPIC 005 COMPLETE. 005-S9 DONE.
+    handoff_id: null
