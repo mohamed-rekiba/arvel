@@ -1519,6 +1519,25 @@ class QueryBuilder(Generic[T]):
             raise QueryCompileError(str(exc)) from exc
         return str(compiled)
 
+    def to_raw_sql(self, *, dialect: str | None = None) -> str:
+        """SQL with bindings inlined (Laravel ``toRawSql``) — handy for copy-paste debugging."""
+        return self.to_sql(dialect=dialect)
+
+    def get_bindings(self, *, dialect: str | None = None) -> list[Any]:
+        """Bound parameter values, in statement order (Laravel ``getBindings``)."""
+        stmt = self._apply_locks(self.apply_global_scopes())
+        compiled = stmt.compile(dialect=_resolve_sqla_dialect(dialect))
+        return list(compiled.params.values())
+
+    async def explain(self) -> list[dict[str, Any]]:
+        """Return the dialect's query plan rows (``EXPLAIN`` / ``EXPLAIN QUERY PLAN`` on SQLite)."""
+        session = get_active_session()
+        dialect_name = (await session.connection()).dialect.name
+        prefix = "EXPLAIN QUERY PLAN" if dialect_name == "sqlite" else "EXPLAIN"
+        sql = self.to_sql()
+        result = await session.execute(text(f"{prefix} {sql}"))
+        return [dict(row) for row in result.mappings().all()]
+
     # --------------------------------------------------------------- raw select helper
 
     async def _execute_raw_select(self) -> list[dict[str, Any]]:

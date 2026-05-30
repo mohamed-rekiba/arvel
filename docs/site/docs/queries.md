@@ -598,6 +598,46 @@ print(qb.to_sql())
 
 Useful for debugging and explaining queries. The parameters are kept separate, so this never leaks user data into the printed SQL.
 
+### Raw SQL, bindings, and EXPLAIN
+
+```python
+qb = User.where(User.name == "Alice")
+
+qb.to_raw_sql()      # SQL with bindings inlined — copy-paste into a SQL console
+qb.get_bindings()    # ['Alice'] — the bound values, in order
+
+plan = await qb.explain()   # EXPLAIN (or EXPLAIN QUERY PLAN on SQLite) → list of dict rows
+```
+
+### Query log
+
+Capture every statement (builder, raw, relationship loads) with bindings and timing:
+
+```python
+DB.enable_query_log()
+await User.where(active=True).get()
+log = DB.get_query_log()
+# [{"sql": "SELECT ...", "bindings": (...), "time_ms": 0.42}]
+DB.flush_query_log()    # clear without disabling
+DB.disable_query_log()  # stop and detach
+```
+
+`enable_query_log()` needs `DB.configure_engine(engine)` (the `DatabaseServiceProvider` does
+this for you).
+
+### Pretend (dry-run writes)
+
+`DB.pretend` runs a block, captures the SQL it would emit, then rolls back — nothing persists:
+
+```python
+async def migration() -> None:
+    await User.where(active=False).delete()
+    await Audit.create(event="cleanup")
+
+log = await DB.pretend(migration)   # statements run in a rolled-back transaction
+# log holds the SQL; the database is unchanged
+```
+
 ## Full-text search (PostgreSQL)
 
 Arvel ships thin helpers that sit directly on the query builder — no separate search index, no external dependency. They require a `tsvector` column (or a generated one) and are PostgreSQL-only.

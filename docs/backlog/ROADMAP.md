@@ -86,9 +86,10 @@ Parity Sprint C (WI-arvel-009): 005 S1 date/time + S5 LIKE/multi-col + S6 joins 
 Parity Sprint D (WI-arvel-010): 005 S12 imperative begin/commit/rollback [DONE, ADR-126-03]
 Parity Sprint E (WI-arvel-011): 005 S8 write-path completeness [DONE, ADR-132]
 Parity Sprint F (WI-arvel-012): 005 S3 subquery FROM/JOIN/SELECT [DONE, ADR-133]
+Parity Sprint G (WI-arvel-013): 005 S11 debugging + query-log parity [DONE, ADR-134]
 
 Remaining (proceeding autonomously through all epics):
-  005: S9 pagination, S11 debug/query-log
+  005: S9 pagination (last 005 story)
   006: S3 encrypted, S5 Attribute descriptor, S6 enum/builtin casts, S8 ModelCollection,
        S9 static events, S10 soft-delete upsert, S11 delete/replicate events, S12 timestamps,
        S13 factory, S14 attribute polish

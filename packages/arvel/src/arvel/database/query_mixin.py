@@ -646,6 +646,18 @@ class QueryMixin:
     def to_sql(cls, *, dialect: str | None = None) -> str:
         return cls.query().to_sql(dialect=dialect)
 
+    @classmethod
+    def to_raw_sql(cls, *, dialect: str | None = None) -> str:
+        return cls.query().to_raw_sql(dialect=dialect)
+
+    @classmethod
+    def get_bindings(cls, *, dialect: str | None = None) -> list[Any]:
+        return cls.query().get_bindings(dialect=dialect)
+
+    @classmethod
+    async def explain(cls) -> list[dict[str, Any]]:
+        return await cls.query().explain()
+
     # ── write ─────────────────────────────────────────────────────────────
 
     @classmethod
