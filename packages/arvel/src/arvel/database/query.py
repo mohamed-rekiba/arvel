@@ -800,6 +800,10 @@ class QueryBuilder(Generic[T]):
         sub = _exists_subquery(self._model, target, constraint)
         return self._clone(self._stmt.where(sqla_exists(sub)))
 
+    def where_relation(self, relation: str | Any, column: str, value: Any) -> Self:
+        """Filter to rows whose related model has ``column == value`` (Eloquent's whereRelation)."""
+        return self.where_has(relation, lambda q: q.where(**{column: value}))
+
     def doesnt_have(self, relation: str | Any) -> Self:
         from sqlalchemy import exists as sqla_exists
 
@@ -1016,6 +1020,10 @@ class QueryBuilder(Generic[T]):
         if instance is None:
             raise ModelNotFoundError(self._model.__name__, "first()")
         return instance
+
+    async def first_where(self, *clauses: Any, **kwargs: Any) -> T | None:
+        """Add a where constraint and return the first matching row (Eloquent's firstWhere)."""
+        return await self.where(*clauses, **kwargs).first()
 
     async def first_or(self, callback: Callable[[], T]) -> T:
         instance = await self.first()
@@ -1374,6 +1382,15 @@ class QueryBuilder(Generic[T]):
         await session.flush()
         return result.lastrowid
 
+    def _touch_updated_at(self, values: dict[str, Any]) -> dict[str, Any]:
+        """Merge ``updated_at = now()`` for timestamped models, like Eloquent's bulk update."""
+        table = _table_of(self._model)
+        if "updated_at" in table.c and "updated_at" not in values:
+            from datetime import UTC, datetime
+
+            return {**values, "updated_at": datetime.now(UTC)}
+        return values
+
     async def update(self, values: dict[str, Any]) -> int:
         self._assert_writable("update")
         from sqlalchemy import update as sqla_update
@@ -1384,7 +1401,7 @@ class QueryBuilder(Generic[T]):
         where_clause = self.apply_global_scopes().whereclause
         if where_clause is not None:
             stmt = stmt.where(where_clause)
-        stmt = stmt.values(**values)
+        stmt = stmt.values(**self._touch_updated_at(values))
         result = cast("CursorResult[Any]", await session.execute(stmt))
         await session.flush()
         return result.rowcount
@@ -1457,15 +1474,18 @@ class QueryBuilder(Generic[T]):
                     await type(self)(self._model).insert([row])
         await session.flush()
 
-    async def increment(self, col: str, amount: int = 1) -> int:
-        """Increment a column by ``amount`` and return the affected row count."""
+    async def increment(
+        self, col: str, amount: int = 1, *, extra: dict[str, Any] | None = None
+    ) -> int:
+        """Increment ``col`` by ``amount``, set any ``extra`` columns, return rows affected."""
         self._assert_writable("increment")
         from sqlalchemy import update as sqla_update
 
         session = get_active_session()
         table = _table_of(self._model)
         db_col = table.c[col]
-        stmt = sqla_update(table).values({col: db_col + amount})
+        values: dict[str, Any] = {col: db_col + amount, **(extra or {})}
+        stmt = sqla_update(table).values(self._touch_updated_at(values))
         where_clause = self.apply_global_scopes().whereclause
         if where_clause is not None:
             stmt = stmt.where(where_clause)
@@ -1473,9 +1493,11 @@ class QueryBuilder(Generic[T]):
         await session.flush()
         return int(result.rowcount)
 
-    async def decrement(self, col: str, amount: int = 1) -> int:
-        """Decrement a column by ``amount`` and return the affected row count."""
-        return await self.increment(col, -amount)
+    async def decrement(
+        self, col: str, amount: int = 1, *, extra: dict[str, Any] | None = None
+    ) -> int:
+        """Decrement ``col`` by ``amount``, set any ``extra`` columns, return rows affected."""
+        return await self.increment(col, -amount, extra=extra)
 
     async def delete(self) -> int:
         """Delete matching rows. Soft-deletes (UPDATE deleted_at) when the model
@@ -1489,7 +1511,8 @@ class QueryBuilder(Generic[T]):
 
             session = get_active_session()
             table = _table_of(self._model)
-            stmt = sqla_update(table).values({soft_field: datetime.now(UTC)})
+            soft_values = self._touch_updated_at({soft_field: datetime.now(UTC)})
+            stmt = sqla_update(table).values(soft_values)
             where_clause = self.apply_global_scopes().whereclause
             if where_clause is not None:
                 stmt = stmt.where(where_clause)
