@@ -992,6 +992,13 @@ class QueryBuilder(Generic[T]):
 
     # === terminal (read) ============================================================
 
+    async def _fire_retrieved(self, instances: Sequence[Any]) -> None:
+        """Fire the ``retrieved`` event for each hydrated model instance."""
+        from arvel.database.events import fire_async
+
+        for instance in instances:
+            await fire_async(self._model, "retrieved", instance)
+
     async def first(self) -> T | None:
         stmt = self.apply_global_scopes().limit(1)
         if self._lock_for_update:
@@ -999,7 +1006,10 @@ class QueryBuilder(Generic[T]):
         elif self._lock_shared:
             stmt = stmt.with_for_update(read=True)
         result = await get_active_session().execute(stmt)
-        return cast("T | None", result.scalars().first())
+        instance = cast("T | None", result.scalars().first())
+        if instance is not None:
+            await self._fire_retrieved((instance,))
+        return instance
 
     async def first_or_fail(self) -> T:
         instance = await self.first()
@@ -1060,6 +1070,7 @@ class QueryBuilder(Generic[T]):
             raise ModelNotFoundError(self._model.__name__, "sole()")
         if len(rows) > 1:
             raise MultipleResultsError(self._model.__name__)
+        await self._fire_retrieved((rows[0],))
         return cast("T", rows[0])
 
     async def find(self, pk: Any) -> T | None:
@@ -1127,10 +1138,13 @@ class QueryBuilder(Generic[T]):
                         with contextlib.suppress(AttributeError, TypeError):
                             object.__setattr__(obj, key, row_seq[i])
                 items.append(cast("T", obj))
+            await self._fire_retrieved(items)
             return Collection(items)
 
         result = await get_active_session().execute(stmt)
-        return Collection(result.scalars().all())
+        scalars = list(result.scalars().all())
+        await self._fire_retrieved(scalars)
+        return Collection(scalars)
 
     async def get(self) -> Any:
         return await self.all()
@@ -1191,6 +1205,7 @@ class QueryBuilder(Generic[T]):
         from arvel.support.collections import Collection
 
         items: list[T] = cast("list[T]", Collection(result.scalars().all()))
+        await self._fire_retrieved(items)
         return Paginator(items=items, total=total, per_page=per_page, current_page=page)
 
     async def simple_paginate(self, per_page: int = 15, *, page: int = 1) -> SimplePaginator[T]:
@@ -1318,6 +1333,7 @@ class QueryBuilder(Generic[T]):
             batch: list[T] = cast("list[T]", list(result.scalars().all()))
             if not batch:
                 return
+            await self._fire_retrieved(batch)
             await callback(batch)
             if len(batch) < size:
                 return
