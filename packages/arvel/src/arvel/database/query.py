@@ -18,6 +18,7 @@ from sqlalchemy import (
     Table,
     and_,
     desc,
+    extract,
     func,
     or_,
     select,
@@ -74,6 +75,27 @@ _TSQUERY_FNS: frozenset[str] = frozenset(
 _WHERE_ANY_OPS: frozenset[str] = frozenset({"=", "like", "ilike", ">", "<", ">=", "<=", "!="})
 
 _UNSET: Any = object()
+
+
+class JoinOn:
+    """Fluent ON-clause builder for joins — mirrors Laravel's ``JoinClause``.
+
+    ``q.join_on(Other, lambda j: j.on(A.x == Other.y).or_on(A.z == Other.w))``
+    """
+
+    def __init__(self) -> None:
+        self._predicate: Any = None
+
+    def on(self, condition: Any) -> JoinOn:
+        self._predicate = condition if self._predicate is None else and_(self._predicate, condition)
+        return self
+
+    def or_on(self, condition: Any) -> JoinOn:
+        self._predicate = condition if self._predicate is None else or_(self._predicate, condition)
+        return self
+
+    def build(self) -> Any:
+        return self._predicate
 
 
 def _apply_operator(col: Any, operator: str, value: Any) -> Any:
@@ -812,6 +834,112 @@ class QueryBuilder(Generic[T]):
         c2 = _resolve_column(self._model, col2)
         return self._and(c1 == c2)
 
+    # ------------------------------------------------------------------ date/time parts
+    # ``extract`` compiles to native EXTRACT on PostgreSQL and to a CAST(STRFTIME(...))
+    # on SQLite, so these stay dialect-portable without hand-written SQL per backend.
+
+    def _date_predicate(self, col: Any, value: Any) -> Any:
+        import datetime
+
+        d = value if isinstance(value, datetime.date) else datetime.date.fromisoformat(str(value))
+        column = _resolve_column(self._model, col)
+        return and_(
+            extract("year", column) == d.year,
+            extract("month", column) == d.month,
+            extract("day", column) == d.day,
+        )
+
+    def _time_predicate(self, col: Any, value: Any) -> Any:
+        import datetime
+
+        t = value if isinstance(value, datetime.time) else datetime.time.fromisoformat(str(value))
+        column = _resolve_column(self._model, col)
+        return and_(
+            extract("hour", column) == t.hour,
+            extract("minute", column) == t.minute,
+            extract("second", column) == t.second,
+        )
+
+    def where_date(self, col: str, value: Any) -> Self:
+        return self._and(self._date_predicate(col, value))
+
+    def or_where_date(self, col: str, value: Any) -> Self:
+        return self._or(self._date_predicate(col, value))
+
+    def where_time(self, col: str, value: Any) -> Self:
+        return self._and(self._time_predicate(col, value))
+
+    def or_where_time(self, col: str, value: Any) -> Self:
+        return self._or(self._time_predicate(col, value))
+
+    def where_year(self, col: str, value: int) -> Self:
+        return self._and(extract("year", _resolve_column(self._model, col)) == value)
+
+    def or_where_year(self, col: str, value: int) -> Self:
+        return self._or(extract("year", _resolve_column(self._model, col)) == value)
+
+    def where_month(self, col: str, value: int) -> Self:
+        return self._and(extract("month", _resolve_column(self._model, col)) == value)
+
+    def or_where_month(self, col: str, value: int) -> Self:
+        return self._or(extract("month", _resolve_column(self._model, col)) == value)
+
+    def where_day(self, col: str, value: int) -> Self:
+        return self._and(extract("day", _resolve_column(self._model, col)) == value)
+
+    def or_where_day(self, col: str, value: int) -> Self:
+        return self._or(extract("day", _resolve_column(self._model, col)) == value)
+
+    # ------------------------------------------------------------------ LIKE / multi-column
+    # ``pattern`` is always a bind parameter — never interpolated. ``%``/``_`` in user input
+    # act as wildcards; callers that need them literal must escape and pass an ``escape`` char
+    # via where_raw.
+
+    def _like_clause(self, col: Any, pattern: str, *, case_sensitive: bool) -> Any:
+        column = _resolve_column(self._model, col)
+        return column.like(pattern) if case_sensitive else column.ilike(pattern)
+
+    def where_like(self, col: str, pattern: str, *, case_sensitive: bool = False) -> Self:
+        return self._and(self._like_clause(col, pattern, case_sensitive=case_sensitive))
+
+    def or_where_like(self, col: str, pattern: str, *, case_sensitive: bool = False) -> Self:
+        return self._or(self._like_clause(col, pattern, case_sensitive=case_sensitive))
+
+    def where_not_like(self, col: str, pattern: str, *, case_sensitive: bool = False) -> Self:
+        return self._and(~self._like_clause(col, pattern, case_sensitive=case_sensitive))
+
+    def or_where_not_like(self, col: str, pattern: str, *, case_sensitive: bool = False) -> Self:
+        return self._or(~self._like_clause(col, pattern, case_sensitive=case_sensitive))
+
+    def _multi_col_parts(self, columns: list[str], operator: str, value: Any) -> list[Any]:
+        if operator not in _WHERE_ANY_OPS:
+            raise ValueError(
+                f"Unsupported operator {operator!r}. Valid operators: {sorted(_WHERE_ANY_OPS)}"
+            )
+        return [_apply_operator(_resolve_column(self._model, c), operator, value) for c in columns]
+
+    def where_all(self, columns: list[str], operator: str, value: Any) -> Self:
+        """All listed columns must match (AND)."""
+        parts = self._multi_col_parts(columns, operator, value)
+        return self._and(and_(*parts)) if parts else self._clone()
+
+    def or_where_all(self, columns: list[str], operator: str, value: Any) -> Self:
+        parts = self._multi_col_parts(columns, operator, value)
+        return self._or(and_(*parts)) if parts else self._clone()
+
+    def where_none(self, columns: list[str], operator: str, value: Any) -> Self:
+        """None of the listed columns match — NOR of the per-column conditions."""
+        parts = self._multi_col_parts(columns, operator, value)
+        return self._and(~or_(*parts)) if parts else self._clone()
+
+    def or_where_none(self, columns: list[str], operator: str, value: Any) -> Self:
+        parts = self._multi_col_parts(columns, operator, value)
+        return self._or(~or_(*parts)) if parts else self._clone()
+
+    def or_where_any(self, columns: list[str], operator: str, value: Any) -> Self:
+        parts = self._multi_col_parts(columns, operator, value)
+        return self._or(or_(*parts)) if parts else self._clone()
+
     def where_exists(self, subquery_fn: Callable[[QueryBuilder[T]], Any]) -> Self:
         from sqlalchemy import exists as sqla_exists
 
@@ -1028,6 +1156,37 @@ class QueryBuilder(Generic[T]):
 
     def left_join(self, target: type[Any], *clauses: Any, **kwargs: Any) -> Self:
         return self._clone(self._stmt.outerjoin(target, *clauses, **kwargs))
+
+    def right_join(self, target: type[Any], onclause: Any) -> Self:
+        """RIGHT JOIN. SQLAlchemy has no native form, so this rewrites it as
+        ``target LEFT OUTER JOIN model`` — the standard, equivalent transform."""
+        from sqlalchemy import join as sqla_join
+
+        joined = sqla_join(target, self._model, onclause, isouter=True)
+        return self._clone(self._stmt.select_from(joined))
+
+    def cross_join(self, target: type[Any]) -> Self:
+        """CROSS JOIN (cartesian product)."""
+        from sqlalchemy import true
+
+        return self._clone(self._stmt.join(target, true()))
+
+    def join_on(
+        self,
+        target: type[Any],
+        on: Callable[[JoinOn], Any],
+        *,
+        kind: str = "inner",
+    ) -> Self:
+        """Join with a closure-built ON clause supporting ``on``/``or_on``."""
+        builder = JoinOn()
+        on(builder)
+        predicate = builder.build()
+        if predicate is None:
+            raise ValueError("join_on() closure must add at least one on()/or_on() condition.")
+        if kind == "left":
+            return self._clone(self._stmt.outerjoin(target, predicate))
+        return self._clone(self._stmt.join(target, predicate))
 
     def with_(
         self,

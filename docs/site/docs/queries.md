@@ -37,6 +37,21 @@ adults = await User.where_between("age", (18, 64)).get()
 no_email = await User.where_null("email").get()
 has_email = await User.where_not_null("email").get()
 
+# Date/time parts (extract — works on SQLite and PostgreSQL)
+this_year = await User.where_year("created_at", 2026).get()
+on_day = await User.where_date("created_at", "2026-05-30").get()
+at_noon = await User.where_time("created_at", "12:00:00").get()
+# also: where_month, where_day, and or_where_* variants of each
+
+# LIKE search (case_sensitive=False -> ILIKE)
+matches = await User.where_like("name", "ali%").get()
+exact_case = await User.where_like("code", "AB%", case_sensitive=True).get()
+missing = await User.where_not_like("name", "%test%").get()
+
+# Multi-column sugar
+all_match = await User.where_all(["first", "last"], "ilike", "a%").get()
+none_match = await User.where_none(["first", "last"], "ilike", "a%").get()
+
 # Pattern matching
 johns = await User.where("name", "LIKE", "John%").get()
 ```
@@ -113,6 +128,21 @@ posts_with_authors = await (
     .select("posts.*", "users.name as author_name")
     .get()
 )
+```
+
+Model-level joins cover the rest of Laravel's set:
+
+```python
+# fluent ON builder (on / or_on)
+rows = await Person.join_on(
+    Pet, lambda j: j.on(Pet.owner_id == Person.id).or_on(Pet.species == "cat")
+).get()
+
+# CROSS JOIN (cartesian product)
+pairs = await Person.cross_join(Pet).get()
+
+# RIGHT JOIN (rewritten as target LEFT OUTER JOIN model)
+rows = await Person.right_join(Pet, Pet.owner_id == Person.id).get()
 ```
 
 For relationship-aware joins, prefer Arvent:

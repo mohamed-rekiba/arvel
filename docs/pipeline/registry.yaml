@@ -146,7 +146,28 @@ work_items:
       directional keyset via descending= on chunk_by_id + new lazy_by_id; chunk/chunk_by_id/
       each stop when a callback returns False; offset chunk auto-orders by PK. Shared
       _keyset_batches generator. ADR-129. 4b skipped (L2/Tier2). Gates green: arvel 751 db
-      tests; mypy/pyright/ruff/bandit/gitleaks clean.
+      tests; mypy/pyright/ruff/bandit/      gitleaks clean.
+
+  - id: "WI-arvel-009"
+    name: "Date/time + LIKE + join helpers (backlog 005 S1/S5/S6)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T21:35:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      S1 date/time (where_year/month/day/date/time + or_ via extract, dialect-portable). S5
+      LIKE (where_like/not_like + or_, case_sensitive), multi-column where_all/where_none/
+      or_where_any. S6 joins: cross_join, fluent join_on(on/or_on), right_join (rewritten as
+      target LEFT JOIN model). ADR-131. Gates: arvel 780 db tests; mypy/pyright/ruff/bandit/
+      gitleaks clean.
 
   - id: "WI-arvel-008"
     name: "WHERE predicate engine + clause polish (backlog 005 S13)"

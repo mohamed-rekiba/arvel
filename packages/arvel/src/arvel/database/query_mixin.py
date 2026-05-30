@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from arvel.database.paginator import Paginator
     from arvel.database.query import (
         CursorPaginator,
+        JoinOn,
         QueryBuilder,
         RecursiveQueryBuilder,
         SimplePaginator,
@@ -95,6 +96,90 @@ class QueryMixin:
         cls, raw_sql: str, bindings: dict[str, Any] | None = None
     ) -> QueryBuilder[Self]:
         return cls.query().or_where_raw(raw_sql, bindings)
+
+    @classmethod
+    def where_date(cls, col: str, value: Any) -> QueryBuilder[Self]:
+        return cls.query().where_date(col, value)
+
+    @classmethod
+    def or_where_date(cls, col: str, value: Any) -> QueryBuilder[Self]:
+        return cls.query().or_where_date(col, value)
+
+    @classmethod
+    def where_time(cls, col: str, value: Any) -> QueryBuilder[Self]:
+        return cls.query().where_time(col, value)
+
+    @classmethod
+    def or_where_time(cls, col: str, value: Any) -> QueryBuilder[Self]:
+        return cls.query().or_where_time(col, value)
+
+    @classmethod
+    def where_year(cls, col: str, value: int) -> QueryBuilder[Self]:
+        return cls.query().where_year(col, value)
+
+    @classmethod
+    def or_where_year(cls, col: str, value: int) -> QueryBuilder[Self]:
+        return cls.query().or_where_year(col, value)
+
+    @classmethod
+    def where_month(cls, col: str, value: int) -> QueryBuilder[Self]:
+        return cls.query().where_month(col, value)
+
+    @classmethod
+    def or_where_month(cls, col: str, value: int) -> QueryBuilder[Self]:
+        return cls.query().or_where_month(col, value)
+
+    @classmethod
+    def where_day(cls, col: str, value: int) -> QueryBuilder[Self]:
+        return cls.query().where_day(col, value)
+
+    @classmethod
+    def or_where_day(cls, col: str, value: int) -> QueryBuilder[Self]:
+        return cls.query().or_where_day(col, value)
+
+    @classmethod
+    def where_like(
+        cls, col: str, pattern: str, *, case_sensitive: bool = False
+    ) -> QueryBuilder[Self]:
+        return cls.query().where_like(col, pattern, case_sensitive=case_sensitive)
+
+    @classmethod
+    def or_where_like(
+        cls, col: str, pattern: str, *, case_sensitive: bool = False
+    ) -> QueryBuilder[Self]:
+        return cls.query().or_where_like(col, pattern, case_sensitive=case_sensitive)
+
+    @classmethod
+    def where_not_like(
+        cls, col: str, pattern: str, *, case_sensitive: bool = False
+    ) -> QueryBuilder[Self]:
+        return cls.query().where_not_like(col, pattern, case_sensitive=case_sensitive)
+
+    @classmethod
+    def or_where_not_like(
+        cls, col: str, pattern: str, *, case_sensitive: bool = False
+    ) -> QueryBuilder[Self]:
+        return cls.query().or_where_not_like(col, pattern, case_sensitive=case_sensitive)
+
+    @classmethod
+    def where_all(cls, columns: list[str], operator: str, value: Any) -> QueryBuilder[Self]:
+        return cls.query().where_all(columns, operator, value)
+
+    @classmethod
+    def or_where_all(cls, columns: list[str], operator: str, value: Any) -> QueryBuilder[Self]:
+        return cls.query().or_where_all(columns, operator, value)
+
+    @classmethod
+    def where_none(cls, columns: list[str], operator: str, value: Any) -> QueryBuilder[Self]:
+        return cls.query().where_none(columns, operator, value)
+
+    @classmethod
+    def or_where_none(cls, columns: list[str], operator: str, value: Any) -> QueryBuilder[Self]:
+        return cls.query().or_where_none(columns, operator, value)
+
+    @classmethod
+    def or_where_any(cls, columns: list[str], operator: str, value: Any) -> QueryBuilder[Self]:
+        return cls.query().or_where_any(columns, operator, value)
 
     @classmethod
     def where_raw(
@@ -280,6 +365,20 @@ class QueryMixin:
     @classmethod
     def left_join(cls, target: type[Any], *clauses: Any, **kwargs: Any) -> QueryBuilder[Self]:
         return cls.query().left_join(target, *clauses, **kwargs)
+
+    @classmethod
+    def right_join(cls, target: type[Any], onclause: Any) -> QueryBuilder[Self]:
+        return cls.query().right_join(target, onclause)
+
+    @classmethod
+    def cross_join(cls, target: type[Any]) -> QueryBuilder[Self]:
+        return cls.query().cross_join(target)
+
+    @classmethod
+    def join_on(
+        cls, target: type[Any], on: Callable[[JoinOn], Any], *, kind: str = "inner"
+    ) -> QueryBuilder[Self]:
+        return cls.query().join_on(target, on, kind=kind)
 
     # ── eager loading ─────────────────────────────────────────────────────
 
