@@ -32,7 +32,7 @@ import enum as _enum
 import uuid as _uuid
 from datetime import datetime as _datetime
 from decimal import Decimal
-from typing import Any, Final, Literal, overload
+from typing import Any, Final, Literal, cast, overload
 
 from sqlalchemy import (
     JSON,
@@ -48,7 +48,46 @@ from sqlalchemy import (
     Uuid,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.orm import Mapped, mapped_column
+
+
+class _MutableJSONList(MutableList[Any]):
+    """MutableList used for JSON columns whose root value is a list."""
+
+
+class _MutableJSONDict(MutableDict[str, Any]):
+    """Tracks in-place changes on JSON columns so a flush picks them up.
+
+    SQLAlchemy's stock MutableDict rejects non-dict payloads, which would break
+    JSON columns holding a list. This coerces dict roots to a tracked dict and
+    list roots to a tracked list, so ``model.meta["k"] = v`` (or ``.append(x)``)
+    marks the row dirty either way. Scalars stay as plain values.
+    """
+
+    @classmethod
+    def coerce(cls, key: str, value: Any) -> Any:
+        if isinstance(value, cls | _MutableJSONList) or value is None:
+            return value
+        if isinstance(value, dict):
+            return cls(cast("dict[str, Any]", value))
+        if isinstance(value, list):
+            return _MutableJSONList(cast("list[object]", value))
+        # A scalar JSON root can't carry the parent link the listener needs.
+        raise TypeError(
+            f"json/jsonb column {key!r} expects a dict or list value, "
+            f"got {type(value).__name__}."
+        )
+
+
+def _apply_json_default(kw: dict[str, Any], default: object) -> None:
+    """Set default vs default_factory so callables (e.g. dict) don't warn under dataclasses."""
+    if isinstance(default, _Unset):
+        return
+    if callable(default):
+        kw["default_factory"] = default
+    else:
+        kw["default"] = default
 
 
 class _Unset:
@@ -327,9 +366,8 @@ def json(
     has a fixed schema.
     """
     kw: dict[str, Any] = {"nullable": nullable}
-    if not isinstance(default, _Unset):
-        kw["default"] = default
-    return mapped_column(JSON(), **kw)
+    _apply_json_default(kw, default)
+    return mapped_column(_MutableJSONDict.as_mutable(JSON()), **kw)
 
 
 @overload
@@ -474,9 +512,8 @@ def jsonb(
         slug: Mapped[Any] = jsonb()
     """
     kw: dict[str, Any] = {"nullable": nullable}
-    if not isinstance(default, _Unset):
-        kw["default"] = default
-    return mapped_column(JSONB(), **kw)
+    _apply_json_default(kw, default)
+    return mapped_column(_MutableJSONDict.as_mutable(JSONB()), **kw)
 
 
 @overload
