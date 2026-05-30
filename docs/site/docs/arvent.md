@@ -327,8 +327,10 @@ Post.observe(PostObserver)
 | Before | `creating` | `updating` | `deleting` | `restoring` |
 | After | `created` | `updated` | `deleted` | `restored` |
 
-All writes also emit `saving` / `saved`. Reads emit `retrieved`. `force_delete()`
-fires `deleting` / `deleted`, and `restore()` fires `restoring` / `restored`.
+All writes also emit `saving` / `saved`. Every read that hydrates a model emits
+`retrieved` — once per row, whether you call `find`, `first`, `get`, `all`,
+`sole`, `paginate`, or `chunk`. `force_delete()` fires `deleting` / `deleted`,
+and `restore()` fires `restoring` / `restored`.
 
 Return `False` from `creating`, `updating`, `deleting`, or `restoring` to abort
 the pending operation. Arvel raises `OperationCancelledError` and does not flush
