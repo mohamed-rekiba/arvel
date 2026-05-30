@@ -94,6 +94,45 @@ async with DB.transaction():
 
 The inner block can roll back independently without aborting the outer transaction.
 
+### Retry on deadlock
+
+`DB.transaction()` is a context manager, so it can't re-run its body. For work that should
+retry on a deadlock or serialization failure, pass a callback to `DB.transactional`:
+
+```python
+async def place_order(session) -> Order:
+    order = await Order.create(...)
+    await Inventory.where("sku", sku).decrement("qty", 1)
+    return order
+
+
+order = await DB.transactional(place_order, attempts=3)
+```
+
+Each attempt opens a fresh transaction. Only deadlock/serialization errors retry; anything
+else (integrity violations, app errors) propagates immediately.
+
+### Imperative control
+
+When the begin/commit points don't line up with a block, drive the transaction by hand:
+
+```python
+await DB.begin_transaction()
+try:
+    await User.create(...)
+    await DB.begin_transaction()   # SAVEPOINT
+    await Audit.create(...)
+    await DB.commit()              # release the savepoint
+    await DB.commit()              # commit the outer transaction
+except Exception:
+    await DB.rollback()
+    raise
+```
+
+Nested `begin_transaction()` calls (and calls inside a `DB.transaction()` block) open
+savepoints, mirroring the context-manager behavior. `after_commit` callbacks registered
+during an imperative transaction fire when the outermost `commit()` succeeds.
+
 ## Request-scoped transactions
 
 For HTTP endpoints that should be all-or-nothing, use the `DatabaseTransaction` middleware:

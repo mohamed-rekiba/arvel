@@ -380,3 +380,19 @@ events:
       right_join via target-LEFT-JOIN-model rewrite). Gates: arvel 780 db tests (+18); mypy/
       pyright/ruff/bandit/gitleaks clean. 4b + release skipped (L2/Tier2). S1/S5/S6 DONE.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-010"
+    event_id: "EV-031"
+    timestamp: "2026-05-30T22:05:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      005 S12 imperative-control follow-up (retry shipped earlier). ADR-126-03 updated.
+      DB.begin_transaction/commit/rollback via context-local _TxnFrame stack; outermost owns
+      session + after-commit queue, nested opens begin_nested() savepoint; composes with
+      DB.transaction() (savepoint when a session is already active). Gates: arvel 788 db
+      tests (+8); mypy/pyright/ruff/bandit/gitleaks clean. 4b + release skipped (L2/Tier2).
+      005-S12 DONE.
+    handoff_id: null

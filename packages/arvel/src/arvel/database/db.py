@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
+from contextvars import ContextVar, Token
+from dataclasses import dataclass
 from typing import Any, ClassVar, TypeVar, cast
 
 from sqlalchemy import ColumnClause, Select, text
@@ -13,7 +15,13 @@ from sqlalchemy import select as sqla_select
 from sqlalchemy import update as sqla_update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import DBAPIError, OperationalError
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
+    AsyncEngine,
+    AsyncSession,
+    AsyncSessionTransaction,
+    async_sessionmaker,
+)
 from sqlalchemy.sql import TableClause
 from sqlalchemy.sql import column as sqla_column
 from sqlalchemy.sql import table as sqla_table
@@ -29,6 +37,27 @@ from arvel.database.session import (
 )
 
 _T = TypeVar("_T")
+
+
+@dataclass
+class _TxnFrame:
+    """One level of the imperative ``begin_transaction`` stack.
+
+    Outermost frames own the session (and maybe the after-commit queue); nested
+    frames hold a savepoint and own nothing.
+    """
+
+    session: AsyncSession
+    savepoint: AsyncSessionTransaction | None
+    session_token: Token[AsyncSession | None] | None
+    queue_token: Token[list[Callable[[], Awaitable[Any]]] | None] | None
+    callbacks: list[Callable[[], Awaitable[Any]]] | None
+
+
+# Stack of imperative transaction frames for the current async context.
+_IMPERATIVE_TXN: ContextVar[list[_TxnFrame] | None] = ContextVar(
+    "arvel_imperative_txn", default=None
+)
 
 # Driver error signals for a deadlock or serialization conflict — safe to retry.
 # PostgreSQL SQLSTATEs: 40001 serialization_failure, 40P01 deadlock_detected.
@@ -422,6 +451,86 @@ class DB:
                     raise
         # Unreachable: the loop either returns or raises on the final attempt.
         raise AssertionError("transactional retry loop exited without returning")
+
+    @classmethod
+    async def begin_transaction(cls) -> None:
+        """Open a transaction imperatively (Laravel ``DB::beginTransaction()``).
+
+        The first call opens a real transaction; nested calls (or a call inside a
+        ``DB.transaction()`` block) open a ``SAVEPOINT``. Pair each call with a
+        :meth:`commit` or :meth:`rollback`.
+        """
+        stack = _IMPERATIVE_TXN.get()
+        if stack is None:
+            new_stack: list[_TxnFrame] = []
+            _IMPERATIVE_TXN.set(new_stack)
+            stack = new_stack
+
+        existing = get_optional_session()
+        if existing is not None:
+            savepoint = await existing.begin_nested()
+            stack.append(_TxnFrame(existing, savepoint, None, None, None))
+            return
+
+        if cls._session_maker is None:
+            raise RuntimeError(
+                "DB.begin_transaction() called before DB.configure(). "
+                "Register DatabaseServiceProvider or call DB.configure(session_maker) first."
+            )
+
+        session = cls._session_maker()
+        await session.__aenter__()
+        try:
+            await session.begin()
+        except Exception:
+            await session.close()
+            raise
+
+        session_token = set_active_session(session)
+        owns_queue = get_after_commit_queue() is None
+        callbacks: list[Callable[[], Awaitable[Any]]] | None = [] if owns_queue else None
+        queue_token = set_after_commit_queue(callbacks) if callbacks is not None else None
+        stack.append(_TxnFrame(session, None, session_token, queue_token, callbacks))
+
+    @classmethod
+    async def commit(cls) -> None:
+        """Commit the innermost imperative transaction (releases a savepoint if nested)."""
+        frame = cls._pop_txn_frame()
+        if frame.savepoint is not None:
+            await frame.savepoint.commit()
+            return
+        await frame.session.commit()
+        await cls._teardown_txn(frame, fire_callbacks=True)
+
+    @classmethod
+    async def rollback(cls) -> None:
+        """Roll back the innermost imperative transaction (to a savepoint if nested)."""
+        frame = cls._pop_txn_frame()
+        if frame.savepoint is not None:
+            await frame.savepoint.rollback()
+            return
+        await frame.session.rollback()
+        await cls._teardown_txn(frame, fire_callbacks=False)
+
+    @classmethod
+    def _pop_txn_frame(cls) -> _TxnFrame:
+        stack = _IMPERATIVE_TXN.get()
+        if not stack:
+            raise RuntimeError(
+                "DB.commit()/DB.rollback() called without a matching DB.begin_transaction()."
+            )
+        return stack.pop()
+
+    @classmethod
+    async def _teardown_txn(cls, frame: _TxnFrame, *, fire_callbacks: bool) -> None:
+        if frame.queue_token is not None:
+            reset_after_commit_queue(frame.queue_token)
+        if frame.session_token is not None:
+            reset_active_session(frame.session_token)
+        await frame.session.close()
+        if fire_callbacks and frame.callbacks:
+            for cb in frame.callbacks:
+                await cb()
 
 
 __all__ = ["DB", "TableQueryBuilder", "is_retryable_db_error"]
