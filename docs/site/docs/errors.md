@@ -109,6 +109,10 @@ async def show(post_id: int) -> Post:
 
 The mapping covers both the default JSON shape and the RFC 7807 problem+json shape served by `ProblemDetailsHandler`. The original `ModelNotFoundError` is not exposed to clients — only the standard error code and message.
 
+## Auth errors → HTTP envelope
+
+The auth subsystem raises its own `UnauthenticatedException` and `AuthorizationException` (from `arvel.auth.exceptions`) without knowing about HTTP — guards and the token layer stay transport-agnostic. The `HttpServiceProvider` wires translators for these the same way it does for `ModelNotFoundError`, so they surface as the standard **401 `UNAUTHENTICATED`** and **403 `FORBIDDEN`** envelopes instead of leaking a 500. The broker-layer domain errors (`InvalidCredentialsError`, `EmailNotVerifiedError`, …) stay controller-decided, since the right status (401 / 409 / 422) depends on the endpoint.
+
 To add a translator for your own foreign exception type:
 
 ```python

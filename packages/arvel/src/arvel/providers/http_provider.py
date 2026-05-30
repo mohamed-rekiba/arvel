@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from arvel.http.exceptions import ExceptionTranslator, HttpException, HttpExceptionHandler
+from arvel.http.exceptions import ExceptionTranslator, HttpExceptionHandler
 from arvel.http.ratelimit import InMemoryStore, RateLimiterStore
 from arvel.maintenance import MaintenanceModeManager
 from arvel.providers.service_provider import ServiceProvider
@@ -28,23 +28,47 @@ class HttpServiceProvider(ServiceProvider):
 def default_translators() -> Mapping[type[Exception], ExceptionTranslator]:
     """Foreign-exception translators wired into the default `HttpExceptionHandler`.
 
-    Lives in the providers layer because it imports both `arvel.http` and
-    `arvel.database` — the HTTP package itself stays ORM-agnostic (ADR-016).
-    `arvel.database` is optional; when it's not importable the mapping is
-    empty and apps fall back to the generic 500 envelope for unhandled ORM
-    errors.
+    Lives in the providers layer because it imports `arvel.http` plus the
+    optional `arvel.database` / `arvel.auth` packages — the HTTP package itself
+    stays ORM- and auth-agnostic (ADR-016). Each upstream import is optional;
+    when a package isn't importable its translators are simply absent and apps
+    fall back to the generic 500 envelope for those errors.
     """
-    from arvel.http.exceptions import NotFoundException
+    from arvel.http.exceptions import (
+        AuthorizationException,
+        NotFoundException,
+        UnauthenticatedException,
+    )
+
+    translators: dict[type[Exception], ExceptionTranslator] = {}
 
     try:
         from arvel.database.exceptions import ModelNotFoundError
     except ImportError:
-        return {}
+        pass
+    else:
+        translators[ModelNotFoundError] = lambda exc: NotFoundException(str(exc))
 
-    def _model_not_found(exc: Exception) -> HttpException:
-        return NotFoundException(str(exc))
+    try:
+        from arvel.auth.exceptions import (
+            AuthorizationException as AuthAuthorizationException,
+        )
+        from arvel.auth.exceptions import (
+            UnauthenticatedException as AuthUnauthenticatedException,
+        )
+    except ImportError:
+        pass
+    else:
+        # The auth layer raises these without knowing HTTP; map them to the
+        # standard 401/403 envelopes instead of leaking a 500.
+        translators[AuthUnauthenticatedException] = lambda exc: UnauthenticatedException(
+            str(exc) or "Unauthenticated."
+        )
+        translators[AuthAuthorizationException] = lambda exc: AuthorizationException(
+            str(exc) or "This action is unauthorized."
+        )
 
-    return {ModelNotFoundError: _model_not_found}
+    return translators
 
 
 __all__ = ["HttpServiceProvider", "default_translators"]
