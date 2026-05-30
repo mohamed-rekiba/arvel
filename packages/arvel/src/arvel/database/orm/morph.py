@@ -59,9 +59,11 @@ class MorphOneAccessor(Generic[T]):
             select(self._related_model)
             .where(type_col == owner_type)
             .where(id_col == _owner_pk(self._owner))
+            .limit(1)
         )
         result = await session.execute(stmt)
-        return result.scalar_one_or_none()
+        # Eloquent's morphOne returns the first match; never blows up on duplicates.
+        return result.scalars().first()
 
     # ── factory ─────────────────────────────────────────────────────────────
 

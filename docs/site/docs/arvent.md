@@ -183,6 +183,30 @@ fresh = await post.fresh()         # reload from DB into a new instance
 await post.refresh()               # in-place reload
 ```
 
+### Dirty tracking
+
+Like Eloquent, models track which attributes changed since they were loaded or last saved:
+
+```python
+post = await Post.find_or_fail(1)
+post.title = "New title"
+
+post.is_dirty()            # True
+post.is_dirty("title")     # True
+post.is_dirty("body")      # False
+post.is_clean()            # False
+post.get_dirty()           # {"title": "New title"}
+post.get_original("title") # original DB value, ignoring the unsaved change
+
+await post.save()
+
+post.is_dirty()            # False — save resyncs the baseline
+post.was_changed("title")  # True — the last save touched title
+post.get_changes()         # {"title": "New title"}
+```
+
+`get_original()` with no argument returns every column's loaded value. `sync_original()` resets the baseline to the current values without hitting the DB.
+
 ### Get-or-create helpers
 
 These mirror Laravel's `firstOrCreate` / `firstOrNew` / `updateOrCreate`. The
