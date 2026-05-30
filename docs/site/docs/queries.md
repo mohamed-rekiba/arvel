@@ -358,6 +358,34 @@ await User.each(process)
 ```
 
 `each()` calls the callback once per row; internally it chunks in batches of 100.
+`chunk()` uses OFFSET — if you don't set an order, it auto-orders by primary key so
+batches stay deterministic.
+
+Return `False` from a `chunk`/`chunk_by_id`/`each` callback to stop early:
+
+```python
+async def handle_batch(batch: list[User]) -> bool:
+    for user in batch:
+        if await process(user) is None:
+            return False  # stop iterating
+    return True
+```
+
+Three streaming flavors:
+
+```python
+# Keyset paging — N LIMIT queries, stable under concurrent writes. Ascending by default.
+async for user in User.lazy(500):
+    ...
+async for user in User.lazy_by_id(500, descending=True):  # high-to-low
+    ...
+await User.chunk_by_id(500, handle_batch, descending=True)
+
+# Server-side cursor — one statement, rows pulled from the driver incrementally.
+# Fires `retrieved` per row; does not batch-eager-load pivots.
+async for user in User.stream(batch_size=500):
+    ...
+```
 
 ## CTEs (Common Table Expressions)
 

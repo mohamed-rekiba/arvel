@@ -135,13 +135,14 @@ code expects to find.
 **As a** developer exporting large tables, **I want** a true server-side `stream()` (driver cursor), descending keyset chunk/lazy variants, `each_by_id`, callback early-termination, and an order-by guard, **so that** large-data iteration is memory-safe and matches Laravel's chunking guarantees.
 
 **Acceptance Criteria**:
-- [ ] Given `stream()`, when iterated, then rows are fetched one batch at a time via SQLAlchemy `stream_scalars()` (distinct from the keyset `lazy()` alias).
-- [ ] Given `chunk_by_id(..., descending=True)` and a `lazy_by_id` desc variant, then iteration walks keyset in the requested direction.
-- [ ] Given a `chunk` callback that returns `False`, then iteration stops.
-- [ ] Given offset-based `chunk`/`each` without an order, then it raises (or is documented keyset-only).
+- [x] Given `stream()`, when iterated, then rows are fetched one batch at a time via SQLAlchemy `stream_scalars()` (distinct from the keyset `lazy()` alias).
+- [x] Given `chunk_by_id(..., descending=True)` and a `lazy_by_id` desc variant, then iteration walks keyset in the requested direction.
+- [x] Given a `chunk` callback that returns `False`, then iteration stops.
+- [x] Given offset-based `chunk`/`each` without an order, then it auto-orders by primary key (Eloquent-parity; documented in queries.md).
 
 **Priority**: Should
 **Complexity**: Medium
+**Status**: DONE — WI-arvel-007, ADR-129 (`test_streaming_completeness.py`)
 
 ### Story 11: Debugging and query-log parity
 **As a** developer debugging SQL, **I want** session-level query logging (`{sql, bindings, time_ms}`), a `pretend`/dry-run mode, `explain()`, `to_raw_sql()`, and `get_bindings()`, **so that** I can inspect and snapshot all ORM traffic, not just raw-SQL helpers.
