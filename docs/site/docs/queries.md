@@ -68,6 +68,18 @@ result = await (
 )
 ```
 
+`or_where` ORs onto the whole accumulated WHERE, with explicit grouping:
+`where(a).or_where(b).where(c)` is `(a OR b) AND c`. This is predictable and keeps global
+scopes (soft deletes, tenancy) ANDed around your whole filter — it deliberately avoids
+Laravel's flat `a OR b AND c` precedence. The full `or_*` family mirrors the `where_*` one:
+`or_where_in`, `or_where_not_in`, `or_where_null`, `or_where_not_null`, `or_where_between`,
+`or_where_raw`.
+
+```python
+# qty == 1 OR tag IN ('y', 'z')
+await Widget.where(qty=1).or_where_in("tag", ["y", "z"]).get()
+```
+
 ## Ordering, limiting, offsetting
 
 ```python

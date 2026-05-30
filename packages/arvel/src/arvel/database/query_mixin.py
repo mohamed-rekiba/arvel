@@ -71,6 +71,32 @@ class QueryMixin:
         return cls.query().where_not_null(col)
 
     @classmethod
+    def or_where_in(cls, col: Any, values: Iterable[Any]) -> QueryBuilder[Self]:
+        return cls.query().or_where_in(col, values)
+
+    @classmethod
+    def or_where_not_in(cls, col: Any, values: Iterable[Any]) -> QueryBuilder[Self]:
+        return cls.query().or_where_not_in(col, values)
+
+    @classmethod
+    def or_where_between(cls, col: Any, low: Any, high: Any) -> QueryBuilder[Self]:
+        return cls.query().or_where_between(col, low, high)
+
+    @classmethod
+    def or_where_null(cls, col: Any) -> QueryBuilder[Self]:
+        return cls.query().or_where_null(col)
+
+    @classmethod
+    def or_where_not_null(cls, col: Any) -> QueryBuilder[Self]:
+        return cls.query().or_where_not_null(col)
+
+    @classmethod
+    def or_where_raw(
+        cls, raw_sql: str, bindings: dict[str, Any] | None = None
+    ) -> QueryBuilder[Self]:
+        return cls.query().or_where_raw(raw_sql, bindings)
+
+    @classmethod
     def where_raw(
         cls,
         raw_sql: str,
@@ -148,6 +174,18 @@ class QueryMixin:
         return cls.query().order_by_raw(raw_sql)
 
     @classmethod
+    def order_by_desc(cls, col: str) -> QueryBuilder[Self]:
+        return cls.query().order_by_desc(col)
+
+    @classmethod
+    def reorder(cls, *cols: Any) -> QueryBuilder[Self]:
+        return cls.query().reorder(*cols)
+
+    @classmethod
+    def in_random_order(cls) -> QueryBuilder[Self]:
+        return cls.query().in_random_order()
+
+    @classmethod
     def where_full_text(
         cls,
         col: InstrumentedAttribute[Any],
@@ -193,8 +231,23 @@ class QueryMixin:
         return cls.query().group_by(*cols)
 
     @classmethod
-    def having(cls, clause: Any) -> QueryBuilder[Self]:
-        return cls.query().having(clause)
+    def group_by_raw(cls, raw_sql: str) -> QueryBuilder[Self]:
+        return cls.query().group_by_raw(raw_sql)
+
+    @classmethod
+    def having(
+        cls, column: Any, operator: str | None = None, value: Any = None
+    ) -> QueryBuilder[Self]:
+        qb = cls.query()
+        return qb.having(column) if operator is None else qb.having(column, operator, value)
+
+    @classmethod
+    def having_null(cls, col: str) -> QueryBuilder[Self]:
+        return cls.query().having_null(col)
+
+    @classmethod
+    def having_between(cls, col: str, low: Any, high: Any) -> QueryBuilder[Self]:
+        return cls.query().having_between(col, low, high)
 
     @classmethod
     def having_raw(
@@ -360,8 +413,8 @@ class QueryMixin:
         return await cls.query().sole()
 
     @classmethod
-    async def count(cls) -> int:
-        return await cls.query().count()
+    async def count(cls, column: str | None = None) -> int:
+        return await cls.query().count(column)
 
     @classmethod
     async def exists(cls) -> bool:
@@ -376,8 +429,8 @@ class QueryMixin:
         return await cls.query().value(col)
 
     @classmethod
-    async def pluck(cls, col: str) -> list[Any]:
-        return await cls.query().pluck(col)
+    async def pluck(cls, col: str, key: str | None = None) -> list[Any] | dict[Any, Any]:
+        return await cls.query().pluck(col, key)
 
     # ── aggregates ────────────────────────────────────────────────────────
 
