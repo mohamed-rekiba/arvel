@@ -77,3 +77,38 @@ async def test_delete_hard_when_no_softdeletes(engine: Any, session: AsyncSessio
     hard = await HardOnly.create(name="x")
     await hard.delete()
     assert await HardOnly.find(hard.id) is None
+
+
+async def test_bulk_delete_soft_deletes_on_softdelete_model(
+    engine: Any, session: AsyncSession
+) -> None:
+    await _setup(engine)
+    a = await Doc.create(title="keep")
+    b = await Doc.create(title="drop")
+    n = await Doc.where(title="drop").delete()
+    assert n == 1
+    # Soft-deleted: gone from default scope, still present with_trashed.
+    # Assert via SQL aggregates — bulk UPDATE doesn't refresh in-memory instances.
+    assert await Doc.find(b.id) is None
+    assert await Doc.only_trashed().where(title="drop").count() == 1
+    assert await Doc.find(a.id) is not None
+
+
+async def test_bulk_force_delete_hard_removes_softdelete_model(
+    engine: Any, session: AsyncSession
+) -> None:
+    await _setup(engine)
+    await Doc.create(title="gone")
+    n = await Doc.where(title="gone").force_delete()
+    assert n == 1
+    assert await Doc.with_trashed().where(title="gone").first() is None
+
+
+async def test_bulk_delete_hard_when_no_softdeletes(
+    engine: Any, session: AsyncSession
+) -> None:
+    await _setup(engine)
+    await HardOnly.create(name="bulk")
+    n = await HardOnly.where(name="bulk").delete()
+    assert n == 1
+    assert await HardOnly.where(name="bulk").count() == 0
