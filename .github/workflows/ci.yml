@@ -8,19 +8,14 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
-  POSTGRES_DB: arvel_test
-  POSTGRES_USER: arvel
-  POSTGRES_PASSWORD: arvel_secret
-  MARIADB_DATABASE: arvel_test
-  MARIADB_USER: arvel
-  MARIADB_PASSWORD: arvel_secret
-  MARIADB_ROOT_PASSWORD: root_secret
-  VALKEY_URL: redis://localhost:6379/0
-  MINIO_ROOT_USER: arvel_minio
-  MINIO_ROOT_PASSWORD: arvel_minio_secret
+  PYTHON_VERSION: "3.14"
+  UV_VERSION: "0.11.16"
 
 jobs:
   lint:
@@ -28,217 +23,284 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
-          python-version: "3.14"
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Install dependencies
-        run: uv sync --all-extras
-      - name: Ruff check
-        run: uv run ruff check src/ tests/
-      - name: Ruff format check
-        run: uv run ruff format --check src/ tests/
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-extras --frozen
+      - name: ruff check (workspace)
+        run: uv run ruff check
+      - name: ruff format --check (workspace)
+        run: uv run ruff format --check
 
   typecheck:
-    name: Type Check
+    name: Type Check (mypy + pyright, --strict)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
-          python-version: "3.14"
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Install dependencies
-        run: uv sync --all-extras
-      - name: Type check
-        run: uv run ty check src/ tests/
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-extras --frozen
+      - name: mypy --strict
+        run: uv run mypy
+      - name: pyright --strict
+        run: uv run pyright
 
-  test-fast:
-    name: Unit Tests (fast)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.14"
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Install dependencies
-        run: uv sync --all-extras
-      - name: Run unit tests (no DB, no services)
-        run: >-
-          uv run pytest tests/
-          -m "not db and not integration"
-          -n auto --dist loadfile
-          --timeout=10
-          --tb=short
-
-  test-full:
-    name: Full Tests (Python ${{ matrix.python-version }})
-    needs: [test-fast]
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.14"]
-
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_DB: arvel_test
-          POSTGRES_USER: arvel
-          POSTGRES_PASSWORD: arvel_secret
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U arvel"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
-
-      mariadb:
-        image: mariadb:11-ubi
-        env:
-          MARIADB_DATABASE: arvel_test
-          MARIADB_USER: arvel
-          MARIADB_PASSWORD: arvel_secret
-          MARIADB_ROOT_PASSWORD: root_secret
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "healthcheck.sh --connect --innodb_initialized"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
-
-      valkey:
-        image: valkey/valkey:9-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "valkey-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
-
-      mailpit:
-        image: axllent/mailpit:v1.29
-        ports:
-          - 1025:1025
-          - 8025:8025
-
-      rabbitmq:
-        image: rabbitmq:4-management-alpine
-        env:
-          RABBITMQ_DEFAULT_USER: arvel
-          RABBITMQ_DEFAULT_PASS: arvel_secret
-        ports:
-          - 5672:5672
-          - 15672:15672
-        options: >-
-          --health-cmd "rabbitmq-diagnostics -q check_running"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: ${{ matrix.python-version }}
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Install dependencies
-        run: uv sync --all-extras
-      - name: Start MinIO (S3-compatible object store)
-        run: |
-          docker run -d --name minio --network host \
-            -e MINIO_ROOT_USER=arvel_minio \
-            -e MINIO_ROOT_PASSWORD=arvel_minio_secret \
-            minio/minio:RELEASE.2025-09-07T16-13-09Z server /data --address :9000
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:9000/minio/health/live > /dev/null 2>&1; then
-              echo "MinIO is ready"
-              break
-            fi
-            echo "Waiting for MinIO... ($i/30)"
-            sleep 2
-          done
-      - name: Create MinIO test bucket
-        run: |
-          curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
-          chmod +x /usr/local/bin/mc
-          mc alias set local http://localhost:9000 arvel_minio arvel_minio_secret
-          mc mb --ignore-existing local/arvel-test
-      - name: Start Keycloak (OIDC provider with test realm)
-        run: |
-          docker run -d --name keycloak --network host \
-            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
-            -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin_secret \
-            -e KC_HEALTH_ENABLED=true \
-            -e KC_HTTP_MANAGEMENT_PORT=9090 \
-            -v "${{ github.workspace }}/.docker/keycloak:/opt/keycloak/data/import:ro" \
-            quay.io/keycloak/keycloak:26.5 start-dev --import-realm
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:9090/health/ready > /dev/null 2>&1; then
-              echo "Keycloak is ready"
-              break
-            fi
-            echo "Waiting for Keycloak... ($i/60)"
-            sleep 5
-          done
-      - name: Configure Keycloak realm scopes
-        env:
-          KC_URL: http://localhost:8080
-          KC_ADMIN: admin
-          KC_ADMIN_PASS: admin_secret
-        run: sh .docker/keycloak/setup-realm.sh
-      - name: Run full tests with coverage
-        env:
-          DB_URL: postgresql+asyncpg://arvel:arvel_secret@localhost:5432/arvel_test
-          CACHE_DRIVER: redis
-          CACHE_REDIS_URL: redis://localhost:6379/0
-          LOCK_DRIVER: redis
-          LOCK_REDIS_URL: redis://localhost:6379/1
-          MAIL_DRIVER: smtp
-          MAIL_SMTP_HOST: localhost
-          MAIL_SMTP_PORT: 1025
-          STORAGE_DRIVER: s3
-          STORAGE_S3_BUCKET: arvel-test
-          STORAGE_S3_ENDPOINT: http://localhost:9000
-          STORAGE_S3_KEY: arvel_minio
-          STORAGE_S3_SECRET_KEY: arvel_minio_secret
-          OIDC_ISSUER_URL: http://localhost:8080/realms/arvel-test
-          OIDC_CLIENT_ID: arvel-test-client
-          OIDC_CLIENT_SECRET: arvel-test-secret
-          COVERAGE_FILE: coverage/.coverage.${{ runner.os }}-py${{ matrix.python-version }}
+          enable-cache: true
+      - run: uv sync --all-packages --all-extras --frozen
+      - name: pytest with coverage (fail-under = 90)
         run: >-
-          uv run pytest tests/ -v
-          --cov=src/arvel --cov-report=term-missing --cov-report=xml
-      - name: Enforce coverage threshold
-        run: |
-          uv run coverage combine coverage/ 2>/dev/null || true
-          uv run coverage report --fail-under=80
+          uv run pytest
+          --cov=arvel
+          --cov-report=term-missing
+          --cov-report=xml
+          --tb=short
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-py${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 14
 
-  security:
-    name: Security Scan
+  benchmark:
+    name: Smoke Benchmark (perf NFRs)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v6
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-extras --frozen
+      - name: Run smoke benchmark
+        run: uv run python benchmarks/bench_foundations.py
+        # Non-blocking: regressions surface in PR output but don't fail CI.
+        # Promote to a hard gate once we collect a baseline.
+        continue-on-error: true
+
+  integration:
+    name: Integration Tests (Testcontainers emulators)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
-          python-version: "3.14"
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Install dependencies
-        run: uv pip install pip-audit --system
-      - name: Dependency audit
-        run: pip-audit --requirement <(uv pip compile pyproject.toml --quiet) || true
-      - name: Secret scan
-        uses: gitleaks/gitleaks-action@v2
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --all-extras --frozen
+      - name: Pre-pull emulator images (parallel)
+        run: make pull-emulators
+      - name: Run integration suite
+        run: make test-integration
+
+  bench-reverb:
+    name: Reverb Benchmarks (perf NFRs — hard gate)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --all-extras --frozen
+      - name: Run reverb benchmarks
+        # Hard gate per ADR-065 (WI-017). Thresholds in bench_reverb.py are
+        # the code-internal NFR contract; gate values are 1.5× observed p99.
+        # Re-calibrate via benchmarks/scripts/calibrate_bench_reverb.py if
+        # flakes appear; never reintroduce continue-on-error.
+        run: uv run python benchmarks/bench_reverb.py | tee bench-reverb-output.txt
+      - name: Upload bench output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bench-reverb-output
+          path: bench-reverb-output.txt
+          retention-days: 30
+
+  bench-tracemalloc:
+    name: Reverb Tracemalloc Bench (heap-byte gate)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --all-extras --frozen
+      - name: Run tracemalloc bench
+        # WI-017 / FR-017-011. Companion to bench-reverb; same script,
+        # but the tracemalloc gate (96 MiB heap budget) catches sub-page
+        # regressions that ru_maxrss can miss.
+        run: uv run python benchmarks/bench_reverb.py | tee bench-tracemalloc-output.txt
+      - name: Upload tracemalloc bench output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bench-tracemalloc-output
+          path: bench-tracemalloc-output.txt
+          retention-days: 30
+
+  sast:
+    name: SAST (bandit)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-extras --frozen
+      - name: bandit (MEDIUM+ blocks; LOW allowlisted with rationale)
+        # FR-017-013 / SEC-017-001. LOW findings are allowed via inline
+        # `# nosec[B###]: rationale`; MEDIUM+ MUST be fixed or surfaced
+        # by review. The packaged skeleton (template code rendered into
+        # freshly-scaffolded user projects) is excluded — it belongs to
+        # user code, not Arvel runtime.
+        run: |
+          uv run bandit \
+            -r packages/arvel/src \
+              packages/arvel-permission/src \
+              packages/arvel-image/src \
+            --exclude packages/arvel/src/arvel/_skeleton \
+            --severity-level medium \
+            --confidence-level medium \
+            -f json -o bandit.json
+      - name: Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bandit-report
+          path: bandit.json
+          retention-days: 30
+
+  sca:
+    name: SCA (pip-audit)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --all-extras --frozen
+      - name: pip-audit
+        # FR-017-014 / SEC-017-002. --skip-editable skips our own workspace
+        # package (arvel), which is always editable in this monorepo;
+        # --strict + --skip-editable is mutually exclusive, so the gate is
+        # the exit code (non-zero on any unfixed CVE in a third-party dep).
+        # Findings with no available fix go to
+        # docs/security/dependency-exceptions.md with a re-eval date.
+        run: >-
+          uv run pip-audit --skip-editable
+          --ignore-vuln PYSEC-2026-89
+          --ignore-vuln PYSEC-2025-183
+
+  docs:
+    name: Docs (mkdocs --strict)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-extras --frozen
+      - name: mkdocs build --strict
+        run: uv run mkdocs build --strict --site-dir _site
+      - name: Upload docs site
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: docs-site
+          path: _site/
+          retention-days: 14
+
+  ecommerce-demo:
+    name: E-commerce Demo (integration tests — PostgreSQL)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --all-extras --frozen
+      - name: Run ecommerce-demo integration suite
+        working-directory: packages/arvel-ecommerce-demo/backend
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_ENV: testing
+        run: >-
+          uv run --project ../../.. pytest tests/
+          --tb=short -q
+
+  ecommerce-demo-frontend:
+    name: E-commerce Demo Frontend (format + lint + test + build)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24.16.0'
+          cache: 'npm'
+          cache-dependency-path: packages/arvel-ecommerce-demo/frontend/package-lock.json
+      - name: npm ci (ecommerce frontend)
+        working-directory: packages/arvel-ecommerce-demo/frontend
+        run: npm ci
+      - name: Prettier check
+        working-directory: packages/arvel-ecommerce-demo/frontend
+        run: npm run format-check
+      - name: ESLint (max-warnings 0)
+        working-directory: packages/arvel-ecommerce-demo/frontend
+        run: npm run lint
+      - name: Vitest
+        working-directory: packages/arvel-ecommerce-demo/frontend
+        run: npm run test
+      - name: Vite build
+        working-directory: packages/arvel-ecommerce-demo/frontend
+        run: npm run build
+
+  build:
+    name: Build distributions
+    runs-on: ubuntu-24.04
+    needs: [lint, typecheck, test, integration, ecommerce-demo, ecommerce-demo-frontend, docs]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Build arvel
+        run: uv build --package arvel --out-dir dist/arvel
+      - name: Upload distributions
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7

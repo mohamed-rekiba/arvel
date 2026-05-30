@@ -1,0 +1,29 @@
+{#-
+  Branded 404 page for the Arvel docs site.
+  Mirrors mkdocs-material's content block layout while adding an Arvel-styled
+  hero treatment that mirrors the landing page.
+-#}
+{% extends "main.html" %}
+
+{% block content %}
+<div class="arvel-hero arvel-hero--404">
+  <span class="arvel-hero__eyebrow">HTTP 404</span>
+  <h1 class="arvel-hero__title">
+    Page <span class="arvel-hero__accent">not found</span>.
+  </h1>
+  <p class="arvel-hero__lede">
+    The page you were looking for either moved, hasn't been written yet, or
+    never existed. The framework is still pre-alpha, so a few links into the
+    future are normal.
+  </p>
+  <div class="arvel-hero__actions">
+    <a href="{{ '' | url }}" class="md-button md-button--primary">Back to docs home</a>
+    <a href="{{ 'installation/' | url }}" class="md-button">Read installation guide</a>
+  </div>
+</div>
+
+<style>
+  .arvel-hero--404 { padding-top: 4rem; padding-bottom: 4rem; }
+  .arvel-hero--404 .arvel-hero__title { font-size: clamp(2.25rem, 1.5rem + 3vw, 4rem); }
+</style>
+{% endblock %}

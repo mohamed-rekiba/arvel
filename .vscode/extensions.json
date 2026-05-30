@@ -1,8 +1,10 @@
 {
     "recommendations": [
         "ms-python.python",
+        "ms-pyright.pyright",
         "charliermarsh.ruff",
         "astral-sh.ty",
-        "tamasfe.even-better-toml"
+        "tamasfe.even-better-toml",
+        "anysphere.cursorpyright"
     ]
 }

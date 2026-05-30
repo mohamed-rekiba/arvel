@@ -1,0 +1,21 @@
+---
+description: Greenfield framework — no backward compatibility, no legacy code paths
+alwaysApply: true
+---
+
+# No Backward Compatibility
+
+This is a greenfield framework with no existing users, no published releases, and no external code depending on it. Do not preserve, deprecate gracefully, or work around any existing API, signature, or behavior.
+
+## Rules
+
+- Rename, restructure, or delete anything freely. Prefer the cleanest design over the least disruptive one.
+- Do **not** add deprecation warnings, legacy aliases, compatibility shims, fallback branches, or "old vs new" code paths.
+- Do **not** write migration guides, `v1 → v2` notes, or "breaking change" callouts.
+- Do **not** keep old parameters, classes, or modules "just in case." Remove them.
+- If you find yourself writing code whose only purpose is to support a previous version of this framework, stop and replace the previous version instead.
+- Tests should reflect the current design only. Delete tests tied to removed behavior rather than adapting them.
+
+## Optimize for
+
+Correctness, clarity, and good API design as it would look if written today for the first time.

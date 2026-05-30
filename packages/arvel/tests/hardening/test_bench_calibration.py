@@ -1,0 +1,31 @@
+"""WI-017 / FR-017-008, FR-017-009, FR-017-012."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+CALIBRATION_SCRIPT = REPO_ROOT / "benchmarks" / "scripts" / "calibrate_bench_reverb.py"
+ADR_PATH = REPO_ROOT / "docs" / "adr" / "ADR-065-bench-reverb-hard-gate.md"
+
+
+def test_calibration_script_exists() -> None:
+    """FR-017-009: re-runnable calibration helper must exist."""
+    assert CALIBRATION_SCRIPT.exists(), (
+        f"FR-017-009: {CALIBRATION_SCRIPT.relative_to(REPO_ROOT)} must exist"
+    )
+
+
+def test_calibration_script_is_runnable() -> None:
+    """The script must define a main() and accept --runs."""
+    text = CALIBRATION_SCRIPT.read_text(encoding="utf-8")
+    assert "def main(" in text, "calibration script must define main()"
+    assert "--runs" in text, "calibration script must accept --runs CLI flag"
+
+
+def test_adr_documents_calibration() -> None:
+    """FR-017-012: ADR-065 must exist and document the gate."""
+    assert ADR_PATH.exists(), f"FR-017-012: {ADR_PATH.relative_to(REPO_ROOT)} must exist"
+    text = ADR_PATH.read_text(encoding="utf-8")
+    for marker in ("Calibration", "1.5", "p99"):
+        assert marker in text, f"ADR-065 must reference calibration marker {marker!r}"

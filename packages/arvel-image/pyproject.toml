@@ -1,0 +1,34 @@
+[project]
+name = "arvel-image"
+version = "0.3.0" # x-release-please-version
+description = "Fluent, type-safe image manipulation for Arvel — Spatie Image v3 parity, Pillow-only."
+readme = "README.md"
+requires-python = ">=3.14"
+license = { text = "MIT" }
+authors = [{ name = "Arvel contributors" }]
+keywords = ["arvel", "image", "pillow", "spatie", "thumbnail", "resize"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Multimedia :: Graphics",
+    "Typing :: Typed",
+]
+dependencies = ["arvel", "Pillow>=12.2.0"]
+
+[project.optional-dependencies]
+heif = ["pillow-heif>=1.3.0"]
+
+[project.urls]
+Homepage = "https://github.com/mohamed-rekiba/arvel"
+Documentation = "https://github.com/mohamed-rekiba/arvel/tree/main/packages/arvel-image"
+Repository = "https://github.com/mohamed-rekiba/arvel"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/arvel_image"]
+include = ["src/arvel_image/py.typed"]

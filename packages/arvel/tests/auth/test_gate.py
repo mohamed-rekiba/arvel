@@ -1,0 +1,201 @@
+"""
+FR-007-038..045 — Gate + Policy[T] authorization.
+Tests import from arvel.auth.gate and arvel.auth.policy → red state.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+
+class _FakeUser:
+    def __init__(self, id: str, role: str = "user") -> None:
+        self.id = id
+        self.role = role
+
+
+def _ability_edit_post(user: Any, post: Any) -> bool:
+    return bool(user.id == post["owner_id"])
+
+
+def _ability_edit_post_get(user: Any, post: Any) -> bool:
+    return bool(user.id == post.get("owner_id"))
+
+
+def _ability_admin_only(user: Any) -> bool:
+    return bool(user.role == "admin")
+
+
+def _ability_read(_user: Any) -> bool:
+    return True
+
+
+def _before_super_admin(user: Any, _ability: Any) -> bool | None:
+    return True if user.role == "super_admin" else None
+
+
+# ─── FR-007-038: Gate.define() + Gate.allows() ───────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_gate_allows_registered_ability() -> None:
+    from arvel.auth.gate import Gate
+
+    gate = Gate()
+    gate.define("edit-post", _ability_edit_post)
+
+    user = _FakeUser("u1")
+    assert await gate.allows("edit-post", user, {"owner_id": "u1"}) is True
+    assert await gate.allows("edit-post", user, {"owner_id": "u2"}) is False
+
+
+# ─── FR-007-039: Gate.denies() ────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_gate_denies_is_inverse_of_allows() -> None:
+    from arvel.auth.gate import Gate
+
+    gate = Gate()
+    gate.define("delete-post", _ability_admin_only)
+
+    user = _FakeUser("u1", role="user")
+    assert await gate.denies("delete-post", user) is True
+
+    admin = _FakeUser("a1", role="admin")
+    assert await gate.denies("delete-post", admin) is False
+
+
+# ─── FR-007-040: Gate fail-closed — unregistered ability raises ───────────────
+
+
+@pytest.mark.asyncio
+async def test_gate_fail_closed_raises_for_unregistered_ability() -> None:
+    from arvel.auth.exceptions import AuthorizationException
+    from arvel.auth.gate import Gate
+
+    gate = Gate()
+    user = _FakeUser("u1")
+
+    with pytest.raises(AuthorizationException):
+        await gate.allows("nonexistent-ability", user)
+
+
+# ─── FR-007-041: Gate.authorize() raises 403 on denial ───────────────────────
+
+
+@pytest.mark.asyncio
+async def test_gate_authorize_raises_authorization_exception_on_denial() -> None:
+    from arvel.auth.exceptions import AuthorizationException
+    from arvel.auth.gate import Gate
+
+    gate = Gate()
+    gate.define("admin-only", _ability_admin_only)
+
+    with pytest.raises(AuthorizationException):
+        await gate.authorize("admin-only", _FakeUser("u1", role="user"))
+
+
+@pytest.mark.asyncio
+async def test_gate_authorize_does_not_raise_when_allowed() -> None:
+    from arvel.auth.gate import Gate
+
+    gate = Gate()
+    gate.define("admin-only", _ability_admin_only)
+
+    await gate.authorize("admin-only", _FakeUser("a1", role="admin"))
+
+
+# ─── FR-007-042: Gate.before() override ──────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_gate_before_override_grants_all_for_super_admin() -> None:
+    from arvel.auth.gate import Gate
+
+    gate = Gate()
+    gate.define("edit-post", _ability_edit_post_get)
+    gate.before(_before_super_admin)
+
+    admin = _FakeUser("sa1", role="super_admin")
+    # even without being the owner, before() grants access
+    assert await gate.allows("edit-post", admin, {"owner_id": "other"}) is True
+
+
+# ─── FR-007-043: Gate.after() hook ───────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_gate_after_hook_called_with_result() -> None:
+    from arvel.auth.gate import Gate
+
+    after_calls: list[tuple[Any, str, bool]] = []
+    gate = Gate()
+    gate.define("read", _ability_read)
+
+    def _after(user: Any, ability: Any, result: Any) -> None:
+        after_calls.append((user, ability, result))
+
+    gate.after(_after)
+
+    user = _FakeUser("u1")
+    await gate.allows("read", user)
+    assert len(after_calls) == 1
+    assert after_calls[0] == (user, "read", True)
+
+
+# ─── FR-007-044: Policy[T] ────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_policy_view_method_called_for_view_ability() -> None:
+    from arvel.auth.policy import Policy
+
+    class PostPolicy(Policy[dict[str, Any]]):
+        async def view(self, user: Any, resource: dict[str, Any]) -> bool:
+            return True
+
+        async def update(self, user: Any, resource: dict[str, Any]) -> bool:
+            return bool(user.get("role") == "admin")
+
+    policy = PostPolicy()
+    user = _FakeUser("u1")
+    assert await policy.check("view", user, {"id": "p1"}) is True
+
+
+@pytest.mark.asyncio
+async def test_policy_update_method_returns_false_for_non_admin() -> None:
+    from arvel.auth.policy import Policy
+
+    class PostPolicy(Policy[dict[str, Any]]):
+        async def view(self, user: Any, resource: dict[str, Any]) -> bool:
+            return True
+
+        async def update(self, user: Any, resource: dict[str, Any]) -> bool:
+            return isinstance(user, _FakeUser) and user.role == "admin"
+
+    policy = PostPolicy()
+    user = _FakeUser("u1", role="user")
+    assert await policy.check("update", user, {"id": "p1"}) is False
+
+
+# ─── FR-007-045: Gate.policy() registers a policy ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_gate_policy_registration_routes_to_policy_method() -> None:
+    from arvel.auth.gate import Gate
+    from arvel.auth.policy import Policy
+
+    class PostPolicy(Policy[dict[str, Any]]):
+        async def view(self, user: Any, resource: dict[str, Any]) -> bool:
+            return resource.get("public", False) is True
+
+    gate = Gate()
+    gate.policy(dict, PostPolicy())
+
+    user = _FakeUser("u1")
+    assert await gate.allows("view", user, {"public": True}) is True
+    assert await gate.allows("view", user, {"public": False}) is False

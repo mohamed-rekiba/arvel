@@ -1,0 +1,153 @@
+services:
+  backend:
+    image: python:3.14.5-slim-bookworm
+    working_dir: /workspace/packages/arvel-ecommerce-demo/backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      UV_PROJECT_ENVIRONMENT: /workspace/.venv
+      UV_LINK_MODE: copy
+      PATH: /workspace/.venv/bin:/usr/local/bin:/usr/bin:/bin
+      CACHE_URL: redis://:${REDIS_PASSWORD:-arvel_local_redis_password}@redis:6379/0
+    command: >
+      bash -c "pip install --no-cache-dir --root-user-action=ignore uv==0.11.16 &&
+      cd /workspace &&
+      uv sync --frozen --all-packages --all-extras --no-dev &&
+      cd packages/arvel-ecommerce-demo/backend &&
+      arvel serve --host 0.0.0.0 --port 8001 --reload"
+    ports:
+      - "${BACKEND_PORT:-8001}:8001"
+    volumes:
+      - ../..:/workspace
+      - backend-venv:/workspace/.venv
+      - uv-cache:/root/.cache/uv
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/healthz', timeout=2)\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 240s
+      retries: 10
+
+  frontend:
+    image: node:24.15.0-alpine3.23
+    working_dir: /app
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      VITE_DEV_PROXY_TARGET: http://backend:8001
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+    command: >
+      sh -lc "npm ci --no-audit --no-fund &&
+      npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://localhost:5173').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 10
+
+  scheduler:
+    image: python:3.14.5-slim-bookworm
+    working_dir: /workspace/packages/arvel-ecommerce-demo/backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      UV_PROJECT_ENVIRONMENT: /workspace/.venv
+      UV_LINK_MODE: copy
+      PATH: /workspace/.venv/bin:/usr/local/bin:/usr/bin:/bin
+      CACHE_URL: redis://:${REDIS_PASSWORD:-arvel_local_redis_password}@redis:6379/0
+    command: >
+      bash -c "pip install --no-cache-dir --root-user-action=ignore uv==0.11.16 &&
+      cd /workspace &&
+      uv sync --frozen --all-packages --all-extras --no-dev &&
+      cd packages/arvel-ecommerce-demo/backend &&
+      arvel schedule:work --sleep 60"
+    volumes:
+      - ../..:/workspace
+      - scheduler-venv:/workspace/.venv
+      - uv-cache:/root/.cache/uv
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  db:
+    image: postgres:18.4-bookworm
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-arvel_ecommerce}
+      POSTGRES_USER: ${DB_USERNAME:-arvel}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-arvel_local_password}
+      POSTGRES_INITDB_ARGS: >-
+        --encoding=UTF8 --locale=C --auth-local=scram-sha-256 --auth-host=scram-sha-256
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USERNAME:-arvel} -d ${DB_DATABASE:-arvel_ecommerce}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8.6.2-alpine3.23
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--requirepass",
+        "${REDIS_PASSWORD:-arvel_local_redis_password}",
+      ]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-arvel_local_redis_password}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  backend-venv:
+  frontend-node-modules:
+  pgdata:
+  redisdata:
+  scheduler-venv:
+  uv-cache:

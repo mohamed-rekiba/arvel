@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Arvel">
+  <title>Arvel</title>
+  <rect width="32" height="32" rx="6" fill="#0E0E1A" />
+  <path fill="#A78BFA" d="M13.58 23.64 L13.58 2.62 L3.07 23.64 Z" />
+  <path fill="#22D3EE" d="M13.58 2.62 L21.84 2.62 L28.92 29.37 L19.20 24.25 Z" />
+  <rect x="4" y="14.5" width="23" height="3" rx="0.5" fill="#A78BFA" />
+</svg>
