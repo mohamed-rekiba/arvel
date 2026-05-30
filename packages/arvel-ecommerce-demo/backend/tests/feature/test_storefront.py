@@ -121,7 +121,7 @@ async def test_product_list_excludes_soft_deleted_products(client: Any, seeded_d
     """US-018: soft-deleted products never appear in the storefront."""
     # Soft-delete a product via admin, then check it's gone from storefront
     admin_token = await _get_admin_token(client)
-    product_id = await _get_product_id_by_slug(client, admin_token, "usb-c-hub-7in1")
+    product_id = await _get_product_id_by_slug(client, admin_token, "airpods-pro-3")
     await client.delete(
         f"/api/admin/products/{product_id}",
         headers={"Authorization": f"Bearer {admin_token}"},
@@ -129,7 +129,7 @@ async def test_product_list_excludes_soft_deleted_products(client: Any, seeded_d
 
     response = await client.get("/api/products")
     slugs = {p["slug"] for p in response.json()["data"]}
-    assert "usb-c-hub-7in1" not in slugs, "Soft-deleted product must not appear in storefront"
+    assert "airpods-pro-3" not in slugs, "Soft-deleted product must not appear in storefront"
 
 
 @pytest.mark.asyncio

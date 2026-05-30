@@ -260,6 +260,19 @@ class QueryMixin:
     ) -> QueryBuilder[Self]:
         return cls.query().when(condition, callback, otherwise)
 
+    @classmethod
+    def unless(
+        cls,
+        condition: Any,
+        callback: Callable[[QueryBuilder[Self]], QueryBuilder[Self]],
+        otherwise: Callable[[QueryBuilder[Self]], QueryBuilder[Self]] | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().unless(condition, callback, otherwise)
+
+    @classmethod
+    def tap(cls, callback: Callable[[QueryBuilder[Self]], Any]) -> QueryBuilder[Self]:
+        return cls.query().tap(callback)
+
     # ── global scopes / soft deletes ──────────────────────────────────────
 
     @classmethod
@@ -353,6 +366,10 @@ class QueryMixin:
     @classmethod
     async def exists(cls) -> bool:
         return await cls.query().exists()
+
+    @classmethod
+    async def doesnt_exist(cls) -> bool:
+        return await cls.query().doesnt_exist()
 
     @classmethod
     async def value(cls, col: str) -> Any:

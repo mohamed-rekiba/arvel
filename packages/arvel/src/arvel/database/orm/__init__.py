@@ -19,6 +19,11 @@ from sqlalchemy.orm import (
 from arvel.database.orm._column_attr import column_attr
 from arvel.database.orm.belongs_to_many import BelongsToMany, BelongsToManyAccessor
 from arvel.database.orm.morph import MorphMany, MorphManyAccessor, MorphOne, MorphOneAccessor
+from arvel.database.orm.morph_to_many import (
+    MorphToMany,
+    MorphToManyAccessor,
+    MorphToManyLink,
+)
 from arvel.database.orm.relations import has_many_attr
 
 __all__ = [
@@ -29,6 +34,9 @@ __all__ = [
     "MorphManyAccessor",
     "MorphOne",
     "MorphOneAccessor",
+    "MorphToMany",
+    "MorphToManyAccessor",
+    "MorphToManyLink",
     "column_attr",
     "declared_attr",
     "foreign",

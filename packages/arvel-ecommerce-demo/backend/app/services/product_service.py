@@ -13,6 +13,7 @@ from decimal import Decimal
 from typing import Any, TypedDict
 
 from arvel.database import TranslatableMixin
+from arvel.database.exceptions import InvalidCursorError
 
 from app.models.product import Product
 from app.models.product_base import IMAGES_COLLECTION
@@ -77,15 +78,15 @@ class ProductService:
         if category_slug is not None:
             query = query.where_json_path("category_slug", locale, category_slug)
 
-        # G-002: cursor_paginate raises ValueError/KeyError on invalid cursor tokens;
-        # callers should catch these and return an empty page rather than a 500.
+        # G-002: a malformed cursor must not 500 the storefront — cursor_paginate
+        # raises InvalidCursorError, so fall back to page one.
         try:
             page = await query.cursor_paginate(
                 limit,
                 cursor=cursor,
                 keyset=["published_at DESC", "id ASC"],
             )
-        except ValueError, KeyError:
+        except InvalidCursorError:
             page = await query.cursor_paginate(
                 limit, cursor=None, keyset=["published_at DESC", "id ASC"]
             )

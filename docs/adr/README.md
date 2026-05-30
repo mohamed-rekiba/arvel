@@ -179,12 +179,13 @@ documents the reversal and links to the original.
 | ADR | Decision |
 |-----|----------|
 | [ADR-079](ADR-079-arvel-permission-spatie-parity.md) | `arvel-permission` — Spatie Permission parity |
-| [ADR-094](ADR-094-permission-integer-pk-support.md) | Integer PK support strategy |
+| [ADR-094](ADR-094-permission-integer-pk-support.md) | Integer PK support strategy (superseded by ADR-122) |
 | [ADR-098](ADR-098-has-level-on-has-roles.md) | Role hierarchy — numeric level rejected; use role names |
 | [ADR-105](ADR-105-remove-has-roles-mixin.md) | Remove legacy `HasRolesMixin` in favour of `HasRoles`/`HasPermissions` |
 | [ADR-107](ADR-107-permission-pivot-composite-pk.md) | Permission pivot tables: composite primary key |
 | [ADR-120](ADR-120-arvel-permission-events-standalone.md) | Standalone event system (no framework event bus dependency) |
 | [ADR-121](ADR-121-arvel-permission-exception-hierarchy.md) | `UnauthorizedException` as a typed exception hierarchy |
+| [ADR-122](ADR-122-async-morph-to-many-permission.md) | Async `MorphToMany` for permission pivots (supersedes ADR-094) |
 
 ## arvel-image
 

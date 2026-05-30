@@ -41,22 +41,17 @@ class MediaLibrary:
 
         Returns the count of rows processed.
         """
-        from arvel.database.session import get_active_session  # noqa: PLC0415
-        from sqlalchemy import select  # noqa: PLC0415
-
         from arvel_image.media.conversion_runner import ConversionRunner  # noqa: PLC0415
         from arvel_image.media.model import Media  # noqa: PLC0415
 
-        session = get_active_session()
-        stmt = select(Media)
+        query = Media.query()
         if host is not None:
-            stmt = stmt.where(Media.model_type == type(host).__name__)
-            stmt = stmt.where(Media.model_id == str(host.host_pk()))
+            query = query.where(Media.model_type == type(host).__name__)
+            query = query.where(Media.model_id == str(host.host_pk()))
         if collection is not None:
-            stmt = stmt.where(Media.collection_name == collection)
+            query = query.where(Media.collection_name == collection)
 
-        result = await session.execute(stmt)
-        rows: list[Media] = list(result.scalars())
+        rows: list[Media] = list(await query.all())
 
         runner = ConversionRunner()
         gen = resolve_path_generator()

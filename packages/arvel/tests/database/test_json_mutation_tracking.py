@@ -39,9 +39,7 @@ async def test_in_place_dict_mutation_marks_dirty(
     assert doc.is_dirty("meta") is True
 
 
-async def test_in_place_dict_mutation_persists(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_in_place_dict_mutation_persists(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     doc = await JmtDoc.create(title="t", meta={"views": 0})
 
@@ -54,9 +52,7 @@ async def test_in_place_dict_mutation_persists(
     assert doc.meta["views"] == 42
 
 
-async def test_in_place_list_mutation_persists(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_in_place_list_mutation_persists(engine: AsyncEngine, session: AsyncSession) -> None:
     """A list-rooted JSON column tracks .append() in place."""
     await _setup(engine)
     doc = await JmtDoc.create(title="list", meta=["a"])

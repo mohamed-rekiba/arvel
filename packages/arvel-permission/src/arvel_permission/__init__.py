@@ -24,27 +24,20 @@ from arvel_permission.middleware import (
     RoleOrPermissionMiddleware,
 )
 from arvel_permission.models import (
-    ModelHasPermission,
-    ModelHasRole,
     Permission,
     Role,
-    RoleHasPermission,
+    model_has_permissions,
+    model_has_roles,
+    role_has_permissions,
 )
 from arvel_permission.provider import PermissionServiceProvider
 from arvel_permission.service import GuardMismatchError, PermissionRegistrar
-from arvel_permission.traits import (
-    HasPermissions,
-    HasRoles,
-    make_permissions_relationship,
-    make_roles_relationship,
-)
+from arvel_permission.traits import HasPermissions, HasRoles
 
 __all__ = [
     "GuardMismatchError",
     "HasPermissions",
     "HasRoles",
-    "ModelHasPermission",
-    "ModelHasRole",
     "Permission",
     "PermissionConfig",
     "PermissionDoesNotExist",
@@ -53,11 +46,11 @@ __all__ = [
     "PermissionServiceProvider",
     "Role",
     "RoleDoesNotExist",
-    "RoleHasPermission",
     "RoleMiddleware",
     "RoleOrPermissionMiddleware",
     "UnauthorizedException",
-    "make_permissions_relationship",
-    "make_roles_relationship",
+    "model_has_permissions",
+    "model_has_roles",
     "register_permissions_with_gate",
+    "role_has_permissions",
 ]

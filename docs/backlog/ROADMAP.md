@@ -2,9 +2,12 @@
 
 ## Overview
 
-Four epics ported and hardened from the `arvel_old` codebase, rewritten for the current
-monorepo architecture. Epics are sequenced by dependency: the core framework hardening epic
-must land first, as companion packages rely on its observability and context foundations.
+The first four epics were ported and hardened from the `arvel_old` codebase, rewritten for the
+current monorepo architecture. Epics 005–007 are an Eloquent-parity wave: a five-dimension review
+of Arvent against the Laravel source (`repos/lv-app/vendor/laravel`) surfaced gaps across the query
+builder, model/attribute layer, and relationships. Epics are sequenced by dependency: the core
+framework hardening epic must land first, as companion packages rely on its observability and
+context foundations.
 
 ---
 
@@ -16,6 +19,9 @@ must land first, as companion packages rely on its observability and context fou
 | 002 | Social Authentication (`arvel-auth-social`) | `002-epic-social-authentication.md` | 5 | Large | Must |
 | 003 | Scout-Style Search (`arvel-search`) | `003-epic-scout-search.md` | 4 | Medium | Must |
 | 004 | Audit Trail & Activity Log (`arvel-audit`) | `004-epic-audit-activity.md` | 4 | Medium | Should |
+| 005 | Query Builder Parity | `005-epic-query-builder-parity.md` | 13 | Large | Should |
+| 006 | Eloquent Model Parity (Attributes & Lifecycle) | `006-epic-eloquent-model-parity.md` | 14 | Large | Should |
+| 007 | Relationship Parity | `007-epic-relationship-parity.md` | 11 | Large | Should |
 
 ---
 
@@ -55,6 +61,40 @@ Sprint 5: Epic 004 (continued)
   └── Epic 004 Story 4: arvel audit:install command
 ```
 
+### Eloquent-Parity Wave (Epics 005–007)
+
+This wave is independent of 001–004 and can run in parallel once the team has capacity. Within the
+wave, lead with the highest-value, lowest-risk wins, then the foundation-dependent work.
+
+```
+Parity Sprint A: highest-value, self-contained wins  [SPRINT COMPLETE]
+  ├── 005 Story 7: efficient exists() / doesnt_exist()   [DONE — WI-arvel-001, ADR-123]
+  ├── 005 Story 2: nested WHERE groups                   [DONE — WI-arvel-001, ADR-123]
+  ├── 005 Story 4: unless / tap                          [DONE — WI-arvel-001, ADR-123]
+  ├── 006 Story 7: without_events() + quiet persistence  [DONE — WI-arvel-002, ADR-124]
+  └── 006 Story 2: hashed cast + force_fill + unguard    [DONE — WI-arvel-003, ADR-125]
+
+Parity Sprint B: attribute pipeline + write/stream gaps
+  ├── 006 Story 1: attribute-level custom cast protocol
+  ├── 006 Story 4: cast-aware dirty tracking
+  ├── 005 Story 8: write-path completeness (insert_or_ignore, upsert, truncate)
+  ├── 005 Story 10: streaming + chunking completeness
+  └── 005 Story 12: transaction retry on deadlock
+
+Parity Sprint C: relationship foundation
+  ├── 007 Story 1: morph map foundation
+  ├── 007 Story 2: MorphTo inverse relation
+  ├── 007 Story 3: MorphOne/MorphMany query + eager integration
+  └── 006 Story 8: ModelCollection (load / loadMissing / PK helpers)
+
+Parity Sprint D: relationship breadth + pagination/API parity
+  ├── 007 Story 5: of_many / latest_of_many
+  ├── 007 Story 6: chaperone
+  ├── 007 Story 10: pivot ergonomics
+  ├── 005 Story 9: pagination HTTP + JSON parity
+  └── 005 Story 3: subquery FROM / JOIN / SELECT
+```
+
 ---
 
 ## Cross-Cutting Dependencies
@@ -69,6 +109,18 @@ Epic 001 Story 1 (context/)
 Epic 001 Story 4 (BaseService)
   └──▶ Epic 001 Story 5 (/_health endpoint)
   └──▶ Epic 001 Story 7 (graceful shutdown calls disconnect())
+
+Epic 007 Story 1 (morph map)
+  └──▶ Epic 007 Story 2 (MorphTo)
+        └──▶ Epic 007 Story 3 (MorphOne/Many integration)
+              └──▶ Epic 007 Story 7 (hasMorph / whereHasMorph)
+  └──▶ Epic 007 Story 4 (morphedByMany)
+
+Epic 006 Story 7 (without_events)
+  └──▶ Epic 006 Story 13 (factory create_quietly)
+
+Epic 007 Story 3 (morph/pivot eager engine)
+  └──▶ Epic 006 Story 8 (ModelCollection.load)
 ```
 
 ---

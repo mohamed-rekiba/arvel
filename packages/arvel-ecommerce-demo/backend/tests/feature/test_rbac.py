@@ -208,11 +208,11 @@ async def test_super_admin_can_assign_role_to_user(client: Any, super_admin_toke
     response = await client.post(
         f"/api/admin/users/{user_id}/roles",
         headers={"Authorization": f"Bearer {super_admin_token}"},
-        json={"role": "support"},
+        json={"role": "support_agent"},
     )
     assert response.status_code == 200
-    roles = {r["slug"] for r in response.json()["data"]["roles"]}
-    assert "support" in roles
+    roles = set(response.json()["data"]["roles"])
+    assert "support_agent" in roles
 
 
 @pytest.mark.asyncio
@@ -231,7 +231,7 @@ async def test_super_admin_can_grant_direct_permission(client: Any, super_admin_
         json={"permission": "orders.view"},
     )
     assert response.status_code == 200
-    direct_perms = {p["slug"] for p in response.json()["data"]["direct_permissions"]}
+    direct_perms = set(response.json()["data"]["direct_permissions"])
     assert "orders.view" in direct_perms
 
 

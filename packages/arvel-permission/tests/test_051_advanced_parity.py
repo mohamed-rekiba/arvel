@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 import pytest
 from arvel.cache.stores.array import ArrayStore
 from arvel_permission.config import PermissionConfig
 from arvel_permission.models import Permission, Role
 from arvel_permission.service import PermissionRegistrar
-from arvel_permission.traits import HasPermissions, HasRoles, apply_model_config
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -37,28 +34,6 @@ def test_registrar_uses_custom_models_for_sync_registration() -> None:
 
     assert isinstance(role, CustomRole)
     assert isinstance(permission, CustomPermission)
-
-
-def test_mixins_use_custom_models_for_string_coercion() -> None:
-    config = PermissionConfig(role_model=CustomRole, permission_model=CustomPermission)
-    apply_model_config(config)
-
-    class User(HasRoles, HasPermissions):
-        default_guard_name = "web"
-
-    try:
-        user = User()
-        object.__setattr__(user, "roles", [])
-        object.__setattr__(user, "permissions", [])
-        user.assign_role("editor")
-        user.give_permission_to("articles.edit")
-
-        roles = cast("list[Role]", object.__getattribute__(user, "roles"))
-        permissions = cast("list[Permission]", object.__getattribute__(user, "permissions"))
-        assert isinstance(roles[0], CustomRole)
-        assert isinstance(permissions[0], CustomPermission)
-    finally:
-        apply_model_config(PermissionConfig())
 
 
 @pytest.mark.asyncio

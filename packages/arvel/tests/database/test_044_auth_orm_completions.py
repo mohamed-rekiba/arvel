@@ -115,21 +115,6 @@ class TestQueryBuilderFindUsesScopes:
         )
 
 
-# ── FR-003: get_all_permissions() guards lazy-load errors (F-028) ──────────────
-
-
-class TestGetAllPermissionsGuarded:
-    """AC-003a: get_all_permissions() must wrap role.permissions access."""
-
-    def test_get_all_permissions_has_try_except(self) -> None:
-        """get_all_permissions must use try/except for role.permissions."""
-        method_src = _extract_method(_src("arvel_permission.traits"), "def get_all_permissions(")
-        assert "try:" in method_src or "except" in method_src, (
-            "F-028: get_all_permissions() must guard role.permissions access with try/except. "
-            "MissingGreenlet crash when roles loaded without nested permissions."
-        )
-
-
 # ── FR-004: CursorPaginator.to_dict() + SimplePaginator.to_dict() (F-029) ──────
 
 

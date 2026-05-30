@@ -43,16 +43,12 @@ def _roles(t: Blueprint) -> None:
 
 
 def _model_has_permissions(t: Blueprint) -> None:
-    t.id()
-    t.integer("permission_id")
-    t.string("model_type", length=255)
-    t.string("model_id", length=36)
+    # Composite PK matches the association-object ORM model; model_type is part
+    # of the key (NOT NULL) so polymorphic grants persist their discriminator.
+    t.integer("permission_id").primary()
+    t.string("model_type", length=255).primary()
+    t.string("model_id", length=36).primary()
     t.string("guard_name", length=125).default("web")
-    t.timestamps()
-    t.unique(
-        ["permission_id", "model_id", "model_type"],
-        name="model_has_permissions_unique",
-    )
     t.index(
         ["model_id", "model_type", "guard_name"],
         name="model_has_permissions_model_idx",
@@ -60,16 +56,10 @@ def _model_has_permissions(t: Blueprint) -> None:
 
 
 def _model_has_roles(t: Blueprint) -> None:
-    t.id()
-    t.integer("role_id")
-    t.string("model_type", length=255)
-    t.string("model_id", length=36)
+    t.integer("role_id").primary()
+    t.string("model_type", length=255).primary()
+    t.string("model_id", length=36).primary()
     t.string("guard_name", length=125).default("web")
-    t.timestamps()
-    t.unique(
-        ["role_id", "model_id", "model_type"],
-        name="model_has_roles_unique",
-    )
     t.index(
         ["model_id", "model_type", "guard_name"],
         name="model_has_roles_model_idx",
@@ -77,9 +67,8 @@ def _model_has_roles(t: Blueprint) -> None:
 
 
 def _role_has_permissions(t: Blueprint) -> None:
-    t.integer("permission_id")
-    t.integer("role_id")
-    t.unique(["permission_id", "role_id"], name="role_has_permissions_unique")
+    t.integer("permission_id").primary()
+    t.integer("role_id").primary()
 
 
 async def up(schema: Schema) -> None:

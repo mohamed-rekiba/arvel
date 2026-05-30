@@ -23,8 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TypeGuard, Union
 
 from arvel.database.orm.morph import MorphMany
-from arvel.database.session import get_active_session
-from sqlalchemy import asc, nullslast, select
+from sqlalchemy import asc, nullslast
 
 from arvel_image.media.exceptions import MediaError
 from arvel_image.media.model import Media
@@ -102,16 +101,14 @@ async def get_media_ordered(host: HasMedia, collection: str) -> list[Media]:
     Public helper — used by :class:`FileAdder` and :meth:`HasMedia.get_media`
     (FR-046-04, FR-050-29).
     """
-    session = get_active_session()
-    stmt = (
-        select(Media)
+    query = (
+        Media.query()
         .where(Media.model_type == _model_type_for(host))
         .where(Media.model_id == str(host.host_pk()))
         .where(Media.collection_name == collection)
         .order_by(nullslast(asc(Media.order_column)), asc(Media.id))
     )
-    result = await session.execute(stmt)
-    return list(result.scalars())
+    return list(await query.all())
 
 
 def _apply_dict_filters(rows: list[Media], criteria: dict[str, Any]) -> list[Media]:
@@ -257,15 +254,13 @@ class HasMedia:
 
     async def _get_all_media(self) -> list[Media]:
         """Fetch all Media rows for this host across all collections (FR-050-27)."""
-        session = get_active_session()
-        stmt = (
-            select(Media)
+        query = (
+            Media.query()
             .where(Media.model_type == _model_type_for(self))
             .where(Media.model_id == str(self.host_pk()))
             .order_by(nullslast(asc(Media.order_column)), asc(Media.id))
         )
-        result = await session.execute(stmt)
-        return list(result.scalars())
+        return list(await query.all())
 
     async def get_first_media(self, collection: str = "default") -> Media | None:
         """Return the first :class:`Media` in ``collection``, or ``None``."""

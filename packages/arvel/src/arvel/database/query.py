@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Generic, Protocol, Self, TypeGuard, TypeV
 
 from sqlalchemy import (
     Select,
+    String,
     Table,
     desc,
     func,
@@ -28,6 +29,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import REGCONFIG
 from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.associationproxy import AssociationProxy, AssociationProxyInstance
 from sqlalchemy.orm import InstrumentedAttribute, Mapper, selectinload
 
 from arvel.database.exceptions import (
@@ -36,6 +38,7 @@ from arvel.database.exceptions import (
     MultipleResultsError,
     UnknownRelationError,
 )
+from arvel.database.orm._eager import set_eager_relation
 from arvel.database.paginator import Paginator
 from arvel.database.session import get_active_session
 
@@ -43,6 +46,7 @@ if TYPE_CHECKING:
     from sqlalchemy.sql.expression import CTE
 
     from arvel.database.orm.belongs_to_many import BelongsToManyLink
+    from arvel.database.orm.morph_to_many import MorphToManyLink
     from arvel.database.query_mixin import QueryMixin
 
 T = TypeVar("T", bound="QueryMixin")
@@ -174,11 +178,12 @@ def _local_remote(rel: Any) -> tuple[Any, Any]:
 
 @dataclass(frozen=True)
 class _RelationTarget:
-    """Resolved relation — either a SQLAlchemy relationship or BelongsToMany."""
+    """Resolved relation — a SQLAlchemy relationship, BelongsToMany, or MorphToMany."""
 
     kind: str
     sa_rel: Any | None = None
     btm_link: BelongsToManyLink | None = None
+    mtm_link: MorphToManyLink | None = None
 
 
 def _resolve_relation(model: type[Any], name: str | Any) -> _RelationTarget:
@@ -191,10 +196,13 @@ def _resolve_relation(model: type[Any], name: str | Any) -> _RelationTarget:
         return _RelationTarget(kind="sa", sa_rel=rel)
 
     from arvel.database.orm.belongs_to_many import BelongsToMany
+    from arvel.database.orm.morph_to_many import MorphToMany
 
     descriptor = getattr(model, name, None)
     if isinstance(descriptor, BelongsToMany):
         return _RelationTarget(kind="btm", btm_link=descriptor.link_spec())
+    if isinstance(descriptor, MorphToMany):
+        return _RelationTarget(kind="mtm", mtm_link=descriptor.link_spec(model.__name__))
 
     raise UnknownRelationError(model.__name__, name)
 
@@ -221,6 +229,20 @@ def _exists_subquery(
         related_cls = rel.mapper.class_
         local_col, remote_col = _local_remote(rel)
         sub: Select[Any] = select(related_cls).where(remote_col == local_col)
+    elif target.kind == "mtm":
+        mlink = target.mtm_link
+        if mlink is None:
+            raise UnknownRelationError(model.__name__, "?")
+        pivot = mlink.table
+        related_cls = mlink.related_model
+        local_col = _primary_key_column(model)
+        remote_col = _primary_key_column(related_cls)
+        sub = (
+            select(related_cls)
+            .join(pivot, pivot.c[mlink.related_foreign_key] == remote_col)
+            .where(pivot.c[mlink.id_column] == sqla_cast(local_col, String))
+            .where(pivot.c[mlink.type_column] == mlink.owner_type)
+        )
     else:
         link = target.btm_link
         if link is None:
@@ -241,6 +263,26 @@ def _exists_subquery(
     return sub_qb.apply_global_scopes()
 
 
+def _expand_association_proxy(
+    model: type[Any], mapper: Mapper[Any], head: str, tail: str
+) -> tuple[str, str]:
+    """Rewrite an association-proxy head into its underlying ``link.value`` path.
+
+    ``with_("roles")`` on a model whose ``roles`` is an ``association_proxy`` over
+    ``role_assignments.role`` becomes ``role_assignments.role`` so the normal
+    relationship loader can build the selectinload chain.
+    """
+    descriptor = mapper.all_orm_descriptors.get(head)
+    if not isinstance(descriptor, AssociationProxy):
+        return head, tail
+    proxy = cast("AssociationProxyInstance[Any]", getattr(model, head))
+    expanded = f"{proxy.target_collection}.{proxy.value_attr}"
+    if tail:
+        expanded = f"{expanded}.{tail}"
+    new_head, _, new_tail = expanded.partition(".")
+    return new_head, new_tail
+
+
 def _selectin_loader_for_path(
     model: type[Any],
     relation_path: str,
@@ -249,8 +291,9 @@ def _selectin_loader_for_path(
 ) -> Any:
     """Build a selectinload option for *relation_path*, optionally filtered."""
     mapper = _mapper_of(model)
-    valid: set[str] = {r.key for r in mapper.relationships}
     head, _, tail = relation_path.partition(".")
+    head, tail = _expand_association_proxy(model, mapper, head, tail)
+    valid: set[str] = {r.key for r in mapper.relationships}
     if head not in valid:
         raise UnknownRelationError(model.__name__, head)
     head_rel = mapper.relationships[head]
@@ -290,6 +333,30 @@ def _count_subquery(model: type[Any], target: _RelationTarget) -> Any:
             stmt = stmt.where(scope_where)
         return stmt.correlate(model).scalar_subquery()
 
+    if target.kind == "mtm":
+        mlink = target.mtm_link
+        if mlink is None:
+            raise UnknownRelationError(model.__name__, "?")
+        pivot = mlink.table
+        related_cls = mlink.related_model
+        local_col = _primary_key_column(model)
+        remote_col = _primary_key_column(related_cls)
+        pivot_rfk = pivot.c[mlink.related_foreign_key]
+        scope_where = _global_scope_whereclause(related_cls)
+        base = (
+            select(sqla_func.count())
+            .where(pivot.c[mlink.id_column] == sqla_cast(local_col, String))
+            .where(pivot.c[mlink.type_column] == mlink.owner_type)
+        )
+        if scope_where is None:
+            return base.select_from(pivot).correlate(model).scalar_subquery()
+        return (
+            base.select_from(pivot.join(related_cls, pivot_rfk == remote_col))
+            .where(scope_where)
+            .correlate(model)
+            .scalar_subquery()
+        )
+
     link = target.btm_link
     if link is None:
         raise UnknownRelationError(model.__name__, "?")
@@ -317,6 +384,133 @@ def _count_subquery(model: type[Any], target: _RelationTarget) -> Any:
         .correlate(model)
         .scalar_subquery()
     )
+
+
+@dataclass(frozen=True)
+class _AsyncEagerSpec:
+    """A pending batched eager-load for a MorphToMany/BelongsToMany path."""
+
+    path: str
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None
+
+
+def _is_async_relation(model: type[Any], path: str) -> bool:
+    """True when *path*'s head is a MorphToMany/BelongsToMany descriptor."""
+    head = path.partition(".")[0]
+    try:
+        target = _resolve_relation(model, head)
+    except UnknownRelationError:
+        return False
+    return target.kind in ("btm", "mtm")
+
+
+def _owner_pk_key(model: type[Any]) -> str:
+    pk_key = _mapper_of(model).primary_key[0].key
+    if pk_key is None:
+        raise TypeError(f"{model.__name__} primary key column has no key")
+    return pk_key
+
+
+def _dedupe_by_pk(model: type[Any], objs: list[Any]) -> list[Any]:
+    pk_key = _owner_pk_key(model)
+    seen: set[Any] = set()
+    out: list[Any] = []
+    for obj in objs:
+        key = getattr(obj, pk_key)
+        if key not in seen:
+            seen.add(key)
+            out.append(obj)
+    return out
+
+
+async def _batch_load_async(
+    model: type[Any],
+    parents: list[Any],
+    attr_name: str,
+    target: _RelationTarget,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None,
+) -> list[Any]:
+    """Load one pivot relation for every parent in a single query.
+
+    Mirrors Eloquent's ``BelongsToMany::match``/``buildDictionary``: one
+    ``WHERE pivot.owner_key IN (...)`` (plus ``morph_type`` for MorphToMany),
+    then group the related rows by owner key and stash each parent's slice.
+    """
+    owner_pk_key = _owner_pk_key(model)
+    owner_values = [getattr(p, owner_pk_key) for p in parents]
+    owner_label = "__arvel_owner_key__"
+
+    if target.kind == "mtm":
+        mlink = target.mtm_link
+        if mlink is None:
+            raise UnknownRelationError(model.__name__, attr_name)
+        related_cls = mlink.related_model
+        owner_col = mlink.table.c[mlink.id_column]
+        stmt = (
+            select(related_cls, owner_col.label(owner_label))
+            .join(
+                mlink.table,
+                mlink.table.c[mlink.related_foreign_key] == _primary_key_column(related_cls),
+            )
+            .where(mlink.table.c[mlink.type_column] == mlink.owner_type)
+            .where(owner_col.in_({str(v) for v in owner_values}))
+        )
+    else:
+        link = target.btm_link
+        if link is None:
+            raise UnknownRelationError(model.__name__, attr_name)
+        related_cls = link.related_model
+        owner_col = link.table.c[link.foreign_key]
+        stmt = (
+            select(related_cls, owner_col.label(owner_label))
+            .join(
+                link.table,
+                link.table.c[link.related_foreign_key] == _primary_key_column(related_cls),
+            )
+            .where(owner_col.in_(set(owner_values)))
+        )
+
+    # No global-scope filter here: the cache must be a transparent substitute
+    # for the lazy accessor, which also reads through the raw pivot join.
+    if constraint is not None:
+        sub_qb: QueryBuilder[Any] = QueryBuilder(related_cls, select(related_cls))
+        sub_qb = constraint(sub_qb)
+        where_clause = sub_qb.statement.whereclause
+        if where_clause is not None:
+            stmt = stmt.where(where_clause)
+
+    result = await get_active_session().execute(stmt)
+    grouped: dict[str, list[Any]] = {}
+    for row in result.all():
+        grouped.setdefault(str(row[1]), []).append(row[0])
+
+    flat: list[Any] = []
+    for parent in parents:
+        related = grouped.get(str(getattr(parent, owner_pk_key)), [])
+        set_eager_relation(parent, attr_name, related)
+        flat.extend(related)
+    return _dedupe_by_pk(related_cls, flat)
+
+
+async def _load_async_relation_path(
+    model: type[Any],
+    parents: list[Any],
+    path: str,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None,
+) -> None:
+    """Batch-load *path* (optionally nested, e.g. ``roles.permissions``)."""
+    head, _, tail = path.partition(".")
+    target = _resolve_relation(model, head)
+    if target.kind not in ("btm", "mtm"):
+        raise UnknownRelationError(model.__name__, head)
+    # A constraint closure applies to the leaf relation, as in Eloquent.
+    related = await _batch_load_async(model, parents, head, target, None if tail else constraint)
+    if not tail or not related:
+        return
+    link = target.mtm_link or target.btm_link
+    if link is None:
+        return
+    await _load_async_relation_path(link.related_model, related, tail, constraint)
 
 
 def _is_pk_tuple(pk: object) -> TypeGuard[tuple[Any, ...]]:
@@ -374,11 +568,13 @@ def _apply_keyset_where(
         # Strings that look like ISO datetimes are cast back to datetime for
         # proper parameterised comparison without dialect-specific CAST.
         val: Any = _coerce_cursor_value(raw_val, attr)
-        lt = attr < val if direction == "asc" else attr > val
+        # ASC walks forward with values greater than the cursor; DESC walks
+        # forward with values smaller than it.
+        boundary = attr > val if direction == "asc" else attr < val
         eq = attr == val
         if index + 1 == len(parsed):
-            return lt
-        return or_(lt, and_(eq, _clause(index + 1)))
+            return boundary
+        return or_(boundary, and_(eq, _clause(index + 1)))
 
     return stmt.where(_clause(0))
 
@@ -421,6 +617,7 @@ class QueryBuilder(Generic[T]):
         self._lock_shared: bool = False
         self._select_columns: list[Any] | None = None
         self._raw_select_expr: str | None = None  # for select_raw()
+        self._async_eager: list[_AsyncEagerSpec] = []
 
     @property
     def model(self) -> type[T]:
@@ -477,12 +674,34 @@ class QueryBuilder(Generic[T]):
         new._lock_shared = self._lock_shared
         new._select_columns = list(self._select_columns) if self._select_columns else None
         new._raw_select_expr = self._raw_select_expr
+        new._async_eager = list(self._async_eager)
         return new
+
+    def _grouped_whereclause(self, callback: Callable[[Self], object]) -> Any:
+        """Run a group callback on a fresh sub-builder and return its combined predicate.
+
+        The callback must return a builder — Arvel builders are immutable, so a
+        mutate-in-place closure (Laravel's style) would silently drop the group.
+        Returns ``None`` when the callback added no clauses.
+        """
+        sub = type(self)(self._model)
+        result = callback(sub)
+        if not isinstance(result, QueryBuilder):
+            raise TypeError(
+                "where()/or_where() group callback must return the query builder, "
+                "e.g. `lambda q: q.where(...).or_where(...)`."
+            )
+        return result._stmt.whereclause
 
     def where(self, *clauses: Any, **kwargs: Any) -> Self:
         stmt = self._stmt
         for clause in clauses:
-            stmt = stmt.where(clause)
+            if callable(clause):
+                group = self._grouped_whereclause(clause)
+                if group is not None:
+                    stmt = stmt.where(group)
+            else:
+                stmt = stmt.where(clause)
         for key, value in kwargs.items():
             col = _resolve_column(self._model, key)
             stmt = stmt.where(col == value)
@@ -491,7 +710,14 @@ class QueryBuilder(Generic[T]):
     def or_where(self, *clauses: Any, **kwargs: Any) -> Self:
         from sqlalchemy import or_
 
-        terms: list[Any] = list(clauses)
+        terms: list[Any] = []
+        for clause in clauses:
+            if callable(clause):
+                group = self._grouped_whereclause(clause)
+                if group is not None:
+                    terms.append(group)
+            else:
+                terms.append(clause)
         for key, value in kwargs.items():
             col = _resolve_column(self._model, key)
             terms.append(col == value)
@@ -604,6 +830,20 @@ class QueryBuilder(Generic[T]):
             return otherwise(self._clone())
         return self._clone()
 
+    def unless(
+        self,
+        condition: Any,
+        callback: Callable[[Self], Self],
+        otherwise: Callable[[Self], Self] | None = None,
+    ) -> Self:
+        return self.when(not condition, callback, otherwise)
+
+    def tap(self, callback: Callable[[Self], Any]) -> Self:
+        """Hand a clone to ``callback`` for side effects; the return value is ignored."""
+        clone = self._clone()
+        callback(clone)
+        return clone
+
     def order_by(self, *cols: Any) -> Self:
         resolved: list[Any] = []
         for c in cols:
@@ -714,20 +954,37 @@ class QueryBuilder(Generic[T]):
         *relations: str | Mapping[str, Callable[[QueryBuilder[Any]], QueryBuilder[Any]]],
     ) -> Self:
         stmt = self._stmt
+        async_specs: list[_AsyncEagerSpec] = list(self._async_eager)
         for item in relations:
             if isinstance(item, Mapping):
                 for path, callback in item.items():
-                    stmt = stmt.options(
-                        _selectin_loader_for_path(self._model, path, constraint=callback)
-                    )
+                    if _is_async_relation(self._model, path):
+                        async_specs.append(_AsyncEagerSpec(path, callback))
+                    else:
+                        stmt = stmt.options(
+                            _selectin_loader_for_path(self._model, path, constraint=callback)
+                        )
             elif type(item) is str:
-                stmt = stmt.options(_selectin_loader_for_path(self._model, item))
+                if _is_async_relation(self._model, item):
+                    async_specs.append(_AsyncEagerSpec(item, None))
+                else:
+                    stmt = stmt.options(_selectin_loader_for_path(self._model, item))
             else:
                 raise TypeError(
                     f"{self._model.__name__}.with_() expects str relation paths or "
                     f"dict[str, callback] mappings, got {type(item).__name__}."
                 )
-        return self._clone(stmt)
+        clone = self._clone(stmt)
+        clone._async_eager = async_specs
+        return clone
+
+    async def _eager_load_async(self, items: Sequence[Any]) -> None:
+        """Run any pending batched MorphToMany/BelongsToMany eager loads."""
+        if not self._async_eager or not items:
+            return
+        parents = list(items)
+        for spec in self._async_eager:
+            await _load_async_relation_path(self._model, parents, spec.path, spec.constraint)
 
     def with_count(self, *relations: str) -> Self:
         """Add {relation}_count columns via correlated COUNT subqueries.
@@ -1015,6 +1272,7 @@ class QueryBuilder(Generic[T]):
         instance = cast("T | None", result.scalars().first())
         if instance is not None:
             await self._fire_retrieved((instance,))
+            await self._eager_load_async((instance,))
         return instance
 
     async def first_or_fail(self) -> T:
@@ -1081,6 +1339,7 @@ class QueryBuilder(Generic[T]):
         if len(rows) > 1:
             raise MultipleResultsError(self._model.__name__)
         await self._fire_retrieved((rows[0],))
+        await self._eager_load_async((rows[0],))
         return cast("T", rows[0])
 
     async def find(self, pk: Any) -> T | None:
@@ -1149,11 +1408,13 @@ class QueryBuilder(Generic[T]):
                             object.__setattr__(obj, key, row_seq[i])
                 items.append(cast("T", obj))
             await self._fire_retrieved(items)
+            await self._eager_load_async(items)
             return Collection(items)
 
         result = await get_active_session().execute(stmt)
         scalars = list(result.scalars().all())
         await self._fire_retrieved(scalars)
+        await self._eager_load_async(scalars)
         return Collection(scalars)
 
     async def get(self) -> Any:
@@ -1166,7 +1427,17 @@ class QueryBuilder(Generic[T]):
         return int(result.scalar_one())
 
     async def exists(self) -> bool:
-        return await self.count() > 0
+        from sqlalchemy import exists as sqla_exists
+
+        # EXISTS ignores the projected columns but keeps FROM/WHERE; the planner
+        # short-circuits on the first matching row instead of counting all of them.
+        inner = self.apply_global_scopes().limit(1)
+        stmt = select(sqla_exists(inner))
+        result = await get_active_session().execute(stmt)
+        return bool(result.scalar())
+
+    async def doesnt_exist(self) -> bool:
+        return not await self.exists()
 
     async def value(self, col: str) -> Any:
         column = _resolve_column(self._model, col)
@@ -1216,6 +1487,7 @@ class QueryBuilder(Generic[T]):
 
         items: list[T] = cast("list[T]", Collection(result.scalars().all()))
         await self._fire_retrieved(items)
+        await self._eager_load_async(items)
         return Paginator(items=items, total=total, per_page=per_page, current_page=page)
 
     async def simple_paginate(self, per_page: int = 15, *, page: int = 1) -> SimplePaginator[T]:
@@ -1226,8 +1498,10 @@ class QueryBuilder(Generic[T]):
 
         rows: list[T] = cast("list[T]", list(result.scalars().all()))
         has_more = len(rows) > per_page
+        page_items = rows[:per_page]
+        await self._eager_load_async(page_items)
         return SimplePaginator(
-            items=Collection(rows[:per_page]),
+            items=Collection(page_items),
             per_page=per_page,
             current_page=page,
             has_more=has_more,
@@ -1288,6 +1562,7 @@ class QueryBuilder(Generic[T]):
         rows: list[T] = cast("list[T]", list(result.scalars().all()))
         has_more = len(rows) > per_page
         items = Collection(rows[:per_page])
+        await self._eager_load_async(list(items))
         next_cursor: str | None = None
         if has_more and items:
             last_pk_val = getattr(items[-1], pk_key)
@@ -1322,6 +1597,7 @@ class QueryBuilder(Generic[T]):
         rows: list[T] = cast("list[T]", list(result.scalars().all()))
         has_more = len(rows) > per_page
         items = Collection(rows[:per_page])
+        await self._eager_load_async(list(items))
         next_cursor: str | None = None
         if has_more and items:
             last = items[-1]
@@ -1346,6 +1622,7 @@ class QueryBuilder(Generic[T]):
             if not batch:
                 return
             await self._fire_retrieved(batch)
+            await self._eager_load_async(batch)
             await callback(batch)
             if len(batch) < size:
                 return
@@ -1375,6 +1652,7 @@ class QueryBuilder(Generic[T]):
             if not batch:
                 return
             await self._fire_retrieved(batch)
+            await self._eager_load_async(batch)
             await callback(batch)
             if len(batch) < size:
                 return
@@ -1394,6 +1672,7 @@ class QueryBuilder(Generic[T]):
             if not batch:
                 return
             await self._fire_retrieved(batch)
+            await self._eager_load_async(batch)
             for row in batch:
                 yield row
             if len(batch) < chunk_size:
@@ -1827,6 +2106,7 @@ class RecursiveQueryBuilder(QueryBuilder[T]):
         session = get_active_session()
         result = await session.execute(stmt)
         rows: list[T] = list(result.scalars().all())
+        await self._eager_load_async(rows)
         return Collection(rows)
 
     async def as_tree(self) -> list[TreeNode[T]]:
