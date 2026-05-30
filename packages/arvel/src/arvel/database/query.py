@@ -1448,7 +1448,34 @@ class QueryBuilder(Generic[T]):
         return await self.increment(col, -amount)
 
     async def delete(self) -> int:
+        """Delete matching rows. Soft-deletes (UPDATE deleted_at) when the model
+        uses SoftDeletes; otherwise issues a hard DELETE."""
         self._assert_writable("delete")
+        soft_field: str | None = getattr(self._model, "__arvel_soft_delete_column__", None)
+        if soft_field is not None:
+            from datetime import UTC, datetime
+
+            from sqlalchemy import update as sqla_update
+
+            session = get_active_session()
+            table = _table_of(self._model)
+            stmt = sqla_update(table).values({soft_field: datetime.now(UTC)})
+            where_clause = self._apply_global_scopes().whereclause
+            if where_clause is not None:
+                stmt = stmt.where(where_clause)
+            result = cast("CursorResult[Any]", await session.execute(stmt))
+            await session.flush()
+            return int(result.rowcount)
+        return await self._hard_delete()
+
+    async def force_delete(self) -> int:
+        """Permanently remove matching rows, including already-trashed ones."""
+        self._assert_writable("force_delete")
+        soft_field: str | None = getattr(self._model, "__arvel_soft_delete_column__", None)
+        target = self.without_global_scope("soft_delete") if soft_field is not None else self
+        return await target._hard_delete()
+
+    async def _hard_delete(self) -> int:
         from sqlalchemy import delete as sqla_delete
 
         session = get_active_session()
@@ -1459,7 +1486,7 @@ class QueryBuilder(Generic[T]):
             stmt = stmt.where(where_clause)
         result = cast("CursorResult[Any]", await session.execute(stmt))
         await session.flush()
-        return result.rowcount
+        return int(result.rowcount)
 
 
 class SimplePaginator(Generic[TItem]):
