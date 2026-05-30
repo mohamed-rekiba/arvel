@@ -7,7 +7,7 @@ import binascii
 import contextlib
 import json
 import uuid as _uuid
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Any, Generic, Protocol, Self, TypeGuard, TypeVar, cast
@@ -1350,6 +1350,59 @@ class QueryBuilder(Generic[T]):
             if len(batch) < size:
                 return
             page += 1
+
+    async def chunk_by_id(
+        self,
+        size: int,
+        callback: Callable[[list[T]], Awaitable[None]],
+        *,
+        column: str = "id",
+    ) -> None:
+        """Chunk by a keyset on ``column`` instead of OFFSET.
+
+        Stable under concurrent inserts/deletes — rows can't be skipped or
+        seen twice the way OFFSET-based ``chunk()`` can.
+        """
+        col = _resolve_column(self._model, column)
+        last_id: Any = None
+        while True:
+            stmt = self.apply_global_scopes()
+            if last_id is not None:
+                stmt = stmt.where(col > last_id)
+            stmt = stmt.order_by(col).limit(size)
+            result = await get_active_session().execute(stmt)
+            batch: list[T] = cast("list[T]", list(result.scalars().all()))
+            if not batch:
+                return
+            await self._fire_retrieved(batch)
+            await callback(batch)
+            if len(batch) < size:
+                return
+            last_id = getattr(batch[-1], column)
+
+    async def lazy(self, chunk_size: int = 1000, *, column: str = "id") -> AsyncGenerator[T]:
+        """Stream rows one at a time, fetching in keyset batches under the hood."""
+        col = _resolve_column(self._model, column)
+        last_id: Any = None
+        while True:
+            stmt = self.apply_global_scopes()
+            if last_id is not None:
+                stmt = stmt.where(col > last_id)
+            stmt = stmt.order_by(col).limit(chunk_size)
+            result = await get_active_session().execute(stmt)
+            batch: list[T] = cast("list[T]", list(result.scalars().all()))
+            if not batch:
+                return
+            await self._fire_retrieved(batch)
+            for row in batch:
+                yield row
+            if len(batch) < chunk_size:
+                return
+            last_id = getattr(batch[-1], column)
+
+    def cursor(self, chunk_size: int = 1000, *, column: str = "id") -> AsyncGenerator[T]:
+        """Alias for :meth:`lazy` — stream rows without loading them all at once."""
+        return self.lazy(chunk_size, column=column)
 
     async def each(self, callback: Callable[[T], Awaitable[None]]) -> None:
         async def _per_batch(batch: list[T]) -> None:

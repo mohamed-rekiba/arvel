@@ -252,7 +252,16 @@ async def handle(batch: list[Post]) -> None:
         ...
 
 await Post.chunk(100, handle)
+
+# chunk_by_id — keyset chunking, stable under concurrent inserts/deletes
+await Post.chunk_by_id(100, handle)
+
+# lazy / cursor — stream rows one at a time, fetched in keyset batches
+async for post in Post.where(published=True).lazy(500):
+    ...
 ```
+
+`chunk()` uses OFFSET, so concurrent inserts/deletes can skip or repeat rows. `chunk_by_id()` walks a keyset on the primary key (override with `column=`) and never does — prefer it for long-running jobs. `lazy()` (alias `cursor()`) yields rows individually without materializing the whole result set.
 
 The kwarg-shorthand for `where(field=value)` resolves the column via `getattr(Model, field)` and binds the value as a parameter — there's no string interpolation, so SQL injection is structurally impossible. This is verified by the framework's security tests.
 

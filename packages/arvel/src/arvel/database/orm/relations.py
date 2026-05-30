@@ -9,6 +9,7 @@ Also provides ``has_many_attr`` — a class-attribute declarator that wraps
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
@@ -73,6 +74,14 @@ class HasMany(QueryBuilder[T], Generic[T]):
         if self._fk_col:
             attrs = {**attrs, self._fk_col: self._owner_pk}
         return await self._model.create(**attrs)
+
+    async def save_many(self, instances: Sequence[Any]) -> list[Any]:
+        """Persist several related instances, setting the FK on each."""
+        return [await self.save(instance) for instance in instances]
+
+    async def create_many(self, rows: Sequence[dict[str, Any]]) -> list[Any]:
+        """Create several related instances with the FK already set."""
+        return [await self.create(attrs) for attrs in rows]
 
 
 class HasOne(QueryBuilder[T], Generic[T]):
