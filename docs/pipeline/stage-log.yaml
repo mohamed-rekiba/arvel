@@ -413,3 +413,19 @@ events:
       mypy/pyright/ruff/bandit (0 issues)/gitleaks clean. 4b + release skipped (L2/Tier2).
       005-S8 DONE.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-012"
+    event_id: "EV-033"
+    timestamp: "2026-05-30T23:05:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      005 S3 subquery FROM/JOIN/SELECT. ADR-133. from_sub (derived table → dict rows, clears
+      inherited WHERE), join_sub/left_join_sub (closure receives the aliased subquery),
+      select_sub (correlated scalar subquery as labeled column), add_select (append model cols
+      or SQLAlchemy expressions). Appended columns attach onto the model via the existing
+      __with_agg__ path. Gates: arvel 799 db tests (+5); mypy/pyright/ruff/bandit/gitleaks
+      clean. 4b + release skipped (L2/Tier2). 005-S3 DONE.
+    handoff_id: null

@@ -353,6 +353,18 @@ class QueryMixin:
         return cls.query().select_raw(raw_sql)
 
     @classmethod
+    def add_select(cls, *columns: str | Any) -> QueryBuilder[Self]:
+        return cls.query().add_select(*columns)
+
+    @classmethod
+    def select_sub(cls, query: QueryBuilder[Any], alias: str) -> QueryBuilder[Self]:
+        return cls.query().select_sub(query, alias)
+
+    @classmethod
+    def from_sub(cls, query: QueryBuilder[Any], alias: str) -> QueryBuilder[Self]:
+        return cls.query().from_sub(query, alias)
+
+    @classmethod
     def distinct(cls, *cols: Any) -> QueryBuilder[Self]:
         return cls.query().distinct(*cols)
 
@@ -379,6 +391,23 @@ class QueryMixin:
         cls, target: type[Any], on: Callable[[JoinOn], Any], *, kind: str = "inner"
     ) -> QueryBuilder[Self]:
         return cls.query().join_on(target, on, kind=kind)
+
+    @classmethod
+    def join_sub(
+        cls,
+        query: QueryBuilder[Any],
+        alias: str,
+        on: Callable[[Any], Any] | Any,
+        *,
+        kind: str = "inner",
+    ) -> QueryBuilder[Self]:
+        return cls.query().join_sub(query, alias, on, kind=kind)
+
+    @classmethod
+    def left_join_sub(
+        cls, query: QueryBuilder[Any], alias: str, on: Callable[[Any], Any] | Any
+    ) -> QueryBuilder[Self]:
+        return cls.query().left_join_sub(query, alias, on)
 
     # ── eager loading ─────────────────────────────────────────────────────
 
