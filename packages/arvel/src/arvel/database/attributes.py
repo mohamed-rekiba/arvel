@@ -2,10 +2,40 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
 T = TypeVar("T")
+
+
+class CastsAttributes(ABC):
+    """Attribute-level custom cast: route a column's reads/writes through get/set.
+
+    Register the class or an instance in ``__casts__``::
+
+        class AsUpper(CastsAttributes):
+            def get(self, model, key, value) -> str:
+                return value.upper()
+
+            def set(self, model, key, value) -> str:
+                return value.lower()
+
+        class Doc(Model):
+            __casts__ = {"code": AsUpper}   # or AsUpper()
+    """
+
+    @abstractmethod
+    def get(self, model: Any, key: str, value: Any) -> Any:
+        """Transform the stored value on read."""
+
+    @abstractmethod
+    def set(self, model: Any, key: str, value: Any) -> Any:
+        """Transform the in-memory value before it's stored."""
+
+    def serialize(self, model: Any, key: str, value: Any) -> Any:
+        """Form used by ``to_dict()``; defaults to the get value unchanged."""
+        return value
 
 
 def accessor(fn: Callable[[Any], T]) -> property:
@@ -44,4 +74,4 @@ def mutator(column: str) -> Callable[[Callable[[Any, Any], Any]], Callable[[Any,
     return decorator
 
 
-__all__ = ["accessor", "mutator"]
+__all__ = ["CastsAttributes", "accessor", "mutator"]
