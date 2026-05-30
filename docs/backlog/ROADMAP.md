@@ -79,7 +79,17 @@ Parity Sprint B: attribute pipeline + write/stream gaps
   ├── 006 Story 4: cast-aware dirty tracking            [DONE — WI-arvel-006, ADR-128]
   ├── 005 Story 8: write-path completeness (insert_or_ignore, upsert, truncate)
   ├── 005 Story 10: streaming + chunking completeness    [DONE — WI-arvel-007, ADR-129]
+  ├── 005 Story 13: clause polish + WHERE predicate engine [DONE — WI-arvel-008, ADR-130]
   └── 005 Story 12: transaction retry on deadlock        [PARTIAL — WI-arvel-004, ADR-126: retry done; imperative begin/commit/rollback deferred]
+
+Remaining (proceeding autonomously through all epics):
+  005: S1 date/time where, S3 subquery, S5 like+multi-col, S6 joins, S8 write-path,
+       S9 pagination, S11 debug/query-log, S12 imperative-txn follow-up
+  006: S3 encrypted, S5 Attribute descriptor, S6 enum/builtin casts, S8 ModelCollection,
+       S9 static events, S10 soft-delete upsert, S11 delete/replicate events, S12 timestamps,
+       S13 factory, S14 attribute polish
+  007: S1-S11 (morph map → MorphTo → MorphOne/Many → morphed_by_many → of_many → chaperone →
+       polymorphic existence → relation-query completeness → aggregates → pivot → defaults)
 
 Parity Sprint C: relationship foundation
   ├── 007 Story 1: morph map foundation

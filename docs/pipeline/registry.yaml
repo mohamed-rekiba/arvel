@@ -147,3 +147,26 @@ work_items:
       each stop when a callback returns False; offset chunk auto-orders by PK. Shared
       _keyset_batches generator. ADR-129. 4b skipped (L2/Tier2). Gates green: arvel 751 db
       tests; mypy/pyright/ruff/bandit/gitleaks clean.
+
+  - id: "WI-arvel-008"
+    name: "WHERE predicate engine + clause polish (backlog 005 S13)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T21:10:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      Foundational: QueryBuilder WHERE moved into _where_predicate so or_where/or_where_* OR
+      onto the whole chain (explicit grouping, safer than Laravel's flat precedence). All
+      where_* route through _and, or_where_* through _or; applied in apply_global_scopes +
+      statement. Clause bundle: order_by_desc/reorder/in_random_order/group_by_raw, operator
+      having + having_null/between, pluck(value,key)->dict, count(column), sum()->0. ADR-130.
+      Gates green: arvel fast 3483 / permission 75 / ecommerce 407; mypy/pyright/ruff/bandit/
+      gitleaks clean.
