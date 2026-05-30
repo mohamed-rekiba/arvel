@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, TypeVar, cast
 
 from sqlalchemy import ColumnClause, Select, text
 from sqlalchemy import delete as sqla_delete
@@ -12,6 +12,7 @@ from sqlalchemy import insert as sqla_insert
 from sqlalchemy import select as sqla_select
 from sqlalchemy import update as sqla_update
 from sqlalchemy.engine import CursorResult
+from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.sql import TableClause
 from sqlalchemy.sql import column as sqla_column
@@ -26,6 +27,31 @@ from arvel.database.session import (
     set_active_session,
     set_after_commit_queue,
 )
+
+_T = TypeVar("_T")
+
+# Driver error signals for a deadlock or serialization conflict — safe to retry.
+# PostgreSQL SQLSTATEs: 40001 serialization_failure, 40P01 deadlock_detected.
+_RETRYABLE_SQLSTATES = frozenset({"40001", "40P01"})
+_RETRYABLE_TOKENS = (
+    "deadlock",
+    "serialization",
+    "could not serialize",
+    "database is locked",
+    "lock wait timeout",
+)
+
+
+def is_retryable_db_error(exc: BaseException) -> bool:
+    """True for deadlock/serialization failures that a transaction can safely retry."""
+    if not isinstance(exc, (OperationalError, DBAPIError)):
+        return False
+    orig = exc.orig
+    sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+    if sqlstate in _RETRYABLE_SQLSTATES:
+        return True
+    message = str(orig if orig is not None else exc).lower()
+    return any(token in message for token in _RETRYABLE_TOKENS)
 
 
 class TableQueryBuilder:
@@ -372,5 +398,30 @@ class DB:
             for cb in callbacks:
                 await cb()
 
+    @classmethod
+    async def transactional(
+        cls,
+        callback: Callable[[AsyncSession], Awaitable[_T]],
+        *,
+        attempts: int = 1,
+    ) -> _T:
+        """Run ``callback`` in a transaction, retrying on deadlock/serialization failures.
 
-__all__ = ["DB", "TableQueryBuilder"]
+        Each attempt opens a fresh outermost transaction, so a rolled-back attempt
+        leaves no state behind. Non-retryable errors propagate immediately.
+        """
+        if attempts < 1:
+            raise ValueError("attempts must be >= 1")
+        last_attempt = attempts
+        for attempt in range(1, attempts + 1):
+            try:
+                async with cls.transaction() as session:
+                    return await callback(session)
+            except Exception as exc:
+                if attempt >= last_attempt or not is_retryable_db_error(exc):
+                    raise
+        # Unreachable: the loop either returns or raises on the final attempt.
+        raise AssertionError("transactional retry loop exited without returning")
+
+
+__all__ = ["DB", "TableQueryBuilder", "is_retryable_db_error"]

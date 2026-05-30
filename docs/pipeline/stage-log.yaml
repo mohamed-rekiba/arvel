@@ -167,3 +167,51 @@ events:
       force_fill/unguarded explicit-only, bounded (task-local ContextVar, no global
       toggle), no plaintext logging. PASS — no critical/high. Closes Parity Sprint A.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-004"
+    event_id: "EV-015"
+    timestamp: "2026-05-30T15:45:00+03:00"
+    from_stage: null
+    to_stage: "planning-sa"
+    role: "solution-architect"
+    result: "pass"
+    notes: >
+      ADR-126: closure-form DB.transactional retry (separate from CM transaction()),
+      retryable predicate scoped to deadlock/serialization. Imperative txn control deferred.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-004"
+    event_id: "EV-016"
+    timestamp: "2026-05-30T15:48:00+03:00"
+    from_stage: "planning-sa"
+    to_stage: "qa-pre"
+    role: "qa-engineer"
+    result: "pass"
+    notes: "6 tests in test_transaction_retry.py (Red: import of helper fails)."
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-004"
+    event_id: "EV-017"
+    timestamp: "2026-05-30T15:52:00+03:00"
+    from_stage: "qa-pre"
+    to_stage: "execution"
+    role: "developer"
+    result: "pass"
+    notes: >
+      db.py: is_retryable_db_error predicate + DB.transactional(callback, attempts).
+      6 tests green. Promoted helper to public (renamed off _ prefix) per quality-gate
+      rule when test needed direct access.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-004"
+    event_id: "EV-018"
+    timestamp: "2026-05-30T15:56:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      Gates: 729 db tests, mypy clean (873 files), pyright 0/0/0, ruff clean, bandit 0,
+      pip-audit clean, gitleaks clean. 4b + release skipped (L2/Tier2, library increment).
+      S12 marked PARTIAL in ROADMAP.
+    handoff_id: null
