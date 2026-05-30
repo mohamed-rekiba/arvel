@@ -42,6 +42,8 @@ The URL embeds an HMAC signature and expiration timestamp. The route handler val
 async def invoice(invoice_id: int) -> FileResponse: ...
 ```
 
+The signature covers the absolute URL — scheme, host, path, and query. A link signed for `https://app.example.com/...` won't validate when replayed against another host serving the same path.
+
 ## Current URL
 
 ```python
