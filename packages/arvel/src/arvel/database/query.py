@@ -16,8 +16,10 @@ from sqlalchemy import (
     Select,
     String,
     Table,
+    and_,
     desc,
     func,
+    or_,
     select,
     text,
 )
@@ -31,6 +33,7 @@ from sqlalchemy.dialects.postgresql import REGCONFIG
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.associationproxy import AssociationProxy, AssociationProxyInstance
 from sqlalchemy.orm import InstrumentedAttribute, Mapper, selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from arvel.database.exceptions import (
     InvalidCursorError,
@@ -69,6 +72,8 @@ _TSQUERY_FNS: frozenset[str] = frozenset(
 )
 
 _WHERE_ANY_OPS: frozenset[str] = frozenset({"=", "like", "ilike", ">", "<", ">=", "<=", "!="})
+
+_UNSET: Any = object()
 
 
 def _apply_operator(col: Any, operator: str, value: Any) -> Any:
@@ -618,6 +623,8 @@ class QueryBuilder(Generic[T]):
         self._select_columns: list[Any] | None = None
         self._raw_select_expr: str | None = None  # for select_raw()
         self._async_eager: list[_AsyncEagerSpec] = []
+        # WHERE lives here, not on _stmt, so or_where can OR onto the whole chain.
+        self._where_predicate: ColumnElement[bool] | None = None
 
     @property
     def model(self) -> type[T]:
@@ -626,8 +633,10 @@ class QueryBuilder(Generic[T]):
 
     @property
     def statement(self) -> Select[Any]:
-        """Return the underlying SQLAlchemy ``Select`` for this builder."""
-        return self._stmt
+        """Return the underlying SQLAlchemy ``Select``, with accumulated WHERE applied."""
+        if self._where_predicate is None:
+            return self._stmt
+        return self._stmt.where(self._where_predicate)
 
     # ------------------------------------------------------------------ scope forwarding
 
@@ -675,7 +684,25 @@ class QueryBuilder(Generic[T]):
         new._select_columns = list(self._select_columns) if self._select_columns else None
         new._raw_select_expr = self._raw_select_expr
         new._async_eager = list(self._async_eager)
+        new._where_predicate = self._where_predicate
         return new
+
+    def _with_predicate(self, predicate: ColumnElement[bool]) -> Self:
+        new = self._clone()
+        new._where_predicate = predicate
+        return new
+
+    def _and(self, condition: Any) -> Self:
+        """AND ``condition`` onto the accumulated WHERE."""
+        if self._where_predicate is None:
+            return self._with_predicate(condition)
+        return self._with_predicate(and_(self._where_predicate, condition))
+
+    def _or(self, condition: Any) -> Self:
+        """OR ``condition`` onto the accumulated WHERE (the whole chain, not just the last term)."""
+        if self._where_predicate is None:
+            return self._with_predicate(condition)
+        return self._with_predicate(or_(self._where_predicate, condition))
 
     def _grouped_whereclause(self, callback: Callable[[Self], object]) -> Any:
         """Run a group callback on a fresh sub-builder and return its combined predicate.
@@ -691,25 +718,23 @@ class QueryBuilder(Generic[T]):
                 "where()/or_where() group callback must return the query builder, "
                 "e.g. `lambda q: q.where(...).or_where(...)`."
             )
-        return result._stmt.whereclause
+        return result._where_predicate
 
     def where(self, *clauses: Any, **kwargs: Any) -> Self:
-        stmt = self._stmt
+        qb = self
         for clause in clauses:
             if callable(clause):
                 group = self._grouped_whereclause(clause)
                 if group is not None:
-                    stmt = stmt.where(group)
+                    qb = qb._and(group)
             else:
-                stmt = stmt.where(clause)
+                qb = qb._and(clause)
         for key, value in kwargs.items():
-            col = _resolve_column(self._model, key)
-            stmt = stmt.where(col == value)
-        return self._clone(stmt)
+            qb = qb._and(_resolve_column(self._model, key) == value)
+        return qb if qb is not self else self._clone()
 
-    def or_where(self, *clauses: Any, **kwargs: Any) -> Self:
-        from sqlalchemy import or_
-
+    def _or_terms(self, clauses: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
+        """Combine positional clauses + kwargs into one OR-group predicate (or None)."""
         terms: list[Any] = []
         for clause in clauses:
             if callable(clause):
@@ -719,56 +744,82 @@ class QueryBuilder(Generic[T]):
             else:
                 terms.append(clause)
         for key, value in kwargs.items():
-            col = _resolve_column(self._model, key)
-            terms.append(col == value)
+            terms.append(_resolve_column(self._model, key) == value)
         if not terms:
+            return None
+        return terms[0] if len(terms) == 1 else or_(*terms)
+
+    def or_where(self, *clauses: Any, **kwargs: Any) -> Self:
+        combined = self._or_terms(clauses, kwargs)
+        if combined is None:
             return self._clone()
-        stmt = self._stmt.where(or_(*terms))
-        return self._clone(stmt)
+        return self._or(combined)
 
     def where_in(self, col: Any, values: Iterable[Any]) -> Self:
         column = _resolve_column(self._model, col)
-        return self._clone(self._stmt.where(column.in_(list(values))))
+        return self._and(column.in_(list(values)))
+
+    def or_where_in(self, col: Any, values: Iterable[Any]) -> Self:
+        column = _resolve_column(self._model, col)
+        return self._or(column.in_(list(values)))
 
     def where_not_in(self, col: Any, values: Iterable[Any]) -> Self:
         column = _resolve_column(self._model, col)
-        return self._clone(self._stmt.where(~column.in_(list(values))))
+        return self._and(~column.in_(list(values)))
+
+    def or_where_not_in(self, col: Any, values: Iterable[Any]) -> Self:
+        column = _resolve_column(self._model, col)
+        return self._or(~column.in_(list(values)))
 
     def where_between(self, col: Any, low: Any, high: Any) -> Self:
         column = _resolve_column(self._model, col)
-        return self._clone(self._stmt.where(column.between(low, high)))
+        return self._and(column.between(low, high))
+
+    def or_where_between(self, col: Any, low: Any, high: Any) -> Self:
+        column = _resolve_column(self._model, col)
+        return self._or(column.between(low, high))
 
     def where_not_between(self, col: Any, low: Any, high: Any) -> Self:
         column = _resolve_column(self._model, col)
-        return self._clone(self._stmt.where(~column.between(low, high)))
+        return self._and(~column.between(low, high))
 
     def where_null(self, col: Any) -> Self:
         column = _resolve_column(self._model, col)
-        return self._clone(self._stmt.where(column.is_(None)))
+        return self._and(column.is_(None))
+
+    def or_where_null(self, col: Any) -> Self:
+        column = _resolve_column(self._model, col)
+        return self._or(column.is_(None))
 
     def where_not_null(self, col: Any) -> Self:
         column = _resolve_column(self._model, col)
-        return self._clone(self._stmt.where(column.is_not(None)))
+        return self._and(column.is_not(None))
+
+    def or_where_not_null(self, col: Any) -> Self:
+        column = _resolve_column(self._model, col)
+        return self._or(column.is_not(None))
 
     def where_raw(self, raw_sql: str, bindings: dict[str, Any] | None = None) -> Self:
         clause = text(raw_sql).bindparams(**(bindings or {}))
-        return self._clone(self._stmt.where(clause))
+        return self._and(clause)
+
+    def or_where_raw(self, raw_sql: str, bindings: dict[str, Any] | None = None) -> Self:
+        clause = text(raw_sql).bindparams(**(bindings or {}))
+        return self._or(clause)
 
     def where_column(self, col1: str, col2: str) -> Self:
         c1 = _resolve_column(self._model, col1)
         c2 = _resolve_column(self._model, col2)
-        return self._clone(self._stmt.where(c1 == c2))
+        return self._and(c1 == c2)
 
     def where_exists(self, subquery_fn: Callable[[QueryBuilder[T]], Any]) -> Self:
         from sqlalchemy import exists as sqla_exists
 
         sub = subquery_fn(type(self)(self._model))
         sub_stmt = sub.apply_global_scopes() if hasattr(sub, "apply_global_scopes") else sub
-        return self._clone(self._stmt.where(sqla_exists(sub_stmt)))
+        return self._and(sqla_exists(sub_stmt))
 
     def where_any(self, columns: list[str], operator: str, value: Any) -> Self:
-        from sqlalchemy import or_
-
         if operator not in _WHERE_ANY_OPS:
             raise ValueError(
                 f"where_any() received unsupported operator {operator!r}. "
@@ -777,7 +828,7 @@ class QueryBuilder(Generic[T]):
         parts = [_apply_operator(_resolve_column(self._model, c), operator, value) for c in columns]
         if not parts:
             return self._clone()
-        return self._clone(self._stmt.where(or_(*parts)))
+        return self._and(or_(*parts))
 
     def where_json_path(
         self,
@@ -801,7 +852,7 @@ class QueryBuilder(Generic[T]):
         sql = text(f"{col_name}->>'{path}' = :__json_path_val__").bindparams(
             __json_path_val__=value
         )
-        return self._clone(self._stmt.where(sql))
+        return self._and(sql)
 
     def where_json_contains(
         self,
@@ -816,7 +867,7 @@ class QueryBuilder(Generic[T]):
         sql = text(f"{col_name} @> CAST(:__json_contains_val__ AS jsonb)").bindparams(
             bindparam("__json_contains_val__", payload, type_=String())
         )
-        return self._clone(self._stmt.where(sql))
+        return self._and(sql)
 
     def when(
         self,
@@ -858,6 +909,18 @@ class QueryBuilder(Generic[T]):
     def order_by_raw(self, raw_sql: str) -> Self:
         return self._clone(self._stmt.order_by(text(raw_sql)))
 
+    def order_by_desc(self, col: str) -> Self:
+        return self._clone(self._stmt.order_by(_resolve_column(self._model, col).desc()))
+
+    def reorder(self, *cols: Any) -> Self:
+        """Drop any existing ORDER BY, then optionally apply a new one."""
+        cleared = self._clone(self._stmt.order_by(None))
+        return cleared.order_by(*cols) if cols else cleared
+
+    def in_random_order(self) -> Self:
+        """Order rows randomly. Uses ``random()`` (SQLite/PostgreSQL)."""
+        return self._clone(self._stmt.order_by(func.random()))
+
     def where_full_text(
         self,
         col: InstrumentedAttribute[Any],
@@ -879,7 +942,7 @@ class QueryBuilder(Generic[T]):
 
         tsq = getattr(func, tsquery_fn)(sqla_cast(literal(lang), REGCONFIG), query)
         clause = col.op("@@")(tsq)
-        return self._clone(self._stmt.where(clause))
+        return self._and(clause)
 
     def order_by_relevance(
         self,
@@ -913,8 +976,25 @@ class QueryBuilder(Generic[T]):
         resolved = [_resolve_column(self._model, c) if isinstance(c, str) else c for c in cols]
         return self._clone(self._stmt.group_by(*resolved))
 
-    def having(self, clause: Any) -> Self:
-        return self._clone(self._stmt.having(clause))
+    def group_by_raw(self, raw_sql: str) -> Self:
+        return self._clone(self._stmt.group_by(text(raw_sql)))
+
+    def having(self, column: Any, operator: str | None = None, value: Any = _UNSET) -> Self:
+        """Add a HAVING clause.
+
+        Pass a ready SQL expression (``having(func.count() > 5)``) or the
+        operator form (``having("total", ">", 5)``).
+        """
+        if operator is None:
+            return self._clone(self._stmt.having(column))
+        col = _resolve_column(self._model, column) if isinstance(column, str) else column
+        return self._clone(self._stmt.having(_apply_operator(col, operator, value)))
+
+    def having_null(self, col: str) -> Self:
+        return self._clone(self._stmt.having(_resolve_column(self._model, col).is_(None)))
+
+    def having_between(self, col: str, low: Any, high: Any) -> Self:
+        return self._clone(self._stmt.having(_resolve_column(self._model, col).between(low, high)))
 
     def having_raw(self, raw_sql: str, bindings: dict[str, Any] | None = None) -> Self:
         clause = text(raw_sql).bindparams(**(bindings or {}))
@@ -1057,7 +1137,7 @@ class QueryBuilder(Generic[T]):
 
         target = _resolve_relation(self._model, relation)
         sub = _exists_subquery(self._model, target, constraint)
-        return self._clone(self._stmt.where(sqla_exists(sub)))
+        return self._and(sqla_exists(sub))
 
     def where_relation(self, relation: str | Any, column: str, value: Any) -> Self:
         """Filter to rows whose related model has ``column == value`` (Eloquent's whereRelation)."""
@@ -1068,7 +1148,7 @@ class QueryBuilder(Generic[T]):
 
         target = _resolve_relation(self._model, relation)
         sub = _exists_subquery(self._model, target)
-        return self._clone(self._stmt.where(~sqla_exists(sub)))
+        return self._and(~sqla_exists(sub))
 
     def has(self, relation: str | Any, operator: str = ">=", count: int = 1) -> Self:
         target = _resolve_relation(self._model, relation)
@@ -1082,7 +1162,7 @@ class QueryBuilder(Generic[T]):
             "!=": cnt_sub != count,
         }
         cond = op_map.get(operator, cnt_sub >= count)
-        return self._clone(self._stmt.where(cond))
+        return self._and(cond)
 
     def where_pivot(self, column: str, value: Any) -> Self:
         """Filter via pivot table column — only valid on BelongsToManyAccessor.
@@ -1144,32 +1224,34 @@ class QueryBuilder(Generic[T]):
         # ``Select.from_statement`` is typed by SQLAlchemy as the more general
         # ``ExecutableReturnsRows``; at runtime it returns the originating
         # ``Select`` instance, which is what ``_clone`` consumes.
-        return self._clone(cast("Select[Any]", select(self._model).from_statement(combined)))
+        new = self._clone(cast("Select[Any]", select(self._model).from_statement(combined)))
+        # WHERE is already baked into the union operands; don't re-apply it.
+        new._where_predicate = None
+        return new
 
     def union_all(self, other: QueryBuilder[Any]) -> Self:
         """UNION ALL (keeps duplicates)."""
         combined = self.apply_global_scopes().union_all(other.apply_global_scopes())
-        return self._clone(cast("Select[Any]", select(self._model).from_statement(combined)))
+        new = self._clone(cast("Select[Any]", select(self._model).from_statement(combined)))
+        new._where_predicate = None
+        return new
 
     # ------------------------------------------------------------------ apply scopes
 
     def apply_global_scopes(self) -> Select[Any]:
-        if self._remove_all_global_scopes:
-            stmt = self._stmt
-        else:
+        target: QueryBuilder[Any] = self
+        if not self._remove_all_global_scopes:
             scopes: dict[str, Callable[[QueryBuilder[Any]], QueryBuilder[Any]]] = getattr(
                 self._model, "__arvel_global_scopes__", {}
             )
-            if not scopes:
-                stmt = self._stmt
-            else:
-                current_qb: QueryBuilder[Any] = self
-                for name, scope_fn in scopes.items():
-                    if name in self._removed_global_scopes:
-                        continue
-                    current_qb = scope_fn(current_qb)
-                stmt = current_qb._stmt
+            for name, scope_fn in scopes.items():
+                if name in self._removed_global_scopes:
+                    continue
+                target = scope_fn(target)
 
+        stmt = target._stmt
+        if target._where_predicate is not None:
+            stmt = stmt.where(target._where_predicate)
         for _name, cte in self._ctes:
             stmt = stmt.add_cte(cte)
         return stmt
@@ -1200,6 +1282,7 @@ class QueryBuilder(Generic[T]):
         rb._removed_global_scopes = set(self._removed_global_scopes)
         rb._remove_all_global_scopes = self._remove_all_global_scopes
         rb._ctes = list(self._ctes)
+        rb._where_predicate = self._where_predicate
         return rb
 
     # ------------------------------------------------------------------ SQL inspection
@@ -1420,9 +1503,12 @@ class QueryBuilder(Generic[T]):
     async def get(self) -> Any:
         return await self.all()
 
-    async def count(self) -> int:
+    async def count(self, column: str | None = None) -> int:
         stmt = self.apply_global_scopes()
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+        sub = stmt.subquery()
+        # COUNT(col) skips NULLs; COUNT(*) counts every row.
+        counter = func.count(sub.c[column]) if column is not None else func.count()
+        count_stmt = select(counter).select_from(sub)
         result = await get_active_session().execute(count_stmt)
         return int(result.scalar_one())
 
@@ -1445,11 +1531,17 @@ class QueryBuilder(Generic[T]):
         result = await get_active_session().execute(stmt)
         return result.scalar()
 
-    async def pluck(self, col: str) -> list[Any]:
+    async def pluck(self, col: str, key: str | None = None) -> list[Any] | dict[Any, Any]:
+        """Return a flat list of one column, or ``{key: value}`` when ``key`` is given."""
         column = _resolve_column(self._model, col)
-        stmt = self.apply_global_scopes().with_only_columns(column)
-        result = await get_active_session().execute(stmt)
-        return list(result.scalars().all())
+        if key is None:
+            stmt = self.apply_global_scopes().with_only_columns(column)
+            result = await get_active_session().execute(stmt)
+            return list(result.scalars().all())
+        key_col = _resolve_column(self._model, key)
+        stmt = self.apply_global_scopes().with_only_columns(key_col, column)
+        rows = (await get_active_session().execute(stmt)).all()
+        return {row[0]: row[1] for row in rows}
 
     # ------------------------------------------------------------------ aggregates
 
@@ -1457,7 +1549,9 @@ class QueryBuilder(Generic[T]):
         column = _resolve_column(self._model, col)
         stmt = self.apply_global_scopes().with_only_columns(func.sum(column))
         result = await get_active_session().execute(stmt)
-        return result.scalar_one_or_none()
+        # Laravel returns 0 for an empty set, not null.
+        value = result.scalar_one_or_none()
+        return value if value is not None else 0
 
     async def avg(self, col: str) -> Any:
         column = _resolve_column(self._model, col)

@@ -335,3 +335,33 @@ events:
       Gates: arvel 751 db tests (744 + 7 new), mypy clean, pyright 0/0/0, ruff clean, bandit +
       gitleaks clean. 4b + release skipped (L2/Tier2). 005-S10 marked DONE. ADR-129.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-008"
+    event_id: "EV-028"
+    timestamp: "2026-05-30T21:15:00+03:00"
+    from_stage: "planning"
+    to_stage: "execution"
+    role: "solution-architect"
+    result: "pass"
+    notes: >
+      005-S13 + WHERE predicate engine. ADR-130: QueryBuilder accumulates WHERE in
+      _where_predicate (ColumnElement|None) applied in apply_global_scopes/statement, enabling
+      real or_where/or_where_* OR-onto-chain with explicit grouping ((a OR b) AND c). Routed
+      all where_* through _and, or_where_* through _or. Clause bundle: order_by_desc, reorder,
+      in_random_order, group_by_raw, operator-form having + having_null/between, pluck(value,
+      key)->dict, count(column), sum()->0.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-008"
+    event_id: "EV-029"
+    timestamp: "2026-05-30T21:30:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      Gates: arvel full fast suite 3483 pass (incl 11 new test_qb_clause_polish), permission 75,
+      ecommerce 407, mypy clean, pyright 0/0/0, ruff clean, bandit + gitleaks clean. union/
+      union_all fixed to clear baked-in predicate; sum-empty test updated to 0 (Laravel parity).
+      4b + release skipped (L2/Tier2). 005-S13 marked DONE. ADR-130.
+    handoff_id: null

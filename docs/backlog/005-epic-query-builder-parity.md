@@ -170,11 +170,13 @@ code expects to find.
 **As a** developer, **I want** the remaining clause variants — `or_where_in/null/raw/between`, operator-form `having` + `having_null/between`, `reorder`, `in_random_order`, `order_by_desc`, `group_by_raw`, `pluck(value, key)` returning a dict, `count(column)`, and `sum()` defaulting to 0 — **so that** common Laravel idioms have a direct Arvel equivalent.
 
 **Acceptance Criteria**:
-- [ ] Each listed method exists with Laravel-equivalent semantics and is covered by a unit test.
-- [ ] `pluck("name", "id")` returns `{id: name}`; `sum()` over an empty set returns `0`.
+- [x] Each listed method exists with Laravel-equivalent semantics and is covered by a unit test.
+- [x] `pluck("name", "id")` returns `{id: name}`; `sum()` over an empty set returns `0`.
 
 **Priority**: Could
 **Complexity**: Medium
+**Status**: DONE — WI-arvel-008, ADR-130 (`test_qb_clause_polish.py`). Includes the WHERE
+predicate engine (real `or_where`/`or_where_*` OR-onto-chain) and the clause-variant bundle.
 
 ## Dependencies
 

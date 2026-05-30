@@ -377,7 +377,8 @@ async def test_min(engine: AsyncEngine, session: AsyncSession) -> None:
 
 async def test_aggregates_return_none_on_empty(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
-    assert await ItemS1.where(ItemS1.name == "nope").sum("score") is None
+    # sum() follows Laravel: 0 for an empty set, not null.
+    assert await ItemS1.where(ItemS1.name == "nope").sum("score") == 0
     assert await ItemS1.where(ItemS1.name == "nope").avg("score") is None
     assert await ItemS1.where(ItemS1.name == "nope").max("score") is None
     assert await ItemS1.where(ItemS1.name == "nope").min("score") is None
