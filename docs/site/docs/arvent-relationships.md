@@ -34,9 +34,13 @@ recent = await user.posts().order_by("-created_at").limit(5).get()
 # Writing through the relation sets the FK automatically
 new_post = await user.posts().create(title="hello", body="world")
 await user.posts().save(existing_post)
+
+# Batch writes
+await user.posts().create_many([{"title": "a"}, {"title": "b"}])
+await user.posts().save_many([draft1, draft2])
 ```
 
-`save()` and `create()` both go through `Model.save()` / `Model.create()`, so observer events (`creating` / `created` / `saving` / `saved`), mutators, and timestamps all run — writing through a relation is not a shortcut around the model lifecycle.
+`save()`, `create()`, and their `_many` batch forms all go through `Model.save()` / `Model.create()`, so observer events (`creating` / `created` / `saving` / `saved`), mutators, and timestamps all run — writing through a relation is not a shortcut around the model lifecycle.
 
 The method returns a `QueryBuilder` scoped to `WHERE user_id = user.id` — every builder method chains normally before the terminal `get()` / `first()` / `count()`.
 
