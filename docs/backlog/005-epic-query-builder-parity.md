@@ -137,10 +137,17 @@ SELECT), `increment_each`/`decrement_each` (multi-column in one UPDATE).
 **As a** frontend consumer, **I want** `paginate`/`simple_paginate`/`cursor_paginate` to support `page_name`, request page resolution, `appends`/`with_query_string`/`fragment`, an `on_each_side` link window, bidirectional cursors, and a Laravel-shaped JSON envelope, **so that** Arvel endpoints are drop-in compatible with Laravel API clients and resources.
 
 **Acceptance Criteria**:
-- [ ] Given a request, when `paginate()` is called without an explicit page, then the current page resolves from the configured `page_name` query param.
-- [ ] Given a paginator result, when serialized, then it can emit Laravel's flat envelope (`current_page`, `data`, `next_page_url`, `path`, `from`, `to`, `total`, ...).
-- [ ] Given `cursor_paginate()`, then both `next_cursor` and `prev_cursor` are produced and a previous page can be fetched.
-- [ ] Given `appends({...}).with_query_string()`, then generated URLs preserve query parameters.
+- [x] Given a request, when `paginate()` is called without an explicit page, then the current page resolves from the configured `page_name` query param.
+- [x] Given a paginator result, when serialized, then it can emit Laravel's flat envelope (`current_page`, `data`, `next_page_url`, `path`, `from`, `to`, `total`, ...).
+- [x] Given `cursor_paginate()`, then both `next_cursor` and `prev_cursor` are produced and a previous page can be fetched.
+- [x] Given `appends({...}).with_query_string()`, then generated URLs preserve query parameters.
+
+**Status**: DONE — WI-arvel-014, ADR-135 (`test_qb_pagination_parity.py`). `PaginationRequest`
+contextvar set by `ObservabilityMiddleware`; `paginate`/`simple_paginate` resolve the page via
+`page_name`; `Paginator.to_response()` emits the flat Laravel envelope with the windowed `links`
+array (`on_each_side`) + `&laquo; Previous`/`Next &raquo;` bookends; `appends`/`with_query_string`/
+`fragment` chainable on the paginator; `cursor_paginate` is bidirectional (`next_cursor` +
+`prev_cursor`, walks both ways) with flat `to_response()`.
 
 **Documentation Requirements**:
 - [ ] Document the JSON envelope shapes and the cursor encoding.

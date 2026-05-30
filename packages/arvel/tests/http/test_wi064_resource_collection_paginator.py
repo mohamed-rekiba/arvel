@@ -209,8 +209,8 @@ class TestCursorPaginatorCollection:
             next_cursor="eyJpZCI6IDF9",
         )
         body = UserResource.collection(page).to_dict(_DummyRequest())
-        # No URL context → the raw cursor token is the link value.
-        assert body["links"] == {"next": "eyJpZCI6IDF9"}
+        # No URL context → the raw cursor token is the link value. prev is None (first page).
+        assert body["links"] == {"prev": None, "next": "eyJpZCI6IDF9"}
         assert body["meta"] == {"per_page": 10, "has_more": True}
         assert body["data"] == [{"id": 1, "email": "a@x.io"}]
 
