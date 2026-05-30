@@ -210,6 +210,27 @@ work_items:
       increment_each/decrement_each. ADR-132. Gates: arvel 794 db tests; mypy/pyright/ruff/
       bandit (0)/gitleaks clean.
 
+  - id: "WI-arvel-012"
+    name: "Subquery FROM/JOIN/SELECT (backlog 005 S3)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T22:45:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      from_sub (derived table → dict rows), join_sub/left_join_sub (closure receives the
+      aliased subquery), select_sub (correlated scalar subquery → labeled column), add_select
+      (append model cols or SQLAlchemy expressions). Appended columns attach onto the model via
+      the existing __with_agg__ row-shaping path. ADR-133. Gates: arvel 799 db tests; mypy/
+      pyright/ruff/bandit/gitleaks clean.
+
   - id: "WI-arvel-008"
     name: "WHERE predicate engine + clause polish (backlog 005 S13)"
     complexity: "L2"
