@@ -125,3 +125,56 @@ def test_provider_wires_orm_translator_by_default() -> None:
     translated = wired[ModelNotFoundError](ModelNotFoundError("User", 1))
     assert isinstance(translated, NotFoundException)
     assert translated.status_code == 404
+
+
+def test_provider_wires_auth_exceptions_to_401_and_403() -> None:
+    from arvel.auth.exceptions import AuthorizationException as AuthForbidden
+    from arvel.auth.exceptions import UnauthenticatedException as AuthUnauth
+    from arvel.http.exceptions import AuthorizationException, UnauthenticatedException
+    from arvel.providers.http_provider import default_translators
+
+    wired = default_translators()
+    assert AuthUnauth in wired
+    assert AuthForbidden in wired
+
+    unauth = wired[AuthUnauth](AuthUnauth())
+    assert isinstance(unauth, UnauthenticatedException)
+    assert unauth.status_code == 401
+
+    forbidden = wired[AuthForbidden](AuthForbidden())
+    assert isinstance(forbidden, AuthorizationException)
+    assert forbidden.status_code == 403
+
+
+def test_auth_unauthenticated_exception_returns_401_envelope() -> None:
+    from arvel.auth.exceptions import UnauthenticatedException as AuthUnauth
+    from arvel.providers.http_provider import default_translators
+
+    app = FastAPI()
+    HttpExceptionHandler(translators=default_translators()).register(app)
+
+    @app.get("/me")
+    async def handler() -> dict[str, str]:
+        raise AuthUnauth("token expired")
+
+    del handler
+    resp = TestClient(app, raise_server_exceptions=False).get("/me")
+    assert resp.status_code == 401
+    assert resp.json()["error"]["code"] == "UNAUTHENTICATED"
+
+
+def test_auth_authorization_exception_returns_403_envelope() -> None:
+    from arvel.auth.exceptions import AuthorizationException as AuthForbidden
+    from arvel.providers.http_provider import default_translators
+
+    app = FastAPI()
+    HttpExceptionHandler(translators=default_translators()).register(app)
+
+    @app.get("/admin")
+    async def handler() -> dict[str, str]:
+        raise AuthForbidden
+
+    del handler
+    resp = TestClient(app, raise_server_exceptions=False).get("/admin")
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "FORBIDDEN"
