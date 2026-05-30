@@ -346,6 +346,15 @@ def _check_mass_assignment(model_cls: type[Any], attrs: dict[str, Any]) -> None:
             raise MassAssignmentError(model_cls.__name__, key)
 
 
+def _pk_name(model_cls: type[Any]) -> str:
+    """Single-column primary-key attribute name for *model_cls* (Laravel's getKeyName)."""
+    mapper: Mapper[Any] = cast("Mapper[Any]", sqla_inspect(model_cls))
+    key = mapper.primary_key[0].key
+    if key is None:
+        raise TypeError(f"{model_cls.__name__} primary key column has no key")
+    return key
+
+
 def _is_pk_tuple(pk: object) -> TypeGuard[tuple[Any, ...]]:
     return isinstance(pk, tuple)
 
@@ -429,6 +438,13 @@ class ActiveRecord(QueryMixin):
         await fire_async(cls, "saved", instance)
         fire_after_commit(cls, instance)
         return instance
+
+    def fill(self, **attrs: Any) -> Any:
+        """Mass-assign attributes in place, honouring fillable/guarded and mutators."""
+        _check_mass_assignment(type(self), attrs)
+        for key, value in attrs.items():
+            setattr(self, key, value)
+        return self
 
     async def save(self) -> Any:
         from arvel.database.events import fire_after_commit, fire_async, fire_cancellable
@@ -778,12 +794,13 @@ class Model(
         related: type[RelatedT],
         *,
         foreign_key: str | None = None,
-        local_key: str = "id",
+        local_key: str | None = None,
     ) -> HasMany[RelatedT]:
         from arvel.database.orm.relations import HasMany
 
-        fk = foreign_key or f"{Str.snake(type(self).__name__)}_id"
-        owner_pk = getattr(self, local_key)
+        lk = local_key or _pk_name(type(self))
+        fk = foreign_key or f"{Str.snake(type(self).__name__)}_{lk}"
+        owner_pk = getattr(self, lk)
         col = getattr(related, fk)
         qb: HasMany[RelatedT] = HasMany(related, owner=self, fk_col=fk, owner_pk=owner_pk)
         return qb.where(col == owner_pk)
@@ -793,12 +810,13 @@ class Model(
         related: type[RelatedT],
         *,
         foreign_key: str | None = None,
-        local_key: str = "id",
+        local_key: str | None = None,
     ) -> HasOne[RelatedT]:
         from arvel.database.orm.relations import HasOne
 
-        fk = foreign_key or f"{Str.snake(type(self).__name__)}_id"
-        owner_pk = getattr(self, local_key)
+        lk = local_key or _pk_name(type(self))
+        fk = foreign_key or f"{Str.snake(type(self).__name__)}_{lk}"
+        owner_pk = getattr(self, lk)
         col = getattr(related, fk)
         qb: HasOne[RelatedT] = HasOne(related, owner=self, fk_col=fk, owner_pk=owner_pk)
         return qb.where(col == owner_pk)
@@ -808,14 +826,15 @@ class Model(
         related: type[RelatedT],
         *,
         foreign_key: str | None = None,
-        owner_key: str = "id",
+        owner_key: str | None = None,
     ) -> BelongsTo[RelatedT]:
         from arvel.database.orm.relations import BelongsTo
 
-        fk = foreign_key or f"{Str.snake(related.__name__)}_id"
+        ok = owner_key or _pk_name(related)
+        fk = foreign_key or f"{Str.snake(related.__name__)}_{ok}"
         fk_value = getattr(self, fk, None)
-        pk_col = getattr(related, owner_key)
-        qb: BelongsTo[RelatedT] = BelongsTo(related, owner=self, fk_attr=fk, owner_key=owner_key)
+        pk_col = getattr(related, ok)
+        qb: BelongsTo[RelatedT] = BelongsTo(related, owner=self, fk_attr=fk, owner_key=ok)
         if fk_value is not None:
             qb = qb.where(pk_col == fk_value)
         return qb

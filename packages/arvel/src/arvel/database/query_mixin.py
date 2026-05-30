@@ -439,6 +439,18 @@ class QueryMixin:
         return await cls.query().update_or_create(attributes, values)
 
     @classmethod
+    async def first_or_create(
+        cls, attributes: dict[str, Any], values: dict[str, Any] | None = None
+    ) -> Self:
+        return await cls.query().first_or_create(attributes, values)
+
+    @classmethod
+    async def first_or_new(
+        cls, attributes: dict[str, Any], values: dict[str, Any] | None = None
+    ) -> Self:
+        return await cls.query().first_or_new(attributes, values)
+
+    @classmethod
     async def upsert(
         cls,
         rows: list[dict[str, Any]],

@@ -7,13 +7,27 @@ ADR-022: the ``{name}_type`` column stores the owner's unqualified class name
 from __future__ import annotations
 
 from collections.abc import Generator
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
+from sqlalchemy.orm import Mapper
 
 from arvel.database.session import get_active_session
 
+if TYPE_CHECKING:
+    from arvel.database.model import Model
+
 T = TypeVar("T")
+
+
+def _owner_pk(owner: Model) -> Any:
+    """Owner primary-key value, resolved via the mapper (supports non-"id"/UUID PKs)."""
+    mapper: Mapper[Any] = cast("Mapper[Any]", sa_inspect(type(owner)))
+    pk_key = mapper.primary_key[0].key
+    if pk_key is None:
+        raise TypeError(f"{type(owner).__name__} primary key column has no key")
+    return getattr(owner, pk_key)
 
 
 # ── MorphOne ──────────────────────────────────────────────────────────────────
@@ -44,7 +58,7 @@ class MorphOneAccessor(Generic[T]):
         stmt = (
             select(self._related_model)
             .where(type_col == owner_type)
-            .where(id_col == self._owner.id)
+            .where(id_col == _owner_pk(self._owner))
         )
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
@@ -54,7 +68,7 @@ class MorphOneAccessor(Generic[T]):
     async def create(self, **attrs: Any) -> T:
         """Create a related row with discriminator columns set automatically."""
         attrs[f"{self._name}_type"] = type(self._owner).__name__
-        attrs[f"{self._name}_id"] = self._owner.id
+        attrs[f"{self._name}_id"] = _owner_pk(self._owner)
         model: Any = self._related_model
         return await model.create(**attrs)  # type: ignore[no-any-return]
 
@@ -98,7 +112,7 @@ class MorphManyAccessor(Generic[T]):
         stmt = (
             select(self._related_model)
             .where(type_col == owner_type)
-            .where(id_col == self._owner.id)
+            .where(id_col == _owner_pk(self._owner))
         )
         result = await session.execute(stmt)
         return list(result.scalars())
@@ -106,7 +120,7 @@ class MorphManyAccessor(Generic[T]):
     async def create(self, **attrs: Any) -> T:
         """Create a related row with discriminator columns set automatically."""
         attrs[f"{self._name}_type"] = type(self._owner).__name__
-        attrs[f"{self._name}_id"] = self._owner.id
+        attrs[f"{self._name}_id"] = _owner_pk(self._owner)
         model: Any = self._related_model
         return await model.create(**attrs)  # type: ignore[no-any-return]
 

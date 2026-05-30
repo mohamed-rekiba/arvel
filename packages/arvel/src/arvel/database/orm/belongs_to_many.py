@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
 
 from sqlalchemy import Table, delete, insert, select
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.orm import Mapper
 
 from arvel.database.session import get_active_session
+
+if TYPE_CHECKING:
+    from arvel.database.model import Model
 
 T = TypeVar("T")
 
@@ -29,7 +33,7 @@ class BelongsToManyAccessor(Generic[T]):
 
     def __init__(
         self,
-        owner: Any,
+        owner: Model,
         related_model: type[T],
         table: Table,
         foreign_key: str,
@@ -40,6 +44,17 @@ class BelongsToManyAccessor(Generic[T]):
         self._table = table
         self._fk = foreign_key
         self._rfk = related_foreign_key
+        # Resolve the owner PK column name once; reads stay lazy so a freshly
+        # flushed autoincrement id is picked up. Supports non-"id" / UUID PKs.
+        owner_mapper: Mapper[Any] = cast("Mapper[Any]", sa_inspect(type(owner)))
+        pk_key = owner_mapper.primary_key[0].key
+        if pk_key is None:
+            raise TypeError(f"{type(owner).__name__} primary key column has no key")
+        self._owner_key: str = pk_key
+
+    @property
+    def _owner_id(self) -> Any:
+        return getattr(self._owner, self._owner_key)
 
     # ── async iteration ────────────────────────────────────────────────────
 
@@ -55,7 +70,7 @@ class BelongsToManyAccessor(Generic[T]):
         stmt = (
             select(self._related_model)
             .join(self._table, self._table.c[self._rfk] == pk_col)
-            .where(self._table.c[self._fk] == self._owner.id)
+            .where(self._table.c[self._fk] == self._owner_id)
         )
         result = await session.execute(stmt)
         for row in result.scalars():
@@ -68,7 +83,7 @@ class BelongsToManyAccessor(Generic[T]):
         session = get_active_session()
         check = (
             select(self._table)
-            .where(self._table.c[self._fk] == self._owner.id)
+            .where(self._table.c[self._fk] == self._owner_id)
             .where(self._table.c[self._rfk] == related_id)
         )
         existing = (await session.execute(check)).fetchone()
@@ -76,7 +91,7 @@ class BelongsToManyAccessor(Generic[T]):
             return False
         await session.execute(
             insert(self._table).values(
-                **{self._fk: self._owner.id, self._rfk: related_id, **pivot_kwargs}
+                **{self._fk: self._owner_id, self._rfk: related_id, **pivot_kwargs}
             )
         )
         await session.flush()
@@ -87,7 +102,7 @@ class BelongsToManyAccessor(Generic[T]):
         session = get_active_session()
         await session.execute(
             delete(self._table)
-            .where(self._table.c[self._fk] == self._owner.id)
+            .where(self._table.c[self._fk] == self._owner_id)
             .where(self._table.c[self._rfk] == related_id)
         )
         await session.flush()
@@ -95,7 +110,7 @@ class BelongsToManyAccessor(Generic[T]):
     async def sync(self, related_ids: list[int]) -> None:
         """Replace all pivot rows with exactly related_ids."""
         session = get_active_session()
-        stmt = select(self._table.c[self._rfk]).where(self._table.c[self._fk] == self._owner.id)
+        stmt = select(self._table.c[self._rfk]).where(self._table.c[self._fk] == self._owner_id)
         current_ids: set[int] = set((await session.execute(stmt)).scalars())
         new_ids = set(related_ids)
         for rid in current_ids - new_ids:
@@ -106,7 +121,7 @@ class BelongsToManyAccessor(Generic[T]):
     async def sync_without_detaching(self, related_ids: list[int]) -> None:
         """Attach related_ids that aren't already attached; never remove existing rows."""
         session = get_active_session()
-        stmt = select(self._table.c[self._rfk]).where(self._table.c[self._fk] == self._owner.id)
+        stmt = select(self._table.c[self._rfk]).where(self._table.c[self._fk] == self._owner_id)
         current_ids: set[int] = set((await session.execute(stmt)).scalars())
         for rid in set(related_ids) - current_ids:
             await self.attach(rid)
@@ -121,7 +136,7 @@ class BelongsToManyAccessor(Generic[T]):
         stmt = (
             select(self._related_model)
             .join(self._table, self._table.c[self._rfk] == pk_col)
-            .where(self._table.c[self._fk] == self._owner.id)
+            .where(self._table.c[self._fk] == self._owner_id)
             .where(self._table.c[column] == value)
         )
         result = await session.execute(stmt)
@@ -132,7 +147,7 @@ class BelongsToManyAccessor(Generic[T]):
         session = get_active_session()
         check = (
             select(self._table)
-            .where(self._table.c[self._fk] == self._owner.id)
+            .where(self._table.c[self._fk] == self._owner_id)
             .where(self._table.c[self._rfk] == related_id)
         )
         row = (await session.execute(check)).mappings().fetchone()
@@ -145,7 +160,7 @@ class BelongsToManyAccessor(Generic[T]):
         session = get_active_session()
         check = (
             select(self._table)
-            .where(self._table.c[self._fk] == self._owner.id)
+            .where(self._table.c[self._fk] == self._owner_id)
             .where(self._table.c[self._rfk] == related_id)
         )
         existing = (await session.execute(check)).fetchone()
