@@ -67,6 +67,17 @@ class MorphVideo(Model, Timestamps):
     image: ClassVar[MorphOne[MorphImage]] = MorphOne(MorphImage, name="imageable")
 
 
+class MorphArticle(Model, Timestamps):
+    """Owner with a non-"id" string primary key — exercises mapper-based PK resolution."""
+
+    __tablename__ = "morph_articles"
+
+    slug: Mapped[str] = mapped_column(String(80), primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+
+    comments: ClassVar[MorphMany[MorphComment]] = MorphMany(MorphComment, name="commentable")
+
+
 async def _create_tables(engine: Any) -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -211,6 +222,19 @@ async def test_two_owners_share_polymorphic_table(engine: Any, session: AsyncSes
     assert post_result.id == post_img.id
     assert video_result.id == video_img.id
     assert post_result.id != video_result.id
+
+
+async def test_morph_many_resolves_non_id_primary_key(engine: Any, session: AsyncSession) -> None:
+    """Owner PK is resolved via the mapper, so non-"id" PKs work end to end."""
+    await _create_tables(engine)
+    article = await MorphArticle.create(slug="intro", title="Intro")
+
+    comment = await article.comments.create(body="On a slug-keyed owner")
+
+    assert comment.commentable_type == "MorphArticle"
+    assert comment.commentable_id == "intro"  # the slug, not a missing .id
+    fetched = await article.comments.all()
+    assert [c.id for c in fetched] == [comment.id]
 
 
 async def test_polymorphic_images_are_isolated_by_owner_type(

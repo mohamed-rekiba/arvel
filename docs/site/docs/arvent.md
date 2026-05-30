@@ -173,6 +173,7 @@ post = await Post.create(title="hello", body="world")
 post = await Post.find(post.id)
 post = await Post.find_or_fail(post.id)
 
+post.fill(title="edited", body="...")  # mass-assign (honours __fillable__/__guarded__)
 await post.save()
 await post.delete()                # soft delete (if SoftDeletes is mixed in)
 await post.force_delete()          # hard delete
@@ -180,6 +181,23 @@ await post.restore()               # un-soft-delete
 
 fresh = await post.fresh()         # reload from DB into a new instance
 await post.refresh()               # in-place reload
+```
+
+### Get-or-create helpers
+
+These mirror Laravel's `firstOrCreate` / `firstOrNew` / `updateOrCreate`. The
+first argument is the attributes to match on; the second is extra values used
+only when creating. The searched attributes are always merged into the new row:
+
+```python
+# Find by email, or create with email + name. The email is persisted too.
+user = await User.first_or_create({"email": "a@b.com"}, {"name": "Alice"})
+
+# Same lookup, but returns an unsaved instance you can tweak before save().
+user = await User.first_or_new({"email": "a@b.com"}, {"name": "Alice"})
+
+# Match on email; update name if found, otherwise create with both.
+user = await User.update_or_create({"email": "a@b.com"}, {"name": "Alice"})
 ```
 
 ## QueryBuilder

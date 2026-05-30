@@ -111,6 +111,16 @@ new_profile = await user.profile().create(bio="...")
 
 FK is inferred as `user_id` by default. Pass `foreign_key="..."` to override.
 
+### Non-`id` primary keys
+
+`has_one`, `has_many`, and `belongs_to` resolve the local/owner key from the
+model's actual primary key, not a hardcoded `id`. A model keyed on `uuid` or a
+string `slug` works without extra config — the inferred FK follows the key name
+(e.g. `{owner}_uuid`). Pass `local_key=` / `owner_key=` to override. Pivot
+(`BelongsToMany`) and polymorphic (`MorphOne` / `MorphMany`) relations resolve
+the owner's PK the same way, so attach/detach/sync and morph creates work on
+non-`id` owners too.
+
 ## Belongs to (inverse)
 
 ```python

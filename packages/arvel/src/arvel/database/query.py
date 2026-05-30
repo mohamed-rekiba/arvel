@@ -999,22 +999,24 @@ class QueryBuilder(Generic[T]):
         instance = await self.first()
         return instance if instance is not None else callback()
 
-    async def first_or_create(self, defaults: dict[str, Any] | None = None) -> T:
-        """Return the first matching row, or create it with *defaults* merged in."""
-        instance = await self.first()
+    async def first_or_create(
+        self, attributes: dict[str, Any], values: dict[str, Any] | None = None
+    ) -> T:
+        """Return the first row matching *attributes*, or create it with *attributes* + *values*."""
+        instance = await self.where(**attributes).first()
         if instance is not None:
             return instance
-        return cast("T", await self._model.create(**(defaults or {})))  # type: ignore[attr-defined]
+        model_factory = cast("_ModelFactory", self._model)
+        return cast("T", await model_factory.create(**{**attributes, **(values or {})}))
 
-    async def first_or_new(self, defaults: dict[str, Any] | None = None) -> T:
-        """Return the first matching row, or return an unsaved new instance with *defaults*."""
-        instance = await self.first()
+    async def first_or_new(
+        self, attributes: dict[str, Any], values: dict[str, Any] | None = None
+    ) -> T:
+        """Return the first row matching *attributes*, or an unsaved instance built from both."""
+        instance = await self.where(**attributes).first()
         if instance is not None:
             return instance
-        new_instance: T = object.__new__(self._model)
-        for key, value in (defaults or {}).items():
-            object.__setattr__(new_instance, key, value)
-        return new_instance
+        return cast("T", cast("Any", self._model)(**{**attributes, **(values or {})}))
 
     async def update_or_create(self, attributes: dict[str, Any], values: dict[str, Any]) -> T:
         """Update the first row matching attributes, or create it."""

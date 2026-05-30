@@ -192,3 +192,58 @@ async def test_update_or_create_updates_existing_model(engine: Any, session: Asy
     refreshed = await Bag.find(created.id)
     assert refreshed is not None
     assert refreshed.qty == 7
+
+
+async def test_first_or_create_persists_searched_attributes(
+    engine: Any, session: AsyncSession
+) -> None:
+    await _setup(engine)
+
+    bag = await Bag.first_or_create({"name": "satchel"}, {"qty": 3})
+
+    assert bag.id is not None
+    # The searched attribute must be stored, not just the values.
+    assert bag.name == "satchel"
+    assert bag.qty == 3
+    found = await Bag.where(Bag.name == "satchel").first()
+    assert found is not None
+    assert found.id == bag.id
+
+
+async def test_first_or_create_returns_existing_without_duplicating(
+    engine: Any, session: AsyncSession
+) -> None:
+    await _setup(engine)
+    original = await Bag.create(name="tote", qty=1)
+
+    again = await Bag.first_or_create({"name": "tote"}, {"qty": 99})
+
+    assert again.id == original.id
+    assert again.qty == 1  # existing row untouched
+    assert len(await Bag.where(Bag.name == "tote").all()) == 1
+
+
+async def test_first_or_new_returns_unsaved_with_merged_attributes(
+    engine: Any, session: AsyncSession
+) -> None:
+    await _setup(engine)
+
+    bag = await Bag.first_or_new({"name": "duffel"}, {"qty": 5})
+
+    assert bag.name == "duffel"
+    assert bag.qty == 5
+    # Not persisted: no matching row exists in the table.
+    assert await Bag.where(Bag.name == "duffel").first() is None
+
+
+async def test_fill_mass_assigns_in_place(engine: Any, session: AsyncSession) -> None:
+    await _setup(engine)
+    bag = await Bag.create(name="clutch", qty=0)
+
+    bag.fill(qty=12, note="filled")
+    await bag.save()
+
+    refreshed = await Bag.find(bag.id)
+    assert refreshed is not None
+    assert refreshed.qty == 12
+    assert refreshed.note == "filled"
