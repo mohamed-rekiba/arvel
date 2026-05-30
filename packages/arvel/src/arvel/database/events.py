@@ -20,10 +20,12 @@ class _ObserverRuntime:
 
 
 # Events fired from arvel's async persistence methods.
-_ASYNC_EVENTS = frozenset({"created", "saved", "saving", "updated", "deleted", "retrieved"})
+_ASYNC_EVENTS = frozenset(
+    {"created", "saved", "saving", "updated", "deleted", "retrieved", "restored"}
+)
 
 # Before-hooks; ``False`` return aborts the pending write.
-_CANCELLABLE_EVENTS = frozenset({"creating", "updating", "deleting"})
+_CANCELLABLE_EVENTS = frozenset({"creating", "updating", "deleting", "restoring"})
 
 
 def _get_observers(model_cls: type[Any]) -> list[Any]:
@@ -71,10 +73,10 @@ class Observer(Generic[T]):
 
     Subclasses can implement any combination of sync or async methods:
     ``creating / created / updating / updated / deleting / deleted /
-    saving / saved / retrieved``.
+    restoring / restored / saving / saved / retrieved``.
 
-    ``creating``, ``updating``, and ``deleting`` may return ``False`` to abort
-    the pending operation.
+    ``creating``, ``updating``, ``deleting``, and ``restoring`` may return
+    ``False`` to abort the pending operation.
 
     ``after_commit`` is called after the surrounding transaction commits. It
     receives the model instance and should be used for side-effects that must

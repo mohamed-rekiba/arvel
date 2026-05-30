@@ -181,7 +181,12 @@ await post.restore()               # un-soft-delete
 
 fresh = await post.fresh()         # reload from DB into a new instance
 await post.refresh()               # in-place reload
+
+clone = await post.replicate()     # unsaved copy: no PK, no timestamps, not trashed
 ```
+
+`replicate()` drops the primary key, `created_at` / `updated_at`, and the
+soft-delete column by default. Pass `except_=[...]` to skip extra fields.
 
 ### Dirty tracking
 
@@ -317,15 +322,17 @@ Post.observe(PostObserver)
 
 `create()`, `save()`, and `delete()` fire these events:
 
-| Phase | New record | Existing record | Delete |
-|---|---|---|---|
-| Before | `creating` | `updating` | `deleting` |
-| After | `created` | `updated` | `deleted` |
+| Phase | New record | Existing record | Delete | Restore |
+|---|---|---|---|---|
+| Before | `creating` | `updating` | `deleting` | `restoring` |
+| After | `created` | `updated` | `deleted` | `restored` |
 
-All writes also emit `saving` / `saved`. Reads emit `retrieved`.
+All writes also emit `saving` / `saved`. Reads emit `retrieved`. `force_delete()`
+fires `deleting` / `deleted`, and `restore()` fires `restoring` / `restored`.
 
-Return `False` from `creating`, `updating`, or `deleting` to abort the pending
-operation. Arvel raises `OperationCancelledError` and does not flush the change.
+Return `False` from `creating`, `updating`, `deleting`, or `restoring` to abort
+the pending operation. Arvel raises `OperationCancelledError` and does not flush
+the change.
 
 ```python
 from arvel.database.exceptions import OperationCancelledError
