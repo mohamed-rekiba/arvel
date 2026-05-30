@@ -39,6 +39,7 @@ from sqlalchemy.orm import (
     relationship,
     synonym,
 )
+from sqlalchemy.orm.base import NO_VALUE
 from sqlalchemy.orm.decl_api import DCTransformDeclarative
 
 from arvel.database.attributes import CastsAttributes
@@ -573,13 +574,48 @@ class ActiveRecord(QueryMixin):
         mapper: Mapper[Any] = cast("Mapper[Any]", sqla_inspect(type(self)))
         return [c.key for c in mapper.column_attrs]
 
+    def _read_cast(self, key: str, raw: Any) -> Any:
+        if raw is None or raw is NO_VALUE:
+            return raw
+        resolved = type(self).__arvel_cast_resolvers__.get(key)
+        if resolved is not None and resolved.read is not None:
+            return resolved.read(self, key, raw)
+        return raw
+
+    def original_is_equivalent(self, key: str) -> bool:
+        """True when ``key``'s pending value equals its original *cast* value.
+
+        Mirrors Eloquent's ``originalIsEquivalent``: ``"1"`` vs ``1``, a re-serialized
+        JSON string, or an equal decimal in a different form don't count as dirty.
+        """
+        state = sqla_inspect(self)
+        if state is None:
+            return True
+        if key not in state.attrs or not state.attrs[key].history.has_changes():
+            return True
+        original_raw = state.committed_state.get(key, NO_VALUE)
+        current_raw = object.__getattribute__(self, key)
+        # NO_VALUE = pending/unflushed with no committed original → genuinely dirty.
+        if original_raw is NO_VALUE or current_raw is NO_VALUE:
+            return False
+        if current_raw == original_raw:
+            return True
+        if current_raw is None or original_raw is None:
+            return False
+        return bool(self._read_cast(key, current_raw) == self._read_cast(key, original_raw))
+
     def is_dirty(self, *attributes: str) -> bool:
         """True if any (or any of the named) column attributes have unsaved changes."""
         state = sqla_inspect(self)
         if state is None:
             return False
         keys = list(attributes) if attributes else self._arvel_column_keys()
-        return any(state.attrs[k].history.has_changes() for k in keys if k in state.attrs)
+        return any(
+            k in state.attrs
+            and state.attrs[k].history.has_changes()
+            and not self.original_is_equivalent(k)
+            for k in keys
+        )
 
     def is_clean(self, *attributes: str) -> bool:
         return not self.is_dirty(*attributes)
@@ -592,11 +628,13 @@ class ActiveRecord(QueryMixin):
         return {
             k: getattr(self, k)
             for k in self._arvel_column_keys()
-            if k in state.attrs and state.attrs[k].history.has_changes()
+            if k in state.attrs
+            and state.attrs[k].history.has_changes()
+            and not self.original_is_equivalent(k)
         }
 
-    def get_original(self, key: str | None = None, default: Any = None) -> Any:
-        """Value(s) as loaded from the DB (or last save), ignoring unsaved changes."""
+    def get_raw_original(self, key: str | None = None, default: Any = None) -> Any:
+        """Pre-cast value(s) as loaded from the DB (or last save), ignoring pending changes."""
         state = sqla_inspect(self)
         if state is None:
             return default if key is not None else {}
@@ -604,10 +642,16 @@ class ActiveRecord(QueryMixin):
             if key in state.committed_state:
                 return state.committed_state[key]
             return getattr(self, key, default)
-        original: dict[str, Any] = {}
-        for k in self._arvel_column_keys():
-            original[k] = state.committed_state.get(k, getattr(self, k))
-        return original
+        return {
+            k: state.committed_state.get(k, getattr(self, k)) for k in self._arvel_column_keys()
+        }
+
+    def get_original(self, key: str | None = None, default: Any = None) -> Any:
+        """Original value(s), cast like Eloquent's ``getOriginal``. See ``get_raw_original``."""
+        raw = self.get_raw_original(key, default)
+        if key is not None:
+            return self._read_cast(key, raw) if raw is not default else raw
+        return {k: self._read_cast(k, v) for k, v in raw.items()}
 
     def was_changed(self, *attributes: str) -> bool:
         """True if the last save modified any (or any of the named) attributes."""

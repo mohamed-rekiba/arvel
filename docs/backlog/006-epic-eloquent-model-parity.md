@@ -57,13 +57,13 @@ ergonomics gaps.
 **Priority**: Should
 **Complexity**: Medium
 
-### Story 4: Cast-aware dirty tracking
+### Story 4: Cast-aware dirty tracking — DONE (WI-arvel-006, ADR-128)
 **As a** developer relying on `is_dirty`/`get_original`, **I want** cast-aware comparison (`original_is_equivalent`) and `get_raw_original`, **so that** `"1"` vs `1`, decimal strings, JSON, and encrypted fields don't produce false dirty results.
 
 **Acceptance Criteria**:
-- [ ] Given a boolean cast over an integer column, when the value is unchanged semantically, then `is_dirty()` returns `False`.
-- [ ] Given `get_raw_original(key)`, then it returns the pre-cast committed value.
-- [ ] Given `get_original(key)`, then it returns the cast/accessor-transformed value (matching Laravel).
+- [x] Given a boolean cast over an integer column, when the value is unchanged semantically, then `is_dirty()` returns `False`.
+- [x] Given `get_raw_original(key)`, then it returns the pre-cast committed value.
+- [x] Given `get_original(key)`, then it returns the cast/accessor-transformed value (matching Laravel).
 
 **Priority**: Should
 **Complexity**: Medium

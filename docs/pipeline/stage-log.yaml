@@ -254,3 +254,44 @@ events:
       hot-path rewrite, no regressions. mypy clean (874 files), pyright 0/0/0, ruff + format
       clean, security clean. 4b + release skipped (L2/Tier2). 006-S1 marked DONE.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-006"
+    event_id: "EV-022"
+    timestamp: "2026-05-30T19:45:00+03:00"
+    from_stage: "qa-post"
+    to_stage: "qa-pre"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      006-S4 cast-aware dirty tracking. TDD (proper red first): 7 tests in
+      test_cast_aware_dirty.py — boolean/int + decimal-string + re-serialized-JSON
+      equivalence, get_raw_original, get_original casts, original_is_equivalent. Red: JSON
+      reserialization false-positive + missing methods.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-006"
+    event_id: "EV-023"
+    timestamp: "2026-05-30T19:55:00+03:00"
+    from_stage: "qa-pre"
+    to_stage: "execution"
+    role: "developer"
+    result: "pass"
+    notes: >
+      model.py: original_is_equivalent (read-cast comparison, Eloquent parity),
+      get_raw_original (pre-cast) + get_original (cast) split, is_dirty/get_dirty filter via
+      equivalence. NO_VALUE sentinel guarded in original_is_equivalent + _read_cast (pending
+      instances during create() snapshot). 15 dirty tests green.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-006"
+    event_id: "EV-024"
+    timestamp: "2026-05-30T20:06:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      Gates: arvel 744 db tests, permission 75, ecommerce 407 (own sessions). mypy clean
+      (875 files), pyright 0/0/0, ruff + format clean, security clean. 4b + release skipped
+      (L2/Tier2). 006-S4 marked DONE. ADR-128.
+    handoff_id: null
