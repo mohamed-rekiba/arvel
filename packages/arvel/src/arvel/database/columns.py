@@ -75,8 +75,7 @@ class _MutableJSONDict(MutableDict[str, Any]):
             return _MutableJSONList(cast("list[object]", value))
         # A scalar JSON root can't carry the parent link the listener needs.
         raise TypeError(
-            f"json/jsonb column {key!r} expects a dict or list value, "
-            f"got {type(value).__name__}."
+            f"json/jsonb column {key!r} expects a dict or list value, got {type(value).__name__}."
         )
 
 
@@ -163,19 +162,50 @@ def uuid_id(
 
 
 @overload
-def uuid(*, nullable: Literal[False] = ..., default: str | _Unset = ...) -> Mapped[str]: ...
+def uuid(
+    *,
+    nullable: Literal[False] = ...,
+    unique: bool = ...,
+    index: bool = ...,
+    as_uuid: bool = ...,
+    init: bool = ...,
+    default: str | _Unset = ...,
+) -> Mapped[str]: ...
 @overload
-def uuid(*, nullable: Literal[True], default: str | None | _Unset = ...) -> Mapped[str | None]: ...
+def uuid(
+    *,
+    nullable: Literal[True],
+    unique: bool = ...,
+    index: bool = ...,
+    as_uuid: bool = ...,
+    init: bool = ...,
+    default: str | None | _Unset = ...,
+) -> Mapped[str | None]: ...
 def uuid(
     *,
     nullable: bool = False,
+    unique: bool = False,
+    index: bool = False,
+    as_uuid: bool = True,
+    init: bool = True,
     default: str | None | _Unset = _UNSET,
 ) -> Mapped[str | None]:
-    """UUID column. Mirrors :meth:`Blueprint.uuid`."""
-    kw: dict[str, Any] = {"nullable": nullable}
+    """UUID column. Mirrors :meth:`Blueprint.uuid`.
+
+    ``as_uuid=False`` stores/returns the value as a string rather than a Python
+    ``uuid.UUID`` — needed for VARCHAR-backed UUID columns. ``init=False`` keeps
+    the column out of the dataclass ``__init__`` for system-populated values.
+    """
+    kw: dict[str, Any] = {
+        "nullable": nullable,
+        "unique": unique,
+        "index": index,
+        "init": init,
+    }
     if not isinstance(default, _Unset):
         kw["default"] = default
-    return mapped_column(Uuid, **kw)
+    sa_type = Uuid(as_uuid=True) if as_uuid else Uuid(as_uuid=False)
+    return mapped_column(sa_type, **kw)
 
 
 @overload
@@ -185,6 +215,7 @@ def string(
     nullable: Literal[False] = ...,
     unique: bool = ...,
     index: bool = ...,
+    init: bool = ...,
     default: str | _Unset = ...,
 ) -> Mapped[str]: ...
 @overload
@@ -194,6 +225,7 @@ def string(
     nullable: Literal[True],
     unique: bool = ...,
     index: bool = ...,
+    init: bool = ...,
     default: str | None | _Unset = ...,
 ) -> Mapped[str | None]: ...
 def string(
@@ -202,6 +234,7 @@ def string(
     nullable: bool = False,
     unique: bool = False,
     index: bool = False,
+    init: bool = True,
     default: str | None | _Unset = _UNSET,
 ) -> Mapped[str | None]:
     """``VARCHAR(length)`` column. Mirrors :meth:`Blueprint.string`.
@@ -213,10 +246,13 @@ def string(
         name: str = string(255)                    # required in __init__
         slug: str | None = string(255, default=None)   # optional
 
+    Pass ``init=False`` for system-populated columns that shouldn't appear in
+    the dataclass ``__init__``.
+
     >>> name: str = string(255)
     >>> email: str = string(255, unique=True, index=True)
     """
-    kw: dict[str, Any] = {"nullable": nullable, "unique": unique, "index": index}
+    kw: dict[str, Any] = {"nullable": nullable, "unique": unique, "index": index, "init": init}
     if not isinstance(default, _Unset):
         kw["default"] = default
     return mapped_column(String(length=length), **kw)
@@ -244,6 +280,7 @@ def integer(
     nullable: Literal[False] = ...,
     unique: bool = ...,
     index: bool = ...,
+    init: bool = ...,
     default: int | _Unset = ...,
 ) -> Mapped[int]: ...
 @overload
@@ -252,6 +289,7 @@ def integer(
     nullable: Literal[True],
     unique: bool = ...,
     index: bool = ...,
+    init: bool = ...,
     default: int | None | _Unset = ...,
 ) -> Mapped[int | None]: ...
 def integer(
@@ -259,10 +297,14 @@ def integer(
     nullable: bool = False,
     unique: bool = False,
     index: bool = False,
+    init: bool = True,
     default: int | None | _Unset = _UNSET,
 ) -> Mapped[int | None]:
-    """``INTEGER`` column. Mirrors :meth:`Blueprint.integer`."""
-    kw: dict[str, Any] = {"nullable": nullable, "unique": unique, "index": index}
+    """``INTEGER`` column. Mirrors :meth:`Blueprint.integer`.
+
+    Pass ``init=False`` for system-populated columns kept out of ``__init__``.
+    """
+    kw: dict[str, Any] = {"nullable": nullable, "unique": unique, "index": index, "init": init}
     if not isinstance(default, _Unset):
         kw["default"] = default
     return mapped_column(Integer, **kw)
@@ -350,12 +392,17 @@ def datetime(
 
 
 @overload
-def json(*, nullable: Literal[False] = ..., default: object | _Unset = ...) -> Mapped[Any]: ...
+def json(
+    *, nullable: Literal[False] = ..., init: bool = ..., default: object | _Unset = ...
+) -> Mapped[Any]: ...
 @overload
-def json(*, nullable: Literal[True], default: object | _Unset = ...) -> Mapped[Any]: ...
+def json(
+    *, nullable: Literal[True], init: bool = ..., default: object | _Unset = ...
+) -> Mapped[Any]: ...
 def json(
     *,
     nullable: bool = False,
+    init: bool = True,
     default: object | _Unset = _UNSET,
 ) -> Mapped[Any]:
     """``JSON`` column. Mirrors :meth:`Blueprint.json`.
@@ -363,9 +410,9 @@ def json(
     The Python type is intentionally ``Any`` — JSON payload shape belongs to
     the boundary layer (Pydantic schema), not the storage layer. Pair this
     with ``PydanticType`` from :mod:`arvel.database.casts` when the payload
-    has a fixed schema.
+    has a fixed schema. Pass ``init=False`` for system-populated columns.
     """
-    kw: dict[str, Any] = {"nullable": nullable}
+    kw: dict[str, Any] = {"nullable": nullable, "init": init}
     _apply_json_default(kw, default)
     return mapped_column(_MutableJSONDict.as_mutable(JSON()), **kw)
 

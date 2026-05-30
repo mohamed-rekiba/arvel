@@ -90,9 +90,7 @@ async def test_increment_returns_rowcount_and_touches_updated_at(
     assert author.updated_at > before
 
 
-async def test_increment_with_extra_columns(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_increment_with_extra_columns(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     author = await QbeAuthor.create(name="Ada", hits=0)
 
@@ -102,9 +100,7 @@ async def test_increment_with_extra_columns(
     assert author.name == "Renamed"
 
 
-async def test_bulk_update_touches_updated_at(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_bulk_update_touches_updated_at(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     author = await QbeAuthor.create(name="Ada")
     await QbeAuthor.where(QbeAuthor.id == author.id).update(

@@ -17,9 +17,7 @@ Route hierarchy:
 
 from __future__ import annotations
 
-from app.http.controllers import (
-    test as _test,  # noqa: F401  — import side-effect registers test routes
-)
+from app.http.controllers import test as _test
 from app.http.controllers._deps import DB_TX
 from app.http.controllers.account import AccountController
 from app.http.controllers.admin.categories import AdminCategoriesController
@@ -99,7 +97,13 @@ with Route.group(prefix="/api/cart", name_prefix="cart.", middleware=DB_TX):
 # ─── Checkout ─────────────────────────────────────────────────────────────────
 
 with Route.group(prefix="/api", middleware=DB_TX):
-    Route.post("/checkout", controller=CheckoutController, action="checkout", name="checkout")
+    Route.post(
+        "/checkout",
+        controller=CheckoutController,
+        action="checkout",
+        name="checkout",
+        status_code=201,
+    )
 
 
 # ─── Account ──────────────────────────────────────────────────────────────────
@@ -126,7 +130,9 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
     # Products
     with Route.group(prefix="/products", name_prefix="products."):
         Route.get("", controller=AdminProductsController, action="index", name="index")
-        Route.post("", controller=AdminProductsController, action="store", name="store")
+        Route.post(
+            "", controller=AdminProductsController, action="store", name="store", status_code=201
+        )
         # catalog/refresh must come before /{product_id} to avoid shadowing
         Route.post(
             "/catalog/refresh",
@@ -164,13 +170,13 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
             action="restore",
             name="restore",
         )
-        Route.post(
+        Route.patch(
             "/{product_id}/publish",
             controller=AdminProductsController,
             action="publish",
             name="publish",
         )
-        Route.post(
+        Route.patch(
             "/{product_id}/unpublish",
             controller=AdminProductsController,
             action="unpublish",
@@ -187,6 +193,7 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
             controller=AdminProductsController,
             action="media_store",
             name="media.store",
+            status_code=201,
         )
         Route.delete(
             "/{product_id}/media/{media_id}",
@@ -198,7 +205,9 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
     # Categories
     with Route.group(prefix="/categories", name_prefix="categories."):
         Route.get("", controller=AdminCategoriesController, action="index", name="index")
-        Route.post("", controller=AdminCategoriesController, action="store", name="store")
+        Route.post(
+            "", controller=AdminCategoriesController, action="store", name="store", status_code=201
+        )
         Route.get(
             "/{category_id}",
             controller=AdminCategoriesController,
@@ -229,13 +238,13 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
             action="restore",
             name="restore",
         )
-        Route.post(
+        Route.patch(
             "/{category_id}/publish",
             controller=AdminCategoriesController,
             action="publish",
             name="publish",
         )
-        Route.post(
+        Route.patch(
             "/{category_id}/unpublish",
             controller=AdminCategoriesController,
             action="unpublish",
@@ -245,7 +254,9 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
     # Vendors
     with Route.group(prefix="/vendors", name_prefix="vendors."):
         Route.get("", controller=AdminVendorsController, action="index", name="index")
-        Route.post("", controller=AdminVendorsController, action="store", name="store")
+        Route.post(
+            "", controller=AdminVendorsController, action="store", name="store", status_code=201
+        )
         Route.get(
             "/{vendor_id}",
             controller=AdminVendorsController,
@@ -276,13 +287,13 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
             action="restore",
             name="restore",
         )
-        Route.post(
+        Route.patch(
             "/{vendor_id}/publish",
             controller=AdminVendorsController,
             action="publish",
             name="publish",
         )
-        Route.post(
+        Route.patch(
             "/{vendor_id}/unpublish",
             controller=AdminVendorsController,
             action="unpublish",
@@ -331,13 +342,13 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
             action="restore",
             name="restore",
         )
-        Route.post(
+        Route.patch(
             "/{user_id}/suspend",
             controller=AdminUsersController,
             action="suspend",
             name="suspend",
         )
-        Route.post(
+        Route.patch(
             "/{user_id}/unsuspend",
             controller=AdminUsersController,
             action="unsuspend",
@@ -381,3 +392,9 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
     # Translations
     with Route.group(prefix="/translations", name_prefix="translations."):
         Route.get("", controller=AdminTranslationsController, action="index", name="index")
+
+
+# ─── Test-only ──────────────────────────────────────────────────────────────
+# Registered via a call (not import side-effect) so they survive routing reloads
+# when a fresh Application is built per integration test.
+_test.register_test_routes()

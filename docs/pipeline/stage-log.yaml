@@ -1,0 +1,169 @@
+schema_version: 1
+events:
+  - work_item_id: "WI-arvel-001"
+    event_id: "EV-001"
+    timestamp: "2026-05-30T14:42:00+03:00"
+    from_stage: null
+    to_stage: "planning-sa"
+    role: "solution-architect"
+    result: "pass"
+    notes: "ADR-123 authored (nested groups, unless/tap, EXISTS). SAD/OpenAPI N/A — no system/HTTP surface."
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-001"
+    event_id: "EV-002"
+    timestamp: "2026-05-30T14:46:00+03:00"
+    from_stage: "planning-sa"
+    to_stage: "qa-pre"
+    role: "qa-engineer"
+    result: "pass"
+    notes: "10 failing tests authored in test_qb_conditionals_existence.py (Red confirmed: 8 fail, 2 behavioral pass)."
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-001"
+    event_id: "EV-003"
+    timestamp: "2026-05-30T14:50:00+03:00"
+    from_stage: "qa-pre"
+    to_stage: "execution"
+    role: "developer"
+    result: "pass"
+    notes: >
+      Implemented where()/or_where() callable group support, unless(), tap(),
+      EXISTS-based exists()/doesnt_exist(), and query_mixin class forwarders.
+      All 10 tests green.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-001"
+    event_id: "EV-004"
+    timestamp: "2026-05-30T14:55:00+03:00"
+    from_stage: "execution"
+    to_stage: "qa-post"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      Regression caught & fixed: exists() with_only_columns(literal(1)) dropped
+      FROM clause (always-true). Rebuilt EXISTS from scoped select. Gates:
+      708 db tests pass, mypy clean (870 files), pyright 0/0/0, ruff lint+format
+      clean, bandit 0, pip-audit clean, gitleaks clean.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-001"
+    event_id: "EV-005"
+    timestamp: "2026-05-30T14:58:00+03:00"
+    from_stage: "qa-post"
+    to_stage: "operations"
+    role: "devops"
+    result: "pass"
+    notes: >
+      Security-review (4b) skipped: L2/Tier 2, no auth/PII surface. Release
+      skipped: library code increment, no deployable artifact (gates verified
+      in qa-post). ROADMAP Sprint A updated (S2/S4/S7 marked DONE).
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-002"
+    event_id: "EV-006"
+    timestamp: "2026-05-30T15:01:00+03:00"
+    from_stage: null
+    to_stage: "planning-sa"
+    role: "solution-architect"
+    result: "pass"
+    notes: "ADR-124: ContextVar-based re-entrant event suppression + quiet wrappers."
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-002"
+    event_id: "EV-007"
+    timestamp: "2026-05-30T15:03:00+03:00"
+    from_stage: "planning-sa"
+    to_stage: "qa-pre"
+    role: "qa-engineer"
+    result: "pass"
+    notes: "9 failing tests in test_without_events_quiet.py (Red confirmed)."
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-002"
+    event_id: "EV-008"
+    timestamp: "2026-05-30T15:05:00+03:00"
+    from_stage: "qa-pre"
+    to_stage: "execution"
+    role: "developer"
+    result: "pass"
+    notes: >
+      events.py: _suppress_events ContextVar, without_events() async CM, early-return
+      in fire_async/fire_cancellable/fire_after_commit. model.py: without_events()
+      classmethod + save/delete/force_delete/restore/update _quietly. 9 tests green.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-002"
+    event_id: "EV-009"
+    timestamp: "2026-05-30T15:07:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      Fixed 2 pyright strict findings (asynccontextmanager AsyncGenerator return
+      type, unused import). Gates: 717 db tests, mypy clean (871 files), pyright
+      0/0/0, ruff clean, bandit 0, pip-audit clean, gitleaks clean. 4b + release
+      skipped (L2/Tier2, library increment).
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-003"
+    event_id: "EV-010"
+    timestamp: "2026-05-30T15:08:00+03:00"
+    from_stage: null
+    to_stage: "planning-sa"
+    role: "solution-architect"
+    result: "pass"
+    notes: >
+      ADR-125: write-only hashed cast over __casts__ dispatch (_READ_SKIP_CASTS),
+      force_fill, scoped unguarded() context (no global toggle, security rationale).
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-003"
+    event_id: "EV-011"
+    timestamp: "2026-05-30T15:09:00+03:00"
+    from_stage: "planning-sa"
+    to_stage: "qa-pre"
+    role: "qa-engineer"
+    result: "pass"
+    notes: "6 tests in test_hashed_cast_unguard.py (Red: validation rejects 'hashed')."
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-003"
+    event_id: "EV-012"
+    timestamp: "2026-05-30T15:11:00+03:00"
+    from_stage: "qa-pre"
+    to_stage: "execution"
+    role: "developer"
+    result: "pass"
+    notes: >
+      model.py: _hashed_cast + dispatch entry, _READ_SKIP_CASTS, __getattribute__
+      read-skip, _mass_assignment_unguarded ContextVar, force_fill, unguarded().
+      6 tests green; fixed @contextmanager Generator return-type deprecation.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-003"
+    event_id: "EV-013"
+    timestamp: "2026-05-30T15:12:00+03:00"
+    from_stage: "execution"
+    to_stage: "security-review"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      QA-Post gates: 723 db tests, mypy clean (872 files), pyright 0/0/0, ruff
+      clean, bandit 0, pip-audit clean, gitleaks clean.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-003"
+    event_id: "EV-014"
+    timestamp: "2026-05-30T15:13:00+03:00"
+    from_stage: "security-review"
+    to_stage: "operations"
+    role: "code-reviewer"
+    result: "pass"
+    notes: >
+      Stage 4b (Tier 3, credential hashing). OWASP A04/A05: argon2id via Hash
+      facade (no weak hash), idempotent on PHC prefixes, read-path skipped.
+      force_fill/unguarded explicit-only, bounded (task-local ContextVar, no global
+      toggle), no plaintext logging. PASS — no critical/high. Closes Parity Sprint A.
+    handoff_id: null

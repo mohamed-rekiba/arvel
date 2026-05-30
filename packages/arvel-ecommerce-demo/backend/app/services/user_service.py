@@ -36,7 +36,7 @@ class UserService:
             count_qb = count_qb.where_any(["name", "email"], "ilike", f"%{search}%")
         total: int = await count_qb.count()
 
-        qb = User.with_("roles", "permissions")
+        qb = User.query()
         if trashed == "without":
             qb = qb.where_null(User.deleted_at)
         elif trashed == "only":
@@ -46,33 +46,36 @@ class UserService:
         if search:
             qb = qb.where_any(["name", "email"], "ilike", f"%{search}%")
 
-        users: list[User] = await qb.order_by("-created_at").limit(limit).offset(offset).all()
-        return {"data": [self._format_user(u) for u in users], "total": total}
+        # Eager-load roles + direct permissions in two batched queries (one per
+        # relation) instead of two per user — kills the admin list N+1.
+        users: list[User] = (
+            await qb.with_("roles", "permissions")
+            .order_by("-created_at")
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+        return {"data": [await self._format_user(u) for u in users], "total": total}
 
     async def get_user(self, user_id: int) -> dict[str, Any] | None:
-        user: User | None = (
-            await User.with_("roles", "permissions")
-            .with_trashed()
-            .where(User.id == user_id)
-            .first()
-        )
+        user: User | None = await User.with_trashed().where(User.id == user_id).first()
         if user is None:
             return None
-        return self._format_user(user)
+        return await self._format_user(user)
 
     async def suspend(self, user_id: int) -> dict[str, Any] | None:
         user: User | None = await User.find(user_id)
         if user is None:
             return None
         await user.suspend()
-        return self._format_user(user)
+        return await self._format_user(user)
 
     async def unsuspend(self, user_id: int) -> dict[str, Any] | None:
         user: User | None = await User.find(user_id)
         if user is None:
             return None
         await user.unsuspend()
-        return self._format_user(user)
+        return await self._format_user(user)
 
     async def soft_delete(self, user_id: int) -> None:
         user: User | None = await User.find(user_id)
@@ -89,12 +92,13 @@ class UserService:
         if user is None:
             return None
         await user.restore()
-        return self._format_user(user)
+        return await self._format_user(user)
 
     @staticmethod
-    def _format_user(user: User) -> dict[str, Any]:
-        roles = sorted({role.name or "" for role in (user.roles or [])})
-        direct_permissions = sorted({perm.name or "" for perm in (user.permissions or [])})
+    async def _format_user(user: User) -> dict[str, Any]:
+        roles = sorted({role.name or "" for role in await user.roles.all()})
+        direct = await user.get_direct_permissions()
+        direct_permissions = sorted({perm.name or "" for perm in direct})
         return {
             "id": int(user.id),
             "name": user.name or "",

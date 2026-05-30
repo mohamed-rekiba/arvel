@@ -9,6 +9,7 @@ abilities.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
 from arvel_permission.service import GuardMismatchError
@@ -25,14 +26,16 @@ def register_permissions_with_gate(gate: Gate, *, guard: str = "web") -> None:
     handle abilities that aren't permission-shaped.
     """
 
-    def _hook(user: Any, ability: str) -> bool | None:
+    async def _hook(user: Any, ability: str) -> bool | None:
         if user is None:
             return None
-        has = getattr(user, "has_permission_to", None)
-        if not callable(has):
+        # ``user`` is an untyped auth-boundary object; narrow the check to a
+        # coroutine-returning callable so the await is well-typed.
+        has: Callable[..., Awaitable[bool]] | None = getattr(user, "has_permission_to", None)
+        if has is None:
             return None
         try:
-            granted = has(ability, guard=guard)
+            granted = await has(ability, guard=guard)
         except GuardMismatchError:
             return None
         return True if granted else None

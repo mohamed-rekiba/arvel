@@ -314,9 +314,7 @@ async def test_relation_create(engine: AsyncEngine, session: AsyncSession) -> No
     assert post.id is not None
 
 
-async def test_relation_save_fires_model_events(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_relation_save_fires_model_events(engine: AsyncEngine, session: AsyncSession) -> None:
     """has_many().save() persists through Model.save(), so lifecycle events fire."""
     from arvel.database.events import clear_observers
 

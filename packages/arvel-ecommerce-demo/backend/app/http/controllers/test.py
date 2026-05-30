@@ -12,7 +12,6 @@ from arvel.http.exceptions import NotFoundException
 from arvel.support.env import env
 
 
-@Route.post("/api/test/seed/catalog", name="api.test.seed.catalog")
 async def seed_catalog() -> dict[str, Any]:
     """Test-only seeder trigger. Disabled in production.
 
@@ -36,7 +35,6 @@ async def seed_catalog() -> dict[str, Any]:
     return {"status": "seeded"}
 
 
-@Route.post("/api/test/catalog/refresh", name="api.test.catalog.refresh")
 async def refresh_catalog() -> dict[str, Any]:
     """Trigger an immediate refresh of the products_catalog materialized view.
 
@@ -48,3 +46,13 @@ async def refresh_catalog() -> dict[str, Any]:
         raise NotFoundException("Not found.")
     count = await refresh_products_catalog()
     return {"status": "refreshed", "count": count}
+
+
+def register_test_routes() -> None:
+    """Register test-only routes.
+
+    Called from routes/api.py on every routing reload. Decorators would only
+    fire on first import, so a fresh Application would silently lose these routes.
+    """
+    Route.post("/api/test/seed/catalog", name="api.test.seed.catalog")(seed_catalog)
+    Route.post("/api/test/catalog/refresh", name="api.test.catalog.refresh")(refresh_catalog)

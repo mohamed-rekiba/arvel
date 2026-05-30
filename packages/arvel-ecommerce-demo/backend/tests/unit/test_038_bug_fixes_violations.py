@@ -126,13 +126,14 @@ class TestUserRoleLevel:
         assert hasattr(User, "has_level")
 
     def test_is_admin_uses_has_any_role(self) -> None:
-        """User.is_admin source must reference has_any_role, not has_level."""
+        """User.is_admin is an async method that uses has_any_role/has_role."""
+        import inspect as _inspect
+
         from app.models.user import User
 
         is_admin = User.__dict__["is_admin"]
-        assert isinstance(is_admin, property)
-        assert is_admin.fget is not None
-        src = inspect.getsource(is_admin.fget)
+        assert _inspect.iscoroutinefunction(is_admin), "User.is_admin must be async"
+        src = inspect.getsource(is_admin)
         assert "has_any_role" in src or "has_role" in src, (
             "User.is_admin must use has_any_role() or has_role()"
         )

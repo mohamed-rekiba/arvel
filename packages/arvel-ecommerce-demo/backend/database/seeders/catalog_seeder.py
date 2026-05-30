@@ -460,6 +460,55 @@ class CatalogSeeder(EcommerceSeeder):
                 "category_id": categories["headsets"],
                 "vendor_id": vendors["techworld"],
             },
+            {
+                "id": self.uuid(),
+                "name": {
+                    "en": "Wireless Headphones Pro",
+                    "ar": "سماعات لاسلكية برو",
+                    "tr": "Kablosuz Kulaklık Pro",
+                },
+                "slug": {
+                    "en": "wireless-headphones-pro",
+                    "ar": "wireless-headphones-pro",
+                    "tr": "wireless-headphones-pro",
+                },
+                "description": {
+                    "en": "Over-ear wireless headphones with active noise cancellation and 35h battery.",
+                    "ar": "سماعات لاسلكية تحيط بالأذن مع إلغاء الضوضاء النشط وبطارية 35 ساعة.",
+                    "tr": "Aktif gürültü engelleme ve 35 saat pille kulak üstü kablosuz kulaklık.",
+                },
+                "price": "199.00",
+                "stock_qty": 70,
+                "status": "published",
+                "published_at": self.now(),
+                "category_id": categories["headsets"],
+                "vendor_id": vendors["techworld"],
+            },
+            # ── Draft (never visible in storefront; drives the publish workflow) ──
+            {
+                "id": self.uuid(),
+                "name": {
+                    "en": "Prototype Gadget X",
+                    "ar": "نموذج أولي جهاز إكس",
+                    "tr": "Prototip Cihaz X",
+                },
+                "slug": {
+                    "en": "prototype-gadget-x",
+                    "ar": "prototype-gadget-x",
+                    "tr": "prototype-gadget-x",
+                },
+                "description": {
+                    "en": "Unreleased prototype — kept in draft so it stays out of the storefront.",
+                    "ar": "نموذج أولي غير مُصدر — يبقى مسودة حتى لا يظهر في المتجر.",
+                    "tr": "Yayımlanmamış prototip — mağazada görünmemesi için taslak olarak tutulur.",
+                },
+                "price": "0.00",
+                "stock_qty": 0,
+                "status": "draft",
+                "published_at": None,
+                "category_id": categories["headsets"],
+                "vendor_id": vendors["techworld"],
+            },
         ]
 
         for product in products:

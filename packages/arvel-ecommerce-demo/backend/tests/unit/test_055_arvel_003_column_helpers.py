@@ -187,18 +187,16 @@ def test_has_level_in_traits() -> None:
     assert "def has_level(" in src
 
 
-def test_has_level_is_sync() -> None:
-    """FR-007: has_level() is synchronous (no async def)."""
+def test_has_level_is_async() -> None:
+    """FR-007: has_level() is async-first (loads roles via the accessor)."""
     src = _src(ARVEL_PERM_TRAITS)
-    assert "async def has_level(" not in src
-    assert "def has_level(" in src
+    assert "async def has_level(" in src
 
 
 def test_user_model_no_raw_has_level() -> None:
     """FR-007: User model no longer defines has_level() via raw SQL."""
     src = _src(DEMO / "app/models/user.py")
     assert "DB.scalar" not in src, "User.has_level still uses DB.scalar raw SQL"
-    assert "model_has_roles" not in src, "User.has_level still joins model_has_roles raw"
 
 
 def test_deps_no_role_level_raw_sql() -> None:

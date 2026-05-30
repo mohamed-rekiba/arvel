@@ -71,27 +71,23 @@ class AdminUsersController(Controller):
     ) -> dict[str, Any]:
         actor = await require_permission(request, "roles.manage")
         level = await role_level(payload.role)
-        if not actor.has_level(level):
+        if not await actor.has_level(level):
             raise AuthorizationException("Cannot assign a role above your level.")
-        target: User | None = (
-            await User.with_("roles", "permissions").where(User.id == user_id).first()
-        )
+        target: User | None = await User.where(User.id == user_id).first()
         role_obj: Role | None = await Role.where(name=payload.role, guard_name="api").first()
         if target is None:
             raise NotFoundException("User not found.")
         if role_obj is None:
             raise NotFoundException(f"Role '{payload.role}' not found.")
-        target.assign_role(role_obj)
-        await target.save()
+        await target.assign_role(role_obj)
         return {"data": await users.get_user(user_id)}
 
     async def revoke_role(self, user_id: int, role_name: str, request: Request) -> dict[str, Any]:
         await require_permission(request, "roles.manage")
-        target: User | None = await User.with_("roles").where(User.id == user_id).first()
+        target: User | None = await User.where(User.id == user_id).first()
         if target is None:
             raise NotFoundException("User not found.")
-        target.remove_role(role_name)
-        await target.save()
+        await target.remove_role(role_name)
         return {"data": await users.get_user(user_id)}
 
     async def grant_permission(
@@ -101,13 +97,10 @@ class AdminUsersController(Controller):
         perm_obj: Permission | None = await Permission.where(name=payload.permission).first()
         if perm_obj is None:
             raise NotFoundException(f"Permission '{payload.permission}' not found.")
-        target: User | None = (
-            await User.with_("roles", "permissions").where(User.id == user_id).first()
-        )
+        target: User | None = await User.where(User.id == user_id).first()
         if target is None:
             raise NotFoundException("User not found.")
-        target.give_permission_to(perm_obj)
-        await target.save()
+        await target.give_permission_to(perm_obj)
         return {"data": await users.get_user(user_id)}
 
     async def revoke_permission(
@@ -117,11 +110,8 @@ class AdminUsersController(Controller):
         perm_obj: Permission | None = await Permission.where(name=permission_name).first()
         if perm_obj is None:
             raise NotFoundException(f"Permission '{permission_name}' not found.")
-        target: User | None = (
-            await User.with_("roles", "permissions").where(User.id == user_id).first()
-        )
+        target: User | None = await User.where(User.id == user_id).first()
         if target is None:
             raise NotFoundException("User not found.")
-        target.revoke_permission_to(perm_obj)
-        await target.save()
+        await target.revoke_permission_to(perm_obj)
         return {"data": await users.get_user(user_id)}

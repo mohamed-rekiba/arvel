@@ -1,11 +1,20 @@
-"""Role, Permission, and pivot ORM models for arvel-permission.
+"""Role, Permission, and pivot tables for arvel-permission.
 
 ``Role`` and ``Permission`` enforce ``UNIQUE(name, guard_name)`` so the same
-name can exist under multiple guards. ``ModelHasRole``, ``ModelHasPermission``,
-and ``RoleHasPermission`` represent the polymorphic pivot tables.
+name can exist under multiple guards.
 
-Pivots use composite primary keys, matching Spatie's default migration schema
-and providing DB-level duplicate prevention.
+The three pivots are plain Core ``Table``s on ``Model.metadata`` (no surrogate
+id, no timestamps — Spatie v7 schema):
+
+- ``model_has_roles`` / ``model_has_permissions`` are polymorphic. A host model
+  links to them through a :class:`~arvel.database.orm.MorphToMany` accessor,
+  which writes the ``model_type`` discriminator and string-casts the owner PK
+  into the ``VARCHAR(36)`` ``model_id`` column on every INSERT. This is what
+  killed the old ``model_type``-NULL bug class — the discriminator is no longer
+  a constant-join column a ``secondary`` relationship could silently drop.
+- ``role_has_permissions`` is a simple int↔int pivot exposed via
+  :class:`~arvel.database.orm.BelongsToMany` on ``Role.permissions`` /
+  ``Permission.roles``.
 """
 
 from __future__ import annotations
@@ -14,31 +23,45 @@ from typing import TYPE_CHECKING, ClassVar, Self
 
 from arvel.database.columns import id_, integer, string
 from arvel.database.model import Model, Timestamps
-from sqlalchemy import Integer, String, UniqueConstraint, select
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.types import TypeDecorator
+from arvel.database.orm import BelongsToMany, Mapped
+from sqlalchemy import (
+    Column,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    UniqueConstraint,
+    select,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-class _StringId(TypeDecorator[str]):
-    """VARCHAR column that coerces integer PKs to str at bind time.
+model_has_permissions = Table(
+    "model_has_permissions",
+    Model.metadata,
+    Column("permission_id", Integer, ForeignKey("permissions.id"), primary_key=True),
+    Column("model_type", String(255), primary_key=True),
+    Column("model_id", String(36), primary_key=True),
+    Column("guard_name", String(125), nullable=False, default="web"),
+)
 
-    Asyncpg is strict about parameter types; passing an int for a VARCHAR
-    parameter raises DataError. This decorator converts transparently.
-    """
+model_has_roles = Table(
+    "model_has_roles",
+    Model.metadata,
+    Column("role_id", Integer, ForeignKey("roles.id"), primary_key=True),
+    Column("model_type", String(255), primary_key=True),
+    Column("model_id", String(36), primary_key=True),
+    Column("guard_name", String(125), nullable=False, default="web"),
+)
 
-    impl = String
-    cache_ok = True
-
-    def process_bind_param(self, value: object, dialect: object) -> str | None:
-        if value is None:
-            return None
-        return str(value)
-
-    def process_result_value(self, value: str | None, dialect: object) -> str | None:
-        return value
+role_has_permissions = Table(
+    "role_has_permissions",
+    Model.metadata,
+    Column("permission_id", Integer, ForeignKey("permissions.id"), primary_key=True),
+    Column("role_id", Integer, ForeignKey("roles.id"), primary_key=True),
+)
 
 
 class Role(Model, Timestamps):
@@ -52,17 +75,10 @@ class Role(Model, Timestamps):
     guard_name: Mapped[str] = string(125, default="web")
     level: Mapped[int] = integer(default=0)
 
-    permissions: Mapped[list[Permission]] = relationship(
-        "Permission",
-        secondary="role_has_permissions",
-        primaryjoin="Role.id == foreign(RoleHasPermission.role_id)",
-        secondaryjoin="foreign(RoleHasPermission.permission_id) == Permission.id",
-        viewonly=False,
-        lazy="selectin",
-        default_factory=list,
-        init=False,
-        back_populates="roles",
-    )
+    if TYPE_CHECKING:
+        # Real descriptor assigned at module end (breaks the Role↔Permission cycle).
+        # Kept out of runtime __annotations__ so SQLAlchemy doesn't try to map it.
+        permissions: ClassVar[BelongsToMany[Permission]]
 
     @property
     def default_guard_name(self) -> str:
@@ -108,17 +124,9 @@ class Permission(Model, Timestamps):
     name: Mapped[str] = string(125)
     guard_name: Mapped[str] = string(125, default="web")
 
-    roles: Mapped[list[Role]] = relationship(
-        "Role",
-        secondary="role_has_permissions",
-        primaryjoin="Permission.id == foreign(RoleHasPermission.permission_id)",
-        secondaryjoin="foreign(RoleHasPermission.role_id) == Role.id",
-        viewonly=False,
-        lazy="selectin",
-        default_factory=list,
-        init=False,
-        back_populates="permissions",
-    )
+    if TYPE_CHECKING:
+        # Real descriptor assigned at module end (breaks the Role↔Permission cycle).
+        roles: ClassVar[BelongsToMany[Role]]
 
     @property
     def default_guard_name(self) -> str:
@@ -156,51 +164,15 @@ class Permission(Model, Timestamps):
         return obj
 
 
-class ModelHasRole(Model):
-    """Polymorphic pivot — assigns a :class:`Role` to any model type.
-
-    Composite PK ``(role_id, model_type, model_id)`` enforces uniqueness at the
-    DB level: assigning the same role twice raises an IntegrityError.
-    ``model_id`` is VARCHAR(36) to support both integer and UUID primary keys.
-    """
-
-    __tablename__ = "model_has_roles"
-    __fillable__: ClassVar[list[str] | None] = ["role_id", "model_type", "model_id", "guard_name"]
-
-    role_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    model_type: Mapped[str] = mapped_column(String(255), primary_key=True)
-    model_id: Mapped[str] = mapped_column(_StringId(36), primary_key=True)
-    guard_name: Mapped[str] = string(125, default="web")
-
-
-class ModelHasPermission(Model):
-    """Polymorphic pivot — grants a :class:`Permission` directly to any model type.
-
-    Composite PK ``(permission_id, model_type, model_id)`` enforces uniqueness.
-    """
-
-    __tablename__ = "model_has_permissions"
-    __fillable__: ClassVar[list[str] | None] = [
-        "permission_id",
-        "model_type",
-        "model_id",
-        "guard_name",
-    ]
-
-    permission_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    model_type: Mapped[str] = mapped_column(String(255), primary_key=True)
-    model_id: Mapped[str] = mapped_column(_StringId(36), primary_key=True)
-    guard_name: Mapped[str] = string(125, default="web")
-
-
-class RoleHasPermission(Model):
-    """Pivot that grants a :class:`Permission` to a :class:`Role`.
-
-    Composite PK ``(permission_id, role_id)`` matches the migration schema.
-    """
-
-    __tablename__ = "role_has_permissions"
-    __fillable__: ClassVar[list[str] | None] = ["permission_id", "role_id"]
-
-    permission_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    role_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+Role.permissions = BelongsToMany(
+    Permission,
+    table=role_has_permissions,
+    foreign_key="role_id",
+    related_foreign_key="permission_id",
+)
+Permission.roles = BelongsToMany(
+    Role,
+    table=role_has_permissions,
+    foreign_key="permission_id",
+    related_foreign_key="role_id",
+)

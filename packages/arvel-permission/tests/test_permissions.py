@@ -5,7 +5,36 @@ Maps to FR-025-04 .. FR-025-09 and the related NFRs.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+from typing import ClassVar
+
 import pytest
+import pytest_asyncio
+from arvel.database.columns import id_
+from arvel.database.model import Model
+from arvel.database.orm import MorphToMany
+from arvel.database.session import use_session
+from arvel_permission.models import Role, model_has_roles
+from arvel_permission.traits import HasRoles
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import Mapped
+
+
+class _GuardUser(Model, HasRoles):
+    __tablename__ = "users_guard_scope"
+    id: Mapped[int] = id_(init=False)
+    default_guard_name: str = "web"
+
+    roles: ClassVar[MorphToMany[Role]] = MorphToMany(
+        Role, table=model_has_roles, name="model", related_key="role_id"
+    )
+
+
+@pytest_asyncio.fixture()
+async def session_factory(
+    async_engine: AsyncEngine,
+) -> AsyncGenerator[async_sessionmaker[AsyncSession]]:
+    yield async_sessionmaker(async_engine, expire_on_commit=False)
 
 
 def test_role_and_permission_models_have_unique_per_guard_name() -> None:
@@ -60,22 +89,24 @@ def test_has_permissions_lifecycle() -> None:
         assert hasattr(HasPermissions, method), f"HasPermissions missing {method}"
 
 
-def test_has_role_is_guard_scoped() -> None:
+@pytest.mark.asyncio
+async def test_has_role_is_guard_scoped(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
     """FR-025-07: roles in different guards are not interchangeable."""
-    from arvel_permission import GuardMismatchError, HasRoles, Role
+    from arvel_permission import GuardMismatchError
 
-    class _User(HasRoles):
-        def __init__(self) -> None:
-            self.roles = []
+    async with session_factory() as session, use_session(session):
+        web_admin = Role(name="admin", guard_name="web")
+        api_admin = Role(name="admin", guard_name="api")
+        user = _GuardUser()
+        session.add_all([web_admin, api_admin, user])
+        await session.flush()
 
-    web_admin = Role(name="admin", guard_name="web")
-    api_admin = Role(name="admin", guard_name="api")
-
-    user = _User()
-    user.roles = [web_admin]
-    assert user.has_role(web_admin) is True
-    with pytest.raises(GuardMismatchError):
-        user.has_role(api_admin, guard="web")
+        await user.assign_role(web_admin)
+        assert await user.has_role(web_admin) is True
+        with pytest.raises(GuardMismatchError):
+            await user.has_role(api_admin, guard="web")
 
 
 def test_permission_service_provider_registers_with_gate() -> None:

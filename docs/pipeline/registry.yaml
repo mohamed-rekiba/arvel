@@ -1,0 +1,62 @@
+schema_version: 1
+work_items:
+  - id: "WI-arvel-001"
+    name: "Query builder conditionals & efficient existence (backlog 005 S2/S4/S7)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T14:40:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      ADR-driven repo: ceremony stages (initiation, BA-PRD, UX, DX, DBA, OpenAPI,
+      release Dockerfile/ops) marked SKIP per no-overengineering. Requirements
+      sourced from backlog 005. Delivered nested WHERE groups, unless/tap, and
+      EXISTS-based exists()/doesnt_exist(). All gates green.
+
+  - id: "WI-arvel-002"
+    name: "without_events() + quiet persistence (backlog 006 S7)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T15:00:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      Re-entrant event suppression via ContextVar + without_events() async CM;
+      save/delete/force_delete/restore/update _quietly wrappers. ADR-124.
+      Same adapted library-increment flow (4b skipped: L2/Tier2, no auth/PII).
+      All gates green (717 db tests, mypy/pyright/ruff/bandit/pip-audit/gitleaks).
+
+  - id: "WI-arvel-003"
+    name: "hashed cast + force_fill + unguarded (backlog 006 S2)"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "confidential"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T15:08:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment + Stage 4b)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      Write-only `hashed` cast (argon2id via Hash facade, idempotent on PHC prefixes),
+      force_fill(), and re-entrant unguarded() context (no global unguard toggle, by
+      design). ADR-125. Stage 4b security review ran (Tier 3, credential hashing):
+      PASS, no critical/high. Gates green (723 db tests, mypy/pyright/ruff/bandit/
+      pip-audit/gitleaks). Completes Parity Sprint A.

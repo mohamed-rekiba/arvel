@@ -1,10 +1,21 @@
-"""BelongsToMany — many-to-many relation via an explicit pivot table."""
+"""MorphToMany — polymorphic many-to-many via a pivot table with a type discriminator.
+
+Like :class:`BelongsToMany`, but the pivot carries ``{name}_type`` / ``{name}_id``
+columns (ADR-022 short class name + string-cast owner PK) instead of a single
+owner foreign key. One pivot table can therefore link many owner types to the
+same related model — e.g. ``model_has_roles`` linking both ``User`` and ``Team``
+to ``Role``.
+
+The owner id is always written and compared as a string so a VARCHAR pivot
+column accepts integer, UUID, and string primary keys without a dialect-specific
+cast on INSERT.
+"""
 
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
 
 from sqlalchemy import Table, delete, insert, select, update
 from sqlalchemy import inspect as sa_inspect
@@ -12,6 +23,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Mapper
 
 from arvel.database.orm._eager import clear_eager_relation, get_eager_relation
+from arvel.database.orm.belongs_to_many import SyncIds, SyncResult, normalize_sync_ids
 from arvel.database.session import get_active_session
 
 if TYPE_CHECKING:
@@ -19,55 +31,43 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 
-# Either a plain list of related IDs, or {id: {pivot_col: value, ...}}.
-SyncIds = list[int] | Mapping[int, Mapping[str, Any]]
-
-
-class SyncResult(TypedDict):
-    """What sync() changed, mirroring Eloquent's return shape."""
-
-    attached: list[int]
-    detached: list[int]
-    updated: list[int]
-
-
-def normalize_sync_ids(ids: SyncIds) -> dict[int, dict[str, Any]]:
-    """Coerce list or mapping form into {id: pivot_attrs}. Shared with MorphToMany."""
-    if isinstance(ids, Mapping):
-        return {int(k): dict(v) for k, v in ids.items()}
-    return {int(i): {} for i in ids}
-
 
 @dataclass(frozen=True)
-class BelongsToManyLink:
-    """Pivot metadata for query-builder existence subqueries."""
+class MorphToManyLink:
+    """Pivot metadata for query-builder existence subqueries.
+
+    ``owner_type`` is filled in by the query builder from the owning model's
+    class name; the descriptor itself doesn't know which class it lives on.
+    """
 
     table: Table
     related_model: type[Any]
-    foreign_key: str
+    type_column: str
+    id_column: str
     related_foreign_key: str
+    owner_type: str
 
 
-class BelongsToManyAccessor(Generic[T]):
-    """Bound to an owner instance; exposes attach/detach/sync/pivot/toggle."""
+class MorphToManyAccessor(Generic[T]):
+    """Bound to an owner instance; exposes attach/detach/sync/pivot/toggle/all."""
 
     def __init__(
         self,
         owner: Model,
         related_model: type[T],
         table: Table,
-        foreign_key: str,
+        type_column: str,
+        id_column: str,
         related_foreign_key: str,
         attr_name: str | None = None,
     ) -> None:
         self._owner = owner
         self._related_model = related_model
         self._table = table
-        self._fk = foreign_key
+        self._type_col = type_column
+        self._id_col = id_column
         self._rfk = related_foreign_key
         self._attr_name = attr_name
-        # Resolve the owner PK column name once; reads stay lazy so a freshly
-        # flushed autoincrement id is picked up. Supports non-"id" / UUID PKs.
         owner_mapper: Mapper[Any] = cast("Mapper[Any]", sa_inspect(type(owner)))
         pk_key = owner_mapper.primary_key[0].key
         if pk_key is None:
@@ -79,8 +79,19 @@ class BelongsToManyAccessor(Generic[T]):
             clear_eager_relation(self._owner, self._attr_name)
 
     @property
-    def _owner_id(self) -> Any:
-        return getattr(self._owner, self._owner_key)
+    def _owner_type(self) -> str:
+        return type(self._owner).__name__
+
+    @property
+    def _owner_id(self) -> str:
+        # VARCHAR pivot column — coerce here so int/UUID PKs round-trip cleanly.
+        return str(getattr(self._owner, self._owner_key))
+
+    def _owner_where(self) -> tuple[Any, Any]:
+        return (
+            self._table.c[self._type_col] == self._owner_type,
+            self._table.c[self._id_col] == self._owner_id,
+        )
 
     # ── async iteration ────────────────────────────────────────────────────
 
@@ -99,10 +110,12 @@ class BelongsToManyAccessor(Generic[T]):
         if mapper is None:
             raise TypeError(f"{self._related_model} is not a mapped SQLAlchemy class")
         pk_col = mapper.primary_key[0]
+        type_pred, id_pred = self._owner_where()
         stmt = (
             select(self._related_model)
             .join(self._table, self._table.c[self._rfk] == pk_col)
-            .where(self._table.c[self._fk] == self._owner_id)
+            .where(type_pred)
+            .where(id_pred)
         )
         result = await session.execute(stmt)
         for row in result.scalars():
@@ -117,9 +130,11 @@ class BelongsToManyAccessor(Generic[T]):
     async def attach(self, related_id: int, **pivot_kwargs: Any) -> bool:
         """Insert pivot row. Returns True if new, False if already existed (upsert)."""
         session = get_active_session()
+        type_pred, id_pred = self._owner_where()
         check = (
             select(self._table)
-            .where(self._table.c[self._fk] == self._owner_id)
+            .where(type_pred)
+            .where(id_pred)
             .where(self._table.c[self._rfk] == related_id)
         )
         existing = (await session.execute(check)).fetchone()
@@ -127,7 +142,12 @@ class BelongsToManyAccessor(Generic[T]):
             return False
         await session.execute(
             insert(self._table).values(
-                **{self._fk: self._owner_id, self._rfk: related_id, **pivot_kwargs}
+                **{
+                    self._type_col: self._owner_type,
+                    self._id_col: self._owner_id,
+                    self._rfk: related_id,
+                    **pivot_kwargs,
+                }
             )
         )
         await session.flush()
@@ -137,9 +157,11 @@ class BelongsToManyAccessor(Generic[T]):
     async def detach(self, related_id: int) -> None:
         """Remove the pivot row for related_id. No-op if absent."""
         session = get_active_session()
+        type_pred, id_pred = self._owner_where()
         await session.execute(
             delete(self._table)
-            .where(self._table.c[self._fk] == self._owner_id)
+            .where(type_pred)
+            .where(id_pred)
             .where(self._table.c[self._rfk] == related_id)
         )
         await session.flush()
@@ -150,11 +172,13 @@ class BelongsToManyAccessor(Generic[T]):
         if not attrs:
             return False
         session = get_active_session()
+        type_pred, id_pred = self._owner_where()
         result = cast(
             "CursorResult[Any]",
             await session.execute(
                 update(self._table)
-                .where(self._table.c[self._fk] == self._owner_id)
+                .where(type_pred)
+                .where(id_pred)
                 .where(self._table.c[self._rfk] == related_id)
                 .values(**dict(attrs))
             ),
@@ -162,15 +186,16 @@ class BelongsToManyAccessor(Generic[T]):
         await session.flush()
         return int(result.rowcount) > 0
 
-    async def sync(self, related_ids: SyncIds) -> SyncResult:
-        """Replace pivot rows so they match related_ids, returning what changed.
-
-        Accepts a list of IDs or ``{id: {pivot_col: value}}`` to set pivot data.
-        """
+    async def _current_ids(self) -> set[int]:
         session = get_active_session()
+        type_pred, id_pred = self._owner_where()
+        stmt = select(self._table.c[self._rfk]).where(type_pred).where(id_pred)
+        return set((await session.execute(stmt)).scalars())
+
+    async def sync(self, related_ids: SyncIds) -> SyncResult:
+        """Replace pivot rows so they match related_ids, returning what changed."""
         desired = normalize_sync_ids(related_ids)
-        stmt = select(self._table.c[self._rfk]).where(self._table.c[self._fk] == self._owner_id)
-        current_ids: set[int] = set((await session.execute(stmt)).scalars())
+        current_ids = await self._current_ids()
         result: SyncResult = {"attached": [], "detached": [], "updated": []}
         for rid in current_ids - set(desired):
             await self.detach(rid)
@@ -185,10 +210,8 @@ class BelongsToManyAccessor(Generic[T]):
 
     async def sync_without_detaching(self, related_ids: SyncIds) -> SyncResult:
         """Attach/update related_ids without removing existing rows; report changes."""
-        session = get_active_session()
         desired = normalize_sync_ids(related_ids)
-        stmt = select(self._table.c[self._rfk]).where(self._table.c[self._fk] == self._owner_id)
-        current_ids: set[int] = set((await session.execute(stmt)).scalars())
+        current_ids = await self._current_ids()
         result: SyncResult = {"attached": [], "detached": [], "updated": []}
         for rid, attrs in desired.items():
             if rid not in current_ids:
@@ -198,6 +221,14 @@ class BelongsToManyAccessor(Generic[T]):
                 result["updated"].append(rid)
         return result
 
+    async def toggle(self, related_id: int) -> str:
+        """Attach if absent, detach if present. Returns 'attached' or 'detached'."""
+        if related_id in await self._current_ids():
+            await self.detach(related_id)
+            return "detached"
+        await self.attach(related_id)
+        return "attached"
+
     async def where_pivot(self, column: str, value: Any) -> list[T]:
         """Filter the pivot table by a column value and return related records."""
         session = get_active_session()
@@ -205,10 +236,12 @@ class BelongsToManyAccessor(Generic[T]):
         if mapper is None:
             raise TypeError(f"{self._related_model} is not a mapped SQLAlchemy class")
         pk_col = mapper.primary_key[0]
+        type_pred, id_pred = self._owner_where()
         stmt = (
             select(self._related_model)
             .join(self._table, self._table.c[self._rfk] == pk_col)
-            .where(self._table.c[self._fk] == self._owner_id)
+            .where(type_pred)
+            .where(id_pred)
             .where(self._table.c[column] == value)
         )
         result = await session.execute(stmt)
@@ -217,9 +250,11 @@ class BelongsToManyAccessor(Generic[T]):
     async def pivot(self, related_id: int) -> dict[str, Any] | None:
         """Return the pivot row as a dict, or None if the row doesn't exist."""
         session = get_active_session()
+        type_pred, id_pred = self._owner_where()
         check = (
             select(self._table)
-            .where(self._table.c[self._fk] == self._owner_id)
+            .where(type_pred)
+            .where(id_pred)
             .where(self._table.c[self._rfk] == related_id)
         )
         row = (await session.execute(check)).mappings().fetchone()
@@ -227,30 +262,15 @@ class BelongsToManyAccessor(Generic[T]):
             return None
         return dict(row)
 
-    async def toggle(self, related_id: int) -> str:
-        """Attach if absent, detach if present. Returns 'attached' or 'detached'."""
-        session = get_active_session()
-        check = (
-            select(self._table)
-            .where(self._table.c[self._fk] == self._owner_id)
-            .where(self._table.c[self._rfk] == related_id)
-        )
-        existing = (await session.execute(check)).fetchone()
-        if existing is None:
-            await self.attach(related_id)
-            return "attached"
-        await self.detach(related_id)
-        return "detached"
 
-
-class BelongsToMany(Generic[T]):
-    """Descriptor for many-to-many relations via a pivot table.
+class MorphToMany(Generic[T]):
+    """Descriptor for a polymorphic many-to-many relation via a pivot table.
 
     Usage::
 
-        class Post(Model):
-            tags: BelongsToMany[Tag] = BelongsToMany(
-                Tag, table=post_tag_table, foreign_key="post_id", related_foreign_key="tag_id"
+        class User(Model):
+            roles: ClassVar[MorphToMany[Role]] = MorphToMany(
+                Role, table=model_has_roles, name="model", related_key="role_id"
             )
     """
 
@@ -259,13 +279,15 @@ class BelongsToMany(Generic[T]):
         related_model: type[T],
         *,
         table: Table,
-        foreign_key: str,
-        related_foreign_key: str,
+        name: str,
+        related_key: str,
     ) -> None:
         self._related_model = related_model
         self._table = table
-        self._fk = foreign_key
-        self._rfk = related_foreign_key
+        self._name = name
+        self._type_col = f"{name}_type"
+        self._id_col = f"{name}_id"
+        self._rfk = related_key
         self._attr_name: str | None = None
 
     def __set_name__(self, owner: type[Any], name: str) -> None:
@@ -280,57 +302,44 @@ class BelongsToMany(Generic[T]):
         return self._related_model
 
     @property
-    def foreign_key(self) -> str:
-        return self._fk
+    def type_column(self) -> str:
+        return self._type_col
+
+    @property
+    def id_column(self) -> str:
+        return self._id_col
 
     @property
     def related_foreign_key(self) -> str:
         return self._rfk
 
-    def link_spec(self) -> BelongsToManyLink:
-        return BelongsToManyLink(
+    def link_spec(self, owner_type: str) -> MorphToManyLink:
+        return MorphToManyLink(
             table=self._table,
             related_model=self._related_model,
-            foreign_key=self._fk,
+            type_column=self._type_col,
+            id_column=self._id_col,
             related_foreign_key=self._rfk,
+            owner_type=owner_type,
         )
 
     @overload
-    def __get__(self, obj: None, objtype: type) -> BelongsToMany[T]: ...
+    def __get__(self, obj: None, objtype: type) -> MorphToMany[T]: ...
 
     @overload
-    def __get__(self, obj: Any, objtype: type) -> BelongsToManyAccessor[T]: ...
+    def __get__(self, obj: Any, objtype: type) -> MorphToManyAccessor[T]: ...
 
     def __get__(
         self, obj: Any, objtype: type | None = None
-    ) -> BelongsToMany[T] | BelongsToManyAccessor[T]:
+    ) -> MorphToMany[T] | MorphToManyAccessor[T]:
         if obj is None:
             return self
-        return BelongsToManyAccessor(
+        return MorphToManyAccessor(
             owner=obj,
             related_model=self._related_model,
             table=self._table,
-            foreign_key=self._fk,
+            type_column=self._type_col,
+            id_column=self._id_col,
             related_foreign_key=self._rfk,
             attr_name=self._attr_name,
-        )
-
-    # Class-level method declarations so that feature-existence checks like
-    # ``hasattr(BelongsToMany, "sync_without_detaching")`` succeed without
-    # aliasing the generic ``BelongsToManyAccessor`` methods (which would
-    # propagate ``BelongsToManyAccessor[Unknown]`` to every reader). Real
-    # behaviour lives on the accessor returned from ``__get__``; calling
-    # these directly on the descriptor (not through an instance) is a
-    # programming error and is reported as such.
-
-    async def sync_without_detaching(self, related_ids: SyncIds) -> SyncResult:
-        raise TypeError(
-            "BelongsToMany.sync_without_detaching must be called on an instance "
-            "(e.g. post.tags.sync_without_detaching([...])), not on the descriptor."
-        )
-
-    async def where_pivot(self, column: str, value: Any) -> list[T]:
-        raise TypeError(
-            "BelongsToMany.where_pivot must be called on an instance "
-            "(e.g. post.tags.where_pivot(...)), not on the descriptor."
         )
