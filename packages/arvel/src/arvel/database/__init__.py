@@ -6,7 +6,7 @@ full contract.
 
 from __future__ import annotations
 
-from arvel.database.attributes import accessor, mutator
+from arvel.database.attributes import CastsAttributes, accessor, mutator
 from arvel.database.casts import DecryptionError, EncryptedType, EnumType, PydanticType
 from arvel.database.columns import (
     big_integer,
@@ -71,6 +71,7 @@ __all__ = [
     "DB",
     "ActiveRecord",
     "Blueprint",
+    "CastsAttributes",
     "Collection",
     "CursorPaginator",
     "DatabaseConnectionError",

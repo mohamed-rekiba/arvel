@@ -15,13 +15,13 @@ ergonomics gaps.
 
 ## Stories
 
-### Story 1: Attribute-level custom cast protocol
+### Story 1: Attribute-level custom cast protocol — DONE (WI-arvel-005, ADR-127)
 **As a** developer, **I want** a `CastsAttributes`-style protocol usable from `__casts__` (e.g. `__casts__ = {"meta": AsCollection}`), **so that** I can define virtual, computed, or multi-column casts without changing the SQLAlchemy column type.
 
 **Acceptance Criteria**:
-- [ ] Given a cast class with `get(model, key, value)` / `set(model, key, value)`, when registered in `__casts__`, then reads and writes route through it.
-- [ ] Given a parameterized cast spec (`"decimal:2"`, `"AsCollection:CustomCollection"`), then the parameter is parsed and passed to the cast.
-- [ ] Given a custom cast, when the attribute is serialized via `to_dict`, then the cast's serialized form is used.
+- [x] Given a cast class with `get(model, key, value)` / `set(model, key, value)`, when registered in `__casts__`, then reads and writes route through it.
+- [x] Given a parameterized cast spec (`"decimal:2"`), then the parameter is parsed and passed to the cast. (Named-registry form `"AsCollection:CustomCollection"` deferred — pass the cast class/instance directly instead; see ADR-127-03.)
+- [x] Given a custom cast, when the attribute is serialized via `to_dict`, then the cast's serialized form is used.
 
 **Documentation Requirements**:
 - [ ] Document the cast protocol with a worked example.

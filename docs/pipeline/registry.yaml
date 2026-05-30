@@ -81,3 +81,26 @@ work_items:
       imperative begin/commit/rollback deferred (separate concern, ContextVar lifecycle
       risk). 4b skipped (L2/Tier2). Gates green (729 db tests, mypy/pyright/ruff/bandit/
       pip-audit/gitleaks). First increment of Parity Sprint B.
+
+  - id: "WI-arvel-005"
+    name: "attribute-level custom cast protocol (backlog 006 S1)"
+    complexity: "L3"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T18:00:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      CastsAttributes ABC (get/set/serialize) + class/instance specs in __casts__ +
+      parameterized "decimal:N". Resolvers cached at __init_subclass__ so the
+      __getattribute__/__setattr__ hot path stays a single dict lookup; built-in
+      read/write-skip semantics preserved. to_dict honours custom serialize(). ADR-127.
+      Registry-named cast sugar deferred (pass class directly). 4b skipped (L2/Tier2).
+      Gates green: arvel 3448 tests, permission 75, ecommerce 407; mypy/pyright/ruff/
+      bandit/pip-audit/gitleaks clean.

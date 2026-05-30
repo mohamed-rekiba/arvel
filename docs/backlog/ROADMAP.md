@@ -75,7 +75,7 @@ Parity Sprint A: highest-value, self-contained wins  [SPRINT COMPLETE]
   └── 006 Story 2: hashed cast + force_fill + unguard    [DONE — WI-arvel-003, ADR-125]
 
 Parity Sprint B: attribute pipeline + write/stream gaps
-  ├── 006 Story 1: attribute-level custom cast protocol
+  ├── 006 Story 1: attribute-level custom cast protocol  [DONE — WI-arvel-005, ADR-127]
   ├── 006 Story 4: cast-aware dirty tracking
   ├── 005 Story 8: write-path completeness (insert_or_ignore, upsert, truncate)
   ├── 005 Story 10: streaming + chunking completeness

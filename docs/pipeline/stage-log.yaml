@@ -215,3 +215,42 @@ events:
       pip-audit clean, gitleaks clean. 4b + release skipped (L2/Tier2, library increment).
       S12 marked PARTIAL in ROADMAP.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-005"
+    event_id: "EV-019"
+    timestamp: "2026-05-30T18:05:00+03:00"
+    from_stage: "qa-post"
+    to_stage: "planning-sa"
+    role: "solution-architect"
+    result: "pass"
+    notes: >
+      006-S1 attribute custom cast protocol. ADR-127: CastsAttributes ABC (get/set/serialize),
+      resolvers cached at __init_subclass__ to keep __getattribute__ hot path cheap,
+      parameterized "decimal:N" specs. Registry-named cast form deferred (pass class directly).
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-005"
+    event_id: "EV-020"
+    timestamp: "2026-05-30T18:08:00+03:00"
+    from_stage: "planning-sa"
+    to_stage: "execution"
+    role: "developer"
+    result: "pass"
+    notes: >
+      CastsAttributes (non-generic ABC) in attributes.py; _ResolvedCast resolver pipeline +
+      _resolve_cast_spec in model.py; __getattribute__/__setattr__/to_dict route through
+      resolvers; built-in read/write-skip semantics (hashed, json) preserved. 8 tests green.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-005"
+    event_id: "EV-021"
+    timestamp: "2026-05-30T18:11:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      Gates: arvel 3448 tests, arvel-permission 75, ecommerce-demo 407 (own sessions) —
+      hot-path rewrite, no regressions. mypy clean (874 files), pyright 0/0/0, ruff + format
+      clean, security clean. 4b + release skipped (L2/Tier2). 006-S1 marked DONE.
+    handoff_id: null
