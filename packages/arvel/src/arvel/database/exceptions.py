@@ -120,6 +120,18 @@ class OperationCancelledError(ORMError):
         self.event_name = event_name
 
 
+class InvalidCursorError(ORMError):
+    """Raised by cursor pagination when a cursor token can't be decoded.
+
+    A malformed token must fail loudly — silently serving page 1 hides bugs
+    and corrupts pagination state for the caller.
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"Invalid pagination cursor: {reason}.")
+        self.reason = reason
+
+
 class ReadOnlyModelError(ORMError):
     """Raised when a write operation is attempted on a ViewModel.
 
@@ -166,6 +178,7 @@ __all__ = [
     "CastError",
     "DatabaseConnectionError",
     "DecryptionError",
+    "InvalidCursorError",
     "MassAssignmentError",
     "MigrationNotReversibleError",
     "ModelNotFoundError",
