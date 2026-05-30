@@ -242,6 +242,36 @@ async def test_cursor_paginate_second_page(engine: AsyncEngine, session: AsyncSe
     assert second.items[0].name != first.items[0].name
 
 
+async def test_cursor_paginate_malformed_cursor_raises(
+    engine: AsyncEngine, session: AsyncSession
+) -> None:
+    """A garbage cursor must raise InvalidCursorError, not silently return page 1."""
+    from arvel.database.exceptions import InvalidCursorError
+
+    await _setup(engine)
+    for i in range(5):
+        await AuthorS2.create(name=f"mc{i}", score=i)
+
+    with pytest.raises(InvalidCursorError):
+        await AuthorS2.order_by(AuthorS2.id).cursor_paginate(per_page=2, cursor="!!not-base64!!")
+
+
+async def test_keyset_paginate_malformed_cursor_raises(
+    engine: AsyncEngine, session: AsyncSession
+) -> None:
+    """Keyset pagination must also reject a malformed cursor loudly."""
+    from arvel.database.exceptions import InvalidCursorError
+
+    await _setup(engine)
+    for i in range(5):
+        await AuthorS2.create(name=f"kc{i}", score=i)
+
+    with pytest.raises(InvalidCursorError):
+        await AuthorS2.query().cursor_paginate(
+            per_page=2, cursor="@@bad@@", keyset=["score DESC", "id ASC"]
+        )
+
+
 # ─── FR-012-011: Query extras ────────────────────────────────────────────────
 
 

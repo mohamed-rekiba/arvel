@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import contextlib
 import json
 import uuid as _uuid
@@ -30,6 +31,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import InstrumentedAttribute, Mapper, selectinload
 
 from arvel.database.exceptions import (
+    InvalidCursorError,
     ModelNotFoundError,
     MultipleResultsError,
     UnknownRelationError,
@@ -1249,8 +1251,7 @@ class QueryBuilder(Generic[T]):
                 keyset=["published_at DESC", "id ASC"],
             )
 
-        When ``keyset`` is omitted the method falls back to the legacy
-        single-PK ascending cursor so existing callers are unaffected.
+        When ``keyset`` is omitted the method uses a single-PK ascending cursor.
 
         Cursor tokens are opaque ``base64(json(values))`` strings.  The token
         encodes a dict mapping each keyset column to the last row's value so
@@ -1265,7 +1266,7 @@ class QueryBuilder(Generic[T]):
         if keyset:
             return await self._keyset_paginate(per_page, cursor=cursor, keyset=keyset)
 
-        # Legacy single-PK path (backward-compatible).
+        # Default single-PK ascending cursor.
         mapper = _mapper_of(self._model)
         pk_col = mapper.primary_key[0]
         pk_key = pk_col.key
@@ -1275,7 +1276,10 @@ class QueryBuilder(Generic[T]):
 
         stmt = self.apply_global_scopes().order_by(pk_attr)
         if cursor is not None:
-            last_pk = json.loads(base64.b64decode(cursor.encode()).decode())
+            try:
+                last_pk = json.loads(base64.b64decode(cursor.encode()).decode())
+            except (ValueError, binascii.Error) as exc:
+                raise InvalidCursorError(str(exc)) from exc
             stmt = stmt.where(pk_attr > last_pk)
 
         result = await get_active_session().execute(stmt.limit(per_page + 1))
@@ -1309,8 +1313,8 @@ class QueryBuilder(Generic[T]):
             try:
                 cursor_vals: dict[str, Any] = json.loads(base64.b64decode(cursor.encode()).decode())
                 stmt = _apply_keyset_where(stmt, parsed, cursor_vals)
-            except ValueError, KeyError:
-                pass  # Malformed cursor — ignore and return the first page.
+            except (ValueError, KeyError, binascii.Error) as exc:
+                raise InvalidCursorError(str(exc)) from exc
 
         result = await get_active_session().execute(stmt.limit(per_page + 1))
         from arvel.support.collections import Collection

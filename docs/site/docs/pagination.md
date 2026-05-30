@@ -114,7 +114,7 @@ async def list_posts(cursor: str | None = None) -> dict:
 
 On the client, pass the previous `next_cursor` as the `cursor` query parameter to advance. When `next_cursor` is `null`, you've reached the end.
 
-Cursor values are opaque base64 strings encoding the last primary key. Don't parse or construct them manually.
+Cursor values are opaque base64 strings encoding the last primary key. Don't parse or construct them manually. A malformed or tampered cursor raises `InvalidCursorError` (from `arvel.database.exceptions`) instead of silently returning the first page — catch it at the route boundary and return a `400` if you want a friendlier response.
 
 ## Simple pagination
 
