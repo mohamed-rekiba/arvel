@@ -297,14 +297,13 @@ class TestStory11UpsertHelpers:
 
         qb = _bare_query_builder()
         object.__setattr__(qb, "_model", _Fake)
-        object.__setattr__(qb, "_lock_for_update", False)
-        object.__setattr__(qb, "_lock_shared", False)
+        object.__setattr__(qb, "where", MagicMock(return_value=qb))
         qb.first = AsyncMock(return_value=existing)  # type: ignore[method-assign]
-        result = await qb.first_or_create(defaults={"name": "Alice"})
+        result = await qb.first_or_create({"name": "Alice"})
         assert result is existing
 
     @pytest.mark.asyncio
-    async def test_first_or_create_creates_when_not_found(self) -> None:
+    async def test_first_or_create_merges_attributes_into_create_when_not_found(self) -> None:
 
         created = object()
 
@@ -313,25 +312,27 @@ class TestStory11UpsertHelpers:
 
         qb = _bare_query_builder()
         object.__setattr__(qb, "_model", _Fake)
-        object.__setattr__(qb, "_lock_for_update", False)
-        object.__setattr__(qb, "_lock_shared", False)
+        object.__setattr__(qb, "where", MagicMock(return_value=qb))
         qb.first = AsyncMock(return_value=None)  # type: ignore[method-assign]
-        result = await qb.first_or_create(defaults={"email": "b@b.com", "name": "Bob"})
+        result = await qb.first_or_create({"email": "b@b.com"}, {"name": "Bob"})
         assert result is created
+        # Searched attributes AND values both reach create — Laravel firstOrCreate semantics.
+        _Fake.create.assert_awaited_once_with(email="b@b.com", name="Bob")
 
     @pytest.mark.asyncio
-    async def test_first_or_new_returns_unsaved_instance_when_not_found(self) -> None:
+    async def test_first_or_new_returns_unsaved_instance_with_merged_attributes(self) -> None:
 
         class _FakeUser:
-            pass
+            def __init__(self, **attrs: object) -> None:
+                self.attrs = attrs
 
         qb = _bare_query_builder()
         object.__setattr__(qb, "_model", _FakeUser)
-        object.__setattr__(qb, "_lock_for_update", False)
-        object.__setattr__(qb, "_lock_shared", False)
+        object.__setattr__(qb, "where", MagicMock(return_value=qb))
         qb.first = AsyncMock(return_value=None)  # type: ignore[method-assign]
-        result = await qb.first_or_new(defaults={"name": "Charlie"})
+        result = await qb.first_or_new({"email": "c@c.com"}, {"name": "Charlie"})
         assert isinstance(result, _FakeUser)
+        assert result.attrs == {"email": "c@c.com", "name": "Charlie"}
 
     @pytest.mark.asyncio
     async def test_update_or_create_updates_existing_row(self) -> None:

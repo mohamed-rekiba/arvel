@@ -104,9 +104,7 @@ async def test_bulk_force_delete_hard_removes_softdelete_model(
     assert await Doc.with_trashed().where(title="gone").first() is None
 
 
-async def test_bulk_delete_hard_when_no_softdeletes(
-    engine: Any, session: AsyncSession
-) -> None:
+async def test_bulk_delete_hard_when_no_softdeletes(engine: Any, session: AsyncSession) -> None:
     await _setup(engine)
     await HardOnly.create(name="bulk")
     n = await HardOnly.where(name="bulk").delete()
