@@ -1188,6 +1188,58 @@ class QueryBuilder(Generic[T]):
             return self._clone(self._stmt.outerjoin(target, predicate))
         return self._clone(self._stmt.join(target, predicate))
 
+    def from_sub(self, query: QueryBuilder[Any], alias: str) -> Self:
+        """Select FROM a derived table (subquery). Rows come back as dicts, not model instances."""
+        subq = query.apply_global_scopes().subquery(alias)
+        new = self._clone(select(subq).select_from(subq))
+        new._where_predicate = None
+        new._select_columns = ["__cols__"]
+        return new
+
+    def join_sub(
+        self,
+        query: QueryBuilder[Any],
+        alias: str,
+        on: Callable[[Any], Any] | Any,
+        *,
+        kind: str = "inner",
+    ) -> Self:
+        """JOIN a subquery as a derived table. ``on`` may be a condition or a callable
+        receiving the aliased subquery (use ``alias.c.<col>`` to reference its columns)."""
+        subq = query.apply_global_scopes().subquery(alias)
+        predicate: Any = on(subq) if callable(on) else on
+        if kind == "left":
+            return self._clone(self._stmt.outerjoin(subq, predicate))
+        return self._clone(self._stmt.join(subq, predicate))
+
+    def left_join_sub(
+        self, query: QueryBuilder[Any], alias: str, on: Callable[[Any], Any] | Any
+    ) -> Self:
+        """LEFT JOIN a subquery as a derived table."""
+        return self.join_sub(query, alias, on, kind="left")
+
+    def select_sub(self, query: QueryBuilder[Any], alias: str) -> Self:
+        """Append a single-column subquery as a correlated scalar column labeled ``alias``."""
+        scalar = query.apply_global_scopes().scalar_subquery().label(alias)
+        clone = self._clone(self._stmt.add_columns(scalar))
+        clone._select_columns = ["__with_agg__"]
+        return clone
+
+    def add_select(self, *columns: str | Any) -> Self:
+        """Append columns to the SELECT list (model column names or SQLAlchemy expressions)."""
+        cols: list[Any] = []
+        for c in columns:
+            if isinstance(c, str):
+                try:
+                    cols.append(_resolve_column(self._model, c))
+                except AttributeError:
+                    cols.append(text(c))
+            else:
+                cols.append(c)
+        clone = self._clone(self._stmt.add_columns(*cols))
+        clone._select_columns = ["__with_agg__"]
+        return clone
+
     def with_(
         self,
         *relations: str | Mapping[str, Callable[[QueryBuilder[Any]], QueryBuilder[Any]]],

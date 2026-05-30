@@ -51,12 +51,16 @@ EXTRACT (PG) / STRFTIME (SQLite); `where_date`/`where_time` compose year/month/d
 **As a** developer writing reporting queries, **I want** `from_sub`, `join_sub`/`left_join_sub`, `select_sub`, and `add_select`, **so that** I can build derived-table and ranked-subquery queries the way Laravel does.
 
 **Acceptance Criteria**:
-- [ ] Given a sub-builder, when passed to `from_sub(qb, alias)`, then the outer query selects from the aliased derived table.
-- [ ] Given `join_sub(qb, alias, on)`, when compiled, then the subquery joins as a table with the given ON condition.
-- [ ] Given `select_sub(qb, alias)` and `add_select(*cols)`, then columns are appended (not replaced) on the SELECT list.
+- [x] Given a sub-builder, when passed to `from_sub(qb, alias)`, then the outer query selects from the aliased derived table.
+- [x] Given `join_sub(qb, alias, on)`, when compiled, then the subquery joins as a table with the given ON condition.
+- [x] Given `select_sub(qb, alias)` and `add_select(*cols)`, then columns are appended (not replaced) on the SELECT list.
 
 **Priority**: Should
 **Complexity**: Large
+**Status**: DONE — WI-arvel-012, ADR-133 (`test_qb_subqueries.py`). `from_sub` (derived
+table → dict rows), `join_sub`/`left_join_sub` (closure receives the aliased subquery),
+`select_sub` (correlated scalar subquery as a labeled column), `add_select` (append model
+columns or SQLAlchemy expressions). Appended columns attach onto the model instance.
 
 ### Story 4: `unless` and `tap` conditional chaining
 **As a** developer porting Laravel code, **I want** `unless(cond, cb, default=None)` and `tap(cb)`, **so that** inverse-conditional and mid-chain inspection read the same as Laravel.

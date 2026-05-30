@@ -175,6 +175,38 @@ result = await (
 )
 ```
 
+### Derived tables and subquery joins
+
+```python
+# FROM a derived table — rows come back as dicts (the query targets the subquery, not the model)
+rows = await User.from_sub(User.where(User.active.is_(True)), "active_users").get()
+
+# JOIN a subquery; the closure receives the aliased subquery so you can reference its columns
+high_value = Order.where(Order.amount >= 100)
+users = await User.join_sub(high_value, "hv", lambda hv: hv.c.user_id == User.id).get()
+
+# LEFT JOIN keeps unmatched parent rows
+users = await User.left_join_sub(high_value, "hv", lambda hv: hv.c.user_id == User.id).get()
+```
+
+### Appending columns
+
+`add_select` and `select_sub` append to the SELECT list (they don't replace it). The extra
+columns attach onto each model instance as attributes:
+
+```python
+from sqlalchemy import func
+
+# A correlated scalar subquery as a labeled column
+top = Order.where(Order.user_id == User.id).order_by_desc("amount").limit(1).select("amount")
+users = await User.select_sub(top, "top_amount").get()
+users[0].top_amount  # → the user's highest order amount
+
+# An arbitrary expression
+users = await User.add_select(func.upper(User.name).label("upper_name")).get()
+users[0].upper_name
+```
+
 ## Raw expressions
 
 For SQL fragments you can't express via the builder, use `DB.raw`:
