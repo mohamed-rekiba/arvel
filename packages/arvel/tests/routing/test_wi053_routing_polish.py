@@ -463,6 +463,36 @@ class TestStory8SignedUrls:
         assert resp.status_code == 200
         assert resp.json() == {"valid": False}
 
+    def test_has_valid_signature_returns_false_when_replayed_on_another_host(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A link signed for example.com must not validate against evil.com,
+        # even with an identical path + query (host-bound signature).
+        from arvel.routing import URL, Route, Router
+        from fastapi import FastAPI, Request
+        from starlette.testclient import TestClient
+
+        Router.reset_singleton()
+        monkeypatch.setenv("APP_URL", "https://example.com")
+        monkeypatch.setenv("APP_KEY", "base64:" + "A" * 44)
+
+        @Route.get("/verify/{user_id}", name="verify-email")
+        async def verify(user_id: int, request: Request) -> dict[str, Any]:
+            return {"valid": URL.has_valid_signature(request)}
+
+        del verify  # registered via @Route.*; drop local binding
+
+        app = FastAPI()
+        Router.singleton().register_with_app(app)
+
+        signed = URL.signed_route("verify-email", user_id=5)
+        path_and_query = signed[len("https://example.com") :]
+
+        client = TestClient(app, base_url="https://evil.com")
+        resp = client.get(path_and_query)
+        assert resp.status_code == 200
+        assert resp.json() == {"valid": False}
+
     def test_has_valid_signature_returns_false_after_expiry(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

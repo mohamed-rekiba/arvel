@@ -1250,9 +1250,13 @@ def _sign_message(message: str) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
-def _signature_payload(path: str, query_without_signature: str) -> str:
-    """Canonical payload signed for a URL — `path?query` with `signature` stripped."""
-    return f"{path}?{query_without_signature}" if query_without_signature else path
+def _signature_payload(base_url: str, query_without_signature: str) -> str:
+    """Canonical payload signed for a URL — absolute `base_url?query`, `signature` stripped.
+
+    Binds the signature to scheme+host+path so a link signed for one host can't be
+    replayed against another host serving the same path (Laravel's hasValidSignature).
+    """
+    return f"{base_url}?{query_without_signature}" if query_without_signature else base_url
 
 
 class _URLFacade:
@@ -1277,7 +1281,7 @@ class _URLFacade:
         if expires is not None:
             query_pairs.append(("expires", str(expires)))
         query = urlencode(query_pairs)
-        signature = _sign_message(_signature_payload(path, query))
+        signature = _sign_message(_signature_payload(f"{_app_url()}{path}", query))
         query_pairs.append(("signature", signature))
         return f"{_app_url()}{path}?{urlencode(query_pairs)}"
 
@@ -1297,10 +1301,12 @@ class _URLFacade:
             if time.time() > expires_ts:
                 return False
 
-        # Rebuild the signed payload: original path + original query minus `signature`.
+        # Rebuild the signed payload: absolute URL (scheme+host+path) + original
+        # query minus `signature`. Host binding rejects cross-host replay.
         pairs = [(k, v) for k, v in query_params.multi_items() if k != "signature"]
         query_without_sig = urlencode(pairs)
-        expected = _sign_message(_signature_payload(request.url.path, query_without_sig))
+        base_url = f"{request.url.scheme}://{request.url.netloc}{request.url.path}"
+        expected = _sign_message(_signature_payload(base_url, query_without_sig))
         return hmac.compare_digest(expected, signature)
 
 
