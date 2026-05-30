@@ -1,43 +1,50 @@
-name: Documentation
+name: Docs
 
 on:
   push:
     branches: [main]
-    paths: ['docs/site/**', 'src/arvel/**']
-  pull_request:
-    paths: ['docs/site/**', 'src/arvel/**']
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 concurrency:
-  group: docs-${{ github.ref }}
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.14"
+  UV_VERSION: "0.11.16"
 
 jobs:
   build:
-    name: Build docs
+    name: Build docs site
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0
-      - run: uv sync --extra docs
-      - run: uv run mkdocs build -f docs/site/en/mkdocs.yml --strict
-      - uses: actions/upload-pages-artifact@v5
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         with:
-          path: docs/site/en/site
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-extras --frozen
+      - name: mkdocs build --strict
+        run: uv run mkdocs build --strict --site-dir _site
+      - name: Bundle install scripts into site root
+        run: cp install.sh install.ps1 _site/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
 
   deploy:
-    name: Deploy to GitHub Pages
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [build]
+    name: Publish to GitHub Pages
     runs-on: ubuntu-24.04
-    permissions:
-      pages: write
-      id-token: write
+    needs: build
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+      - id: deployment
+        uses: actions/deploy-pages@v4

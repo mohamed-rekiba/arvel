@@ -1,0 +1,6 @@
+# False-positive suppression for gitleaks generic-api-key rule.
+# These are documentation strings that match the entropy threshold but contain
+# no actual secrets — "guest/verified/can middleware" paths in pipeline docs.
+
+docs/backlog/ROADMAP.md:generic-api-key:20
+docs/pipeline/handoffs/HO-001-PM-to-BA-007.yaml:generic-api-key:30

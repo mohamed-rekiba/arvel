@@ -27,11 +27,22 @@ ENV/
 # Linting / Testing
 .ruff_cache/
 .pytest_cache/
-.coverage
+.coverage*
+.vite/
+
+# Local experiments / scratch
 coverage.xml
 coverage/
 htmlcov/
 .mypy_cache/
+.pyright/
+.benchmarks/
+.playwright-mcp/
+
+# SBOM / build scratch
+req-*.txt
+sbom-*.cdx.json
+sbom-*.spdx.json
 
 # Environment
 .env
@@ -51,5 +62,6 @@ Thumbs.db
 **/*.sqlite3
 
 # MkDocs build output
-docs/site/*/site/
-docs/site/*/.cache/
+/site/
+/_site/
+.cache/

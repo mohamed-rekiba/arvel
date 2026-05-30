@@ -1,0 +1,29 @@
+name: Release Please
+
+# Opens per-package release PRs on every push to `main`. When a release PR is
+# merged, release-please creates a component-prefixed tag (e.g. `arvel-v1.0.1`
+# or `arvel-cli-v0.1.0`) and a GitHub Release. The companion
+# `publish.yml` workflow then uploads the matching distribution to PyPI via
+# Trusted Publishing.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Open / update release PRs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: googleapis/release-please-action@v5.0.0
+        with:
+          config-file: .github/release-please-config.json
+          manifest-file: .github/release-please-manifest.json

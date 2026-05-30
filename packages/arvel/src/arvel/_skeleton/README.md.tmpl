@@ -1,0 +1,42 @@
+# {{ project_name_pascal }}
+
+An [Arvel](https://github.com/mohamed-rekiba/arvel) application.
+
+## Getting started
+
+```bash
+uv sync
+uv run uvicorn public.asgi:asgi --reload
+```
+
+Visit `http://127.0.0.1:8000/` to see the welcome route.
+
+## Layout
+
+```
+{{ project_name }}/
+├── app/                # First-party application code
+│   ├── Http/           # Controllers, middleware, form requests
+│   ├── Models/         # ORM models
+│   ├── Providers/      # Application service providers
+│   └── Console/        # CLI commands (WI-arvel-005)
+├── bootstrap/          # Application kernel (app.py, providers.py)
+├── config/             # Configuration files (loaded by arvel.config.lookup)
+├── database/           # Migrations, seeders, factories
+├── public/             # ASGI entrypoint
+├── routes/             # web.py, api.py, console.py
+├── storage/            # Runtime artefacts (logs, cache, sessions)
+└── tests/              # Feature + Unit tests
+```
+
+## Configuration
+
+Copy `.env.example` to `.env` and adjust values for your environment.
+Configuration is loaded from `config/` and read at runtime via
+`arvel.config.lookup("app.name")`.
+
+## Tests
+
+```bash
+uv run pytest
+```

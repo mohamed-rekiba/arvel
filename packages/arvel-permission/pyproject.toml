@@ -1,0 +1,31 @@
+[project]
+name = "arvel-permission"
+version = "0.3.0" # x-release-please-version
+description = "Roles and permissions for Arvel — Spatie Laravel Permission v7 parity."
+readme = "README.md"
+requires-python = ">=3.14"
+license = { text = "MIT" }
+authors = [{ name = "Arvel contributors" }]
+keywords = ["arvel", "authorization", "permissions", "roles", "spatie"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+dependencies = ["arvel", "pydantic>=2.13.4", "sqlalchemy[asyncio]>=2.0.49"]
+
+[project.urls]
+Homepage = "https://github.com/mohamed-rekiba/arvel"
+Documentation = "https://github.com/mohamed-rekiba/arvel/tree/main/packages/arvel-permission"
+Repository = "https://github.com/mohamed-rekiba/arvel"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/arvel_permission"]
+include = ["src/arvel_permission/py.typed"]

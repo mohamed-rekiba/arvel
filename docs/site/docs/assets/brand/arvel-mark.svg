@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Arvel mark">
+  <title>Arvel</title>
+  <desc>Arvel monogram: two angular filled shapes meet at a top apex to form a stylized letter A, completed by a horizontal violet crossbar. The left shape is violet; the right is cyan.</desc>
+  <path fill="#6D28D9" d="M13.58 23.64 L13.58 2.62 L3.07 23.64 Z" />
+  <path fill="#06B6D4" d="M13.58 2.62 L21.84 2.62 L28.92 29.37 L19.20 24.25 Z" />
+  <rect x="4" y="15" width="23" height="2" rx="0.5" fill="#6D28D9" />
+</svg>

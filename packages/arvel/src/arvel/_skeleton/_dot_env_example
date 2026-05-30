@@ -1,0 +1,28 @@
+APP_NAME={{ project_name_pascal }}
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=http://localhost:8000
+APP_TIMEZONE=UTC
+
+LOG_LEVEL=info
+
+DB_CONNECTION=sqlite
+# DB_URL=sqlite+aiosqlite:///database/database.sqlite
+# DB_CONNECTION=postgresql
+# DB_URL=postgresql+asyncpg://user:password@localhost:5432/dbname
+# DB_HOST=127.0.0.1
+# DB_PORT=5432
+# DB_DATABASE=dbname
+# DB_USERNAME=user
+# DB_PASSWORD=
+# DB_ECHO=false
+# DB_POOL_SIZE=5
+# DB_MAX_OVERFLOW=10
+# DB_POOL_RECYCLE=1800
+
+# CACHE_CONNECTION=redis
+# CACHE_URL=redis://localhost:6379/0
+# CACHE_HOST=127.0.0.1
+# CACHE_PORT=6379
+# CACHE_PASSWORD=
+# CACHE_DATABASE=0
