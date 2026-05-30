@@ -38,6 +38,8 @@ The helpers in [`arvel.database.columns`](#typed-column-helpers) — `id_`, `str
 | `json(*, nullable=False, default=None)` | `JSON` / `JSONB` | `mapped_column(JSON, ...)` |
 | `foreign_id(references, *, on="id", nullable=False, index=True, ondelete=None)` | `INTEGER REFERENCES …` | `mapped_column(ForeignKey(...), ...)` |
 
+> **In-place JSON edits are tracked.** `json()` and `jsonb()` wrap the value so editing a dict or list root in place marks the row dirty — `model.meta["k"] = v` then `await model.save()` persists, no reassignment needed. Roots must be a dict or list; a scalar root raises `TypeError` since there's nothing to track in place.
+
 > **Email validation belongs at the API boundary, not on the column.** Use `string(254, unique=True)` for the model, and `EmailStr` on your Pydantic input schemas (`UserCreate`, `UserUpdate`). The storage layer stays plain VARCHAR — indexed, simple, fast — and the validation runs once at the boundary where invalid input is caught and rejected with a 422. See the [Email validation](#email-validation) section below and [ADR-077](https://github.com/mohamed-rekiba/arvel/blob/main/docs/adr/ADR-077-email-validation-at-boundary.md) for the rationale.
 
 The helpers are additive — fall back to `mapped_column(...)` whenever you need something the helpers don't cover (custom server-side defaults, computed columns, dialect-specific types):
