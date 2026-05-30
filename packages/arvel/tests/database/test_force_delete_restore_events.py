@@ -51,9 +51,7 @@ async def _setup(engine: AsyncEngine) -> None:
         await conn.run_sync(Model.metadata.create_all)
 
 
-async def test_force_delete_fires_delete_events(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_force_delete_fires_delete_events(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     rec = Recorder()
     Paper.observe(rec)

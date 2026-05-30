@@ -33,9 +33,13 @@ def test_queued_conversion_job_is_serializable() -> None:
     envelope = job.to_envelope()
     assert envelope.payload["media_id"] == "abc-123"
     assert envelope.payload["model_class_path"] == "app.models.Product"
-    # queue/tries/backoff are envelope metadata, excluded from payload
+    # queue/delay/priority are routing metadata promoted onto the envelope.
     assert "queue" not in envelope.payload
-    assert "tries" not in envelope.payload
+    assert "delay" not in envelope.payload
+    assert "priority" not in envelope.payload
+    # Retry config has no envelope slot, so it round-trips inside the payload.
+    assert envelope.payload["tries"] == 3
+    assert envelope.payload["backoff"] == [30, 60, 120]
 
 
 # ── QueuedConversionJob.handle ────────────────────────────────────────────────

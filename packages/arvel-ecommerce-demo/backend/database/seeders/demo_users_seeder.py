@@ -12,12 +12,18 @@ class DemoUsersSeeder(EcommerceSeeder):
     async def run(self) -> None:
         users = [
             {
+                "name": "Sandra Super",
+                "email": "superadmin@example.com",
+                "role_name": "super_admin",
+            },
+            {
                 "name": "Carol Catalog",
                 "email": "catalog@example.com",
                 "role_name": "catalog_manager",
             },
             {"name": "Sam Support", "email": "support@example.com", "role_name": "support_agent"},
             {"name": "Chris Customer", "email": "customer@example.com", "role_name": "customer"},
+            {"name": "Casey Customer", "email": "customer2@example.com", "role_name": "customer"},
         ]
 
         for user_data in users:

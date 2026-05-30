@@ -19,7 +19,7 @@ arvel migrate
 
 Both `roles` and `permissions` enforce `UNIQUE(name, guard_name)`, so the same role name can exist under multiple guards (a `web` admin and an `api` admin are distinct).
 
-The two pivot tables (`model_has_roles`, `model_has_permissions`) use a **composite primary key** — `(role_id / permission_id, model_type, model_id)` — with no surrogate `id` column and no timestamps. This matches Spatie v7's default schema and enforces uniqueness at the database level: assigning the same role or permission to a user twice raises an `IntegrityError` rather than silently creating a duplicate row.
+The two pivot tables (`model_has_roles`, `model_has_permissions`) use a **composite primary key** — `(role_id / permission_id, model_type, model_id)` — with no surrogate `id` column and no timestamps. This matches Spatie v7's default schema and enforces uniqueness at the database level. The async `MorphToMany` accessor that drives these pivots dedups before inserting, so assigning the same role twice is a no-op rather than an `IntegrityError`.
 
 ## Models
 
@@ -33,11 +33,11 @@ role = await Role.where(Role.name == "editor").first()
 perms = await Permission.where(Permission.guard_name == "api").all()
 ```
 
-`Permission` also exposes a `roles` relationship, so you can navigate the assignment graph in both directions:
+`Permission` also exposes a `roles` relation (a `BelongsToMany` accessor over `role_has_permissions`), so you can navigate the assignment graph in both directions:
 
 ```python
-perm = await Permission.find_by_name("edit articles")
-for role in perm.roles:
+perm = await Permission.find_by_name("edit articles", session=db)
+for role in await perm.roles.all():
     print(role.name)  # every role that carries this permission
 ```
 
@@ -109,16 +109,18 @@ app.add_exception_handler(UnauthorizedException, permission_exception_handler)
 
 ## Mixins
 
-Add `HasRoles` and `HasPermissions` to any user model. These mixins assume the host class exposes mutable `roles` and `permissions` collections wired to the permission pivot tables.
+Add `HasRoles` and `HasPermissions` to any user model. The mixins are **async-first**: every grant, revoke, and check hits the active session directly, so there's no in-memory collection to flush.
 
-Use the `make_roles_relationship` and `make_permissions_relationship` factory functions. They handle the integer-PK → `VARCHAR(36)` cast internally so you don't need any `cast()` calls or `# type: ignore` comments:
+The host declares `roles` and `permissions` as `MorphToMany` accessors over the polymorphic pivots. The accessor writes the `model_type` discriminator and string-casts the owner PK into the `VARCHAR(36)` `model_id` column on every INSERT — so API-assigned grants always persist, with no `cast()` calls, no `# type: ignore`, and no `model_type`-NULL bug class:
 
 ```python
+from typing import ClassVar
+
 from arvel.database import Model, Timestamps
 from arvel.database.columns import id_, string
+from arvel.database.orm import Mapped, MorphToMany
 from arvel_permission import HasPermissions, HasRoles, Permission, Role
-from arvel_permission.traits import make_permissions_relationship, make_roles_relationship
-from sqlalchemy.orm import Mapped
+from arvel_permission.models import model_has_permissions, model_has_roles
 
 
 class User(Model, Timestamps, HasRoles, HasPermissions):
@@ -126,33 +128,37 @@ class User(Model, Timestamps, HasRoles, HasPermissions):
 
     id: Mapped[int] = id_()
     name: Mapped[str] = string(255)
-
-    roles: Mapped[list[Role]] = make_roles_relationship(lambda: User, model_type="User")
-    permissions: Mapped[list[Permission]] = make_permissions_relationship(
-        lambda: User, model_type="User"
-    )
     default_guard_name = "web"
+
+    roles: ClassVar[MorphToMany[Role]] = MorphToMany(
+        Role, table=model_has_roles, name="model", related_key="role_id"
+    )
+    permissions: ClassVar[MorphToMany[Permission]] = MorphToMany(
+        Permission, table=model_has_permissions, name="model", related_key="permission_id"
+    )
 ```
 
-The `lambda: User` forward reference avoids circular import issues at class definition time. The `model_type` string must match the value stored in the `model_type` column of the pivot tables — by convention this is the short class name.
+`name="model"` names the pivot discriminator pair (`model_type` / `model_id`); `MorphToMany` derives the `model_type` value from the host's short class name (`"User"`) automatically.
+
+!!! note "Async relations don't load via `with_()`"
+    `QueryBuilder.with_()` only eager-loads SQLAlchemy `relationship()` properties. `MorphToMany` is a custom async descriptor, so load it on demand with `await user.roles.all()` rather than `User.with_("roles")`. See [Arvent relationships](arvent-relationships.md#morphtomany).
 
 ### Roles
 
 ```python
-user.assign_role("editor")
-user.assign_role("editor", "moderator")  # multi-arg, deduped
-user.has_role("editor")                   # True
-user.has_any_role("editor", "admin")      # True
-user.has_all_roles("editor", "moderator") # True
-user.get_role_names()                     # ["editor", "moderator"]
+await user.assign_role("editor")
+await user.assign_role("editor", "moderator")  # multi-arg, deduped
+await user.has_role("editor")                   # True
+await user.has_any_role("editor", "admin")      # True
+await user.has_all_roles("editor", "moderator") # True
+await user.get_role_names()                     # ["editor", "moderator"]
 
-user.remove_role("moderator")
-user.sync_roles(["editor", "author"])              # replaces the set wholesale
-user.sync_roles(["editor", "author"], detach=False) # appends, keeps existing roles
-await user.save()
+await user.remove_role("moderator")
+await user.sync_roles(["editor", "author"])               # replaces the set wholesale
+await user.sync_roles(["editor", "author"], detach=False) # appends, keeps existing roles
 ```
 
-`HasRoles` operations mutate `self.roles` in memory. Persistence is your call — typically `await user.save()` after a batch of changes, so SQLAlchemy emits one round-trip.
+Each call persists immediately through the accessor — there's no separate `save()` step for role and permission grants. The roles themselves are find-or-created by name and guard, so `assign_role("editor")` works even if the `editor` row doesn't exist yet.
 
 All mixin methods accept plain strings **or** `StrEnum` values, so you can use an enum to define your app's role set without losing type safety:
 
@@ -165,21 +171,20 @@ class AppRole(enum.StrEnum):
     ADMIN = "admin"
 
 
-user.assign_role(AppRole.EDITOR)
-user.has_role(AppRole.ADMIN)  # False
+await user.assign_role(AppRole.EDITOR)
+await user.has_role(AppRole.ADMIN)  # False
 ```
 
 ### Permissions
 
 ```python
-user.give_permission_to("edit articles")
-user.has_permission_to("edit articles")   # True
-user.has_any_permission("edit articles", "delete articles")
-user.get_permission_names()               # ["edit articles", ...]
+await user.give_permission_to("edit articles")
+await user.has_permission_to("edit articles")   # True
+await user.has_any_permission("edit articles", "delete articles")
+await user.get_permission_names()               # ["edit articles", ...]
 
-user.revoke_permission_to("edit articles")
-user.sync_permissions(["edit articles", "publish articles"])
-await user.save()
+await user.revoke_permission_to("edit articles")
+await user.sync_permissions(["edit articles", "publish articles"])
 ```
 
 `has_permission_to` checks **direct** permissions plus permissions **inherited via roles** — exactly the Spatie semantics.
@@ -189,9 +194,9 @@ await user.save()
 When you need to distinguish where a permission came from:
 
 ```python
-user.get_direct_permissions()      # only directly granted
-user.get_permissions_via_roles()   # only inherited through roles
-user.get_all_permissions()         # union of both, de-duped
+await user.get_direct_permissions()      # only directly granted
+await user.get_permissions_via_roles()   # only inherited through roles
+await user.get_all_permissions()         # union of both, de-duped
 ```
 
 #### Wildcard permissions
@@ -199,26 +204,26 @@ user.get_all_permissions()         # union of both, de-duped
 `has_permission_to` evaluates wildcard patterns held by the user. Patterns follow the Apache Shiro model: use `*` for any segment and comma-separate alternatives within a segment:
 
 ```python
-user.give_permission_to("edit.*")
-user.has_permission_to("edit.articles")  # True
-user.has_permission_to("edit.comments") # True
-user.has_permission_to("delete.posts")  # False
+await user.give_permission_to("edit.*")
+await user.has_permission_to("edit.articles")  # True
+await user.has_permission_to("edit.comments") # True
+await user.has_permission_to("delete.posts")  # False
 
 # Match any ability
-user.give_permission_to("*")
-user.has_permission_to("anything.at.all")  # True
+await user.give_permission_to("*")
+await user.has_permission_to("anything.at.all")  # True
 
 # Comma-separated OR within a segment
-user.give_permission_to("posts,users.create,update")
-user.has_permission_to("posts.create")  # True
-user.has_permission_to("users.update")  # True
-user.has_permission_to("users.delete")  # False
+await user.give_permission_to("posts,users.create,update")
+await user.has_permission_to("posts.create")  # True
+await user.has_permission_to("users.update")  # True
+await user.has_permission_to("users.delete")  # False
 
 # Star on one segment, OR list on another
-user.give_permission_to("*.create,update")
-user.has_permission_to("articles.create")  # True
-user.has_permission_to("comments.update")  # True
-user.has_permission_to("posts.delete")     # False
+await user.give_permission_to("*.create,update")
+await user.has_permission_to("articles.create")  # True
+await user.has_permission_to("comments.update")  # True
+await user.has_permission_to("posts.delete")     # False
 ```
 
 To disable wildcard matching for a specific model class, set the class attribute:
@@ -235,13 +240,12 @@ To change the default for **all** models at once, set `wildcard_enabled` on `Per
 `Role` also mixes in `HasPermissions`, so you can assign permissions directly to a role:
 
 ```python
-editor_role = Role(name="editor", guard_name="web")
-editor_role.give_permission_to("edit articles", "publish articles")
-editor_role.has_permission_to("edit articles")  # True
+editor_role = await Role.find_or_create("editor", session=db, guard="web")
+await editor_role.give_permission_to("edit articles", "publish articles")
+await editor_role.has_permission_to("edit articles")  # True
 
-editor_role.revoke_permission_to("publish articles")
-editor_role.sync_permissions(["edit articles"])
-await editor_role.save()
+await editor_role.revoke_permission_to("publish articles")
+await editor_role.sync_permissions(["edit articles"])
 ```
 
 Any user assigned the `editor` role will inherit these permissions via `has_permission_to`.
@@ -283,12 +287,12 @@ Every check accepts an optional `guard=` keyword. Asking under the wrong guard r
 from arvel_permission import GuardMismatchError
 
 
-api_admin = Role(name="admin", guard_name="api")
-user.roles.append(api_admin)
+api_admin = await Role.find_or_create("admin", session=db, guard="api")
+await user.assign_role(api_admin)
 
-user.has_role("admin", guard="api")    # True
+await user.has_role("admin", guard="api")    # True
 try:
-    user.has_role(api_admin, guard="web")
+    await user.has_role(api_admin, guard="web")
 except GuardMismatchError:
     pass  # Item belongs to guard 'api' but caller asked about 'web'.
 ```
@@ -401,8 +405,7 @@ Now this works end-to-end:
 from arvel.facades import Gate
 
 
-user.give_permission_to("publish articles")
-await user.save()
+await user.give_permission_to("publish articles")
 
 await Gate.allows("publish articles")  # True
 ```

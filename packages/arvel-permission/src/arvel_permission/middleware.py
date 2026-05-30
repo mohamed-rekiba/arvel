@@ -34,6 +34,18 @@ def _split(value: str) -> list[str]:
     return [p.strip() for p in value.split("|")]
 
 
+async def _any(
+    check: Callable[..., Awaitable[bool]],
+    values: list[str],
+    guard: str,
+) -> bool:
+    """True if the async ``check`` passes for any value (short-circuits)."""
+    for value in values:
+        if await check(value, guard=guard):
+            return True
+    return False
+
+
 class RoleMiddleware:
     """Guard a route to users that hold the specified role.
 
@@ -54,7 +66,7 @@ class RoleMiddleware:
         if user is None:
             raise UnauthorizedException(status_code=401)
         check = getattr(user, "has_role", None)
-        if check is None or not any(check(r, guard=self._guard) for r in self._roles):
+        if check is None or not await _any(check, self._roles, self._guard):
             raise UnauthorizedException(status_code=403)
         return await call_next(request)
 
@@ -79,7 +91,7 @@ class PermissionMiddleware:
         if user is None:
             raise UnauthorizedException(status_code=401)
         check = getattr(user, "has_permission_to", None)
-        if check is None or not any(check(p, guard=self._guard) for p in self._permissions):
+        if check is None or not await _any(check, self._permissions, self._guard):
             raise UnauthorizedException(status_code=403)
         return await call_next(request)
 
@@ -104,10 +116,13 @@ class RoleOrPermissionMiddleware:
             raise UnauthorizedException(status_code=401)
         has_role = getattr(user, "has_role", None)
         has_perm = getattr(user, "has_permission_to", None)
-        if not any(
-            (has_role and has_role(v, guard=self._guard))
-            or (has_perm and has_perm(v, guard=self._guard))
-            for v in self._values
-        ):
+        allowed = False
+        for v in self._values:
+            if (has_role is not None and await has_role(v, guard=self._guard)) or (
+                has_perm is not None and await has_perm(v, guard=self._guard)
+            ):
+                allowed = True
+                break
+        if not allowed:
             raise UnauthorizedException(status_code=403)
         return await call_next(request)

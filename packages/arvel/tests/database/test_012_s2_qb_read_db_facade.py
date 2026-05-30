@@ -272,6 +272,57 @@ async def test_keyset_paginate_malformed_cursor_raises(
         )
 
 
+async def test_keyset_paginate_desc_walks_forward_without_overlap(
+    engine: AsyncEngine, session: AsyncSession
+) -> None:
+    """A DESC keyset walk must move toward smaller values, not loop on the head.
+
+    Regression: _apply_keyset_where inverted the comparison, so the second page
+    returned the first page's rows again.
+    """
+    await _setup(engine)
+    # Distinct scores so the leading keyset column alone orders every row.
+    for i in range(9):
+        await AuthorS2.create(name=f"k{i}", score=i)
+
+    keyset = ["score DESC", "id ASC"]
+    seen: list[int] = []
+    cursor: str | None = None
+    for _ in range(5):  # 9 rows / 2 per page → at most 5 pages
+        page = await AuthorS2.query().cursor_paginate(per_page=2, cursor=cursor, keyset=keyset)
+        seen.extend(a.score for a in page.items)
+        if page.next_cursor is None:
+            break
+        cursor = page.next_cursor
+
+    assert seen == sorted(range(9), reverse=True), seen
+    assert len(seen) == len(set(seen)), "pages overlapped"
+
+
+async def test_keyset_paginate_handles_tied_leading_column(
+    engine: AsyncEngine, session: AsyncSession
+) -> None:
+    """When the leading column ties, the secondary column must break it cleanly."""
+    await _setup(engine)
+    # All scores equal → ordering falls entirely to the id ASC tiebreaker.
+    for i in range(6):
+        await AuthorS2.create(name=f"t{i}", score=100)
+
+    keyset = ["score DESC", "id ASC"]
+    seen_ids: list[int] = []
+    cursor: str | None = None
+    for _ in range(4):
+        page = await AuthorS2.query().cursor_paginate(per_page=2, cursor=cursor, keyset=keyset)
+        seen_ids.extend(a.id for a in page.items)
+        if page.next_cursor is None:
+            break
+        cursor = page.next_cursor
+
+    assert seen_ids == sorted(seen_ids), seen_ids
+    assert len(seen_ids) == 6
+    assert len(seen_ids) == len(set(seen_ids)), "pages overlapped on tie"
+
+
 # ─── FR-012-011: Query extras ────────────────────────────────────────────────
 
 

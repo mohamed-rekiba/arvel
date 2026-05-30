@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
@@ -13,6 +15,25 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="Model")
 
 _OBSERVERS_ATTR = "_arvel_observers"
+
+# Task-local event mute. ContextVar (not a plain global) so suppression survives
+# await boundaries and stays isolated per asyncio task under concurrency.
+_suppress_events: ContextVar[bool] = ContextVar("arvel_suppress_events", default=False)
+
+
+def events_suppressed() -> bool:
+    """True when the current context is inside a ``without_events()`` block."""
+    return _suppress_events.get()
+
+
+@asynccontextmanager
+async def without_events() -> AsyncGenerator[None]:
+    """Mute all lifecycle events for the duration of the block. Re-entrant."""
+    token = _suppress_events.set(True)
+    try:
+        yield
+    finally:
+        _suppress_events.reset(token)
 
 
 class _ObserverRuntime:
@@ -51,12 +72,16 @@ async def _dispatch_observer(observer: Any, event_name: str, instance: Any) -> b
 
 async def fire_async(model_cls: type[Any], event_name: str, instance: Any) -> None:
     """Await all observer callbacks registered for ``event_name`` on ``model_cls``."""
+    if _suppress_events.get():
+        return
     for observer in _get_observers(model_cls):
         await _dispatch_observer(observer, event_name, instance)
 
 
 async def fire_cancellable(model_cls: type[Any], event_name: str, instance: Any) -> None:
     """Run a before-hook; abort when any observer returns ``False``."""
+    if _suppress_events.get():
+        return
     if event_name not in _CANCELLABLE_EVENTS:
         msg = f"fire_cancellable() only supports {_CANCELLABLE_EVENTS}, got {event_name!r}."
         raise ValueError(msg)
@@ -92,6 +117,8 @@ def fire_after_commit(model_cls: type[Any], instance: Any) -> None:
     Safe to call inside any lifecycle hook that runs within a DB.transaction() block.
     Does nothing for observers that don't implement ``after_commit``.
     """
+    if _suppress_events.get():
+        return
     from arvel.database.session import enqueue_after_commit, get_after_commit_queue
 
     # Short-circuit when there's no active transaction queue.
@@ -156,8 +183,10 @@ __all__ = [
     "bind_observer",
     "clear_observers",
     "configure_observer_container",
+    "events_suppressed",
     "fire_after_commit",
     "fire_async",
     "fire_cancellable",
     "observe",
+    "without_events",
 ]

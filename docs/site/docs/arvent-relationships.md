@@ -285,6 +285,57 @@ def up(self, t: Blueprint) -> None:
     t.timestamps()
 ```
 
+## MorphToMany
+
+`MorphToMany` is a **polymorphic many-to-many**: like `BelongsToMany`, but the pivot carries a `{name}_type` / `{name}_id` discriminator pair instead of a single owner foreign key. One pivot table can therefore link several owner types to the same related model — this is exactly how [`arvel-permission`](permission.md) lets both a `User` and a `Team` share the `model_has_roles` pivot.
+
+Declare it as a `ClassVar` descriptor, pointing at a shared pivot `Table`:
+
+```python
+from typing import ClassVar
+
+from arvel.database import Model
+from arvel.database.orm import MorphToMany
+from sqlalchemy import Column, ForeignKey, String, Table
+
+# A pivot keyed by (model_type, model_id, role_id)
+model_has_roles = Table(
+    "model_has_roles",
+    Model.metadata,
+    Column("model_type", String(255), primary_key=True),
+    Column("model_id", String(36), primary_key=True),
+    Column("role_id", ForeignKey("roles.id"), primary_key=True),
+)
+
+
+class User(Model):
+    roles: ClassVar[MorphToMany["Role"]] = MorphToMany(
+        Role, table=model_has_roles, name="model", related_key="role_id"
+    )
+```
+
+`name="model"` selects the `model_type` / `model_id` column pair. The `model_type` value is the owner's short class name (`"User"`), and `model_id` is the **string-cast owner PK** — written and compared as a string so a `VARCHAR` pivot column accepts integer, UUID, and string primary keys without a dialect-specific cast.
+
+Accessing the attribute on an instance returns a `MorphToManyAccessor`:
+
+```python
+await user.roles.attach(role.id)        # True if new, False if already attached
+await user.roles.detach(role.id)        # no-op if absent
+await user.roles.toggle(role.id)        # "attached" or "detached"
+await user.roles.sync([1, 2, 3])        # replace the set, returns {attached, detached, updated}
+await user.roles.sync_without_detaching([4])
+rows = await user.roles.all()           # list[Role]
+row = await user.roles.pivot(role.id)   # the pivot row as a dict, or None
+matches = await user.roles.where_pivot("expires_at", None)
+async for role in user.roles:           # streaming iteration
+    ...
+```
+
+Every INSERT/SELECT/DELETE sets both discriminator columns, so there's no `model_type`-NULL bug class and no separate `save()` step.
+
+!!! warning "`MorphToMany` does not eager-load via `with_()`"
+    `with_()` resolves SQLAlchemy `relationship()` properties only. `MorphToMany` is a custom async descriptor — load it on demand with `await user.roles.all()`. `where_has` and `with_count` *do* support it (see below).
+
 ## Has many through
 
 Reach a distant model through an intermediate one:
@@ -339,7 +390,7 @@ Each callback receives a `QueryBuilder` scoped to the related model and must ret
 
 ## Querying through relations
 
-`where_has`, `doesnt_have`, and `has` work with both descriptor-style attributes and `BelongsToMany` pivot descriptors:
+`where_has`, `doesnt_have`, and `has` work with descriptor-style attributes and both pivot descriptors (`BelongsToMany` and `MorphToMany`):
 
 ```python
 # At least one matching related row
@@ -386,7 +437,7 @@ Attribute name pattern: `{relation}_{aggregate}_{column}` — `posts_count`, `or
 
 These only work with descriptor-style relations.
 
-`with_count` accepts both SQLA relationships and `BelongsToMany` descriptors, and raises `UnknownRelationError` if the name isn't a relation on the model. `with_sum`/`with_max` cover SQLA relationships.
+`with_count` accepts SQLA relationships and both pivot descriptors (`BelongsToMany`, `MorphToMany`), and raises `UnknownRelationError` if the name isn't a relation on the model. `with_sum`/`with_max` cover SQLA relationships.
 
 ### Soft-deletes and relation counts
 

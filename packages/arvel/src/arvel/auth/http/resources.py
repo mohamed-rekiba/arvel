@@ -7,11 +7,21 @@ the controller stays free of ad-hoc ``dict`` construction.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import Annotated, Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 T = TypeVar("T")
+
+
+def _stringify_id(value: object) -> str:
+    return str(value)
+
+
+# IDs travel as strings in the API even when the model stores them as ints or
+# UUIDs (see the API design rule). Coerce at the boundary so apps with integer
+# primary keys serialise cleanly.
+UserId = Annotated[str, BeforeValidator(_stringify_id)]
 
 
 class UserResource(BaseModel):
@@ -25,7 +35,7 @@ class UserResource(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, frozen=True, extra="ignore")
 
-    id: str
+    id: UserId
     name: str
     email: str
     locale: str | None = None

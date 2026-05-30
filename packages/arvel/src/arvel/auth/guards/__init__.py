@@ -78,8 +78,8 @@ def make_permission_guard(user_model: type) -> Callable[..., Any]:
     async def require_permission(request: Request, perm: str) -> Any:
         raw_user = await require_auth(request)
         _model: Any = user_model
-        user = await _model.with_("roles", "permissions").where(_model.id == raw_user.id).first()
-        if user is None or not user.has_permission_to(perm):
+        user = await _model.where(_model.id == raw_user.id).first()
+        if user is None or not await user.has_permission_to(perm):
             raise AuthorizationException(f"Permission '{perm}' required.")
         return user
 

@@ -40,6 +40,7 @@ from arvel.database import (
     uuid_id,
 )
 from arvel_image import Conversion, HasMedia, MediaCollection
+from sqlalchemy.orm import MappedAsDataclass
 
 from app.models.base import TranslatableMixin
 from app.models.category import Category
@@ -63,11 +64,14 @@ class ProductMediaMixin(HasMedia):
         )
 
 
-class ProductBase(ProductMediaMixin, TranslatableMixin):
+class ProductBase(ProductMediaMixin, TranslatableMixin, MappedAsDataclass):
     """Abstract base for Product and PublishedProduct.
 
     Uses ``declared_attr`` so each concrete mapper gets its own Column /
-    Relationship instance while the declaration lives once.
+    Relationship instance while the declaration lives once. Extends
+    ``MappedAsDataclass`` so SQLAlchemy treats it as a typed-dataclass mixin —
+    required once the concrete models (``Product``, ``ProductCatalog``) are
+    dataclass-mapped, enforced in SQLA 2.1.
     """
 
     __abstract__ = True

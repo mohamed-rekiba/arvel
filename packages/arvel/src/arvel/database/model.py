@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from contextlib import AbstractAsyncContextManager, contextmanager
+from contextvars import ContextVar
 from dataclasses import InitVar
 from datetime import UTC, date
 from datetime import datetime as _datetime
@@ -144,6 +146,20 @@ def _timestamp_cast(value: Any) -> int:
     return int(_to_utc_datetime(value).timestamp())
 
 
+# argon2 ("$argon2…") and bcrypt ("$2…") digests — treat as already-hashed.
+_HASH_PREFIXES = ("$argon2", "$2")
+
+
+def _hashed_cast(value: Any) -> str:
+    """Hash on write via the Hash facade; pass an existing digest through unchanged."""
+    from arvel.facades.hash import Hash
+
+    text_value = value if isinstance(value, str) else str(value)
+    if text_value.startswith(_HASH_PREFIXES):
+        return text_value
+    return Hash.make(text_value)
+
+
 # Dispatch table for __casts__ — maps a cast type name to a value coercer.
 _CAST_DISPATCH: dict[str, Callable[[Any], Any]] = {
     "boolean": _bool_cast,
@@ -159,12 +175,17 @@ _CAST_DISPATCH: dict[str, Callable[[Any], Any]] = {
     "datetime": _datetime_cast,
     "date": _date_cast,
     "timestamp": _timestamp_cast,
+    "hashed": _hashed_cast,
 }
 _VALID_CASTS: frozenset[str] = frozenset(_CAST_DISPATCH)
 
 # JSON collection casts stay read-path only on write — coercing to dict/list in
 # memory breaks String-column INSERTs. Use TypeDecorator for column-level JSON.
 _WRITE_SKIP_CASTS: frozenset[str] = frozenset({"dict", "list", "array"})
+
+# Write-only casts: applied on assignment, never on read. `hashed` would corrupt a
+# stored digest if re-hashed on every attribute access.
+_READ_SKIP_CASTS: frozenset[str] = frozenset({"hashed"})
 
 
 def _should_auto_wrap(attr_name: str, annotation: Any, value: Any) -> bool:
@@ -340,8 +361,14 @@ def unwrap_method(raw: Any) -> Callable[..., Any]:
     return cast("Callable[..., Any]", boxed)
 
 
+# Task-local switch for Model.unguarded(): suspends mass-assignment checks.
+_mass_assignment_unguarded: ContextVar[bool] = ContextVar("arvel_unguarded", default=False)
+
+
 def _check_mass_assignment(model_cls: type[Any], attrs: dict[str, Any]) -> None:
     """Enforce __fillable__ / __guarded__ on create()/update() calls."""
+    if _mass_assignment_unguarded.get():
+        return
     fillable: list[str] | None = getattr(model_cls, "__fillable__", None)
     guarded: list[str] | None = getattr(model_cls, "__guarded__", None)
 
@@ -448,9 +475,32 @@ class ActiveRecord(QueryMixin):
         fire_after_commit(cls, instance)
         return instance
 
+    @classmethod
+    def without_events(cls) -> AbstractAsyncContextManager[None]:
+        """Mute lifecycle observers for the duration of an ``async with`` block."""
+        from arvel.database.events import without_events as _without_events
+
+        return _without_events()
+
+    @classmethod
+    @contextmanager
+    def unguarded(cls) -> Generator[None]:
+        """Suspend mass-assignment guards for the block (re-entrant). Trusted input only."""
+        token = _mass_assignment_unguarded.set(True)
+        try:
+            yield
+        finally:
+            _mass_assignment_unguarded.reset(token)
+
     def fill(self, **attrs: Any) -> Any:
         """Mass-assign attributes in place, honouring fillable/guarded and mutators."""
         _check_mass_assignment(type(self), attrs)
+        for key, value in attrs.items():
+            setattr(self, key, value)
+        return self
+
+    def force_fill(self, **attrs: Any) -> Any:
+        """Mass-assign every attribute, bypassing fillable/guarded. Trusted input only."""
         for key, value in attrs.items():
             setattr(self, key, value)
         return self
@@ -581,6 +631,37 @@ class ActiveRecord(QueryMixin):
         await fire_async(type(self), "restored", self)
         fire_after_commit(type(self), self)
         return self
+
+    async def save_quietly(self) -> Any:
+        from arvel.database.events import without_events
+
+        async with without_events():
+            return await self.save()
+
+    async def delete_quietly(self) -> Any:
+        from arvel.database.events import without_events
+
+        async with without_events():
+            return await self.delete()
+
+    async def force_delete_quietly(self) -> Any:
+        from arvel.database.events import without_events
+
+        async with without_events():
+            return await self.force_delete()
+
+    async def restore_quietly(self) -> Any:
+        from arvel.database.events import without_events
+
+        async with without_events():
+            return await self.restore()
+
+    async def update_quietly(self, **attrs: Any) -> Any:
+        from arvel.database.events import without_events
+
+        async with without_events():
+            self.fill(**attrs)
+            return await self.save()
 
     async def fresh(self) -> Any:
         # Route through the query builder so global scopes (soft-delete etc.) apply.
@@ -858,6 +939,8 @@ class Model(
             type(self), "__casts__", None
         )
         if not casts or name not in casts or value is None:
+            return value
+        if casts[name] in _READ_SKIP_CASTS:
             return value
         caster = _CAST_DISPATCH.get(casts[name])
         return caster(value) if caster is not None else value

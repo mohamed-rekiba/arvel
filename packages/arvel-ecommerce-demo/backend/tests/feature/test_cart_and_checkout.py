@@ -77,16 +77,7 @@ async def customer_token(client: Any) -> str:
 
 @pytest.fixture
 async def customer2_token(client: Any) -> str:
-    """Second customer for cross-customer access checks."""
-    await client.post(
-        "/api/auth/register",
-        json={
-            "name": "Customer Two",
-            "email": "customer2@example.com",
-            "password": "password",
-            "password_confirmation": "password",
-        },
-    )
+    """Second customer for cross-customer access checks (seeded + pre-verified)."""
     return await _login(client, "customer2@example.com", "password")
 
 
@@ -218,17 +209,30 @@ async def test_checkout_creates_order_with_price_snapshot(
 
 
 @pytest.mark.asyncio
-async def test_checkout_fails_on_insufficient_stock(client: Any, customer_token: str) -> None:
-    """US-021: checkout returns 409 when product stock_qty is 0."""
-    # Mechanical keyboard has stock_qty = 0 in seed data
-    kb_response = await client.get("/api/products/mechanical-keyboard-tkl")
-    keyboard_id = kb_response.json()["data"]["id"]
+async def test_checkout_fails_on_insufficient_stock(
+    client: Any, customer_token: str, headphones_id: str
+) -> None:
+    """US-021: checkout is the atomic stock gate.
 
+    Adding is optimistic; the authoritative check happens at checkout under a row
+    lock. This reproduces the oversell race: the item is in stock when added, then
+    sells out before this customer checks out, so checkout must 409.
+    """
     await client.post(
         "/api/cart/items",
         headers={"Authorization": f"Bearer {customer_token}"},
-        json={"product_id": keyboard_id, "quantity": 1},
+        json={"product_id": headphones_id, "quantity": 1},
     )
+
+    # Stock drains to zero between add and checkout.
+    admin_token = await _login(client, "catalog@example.com", "password")
+    drained = await client.patch(
+        f"/api/admin/products/{headphones_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"stock_qty": 0},
+    )
+    assert drained.status_code == 200
+
     checkout = await client.post(
         "/api/checkout",
         headers={"Authorization": f"Bearer {customer_token}"},

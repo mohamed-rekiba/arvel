@@ -20,21 +20,11 @@ from arvel.http.exceptions import UnauthenticatedException
 class EcommerceAuthController(AuthController):
     async def me(self, request: Request) -> dict[str, Any]:
         raw_user = await require_auth(request)
-        user: User | None = await (
-            User.with_("roles", "permissions").where(User.id == raw_user.id).first()
-        )
+        user: User | None = await User.where(User.id == raw_user.id).first()
         if user is None:
             raise UnauthenticatedException("User not found.")
-        role_names: list[str] = []
-        all_permissions: list[str] = []
-        if hasattr(user, "roles") and user.roles:
-            for role in user.roles:
-                if role.name:
-                    role_names.append(role.name)
-                if hasattr(role, "permissions") and role.permissions:
-                    all_permissions.extend(p.name for p in role.permissions if p.name)
-        if hasattr(user, "permissions") and user.permissions:
-            all_permissions.extend(p.name for p in user.permissions if p.name)
+        role_names = [r.name for r in await user.roles.all() if r.name]
+        all_permissions = [p.name for p in await user.get_all_permissions() if p.name]
         return {
             "id": int(user.id),
             "name": str(user.name),

@@ -8,13 +8,14 @@ from typing import ClassVar
 
 from arvel.auth.mixins import Authenticatable, HasApiTokens
 from arvel.database import Model, SoftDeletes, Timestamps, datetime, enum, id_, string
-from arvel_permission.models import Permission, Role
-from arvel_permission.traits import (
-    HasPermissions,
-    HasRoles,
-    make_permissions_relationship,
-    make_roles_relationship,
+from arvel.database.orm import MorphToMany
+from arvel_permission.models import (
+    Permission,
+    Role,
+    model_has_permissions,
+    model_has_roles,
 )
+from arvel_permission.traits import HasPermissions, HasRoles
 
 
 class User(
@@ -43,12 +44,15 @@ class User(
     suspended_at: _datetime | None = datetime(nullable=True, default=None)
     remember_token: str | None = string(100, nullable=True, default=None)
 
-    roles: list[Role] = make_roles_relationship(lambda: User, model_type="User")
-    permissions: list[Permission] = make_permissions_relationship(lambda: User, model_type="User")
+    roles: ClassVar[MorphToMany[Role]] = MorphToMany(
+        Role, table=model_has_roles, name="model", related_key="role_id"
+    )
+    permissions: ClassVar[MorphToMany[Permission]] = MorphToMany(
+        Permission, table=model_has_permissions, name="model", related_key="permission_id"
+    )
 
-    @property
-    def is_admin(self) -> bool:
-        return self.has_any_role("admin", "super_admin")
+    async def is_admin(self) -> bool:
+        return await self.has_any_role("admin", "super_admin")
 
     @property
     def is_suspended(self) -> bool:

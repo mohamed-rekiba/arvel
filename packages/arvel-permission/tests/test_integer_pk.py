@@ -1,93 +1,68 @@
-"""Tests for integer PK support in arvel-permission — FR-032-08 / AC-19..20.
+"""Integer-PK host support for arvel-permission — FR-032-08 / AC-19..20.
 
-Tests are written RED — make_roles_relationship / make_permissions_relationship
-do not exist yet in arvel_permission.traits.
+The async ``MorphToMany`` accessor str-casts the owner PK into the VARCHAR
+``model_id`` pivot column, so grants persist and survive a fresh session
+without ``_StringId``, ``cast``, or ``type: ignore``.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import (
-    Column,
-)
-from sqlalchemy import (
-    Integer as _Integer,
-)
-from sqlalchemy import (
-    MetaData as _MetaData,
-)
-from sqlalchemy import (
-    String as _String,
-)
-from sqlalchemy import (
-    Table as _Table,
-)
+from collections.abc import AsyncGenerator
+from typing import ClassVar
 
-# ─── Fake models for factory tests ───────────────────────────────────────────
+import pytest
+import pytest_asyncio
+from arvel.database.columns import id_
+from arvel.database.model import Model
+from arvel.database.orm import MorphToMany
+from arvel.database.session import use_session
+from arvel_permission.models import (
+    Permission,
+    Role,
+    model_has_permissions,
+    model_has_roles,
+)
+from arvel_permission.traits import HasPermissions, HasRoles
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import Mapped
 
-_fake_meta = _MetaData()
 
+class _IntPkUser(Model, HasRoles, HasPermissions):
+    __tablename__ = "users_intpk"
+    id: Mapped[int] = id_(init=False)
+    default_guard_name: str = "web"
 
-class _FakeIntModel:
-    """Simulates a model with integer PK — has a real __table__ for factory tests."""
-
-    __tablename__ = "fake_int_models"
-    __table__ = _Table(
-        "fake_int_models",
-        _fake_meta,
-        Column("id", _Integer, primary_key=True),
+    roles: ClassVar[MorphToMany[Role]] = MorphToMany(
+        Role, table=model_has_roles, name="model", related_key="role_id"
+    )
+    permissions: ClassVar[MorphToMany[Permission]] = MorphToMany(
+        Permission, table=model_has_permissions, name="model", related_key="permission_id"
     )
 
 
-class _FakeStrModel:
-    """Simulates a model with string/UUID PK."""
-
-    __tablename__ = "fake_str_models"
-    __table__ = _Table(
-        "fake_str_models",
-        _fake_meta,
-        Column("id", _String(36), primary_key=True),
-    )
+@pytest_asyncio.fixture()
+async def session_factory(
+    async_engine: AsyncEngine,
+) -> AsyncGenerator[async_sessionmaker[AsyncSession]]:
+    yield async_sessionmaker(async_engine, expire_on_commit=False)
 
 
-# ─── AC-19: importable factory functions ─────────────────────────────────────
+@pytest.mark.asyncio
+async def test_integer_pk_host_grants_survive(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as s1, use_session(s1):
+        user = _IntPkUser()
+        s1.add(user)
+        await s1.flush()
+        await user.assign_role("editor")
+        await user.give_permission_to("articles.edit")
+        await s1.commit()
+        user_id = user.id
 
-
-def test_factory_functions_importable() -> None:
-    from arvel_permission.traits import (
-        make_permissions_relationship,
-        make_roles_relationship,
-    )
-
-    assert callable(make_permissions_relationship)
-    assert callable(make_roles_relationship)
-
-
-# ─── AC-19: integer PK model can use factory without cast/type-ignore ─────────
-
-
-def test_integer_pk_relationship_factory_exists() -> None:
-    """make_roles_relationship must return a SQLAlchemy relationship descriptor."""
-    from arvel_permission.traits import make_roles_relationship
-
-    rel = make_roles_relationship(lambda: _FakeIntModel, model_type="FakeIntModel")
-    assert rel is not None
-
-
-def test_permissions_relationship_factory_exists() -> None:
-    from arvel_permission.traits import make_permissions_relationship
-
-    rel = make_permissions_relationship(lambda: _FakeIntModel, model_type="FakeIntModel")
-    assert rel is not None
-
-
-# ─── AC-20: string/UUID PK model still works (regression) ────────────────────
-
-
-def test_string_pk_relationship_factory_works() -> None:
-    from arvel_permission.traits import make_roles_relationship
-
-    rel = make_roles_relationship(lambda: _FakeStrModel, model_type="FakeStrModel")
-    assert rel is not None
-
-
-# ─── No new type: ignore needed in consuming model ───────────────────────────
+    async with session_factory() as s2, use_session(s2):
+        reloaded = await _IntPkUser.where(_IntPkUser.id == user_id).first()
+        assert reloaded is not None
+        assert [r.name for r in await reloaded.roles.all()] == ["editor"]
+        assert await reloaded.has_permission_to("articles.edit")
+        assert await reloaded.has_role("editor")

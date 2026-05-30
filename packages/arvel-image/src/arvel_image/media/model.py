@@ -17,9 +17,9 @@ import uuid as _uuid_module
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from arvel.database import Model, Timestamps
-from arvel.database.columns import big_integer, id_, string
-from sqlalchemy import JSON, Index, Integer, String, Uuid
-from sqlalchemy.orm import Mapped, mapped_column
+from arvel.database.columns import big_integer, id_, integer, json, string
+from arvel.database.columns import uuid as uuid_column
+from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
     from arvel_image.media.path_generator import PathGenerator
@@ -77,34 +77,18 @@ class Media(Model, Timestamps):
 
     # Defaulted (init=True, with default)
     collection_name: Mapped[str] = string(255, default="default")
-    manipulations: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False, default_factory=dict
-    )
-    custom_properties: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False, default_factory=dict
-    )
+    manipulations: Mapped[dict[str, Any]] = json(default=dict)
+    custom_properties: Mapped[dict[str, Any]] = json(default=dict)
 
     # Fields set by the system after row creation (not in __init__)
-    uuid: Mapped[str | None] = mapped_column(
-        Uuid(as_uuid=False), nullable=True, unique=True, init=False, default=None
+    uuid: Mapped[str | None] = uuid_column(
+        nullable=True, unique=True, as_uuid=False, init=False, default=None
     )
-    mime_type: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, init=False, default=None
-    )
-    conversions_disk: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, init=False, default=None
-    )
-    generated_conversions: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False, init=False, default_factory=dict
-    )
-    responsive_images: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False, init=False, default_factory=dict
-    )
-    order_column: Mapped[int | None] = mapped_column(
-        Integer, nullable=True, init=False, default=None
-    )
-
-    __table_args__ = (Index("media_order_column_index", "order_column"),)
+    mime_type: Mapped[str | None] = string(255, nullable=True, init=False, default=None)
+    conversions_disk: Mapped[str | None] = string(255, nullable=True, init=False, default=None)
+    generated_conversions: Mapped[dict[str, Any]] = json(init=False, default=dict)
+    responsive_images: Mapped[dict[str, Any]] = json(init=False, default=dict)
+    order_column: Mapped[int | None] = integer(nullable=True, index=True, init=False, default=None)
 
     # ─── helpers ───────────────────────────────────────────────────────────
 
@@ -323,20 +307,13 @@ class Media(Model, Timestamps):
 
         Unknown IDs are silently skipped. ``start_order`` defaults to 1.
         """
-        from arvel.database.session import get_active_session  # noqa: PLC0415
-        from sqlalchemy import select, update  # noqa: PLC0415
-
-        session = get_active_session()
         # Fetch only the IDs that exist to skip unknowns safely.
-        result = await session.execute(select(cls.id).where(cls.id.in_(ids)))
-        existing_ids = {row[0] for row in result}
+        existing_ids = set(await cls.query().where_in("id", ids).pluck("id"))
 
         for position, media_id in enumerate(ids, start=start_order):
             if media_id not in existing_ids:
                 continue
-            await session.execute(
-                update(cls).where(cls.id == media_id).values(order_column=position)
-            )
+            await cls.query().where(cls.id == media_id).update({"order_column": position})
 
 
 async def _delete_quiet(disk: Any, path: str) -> None:
