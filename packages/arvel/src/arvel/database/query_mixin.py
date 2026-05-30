@@ -628,6 +628,18 @@ class QueryMixin:
         return await cls.query().insert_get_id(row)
 
     @classmethod
+    async def insert_or_ignore(cls, rows: list[dict[str, Any]]) -> int:
+        return await cls.query().insert_or_ignore(rows)
+
+    @classmethod
+    async def insert_using(cls, columns: list[str], query: QueryBuilder[Any]) -> int:
+        return await cls.query().insert_using(columns, query)
+
+    @classmethod
+    async def truncate(cls) -> None:
+        await cls.query().truncate()
+
+    @classmethod
     async def update(cls, values: dict[str, Any]) -> int:
         return await cls.query().update(values)
 
@@ -663,8 +675,8 @@ class QueryMixin:
         *,
         unique_by: list[str],
         update: list[str],
-    ) -> None:
-        await cls.query().upsert(rows, unique_by=unique_by, update=update)
+    ) -> int:
+        return await cls.query().upsert(rows, unique_by=unique_by, update=update)
 
     @classmethod
     async def increment(
@@ -677,6 +689,18 @@ class QueryMixin:
         cls, col: str, amount: int = 1, *, extra: dict[str, Any] | None = None
     ) -> int:
         return await cls.query().decrement(col, amount, extra=extra)
+
+    @classmethod
+    async def increment_each(
+        cls, amounts: dict[str, int], *, extra: dict[str, Any] | None = None
+    ) -> int:
+        return await cls.query().increment_each(amounts, extra=extra)
+
+    @classmethod
+    async def decrement_each(
+        cls, amounts: dict[str, int], *, extra: dict[str, Any] | None = None
+    ) -> int:
+        return await cls.query().decrement_each(amounts, extra=extra)
 
 
 __all__ = ["QueryMixin"]
