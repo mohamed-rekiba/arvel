@@ -704,8 +704,7 @@ Every node in the loaded subtree has its `children` populated; a leaf's `childre
 
 ```python
 await (
-    Category.query()
-    .with_tree(
+    Category.with_tree(
         "descendants",
         constraint=lambda q: q.where(Category.status == "visible"),
         max_depth=3,
