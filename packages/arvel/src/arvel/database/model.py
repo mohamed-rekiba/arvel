@@ -79,7 +79,13 @@ from arvel.support.str import Str
 
 if TYPE_CHECKING:
     from arvel.database.collection import ModelCollection
-    from arvel.database.orm.relations import BelongsTo, HasMany, HasOne
+    from arvel.database.orm.relations import (
+        Ancestors,
+        BelongsTo,
+        Descendants,
+        HasMany,
+        HasOne,
+    )
 
 ModelT = TypeVar("ModelT", bound="Model")
 RelatedT = TypeVar("RelatedT", bound="Model")
@@ -421,7 +427,14 @@ def _should_auto_wrap(attr_name: str, annotation: Any, value: Any) -> bool:
 
 _MappedAlias: Any = Mapped
 
-_RELATION_RETURN_NAMES = frozenset({"HasMany", "HasOne", "BelongsTo"})
+_RECURSIVE_RETURN_NAMES = frozenset({"Descendants", "Ancestors"})
+_RELATION_RETURN_NAMES = frozenset({"HasMany", "HasOne", "BelongsTo"}) | _RECURSIVE_RETURN_NAMES
+
+# The builder methods on Model return relation types from a zero-positional-arg
+# signature too — exclude them by name so they're not mistaken for accessors.
+_RELATION_BUILDER_NAMES = frozenset(
+    {"has_many", "has_one", "belongs_to", "has_many_recursive", "belongs_to_recursive"}
+)
 
 # CPython code-flag bits: 0x04 = *args, 0x08 = **kwargs.
 _VARARGS_OR_KWARGS = 0x04 | 0x08
@@ -431,11 +444,14 @@ def _relation_method_kind(value: Any) -> str | None:
     """Return the relation type name when *value* is a zero-arg relation accessor.
 
     A relation accessor is a plain instance method taking only ``self`` whose
-    return annotation is ``HasMany`` / ``HasOne`` / ``BelongsTo``. The framework's
-    own ``has_many``/``has_one``/``belongs_to`` builders take extra arguments, so
-    they're excluded — only Laravel-style accessors like ``def orders(self)`` match.
+    return annotation is ``HasMany`` / ``HasOne`` / ``BelongsTo`` / ``Descendants``
+    / ``Ancestors``. The framework's own ``has_many``/``belongs_to_recursive``/...
+    builders are excluded by name — only Laravel-style accessors like
+    ``def orders(self)`` or ``def descendants(self)`` match.
     """
     if isinstance(value, (staticmethod, classmethod)) or not callable(value):
+        return None
+    if getattr(value, "__name__", None) in _RELATION_BUILDER_NAMES:
         return None
     code = getattr(value, "__code__", None)
     if code is None or code.co_argcount != 1 or (code.co_flags & _VARARGS_OR_KWARGS):
@@ -477,16 +493,28 @@ def _register_relation_methods(
     Returns the (possibly updated) namespace. Inherited accessor names carry over.
     """
     fk_relations: set[str] = set()
+    recursive_relations: set[str] = set()
     for base in bases:
         fk_relations |= set(getattr(base, "__arvel_fk_relations__", ()))
+        recursive_relations |= set(getattr(base, "__arvel_recursive_relations__", ()))
     wrapped: dict[str, Any] = {}
     for attr_name, value in namespace.items():
-        if _relation_method_kind(value) is not None:
+        kind = _relation_method_kind(value)
+        if kind is None:
+            continue
+        wrapped[attr_name] = _wrap_relation_method(attr_name, value)
+        if kind in _RECURSIVE_RETURN_NAMES:
+            recursive_relations.add(attr_name)
+        else:
             fk_relations.add(attr_name)
-            wrapped[attr_name] = _wrap_relation_method(attr_name, value)
-    if not wrapped and not fk_relations:
+    if not wrapped and not fk_relations and not recursive_relations:
         return namespace
-    return {**namespace, **wrapped, "__arvel_fk_relations__": frozenset(fk_relations)}
+    return {
+        **namespace,
+        **wrapped,
+        "__arvel_fk_relations__": frozenset(fk_relations),
+        "__arvel_recursive_relations__": frozenset(recursive_relations),
+    }
 
 
 @dataclass_transform(
@@ -739,6 +767,9 @@ class ActiveRecord(QueryMixin):
     # populated per-class by _ModelMeta. The eager engine reads this to recognize
     # which methods are eager-loadable via with_("name").
     __arvel_fk_relations__: ClassVar[frozenset[str]] = frozenset()
+    # Self-referential recursive relation accessor names (descendants/ancestors),
+    # populated per-class by _ModelMeta. Eager-loadable via with_tree("name").
+    __arvel_recursive_relations__: ClassVar[frozenset[str]] = frozenset()
 
     # Timestamp controls (Eloquent parity). Set __timestamps__ = False to opt out;
     # point CREATED_AT/UPDATED_AT at custom columns. Auto-fill hooks attach in
@@ -1716,6 +1747,46 @@ class Model(
         if fk_value is not None:
             qb = qb.where(pk_col == fk_value)
         return qb
+
+    def has_many_recursive(
+        self,
+        *,
+        parent_key: str = "parent_id",
+        local_key: str | None = None,
+    ) -> Descendants[Self]:
+        """All rows below this one in a self-referential (adjacency-list) tree.
+
+        Walk the tree downward via ``parent_key``. ``await node.descendants().get()``
+        is the flat subtree; ``.as_tree()`` is a TreeNode forest.
+        """
+        from arvel.database.orm.relations import Descendants
+
+        lk = local_key or _pk_name(type(self))
+        return Descendants(
+            type(self),
+            owner=self,
+            owner_pk=getattr(self, lk),
+            id_key=lk,
+            parent_key=parent_key,
+        )
+
+    def belongs_to_recursive(
+        self,
+        *,
+        parent_key: str = "parent_id",
+        owner_key: str | None = None,
+    ) -> Ancestors[Self]:
+        """All rows above this one in a self-referential tree (walk upward)."""
+        from arvel.database.orm.relations import Ancestors
+
+        ok = owner_key or _pk_name(type(self))
+        return Ancestors(
+            type(self),
+            owner=self,
+            owner_pk=getattr(self, ok),
+            id_key=ok,
+            parent_key=parent_key,
+        )
 
     @classmethod
     def has_many_through(
