@@ -58,7 +58,7 @@ class ArvelTestCase:
         if hasattr(self, "app"):
             await self.app.shutdown()
 
-    async def acting_as(self, user: object, guard: str = "web") -> None:  # noqa: ARG002
+    async def acting_as(self, user: object, guard: str = "web") -> None:
         """Authenticate the next request as ``user`` (test-only)."""
         env = getattr(self.app, "env", "testing")
         if env != "testing":

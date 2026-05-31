@@ -77,6 +77,16 @@ class RedisStore:
         released = await self._redis.eval(script, 1, self._key(key), owner)
         return bool(released)
 
+    async def extend_lock(self, key: str, owner: str, ttl: int) -> bool:
+        # Owner check + EXPIRE are atomic so a non-owner can't renew the lock.
+        script = (
+            'if redis.call("GET", KEYS[1]) == ARGV[1] then '
+            'return redis.call("EXPIRE", KEYS[1], ARGV[2]) end return 0'
+        )
+        # EXPIRE's seconds arg is passed as a string ARGV, like every redis-py eval arg.
+        extended = await self._redis.eval(script, 1, self._key(key), owner, str(ttl))
+        return bool(extended)
+
     async def flush(self) -> None:
         # KEYS blocks the Redis event loop; SCAN iterates non-blocking in batches.
         pattern = f"{self._prefix}:*"

@@ -27,7 +27,9 @@ class CacheServiceProvider(ServiceProvider):
         Cache.bind(self.app.container)
 
     async def boot(self) -> None:
+        from arvel.cache import CacheManager
         from arvel.cache import migrations as cache_migrations
+        from arvel.cache.service import CacheService
 
         stub = Path(cache_migrations.__file__).parent / "create_cache_table.py"
         self.publishes(
@@ -35,6 +37,9 @@ class CacheServiceProvider(ServiceProvider):
             tag="arvel-cache",
             is_migrations=True,
         )
+
+        manager = self.app.container.make(CacheManager)
+        self.app.register_service(CacheService(manager))
 
     def commands(self) -> list[type[Command] | Command]:
         from arvel.console.commands.cache_commands import (

@@ -6,13 +6,13 @@ See ``docs/api/http-api.md`` for the contract and ``docs/architecture/SAD-002-ht
 
 from __future__ import annotations
 
-import logging
-import traceback
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+
+from arvel.logging.facade import Log
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -23,8 +23,6 @@ if TYPE_CHECKING:
 # Translators target Exception, not BaseException — Starlette won't dispatch on
 # the BaseException hierarchy (KeyboardInterrupt, SystemExit).
 ExceptionTranslator = Callable[[Exception], "HttpException"]
-
-logger = logging.getLogger("arvel.http")
 
 _REDACT_HEADERS = frozenset({"authorization", "cookie", "set-cookie", "proxy-authorization"})
 _REDACTED = "[REDACTED]"
@@ -169,14 +167,14 @@ class HttpExceptionHandler:
         return _handle_translated
 
     async def _handle_unexpected(self, request: Request, exc: Exception) -> JSONResponse:
-        logger.error(
-            "unhandled_exception",
-            extra={
-                "exc_type": type(exc).__name__,
-                "path": request.url.path,
-                "method": request.method,
-                "traceback": traceback.format_exc(),
-            },
+        # exc carries the traceback; the OTel logger records it. Active Context
+        # (request_id, user_id, tenant_id) is merged by the logger itself.
+        Log.error(
+            "http.unhandled_exception",
+            exc=exc,
+            exc_type=type(exc).__name__,
+            path=request.url.path,
+            method=request.method,
         )
         server_error = ServerErrorException("Something went wrong")
         return JSONResponse(
@@ -185,15 +183,13 @@ class HttpExceptionHandler:
         )
 
     async def _handle(self, request: Request, exc: HttpException) -> JSONResponse:
-        logger.warning(
-            "http_exception",
-            extra={
-                "code": exc.code,
-                "status": exc.status_code,
-                "path": request.url.path,
-                "method": request.method,
-                "headers": _safe_headers(request),
-            },
+        Log.warning(
+            "http.exception",
+            code=exc.code,
+            status=exc.status_code,
+            path=request.url.path,
+            method=request.method,
+            headers=_safe_headers(request),
         )
         headers: dict[str, str] = {}
         if isinstance(exc, ThrottleException):

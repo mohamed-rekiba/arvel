@@ -8,6 +8,7 @@ from uvicorn looking for ``public.asgi``.
 
 from __future__ import annotations
 
+import os
 from typing import Annotated, ClassVar
 
 import typer
@@ -16,6 +17,17 @@ import uvicorn
 from arvel.console import Command, Context
 from arvel.console._t import Option as _Option
 from arvel.console.bootstrap import find_project_root
+
+
+def _graceful_shutdown_timeout() -> int | None:
+    """Read GRACEFUL_SHUTDOWN_TIMEOUT (seconds). None = uvicorn's default."""
+    raw = os.environ.get("GRACEFUL_SHUTDOWN_TIMEOUT", "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
 
 
 class ServeCommand(Command):
@@ -61,10 +73,16 @@ class ServeCommand(Command):
         reload: bool,
         workers: int | None = None,
     ) -> None:
-        if workers is None:
-            uvicorn.run("public.asgi:asgi", host=host, port=port, reload=reload)
-        else:
-            uvicorn.run("public.asgi:asgi", host=host, port=port, reload=reload, workers=workers)
+        timeout = _graceful_shutdown_timeout()
+        # uvicorn defaults timeout_graceful_shutdown to None, so passing None is a no-op.
+        uvicorn.run(
+            "public.asgi:asgi",
+            host=host,
+            port=port,
+            reload=reload,
+            workers=workers,
+            timeout_graceful_shutdown=timeout,
+        )
 
 
 __all__ = ["ServeCommand"]
