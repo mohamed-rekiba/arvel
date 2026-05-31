@@ -208,6 +208,7 @@ nav:
       - Queues: queues.md
       - Rate Limiting: rate-limiting.md
       - Search: search.md
+      - Audit & Activity Log: audit.md
       - Strings: strings.md
       - Task Scheduling: scheduling.md
   - Security:
@@ -245,6 +246,7 @@ nav:
       - Auth Scaffolding: auth-scaffolding.md
       - Social Authentication: social-auth.md
       - Full-Text Search: search.md
+      - Audit & Activity Log: audit.md
       - Queue Monitoring: queue-monitoring.md
       - High Performance: high-performance.md
       - Code Style: code-style.md

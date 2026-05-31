@@ -804,3 +804,35 @@ work_items:
       assertions. SEARCH_QUEUE_SYNC queues SearchIndexJob/SearchRemoveJob for committed-state indexing.
       Docs: docs/site/docs/search.md; arvel[search] extra. Gates: 59 package tests pass;
       mypy/pyright/ruff clean. 003 S1–S4 DONE — epic 003 complete.
+
+  - id: "WI-arvel-040"
+    name: "arvel-audit — audit trail + activity log package (backlog 004, all stories)"
+    complexity: "L3"
+    risk_tier: 2
+    data_classification: "confidential"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T07:00:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: companion package)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      New arvel-audit workspace package. Auditable mixin auto-wires created/updating/updated/
+      deleting/deleted hooks at class definition (install_audit_observers, idempotent; re-asserted
+      in provider boot via wire_all_auditable). Writes AuditEntry in the same transaction as the
+      change: created => new={all cols}/old={}; updated => changed cols before/after (captured pre-flush
+      since SQLAlchemy clears history on flush); deleted => last values/new={}. __audit_redact__ masks
+      columns as "***" before the row is written (never plaintext at rest); __audit_exclude__ drops them.
+      actor_id pulled from Context.get("user_id"), None when unbound. AuditValues TypeDecorator stores
+      old/new JSON, AES-256-GCM encrypted when AUDIT_ENCRYPT_VALUES=true (lazy APP_KEY resolve).
+      AuditLog query API (for_model/by_actor/action/since/until/get/first/count/paginate) — InvalidAuditAction
+      on bad action; ORM Paginator for pages. Fluent activity(log, session).log().by().on().with_properties().save()
+      => ActivityEntry; MissingActivityDescription without log(); subject's redacted keys stripped from
+      properties at save. ActivityQuery for_subject/by_causer. audit:install publishes two migrations
+      (audit_entries idx (model_type,model_id); activity_entries idx (subject_type,subject_id) +
+      (causer_type,causer_id)), idempotent unless --force. Docs: docs/site/docs/audit.md; arvel[audit] extra.
+      arvel-audit/tests type-checked in isolation (hyphenated-package conftest collision, like arvel-search).
+      Gates: 24 package tests pass; mypy/pyright/ruff clean. 004 S1–S4 DONE — epic 004 complete.
