@@ -8,12 +8,14 @@ plaintext is only returned once at creation time.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC
+from datetime import datetime as _datetime
 from typing import ClassVar
 
-from sqlalchemy import JSON, DateTime, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped
 
+from arvel.database.columns import column, datetime, json, string
 from arvel.database.model import Model, Timestamps
 
 
@@ -50,27 +52,14 @@ class PersonalAccessToken(Model, Timestamps):
     ]
     __hidden__: ClassVar[list[str] | None] = ["token"]
 
-    id: Mapped[str] = mapped_column(
-        String(36),
-        primary_key=True,
-        init=False,
-        default_factory=_new_id,
-    )
-    tokenable_type: Mapped[str] = mapped_column(String(255), nullable=False)
-    tokenable_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    abilities: Mapped[list[str]] = mapped_column(JSON, nullable=False, default_factory=list)
-    last_used_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        default=None,
-    )
-    expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        default=None,
-    )
+    id: Mapped[str] = column(String(36), primary_key=True, init=False, default_factory=_new_id)
+    tokenable_type: Mapped[str] = string(255)
+    tokenable_id: Mapped[str] = string(36, index=True)
+    name: Mapped[str] = string(255)
+    token: Mapped[str] = string(64, unique=True)
+    abilities: Mapped[list[str]] = json(default=list)
+    last_used_at: Mapped[_datetime | None] = datetime(nullable=True, default=None)
+    expires_at: Mapped[_datetime | None] = datetime(nullable=True, default=None)
 
     @property
     def is_expired(self) -> bool:
@@ -80,7 +69,7 @@ class PersonalAccessToken(Model, Timestamps):
         exp = self.expires_at
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=UTC)
-        return exp <= datetime.now(tz=UTC)
+        return exp <= _datetime.now(tz=UTC)
 
     def can(self, ability: str) -> bool:
         """``True`` when this token has the given ability or the wildcard ``*``."""

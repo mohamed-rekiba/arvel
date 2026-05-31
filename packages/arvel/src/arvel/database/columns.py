@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import enum as _enum
 import uuid as _uuid
+from collections.abc import Callable
 from datetime import datetime as _datetime
 from decimal import Decimal
 from typing import Any, Final, Literal, TypeVar, cast, overload
@@ -117,11 +118,13 @@ __all__ = [
     "decimal",
     "enum",
     "foreign_id",
+    "foreign_string",
     "foreign_uuid",
     "id_",
     "integer",
     "json",
     "jsonb",
+    "nullable_column",
     "string",
     "text",
     "uuid",
@@ -513,6 +516,57 @@ def foreign_uuid(
 
 
 @overload
+def foreign_string(
+    references: str,
+    *,
+    length: int = ...,
+    on_delete: str | None = ...,
+    on_update: str | None = ...,
+    nullable: Literal[False] = ...,
+    index: bool = ...,
+) -> Mapped[str]: ...
+@overload
+def foreign_string(
+    references: str,
+    *,
+    length: int = ...,
+    on_delete: str | None = ...,
+    on_update: str | None = ...,
+    nullable: Literal[True],
+    index: bool = ...,
+) -> Mapped[str | None]: ...
+def foreign_string(
+    references: str,
+    *,
+    length: int = 36,
+    on_delete: str | None = None,
+    on_update: str | None = None,
+    nullable: bool = False,
+    index: bool = True,
+) -> Mapped[str | None]:
+    """``VARCHAR(length)`` foreign key column. The string-keyed sibling of :func:`foreign_id`.
+
+    Use when the referenced table's primary key is a ``VARCHAR`` — e.g. a UUID
+    stored as a string, or any natural string key. ``length`` defaults to 36 to
+    match a canonical UUID string::
+
+        user_id: Mapped[str] = foreign_string("users.id", on_delete="CASCADE")
+
+    Like :func:`foreign_id`, indexing defaults to ``True`` — an un-indexed FK is
+    the most common join footgun. When ``nullable=True`` the column defaults to
+    ``None`` automatically.
+    """
+    kw: dict[str, Any] = {"nullable": nullable, "index": index}
+    if nullable:
+        kw["default"] = None
+    return mapped_column(
+        String(length=length),
+        ForeignKey(references, ondelete=on_delete, onupdate=on_update),
+        **kw,
+    )
+
+
+@overload
 def decimal(
     precision: int = ...,
     scale: int = ...,
@@ -619,50 +673,77 @@ def enum(
     return mapped_column(sa_type, **kw)
 
 
-@overload
 def column(
     type_: TypeEngine[_T] | type[TypeEngine[_T]],
     *,
-    nullable: Literal[False] = ...,
-    unique: bool = ...,
-    index: bool = ...,
-    init: bool = ...,
-    default: _T | _Unset = ...,
-) -> Mapped[_T]: ...
-@overload
-def column(
-    type_: TypeEngine[_T] | type[TypeEngine[_T]],
-    *,
-    nullable: Literal[True],
-    unique: bool = ...,
-    index: bool = ...,
-    init: bool = ...,
-    default: _T | None | _Unset = ...,
-) -> Mapped[_T | None]: ...
-def column(
-    type_: TypeEngine[_T] | type[TypeEngine[_T]],
-    *,
+    primary_key: bool = False,
     nullable: bool = False,
     unique: bool = False,
     index: bool = False,
     init: bool = True,
-    default: _T | None | _Unset = _UNSET,
-) -> Mapped[_T | None]:
+    default: object = _UNSET,
+    default_factory: Callable[[], Any] | None = None,
+    server_default: Any = None,
+) -> Mapped[_T]:
     """Column backed by an arbitrary SQLAlchemy type.
 
     The escape hatch for custom ``TypeDecorator`` types — ``EncryptedType``,
     ``PydanticType``, ``HashedType``, and friends — that the named helpers
-    don't wrap. Keeps the same kwargs and ``Mapped[T]`` typing as the rest of
-    the vocabulary, so user models never need to reach for ``mapped_column``
-    directly::
+    don't wrap, plus the place to declare a primary key or server default the
+    named helpers don't cover. Keeps the same kwargs and ``Mapped[T]`` typing
+    as the rest of the vocabulary, so models never reach for ``mapped_column``::
 
-        api_key: str = column(EncryptedType(key_b64=os.environ["APP_KEY"]))
-        profile: Profile = column(PydanticType(Profile), nullable=True, default=None)
+        api_key: Mapped[str] = column(EncryptedType(key_b64=os.environ["APP_KEY"]))
+        profile: Mapped[Profile | None] = column(PydanticType(Profile), nullable=True, default=None)
+        id: Mapped[str] = column(String(36), primary_key=True, init=False, default_factory=new_uuid)
 
     ``T`` is carried from the type's Python side, so ``EncryptedType`` (a
-    ``TypeDecorator[str]``) yields ``Mapped[str]``.
+    ``TypeDecorator[str]``) yields ``Mapped[str]``. The return is ``Mapped[T]``;
+    annotate the attribute ``Mapped[T | None]`` for a nullable column —
+    ``Mapped`` is covariant, so that assignment is sound. The helper isn't
+    overloaded on ``nullable`` on purpose: a ``Literal``-discriminated overload
+    over a ``TypeVar`` defeats mypy's inference for ``nullable=True``.
+    ``default`` is ``object`` for the same reason — keeping ``T`` out of every
+    position but ``type_`` is what lets inference stay clean.
     """
-    kw: dict[str, Any] = {"nullable": nullable, "unique": unique, "index": index, "init": init}
+    kw: dict[str, Any] = {
+        "primary_key": primary_key,
+        "nullable": nullable,
+        "unique": unique,
+        "index": index,
+        "init": init,
+    }
+    if not isinstance(default, _Unset):
+        kw["default"] = default
+    if default_factory is not None:
+        kw["default_factory"] = default_factory
+    if server_default is not None:
+        kw["server_default"] = server_default
+    return mapped_column(type_, **kw)
+
+
+def nullable_column(
+    type_: TypeEngine[Any] | type[TypeEngine[Any]],
+    *,
+    unique: bool = False,
+    index: bool = False,
+    init: bool = True,
+    default: object = _UNSET,
+) -> Mapped[Any]:
+    """Nullable column backed by any SQLAlchemy type — the ``| None`` sibling of :func:`column`.
+
+    Use when the attribute is annotated ``Mapped[T | None]``::
+
+        tokens: Mapped[dict[str, Any] | None] = nullable_column(EncryptedJson(), default=None)
+
+    Returns ``Mapped[Any]`` on purpose — exactly like SQLAlchemy's own
+    ``mapped_column`` — so the ``Mapped[T | None]`` attribute annotation is the
+    source of truth for the Python type. A generic ``Mapped[T | None]`` return
+    can't work here: ``Mapped`` is covariant, so mypy fixes ``T`` from the
+    annotation and then rejects ``type_``. The non-null :func:`column` stays
+    generic because there's no ``| None`` to trip that inference.
+    """
+    kw: dict[str, Any] = {"nullable": True, "unique": unique, "index": index, "init": init}
     if not isinstance(default, _Unset):
         kw["default"] = default
     return mapped_column(type_, **kw)
