@@ -973,3 +973,23 @@ events:
       collision, mirrors arvel-search). Tests: 24 package tests pass; mypy/pyright/ruff clean.
       004 S1–S4 DONE — epic 004 complete.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-041"
+    event_id: "EV-060"
+    timestamp: "2026-05-31T08:30:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      Backlog 005 (query builder parity) — epic close-out. All 13 stories shipped across
+      WI-arvel-001..014 with ADR-123/126/129..135 and committed tests. This event syncs the
+      backlog markers for the three stories whose status had lagged the code: S2 nested WHERE
+      closure groups (where/or_where accept a closure; _grouped_whereclause parenthesizes before
+      AND/OR-join; empty group raises), S4 unless/tap (inverse-conditional + passthrough mid-chain
+      inspection), and S7 EXISTS-based exists()/doesnt_exist() (SELECT EXISTS(SELECT 1 … LIMIT 1),
+      not count>0) — all WI-arvel-001, ADR-123, test_qb_conditionals_existence.py (10 tests pass).
+      Docs verified: queries.md "Nested groups" + "Conditional query construction" (unless/tap added);
+      pagination.md documents the flat Laravel envelope + opaque base64 cursor encoding (S9). No code
+      change — backlog/docs sync only. 005 S1–S13 DONE — epic 005 complete.
+    handoff_id: null

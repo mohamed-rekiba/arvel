@@ -836,3 +836,27 @@ work_items:
       (causer_type,causer_id)), idempotent unless --force. Docs: docs/site/docs/audit.md; arvel[audit] extra.
       arvel-audit/tests type-checked in isolation (hyphenated-package conftest collision, like arvel-search).
       Gates: 24 package tests pass; mypy/pyright/ruff clean. 004 S1–S4 DONE — epic 004 complete.
+
+  - id: "WI-arvel-041"
+    name: "Query builder parity epic close-out (backlog 005, all stories)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T08:00:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: epic roll-up)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      Epic 005 close-out. All 13 query-builder-parity stories shipped across WI-arvel-001..014
+      (ADR-123/126/129..135) with committed tests. This roll-up syncs the backlog markers for the
+      three stories whose status lagged the code: S2 nested WHERE closure groups, S4 unless/tap,
+      S7 EXISTS-based exists()/doesnt_exist() — all WI-arvel-001, ADR-123,
+      test_qb_conditionals_existence.py (10 tests pass). Docs verified: queries.md "Nested groups" +
+      "Conditional query construction" (unless/tap added); pagination.md covers the flat Laravel
+      envelope + opaque base64 cursor encoding (S9 doc requirement). No code change — backlog/docs
+      sync only. 005 S1–S13 DONE — epic 005 complete.
