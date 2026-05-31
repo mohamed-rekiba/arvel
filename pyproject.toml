@@ -281,6 +281,8 @@ ignore = [
     "PLR1714", # the chained-equality form is explicit on purpose in key matching
     "SIM109",  # status code 2xx range check is more readable as written
     "E501",    # docstring lines hold copy-paste-ready user examples; do not wrap
+    "ARG002",  # LockFake mirrors CacheLock's signature for drop-in substitutability
+    "ASYNC109", # LockFake.block(timeout=...) mirrors CacheLock — asyncio.timeout adds no value
 ]
 "packages/arvel/src/arvel/observability/**" = [
     "PLC0415", # optional OTel exporters/instrumentors imported lazily to keep startup fast

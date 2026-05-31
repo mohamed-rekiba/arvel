@@ -82,7 +82,7 @@ class StorageFake:
 class StorageFakeContext:
     """Context manager: swap the bound StorageManager with a StorageFake."""
 
-    def __init__(self, disk: str | None = None) -> None:  # noqa: ARG002 — reserved for parity
+    def __init__(self, disk: str | None = None) -> None:
         self._original: StorageManagerLike | None = None
         self.fake = StorageFake()
 

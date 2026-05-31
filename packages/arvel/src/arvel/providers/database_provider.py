@@ -90,6 +90,10 @@ class DatabaseServiceProvider(ServiceProvider):
 
         configure_observer_container(self.app.container)
 
+        from arvel.database.service import DatabaseService
+
+        self.app.register_service(DatabaseService(self.app.container))
+
     async def shutdown(self) -> None:
         try:
             engine = self.app.container.make(AsyncEngine)

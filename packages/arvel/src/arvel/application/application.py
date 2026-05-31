@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Self
 from arvel.application.errors import (
     BootError,
     EnvironmentNotSetError,
+    ServiceConnectError,
     ShutdownError,
 )
 from arvel.config.registry import register
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from arvel.config.settings import ArvelSettings
     from arvel.providers import ServiceProvider
     from arvel.routing import MiddlewareRef
+    from arvel.services import BaseService
 
 
 def _baseline_head_providers() -> list[type[ServiceProvider]]:
@@ -39,6 +41,10 @@ def _baseline_head_providers() -> list[type[ServiceProvider]]:
       ``register()`` and ``boot()`` paths can emit structured logs.
     - ``LangServiceProvider``      — binds the translator so error messages
       from later providers can be localised.
+    - ``ContextServiceProvider``   — reserves the request-context layer's slot
+      so ``ContextMiddleware`` is mounted ahead of the database/HTTP stack.
+    - ``ObservabilityServiceProvider`` — boots the OTel SDK, bridges uvicorn
+      logging, and exports traces/logs when an OTLP endpoint is configured.
     - ``DatabaseServiceProvider``  — binds ``AsyncEngine`` /
       ``async_sessionmaker`` / ``AsyncSession`` so commands like
       ``arvel migrate`` and ORM-using code can resolve a real engine.
@@ -51,6 +57,8 @@ def _baseline_head_providers() -> list[type[ServiceProvider]]:
     at module import time when the framework is used purely for, say, the
     ``new`` command outside a project.
     """
+    from arvel.context.provider import ContextServiceProvider
+    from arvel.observability import ObservabilityServiceProvider
     from arvel.providers import (
         ConfigServiceProvider,
         DatabaseServiceProvider,
@@ -64,6 +72,8 @@ def _baseline_head_providers() -> list[type[ServiceProvider]]:
         ConfigServiceProvider,
         LogServiceProvider,
         LangServiceProvider,
+        ContextServiceProvider,
+        ObservabilityServiceProvider,
         DatabaseServiceProvider,
         HttpServiceProvider,
         SchedulerServiceProvider,
@@ -98,7 +108,20 @@ class Application:
         self._base_path: Path | None = None
         self._provider_classes: list[type[ServiceProvider]] = []
         self._provider_instances: list[ServiceProvider] = []
+        self._services: list[BaseService] = []
         self._booted: bool = False
+
+    def register_service(self, service: BaseService) -> None:
+        """Register a ``BaseService`` into the managed lifecycle.
+
+        ``connect()`` runs at boot (registration order); ``disconnect()`` at
+        shutdown (reverse). Registering after boot connects immediately is *not*
+        supported — register before ``boot()``.
+        """
+        self._services.append(service)
+
+    def services(self) -> list[BaseService]:
+        return list(self._services)
 
     def register(self) -> None:
         """Bootstrap the framework's baseline providers without a project base_path.
@@ -166,7 +189,31 @@ class Application:
             except Exception as exc:
                 raise BootError(type(inst), exc) from exc
 
+        for service in self._services:
+            try:
+                await service.connect()
+            except Exception as exc:
+                raise ServiceConnectError(service.name, exc) from exc
+
         self._booted = True
+        self._log_registered_routes()
+
+    def _log_registered_routes(self) -> None:
+        """Emit one DEBUG log per registered route once every provider has booted.
+
+        Function names / module paths only ever show up at DEBUG, so external
+        aggregators don't see internal structure at INFO and above.
+        """
+        from arvel.logging.facade import Log
+        from arvel.routing import Router
+
+        for spec in Router.singleton().routes():
+            Log.debug(
+                "route.registered",
+                method=spec.method,
+                path=spec.path,
+                name=spec.name or "",
+            )
 
     def _init_from_builder(
         self,
@@ -237,6 +284,15 @@ class Application:
     async def shutdown(self) -> None:
         if not self._booted:
             return
+        # Disconnect services first (reverse registration). A failing disconnect
+        # is logged, not raised, so the remaining services still tear down.
+        for service in reversed(self._services):
+            try:
+                await service.disconnect()
+            except Exception as exc:  # noqa: BLE001 — one bad disconnect must not strand the rest
+                from arvel.logging.facade import Log
+
+                Log.error("service.disconnect_failed", exc=exc, service=service.name)
         for inst in reversed(self._provider_instances):
             try:
                 await inst.shutdown()
@@ -291,9 +347,42 @@ class Application:
         handler.register(fa)
         router = self.container.make(Router)
         router.register_with_app(fa)
+        self._add_health_route(fa)
         self._maybe_add_maintenance_middleware(fa)
+        # add_middleware prepends, so the LAST call is the OUTERMOST layer.
+        # Desired outer→inner: Observability → Context → DeferredTask → ArvelScope.
         fa.add_middleware(ArvelScopeMiddleware, container=self.container)
+        self._maybe_add_observability_middleware(fa)
         return fa
+
+    def _add_health_route(self, fa: FastAPI) -> None:
+        from arvel.container.errors import BindingResolutionError
+        from arvel.health import add_health_route
+        from arvel.observability.config import ObservabilityConfig
+
+        try:
+            config = self.container.make(ObservabilityConfig)
+        except BindingResolutionError:
+            config = ObservabilityConfig()
+        add_health_route(fa, container=self.container, allowed_cidrs=config.health_allowed_cidrs)
+
+    def _maybe_add_observability_middleware(self, fa: FastAPI) -> None:
+        """Mount the context + observability middleware unless explicitly disabled."""
+        from arvel.container.errors import BindingResolutionError
+        from arvel.context import ContextMiddleware, DeferredTaskMiddleware
+        from arvel.observability import ObservabilityMiddleware
+        from arvel.observability.config import ObservabilityConfig
+
+        try:
+            config = self.container.make(ObservabilityConfig)
+        except BindingResolutionError:
+            config = ObservabilityConfig()
+        if not config.request_middleware_enabled:
+            return
+
+        fa.add_middleware(DeferredTaskMiddleware)
+        fa.add_middleware(ContextMiddleware)
+        fa.add_middleware(ObservabilityMiddleware, service=config.service_name)
 
     def _maybe_add_maintenance_middleware(self, fa: FastAPI) -> None:
         """Attach the maintenance middleware if a manager is bound."""
@@ -329,9 +418,13 @@ def serve(app: Application, *, host: str = "127.0.0.1", port: int = 8000) -> Non
     ``Application.into_asgi()``), so this is callable from a plain sync
     entrypoint.
     """
+    import os
+
     import uvicorn
 
-    uvicorn.run(app.into_asgi(), host=host, port=port)
+    raw = os.environ.get("GRACEFUL_SHUTDOWN_TIMEOUT", "").strip()
+    timeout = int(raw) if raw.isdigit() else None
+    uvicorn.run(app.into_asgi(), host=host, port=port, timeout_graceful_shutdown=timeout)
 
 
 class ApplicationBuilder:

@@ -134,7 +134,21 @@ class Authenticate:
         if user is None:
             raise UnauthenticatedException("Not authenticated.")
         request.state.user = user
+        _bind_user_to_context(user)
         return await call_next(request)
+
+
+def _bind_user_to_context(user: object) -> None:
+    """Bind the authenticated user's opaque id into the request Context.
+
+    Logs emitted for the rest of the request carry ``user_id`` automatically.
+    Only the id is bound — never the email or name (A09).
+    """
+    from arvel.context import Context
+
+    user_id = getattr(user, "id", None)
+    if user_id is not None:
+        Context.add("user_id", str(user_id))
 
 
 # ───────────────────────── CSRF (route-level) ─────────────────────────

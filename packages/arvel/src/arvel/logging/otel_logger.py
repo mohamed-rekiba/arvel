@@ -67,6 +67,20 @@ def _inject_request_context(attrs: dict[str, Any]) -> None:
         attrs.setdefault("service", req_ctx.service)
 
 
+# Keys the framework binds onto every log line when present in the active Context.
+# Anything else in Context stays out of logs unless the caller passes it explicitly.
+_BOUND_CONTEXT_KEYS = ("request_id", "user_id", "tenant_id")
+
+
+def _inject_app_context(attrs: dict[str, Any]) -> None:
+    from arvel.context import Context
+
+    for key in _BOUND_CONTEXT_KEYS:
+        value = Context.get(key)
+        if value is not None:
+            attrs.setdefault(key, value if isinstance(value, str) else str(value))
+
+
 def _inject_trace_context(attrs: dict[str, Any]) -> None:
     span = otel_trace.get_current_span()
     span_ctx = span.get_span_context()
@@ -113,6 +127,7 @@ class OtelLogger:
         attrs: dict[str, Any] = {**self._bound, **context}
         attrs = _redact(attrs)
         _inject_request_context(attrs)
+        _inject_app_context(attrs)
         _inject_trace_context(attrs)
         if exc is not None:
             _inject_exception(attrs, exc)

@@ -19,6 +19,21 @@ class BootError(RuntimeError):
         )
 
 
+class ServiceConnectError(BootError):
+    """Raised when a registered ``BaseService.connect()`` fails during boot.
+
+    Subclasses ``BootError`` so callers can catch either with one ``except``.
+    """
+
+    def __init__(self, service_name: str, original: BaseException) -> None:
+        self.service_name = service_name
+        self.original = original
+        RuntimeError.__init__(
+            self,
+            f"Service {service_name!r} failed to connect during boot: {original!r}",
+        )
+
+
 class ShutdownError(RuntimeError):
     """Raised when a provider fails during shutdown()."""
 

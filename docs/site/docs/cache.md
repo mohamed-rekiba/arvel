@@ -95,6 +95,56 @@ async with Cache.lock("heavy-import", ttl=120) as acquired:
     # else: another worker is already running it, skip
 ```
 
+### Extending a held lock
+
+Long-running jobs can renew their lock so it doesn't expire mid-flight. `extend()` resets the
+TTL **only if you still own the lock** — a different owner gets `False` and the lock is left
+untouched.
+
+```python
+lock = Cache.lock("nightly-rollup", ttl=60)
+if await lock.acquire():
+    try:
+        while more_batches():
+            await process_batch()
+            await lock.extend(60)   # push the expiry out another minute
+    finally:
+        await lock.release()
+```
+
+### Blocking with backoff
+
+`block()` waits for a held lock with exponential backoff so you don't hammer the store under
+contention. Retry intervals grow from `backoff`, doubling up to `max_backoff`:
+
+```python
+lock = Cache.lock("report", ttl=120)
+if await lock.block(timeout=10, backoff=0.1, max_backoff=2.0):
+    await build_report()
+```
+
+### Distributed semantics
+
+Only the Redis store provides true distributed locks. The array, file, and database stores
+fall back to **process-local** locks and emit a `RuntimeWarning` when you call `lock()` — fine
+for single-process dev, but use Redis when multiple workers must coordinate.
+
+### Testing locks
+
+`LockFake` is a drop-in double with assertion helpers:
+
+```python
+from arvel.testing.fakes import LockFake
+
+fake = LockFake("job:import")
+await fake.acquire()
+fake.assert_acquired("job:import")
+
+fake = LockFake("job:import", succeeds=False)
+await fake.acquire()
+fake.assert_nothing_acquired()
+```
+
 ## Choosing a key naming convention
 
 Arvel doesn't enforce a key format, but consistency matters when you debug cache misses. A useful convention:
