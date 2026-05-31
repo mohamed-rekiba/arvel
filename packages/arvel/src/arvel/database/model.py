@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Generator
-from contextlib import AbstractAsyncContextManager, contextmanager
+from collections.abc import AsyncGenerator, Callable, Generator
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import InitVar
 from datetime import UTC, date
 from datetime import datetime as _datetime
 from decimal import ROUND_HALF_UP, Decimal
+from enum import Enum
 from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
     NamedTuple,
+    Protocol,
     TypeGuard,
     TypeVar,
     cast,
@@ -85,6 +87,28 @@ def _json_cast(value: Any) -> Any:
     import json
 
     return json.loads(value) if isinstance(value, str) else value
+
+
+def _object_cast(value: Any) -> Any:
+    """Decode a JSON object into attribute-accessible form (Laravel's ``object`` cast)."""
+    import json
+    from types import SimpleNamespace
+
+    if isinstance(value, str):
+        return json.loads(value, object_hook=lambda d: SimpleNamespace(**d))
+    if isinstance(value, dict):
+        return SimpleNamespace(**value)
+    return value
+
+
+def _collection_cast(value: Any) -> Any:
+    """Decode a JSON array/object into an Arvel ``Collection`` (Laravel's ``collection`` cast)."""
+    import json
+
+    from arvel.support.collections import Collection
+
+    data = json.loads(value) if isinstance(value, str) else value
+    return Collection(data if data is not None else [])
 
 
 def _to_utc_datetime(value: Any) -> _datetime:
@@ -181,12 +205,29 @@ _CAST_DISPATCH: dict[str, Callable[[Any], Any]] = {
     "date": _date_cast,
     "timestamp": _timestamp_cast,
     "hashed": _hashed_cast,
+    "object": _object_cast,
+    "collection": _collection_cast,
 }
 _VALID_CASTS: frozenset[str] = frozenset(_CAST_DISPATCH)
 
+def _object_serialize(value: Any) -> Any:
+    if hasattr(value, "__dict__"):
+        result: dict[str, Any] = dict(value.__dict__)
+        return result
+    return value
+
+
+# Read-only serializers for built-ins whose read value isn't JSON-friendly.
+_BUILTIN_SERIALIZERS: dict[str, Callable[[Any], Any]] = {
+    "object": _object_serialize,
+    "collection": list,
+}
+
 # JSON collection casts stay read-path only on write — coercing to dict/list in
 # memory breaks String-column INSERTs. Use TypeDecorator for column-level JSON.
-_WRITE_SKIP_CASTS: frozenset[str] = frozenset({"dict", "list", "array"})
+_WRITE_SKIP_CASTS: frozenset[str] = frozenset(
+    {"dict", "list", "array", "object", "collection"}
+)
 
 # Write-only casts: applied on assignment, never on read. `hashed` would corrupt a
 # stored digest if re-hashed on every attribute access.
@@ -219,35 +260,137 @@ def _value_only(coercer: Callable[[Any], Any], _model: Any, _key: str, value: An
     return coercer(value)
 
 
+def _make_enum_cast(enum_cls: type[Enum]) -> _ResolvedCast:
+    """Read → enum member, write → backing value, serialize → backing value."""
+
+    def read(_model: Any, _key: str, value: Any) -> Any:
+        return value if isinstance(value, enum_cls) else enum_cls(value)
+
+    def write(_model: Any, _key: str, value: Any) -> Any:
+        if isinstance(value, enum_cls):
+            return value.value
+        # Accept either a backing value or a member name; store the backing value.
+        return enum_cls(value).value
+
+    def serialize(_model: Any, _key: str, value: Any) -> Any:
+        return value.value if isinstance(value, Enum) else value
+
+    return _ResolvedCast(read=read, write=write, serialize=serialize)
+
+
+def _shape_decoded(kind: str, decoded: Any) -> Any:
+    """Wrap a JSON-decoded value into the shape an encrypted cast variant exposes."""
+    if kind == "object":
+        from types import SimpleNamespace
+
+        return SimpleNamespace(**decoded) if isinstance(decoded, dict) else decoded
+    if kind == "collection":
+        from arvel.support.collections import Collection
+
+        return Collection(decoded if decoded is not None else [])
+    return decoded
+
+
+def _make_encrypted_cast(param: str) -> _ResolvedCast:
+    """``encrypted[:json|array|object|collection]`` — AES-GCM via the Crypt facade.
+
+    Reads decrypt (and decode); writes encrypt (and encode). ``to_dict`` exposes the
+    decrypted value, matching Eloquent's ``toArray``.
+    """
+    kind = param or "string"
+    if kind not in ("string", "json", "array", "object", "collection"):
+        raise ValueError(
+            f"'encrypted:{param}' is not a recognised encrypted cast variant "
+            "(use one of: string, json, array, object, collection)."
+        )
+
+    def read(_model: Any, _key: str, value: Any) -> Any:
+        from arvel.facades.crypt import Crypt
+
+        if kind == "string":
+            return Crypt.decrypt_string(value)
+        return _shape_decoded(kind, Crypt.decrypt(value))
+
+    def write(_model: Any, _key: str, value: Any) -> Any:
+        from arvel.facades.crypt import Crypt
+
+        if kind == "string":
+            return Crypt.encrypt_string(value if isinstance(value, str) else str(value))
+        # SimpleNamespace isn't JSON-serializable; unwrap it. dict/list pass straight
+        # through (Collection is a list subclass, so json.dumps handles it).
+        payload: Any = value
+        if hasattr(value, "__dict__") and not isinstance(value, (dict, list)):
+            payload = dict(value.__dict__)
+        return Crypt.encrypt(payload)
+
+    serialize = None
+    if kind == "object":
+        serialize = partial(_value_only, _object_serialize)
+    elif kind == "collection":
+        serialize = partial(_value_only, list)
+    return _ResolvedCast(read=read, write=write, serialize=serialize)
+
+
+def _make_datetime_format_cast(fmt: str) -> _ResolvedCast:
+    """``datetime:FORMAT`` — read coerces to datetime, serialize emits ``strftime(FORMAT)``."""
+
+    def read(_model: Any, _key: str, value: Any) -> Any:
+        if isinstance(value, str):
+            try:
+                parsed = _datetime.strptime(value, fmt)  # noqa: DTZ007 — tz applied below
+            except ValueError:
+                return _to_utc_datetime(value)
+            return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+        return _to_utc_datetime(value)
+
+    def serialize(model: Any, key: str, value: Any) -> Any:
+        dt = read(model, key, value)
+        return dt.strftime(fmt) if isinstance(dt, _datetime) else value
+
+    return _ResolvedCast(read=read, write=read, serialize=serialize)
+
+
 def _resolve_cast_spec(model_name: str, field: str, spec: Any) -> _ResolvedCast:
     if isinstance(spec, CastsAttributes):
         return _ResolvedCast(read=spec.get, write=spec.set, serialize=spec.serialize)
     if isinstance(spec, type) and issubclass(spec, CastsAttributes):
         built = spec()
         return _ResolvedCast(read=built.get, write=built.set, serialize=built.serialize)
+    if isinstance(spec, type) and issubclass(spec, Enum):
+        return _make_enum_cast(spec)
     if isinstance(spec, str):
-        base, sep, param = spec.partition(":")
-        if sep:
-            if base == "decimal":
-                both = partial(_value_only, _make_decimal_cast(int(param)))
-                return _ResolvedCast(read=both, write=both, serialize=None)
-            raise ValueError(
-                f"{model_name}.__casts__['{field}'] = '{spec}': "
-                f"'{base}' takes no parameter or is not a parameterized cast."
-            )
-        coercer = _CAST_DISPATCH.get(base)
-        if coercer is None:
-            raise ValueError(
-                f"{model_name}.__casts__['{field}'] = '{spec}' is not a recognised cast "
-                f"type. Valid: {sorted(_VALID_CASTS)} (or a CastsAttributes subclass)."
-            )
-        read = None if base in _READ_SKIP_CASTS else partial(_value_only, coercer)
-        write = None if base in _WRITE_SKIP_CASTS else partial(_value_only, coercer)
-        return _ResolvedCast(read=read, write=write, serialize=None)
+        return _resolve_string_cast(model_name, field, spec)
     raise TypeError(
-        f"{model_name}.__casts__['{field}']: cast spec must be a str or a "
+        f"{model_name}.__casts__['{field}']: cast spec must be a str, an Enum class, or a "
         f"CastsAttributes class/instance, got {type(cast('object', spec)).__name__}."
     )
+
+
+def _resolve_string_cast(model_name: str, field: str, spec: str) -> _ResolvedCast:
+    base, sep, param = spec.partition(":")
+    if base == "encrypted":
+        return _make_encrypted_cast(param)
+    if sep:
+        if base == "decimal":
+            both = partial(_value_only, _make_decimal_cast(int(param)))
+            return _ResolvedCast(read=both, write=both, serialize=None)
+        if base == "datetime":
+            return _make_datetime_format_cast(param)
+        raise ValueError(
+            f"{model_name}.__casts__['{field}'] = '{spec}': "
+            f"'{base}' takes no parameter or is not a parameterized cast."
+        )
+    coercer = _CAST_DISPATCH.get(base)
+    if coercer is None:
+        raise ValueError(
+            f"{model_name}.__casts__['{field}'] = '{spec}' is not a recognised cast "
+            f"type. Valid: {sorted(_VALID_CASTS)} (or a CastsAttributes subclass)."
+        )
+    read = None if base in _READ_SKIP_CASTS else partial(_value_only, coercer)
+    write = None if base in _WRITE_SKIP_CASTS else partial(_value_only, coercer)
+    serializer = _BUILTIN_SERIALIZERS.get(base)
+    serialize = partial(_value_only, serializer) if serializer is not None else None
+    return _ResolvedCast(read=read, write=write, serialize=serialize)
 
 
 def _should_auto_wrap(attr_name: str, annotation: Any, value: Any) -> bool:
@@ -426,6 +569,20 @@ def unwrap_method(raw: Any) -> Callable[..., Any]:
 # Task-local switch for Model.unguarded(): suspends mass-assignment checks.
 _mass_assignment_unguarded: ContextVar[bool] = ContextVar("arvel_unguarded", default=False)
 
+# Task-local switch for Model.without_timestamps(): the before_insert/before_update
+# hooks read it, so timestamp auto-fill is skipped for writes inside the block.
+_suppress_timestamps: ContextVar[bool] = ContextVar("arvel_suppress_timestamps", default=False)
+
+
+@asynccontextmanager
+async def _without_timestamps() -> AsyncGenerator[None]:
+    """Mute timestamp auto-fill for writes in the block. Re-entrant, task-local."""
+    token = _suppress_timestamps.set(True)
+    try:
+        yield
+    finally:
+        _suppress_timestamps.reset(token)
+
 
 def _check_mass_assignment(model_cls: type[Any], attrs: dict[str, Any]) -> None:
     """Enforce __fillable__ / __guarded__ on create()/update() calls."""
@@ -480,6 +637,23 @@ class ActiveRecord(QueryMixin):
     # Accessor names appended to to_dict() output, like Eloquent's $appends.
     __appends__: ClassVar[list[str] | None] = None
 
+    # Lifecycle name -> ModelEvent subclass, dispatched on the app event bus
+    # when that lifecycle fires (Eloquent's $dispatchesEvents). None unless declared.
+    __dispatches_events__: ClassVar[dict[str, type[Any]] | None] = None
+    # Observer classes auto-registered at class-definition time (Eloquent's #[ObservedBy]).
+    __observed_by__: ClassVar[list[type[Any]] | None] = None
+
+    # Names of parent relation accessor methods whose timestamps get bumped on save.
+    # Eloquent's $touches. Each entry is a method returning a BelongsTo builder.
+    __touches__: ClassVar[tuple[str, ...]] = ()
+
+    # Timestamp controls (Eloquent parity). Set __timestamps__ = False to opt out;
+    # point CREATED_AT/UPDATED_AT at custom columns. Auto-fill hooks attach in
+    # __init_subclass__ only when the named attributes actually exist on the model.
+    __timestamps__: ClassVar[bool] = True
+    CREATED_AT: ClassVar[str] = "created_at"
+    UPDATED_AT: ClassVar[str] = "updated_at"
+
     # Set per-instance at save time: column keys changed by the last save.
     _arvel_changed: ClassVar[frozenset[str] | None] = None
 
@@ -494,6 +668,8 @@ class ActiveRecord(QueryMixin):
     # ClassVar keeps it out of MappedAsDataclass field processing and ORM column
     # mapping.  Instances get their own list via object.__setattr__ on first use.
     _instance_hidden: ClassVar[list[str] | None] = None
+    # Per-instance accessor names added to to_dict() via append() / set_appends().
+    _instance_appends: ClassVar[list[str] | None] = None
 
     @classmethod
     async def find(cls, pk: Any) -> Any:
@@ -693,7 +869,47 @@ class ActiveRecord(QueryMixin):
         await fire_async(type(self), after_event, self)
         await fire_async(type(self), "saved", self)
         fire_after_commit(type(self), self)
+        await self._touch_parents()
         return self
+
+    async def _touch_parents(self) -> None:
+        """Bump UPDATED_AT on each parent named in ``__touches__`` (Eloquent's $touches)."""
+        for name in type(self).__touches__:
+            accessor = getattr(self, name, None)
+            if accessor is None:
+                continue
+            builder = accessor()
+            parent = await builder.first()
+            if parent is not None:
+                await parent.touch()
+
+    async def push(self) -> Any:
+        """Save this model plus every loaded relation (and their loaded relations).
+
+        Eloquent's ``push``: persists the model, then cascades save() across the
+        already-loaded relationships so pending edits on related rows go down too.
+        """
+        await self._push(set())
+        return self
+
+    async def _push(self, visited: set[int]) -> None:
+        # Bidirectional loaded graphs (user.posts <-> post.author) would recurse
+        # forever without a per-call visited set keyed on object identity.
+        if id(self) in visited:
+            return
+        visited.add(id(self))
+        await self.save()
+        state = sqla_inspect(self)
+        if state is None:
+            return
+        for rel in state.mapper.relationships:
+            if rel.key not in state.dict:
+                continue
+            value = state.dict[rel.key]
+            related = value if rel.uselist else ([value] if value is not None else [])
+            for item in related:
+                if isinstance(item, Model):
+                    await item._push(visited)
 
     async def delete(self) -> Any:
         from arvel.database.events import fire_after_commit, fire_async, fire_cancellable
@@ -705,6 +921,8 @@ class ActiveRecord(QueryMixin):
             setattr(self, soft_field, _datetime.now(UTC))
             session.add(self)
             await session.flush()
+            # `trashed` distinguishes a soft delete from a hard one; `deleted` fires for both.
+            await fire_async(type(self), "trashed", self)
             await fire_async(type(self), "deleted", self)
             fire_after_commit(type(self), self)
             return self
@@ -718,12 +936,21 @@ class ActiveRecord(QueryMixin):
         from arvel.database.events import fire_after_commit, fire_async, fire_cancellable
 
         session = get_active_session()
+        # Laravel order: force_deleting, deleting, hard delete, deleted, force_deleted.
+        # Either before-hook can abort. `trashed` never fires — this is a hard delete.
+        await fire_cancellable(type(self), "force_deleting", self)
         await fire_cancellable(type(self), "deleting", self)
         await session.delete(self)
         await session.flush()
         await fire_async(type(self), "deleted", self)
+        await fire_async(type(self), "force_deleted", self)
         fire_after_commit(type(self), self)
         return self
+
+    def trashed(self) -> bool:
+        """True when this instance is soft-deleted (``deleted_at`` is set)."""
+        soft_field = getattr(type(self), "__arvel_soft_delete_column__", None)
+        return soft_field is not None and getattr(self, soft_field, None) is not None
 
     async def restore(self) -> Any:
         from arvel.database.events import fire_after_commit, fire_async, fire_cancellable
@@ -788,17 +1015,36 @@ class ActiveRecord(QueryMixin):
         await session.refresh(self, attrs or None)
         return self
 
-    async def touch(self) -> Any:
-        """Update updated_at to now and persist."""
-        if hasattr(self, "updated_at"):
-            object.__setattr__(self, "updated_at", _datetime.now(UTC))
-        session = get_active_session()
-        session.add(self)
-        await session.flush()
-        return self
+    async def touch(self, attribute: str | None = None) -> Any:
+        """Set a timestamp column to now and save (default: ``UPDATED_AT``).
+
+        Fires lifecycle events through ``save()``; pass an ``attribute`` to bump an
+        arbitrary column (e.g. ``touch("published_at")``).
+        """
+        column = attribute or type(self).UPDATED_AT
+        if hasattr(self, column):
+            object.__setattr__(self, column, _datetime.now(UTC))
+        return await self.save()
+
+    async def touch_quietly(self, attribute: str | None = None) -> Any:
+        """Like ``touch()`` but without firing lifecycle events."""
+        from arvel.database.events import without_events
+
+        async with without_events():
+            return await self.touch(attribute)
+
+    @classmethod
+    def without_timestamps(cls) -> AbstractAsyncContextManager[None]:
+        """Skip timestamp auto-fill for writes inside the ``async with`` block."""
+        return _without_timestamps()
 
     async def replicate(self, *, except_: list[str] | None = None) -> Any:
-        """Return an unsaved copy of this model, excluding ``except_`` fields."""
+        """Return an unsaved copy of this model, excluding ``except_`` fields.
+
+        Fires ``replicating`` on the clone before returning it.
+        """
+        from arvel.database.events import fire_async
+
         mapper = sqla_inspect(type(self))
         if mapper is None:
             raise RuntimeError(f"{type(self).__name__} is not a mapped SQLA class.")
@@ -807,7 +1053,8 @@ class ActiveRecord(QueryMixin):
         skip = set(except_ or [])
         # Eloquent drops the PK and timestamps on a fresh copy; don't carry over a
         # soft-delete flag either, or the clone would start life already trashed.
-        skip.update({"created_at", "updated_at"})
+        skip.update({getattr(type(self), "CREATED_AT", "created_at"),
+                     getattr(type(self), "UPDATED_AT", "updated_at")})
         soft_field = getattr(type(self), "__arvel_soft_delete_column__", None)
         if soft_field:
             skip.add(soft_field)
@@ -826,10 +1073,28 @@ class ActiveRecord(QueryMixin):
                     attrs[key] = None
                 continue
             attrs[key] = getattr(self, key)
-        return cast("Any", type(self))(**attrs)
+        clone = cast("Any", type(self))(**attrs)
+        await fire_async(type(self), "replicating", clone)
+        return clone
 
     async def load(self, *relations: str) -> None:
-        """Lazy-load relations onto this already-fetched instance."""
+        """Lazy-load relations onto this already-fetched instance.
+
+        SQLAlchemy relationships go through selectinload; async descriptor
+        relations (BelongsToMany / MorphToMany / MorphOne / MorphMany) batch-load
+        into the per-instance eager cache so their accessors serve from it.
+        """
+        from arvel.database.query import is_async_relation, load_async_relation_path
+
+        async_rels = [r for r in relations if is_async_relation(type(self), r)]
+        sa_rels = [r for r in relations if r not in async_rels]
+
+        for rel in async_rels:
+            await load_async_relation_path(type(self), [self], rel, None)
+
+        if not sa_rels:
+            return
+
         from sqlalchemy.orm import selectinload
 
         session = get_active_session()
@@ -838,20 +1103,20 @@ class ActiveRecord(QueryMixin):
             return
         # Expire the requested relations so SQLAlchemy's selectinload will
         # replace them even when expire_on_commit=False is in use.
-        session.expire(self, list(relations))
+        session.expire(self, sa_rels)
         pk_cols = mapper.primary_key
         pk_values = tuple(getattr(self, col.key) for col in pk_cols)
         stmt = select(type(self))
         for col, val in zip(pk_cols, pk_values, strict=True):
             stmt = stmt.where(col == val)
-        for rel in relations:
+        for rel in sa_rels:
             rel_attr = getattr(type(self), rel, None)
             if rel_attr is not None:
                 stmt = stmt.options(selectinload(rel_attr))
         result = await session.execute(stmt)
         fresh = result.scalars().first()
         if fresh is not None:
-            for rel in relations:
+            for rel in sa_rels:
                 loaded = getattr(fresh, rel, None)
                 if loaded is not None:
                     object.__setattr__(self, rel, loaded)
@@ -862,6 +1127,43 @@ class ActiveRecord(QueryMixin):
         to_load = [r for r in relations if r in (state.unloaded if state else set())]
         if to_load:
             await self.load(*to_load)
+
+    async def load_aggregate(
+        self,
+        relation: str,
+        agg: str,
+        column: str | None = None,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[Any], Any] | None = None,
+    ) -> Any:
+        """Compute an aggregate over a relation, cache it on this instance, and return it.
+
+        ``relation`` may carry an ``" as <alias>"`` suffix; an explicit ``alias`` wins.
+        """
+        from arvel.database.query import load_aggregate_for
+
+        return await load_aggregate_for(
+            self, relation, agg, column, alias=alias, constraint=constraint
+        )
+
+    async def load_count(
+        self, relation: str, *, constraint: Callable[[Any], Any] | None = None
+    ) -> Any:
+        """Count a relation's rows and cache the result as ``{relation}_count``."""
+        return await self.load_aggregate(relation, "count", constraint=constraint)
+
+    async def load_sum(
+        self, relation: str, column: str, *, constraint: Callable[[Any], Any] | None = None
+    ) -> Any:
+        """Sum a relation column and cache it as ``{relation}_sum_{column}``."""
+        return await self.load_aggregate(relation, "sum", column, constraint=constraint)
+
+    async def load_exists(
+        self, relation: str, *, constraint: Callable[[Any], Any] | None = None
+    ) -> Any:
+        """Check whether a relation has any rows; cache it as ``{relation}_exists``."""
+        return await self.load_aggregate(relation, "exists", constraint=constraint)
 
     def make_hidden(self, *fields: str) -> None:
         """Add fields to per-instance hidden list (does not mutate class-level __hidden__)."""
@@ -877,6 +1179,113 @@ class ActiveRecord(QueryMixin):
         updated = [f for f in current if f not in fields]
         object.__setattr__(self, "_instance_hidden", updated)
 
+    def make_hidden_if(self, condition: bool | Callable[[Any], bool], *fields: str) -> Any:
+        """Hide ``fields`` only when ``condition`` (a bool or ``self``-predicate) holds."""
+        if condition(self) if callable(condition) else condition:
+            self.make_hidden(*fields)
+        return self
+
+    def make_visible_if(self, condition: bool | Callable[[Any], bool], *fields: str) -> Any:
+        """Unhide ``fields`` only when ``condition`` (a bool or ``self``-predicate) holds."""
+        if condition(self) if callable(condition) else condition:
+            self.make_visible(*fields)
+        return self
+
+    def append(self, *attributes: str) -> Any:
+        """Add accessor names to this instance's serialized output (Eloquent's append)."""
+        current = list(getattr(self, "_instance_appends", None) or [])
+        for name in attributes:
+            if name not in current:
+                current.append(name)
+        object.__setattr__(self, "_instance_appends", current)
+        return self
+
+    def set_appends(self, attributes: list[str]) -> Any:
+        """Replace this instance's appended-accessor list."""
+        object.__setattr__(self, "_instance_appends", list(attributes))
+        return self
+
+    def _collect_appends(self) -> list[str]:
+        """Class-level ``__appends__`` merged with per-instance appends, de-duped."""
+        appends: list[str] = list(type(self).__appends__ or [])
+        for name in self._instance_appends or []:
+            if name not in appends:
+                appends.append(name)
+        return appends
+
+    def only(self, *keys: str) -> dict[str, Any]:
+        """Subset of ``to_dict()`` limited to ``keys`` (missing keys are skipped)."""
+        data = self.to_dict()
+        return {k: data[k] for k in keys if k in data}
+
+    def except_(self, *keys: str) -> dict[str, Any]:
+        """``to_dict()`` with ``keys`` removed."""
+        data = self.to_dict()
+        return {k: v for k, v in data.items() if k not in keys}
+
+    @classmethod
+    def get_key_name(cls) -> str:
+        """Name of the primary-key column. Raises for composite keys."""
+        mapper: Mapper[Any] = cast("Mapper[Any]", sqla_inspect(cls))
+        pk_cols = mapper.primary_key
+        if len(pk_cols) != 1:
+            raise TypeError(f"{cls.__name__} has a composite primary key; use get_key().")
+        key = pk_cols[0].key
+        if key is None:
+            raise TypeError(f"{cls.__name__} primary key column has no key.")
+        return key
+
+    def get_key(self) -> Any:
+        """Primary-key value. Returns a tuple for composite keys."""
+        mapper: Mapper[Any] = cast("Mapper[Any]", sqla_inspect(type(self)))
+        pk_cols = mapper.primary_key
+        keys = [c.key for c in pk_cols if c.key is not None]
+        if len(keys) == 1:
+            return getattr(self, keys[0])
+        return tuple(getattr(self, k) for k in keys)
+
+    @classmethod
+    def qualify_column(cls, column: str) -> str:
+        """Prefix ``column`` with the table name: ``"users.email"``."""
+        from sqlalchemy import Table
+
+        mapper: Mapper[Any] = cast("Mapper[Any]", sqla_inspect(cls))
+        table = mapper.local_table
+        table_name = table.name if isinstance(table, Table) else str(table)
+        return f"{table_name}.{column}"
+
+    @classmethod
+    def get_morph_class(cls) -> str:
+        """Polymorphic type token for this model: its morph-map alias, else short name."""
+        from arvel.database.orm.morph_map import get_morph_alias
+
+        return get_morph_alias(cls)
+
+    def is_same(self, other: Any) -> bool:
+        """True when ``other`` is the same model type with the same (non-null) key."""
+        if other is None or type(self) is not type(other):
+            return False
+        key = self.get_key()
+        return key is not None and key == other.get_key()
+
+    def is_not(self, other: Any) -> bool:
+        """Inverse of :meth:`is_same`."""
+        return not self.is_same(other)
+
+    def discard_changes(self) -> Any:
+        """Revert pending attribute changes back to the loaded/last-saved values."""
+        state = sqla_inspect(self)
+        if state is None:
+            return self
+        for key in self._arvel_column_keys():
+            if (
+                key in state.attrs
+                and state.attrs[key].history.has_changes()
+                and key in state.committed_state
+            ):
+                setattr(self, key, state.committed_state[key])
+        return self
+
     def to_dict(self) -> dict[str, Any]:
         mapper = sqla_inspect(type(self))
         if mapper is None:
@@ -887,11 +1296,11 @@ class ActiveRecord(QueryMixin):
         resolvers = type(self).__arvel_cast_resolvers__
         if resolvers:
             for key, resolved in resolvers.items():
-                if resolved.serialize is not None and key in data:
+                if resolved.serialize is not None and data.get(key) is not None:
                     data[key] = resolved.serialize(self, key, data[key])
-        # Append @accessor-backed computed attributes (Eloquent's $appends).
-        appends: list[str] = list(type(self).__appends__ or [])
-        for name in appends:
+        # Append @accessor-backed computed attributes (Eloquent's $appends),
+        # plus any added per-instance via append() / set_appends().
+        for name in self._collect_appends():
             data[name] = getattr(self, name)
         # Apply __visible__ (allowlist)
         visible: list[str] | None = getattr(type(self), "__visible__", None)
@@ -921,7 +1330,8 @@ class ActiveRecord(QueryMixin):
             raw = {
                 k: v
                 for k, v in self.__dict__.items()
-                if not k.startswith("_sa_") and k != "_instance_hidden"
+                if not k.startswith("_sa_")
+                and k not in ("_instance_hidden", "_arvel_attr_cache")
             }
             visible: list[str] | None = getattr(type(self), "__visible__", None)
             if visible is not None:
@@ -1013,6 +1423,24 @@ class Model(
                     mutators[column] = attr
         if mutators:
             cls.__arvel_mutators__ = mutators
+
+        # Auto-register observers declared on this class via __observed_by__.
+        observed_by: list[type[Any]] | None = cls.__dict__.get("__observed_by__")
+        if observed_by:
+            from arvel.database.events import bind_observer
+
+            for observer in observed_by:
+                bind_observer(cls, observer)
+
+        # Attach timestamp auto-fill hooks when the model actually has the columns
+        # named by CREATED_AT/UPDATED_AT. Works for the Timestamps mixin and for
+        # models declaring their own custom timestamp columns.
+        if getattr(cls, "__timestamps__", True):
+            created = getattr(cls, "CREATED_AT", "created_at")
+            updated = getattr(cls, "UPDATED_AT", "updated_at")
+            if hasattr(cls, created) or hasattr(cls, updated):
+                event.listen(cls, "before_insert", _set_timestamps_on_insert, propagate=True)
+                event.listen(cls, "before_update", _set_timestamps_on_update, propagate=True)
 
     @classmethod
     def add_global_scope(
@@ -1115,7 +1543,9 @@ class Model(
         fk = foreign_key or f"{Str.snake(related.__name__)}_{ok}"
         fk_value = getattr(self, fk, None)
         pk_col = getattr(related, ok)
-        qb: BelongsTo[RelatedT] = BelongsTo(related, owner=self, fk_attr=fk, owner_key=ok)
+        qb: BelongsTo[RelatedT] = BelongsTo(
+            related, owner=self, fk_attr=fk, owner_key=ok, fk_present=fk_value is not None
+        )
         if fk_value is not None:
             qb = qb.where(pk_col == fk_value)
         return qb
@@ -1162,17 +1592,43 @@ class Model(
 
         bind_observer(cls, observer)
 
+    @classmethod
+    def on(cls, event: str, callback: Callable[[Any], Any]) -> None:
+        """Register a single ``callback(instance)`` for one lifecycle ``event``.
+
+        Lighter than a full observer class — the callback runs alongside any
+        observers. Before-events (creating/updating/deleting/restoring) may
+        return ``False`` to abort, same as observer hooks.
+        """
+        from arvel.database.events import register_callback
+
+        register_callback(cls, event, callback)
+
+
+def _timestamps_active(cls: type[Any]) -> bool:
+    """True when ``cls`` wants timestamps and the current context hasn't muted them."""
+    return bool(getattr(cls, "__timestamps__", True)) and not _suppress_timestamps.get()
+
 
 def _set_timestamps_on_insert(_mapper: Mapper[Any], _conn: Any, target: Any) -> None:
+    model = cast("Model", target)
+    if not _timestamps_active(type(model)):
+        return
     now = _datetime.now(UTC)
-    if getattr(target, "created_at", None) is None:
-        target.created_at = now
-    if getattr(target, "updated_at", None) is None:
-        target.updated_at = now
+    created, updated = model.CREATED_AT, model.UPDATED_AT
+    if created and getattr(model, created, None) is None:
+        setattr(model, created, now)
+    if updated and getattr(model, updated, None) is None:
+        setattr(model, updated, now)
 
 
 def _set_timestamps_on_update(_mapper: Mapper[Any], _conn: Any, target: Any) -> None:
-    target.updated_at = _datetime.now(UTC)
+    model = cast("Model", target)
+    if not _timestamps_active(type(model)):
+        return
+    updated = model.UPDATED_AT
+    if updated:
+        setattr(model, updated, _datetime.now(UTC))
 
 
 class Timestamps(MappedAsDataclass):
@@ -1180,16 +1636,13 @@ class Timestamps(MappedAsDataclass):
 
     Extends ``MappedAsDataclass`` so SQLAlchemy recognises it as a typed-
     dataclass mixin — required by SQLA 2.0 and will be enforced in 2.1.
-    Both columns are ``init=False``; the mapper-event hook populates them.
+    Both columns are ``init=False``; ``Model.__init_subclass__`` wires the
+    mapper-event hooks that populate them (honoring ``__timestamps__`` and
+    the ``CREATED_AT`` / ``UPDATED_AT`` constants).
     """
 
     created_at: Mapped[_datetime] = datetime(nullable=False, init=False, default=None)
     updated_at: Mapped[_datetime] = datetime(nullable=False, init=False, default=None)
-
-    def __init_subclass__(cls, **kw: Any) -> None:
-        super().__init_subclass__(**kw)
-        event.listen(cls, "before_insert", _set_timestamps_on_insert, propagate=True)
-        event.listen(cls, "before_update", _set_timestamps_on_update, propagate=True)
 
 
 class SoftDeletes(MappedAsDataclass):
@@ -1215,6 +1668,75 @@ class SoftDeletes(MappedAsDataclass):
         if "__arvel_global_scopes__" not in cls.__dict__:
             cls.__arvel_global_scopes__ = dict(getattr(cls, "__arvel_global_scopes__", {}))
         cls.__arvel_global_scopes__["soft_delete"] = SoftDeleteScope(col_name).apply
+
+
+class _UniqueIdProvider(Protocol):
+    @classmethod
+    def new_unique_id(cls) -> str: ...
+
+
+def _set_unique_id_on_insert(_mapper: Any, _connection: Any, target: Any) -> None:
+    """before_insert hook: fill an empty single-column PK from ``new_unique_id()``."""
+    model = cast("Model", target)
+    mapper: Mapper[Any] = cast("Mapper[Any]", sqla_inspect(type(model)))
+    pk_cols = mapper.primary_key
+    if len(pk_cols) != 1:
+        return
+    key = pk_cols[0].key
+    if key is None or getattr(model, key, None) is not None:
+        return
+    provider = cast("type[_UniqueIdProvider]", type(model))
+    setattr(model, key, provider.new_unique_id())
+
+
+class HasUuids:
+    """Mixin: auto-fill a string primary key with a UUID on insert.
+
+    Declare the PK as a string column with ``init=False, default=None`` so it
+    stays empty until the insert hook fills it.
+    """
+
+    @classmethod
+    def new_unique_id(cls) -> str:
+        import uuid
+
+        return str(uuid.uuid4())
+
+    def __init_subclass__(cls, **kw: Any) -> None:
+        super().__init_subclass__(**kw)
+        event.listen(cls, "before_insert", _set_unique_id_on_insert, propagate=True)
+
+
+# Crockford base32 alphabet (no I, L, O, U) used by ULID encoding.
+_CROCKFORD32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def _new_ulid() -> str:
+    """Generate a 26-char, lexicographically-sortable ULID (48-bit time + 80-bit random)."""
+    import os
+    import time
+
+    value = (int(time.time() * 1000) << 80) | int.from_bytes(os.urandom(10), "big")
+    chars = [""] * 26
+    for i in range(25, -1, -1):
+        chars[i] = _CROCKFORD32[value & 0x1F]
+        value >>= 5
+    return "".join(chars)
+
+
+class HasUlids:
+    """Mixin: auto-fill a string primary key with a sortable ULID on insert.
+
+    Declare the PK as a string column with ``init=False, default=None``.
+    """
+
+    @classmethod
+    def new_unique_id(cls) -> str:
+        return _new_ulid()
+
+    def __init_subclass__(cls, **kw: Any) -> None:
+        super().__init_subclass__(**kw)
+        event.listen(cls, "before_insert", _set_unique_id_on_insert, propagate=True)
 
 
 # Type aliases used in Model class body (declared after both classes to avoid forward ref)

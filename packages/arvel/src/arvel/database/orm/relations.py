@@ -9,9 +9,9 @@ Also provides ``has_many_attr`` — a class-attribute declarator that wraps
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 from sqlalchemy import inspect as sqla_inspect
 from sqlalchemy import select
@@ -37,7 +37,36 @@ class ThroughSpec:
     local_key: str = "id"
 
 
-class HasMany(QueryBuilder[T], Generic[T]):
+class _OfMany(QueryBuilder[T], Generic[T]):
+    """Shared `latest_of_many` / `oldest_of_many` / `of_many` for HasMany/HasOne.
+
+    Returns the single related row that wins an aggregate (MAX/MIN of a column),
+    with the PK as a deterministic tiebreaker — Laravel's `latestOfMany`/`ofMany`.
+    """
+
+    def _pk_name(self) -> str:
+        key = sqla_inspect(self._model).primary_key[0].key
+        if key is None:
+            raise TypeError(f"{self._model.__name__} primary key column has no key")
+        return key
+
+    async def of_many(self, column: str = "created_at", aggregate: str = "max") -> T | None:
+        """Return the related row with MAX (default) or MIN of *column*."""
+        pk = self._pk_name()
+        if aggregate.lower() == "max":
+            scoped = self.order_by(f"-{column}", f"-{pk}")
+        else:
+            scoped = self.order_by(column, pk)
+        return await scoped.first()
+
+    async def latest_of_many(self, column: str = "created_at") -> T | None:
+        return await self.of_many(column, "max")
+
+    async def oldest_of_many(self, column: str = "created_at") -> T | None:
+        return await self.of_many(column, "min")
+
+
+class HasMany(_OfMany[T], Generic[T]):
     """QueryBuilder[T] pre-scoped to WHERE foreign_key = owner_pk."""
 
     def __init__(
@@ -84,7 +113,7 @@ class HasMany(QueryBuilder[T], Generic[T]):
         return [await self.create(attrs) for attrs in rows]
 
 
-class HasOne(QueryBuilder[T], Generic[T]):
+class HasOne(_OfMany[T], Generic[T]):
     """QueryBuilder[T] pre-scoped to WHERE foreign_key = owner_pk, limit 1."""
 
     def __init__(
@@ -121,6 +150,9 @@ class HasOne(QueryBuilder[T], Generic[T]):
         return await self._model.create(**attrs)
 
 
+_UNSET: Any = object()
+
+
 class BelongsTo(QueryBuilder[T], Generic[T]):
     """QueryBuilder[T] pre-scoped to WHERE pk = owner.fk_value."""
 
@@ -132,18 +164,58 @@ class BelongsTo(QueryBuilder[T], Generic[T]):
         owner: Any = None,
         fk_attr: str | None = None,
         owner_key: str = "id",
+        fk_present: bool = True,
     ) -> None:
         super().__init__(model, stmt)
         self._owner = owner
         self._fk_attr = fk_attr
         self._owner_key = owner_key
+        # False when the owner's FK is null — first() must not match an arbitrary row.
+        self._fk_present = fk_present
+        self._default: Any = _UNSET
 
     def _clone(self, stmt: Any = None) -> BelongsTo[T]:
         new = super()._clone(stmt)
         new._owner = self._owner
         new._fk_attr = self._fk_attr
         new._owner_key = self._owner_key
+        new._fk_present = self._fk_present
+        new._default = self._default
         return new
+
+    def with_default(
+        self,
+        attributes: Mapping[str, Any] | Callable[[T, Any], None] | bool = True,
+    ) -> BelongsTo[T]:
+        """Return a default related model instead of None when the FK is null/unmatched.
+
+        Mirrors Eloquent's ``withDefault``: pass nothing for an empty instance, a
+        dict of attributes, or a callback ``(instance, owner)`` to populate it.
+        """
+        clone = self._clone()
+        clone._default = attributes
+        return clone
+
+    def _build_default(self) -> T | None:
+        spec = self._default
+        if spec is _UNSET or spec is False:
+            return None
+        instance = self._model()
+        if isinstance(spec, Mapping):
+            attrs = cast("Mapping[str, Any]", spec)
+            for key, value in attrs.items():
+                setattr(instance, key, value)
+        elif callable(spec):
+            spec(instance, self._owner)
+        return instance
+
+    async def first(self) -> T | None:
+        if not self._fk_present:
+            return self._build_default()
+        result = await super().first()
+        if result is None:
+            return self._build_default()
+        return result
 
     async def associate(self, related: Any) -> None:
         """Set the FK on the owner instance to point to related.pk (no persist)."""

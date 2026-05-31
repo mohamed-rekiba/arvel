@@ -419,16 +419,66 @@ class QueryMixin:
         return cls.query().with_(*relations)
 
     @classmethod
-    def with_count(cls, *relations: str) -> QueryBuilder[Self]:
-        return cls.query().with_count(*relations)
+    def with_count(
+        cls,
+        *relations: str,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().with_count(*relations, constraint=constraint)
 
     @classmethod
-    def with_sum(cls, relation: str, col: str) -> QueryBuilder[Self]:
-        return cls.query().with_sum(relation, col)
+    def with_sum(
+        cls,
+        relation: str,
+        col: str,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().with_sum(relation, col, alias=alias, constraint=constraint)
 
     @classmethod
-    def with_max(cls, relation: str, col: str) -> QueryBuilder[Self]:
-        return cls.query().with_max(relation, col)
+    def with_avg(
+        cls,
+        relation: str,
+        col: str,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().with_avg(relation, col, alias=alias, constraint=constraint)
+
+    @classmethod
+    def with_min(
+        cls,
+        relation: str,
+        col: str,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().with_min(relation, col, alias=alias, constraint=constraint)
+
+    @classmethod
+    def with_max(
+        cls,
+        relation: str,
+        col: str,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().with_max(relation, col, alias=alias, constraint=constraint)
+
+    @classmethod
+    def with_exists(
+        cls,
+        relation: str,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().with_exists(relation, alias=alias, constraint=constraint)
 
     # ── conditional ───────────────────────────────────────────────────────
 
@@ -514,6 +564,8 @@ class QueryMixin:
 
     @classmethod
     async def all(cls) -> list[Self]:
+        # Runtime type is ModelCollection[Self]; annotated as list[Self] because
+        # QueryMixin's Self isn't bound to Model (ModelCollection's TypeVar is).
         return cast("list[Self]", await cls.query().all())
 
     @classmethod
@@ -719,6 +771,39 @@ class QueryMixin:
         cls, attributes: dict[str, Any], values: dict[str, Any] | None = None
     ) -> Self:
         return await cls.query().first_or_new(attributes, values)
+
+    @classmethod
+    async def restore_or_create(
+        cls, attributes: dict[str, Any], values: dict[str, Any] | None = None
+    ) -> Self:
+        return await cls.query().restore_or_create(attributes, values)
+
+    @classmethod
+    async def create_or_restore(
+        cls, attributes: dict[str, Any], values: dict[str, Any] | None = None
+    ) -> Self:
+        return await cls.query().create_or_restore(attributes, values)
+
+    @classmethod
+    async def force_destroy(cls, *ids: Any) -> int:
+        """Permanently delete rows by primary key, trashed ones included. Returns rows affected.
+
+        Accepts varargs or a single iterable: ``force_destroy(1, 2)`` or ``force_destroy([1, 2])``.
+        """
+        from sqlalchemy import inspect as sqla_inspect
+
+        flat: list[Any]
+        if len(ids) == 1 and isinstance(ids[0], (list, tuple, set)):
+            flat = list(cast("Iterable[Any]", ids[0]))
+        else:
+            flat = list(ids)
+        if not flat:
+            return 0
+        mapper = sqla_inspect(cls)
+        if mapper is None:
+            raise TypeError(f"{cls.__name__} is not a mapped SQLA class.")
+        pk_attr = getattr(cls, mapper.primary_key[0].key)
+        return await cls.query().where_in(pk_attr, flat).force_delete()
 
     @classmethod
     async def upsert(

@@ -462,3 +462,434 @@ events:
       direction flag) + flat to_response(). Gates: arvel full suite 3606 passed; demo backend
       407 passed; mypy/pyright/ruff/bandit (0)/gitleaks clean. EPIC 005 COMPLETE. 005-S9 DONE.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-017"
+    event_id: "EV-036"
+    timestamp: "2026-05-30T23:05:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      006 S6 enum + extended built-in casts (first 006 story this wave). ADR-136. __casts__
+      accepts an Enum subclass (read->member, write/serialize->backing value); object cast
+      (JSON->SimpleNamespace, serialize->dict) and collection cast (JSON->Collection,
+      serialize->list) are read-path-only on write like array; datetime:FORMAT reads via
+      strptime with ISO fallback and serializes via strftime. decimal:n shipped in WI-005.
+      to_dict serialize skips None (symmetric with read path). Gates: arvel database suite
+      830 passed; mypy/pyright/ruff clean on model.py. 4b + release skipped (L2/Tier2,
+      no auth/PII). 006-S6 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-018"
+    event_id: "EV-037"
+    timestamp: "2026-05-30T23:25:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      006 S3 declarative encrypted casts. ADR-137. New arvel.encryption.Encrypter (AES-256-GCM,
+      32-byte key HKDF-derived from APP_KEY, wire v2 distinct from EncryptedType v1) + Crypt
+      facade (per-APP_KEY cache, set_encrypter for tests, MissingAppKeyError). __casts__
+      encrypted / encrypted:json|array|object|collection: write encrypts (JSON for non-string),
+      read decrypts + decode (object->SimpleNamespace, collection->Collection), serialize emits
+      dict/list. to_dict exposes decrypted value (Eloquent toArray; pair with __hidden__).
+      Random IV per write. Tier3/confidential (PII) — security embedded in QA per A04 (key from
+      APP_KEY env, never code); no auth-flow change so no dedicated 4b. Gates: arvel database
+      846 passed (+16); session 65; mypy/pyright/ruff/bandit clean. 006-S3 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-019"
+    event_id: "EV-038"
+    timestamp: "2026-05-30T23:40:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      006 S5 unified Attribute descriptor. ADR-138. Data descriptor (get/set/__set_name__) as a
+      class attr — fires via the descriptor protocol since Model delegates getattr/setattr to
+      object; no metaclass scan. Attribute.make(get=, set=); set returns column->value Mapping
+      (routed through normal setattr/casts), non-mapping raises TypeError; get-only=read-only,
+      set-only=write-only. should_cache() memoizes per instance, invalidated on write through
+      the attr. Exported from arvel.database. Gates: arvel database 855 passed (+9);
+      mypy/pyright/ruff clean. 4b + release skipped (L2/Tier2, no auth/PII). 006-S5 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-020"
+    event_id: "EV-039"
+    timestamp: "2026-05-30T23:05:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      006 S9 static event registration + custom event objects. ADR-139. Model.on(event, cb) wraps
+      a callable in a one-event _CallbackObserver on the shared observer list (cancellable + async
+      preserved). __observed_by__ auto-registers in __init_subclass__ from cls.__dict__. 
+      __dispatches_events__ maps lifecycle->ModelEvent dispatched on the Event facade after the
+      observer loop; no dispatcher bound => skipped. ModelEvent is a top-level frozen Pydantic Event
+      (arbitrary_types_allowed) defined directly so subclassing type-checks. Also resolved
+      pre-existing strict-pyright findings the gate surfaced (qb test column 'first'->'given' shadow
+      fix, cast() narrowing, unused-symbol cleanup). Gates: arvel database+events 892 passed;
+      mypy/pyright/ruff/bandit clean. 4b + release skipped (L2/Tier2, no auth/PII). 006-S9 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-021"
+    event_id: "EV-040"
+    timestamp: "2026-05-30T23:20:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      006 S12 timestamp controls. ADR-140. __timestamps__ toggle + CREATED_AT/UPDATED_AT str
+      ClassVars on Model. Hook attachment relocated from Timestamps mixin to Model.__init_subclass__
+      — attaches before_insert/before_update only when timestamps enabled AND the named attr exists
+      (plain models free, custom-column models work without the mixin). without_timestamps() async CM
+      via _suppress_timestamps ContextVar for imports/backfills. touch(attribute=None) saves through
+      the event path; touch_quietly suppresses events; replicate drops constant-named ts cols. Gates:
+      arvel database+events 901 passed (+9); mypy/pyright/ruff/bandit clean. 4b + release skipped
+      (L2/Tier2, no auth/PII). 006-S12 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-022"
+    event_id: "EV-041"
+    timestamp: "2026-05-30T23:40:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      006 S10 soft-delete upsert + bulk restore. ADR-141. restore_or_create/create_or_restore search
+      with_trashed by attributes, restore if trashed() else return, create merged dicts if none — no
+      duplicate of a soft-deleted row. Bulk QueryBuilder.restore() = single UPDATE deleted_at=NULL
+      over WHERE (inverse of delete() soft branch, touches updated_at); pair with only_trashed since
+      default scope hides trashed; AttributeError without SoftDeletes; bulk bypasses per-row events.
+      trashed() instance helper; force_destroy(*ids) varargs-or-iterable -> where_in(pk).force_delete
+      (trashed included, single-PK). Gates: arvel database+events 909 passed (+8);
+      mypy/pyright/ruff/bandit clean. 4b + release skipped (L2/Tier2, no auth/PII). 006-S10 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-023"
+    event_id: "EV-042"
+    timestamp: "2026-05-30T23:55:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      006 S11 distinct soft/hard-delete + replicate events. ADR-142. New events added to events.py
+      registries: trashed/force_deleted/replicating (_ASYNC_EVENTS), force_deleting (_CANCELLABLE).
+      Soft delete() fires trashed then deleted (deleted still fires for both kinds). force_delete()
+      fires force_deleting->deleting->deleted->force_deleted, never trashed (the distinguishing
+      signal); both before-hooks cancellable. replicate() fires replicating on the CLONE before
+      return. Bulk QB deletes stay event-free (set-based, no loaded rows — ADR-142-04, Eloquent
+      parity; AC's bulk-trashed mention intentionally not implemented). Observer docstring updated.
+      Gates: arvel database+events 914 passed (+5); mypy/pyright/ruff/bandit clean. 4b + release
+      skipped (L2/Tier2, no auth/PII). 006-S11 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-024"
+    event_id: "EV-043"
+    timestamp: "2026-05-31T00:10:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      006 S13 factory enhancements. ADR-143. has_attached(relation, factory, count, pivot) creates
+      related rows post-flush and links via BelongsToMany.attach(pk, **pivot) (no session.expire —
+      accessor self-invalidates). trashed() state sets the soft-delete col post-construction
+      (init=False col), AttributeError without SoftDeletes. after_making/after_creating now get a
+      shared lazily-imported faker.Faker (None if not installed; dev-only dep). create_quietly()
+      wraps create() in without_events(). connection(name) routes the whole build through
+      DB.session_maker_for(name) (new public maker lookup) bound as active session + commit; added
+      DB.forget_named(). create() refactored to _create_in_active_session(). Pyright/mypy tension on
+      list narrowing solved with _as_list() building into a pre-typed list (no cast/ignore). Gates:
+      arvel database+events 921 passed (+7); mypy/pyright/ruff/bandit clean. 4b + release skipped
+      (L2/Tier2, no auth/PII). 006-S13 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-025"
+    event_id: "EV-044"
+    timestamp: "2026-05-31T00:30:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      006 S14 attribute API polish bundle — final Epic 006 story. ADR-144. Added to model.py:
+      append()/set_appends() (per-instance _instance_appends, merged in to_dict via _collect_appends
+      to keep complexity <=10); make_hidden_if/make_visible_if (bool or self-predicate, chainable);
+      only()/except_() subsets of to_dict; get_key_name()/get_key() (tuple for composite);
+      qualify_column() from mapper local table; is_same()/is_not() (same type + non-null key);
+      discard_changes() reverts dirty cols to committed_state. New HasUuids/HasUlids plain mixins:
+      shared before_insert hook fills empty single-col string PK from type(target).new_unique_id()
+      (uuid4 / 26-char Crockford ULID via os.urandom; _UniqueIdProvider Protocol keeps the hook
+      typed). Exported HasUuids/HasUlids. Gates: arvel database+events 936 passed (+15);
+      mypy/pyright/ruff/bandit clean. 4b + release skipped       (L2/Tier2, no auth/PII). 006-S14 DONE —
+      EPIC 006 COMPLETE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-026"
+    event_id: "EV-045"
+    timestamp: "2026-05-31T01:10:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      007 S1 morph map foundation — first Epic 007 story. ADR-145 (supersedes ADR-022 default token).
+      New orm/morph_map.py: process-global _MorphState (mutated in place, no global rebinds);
+      morph_map({alias: cls}, merge=) register/return; require_morph_map() strict toggle;
+      get_morph_alias(cls) write-side (alias else short name, raises in strict); resolve_morph_class
+      (read-side: map then Model.registry scan by short name, raises MorphMapError); reset_morph_map
+      for test isolation (wired into reset_global_state autouse fixture). Model.get_morph_class()
+      classmethod. Routed all morph write/read paths through get_morph_alias: MorphOne/MorphMany
+      create+query, MorphToMany _owner_type, query.py morph-existence link_spec. Exported morph API
+      from orm + database __init__. Gates: arvel database+events 948 passed (+12); mypy/pyright/ruff/
+      bandit clean. Existing morph tests unchanged (short-name default preserved). 4b + release
+      skipped (L2/Tier2, no auth/PII). 007-S1 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-027"
+    event_id: "EV-046"
+    timestamp: "2026-05-31T01:50:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      007 S2 MorphTo inverse relation. ADR-146 (builds on ADR-145 morph map). New in orm/morph.py:
+      MorphTo(name=) descriptor + MorphToAccessor (awaitable: resolve_morph_class(token) then load by
+      {name}_id; null discriminators -> None). associate(parent)/dissociate(): set/clear
+      {name}_type (get_morph_alias) + {name}_id (parent.get_key()) together; associate primes eager
+      cache; both return child. batch_load_morph_to(children, name, attr): group by {name}_type, one
+      SELECT ... IN per distinct type, store parent on each child via set_eager_relation. Query
+      builder: _RelationTarget gained morph_name:str + kind "morph_to"; _resolve_relation,
+      _is_async_relation, _load_async_relation_path all handle it (morphTo is a leaf — no nested
+      paths, parent type varies per row). Exported MorphTo/MorphToAccessor from orm. Tests verify
+      query count (1 + per-type) via before_cursor_execute counter. Gates: arvel database+events 953
+      passed (+5); mypy/pyright/ruff/bandit clean. 4b + release skipped (L2/Tier2, no auth/PII).
+      007-S2 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-028"
+    event_id: "EV-047"
+    timestamp: "2026-05-31T02:40:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      007 S3 MorphOne/MorphMany query + eager integration. ADR-147. morph.py: MorphChildLink
+      dataclass; MorphOne/MorphMany got __set_name__, name/related_model props, link_spec(owner_alias)
+      and accessors now read the eager cache (MorphOne -> first, MorphMany -> list). New
+      batch_load_morph_children: one WHERE {name}_type=alias AND {name}_id IN (pks) (+constraint),
+      grouped to each owner via set_eager_relation. query.py: _RelationTarget.morph_child_link + kind
+      "morph_child" wired into _resolve_relation, _exists_subquery, _count_subquery (extracted
+      _morph_child_count_subquery for C901), _is_async_relation, _load_async_relation_path (with
+      nested-path recursion + _constraint_where helper). Promoted is_async_relation /
+      load_async_relation_path to public; Model.load() now splits SA vs async relations and batch-
+      loads the latter into the eager cache. Exported MorphChildLink. Gates: arvel database+events
+      960 passed (+7); mypy/pyright/ruff/bandit clean. 4b + release skipped (L2/Tier2). 007-S3 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-029"
+    event_id: "EV-048"
+    timestamp: "2026-05-31T03:30:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      007 S4 morphedByMany (inverse morph pivot). ADR-148. morph_to_many.py: MorphedByMany descriptor
+      + MorphedByManyAccessor + MorphedByManyLink. Inverse pins {name}_type to the related model's
+      alias and joins {name}_id to the related PK (string-cast); owner PK lives in the related_key FK
+      column. Accessor: all/attach/detach/toggle/sync. Related model accepts a lambda: thunk (resolved
+      lazily) for forward refs. query.py: new "mbm" kind wired into _resolve_relation,
+      _is_async_relation, _batch_load_async (one WHERE type=alias AND owner_fk IN (pks), grouped per
+      owner), _exists_subquery, _count_subquery, _load_async_relation_path. _exists_subquery and
+      _count_subquery refactored into dispatchers over per-kind helpers (_pivot_exists_select,
+      _sa/_mtm/_btm/_mbm_count_subquery) to stay under C901/PLR0911. Fixed a cast name collision
+      (sqlalchemy.cast shadowed typing.cast) by aliasing to sa_cast. Exported MorphedByMany/Accessor/
+      Link. Gates: arvel database+test_events 967 passed (+7); mypy/pyright/ruff/bandit clean. 4b +
+      release skipped (L2/Tier2). 007-S4 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-030"
+    event_id: "EV-049"
+    timestamp: "2026-05-31T04:20:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      007 S5 has-one-of-many (latest/oldest/of_many). ADR-149. Two surfaces: (1) method style —
+      _OfMany base shared by HasMany/HasOne adds latest_of_many/oldest_of_many/of_many (order by
+      column + PK tiebreaker, first()); (2) descriptor HasOneOfMany (orm/has_one_of_many.py) +
+      accessor + HasOneOfManyLink + batch_load_one_of_many (one grouped subquery: SELECT fk,
+      AGG(col) GROUP BY fk joined back; ties broken by larger PK). Query builder "one_of_many" kind
+      wired into _resolve_relation, _is_async_relation, _load_async_relation_path. Refactored
+      _resolve_relation -> _resolve_descriptor_relation/_resolve_morph_descriptor and
+      _load_async_relation_path -> _load_morph_to/_morph_child/_one_of_many_path helpers to satisfy
+      C901/PLR0911. Exported HasOneOfMany/Accessor/Link. Gates: arvel       database+test_events 973 passed
+      (+6); mypy/pyright/ruff/bandit clean. 4b + release skipped (L2/Tier2). 007-S5 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-031"
+    event_id: "EV-050"
+    timestamp: "2026-05-31T05:00:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      007 S6 chaperone (inverse parent hydration). ADR-150. QueryBuilder.chaperone(relation=None)
+      marks a with_() closure; with_() runs the closure once on a probe builder, reads the flag, and
+      records _Chaperone(head, inverse, uselist). Inverse resolution: explicit name -> back_populates
+      -> MANYTOONE inference on the child mapper (else UnknownRelationError at build time).
+      _eager_load_async runs _apply_chaperones before async specs, calling
+      sqlalchemy.orm.attributes.set_committed_value(child, inverse, parent) per loaded child — no
+      backref event, no lazy query, identity preserved (child.post is parent). Scope: SA has-one/
+      has-many. Note: SQLAlchemy's identity map already makes the inverse query-free within a session;
+      chaperone is the *guarantee* of the exact instance. Tests: test_wi031_chaperone.py (6). Gates:
+      arvel database 949 passed; mypy/pyright/ruff/bandit clean. 4b + release skipped (L2/Tier2).
+      007-S6 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-032"
+    event_id: "EV-051"
+    timestamp: "2026-05-31T05:40:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      007 S7 polymorphic existence queries. ADR-151. where_has_morph(relation, types, constraint=None)
+      OR's a per-type AND(commentable_type==alias, EXISTS(select type WHERE pk==commentable_id [+
+      constraint])); alias via get_morph_alias so morph_map is honoured; each branch through
+      apply_global_scopes; empty types -> false(). has_morph adds count-based per-type COUNT scalar
+      subquery. where_morph_relation = sugar over where_has_morph. _morph_to_name resolves the MorphTo
+      and raises UnknownRelationError otherwise. _MorphConstraint = Callable[[QueryBuilder, type],
+      QueryBuilder]. Tests: test_wi032_morph_existence.py (7). Gates: arvel database 956 passed (+7);
+      mypy/pyright/ruff/bandit clean. 4b + release skipped (L2/Tier2). 007-S7 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-033"
+    event_id: "EV-052"
+    timestamp: "2026-05-30T23:05:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      007 S8 relation-querying completeness. ADR-152. One recursive _has_predicate(model, path,
+      constraint, operator, count) backs the family: leaf hop carries constraint + operator/count
+      (>=1 -> plain EXISTS, else correlated COUNT via _count_op/_constrained_count_subquery),
+      intermediate hops wrap a child EXISTS that ANDs the nested predicate, so
+      where_has("posts.comments", ...) walks both hops; all subqueries through apply_global_scopes.
+      where_has now takes operator+count and a constraint closure; doesnt_have negates the predicate
+      (constrained doesnt_have = "no row matching constraint"). or_where_has/or_doesnt_have/
+      or_where_relation OR the predicate onto WHERE. with_where_has = where_has(name, c) + with_(
+      {name: c}) so the parent is filtered and its collection pre-filtered. where_belongs_to(parent,
+      relation=None) constrains the local FK to the parent key; _belongs_to_relation_for scans the
+      mapper for the MANYTOONE rel whose target matches the parent instance (isinstance), else
+      UnknownRelationError. Tests: test_wi033_relation_querying.py (11). Gates: arvel database 967
+      passed (+11); mypy/pyright/ruff/bandit clean. 4b + release skipped (L2/Tier2). 007-S8 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-034"
+    event_id: "EV-053"
+    timestamp: "2026-05-30T23:35:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      007 S9 relationship aggregate completeness. ADR-153. One _aggregate_column(model, target, agg,
+      col, constraint) backs every aggregate: resolves via _relation_exists_select (pivot-aware for
+      BTM/MTM/MBM), applies constraint + apply_global_scopes (soft-delete scoped), then count
+      (_count_subquery / _constrained_count_subquery), exists (select.exists()), or
+      func.<sum|avg|min|max>(related.col).scalar_subquery(). with_aggregate(relation, agg, col, alias,
+      constraint) is the QueryBuilder entry; with_count/with_sum/with_avg/with_min/with_max/with_exists
+      delegate. Relation string takes " as <alias>"; explicit alias= wins; default labels {rel}_count/
+      {rel}_exists/{rel}_{agg}_{col}. Hydrated via existing __with_agg__ result path. Instance loaders:
+      load_aggregate_for(instance, ...) selects the scalar for one row and caches it on the instance
+      (object.__setattr__ under suppress); Model exposes load_count/load_sum/load_exists/load_aggregate.
+      Replaced bespoke with_sum/with_max (plain-SA only) with the unified path; existing with_sum/
+      with_max/with_count tests still pass. Tests: test_wi034_aggregate_completeness.py (11). Gates:
+      arvel database 978 passed (+11); mypy/pyright/ruff/bandit clean. 4b + release skipped (L2/Tier2).
+      007-S9 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-035"
+    event_id: "EV-054"
+    timestamp: "2026-05-31T00:05:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      007 S10 pivot ergonomics (BelongsToMany). ADR-154. Frozen PivotConfig(columns, timestamps,
+      created_at, updated_at, accessor) carries per-relation settings; fluent with_pivot(*cols)/
+      with_timestamps(created,updated)/as_(name) configure the descriptor at class definition and flow
+      to every accessor. Read path (_fetch) selects configured pivot columns alongside the related
+      model and attaches a SimpleNamespace under the accessor name (default "pivot"); all() preserves
+      the eager-cache fast path (returns cached without re-query). attach fills created_at+updated_at,
+      update_pivot bumps updated_at (datetime.now(UTC), only when unset); sync inherits via attach/
+      update_pivot. order_by_pivot(col, dir) + where_pivot_in/_not_in/_between/_null(negate) are
+      terminal async list[T] returns. create(pivot=, **attrs) builds related + attaches; save(instance,
+      pivot=) persists if PK null then attaches. Deferred: custom Pivot model via using (ADR-154-06,
+      not in AC). Fixed regression: all() must honour eager cache (test_eager_loading_pivot). Tests:
+      test_wi035_pivot_ergonomics.py (6). Gates: arvel database 984 passed (+6); mypy/pyright/ruff/
+      bandit clean. 4b + release skipped (L2/Tier2). 007-S10 DONE.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-036"
+    event_id: "EV-055"
+    timestamp: "2026-05-31T00:30:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      007 S11 relation defaults / eager control / cascade save. ADR-155. BelongsTo tracks fk_present
+      (false when owner FK is null — short-circuits first() so it no longer matches an arbitrary row)
+      and a _default spec; with_default(True|dict|callback) returns an empty/attributed/callback-filled
+      instance when the FK is null or unmatched, a real parent always wins. Eager control: with_() no
+      longer mutates _stmt — _register_eager records sync requests onto _eager_loads (async/pivot onto
+      _async_eager), materialised in apply_global_scopes so without(*names) drops and with_only(*rels)
+      clears+re-registers before the SELECT builds; relation head still validated eagerly via
+      _validate_eager_head (UnknownRelationError fail-fast preserved). __touches__ tuple of parent
+      accessor method names → Model._touch_parents after save() fetches each parent and touch()es its
+      UPDATED_AT (zero-cost when empty). push() saves the model then walks loaded relationships in the
+      identity map (skips unloaded) and push()es each related instance, cascading edits. Deferred:
+      eager column selection with("posts:id,title") (ADR-155-04, not in AC). Tests:
+      test_wi036_relation_defaults.py (10). Gates: arvel database 994 passed (+10); mypy/pyright/ruff
+      clean. 4b + release skipped (L2/Tier2). 007-S11 DONE — epic 007 complete.
+    handoff_id: null
+
+  - work_item_id: "WI-arvel-037"
+    event_id: "EV-056"
+    timestamp: "2026-05-31T01:00:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      006 S8 Eloquent-style ModelCollection. ADR-156. New ModelCollection(Collection[T]) in
+      arvel/database/collection.py; QueryBuilder.all()/get() return it for model rows (scalar +
+      with_agg paths), dict/raw rows stay on plain Collection. Key-aware (get_key): model_keys, find,
+      contains (predicate|model|key), only/except_, diff/intersect (override base id()-based). Batch
+      load(*rels): async/pivot/morph via load_async_relation_path (batched across members), SA rels
+      via one select(pk IN keys)+selectinload copied onto members; load_missing skips populated.
+      to_query (WHERE pk IN keys), fresh(*rels) (capture keys → expire members → re-query in order,
+      drops deleted), make_hidden/make_visible fan out. Exported from arvel.database. Cast list[Any]
+      at construction (QueryBuilder T bound to QueryMixin, not Model). Tests:
+      test_wi037_model_collection.py (7). Gates: arvel database 1001 passed (+7); full package 3792
+      passed (2 pre-existing cwd-relative skeleton failures, unrelated); mypy/pyright/ruff clean. 4b +
+      release skipped (L2/Tier2). 006-S8 DONE.
+    handoff_id: null

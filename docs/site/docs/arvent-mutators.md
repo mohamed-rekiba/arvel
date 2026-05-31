@@ -152,6 +152,11 @@ fail fast.
 | `datetime` | tz-aware `datetime` (UTC) | ISO-8601 string, epoch seconds (int/float), `datetime` |
 | `date` | `date` | ISO `YYYY-MM-DD`, ISO datetime, `datetime`/`date`, epoch seconds |
 | `timestamp` | `int` (epoch seconds, UTC) | ISO-8601 string, `datetime`, epoch seconds |
+| `decimal:n` | `Decimal` quantized to `n` places | `Decimal`, `int`, `float`, numeric string |
+| `datetime:FMT` | tz-aware `datetime`; serializes via `strftime(FMT)` | string in `FMT`, ISO-8601 fallback, `datetime`, epoch |
+| `object` | `SimpleNamespace` (attribute access); serializes to `dict` | JSON object string or pre-parsed value |
+| `collection` | Arvel `Collection`; serializes to `list` | JSON array string or pre-parsed list |
+| an `Enum` subclass | the enum member; serializes to its backing value | backing value or member |
 
 The temporal trio (`datetime`, `date`, `timestamp`) normalises to UTC. A
 naive `datetime` is *assumed* to be UTC — there's no implicit local-time
@@ -171,6 +176,73 @@ For column-level coercion that should also affect SQL operations (sorting,
 filtering, indexing), prefer the [TypeDecorator](#writing-custom-casts) approach
 below — `__casts__` runs on Python attribute reads and writes, but the
 underlying column type is unchanged in SQL.
+
+### Enums and extended built-ins
+
+Pass an `Enum` subclass straight into `__casts__` — reads give you the member,
+writes store the backing value, and `to_dict()` serializes back to the backing
+value. A raw backing value assigned to the attribute coerces to the member too.
+
+```python
+from enum import Enum
+
+
+class Status(Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+
+
+class Article(Model):
+    __tablename__ = "articles"
+    __casts__ = {
+        "status": Status,                       # enum member <-> backing value
+        "meta": "object",                       # JSON -> SimpleNamespace
+        "tags": "collection",                   # JSON -> Collection
+        "scheduled_at": "datetime:%Y-%m-%d %H:%M",
+    }
+    status: Mapped[str] = mapped_column(String(40), default=None)
+    meta: Mapped[str] = mapped_column(String(255), default="{}")
+    tags: Mapped[str] = mapped_column(String(255), default="[]")
+    scheduled_at: Mapped[str] = mapped_column(String(40), default=None)
+
+
+a = Article(status="published")
+a.status                    # Status.PUBLISHED
+a.meta.author               # attribute access on the decoded object
+list(a.tags)                # Collection, iterable like a list
+a.to_dict()["scheduled_at"] # "2026-05-30 14:45"
+```
+
+`object` and `collection` are **read-path only** on write (like `dict`/`list`)
+— assign the JSON string. `datetime:FORMAT` parses your format first and falls
+back to ISO-8601, then serializes with `strftime`.
+
+### Encrypted casts
+
+Store a column encrypted at rest and work with the plaintext in code. The cast
+encrypts on write and decrypts on read via the `Crypt` facade, which derives an
+AES-256-GCM key from `APP_KEY`.
+
+```python
+class Account(Model):
+    __tablename__ = "accounts"
+    __casts__ = {
+        "ssn": "encrypted",            # plaintext string
+        "recovery_codes": "encrypted:array",
+        "profile": "encrypted:object",      # -> SimpleNamespace
+        "labels": "encrypted:collection",   # -> Collection
+    }
+    __hidden__ = ["ssn"]               # keep it out of to_dict()
+    ssn: Mapped[str] = mapped_column(String(512), default=None)
+    recovery_codes: Mapped[str] = mapped_column(String(512), default=None)
+```
+
+The stored column value is ciphertext; the attribute and `to_dict()` expose the
+decrypted value (Eloquent `toArray` parity — pair it with `__hidden__` when the
+plaintext shouldn't leave the server). Each write uses a fresh IV, so equal
+plaintexts produce different ciphertext and the column isn't searchable by
+equality. `APP_KEY` must be set (run `arvel key:generate`); a wrong key raises
+`DecryptionError` on read.
 
 ## Accessors and mutators
 
@@ -196,6 +268,33 @@ class User(Model):
 ```
 
 This is plain Python — Arvel doesn't add anything to it. The simplicity is the point.
+
+### Unified `Attribute` (one name, get + set)
+
+When a virtual attribute reads from and writes to several columns under one name,
+`Attribute` keeps both halves together instead of a `@property` plus a separate
+setter. `get` takes the model; `set` takes `(model, value)` and returns a mapping
+of real columns to write.
+
+```python
+from arvel.database import Attribute, Model
+
+
+class User(Model):
+    first_name: Mapped[str] = string(50)
+    last_name: Mapped[str] = string(50)
+
+    full_name = Attribute.make(
+        get=lambda m: f"{m.first_name} {m.last_name}".strip(),
+        set=lambda m, v: dict(zip(("first_name", "last_name"), v.split(" ", 1))),
+    )
+```
+
+`u.full_name` computes from the columns; `u.full_name = "Grace Hopper"` writes both
+back through the normal cast/mutator path. A `get`-only `Attribute` is read-only; a
+`set`-only one is write-only. Add `.should_cache()` to memoize the computed value per
+instance — it's invalidated when you write through the attribute, but not when you
+mutate a backing column directly, so reach for it only when that's fine.
 
 ## Default values
 

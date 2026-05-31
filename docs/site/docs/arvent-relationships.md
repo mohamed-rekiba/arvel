@@ -17,7 +17,8 @@ The two styles are complementary — you can declare the same logical relation b
 ### Method style (chainable queries, write path)
 
 ```python
-from arvel.database import HasMany, Model
+from arvel.database import Model
+from arvel.database.orm.relations import HasMany
 
 
 class User(Model):
@@ -100,7 +101,8 @@ The annotation (`list[Any]`, `list[Post]`, or just `Any`) has no effect on runti
 ## Has one
 
 ```python
-from arvel.database import HasOne, Model
+from arvel.database import Model
+from arvel.database.orm.relations import HasOne
 
 
 class User(Model):
@@ -117,6 +119,61 @@ new_profile = await user.profile().create(bio="...")
 
 FK is inferred as `user_id` by default. Pass `foreign_key="..."` to override.
 
+### Has one of many (latest / oldest)
+
+Pick exactly one row out of a one-to-many — the latest or oldest by a column. Two forms:
+
+**Method style** off `has_many`/`has_one` — lazy, per-instance:
+
+```python
+latest = await post.has_many(Comment).latest_of_many("created_at")
+oldest = await post.has_many(Comment).oldest_of_many("created_at")
+top    = await post.has_many(Comment).of_many("score", aggregate="max")
+```
+
+Each orders by the column (with the PK as a deterministic tiebreaker) and returns one row.
+
+**Descriptor style** — eager-loadable over a list with a single grouped subquery:
+
+```python
+from typing import ClassVar
+
+from arvel.database import Model
+from arvel.database.orm import HasOneOfMany
+
+
+class Post(Model):
+    latest_comment: ClassVar[HasOneOfMany["Comment"]] = HasOneOfMany(
+        Comment, column="created_at", aggregate="max"
+    )
+
+
+posts = await Post.with_("latest_comment").get()   # 1 query for posts + 1 subquery
+for p in posts:
+    one = await p.latest_comment                   # served from the eager cache
+```
+
+`with_("latest_comment")` runs one `SELECT fk, MAX(col) ... GROUP BY fk` joined back to the table, so
+it fetches ~one row per parent instead of every related row. `foreign_key` defaults to
+`{snake(owner)}_id`.
+
+### Chaperone (inverse parent hydration)
+
+When you eager-load a has-many and then walk back from each child to its parent, `chaperone()` sets the
+inverse to the already-loaded parent — so the loop stays query-free and you get the *same* instance back:
+
+```python
+posts = await Post.with_({"comments": lambda q: q.chaperone()}).all()
+for p in posts:
+    for c in p.comments:
+        assert c.post is p          # the loaded post, no query
+```
+
+It composes with a filter — `lambda q: q.where(Comment.published == True).chaperone()` filters the
+eager-loaded children and hydrates their inverse. The inverse relation is resolved from `back_populates`
+or inferred from the child's many-to-one; pass it explicitly when it can't be inferred:
+`q.chaperone("post")`.
+
 ### Non-`id` primary keys
 
 `has_one`, `has_many`, and `belongs_to` resolve the local/owner key from the
@@ -130,7 +187,8 @@ non-`id` owners too.
 ## Belongs to (inverse)
 
 ```python
-from arvel.database import BelongsTo, Model
+from arvel.database import Model
+from arvel.database.orm.relations import BelongsTo
 
 
 class Post(Model):
@@ -149,6 +207,45 @@ await post.save()
 
 `associate` sets `post.author_id = user.id` in memory. Call `save()` yourself.
 
+### Default models
+
+When the FK is null (or no row matches), `with_default` returns a placeholder instead of `None` — so templates and callers never hit a `None.name`:
+
+```python
+author = await post.author().with_default().first()                 # empty User instance
+author = await post.author().with_default({"name": "Guest"}).first() # with attributes
+author = await post.author().with_default(
+    lambda user, post: setattr(user, "name", f"author-of-{post.title}")
+).first()
+```
+
+A real matched parent always wins over the default.
+
+## Touching parents
+
+List parent relation methods in `__touches__` to bump their `updated_at` whenever the child is saved:
+
+```python
+class Comment(Model):
+    __touches__ = ("post",)
+
+    def post(self) -> BelongsTo["Post"]:
+        return self.belongs_to(Post)
+```
+
+Saving a comment now also touches its post — handy for cache invalidation keyed on the parent.
+
+## Cascade save with push
+
+`save()` persists one model. `push()` saves the model **and** every loaded relation (recursively), so edits made across an eager-loaded graph go down in one call:
+
+```python
+user = await User.with_("posts").first()
+user.name = "renamed"
+user.posts[0].title = "edited"
+await user.push()   # saves the user and the post
+```
+
 ## Many to many
 
 `BelongsToMany` is a **class-level descriptor**. Define the pivot `Table` once and reference it from both sides:
@@ -156,8 +253,8 @@ await post.save()
 ```python
 from sqlalchemy import Column, ForeignKey, Integer, Table
 
-from arvel.database import BelongsToMany, Model
-from arvel.database.orm import mapped_column
+from arvel.database import Model
+from arvel.database.orm import BelongsToMany
 
 # define the join table (once, typically in a separate tables.py or alongside the model)
 post_tags = Table(
@@ -217,22 +314,60 @@ result = await post.tags.toggle(tag.id)       # "attached" | "detached"
 
 `sync` is the "make the set exactly this list" operation — it detaches IDs no longer in the list and attaches new ones in one transaction. It returns a `{"attached", "detached", "updated"}` dict, like Eloquent. Pass `{id: {pivot_col: value}}` instead of a plain list to set or update pivot columns; an ID already attached with different pivot data lands in `updated`.
 
+### Pivot ergonomics
+
+Configure the relation at class definition with fluent builders, mirroring Eloquent's `withPivot`/`withTimestamps`/`as`:
+
+```python
+class Post(Model):
+    tags: BelongsToMany["Tag"] = (
+        BelongsToMany("Tag", table=post_tags, foreign_key="post_id", related_foreign_key="tag_id")
+        .with_pivot("role", "priority")   # surface extra pivot columns
+        .with_timestamps()                # maintain pivot created_at / updated_at
+        .as_("membership")                # name the pivot accessor (default: "pivot")
+    )
+```
+
+`with_pivot` hydrates those columns onto each related row under the accessor name:
+
+```python
+for tag in await post.tags.all():
+    print(tag.membership.role, tag.membership.priority)
+```
+
+`with_timestamps` sets the pivot `created_at`/`updated_at` on `attach`/`sync`, and bumps `updated_at` on `update_pivot`. Filter and order by pivot columns, and persist-and-attach in one call:
+
+```python
+# ordering
+await post.tags.order_by_pivot("priority")           # asc
+await post.tags.order_by_pivot("priority", "desc")
+
+# filters (each returns the related rows)
+await post.tags.where_pivot_in("role", ["admin", "editor"])
+await post.tags.where_pivot_not_in("role", ["viewer"])
+await post.tags.where_pivot_between("priority", 1, 5)
+await post.tags.where_pivot_null("role")             # negate=True for NOT NULL
+
+# create / save through the relation
+tag = await post.tags.create(pivot={"role": "owner"}, name="ops")
+await post.tags.save(existing_tag, pivot={"priority": 7})
+```
+
 ## Polymorphic relations
 
 Use `MorphOne` or `MorphMany` when several models share the same child table.
 
 ```python
-from arvel.database import MorphMany, MorphOne, Model
-from arvel.database.orm import mapped_column
-from arvel.database import Mapped
+from arvel.database import Model, integer, string
+from arvel.database.orm import MorphMany, MorphOne
 
 
 class Image(Model):
     __tablename__ = "images"
 
-    imageable_type: Mapped[str] = mapped_column(String(100))
-    imageable_id: Mapped[int] = mapped_column(Integer)
-    url: Mapped[str] = mapped_column(String(500))
+    imageable_type: str = string(100)
+    imageable_id: int = integer(index=True)
+    url: str = string(500)
 
 
 class Post(Model):
@@ -259,9 +394,9 @@ img = await post.image.create(url="https://example.com/pic.jpg")
 class Comment(Model):
     __tablename__ = "comments"
 
-    commentable_type: Mapped[str] = mapped_column(String(100))
-    commentable_id: Mapped[int] = mapped_column(Integer)
-    body: Mapped[str] = mapped_column(Text)
+    commentable_type: str = string(100)
+    commentable_id: int = integer(index=True)
+    body: str = text()
 
 
 class Post(Model):
@@ -273,7 +408,26 @@ all_comments = await post.comments.all()
 new_comment = await post.comments.create(body="great post")
 ```
 
-The type column stores the unqualified class name (`"Post"`, not `"app.models.Post"`).
+The type column stores the unqualified class name (`"Post"`, not `"app.models.Post"`) — unless a
+[morph map](#morph-map) assigns an alias.
+
+`MorphOne`/`MorphMany` are full query relations. They batch-load with `with_()`, filter with
+`where_has`/`has`/`doesnt_have`, count with `with_count`, and lazy-load onto an existing instance
+with `Model.load()`:
+
+```python
+posts = await Post.with_("comments").with_count("comments").get()
+for p in posts:
+    p.comments_count                     # count column
+    for c in await p.comments.all():     # served from the eager cache, no N+1
+        ...
+
+# Only posts that have at least one comment containing "hello":
+await Post.where_has("comments", lambda q: q.where(Comment.body.like("%hello%"))).get()
+
+# Lazy-load onto an already-fetched post:
+await post.load("comments")
+```
 
 Migration:
 
@@ -284,6 +438,94 @@ def up(self, t: Blueprint) -> None:
     t.morphs("commentable")    # commentable_id (INTEGER) + commentable_type (VARCHAR)
     t.timestamps()
 ```
+
+### Morph map
+
+By default the `{name}_type` column stores the owner's **short class name** (`"Post"`). That token
+breaks if you rename or move the class. Register a morph map at boot to pin stable aliases instead:
+
+```python
+from arvel.database import morph_map, require_morph_map
+
+morph_map({"post": Post, "video": Video})
+```
+
+Now polymorphic writes store `"post"` / `"video"`, and `Post.get_morph_class()` returns `"post"`.
+Unmapped models keep storing the short name, so adopting a map is incremental.
+
+To enforce that *every* polymorphic model has an alias — turning an accidental unmapped write into a
+loud error — flip strict mode:
+
+```python
+require_morph_map()   # unmapped polymorphic use now raises MorphMapError
+```
+
+If you adopt aliases for an existing app, backfill the old class-name tokens to the new aliases in a
+one-off migration before enabling the map.
+
+### MorphTo — the inverse side
+
+`MorphTo` is the child's view of its polymorphic parent. The child stores `{name}_type` +
+`{name}_id`; `MorphTo` resolves them back to the parent model:
+
+```python
+from typing import Any, ClassVar
+
+from arvel.database import Model, integer, string
+from arvel.database.orm import MorphTo
+
+class Comment(Model):
+    commentable_type: str | None = string(60, nullable=True, default=None)
+    commentable_id: int | None = integer(nullable=True, default=None)
+
+    commentable: ClassVar[MorphTo[Any]] = MorphTo(name="commentable")
+```
+
+```python
+parent = await comment.commentable          # a Post or a Video, resolved from the token
+```
+
+Point a comment at a parent — or detach it — with `associate` / `dissociate`. Both set or clear the
+type and id columns together; save the child to persist:
+
+```python
+comment.commentable.associate(post)         # sets commentable_type + commentable_id
+await comment.save()
+
+comment.commentable.dissociate()            # nulls both columns
+await comment.save()
+```
+
+Eager-load the parent across a list of children with `with_()`. Parents are batched **one query per
+distinct type**, so iterating and accessing `comment.commentable` never triggers N+1:
+
+```python
+comments = await Comment.with_("commentable").get()
+for c in comments:
+    parent = await c.commentable             # served from cache, no query
+```
+
+A `morphTo` is a leaf in eager paths — its parent type varies per row, so nested paths through it
+(`commentable.author`) aren't supported.
+
+#### Filtering across morph types
+
+`MorphTo` has no single related table, so plain `where_has` can't reach it. Use `where_has_morph` to
+filter against one or more concrete target types — it OR's a per-type `EXISTS` subquery:
+
+```python
+# Comments attached to a Post or a Video
+await Comment.query().where_has_morph("commentable", [Post, Video]).get()
+
+# With a per-type constraint — the closure gets (query, type_model)
+await Comment.query().where_has_morph(
+    "commentable", [Post], lambda q, _type: q.where(Post.published == True)
+).get()
+```
+
+It honours a registered `morph_map`, so the stored token (`"post"`) is what gets matched.
+`has_morph(relation, types, operator, count)` is the count-based form, and `where_morph_relation(
+relation, types, column, value)` is sugar for "the morphed parent has `column == value`".
 
 ## MorphToMany
 
@@ -333,15 +575,58 @@ async for role in user.roles:           # streaming iteration
 
 Every INSERT/SELECT/DELETE sets both discriminator columns, so there's no `model_type`-NULL bug class and no separate `save()` step.
 
-!!! warning "`MorphToMany` does not eager-load via `with_()`"
-    `with_()` resolves SQLAlchemy `relationship()` properties only. `MorphToMany` is a custom async descriptor — load it on demand with `await user.roles.all()`. `where_has` and `with_count` *do* support it (see below).
+`MorphToMany` is a full query relation: `with_("roles")` batch-loads it (N+1-free), and `where_has`
+/ `with_count` build the right EXISTS / COUNT subqueries with the morph predicate (see below).
+
+### MorphedByMany — the inverse side
+
+`MorphedByMany` is the other end of a `MorphToMany`, declared on the model the pivot's
+`{name}_type`/`{name}_id` point at. One `taggables` pivot links many owner types to one tag, so the
+tag can look back at each type with its own relation. Mirrors Laravel's `morphedByMany`.
+
+```python
+from arvel.database.orm import MorphedByMany, MorphToMany
+
+
+class Tag(Model):
+    # `related_key` is the pivot column holding the tag's own PK. The related
+    # model is referenced lazily because it's defined later in the module.
+    posts: ClassVar[MorphedByMany["Post"]] = MorphedByMany(
+        lambda: Post, table=taggables, name="taggable", related_key="tag_id"
+    )
+    videos: ClassVar[MorphedByMany["Video"]] = MorphedByMany(
+        lambda: Video, table=taggables, name="taggable", related_key="tag_id"
+    )
+
+
+class Post(Model):
+    tags: ClassVar[MorphToMany["Tag"]] = MorphToMany(
+        Tag, table=taggables, name="taggable", related_key="tag_id"
+    )
+```
+
+The inverse accessor pins the discriminator to the *related* model's alias (`taggable_type == "Post"`)
+and joins `taggable_id` back to the related PK, so `tag.posts` never bleeds into `tag.videos`:
+
+```python
+await tag.posts.attach(post.id)         # idempotent; sets tag_id + taggable_type + taggable_id
+await tag.posts.detach(post.id)
+await tag.posts.toggle(post.id)
+await tag.posts.sync([1, 2, 3])
+posts = await tag.posts.all()           # list[Post] — only Posts, not Videos
+
+# Query-integrated, same as the forward side:
+tags = await Tag.with_("posts").with_count("posts").get()   # batched, N+1-free
+await Tag.where_has("posts").get()
+```
 
 ## Has many through
 
 Reach a distant model through an intermediate one:
 
 ```python
-from arvel.database import HasManyThrough, Model
+from arvel.database import Model
+from arvel.database.orm.relations import HasManyThrough
 
 
 class Country(Model):
@@ -388,9 +673,23 @@ users = await User.with_(
 
 Each callback receives a `QueryBuilder` scoped to the related model and must return it.
 
+### Editing the eager-load set
+
+Eager loads are deferred until the query runs, so you can edit the set after `with_()`:
+
+```python
+# Drop a relation a base query or scope added
+users = await User.query().with_("posts", "profile").without("posts").get()
+
+# Replace whatever was queued with exactly these
+users = await User.query().with_("posts").with_only("profile").get()
+```
+
+`without(*names)` removes queued loads by name; `with_only(*relations)` clears the queue and registers only what you pass.
+
 ## Querying through relations
 
-`where_has`, `doesnt_have`, and `has` work with descriptor-style attributes and both pivot descriptors (`BelongsToMany` and `MorphToMany`):
+`where_has`, `doesnt_have`, and `has` work with descriptor-style attributes and every pivot descriptor (`BelongsToMany`, `MorphToMany`, `MorphedByMany`):
 
 ```python
 # At least one matching related row
@@ -416,6 +715,64 @@ posts = await Post.where_has(
 
 `has()` accepts `">"`, `">="`, `"<"`, `"<="`, `"="`, `"!="`. Default is `">= 1`.
 
+### Nested paths, counts, and OR branches
+
+`where_has` walks relation chains and takes an operator/count, so you can filter on a relation of a relation or require a threshold:
+
+```python
+# Users who have at least one post that has at least one comment
+users = await User.query().where_has("posts.comments").get()
+
+# Posts with 3 or more comments
+posts = await Post.query().where_has("comments", None, ">=", 3).get()
+
+# Posts with 2+ non-spam comments (constraint applies at the leaf hop)
+posts = await Post.query().where_has(
+    "comments", lambda q: q.where(Comment.spam == False), ">=", 2
+).get()
+```
+
+A constrained `doesnt_have` means "no related row matching the constraint":
+
+```python
+# Posts with no non-spam comment
+posts = await Post.query().doesnt_have(
+    "comments", lambda q: q.where(Comment.spam == False)
+).get()
+```
+
+`or_where_has`, `or_doesnt_have`, and `or_where_relation` OR their condition onto the WHERE:
+
+```python
+posts = await (
+    Post.query()
+    .where(Post.title == "special")
+    .or_where_has("comments")
+    .get()
+)
+```
+
+### Filter and eager-load with one constraint
+
+`with_where_has` filters by a relation **and** eager-loads that relation with the same constraint, so the parent's collection comes back pre-filtered:
+
+```python
+posts = await Post.query().with_where_has(
+    "comments", lambda q: q.where(Comment.spam == False)
+).get()
+# posts only contains parents with a non-spam comment, and post.comments holds just those.
+```
+
+### Filtering by a parent instance
+
+`where_belongs_to` is the inverse of `where_has` — constrain children by a known parent:
+
+```python
+author = await User.find(1)
+posts = await Post.query().where_belongs_to(author).get()        # infers the FK relation
+posts = await Post.query().where_belongs_to(author, "author").get()  # explicit relation name
+```
+
 ## Aggregating over relations
 
 ```python
@@ -424,20 +781,55 @@ users = await User.with_count("posts").all()
 for user in users:
     print(user.name, user.posts_count)
 
-# Sum of order totals per user
-users = await User.with_sum("orders", "total_cents").all()
-for user in users:
-    print(user.name, user.orders_sum_total_cents)
+# Sum / avg / min / max of order totals per user
+users = await User.with_sum("orders", "total_cents").all()   # .orders_sum_total_cents
+users = await User.with_avg("orders", "total_cents").all()   # .orders_avg_total_cents
+users = await User.with_min("orders", "total_cents").all()   # .orders_min_total_cents
+users = await User.with_max("orders", "total_cents").all()   # .orders_max_total_cents
 
-# Maximum order value per user
-users = await User.with_max("orders", "total_cents").all()
+# Boolean "has any" per user
+users = await User.with_exists("orders").all()               # .orders_exists
 ```
 
-Attribute name pattern: `{relation}_{aggregate}_{column}` — `posts_count`, `orders_sum_total_cents`, `orders_max_total_cents`.
+Attribute name pattern: `{relation}_{aggregate}_{column}` — `posts_count`, `orders_sum_total_cents`, `orders_max_total_cents`. `with_count` uses `{relation}_count` and `with_exists` uses `{relation}_exists`.
 
-These only work with descriptor-style relations.
+These only work with descriptor-style relations. All of `with_count`/`with_sum`/`with_avg`/`with_min`/`with_max`/`with_exists` accept SQLA relationships **and** every pivot descriptor (`BelongsToMany`, `MorphToMany`, `MorphedByMany`) — pivot aggregates join through the pivot table — and raise `UnknownRelationError` for an unknown relation.
 
-`with_count` accepts SQLA relationships and both pivot descriptors (`BelongsToMany`, `MorphToMany`), and raises `UnknownRelationError` if the name isn't a relation on the model. `with_sum`/`with_max` cover SQLA relationships.
+### Aliasing and constrained aggregates
+
+Rename the result column with `" as <alias>"` (or the `alias=` kwarg), and filter the aggregated rows with a `constraint=` closure:
+
+```python
+# Alias the column
+users = await User.with_count("orders as order_total").all()  # .order_total
+
+# Count only paid orders
+users = await User.with_count(
+    "orders", constraint=lambda q: q.where(Order.status == "paid")
+).all()
+
+# Sum of paid order totals, under a custom name
+users = await User.with_sum(
+    "orders", "total_cents", alias="paid_cents",
+    constraint=lambda q: q.where(Order.status == "paid"),
+).all()
+```
+
+Soft-deleted related rows are never aggregated.
+
+### Loading aggregates after the fact
+
+When you already have an instance, compute an aggregate and cache it on the object:
+
+```python
+user = await User.find(1)
+await user.load_count("orders")               # user.orders_count
+await user.load_sum("orders", "total_cents")  # user.orders_sum_total_cents
+await user.load_exists("orders")              # user.orders_exists
+await user.load_aggregate("orders", "avg", "total_cents")  # avg/min/max
+```
+
+Each loader accepts the same `constraint=` closure as its eager counterpart.
 
 ### Soft-deletes and relation counts
 
