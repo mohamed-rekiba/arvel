@@ -16,7 +16,7 @@ context foundations.
 | # | Epic | File | Stories | Complexity | Priority |
 |---|------|------|---------|------------|----------|
 | 001 | Core Framework Hardening | `001-epic-core-framework-hardening.md` | 9 | Large | Must |
-| 002 | Social Authentication (`arvel-auth-social`) | `002-epic-social-authentication.md` | 5 | Large | Must |
+| 002 | Social Authentication (`arvel-oauth`) | `002-epic-social-authentication.md` | 5 | Large | Must |
 | 003 | Scout-Style Search (`arvel-search`) | `003-epic-scout-search.md` | 4 | Medium | Must |
 | 004 | Audit Trail & Activity Log (`arvel-audit`) | `004-epic-audit-activity.md` | 4 | Medium | Should |
 | 005 | Query Builder Parity | `005-epic-query-builder-parity.md` | 13 | Large | Should |
@@ -149,7 +149,7 @@ Epic 007 Story 3 (morph/pivot eager engine)
 | Package | Location | PyPI Name |
 |---------|----------|-----------|
 | Core enhancements | `packages/arvel/` | `arvel` (existing) |
-| Social auth | `packages/arvel-auth-social/` | `arvel-auth-social` |
+| Social auth | `packages/arvel-oauth/` | `arvel-oauth` |
 | Search | `packages/arvel-search/` | `arvel-search` |
 | Audit & activity | `packages/arvel-audit/` | `arvel-audit` |
 

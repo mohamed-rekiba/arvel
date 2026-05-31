@@ -1,8 +1,8 @@
-# Epic 002: Social Authentication (`arvel-auth-social`)
+# Epic 002: Social Authentication (`arvel-oauth`)
 
 ## Summary
 
-A new companion package (`arvel-auth-social`) that adds OAuth2/OIDC social login to arvel apps.
+A new companion package (`arvel-oauth`) that adds OAuth2/OIDC social login to arvel apps.
 Ships built-in providers for Google, GitHub, Microsoft, and Apple, plus a generic OIDC provider
 for any issuer that exposes a `.well-known/openid-configuration` document. PKCE is enforced by
 default. Social accounts are linked to the app's existing user model via an installable migration.
@@ -18,13 +18,13 @@ default. Social accounts are linked to the app's existing user model via an inst
 **so that** I can add social login without writing OAuth redirect and token exchange logic myself.
 
 **Acceptance Criteria**:
-- [ ] Given `SOCIAL_GOOGLE_CLIENT_ID` and `SOCIAL_GOOGLE_CLIENT_SECRET` are set, when `SocialAuthManager.provider("google")` is called, then a fully configured `GoogleProvider` is returned
-- [ ] Given `SocialAuthManager` is resolved from the container, when `provider.get_authorization_url(state, code_challenge)` is called, then a valid Google authorization URL with PKCE challenge is returned
+- [ ] Given `OAUTH_GOOGLE_CLIENT_ID` and `OAUTH_GOOGLE_CLIENT_SECRET` are set, when `OAuthManager.provider("google")` is called, then a fully configured `GoogleProvider` is returned
+- [ ] Given `OAuthManager` is resolved from the container, when `provider.get_authorization_url(state, code_challenge)` is called, then a valid Google authorization URL with PKCE challenge is returned
 - [ ] Given a valid authorization code is exchanged, when `provider.exchange_code(code, code_verifier)` is called, then an `OAuthToken` is returned with `access_token` and optionally `id_token`
 - [ ] Given a valid access token, when `provider.get_user(token)` is called, then an `OAuthUser` is returned with `provider`, `provider_id`, `email`, and `name` populated
 - [ ] Given GitHub is configured (no `id_token`), when `provider.get_user(token)` is called, then `OAuthUser` is returned using the GitHub userinfo API (not OIDC claims)
 - [ ] Given Apple is configured, when `provider.get_user(token)` is called, then user data is extracted from the `id_token` JWT (Apple does not provide a userinfo endpoint)
-- [ ] Given an unknown provider name is requested, when `SocialAuthManager.provider("unknown")` is called, then a descriptive `SocialProviderNotFound` exception is raised
+- [ ] Given an unknown provider name is requested, when `OAuthManager.provider("unknown")` is called, then a descriptive `ProviderNotFound` exception is raised
 
 **Security Requirements**:
 - [ ] Client secrets must be loaded from environment variables only — no hardcoded values
@@ -32,7 +32,7 @@ default. Social accounts are linked to the app's existing user model via an inst
 - [ ] PKCE code verifier must be ≥ 43 characters (RFC 7636 §4.1)
 
 **Documentation Requirements**:
-- [ ] Add `docs/site/docs/social-auth.md` with provider configuration table and env var reference
+- [ ] Add `docs/site/docs/oauth.md` with provider configuration table and env var reference
 
 **Requirement Refs**: Brainstorm design § Phase 2A
 **Priority**: Must
@@ -51,17 +51,17 @@ default. Social accounts are linked to the app's existing user model via an inst
 - [ ] Given `GET /auth/google/redirect` is called, when the controller runs, then the user is redirected to Google's authorization URL with a `state` cookie set
 - [ ] Given `GET /auth/google/callback?code=...&state=...` is called with a valid state, when the controller runs, then the code is exchanged, the user profile is fetched, and a session/JWT is issued
 - [ ] Given the callback state does not match the cookie, when the controller runs, then HTTP 422 is returned and no session is created
-- [ ] Given the provider returns an error (e.g., `error=access_denied`), when the callback controller runs, then the user is redirected to a configurable `SOCIAL_ERROR_REDIRECT_URL`
-- [ ] Given a first-time user authenticates via social login, when no matching `SocialAccount` exists, then a new `SocialAccount` is created and linked to either a new `User` or an existing `User` with the same verified email
-- [ ] Given an existing user authenticates again via the same provider, when the callback runs, then the existing `SocialAccount` is updated (`updated_at`, `raw` tokens) and no duplicate is created
+- [ ] Given the provider returns an error (e.g., `error=access_denied`), when the callback controller runs, then the user is redirected to a configurable `OAUTH_ERROR_REDIRECT_URL`
+- [ ] Given a first-time user authenticates via social login, when no matching `OAuthAccount` exists, then a new `OAuthAccount` is created and linked to either a new `User` or an existing `User` with the same verified email
+- [ ] Given an existing user authenticates again via the same provider, when the callback runs, then the existing `OAuthAccount` is updated (`updated_at`, `raw` tokens) and no duplicate is created
 
 **Security Requirements**:
 - [ ] The `state` parameter must be stored in an `HttpOnly`, `SameSite=Lax` cookie and compared server-side — never trusted from the query string alone
-- [ ] `SocialAccount` must not store raw access tokens in plaintext; use the encrypted column type (`EncryptedType`) if token storage is required
+- [ ] `OAuthAccount` must not store raw access tokens in plaintext; use the encrypted column type (`EncryptedType`) if token storage is required
 - [ ] Email claim from the provider must be treated as unverified unless the provider explicitly marks it as verified (Google `email_verified`, GitHub primary+verified email)
 
 **Documentation Requirements**:
-- [ ] Add redirect/callback route examples to `docs/site/docs/social-auth.md`
+- [ ] Add redirect/callback route examples to `docs/site/docs/oauth.md`
 
 **Requirement Refs**: Brainstorm design § Phase 2A
 **Priority**: Must
@@ -87,7 +87,7 @@ default. Social accounts are linked to the app's existing user model via an inst
 - [ ] S256 challenge = `base64url(sha256(verifier))` per RFC 7636 — no plain method support
 
 **Documentation Requirements**:
-- [ ] Document PKCE default behavior and opt-out in `docs/site/docs/social-auth.md`
+- [ ] Document PKCE default behavior and opt-out in `docs/site/docs/oauth.md`
 
 **Requirement Refs**: Brainstorm design § Phase 2A
 **Priority**: Must
@@ -103,18 +103,18 @@ default. Social accounts are linked to the app's existing user model via an inst
 **so that** I can integrate enterprise IdPs without manually looking up authorization, token, and userinfo endpoints.
 
 **Acceptance Criteria**:
-- [ ] Given `SOCIAL_OIDC_ISSUER_URL=https://my-keycloak.example.com/realms/myrealm` is set, when `SocialAuthManager.provider("oidc")` is called, then `discover_oidc_config(issuer_url)` fetches `{issuer}/.well-known/openid-configuration` and populates endpoint URLs
+- [ ] Given `OAUTH_OIDC_ISSUER_URL=https://my-keycloak.example.com/realms/myrealm` is set, when `OAuthManager.provider("oidc")` is called, then `discover_oidc_config(issuer_url)` fetches `{issuer}/.well-known/openid-configuration` and populates endpoint URLs
 - [ ] Given the discovery document is fetched, when it contains `authorization_endpoint`, `token_endpoint`, and `userinfo_endpoint`, then the provider uses them without further configuration
 - [ ] Given a discovery document with a trailing slash on the issuer URL, when `discover_oidc_config` is called, then it handles the trailing slash without a double-slash in the constructed URL
 - [ ] Given the discovery endpoint is unreachable, when `discover_oidc_config` is called, then `OIDCDiscoveryError` is raised with the issuer URL and HTTP status in the message
 - [ ] Given the discovery document is fetched, when the provider authenticates a user, then OIDC claims are extracted from the `id_token` if present, with `userinfo` as fallback
 
 **Security Requirements**:
-- [ ] Discovery must only be performed over HTTPS; HTTP issuer URLs must be rejected unless `SOCIAL_ALLOW_HTTP_ISSUER=true` (dev only)
+- [ ] Discovery must only be performed over HTTPS; HTTP issuer URLs must be rejected unless `OAUTH_ALLOW_HTTP_ISSUER=true` (dev only)
 - [ ] `id_token` JWT must be validated (signature, `iss`, `aud`, `exp`) using the provider's JWKS endpoint before trusting claims
 
 **Documentation Requirements**:
-- [ ] Add generic OIDC section to `docs/site/docs/social-auth.md`
+- [ ] Add generic OIDC section to `docs/site/docs/oauth.md`
 
 **Requirement Refs**: Brainstorm design § Phase 2A
 **Priority**: Should
@@ -123,25 +123,25 @@ default. Social accounts are linked to the app's existing user model via an inst
 
 ---
 
-### Story 5: Social account linking and `auth:social:install` command
+### Story 5: Social account linking and `oauth:install` command
 
 **As a** framework user,
-**I want** an `arvel auth:social:install` command that publishes the `social_accounts` migration and stubs,
+**I want** an `arvel oauth:install` command that publishes the `oauth_accounts` migration and stubs,
 **so that** I can add social login to an existing app without manually writing the linking table.
 
 **Acceptance Criteria**:
-- [ ] Given `arvel auth:social:install` is run, when the command completes, then a migration file for `social_accounts` is published to `db/migrations/`
+- [ ] Given `arvel oauth:install` is run, when the command completes, then a migration file for `oauth_accounts` is published to `db/migrations/`
 - [ ] Given the migration runs, when the table is created, then it has columns: `id`, `user_id` (FK → users), `provider`, `provider_id`, `tokens` (encrypted), `created_at`, `updated_at`; and a unique constraint on `(provider, provider_id)`
-- [ ] Given two users attempt to link the same provider account, when `SocialAccount` insert runs, then the unique constraint prevents the duplicate and a `DuplicateSocialAccount` exception is raised
+- [ ] Given two users attempt to link the same provider account, when `OAuthAccount` insert runs, then the unique constraint prevents the duplicate and a `DuplicateOAuthAccount` exception is raised
 - [ ] Given a user has multiple social accounts (Google + GitHub), when queried, then all are returned and each can be used to authenticate independently
-- [ ] Given a social account is deleted, when the user attempts to log in via that provider, then a new `SocialAccount` is created (no orphaned linking)
+- [ ] Given a social account is deleted, when the user attempts to log in via that provider, then a new `OAuthAccount` is created (no orphaned linking)
 
 **Security Requirements**:
 - [ ] `tokens` column must use `EncryptedType` (AES-GCM cast) — never plaintext
 - [ ] `provider_id` must be stored as-is from the provider — never modified or normalised (prevents ID collision attacks)
 
 **Documentation Requirements**:
-- [ ] Add `arvel auth:social:install` to `docs/site/docs/social-auth.md`
+- [ ] Add `arvel oauth:install` to `docs/site/docs/oauth.md`
 
 **Requirement Refs**: Brainstorm design § Phase 2A
 **Priority**: Must
@@ -155,10 +155,10 @@ default. Social accounts are linked to the app's existing user model via an inst
 - Depends on Epic 001 Story 1 (`context/` module) — callback controller writes `user_id` to context after social login
 - Depends on Epic 001 Story 2 (session-scoped logging) — auth events carry `user_id` in logs
 - Requires `arvel` core `auth/` module (JWT issuance, `AuthBroker`) for post-social-login session creation
-- `SocialAccount` model requires `EncryptedType` from `arvel.database` casts
+- `OAuthAccount` model requires `EncryptedType` from `arvel.database` casts
 
 ## Notes
 
-- `SocialAuthServiceProvider` is a companion provider — not in core baseline
+- `OAuthServiceProvider` is a companion provider — not in core baseline
 - Old `arvel_old/auth/oauth.py` contracts and DTOs are direct ports; HTTP flow and concrete providers are new
 - Apple sign-in requires client-secret JWT generation (ES256, `team_id`, `key_id`) — documented separately
