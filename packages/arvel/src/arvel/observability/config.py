@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import os
+from typing import Annotated
 
 from pydantic import Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from arvel.config.exceptions import ConfigurationError
 
@@ -31,7 +32,7 @@ class ObservabilityConfig(BaseSettings):
 
     log_level: str = Field(default="info", alias="LOG_LEVEL")
     log_format: str = Field(default="json", alias="LOG_FORMAT")
-    log_redact_fields: list[str] = Field(
+    log_redact_fields: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [
             "password",
             "token",
@@ -45,7 +46,7 @@ class ObservabilityConfig(BaseSettings):
     log_uvicorn_access: bool = Field(default=True, alias="LOG_UVICORN_ACCESS")
 
     metrics_enabled: bool = Field(default=False, alias="OBSERVABILITY_METRICS_ENABLED")
-    metrics_allowed_cidrs: list[str] = Field(
+    metrics_allowed_cidrs: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["127.0.0.1/32"],
         alias="OBSERVABILITY_METRICS_ALLOWED_CIDRS",
     )
@@ -54,8 +55,27 @@ class ObservabilityConfig(BaseSettings):
         default=True, alias="OBSERVABILITY_REQUEST_MIDDLEWARE_ENABLED"
     )
 
+    # Empty list = no restriction (LBs/k8s probes reach /_health from arbitrary IPs).
+    health_allowed_cidrs: Annotated[list[str], NoDecode] = Field(
+        default_factory=list,
+        alias="HEALTH_ALLOWED_CIDRS",
+    )
+
     db_slow_query_ms: int = Field(default=200, alias="DB_SLOW_QUERY_MS")
     db_query_log_enabled: bool = Field(default=True, alias="DB_QUERY_LOG_ENABLED")
+
+    @field_validator(
+        "log_redact_fields",
+        "metrics_allowed_cidrs",
+        "health_allowed_cidrs",
+        mode="before",
+    )
+    @classmethod
+    def _split_csv(cls, v: object) -> object:
+        # Env vars arrive as strings; accept "a,b,c" instead of forcing JSON arrays.
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
 
     @field_validator("log_level", mode="before")
     @classmethod

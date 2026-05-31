@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from arvel.context import Context
+
 if TYPE_CHECKING:
     from arvel.auth.manager import AuthManager
 
@@ -22,4 +24,8 @@ class OptionalAuthenticate:
         user = await self._manager.user(request)
         if hasattr(request, "state"):
             request.state.user = user
+        if user is not None:
+            user_id = getattr(user, "id", None)
+            if user_id is not None:
+                Context.add("user_id", str(user_id))
         return await call_next(request)

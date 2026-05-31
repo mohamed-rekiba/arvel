@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from arvel.cache.exceptions import CacheException, FacadeNotBoundError, TagsNotSupported
-from arvel.cache.locks import CacheLock
+from arvel.cache.locks import AtomicLockStore, CacheLock
 from arvel.cache.rate_limiter import RateLimiter
 from arvel.cache.store import CacheStore
 from arvel.cache.tags import TaggedCache
@@ -98,7 +98,17 @@ class CacheManager:
 
     def lock(self, name: str, ttl: int = 0) -> CacheLock:
         """Return a CacheLock for the given name."""
-        return CacheLock(store=self.store(), name=name, ttl=ttl)
+        store = self.store()
+        if not isinstance(store, AtomicLockStore):
+            import warnings
+
+            warnings.warn(
+                f"{type(store).__name__} provides process-local locks only; "
+                "distributed-lock semantics require the Redis store.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        return CacheLock(store=store, name=name, ttl=ttl)
 
     def rate_limiter(self) -> RateLimiter:
         """Return a RateLimiter backed by the default store."""
