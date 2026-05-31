@@ -159,6 +159,16 @@ class AuthService:
         )
         return user, tokens
 
+    async def issue_for(self, *, user_id: str, email: str = "") -> TokenPair:
+        """Mint a token pair for an already-authenticated user.
+
+        Skips credential checks — the caller (e.g. social login) has already
+        proven identity through another channel.
+        """
+        tokens = await self._issue_pair(user_id=user_id)
+        await EventFacade.dispatch(LoggedIn(user_id=user_id, email=email, occurred_at=_now()))
+        return tokens
+
     # ─── Refresh ───────────────────────────────────────────────────────────
 
     async def refresh(self, *, refresh_token: str) -> tuple[Any, TokenPair]:

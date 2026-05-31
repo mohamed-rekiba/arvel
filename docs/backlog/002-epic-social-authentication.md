@@ -37,7 +37,7 @@ default. Social accounts are linked to the app's existing user model via an inst
 **Requirement Refs**: Brainstorm design § Phase 2A
 **Priority**: Must
 **Complexity**: Large
-**Status**: Draft
+**Status**: Done
 
 ---
 
@@ -66,7 +66,7 @@ default. Social accounts are linked to the app's existing user model via an inst
 **Requirement Refs**: Brainstorm design § Phase 2A
 **Priority**: Must
 **Complexity**: Medium
-**Status**: Draft
+**Status**: Done
 
 ---
 
@@ -92,7 +92,7 @@ default. Social accounts are linked to the app's existing user model via an inst
 **Requirement Refs**: Brainstorm design § Phase 2A
 **Priority**: Must
 **Complexity**: Small
-**Status**: Draft
+**Status**: Done
 
 ---
 
@@ -119,7 +119,7 @@ default. Social accounts are linked to the app's existing user model via an inst
 **Requirement Refs**: Brainstorm design § Phase 2A
 **Priority**: Should
 **Complexity**: Medium
-**Status**: Draft
+**Status**: Done
 
 ---
 
@@ -146,7 +146,7 @@ default. Social accounts are linked to the app's existing user model via an inst
 **Requirement Refs**: Brainstorm design § Phase 2A
 **Priority**: Must
 **Complexity**: Small
-**Status**: Draft
+**Status**: Done
 
 ---
 

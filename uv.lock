@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "arvel",
+    "arvel-auth-social",
     "arvel-ecommerce-demo",
     "arvel-image",
     "arvel-permission",
@@ -349,6 +350,7 @@ all = [
     { name = "aiomysql" },
     { name = "aiosmtplib" },
     { name = "aiosqlite" },
+    { name = "arvel-auth-social" },
     { name = "arvel-image" },
     { name = "arvel-permission" },
     { name = "asyncpg" },
@@ -371,6 +373,9 @@ all = [
     { name = "taskiq-aio-pika" },
     { name = "taskiq-redis" },
     { name = "websockets" },
+]
+auth-social = [
+    { name = "arvel-auth-social" },
 ]
 azure = [
     { name = "azure-storage-blob" },
@@ -446,7 +451,8 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.18.4" },
     { name = "anyio", specifier = ">=4.13.0" },
     { name = "argon2-cffi", specifier = ">=25.1.0" },
-    { name = "arvel", extras = ["bcrypt", "redis", "postgres", "mysql", "sqlite", "queue", "queue-redis", "queue-amqp", "mail", "s3", "gcs", "azure", "jwt", "broadcasting", "shell", "permission", "image", "openapi", "dev"], marker = "extra == 'all'", editable = "packages/arvel" },
+    { name = "arvel", extras = ["bcrypt", "redis", "postgres", "mysql", "sqlite", "queue", "queue-redis", "queue-amqp", "mail", "s3", "gcs", "azure", "jwt", "broadcasting", "shell", "permission", "image", "auth-social", "openapi", "dev"], marker = "extra == 'all'", editable = "packages/arvel" },
+    { name = "arvel-auth-social", marker = "extra == 'auth-social'", editable = "packages/arvel-auth-social" },
     { name = "arvel-image", marker = "extra == 'image'", editable = "packages/arvel-image" },
     { name = "arvel-permission", marker = "extra == 'permission'", editable = "packages/arvel-permission" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31.0" },
@@ -494,7 +500,30 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.47.0" },
     { name = "websockets", marker = "extra == 'broadcasting'", specifier = ">=16.0" },
 ]
-provides-extras = ["bcrypt", "redis", "postgres", "mysql", "sqlite", "queue", "queue-redis", "queue-amqp", "mail", "s3", "gcs", "azure", "jwt", "broadcasting", "shell", "openapi", "permission", "image", "dev", "all"]
+provides-extras = ["bcrypt", "redis", "postgres", "mysql", "sqlite", "queue", "queue-redis", "queue-amqp", "mail", "s3", "gcs", "azure", "jwt", "broadcasting", "shell", "openapi", "permission", "image", "auth-social", "dev", "all"]
+
+[[package]]
+name = "arvel-auth-social"
+version = "0.4.0"
+source = { editable = "packages/arvel-auth-social" }
+dependencies = [
+    { name = "arvel" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "arvel", editable = "packages/arvel" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "pydantic-settings", specifier = ">=2.14.1" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13.0" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.49" },
+]
 
 [[package]]
 name = "arvel-ecommerce-demo"
@@ -581,6 +610,7 @@ source = { virtual = "." }
 dev = [
     { name = "aiosqlite" },
     { name = "arvel", extra = ["all"] },
+    { name = "arvel-auth-social" },
     { name = "arvel-image" },
     { name = "arvel-permission" },
     { name = "bandit" },
@@ -608,6 +638,7 @@ dev = [
 dev = [
     { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "arvel", extras = ["all"], editable = "packages/arvel" },
+    { name = "arvel-auth-social", editable = "packages/arvel-auth-social" },
     { name = "arvel-image", editable = "packages/arvel-image" },
     { name = "arvel-permission", editable = "packages/arvel-permission" },
     { name = "bandit", specifier = ">=1.9.4" },
