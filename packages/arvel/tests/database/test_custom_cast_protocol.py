@@ -7,10 +7,9 @@ from decimal import Decimal
 from typing import Any, ClassVar
 
 import pytest
-from arvel.database import CastsAttributes, Model
+from arvel.database import CastsAttributes, Model, column, id_
 from sqlalchemy import Integer, Numeric, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class AsJson(CastsAttributes):
@@ -42,12 +41,12 @@ class Doc(Model):
         "flag": "boolean",  # plain built-in still works
     }
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    # Cast-backed columns accept/return types wider than their storage type → Mapped[Any].
-    meta: Mapped[Any] = mapped_column(String(500), default="{}")
-    code: Mapped[Any] = mapped_column(String(50), default="")
-    price: Mapped[Any] = mapped_column(Numeric(10, 2), default=Decimal(0))
-    flag: Mapped[Any] = mapped_column(Integer, default=0)
+    id: int = id_()
+    # Cast-backed columns accept/return types wider than their storage type → Any.
+    meta: Any = column(String(500), default="{}")
+    code: Any = column(String(50), default="")
+    price: Any = column(Numeric(10, 2), default=Decimal(0))
+    flag: Any = column(Integer, default=0)
 
 
 async def _create_tables(engine: AsyncEngine) -> None:
@@ -106,8 +105,8 @@ def _define_model_with_casts(table: str, casts: dict[str, Any]) -> type[Model]:
         {
             "__tablename__": table,
             "__casts__": casts,
-            "__annotations__": {"id": Mapped[int]},
-            "id": mapped_column(Integer, primary_key=True, init=False, default=None),
+            "__annotations__": {"id": int},
+            "id": id_(),
         },
     )
 

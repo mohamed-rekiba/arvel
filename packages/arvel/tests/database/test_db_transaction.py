@@ -5,20 +5,16 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.database.db import DB
 from arvel.database.session import reset_active_session, set_active_session
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class TxWidget(Model):
     __tablename__ = "tx_widgets"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: int = id_()
+    name: str = string(80)
 
 
 async def _create_tables(engine: Any) -> None:

@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, ClassVar
 from arvel.database import Model, foreign_id, id_, string
 from arvel.database.query_logging import QueryLog
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
     from arvel.database.orm.relations import BelongsTo, HasMany, HasOne
@@ -23,8 +22,8 @@ class RelOwner(Model):
     __tablename__ = "rel_owners"
     __guarded__: ClassVar[list[str] | None] = []
 
-    id: Mapped[int] = id_()
-    name: Mapped[str] = string(80)
+    id: int = id_()
+    name: str = string(80)
 
     def items(self) -> HasMany[RelItem]:
         return self.has_many(RelItem, foreign_key="owner_id")
@@ -37,9 +36,9 @@ class RelItem(Model):
     __tablename__ = "rel_items"
     __guarded__: ClassVar[list[str] | None] = []
 
-    id: Mapped[int] = id_()
-    label: Mapped[str] = string(80)
-    owner_id: Mapped[int | None] = foreign_id("rel_owners.id", nullable=True)
+    id: int = id_()
+    label: str = string(80)
+    owner_id: int | None = foreign_id("rel_owners.id", nullable=True)
 
     def owner(self) -> BelongsTo[RelOwner]:
         return self.belongs_to(RelOwner, foreign_key="owner_id")

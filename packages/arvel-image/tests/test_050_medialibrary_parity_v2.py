@@ -17,7 +17,6 @@ import pytest
 pytest.importorskip("arvel_image", reason="arvel_image is the package under test")
 pytest.importorskip("PIL", reason="arvel-image depends on Pillow")
 
-from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
     from arvel_image.media.model import Media
@@ -70,8 +69,8 @@ def _host_050() -> type[Any]:
     class Host050(Model, HasMedia, Timestamps):
         __tablename__ = "media_050_hosts"
 
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
         def register_media_collections(self) -> None:
             MediaCollection("avatar", single_file=True).register_on(self)
@@ -94,8 +93,8 @@ def _host_custom_pk_050() -> type[Any]:
     class HostCustomPk050(Model, HasMedia, Timestamps):
         __tablename__ = "media_050_custom_pk_hosts"
 
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
         def host_pk(self) -> str:
             return f"custom-{self.id}"
@@ -153,8 +152,8 @@ async def test_regenerate_reads_from_media_disk_not_collection_disk(
 
     class HostConv050(Model, HasMedia, Timestamps):
         __tablename__ = "media_050_conv_hosts"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
         def register_media_collections(self) -> None:
             MediaCollection("photos").with_conversions(
@@ -205,8 +204,8 @@ async def test_regenerate_writes_to_conversions_disk(
 
     class HostCDisk050(Model, HasMedia, Timestamps):
         __tablename__ = "media_050_cdisk_hosts"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
         def register_media_collections(self) -> None:
             MediaCollection("art").with_conversions(
@@ -428,8 +427,8 @@ async def test_copy_carries_generated_conversions(
 
     class HostCopy050(Model, HasMedia, Timestamps):
         __tablename__ = "media_050_copy_hosts"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
         def register_media_collections(self) -> None:
             MediaCollection("photos").with_conversions(
@@ -727,8 +726,8 @@ async def test_get_registered_media_collections_empty_when_none(
 
     class HostNoColls050(Model, HasMedia, Timestamps):
         __tablename__ = "media_050_no_colls_hosts"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
     async with engine.begin() as conn:
         from arvel.database import Model
@@ -768,8 +767,8 @@ async def test_get_media_url_uses_collection_fallback_when_empty(
 
     class HostFallback050(Model, HasMedia, Timestamps):
         __tablename__ = "media_050_fallback_hosts"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
         def register_media_collections(self) -> None:
             MediaCollection("avatar").use_fallback_url("/default.jpg").register_on(self)
@@ -793,8 +792,8 @@ async def test_get_media_url_callsite_fallback_takes_precedence(
 
     class HostFallback2050(Model, HasMedia, Timestamps):
         __tablename__ = "media_050_fallback2_hosts"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
         def register_media_collections(self) -> None:
             MediaCollection("avatar").use_fallback_url("/collection-default.jpg").register_on(self)
@@ -1152,8 +1151,8 @@ async def test_accepts_file_callback_rejects_wrong_mime(
 
     class HostAccepts050(Model, HasMedia, Timestamps):
         __tablename__ = "media_050_accepts_hosts"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
         def register_media_collections(self) -> None:
             (

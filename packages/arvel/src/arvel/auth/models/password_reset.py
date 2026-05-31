@@ -23,10 +23,7 @@ from datetime import UTC, timedelta
 from datetime import datetime as _datetime
 from typing import ClassVar
 
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped
-
-from arvel.database.columns import column, datetime, string
+from arvel.database.columns import field
 from arvel.database.model import Model
 
 
@@ -45,9 +42,9 @@ class PasswordReset(Model):
     __fillable__: ClassVar[list[str] | None] = ["email", "token_hash"]
     __hidden__: ClassVar[list[str] | None] = ["token_hash"]
 
-    email: Mapped[str] = column(String(254), primary_key=True)
-    token_hash: Mapped[str] = string(64)
-    created_at: Mapped[_datetime] = datetime(nullable=False, init=False, default=None)
+    email: str = field(length=254, primary_key=True)
+    token_hash: str = field(length=64)
+    created_at: _datetime = field(init=False, default=None)
 
     def is_expired(self, ttl: timedelta) -> bool:
         """``True`` when ``now - created_at > ttl`` (UTC-safe)."""

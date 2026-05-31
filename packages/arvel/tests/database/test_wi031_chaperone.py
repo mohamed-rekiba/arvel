@@ -3,68 +3,60 @@
 from __future__ import annotations
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, foreign_id, id_, relationship, string
 from arvel.database.exceptions import UnknownRelationError
 from arvel.database.query_logging import QueryLog
-from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class Wi031Post(Model):
     __tablename__ = "wi031_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(80))
-    comments: Mapped[list[Wi031Comment]] = relationship(
+    id: int = id_()
+    title: str = string(80)
+    comments: list[Wi031Comment] = relationship(
         "Wi031Comment", back_populates="post", init=False, default_factory=list
     )
 
 
 class Wi031Comment(Model):
     __tablename__ = "wi031_comments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(80))
-    post_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wi031_posts.id"), default=None)
-    post: Mapped[Wi031Post | None] = relationship(
-        "Wi031Post", back_populates="comments", init=False
-    )
+    id: int = id_()
+    body: str = string(80)
+    post_id: int | None = foreign_id("wi031_posts.id", nullable=True)
+    post: Wi031Post | None = relationship("Wi031Post", back_populates="comments", init=False)
 
 
 # A pair with no back_populates — exercises inverse inference.
 class Wi031Hub(Model):
     __tablename__ = "wi031_hubs"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    items: Mapped[list[Wi031Item]] = relationship(
+    id: int = id_()
+    name: str = string(80)
+    items: list[Wi031Item] = relationship(
         "Wi031Item", viewonly=True, init=False, default_factory=list
     )
 
 
 class Wi031Item(Model):
     __tablename__ = "wi031_items"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    label: Mapped[str] = mapped_column(String(80))
-    hub_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wi031_hubs.id"), default=None)
-    hub: Mapped[Wi031Hub | None] = relationship("Wi031Hub", init=False)
+    id: int = id_()
+    label: str = string(80)
+    hub_id: int | None = foreign_id("wi031_hubs.id", nullable=True)
+    hub: Wi031Hub | None = relationship("Wi031Hub", init=False)
 
 
 # Child has no relationship back to the parent — inference has nothing to find.
 class Wi031Orphanage(Model):
     __tablename__ = "wi031_orphanages"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    kids: Mapped[list[Wi031Kid]] = relationship(
-        "Wi031Kid", viewonly=True, init=False, default_factory=list
-    )
+    id: int = id_()
+    name: str = string(80)
+    kids: list[Wi031Kid] = relationship("Wi031Kid", viewonly=True, init=False, default_factory=list)
 
 
 class Wi031Kid(Model):
     __tablename__ = "wi031_kids"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    orphanage_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("wi031_orphanages.id"), default=None
-    )
+    id: int = id_()
+    name: str = string(80)
+    orphanage_id: int | None = foreign_id("wi031_orphanages.id", nullable=True)
 
 
 async def _setup(engine: AsyncEngine) -> None:
@@ -100,7 +92,7 @@ class TestChaperone:
 
         session.expire_all()
         posts = await Wi031Post.with_(
-            {"comments": lambda q: q.where(Wi031Comment.body == "keep").chaperone()}
+            {"comments": lambda q: q.where(Wi031Comment.__table__.c.body == "keep").chaperone()}
         ).all()
 
         loaded = posts[0]

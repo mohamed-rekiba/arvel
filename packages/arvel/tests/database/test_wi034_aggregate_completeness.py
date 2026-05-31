@@ -8,12 +8,11 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from arvel.database import Model
+from arvel.database import Model, boolean, foreign_id, id_, integer, relationship, string
 from arvel.database.orm import BelongsToMany
 from arvel.database.query import QueryBuilder
-from sqlalchemy import Column, ForeignKey, Integer, String, Table
+from sqlalchemy import Column, ForeignKey, Integer, Table
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 wi034_post_tags = Table(
     "wi034_post_tags",
@@ -25,16 +24,16 @@ wi034_post_tags = Table(
 
 class Wi034Tag(Model):
     __tablename__ = "wi034_tags"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    weight: Mapped[int] = mapped_column(Integer, default=0)
+    id: int = id_()
+    name: str = string(80)
+    weight: int = integer(default=0)
 
 
 class Wi034Post(Model):
     __tablename__ = "wi034_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120))
-    comments: Mapped[list[Wi034Comment]] = relationship(
+    id: int = id_()
+    title: str = string(120)
+    comments: list[Wi034Comment] = relationship(
         "Wi034Comment", back_populates="post", init=False, default_factory=list
     )
     tags: ClassVar[BelongsToMany[Wi034Tag]] = BelongsToMany(
@@ -44,14 +43,12 @@ class Wi034Post(Model):
 
 class Wi034Comment(Model):
     __tablename__ = "wi034_comments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(200))
-    rating: Mapped[int] = mapped_column(Integer, default=0)
-    spam: Mapped[bool] = mapped_column(default=False)
-    post_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wi034_posts.id"), default=None)
-    post: Mapped[Wi034Post | None] = relationship(
-        "Wi034Post", back_populates="comments", init=False
-    )
+    id: int = id_()
+    body: str = string(200)
+    rating: int = integer(default=0)
+    spam: bool = boolean(default=False)
+    post_id: int | None = foreign_id("wi034_posts.id", nullable=True)
+    post: Wi034Post | None = relationship("Wi034Post", back_populates="comments", init=False)
 
 
 async def _setup(engine: AsyncEngine) -> None:
@@ -71,7 +68,10 @@ class TestEagerAggregates:
         await _setup(engine)
         p = await _seed_post("p", [2, 4, 6])
         rows = (
-            await Wi034Post.query().with_avg("comments", "rating").where(Wi034Post.id == p.id).get()
+            await Wi034Post.query()
+            .with_avg("comments", "rating")
+            .where(Wi034Post.__table__.c.id == p.id)
+            .get()
         )
         assert rows[0].comments_avg_rating == 4
 
@@ -79,7 +79,10 @@ class TestEagerAggregates:
         await _setup(engine)
         p = await _seed_post("p", [3, 7, 5])
         rows = (
-            await Wi034Post.query().with_min("comments", "rating").where(Wi034Post.id == p.id).get()
+            await Wi034Post.query()
+            .with_min("comments", "rating")
+            .where(Wi034Post.__table__.c.id == p.id)
+            .get()
         )
         assert rows[0].comments_min_rating == 3
 
@@ -105,7 +108,10 @@ class TestPivotAwareSum:
         await post.tags.attach(t2.id)
 
         rows = (
-            await Wi034Post.query().with_sum("tags", "weight").where(Wi034Post.id == post.id).get()
+            await Wi034Post.query()
+            .with_sum("tags", "weight")
+            .where(Wi034Post.__table__.c.id == post.id)
+            .get()
         )
         assert rows[0].tags_sum_weight == 25
 
@@ -117,7 +123,7 @@ class TestAliasAndConstraint:
         rows = (
             await Wi034Post.query()
             .with_count("comments as comment_total")
-            .where(Wi034Post.id == p.id)
+            .where(Wi034Post.__table__.c.id == p.id)
             .get()
         )
         assert rows[0].comment_total == 2
@@ -133,9 +139,9 @@ class TestAliasAndConstraint:
             await Wi034Post.query()
             .with_count(
                 "comments",
-                constraint=lambda q: q.where(Wi034Comment.spam == False),  # noqa: E712
+                constraint=lambda q: q.where(Wi034Comment.__table__.c.spam == False),  # noqa: E712
             )
-            .where(Wi034Post.id == p.id)
+            .where(Wi034Post.__table__.c.id == p.id)
             .get()
         )
         assert rows[0].comments_count == 2
@@ -154,9 +160,9 @@ class TestAliasAndConstraint:
                 "comments",
                 "rating",
                 alias="ham_score",
-                constraint=lambda q: q.where(Wi034Comment.spam == False),  # noqa: E712
+                constraint=lambda q: q.where(Wi034Comment.__table__.c.spam == False),  # noqa: E712
             )
-            .where(Wi034Post.id == p.id)
+            .where(Wi034Post.__table__.c.id == p.id)
             .get()
         )
         assert rows[0].ham_score == 5
@@ -193,7 +199,7 @@ class TestInstanceLoaders:
         await Wi034Comment.create(body="c", post_id=p.id, rating=100, spam=True)
 
         def ham_only(q: QueryBuilder[Any]) -> QueryBuilder[Any]:
-            return q.where(Wi034Comment.spam == False)  # noqa: E712
+            return q.where(Wi034Comment.__table__.c.spam == False)  # noqa: E712
 
         value = await p.load_aggregate("comments", "avg", "rating", constraint=ham_only)
         assert value == 6

@@ -11,7 +11,6 @@ from arvel.database import (
     SoftDeletes,
     Timestamps,
     TranslatableMixin,
-    datetime,
     enum,
     string,
     text,
@@ -32,7 +31,7 @@ class Vendor(TranslatableMixin, Model, Timestamps, SoftDeletes):
     slug: str = string(200, unique=True, default="")
     description: str | None = text(nullable=True, default=None)
     status: str = enum(["draft", "published"], name="vendors_status", default="published")
-    published_at: _datetime | None = datetime(nullable=True, default=None)
+    published_at: _datetime | None = None
 
     def products(self) -> HasMany[Product]:
         return self.has_many("Product", foreign_key="vendor_id")

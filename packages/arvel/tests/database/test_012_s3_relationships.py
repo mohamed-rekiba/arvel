@@ -8,65 +8,51 @@ All tests are RED until implementation is complete.
 from __future__ import annotations
 
 import pytest
-from arvel.database import Model
-from sqlalchemy import ForeignKey, Integer, String
+from arvel.database import Model, boolean, field, foreign_id, id_, integer, relationship, string
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 # ─── Test models ─────────────────────────────────────────────────────────────
 
 
 class CountryS3(Model):
     __tablename__ = "countries_s3"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    name: Mapped[str] = mapped_column(String(80))
-    users: Mapped[list[UserS3]] = relationship(
+    id: int = id_()
+    name: str = string(80)
+    users: list[UserS3] = relationship(
         "UserS3", back_populates="country", init=False, default_factory=list
     )
 
 
 class UserS3(Model):
     __tablename__ = "users_s3"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    name: Mapped[str] = mapped_column(String(80))
-    country_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("countries_s3.id"), nullable=True, default=None
-    )
-    country: Mapped[CountryS3 | None] = relationship(
-        "CountryS3", back_populates="users", init=False
-    )
-    posts: Mapped[list[PostS3]] = relationship(
+    id: int = id_()
+    name: str = string(80)
+    country_id: int | None = foreign_id("countries_s3.id", nullable=True)
+    country: CountryS3 | None = relationship("CountryS3", back_populates="users", init=False)
+    posts: list[PostS3] = relationship(
         "PostS3", back_populates="author", init=False, default_factory=list
     )
-    orders: Mapped[list[OrderS3]] = relationship(
+    orders: list[OrderS3] = relationship(
         "OrderS3", back_populates="user", init=False, default_factory=list
     )
 
 
 class PostS3(Model):
     __tablename__ = "posts_s3"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    title: Mapped[str] = mapped_column(String(200))
-    published: Mapped[bool] = mapped_column(default=False)
-    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users_s3.id"), default=None)
-    author: Mapped[UserS3 | None] = relationship("UserS3", back_populates="posts", init=False)
+    id: int = id_()
+    title: str = string(200)
+    published: bool = boolean(default=False)
+    user_id: int | None = field(foreign_key="users_s3.id", default=None)
+    author: UserS3 | None = relationship("UserS3", back_populates="posts", init=False)
 
 
 class OrderS3(Model):
     __tablename__ = "orders_s3"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    amount: Mapped[int] = mapped_column(Integer, default=0)
-    pending: Mapped[bool] = mapped_column(default=True)
-    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users_s3.id"), default=None)
-    user: Mapped[UserS3 | None] = relationship("UserS3", back_populates="orders", init=False)
+    id: int = id_()
+    amount: int = integer(default=0)
+    pending: bool = boolean(default=True)
+    user_id: int | None = field(foreign_key="users_s3.id", default=None)
+    user: UserS3 | None = relationship("UserS3", back_populates="orders", init=False)
 
 
 async def _setup(engine: AsyncEngine) -> None:

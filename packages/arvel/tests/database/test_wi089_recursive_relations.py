@@ -14,7 +14,6 @@ from arvel.database import Model, TreeNode, foreign_id, id_, relationship, strin
 from arvel.database.exceptions import UnknownRelationError
 from arvel.database.query_logging import QueryLog
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
     from arvel.database.orm.relations import Ancestors, Descendants
@@ -24,12 +23,12 @@ class TreeCat(Model):
     __tablename__ = "tree_cats"
     __guarded__: ClassVar[list[str] | None] = []
 
-    id: Mapped[int] = id_()
-    name: Mapped[str] = string(80)
-    parent_id: Mapped[int | None] = foreign_id("tree_cats.id", nullable=True)
+    id: int = id_()
+    name: str = string(80)
+    parent_id: int | None = foreign_id("tree_cats.id", nullable=True)
     # Self-referential tree edge. with_tree("descendants") hydrates this in memory
     # so the loaded subtree is walkable via `node.children` with no extra query.
-    children: Mapped[list[TreeCat]] = relationship(default_factory=list)
+    children: list[TreeCat] = relationship(default_factory=list)
 
     def descendants(self) -> Descendants[Self]:
         return self.has_many_recursive(parent_key="parent_id")
@@ -163,7 +162,11 @@ class TestEagerWithTree:
         await _seed()
 
         with QueryLog.assert_max_queries(2):
-            roots = await TreeCat.where(TreeCat.parent_id.is_(None)).with_tree("descendants").get()
+            roots = (
+                await TreeCat.where(TreeCat.__table__.c.parent_id.is_(None))
+                .with_tree("descendants")
+                .get()
+            )
             by_name = {r.name: sorted(c.name for c in await r.descendants().get()) for r in roots}
 
         assert by_name == {"root": ["a", "b", "gc", "ggc"], "root2": ["r2c"]}
@@ -172,7 +175,11 @@ class TestEagerWithTree:
         await _setup(engine)
         await _seed()
 
-        roots = await TreeCat.where(TreeCat.parent_id.is_(None)).with_tree("descendants").get()
+        roots = (
+            await TreeCat.where(TreeCat.__table__.c.parent_id.is_(None))
+            .with_tree("descendants")
+            .get()
+        )
         root = next(r for r in roots if r.name == "root")
         with QueryLog.assert_max_queries(0):
             tree = await root.descendants().as_tree()
@@ -186,7 +193,7 @@ class TestEagerWithTree:
         await _seed()
 
         roots = await (
-            TreeCat.where(TreeCat.parent_id.is_(None))
+            TreeCat.where(TreeCat.__table__.c.parent_id.is_(None))
             .with_tree("descendants", constraint=lambda q: q.where(TreeCat.name != "gc"))
             .get()
         )
@@ -200,7 +207,9 @@ class TestEagerWithTree:
         await _seed()
 
         roots = await (
-            TreeCat.where(TreeCat.parent_id.is_(None)).with_tree("descendants", max_depth=2).get()
+            TreeCat.where(TreeCat.__table__.c.parent_id.is_(None))
+            .with_tree("descendants", max_depth=2)
+            .get()
         )
         root = next(r for r in roots if r.name == "root")
         kids = await root.descendants().get()
@@ -223,7 +232,9 @@ class TestEagerWithTree:
         await _setup(engine)
         await _seed()
 
-        roots = await TreeCat.where(TreeCat.parent_id.is_(None)).with_("descendants").get()
+        roots = (
+            await TreeCat.where(TreeCat.__table__.c.parent_id.is_(None)).with_("descendants").get()
+        )
         root = next(r for r in roots if r.name == "root")
         with QueryLog.assert_max_queries(0):
             kids = await root.descendants().get()
@@ -241,7 +252,11 @@ class TestChildrenGraph:
         await _setup(engine)
         await _seed()
 
-        roots = await TreeCat.where(TreeCat.parent_id.is_(None)).with_tree("descendants").get()
+        roots = (
+            await TreeCat.where(TreeCat.__table__.c.parent_id.is_(None))
+            .with_tree("descendants")
+            .get()
+        )
         root = next(r for r in roots if r.name == "root")
 
         with QueryLog.assert_max_queries(0):
@@ -253,13 +268,15 @@ class TestChildrenGraph:
             # Leaf nodes surface as an empty collection, not a lazy load.
             assert gc.children[0].children == []
 
-    async def test_second_root_isolated(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_second_root_isolated(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         await _seed()
 
-        roots = await TreeCat.where(TreeCat.parent_id.is_(None)).with_tree("descendants").get()
+        roots = (
+            await TreeCat.where(TreeCat.__table__.c.parent_id.is_(None))
+            .with_tree("descendants")
+            .get()
+        )
         root2 = next(r for r in roots if r.name == "root2")
         with QueryLog.assert_max_queries(0):
             assert [c.name for c in root2.children] == ["r2c"]
@@ -272,7 +289,9 @@ class TestChildrenGraph:
         await _seed()
 
         roots = await (
-            TreeCat.where(TreeCat.parent_id.is_(None)).with_tree("descendants", max_depth=1).get()
+            TreeCat.where(TreeCat.__table__.c.parent_id.is_(None))
+            .with_tree("descendants", max_depth=1)
+            .get()
         )
         root = next(r for r in roots if r.name == "root")
         with QueryLog.assert_max_queries(0):
@@ -288,7 +307,7 @@ class TestChildrenGraph:
         await _seed()
 
         roots = await (
-            TreeCat.where(TreeCat.parent_id.is_(None))
+            TreeCat.where(TreeCat.__table__.c.parent_id.is_(None))
             .with_tree("descendants", constraint=lambda q: q.where(TreeCat.name != "a"))
             .get()
         )

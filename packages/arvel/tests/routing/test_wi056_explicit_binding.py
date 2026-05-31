@@ -16,11 +16,9 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import pytest
 import pytest_asyncio
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.http.middleware.database_transaction import DatabaseTransaction
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.orm import Mapped, mapped_column
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -31,9 +29,9 @@ class _Widget(Model):
 
     route_key_name: ClassVar[str] = "slug"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    slug: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
-    label: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: int = id_()
+    slug: str = string(80, unique=True)
+    label: str = string(80)
 
 
 @pytest_asyncio.fixture

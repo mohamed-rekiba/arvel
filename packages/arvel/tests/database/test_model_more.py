@@ -5,22 +5,20 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model, SoftDeletes, Timestamps
-from sqlalchemy import Integer, String
+from arvel.database import Model, SoftDeletes, Timestamps, id_, string
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Doc(Model, Timestamps, SoftDeletes):
     __tablename__ = "docs_m"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    id: int = id_()
+    title: str = string(120)
 
 
 class HardOnly(Model, Timestamps):
     __tablename__ = "hard_only"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: int = id_()
+    name: str = string(80)
 
 
 async def _setup(engine: Any) -> None:

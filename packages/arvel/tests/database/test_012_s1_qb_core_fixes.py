@@ -15,34 +15,27 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from arvel.database import Model, QueryBuilder
+from arvel.database import Model, QueryBuilder, boolean, id_, integer, string
+from arvel.database.columns import datetime as datetime_col
 from arvel.database.scope import scope
-from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 # ─── Test models ─────────────────────────────────────────────────────────────
 
 
 class ItemS1(Model):
     __tablename__ = "items_s1"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
-    score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    active: Mapped[bool] = mapped_column(default=True)
+    id: int = id_()
+    name: str = string(80)
+    score: int = integer(default=0)
+    active: bool = boolean(default=True)
 
 
 class PostS1(Model):
     __tablename__ = "posts_s1"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
-    deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, init=False, default=None
-    )
+    id: int = id_()
+    title: str = string(200)
+    deleted_at: datetime | None = datetime_col(nullable=True, init=False, default=None)
 
     @scope
     @staticmethod
@@ -122,10 +115,8 @@ async def test_soft_delete_default_excludes_deleted(
 
     class UserSD(Model, SoftDeletes):
         __tablename__ = "users_sd"
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
+        id: int = id_()
+        name: str = string(80)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -148,10 +139,8 @@ async def test_soft_delete_with_trashed_includes_all(
 
     class UserWT(Model, SoftDeletes):
         __tablename__ = "users_wt"
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
+        id: int = id_()
+        name: str = string(80)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -173,10 +162,8 @@ async def test_soft_delete_only_trashed(engine: AsyncEngine, session: AsyncSessi
 
     class UserOT(Model, SoftDeletes):
         __tablename__ = "users_ot"
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
+        id: int = id_()
+        name: str = string(80)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)

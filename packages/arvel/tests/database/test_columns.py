@@ -16,7 +16,7 @@ from datetime import datetime as _datetime
 from typing import Any, cast
 
 import pytest
-from arvel.database import Model, SoftDeletes, Timestamps
+from arvel.database import Model, SoftDeletes, Timestamps, relationship
 from arvel.database import columns as columns_module
 from arvel.database.columns import (
     big_integer,
@@ -44,7 +44,6 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, relationship
 from sqlalchemy.types import TypeDecorator
 
 
@@ -185,12 +184,12 @@ def test_column_nullable_flag_is_honoured() -> None:
 class _Account(Model, Timestamps):
     __tablename__ = "accounts_columns_test"
 
-    id: Mapped[int] = id_()
-    name: Mapped[str] = string(120, index=True)
-    email: Mapped[str] = string(255, unique=True)
-    balance: Mapped[int] = big_integer(default=0)
-    is_active: Mapped[bool] = boolean(default=True)
-    transactions: Mapped[list[_Transaction]] = relationship(
+    id: int = id_()
+    name: str = string(120, index=True)
+    email: str = string(255, unique=True)
+    balance: int = big_integer(default=0)
+    is_active: bool = boolean(default=True)
+    transactions: list[_Transaction] = relationship(
         "_Transaction", init=False, default_factory=list
     )
 
@@ -198,23 +197,23 @@ class _Account(Model, Timestamps):
 class _Transaction(Model, Timestamps):
     __tablename__ = "transactions_columns_test"
 
-    id: Mapped[int] = id_()
-    balance: Mapped[int] = big_integer(default=0)
-    account_id: Mapped[int | None] = foreign_id("accounts_columns_test.id", nullable=True)
+    id: int = id_()
+    balance: int = big_integer(default=0)
+    account_id: int | None = foreign_id("accounts_columns_test.id", nullable=True)
 
 
 class _SoftAccount(Model, SoftDeletes):
     __tablename__ = "soft_accounts_columns_test"
 
-    id: Mapped[int] = id_()
-    name: Mapped[str] = string(120)
+    id: int = id_()
+    name: str = string(120)
 
 
 class _Vault(Model):
     __tablename__ = "vault_columns_test"
 
-    id: Mapped[int] = id_()
-    secret: Mapped[str] = column(_UpperString(50))
+    id: int = id_()
+    secret: str = column(_UpperString(50))
 
 
 async def _create_tables(engine: Any) -> None:

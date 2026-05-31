@@ -18,8 +18,8 @@ class Attribute:
     one descriptor — handy for computed values backed by several columns::
 
         class User(Model):
-            first_name: Mapped[str] = string(50)
-            last_name: Mapped[str] = string(50)
+            first_name: str = string(50)
+            last_name: str = string(50)
 
             full_name = Attribute.make(
                 get=lambda m: f"{m.first_name} {m.last_name}",

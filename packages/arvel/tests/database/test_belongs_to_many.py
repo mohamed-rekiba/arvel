@@ -14,13 +14,12 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from arvel.database import Model, Timestamps
+from arvel.database import Model, Timestamps, id_, string
 
 # RED: arvel.database.orm.BelongsToMany does not exist yet
 from arvel.database.orm import BelongsToMany
 from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 # ─── Schema ──────────────────────────────────────────────────────────────────
 
@@ -36,15 +35,15 @@ post_tag_table = Table(
 class BtmTag(Model):
     __tablename__ = "btm_tags"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: int = id_()
+    name: str = string(80)
 
 
 class BtmPost(Model, Timestamps):
     __tablename__ = "btm_posts"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    title: str = string(200)
 
     tags: ClassVar[BelongsToMany[BtmTag]] = BelongsToMany(
         BtmTag,

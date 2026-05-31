@@ -1101,7 +1101,7 @@ async def _load_fk_method_path(
 def _self_ref_children_relation(model: type[Any], parent_key: str) -> str | None:
     """Name of the self-referential one-to-many relation keyed on ``parent_key``.
 
-    A model declares the tree edge once as ``children: Mapped[list[Self]] =
+    A model declares the tree edge once as ``children: list[Self] =
     relationship(...)``. ``with_tree`` finds it here so it can hydrate each node's
     direct children in memory — then you walk ``node.children`` synchronously with
     no extra query. Returns None when no such relation is declared.
@@ -1810,7 +1810,7 @@ class QueryBuilder(Generic[T]):
 
     def where_full_text(
         self,
-        col: InstrumentedAttribute[Any],
+        col: ColumnElement[Any] | InstrumentedAttribute[Any],
         query: str,
         *,
         tsquery_fn: str = "plainto_tsquery",
@@ -1833,7 +1833,7 @@ class QueryBuilder(Generic[T]):
 
     def order_by_relevance(
         self,
-        col: InstrumentedAttribute[Any],
+        col: ColumnElement[Any] | InstrumentedAttribute[Any],
         query: str,
         *,
         lang: str = "english",

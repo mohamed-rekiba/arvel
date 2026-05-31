@@ -6,7 +6,7 @@ import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING, ClassVar
 
-from arvel.database import Model, Timestamps, decimal, foreign_uuid, id_, integer
+from arvel.database import Model, Timestamps, decimal, foreign_uuid, id_
 
 if TYPE_CHECKING:
     from arvel.database.orm.relations import BelongsTo
@@ -25,7 +25,7 @@ class CartItem(Model, Timestamps):
     id: int = id_()
     cart_id: uuid.UUID = foreign_uuid("carts.id", on_delete="CASCADE")
     product_id: uuid.UUID = foreign_uuid("products.id", on_delete="CASCADE")
-    quantity: int = integer(default=1)
+    quantity: int = 1
     unit_price_snapshot: Decimal = decimal(10, 2, default=Decimal(0))
 
     def cart(self) -> BelongsTo[Cart]:

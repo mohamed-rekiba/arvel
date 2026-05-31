@@ -9,44 +9,40 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from arvel.database import Model
+from arvel.database import Model, boolean, field, id_, relationship, string
 from arvel.database.query import QueryBuilder
-from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 _Constraint = Callable[[QueryBuilder[Any]], QueryBuilder[Any]]
 
 
 class Wi033User(Model):
     __tablename__ = "wi033_users"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    posts: Mapped[list[Wi033Post]] = relationship(
+    id: int = id_()
+    name: str = string(80)
+    posts: list[Wi033Post] = relationship(
         "Wi033Post", back_populates="author", init=False, default_factory=list
     )
 
 
 class Wi033Post(Model):
     __tablename__ = "wi033_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120))
-    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wi033_users.id"), default=None)
-    author: Mapped[Wi033User | None] = relationship("Wi033User", back_populates="posts", init=False)
-    comments: Mapped[list[Wi033Comment]] = relationship(
+    id: int = id_()
+    title: str = string(120)
+    user_id: int | None = field(foreign_key="wi033_users.id", default=None)
+    author: Wi033User | None = relationship("Wi033User", back_populates="posts", init=False)
+    comments: list[Wi033Comment] = relationship(
         "Wi033Comment", back_populates="post", init=False, default_factory=list
     )
 
 
 class Wi033Comment(Model):
     __tablename__ = "wi033_comments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(200))
-    spam: Mapped[bool] = mapped_column(default=False)
-    post_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wi033_posts.id"), default=None)
-    post: Mapped[Wi033Post | None] = relationship(
-        "Wi033Post", back_populates="comments", init=False
-    )
+    id: int = id_()
+    body: str = string(200)
+    spam: bool = boolean(default=False)
+    post_id: int | None = field(foreign_key="wi033_posts.id", default=None)
+    post: Wi033Post | None = relationship("Wi033Post", back_populates="comments", init=False)
 
 
 async def _setup(engine: AsyncEngine) -> None:
@@ -78,7 +74,7 @@ class TestNestedWhereHas:
             await Wi033User.query()
             .where_has(
                 "posts.comments",
-                lambda q: q.where(Wi033Comment.spam == False),  # noqa: E712
+                lambda q: q.where(Wi033Comment.__table__.c.spam == False),  # noqa: E712
             )
             .get()
         )
@@ -88,7 +84,7 @@ class TestNestedWhereHas:
             await Wi033User.query()
             .where_has(
                 "posts.comments",
-                lambda q: q.where(Wi033Comment.spam == True),  # noqa: E712
+                lambda q: q.where(Wi033Comment.__table__.c.spam == True),  # noqa: E712
             )
             .get()
         )
@@ -119,7 +115,7 @@ class TestOperatorCount:
         await Wi033Comment.create(body="spam", post_id=p.id, spam=True)
 
         # 2 non-spam comments → matches >= 2, not >= 3.
-        c: _Constraint = lambda q: q.where(Wi033Comment.spam == False)  # noqa: E712, E731
+        c: _Constraint = lambda q: q.where(Wi033Comment.__table__.c.spam == False)  # noqa: E712, E731
         matched = await Wi033Post.query().where_has("comments", c, ">=", 2).get()
         assert [x.title for x in matched] == ["p"]
         assert await Wi033Post.query().where_has("comments", c, ">=", 3).get() == []
@@ -134,7 +130,10 @@ class TestOrVariants:
         await Wi033Comment.create(body="x", post_id=commented.id)
 
         rows = await (
-            Wi033Post.query().where(Wi033Post.title == "special").or_where_has("comments").get()
+            Wi033Post.query()
+            .where(Wi033Post.__table__.c.title == "special")
+            .or_where_has("comments")
+            .get()
         )
         assert {p.title for p in rows} == {"commented", "special"}
 
@@ -146,7 +145,7 @@ class TestOrVariants:
 
         rows = await (
             Wi033Post.query()
-            .where(Wi033Post.title == "nonexistent")
+            .where(Wi033Post.__table__.c.title == "nonexistent")
             .or_doesnt_have("comments")
             .get()
         )
@@ -161,7 +160,7 @@ class TestOrVariants:
 
         rows = await (
             Wi033Post.query()
-            .where(Wi033Post.title == "nope")
+            .where(Wi033Post.__table__.c.title == "nope")
             .or_where_relation("comments", "body", "keeper")
             .get()
         )
@@ -183,7 +182,7 @@ class TestDoesntHaveConstraint:
             await Wi033Post.query()
             .doesnt_have(
                 "comments",
-                lambda q: q.where(Wi033Comment.spam == False),  # noqa: E712
+                lambda q: q.where(Wi033Comment.__table__.c.spam == False),  # noqa: E712
             )
             .get()
         )
@@ -206,7 +205,7 @@ class TestWithWhereHas:
             await Wi033Post.query()
             .with_where_has(
                 "comments",
-                lambda q: q.where(Wi033Comment.spam == False),  # noqa: E712
+                lambda q: q.where(Wi033Comment.__table__.c.spam == False),  # noqa: E712
             )
             .get()
         )

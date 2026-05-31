@@ -2,25 +2,23 @@
 
 from __future__ import annotations
 
-from arvel.database import Model
-from sqlalchemy import ForeignKey, Integer, String
+from arvel.database import Model, field, id_, string
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Person(Model):
     __tablename__ = "lj_people"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    given: Mapped[str] = mapped_column(String(40), default="")
-    last: Mapped[str] = mapped_column(String(40), default="")
-    city: Mapped[str] = mapped_column(String(40), default="")
+    id: int = id_()
+    given: str = string(40, default="")
+    last: str = string(40, default="")
+    city: str = string(40, default="")
 
 
 class Pet(Model):
     __tablename__ = "lj_pets"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    owner_id: Mapped[int] = mapped_column(ForeignKey("lj_people.id"), default=0)
-    species: Mapped[str] = mapped_column(String(20), default="")
+    id: int = id_()
+    owner_id: int = field(foreign_key="lj_people.id", default=0)
+    species: str = string(20, default="")
 
 
 async def _seed(engine: AsyncEngine) -> None:
@@ -86,8 +84,8 @@ async def test_where_none(engine: AsyncEngine, session: AsyncSession) -> None:
 async def test_join_on_closure(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
     rows = await (
-        Person.join_on(Pet, lambda j: j.on(Pet.owner_id == Person.id))
-        .where(Pet.species == "cat")
+        Person.join_on(Pet, lambda j: j.on(Pet.__table__.c.owner_id == Person.__table__.c.id))
+        .where(Pet.__table__.c.species == "cat")
         .all()
     )
     assert [r.given for r in rows] == ["Alice"]
@@ -98,7 +96,9 @@ async def test_join_on_or_on(engine: AsyncEngine, session: AsyncSession) -> None
     rows = await (
         Person.join_on(
             Pet,
-            lambda j: j.on(Pet.owner_id == Person.id).or_on(Pet.species == "nope"),
+            lambda j: j.on(Pet.__table__.c.owner_id == Person.__table__.c.id).or_on(
+                Pet.__table__.c.species == "nope"
+            ),
         )
         .order_by("id")
         .all()
@@ -116,5 +116,5 @@ async def test_cross_join(engine: AsyncEngine, session: AsyncSession) -> None:
 async def test_right_join(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
     # right join keeps all pets (both have owners here)
-    rows = await Person.right_join(Pet, Pet.owner_id == Person.id).all()
+    rows = await Person.right_join(Pet, Pet.__table__.c.owner_id == Person.__table__.c.id).all()
     assert len(rows) == 2

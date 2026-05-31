@@ -5,28 +5,23 @@ from_sub, join_sub / left_join_sub, select_sub, add_select.
 
 from __future__ import annotations
 
-from arvel.database import Model
-from sqlalchemy import Integer, String, func
+from arvel.database import Model, boolean, id_, integer, string
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class SqUser(Model):
     __tablename__ = "sq_users"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
-    active: Mapped[bool] = mapped_column(default=True)
+    id: int = id_()
+    name: str = string(80)
+    active: bool = boolean(default=True)
 
 
 class SqOrder(Model):
     __tablename__ = "sq_orders"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    amount: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    id: int = id_()
+    user_id: int = integer()
+    amount: int = integer(default=0)
 
 
 async def _setup(engine: AsyncEngine) -> None:
@@ -47,7 +42,9 @@ async def test_from_sub_selects_derived_table(engine: AsyncEngine, session: Asyn
     await _setup(engine)
     await _seed()
 
-    rows = await SqUser.from_sub(SqUser.where(SqUser.active.is_(True)), "active_users").get()
+    rows = await SqUser.from_sub(
+        SqUser.where(SqUser.__table__.c.active.is_(True)), "active_users"
+    ).get()
 
     assert {r["name"] for r in rows} == {"Alice"}
     assert all(r["active"] for r in rows)
@@ -57,8 +54,10 @@ async def test_join_sub_inner(engine: AsyncEngine, session: AsyncSession) -> Non
     await _setup(engine)
     alice, _bob = await _seed()
 
-    high_value = SqOrder.where(SqOrder.amount >= 100)
-    rows = await SqUser.join_sub(high_value, "hv", lambda hv: hv.c.user_id == SqUser.id).get()
+    high_value = SqOrder.where(SqOrder.__table__.c.amount >= 100)
+    rows = await SqUser.join_sub(
+        high_value, "hv", lambda hv: hv.c.user_id == SqUser.__table__.c.id
+    ).get()
 
     assert {u.id for u in rows} == {alice.id}
 
@@ -67,8 +66,10 @@ async def test_left_join_sub_keeps_unmatched(engine: AsyncEngine, session: Async
     await _setup(engine)
     alice, bob = await _seed()
 
-    high_value = SqOrder.where(SqOrder.amount >= 100)
-    rows = await SqUser.left_join_sub(high_value, "hv", lambda hv: hv.c.user_id == SqUser.id).get()
+    high_value = SqOrder.where(SqOrder.__table__.c.amount >= 100)
+    rows = await SqUser.left_join_sub(
+        high_value, "hv", lambda hv: hv.c.user_id == SqUser.__table__.c.id
+    ).get()
 
     # Both users survive the LEFT JOIN even though Bob has no high-value order.
     assert {u.id for u in rows} == {alice.id, bob.id}
@@ -81,7 +82,7 @@ async def test_select_sub_appends_correlated_column(
     await _seed()
 
     top_amount = (
-        SqOrder.where(SqOrder.user_id == SqUser.id)
+        SqOrder.where(SqOrder.__table__.c.user_id == SqUser.__table__.c.id)
         .order_by_desc("amount")
         .limit(1)
         .select("amount")
@@ -98,7 +99,9 @@ async def test_add_select_appends_expression(engine: AsyncEngine, session: Async
     await _seed()
 
     rows = (
-        await SqUser.add_select(func.upper(SqUser.name).label("upper_name")).order_by("name").get()
+        await SqUser.add_select(func.upper(SqUser.__table__.c.name).label("upper_name"))
+        .order_by("name")
+        .get()
     )
 
     by_name = {u.name: u for u in rows}

@@ -3,12 +3,11 @@
 Arvel models extend :class:`arvel.database.Model` (which composes
 SQLAlchemy :class:`DeclarativeBase` with Arvel's ``ActiveRecord``
 mixin). Columns use the typed helpers in :mod:`arvel.database.columns`
-(``id_``, ``string``, ``integer``, …) — each is a thin wrapper around
-:func:`sqlalchemy.orm.mapped_column` that returns ``Mapped[T]``. Write
-the plain annotation (``id: int = id_()``); the model metaclass wraps it
-in ``Mapped[int]`` at runtime. ``Mapped[...]`` is still required for
-relationships and for columns with no helper on the right. Drop down to
-``mapped_column(...)`` when a column needs something the helpers don't cover.
+(``id_``, ``string``, ``integer``, …). Write the plain annotation
+(``id: int = id_()``); the model metaclass wraps it in ``Mapped[int]`` at
+runtime. Relationships are plain too — ``posts: list[Post] = relationship(...)``
+— and a bare annotation (``name: str``) with no helper infers its column.
+You never write the SQLAlchemy wrapper yourself.
 
 The default stub includes a primary key, a sample text column, and the
 :class:`arvel.database.Timestamps` mixin so ``created_at`` /

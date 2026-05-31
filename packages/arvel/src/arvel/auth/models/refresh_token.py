@@ -28,11 +28,8 @@ from datetime import UTC
 from datetime import datetime as _datetime
 from typing import ClassVar
 
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped
-
 from arvel.database.attributes import accessor
-from arvel.database.columns import column, datetime, string
+from arvel.database.columns import field
 from arvel.database.model import Model, Timestamps
 
 
@@ -64,11 +61,11 @@ class RefreshToken(Model, Timestamps):
     ]
     __hidden__: ClassVar[list[str] | None] = ["token_hash"]
 
-    id: Mapped[str] = column(String(36), primary_key=True, init=False, default_factory=_new_id)
-    user_id: Mapped[str] = string(36, index=True)
-    token_hash: Mapped[str] = string(64, unique=True)
-    expires_at: Mapped[_datetime] = datetime()
-    revoked_at: Mapped[_datetime | None] = datetime(nullable=True, default=None)
+    id: str = field(length=36, primary_key=True, init=False, default_factory=_new_id)
+    user_id: str = field(length=36, index=True)
+    token_hash: str = field(length=64, unique=True)
+    expires_at: _datetime
+    revoked_at: _datetime | None = None
 
     @accessor
     def is_expired(self) -> bool:

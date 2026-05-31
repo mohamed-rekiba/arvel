@@ -4,17 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from arvel.database import Model, Observer
+from arvel.database import Model, Observer, id_, string
 from arvel.database.events import clear_observers
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Note(Model):
     __tablename__ = "notes_o"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    body: str = string(200)
 
 
 class RecordingObserver(Observer[Note]):

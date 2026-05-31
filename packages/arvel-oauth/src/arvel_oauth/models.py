@@ -10,12 +10,11 @@ from __future__ import annotations
 import json
 from typing import Any, cast
 
-from arvel.database import foreign_string, id_, nullable_column, string
+from arvel.database import field, nullable_column
 from arvel.database.model import Model, Timestamps
 from arvel.facades.crypt import Crypt
 from sqlalchemy import Text, TypeDecorator, UniqueConstraint
 from sqlalchemy.engine import Dialect
-from sqlalchemy.orm import Mapped
 
 
 class EncryptedJson(TypeDecorator[dict[str, Any]]):
@@ -51,11 +50,11 @@ class OAuthAccount(Model, Timestamps):
         UniqueConstraint("provider", "provider_id", name="oauth_accounts_provider_unique"),
     )
 
-    id: Mapped[int] = id_(init=False)
-    user_id: Mapped[str] = foreign_string("users.id", on_delete="CASCADE")
-    provider: Mapped[str] = string(40)
-    provider_id: Mapped[str] = string(255)
-    tokens: Mapped[dict[str, Any] | None] = nullable_column(EncryptedJson(), default=None)
+    id: int = field(default=None, primary_key=True, init=False)
+    user_id: str = field(length=36, foreign_key="users.id", on_delete="CASCADE", index=True)
+    provider: str = field(length=40)
+    provider_id: str
+    tokens: dict[str, Any] | None = nullable_column(EncryptedJson(), default=None)
 
 
 __all__ = ["EncryptedJson", "OAuthAccount"]

@@ -9,32 +9,29 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model, ModelCollection
+from arvel.database import Model, ModelCollection, foreign_id, id_, relationship, string
 from arvel.database.exceptions import UnknownRelationError
-from sqlalchemy import ForeignKey, Integer, String, event
+from sqlalchemy import event
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class Wi037User(Model):
     __tablename__ = "wi037_users"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), default="")
-    secret: Mapped[str] = mapped_column(String(80), default="")
-    posts: Mapped[list[Wi037Post]] = relationship(
+    id: int = id_()
+    name: str = string(80, default="")
+    secret: str = string(80, default="")
+    posts: list[Wi037Post] = relationship(
         "Wi037Post", back_populates="author", init=False, default_factory=list
     )
 
 
 class Wi037Post(Model):
     __tablename__ = "wi037_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), default="")
-    user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("wi037_users.id"), nullable=True, default=None
-    )
-    author: Mapped[Wi037User | None] = relationship("Wi037User", back_populates="posts", init=False)
+    id: int = id_()
+    title: str = string(120, default="")
+    user_id: int | None = foreign_id("wi037_users.id", nullable=True)
+    author: Wi037User | None = relationship("Wi037User", back_populates="posts", init=False)
 
 
 async def _setup(engine: AsyncEngine) -> None:
@@ -96,7 +93,7 @@ class TestSetOps:
         assert users.only(a.id, c.id).model_keys() == [a.id, c.id]
         assert users.except_(b.id).model_keys() == [a.id, c.id]
 
-        subset = await Wi037User.query().where(Wi037User.id == b.id).get()
+        subset = await Wi037User.query().where(Wi037User.__table__.c.id == b.id).get()
         assert users.diff(subset).model_keys() == [a.id, c.id]
         assert users.intersect(subset).model_keys() == [b.id]
 
@@ -176,7 +173,7 @@ class TestToQueryAndFresh:
         await _setup(engine)
         a = await Wi037User.create(name="a")
         await Wi037User.create(name="b")
-        only_a = await Wi037User.query().where(Wi037User.id == a.id).get()
+        only_a = await Wi037User.query().where(Wi037User.__table__.c.id == a.id).get()
 
         count = await only_a.to_query().count()
         assert count == 1
@@ -196,7 +193,7 @@ class TestToQueryAndFresh:
         b = await Wi037User.create(name="b")
         users = await Wi037User.query().order_by("id").get()
 
-        await Wi037User.query().where(Wi037User.id == a.id).update({"name": "renamed"})
+        await Wi037User.query().where(Wi037User.__table__.c.id == a.id).update({"name": "renamed"})
 
         fresh = await users.fresh()
         assert fresh.model_keys() == [a.id, b.id]

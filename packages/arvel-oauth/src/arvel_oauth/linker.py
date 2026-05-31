@@ -51,16 +51,16 @@ class OAuthAccountLinker:
         return account
 
     async def _find_account(self, oauth_user: OAuthUser) -> OAuthAccount | None:
-        stmt = select(OAuthAccount).where(
-            OAuthAccount.provider == oauth_user.provider,
-            OAuthAccount.provider_id == oauth_user.provider_id,
+        stmt = select(OAuthAccount).filter_by(
+            provider=oauth_user.provider,
+            provider_id=oauth_user.provider_id,
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
     async def _resolve_user(self, oauth_user: OAuthUser) -> User:
         if oauth_user.email and oauth_user.email_verified:
-            stmt = select(self._user_model).where(self._user_model.email == oauth_user.email)
+            stmt = select(self._user_model).filter_by(email=oauth_user.email)
             result = await self._session.execute(stmt)
             match = result.scalar_one_or_none()
             if match is not None:

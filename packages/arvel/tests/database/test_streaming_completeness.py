@@ -6,16 +6,14 @@ early-termination via returning False; offset chunk auto-orders by PK.
 
 from __future__ import annotations
 
-from arvel.database import Model
-from sqlalchemy import Integer, String
+from arvel.database import Model, id_, string
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class StreamRow(Model):
     __tablename__ = "stream_rows"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(40), default="")
+    id: int = id_()
+    name: str = string(40, default="")
 
 
 async def _seed(engine: AsyncEngine, n: int = 5) -> None:

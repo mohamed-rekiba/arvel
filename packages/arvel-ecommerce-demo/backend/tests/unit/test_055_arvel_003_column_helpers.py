@@ -157,10 +157,10 @@ def test_role_level_field_in_model() -> None:
     assert "level" in src, "Role.level not found in arvel_permission/models.py"
 
 
-def test_role_level_uses_integer_helper() -> None:
-    """FR-006: Role.level uses integer() column helper."""
+def test_role_level_is_integer_column() -> None:
+    """FR-006: Role.level is an integer column via the bare-annotation form."""
     src = _src(ARVEL_PERM_MODELS)
-    assert "integer(" in src and "level" in src
+    assert "level: int" in src
 
 
 def test_arvel_permission_migration_has_level() -> None:

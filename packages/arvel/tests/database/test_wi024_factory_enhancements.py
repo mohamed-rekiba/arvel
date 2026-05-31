@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 import pytest
-from arvel.database import Factory, Model, SoftDeletes, Timestamps
+from arvel.database import Factory, Model, SoftDeletes, Timestamps, id_, string
 from arvel.database.db import DB
 from arvel.database.orm import BelongsToMany
 from sqlalchemy import Column, ForeignKey, Integer, String, Table, select
@@ -22,7 +22,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.pool import StaticPool
 
 wi024_role_user = Table(
@@ -36,14 +35,14 @@ wi024_role_user = Table(
 
 class Wi024Role(Model):
     __tablename__ = "wi024_roles"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(40), nullable=False)
+    id: int = id_()
+    name: str = string(40)
 
 
 class Wi024User(Model, Timestamps, SoftDeletes):
     __tablename__ = "wi024_users"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: int = id_()
+    name: str = string(80)
 
     roles: ClassVar[BelongsToMany[Wi024Role]] = BelongsToMany(
         Wi024Role,
@@ -102,8 +101,11 @@ class TestTrashedState:
         assert isinstance(user, Wi024User)
         assert user.trashed()
         # Hidden by the default soft-delete scope, visible via with_trashed.
-        assert await Wi024User.where(Wi024User.id == user.id).first() is None
-        assert await Wi024User.with_trashed().where(Wi024User.id == user.id).first() is not None
+        assert await Wi024User.where(Wi024User.__table__.c.id == user.id).first() is None
+        assert (
+            await Wi024User.with_trashed().where(Wi024User.__table__.c.id == user.id).first()
+            is not None
+        )
 
     def test_trashed_requires_soft_deletes(self) -> None:
         with pytest.raises(AttributeError, match="SoftDeletes"):
@@ -154,7 +156,7 @@ class TestConnectionSelection:
             assert isinstance(user, Wi024User)
             async with maker() as s:
                 found = (
-                    await s.execute(select(Wi024User).where(Wi024User.id == user.id))
+                    await s.execute(select(Wi024User).where(Wi024User.__table__.c.id == user.id))
                 ).scalar_one_or_none()
                 assert found is not None
         finally:

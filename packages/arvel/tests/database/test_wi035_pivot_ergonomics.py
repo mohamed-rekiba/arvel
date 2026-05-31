@@ -9,11 +9,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import ClassVar
 
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.database.orm import BelongsToMany
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Table
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 wi035_post_tags = Table(
     "wi035_post_tags",
@@ -29,14 +28,14 @@ wi035_post_tags = Table(
 
 class Wi035Tag(Model):
     __tablename__ = "wi035_tags"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    name: str = string(80)
 
 
 class Wi035Post(Model):
     __tablename__ = "wi035_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120))
+    id: int = id_()
+    title: str = string(120)
 
     tags: ClassVar[BelongsToMany[Wi035Tag]] = (
         BelongsToMany(

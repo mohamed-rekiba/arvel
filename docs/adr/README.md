@@ -62,6 +62,7 @@ documents the reversal and links to the original.
 | [ADR-104](ADR-104-uuid7-stdlib.md) | Use `uuid.uuid7` from stdlib instead of a custom implementation |
 | [ADR-113](ADR-113-order-column-select-max.md) | `order_column` assigned via `SELECT MAX + 1` |
 | [ADR-118](ADR-118-framework-query-builder-fixes.md) | Framework query builder critical fixes |
+| [ADR-157](ADR-157-clean-model-syntax-type-inferred-columns.md) | Clean model syntax: type-inferred columns + `field()` |
 
 ## Cache, Session, Storage
 

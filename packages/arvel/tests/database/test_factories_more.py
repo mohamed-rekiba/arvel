@@ -5,27 +5,25 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Factory, Model
-from sqlalchemy import ForeignKey, Integer, String
+from arvel.database import Factory, Model, foreign_id, id_, relationship, string
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class Author(Model):
     __tablename__ = "authors_m"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
-    books: Mapped[list[Book]] = relationship(
+    id: int = id_()
+    name: str = string(80)
+    books: list[Book] = relationship(
         "Book", back_populates="author", lazy="select", init=False, default_factory=list
     )
 
 
 class Book(Model):
     __tablename__ = "books_m"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), nullable=False)
-    author_id: Mapped[int] = mapped_column(Integer, ForeignKey("authors_m.id"), nullable=False)
-    author: Mapped[Author | None] = relationship(
+    id: int = id_()
+    title: str = string(120)
+    author_id: int = foreign_id("authors_m.id")
+    author: Author | None = relationship(
         "Author", back_populates="books", lazy="select", init=False
     )
 

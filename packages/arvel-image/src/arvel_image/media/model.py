@@ -17,9 +17,8 @@ import uuid as _uuid_module
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from arvel.database import Model, Timestamps
-from arvel.database.columns import big_integer, id_, integer, json, string
+from arvel.database.columns import big_integer, field, json
 from arvel.database.columns import uuid as uuid_column
-from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
     from arvel_image.media.path_generator import PathGenerator
@@ -65,30 +64,29 @@ class Media(Model, Timestamps):
         "responsive_images": "dict",
     }
 
-    id: Mapped[int] = id_(init=False)
-    model_type: Mapped[str] = string(255)
+    id: int = field(default=None, primary_key=True, init=False)
+    model_type: str
     # VARCHAR(36) to support UUID-PK host models (ADR-108, FR-046-08).
-    model_id: Mapped[str] = string(36)
-    name: Mapped[str] = string(255)
-    file_name: Mapped[str] = string(255)
-    disk: Mapped[str] = string(255)
+    model_id: str = field(length=36)
+    name: str
+    file_name: str
+    disk: str
     # BigInteger unsigned — matches migration stub (FR-046-15).
-    size: Mapped[int] = big_integer()
+    size: int = big_integer()
 
-    # Defaulted (init=True, with default)
-    collection_name: Mapped[str] = string(255, default="default")
-    manipulations: Mapped[dict[str, Any]] = json(default=dict)
-    custom_properties: Mapped[dict[str, Any]] = json(default=dict)
+    collection_name: str = "default"
+    manipulations: dict[str, Any] = json(default=dict)
+    custom_properties: dict[str, Any] = json(default=dict)
 
-    # Fields set by the system after row creation (not in __init__)
-    uuid: Mapped[str | None] = uuid_column(
+    # Set by the system after row creation — kept out of __init__.
+    uuid: str | None = uuid_column(
         nullable=True, unique=True, as_uuid=False, init=False, default=None
     )
-    mime_type: Mapped[str | None] = string(255, nullable=True, init=False, default=None)
-    conversions_disk: Mapped[str | None] = string(255, nullable=True, init=False, default=None)
-    generated_conversions: Mapped[dict[str, Any]] = json(init=False, default=dict)
-    responsive_images: Mapped[dict[str, Any]] = json(init=False, default=dict)
-    order_column: Mapped[int | None] = integer(nullable=True, index=True, init=False, default=None)
+    mime_type: str | None = field(init=False, default=None)
+    conversions_disk: str | None = field(init=False, default=None)
+    generated_conversions: dict[str, Any] = json(init=False, default=dict)
+    responsive_images: dict[str, Any] = json(init=False, default=dict)
+    order_column: int | None = field(index=True, init=False, default=None)
 
     # ─── helpers ───────────────────────────────────────────────────────────
 

@@ -12,23 +12,23 @@ from arvel.database import (
     RelationNotLoadedError,
     SoftDeletes,
     Timestamps,
+    id_,
+    string,
 )
 from pydantic import BaseModel
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class UserA(Model, Timestamps):
     __tablename__ = "users_a"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    id: int = id_()
+    name: str = string(100)
 
 
 class PostA(Model, Timestamps, SoftDeletes):
     __tablename__ = "posts_a"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    title: str = string(200)
 
 
 async def _create_tables(engine: Any) -> None:
@@ -113,9 +113,9 @@ async def test_to_json_respects_class_level_hidden(engine: Any, session: AsyncSe
     class SecretA(Model, Timestamps):
         __tablename__ = "secrets_a"
         __hidden__ = ["secret"]
-        id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-        name: Mapped[str] = mapped_column(String(100), nullable=False)
-        secret: Mapped[str] = mapped_column(String(100), nullable=False)
+        id: int = id_()
+        name: str = string(100)
+        secret: str = string(100)
 
     await _create_tables(engine)
     row = await SecretA.create(name="Vault", secret="redacted")

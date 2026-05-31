@@ -9,36 +9,34 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from arvel.database import Model
+from arvel.database import Model, id_, integer, string
 from arvel.database.orm import MorphMany, MorphTo
-from sqlalchemy import Integer, String
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Wi027Comment(Model):
     __tablename__ = "wi027_comments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(200), nullable=False)
-    commentable_type: Mapped[str] = mapped_column(String(60), nullable=True, default=None)
-    commentable_id: Mapped[int] = mapped_column(Integer, nullable=True, default=None)
+    id: int = id_()
+    body: str = string(200)
+    commentable_type: str | None = string(60, nullable=True, default=None)
+    commentable_id: int | None = integer(nullable=True, default=None)
 
     commentable: ClassVar[MorphTo[Any]] = MorphTo(name="commentable")
 
 
 class Wi027Post(Model):
     __tablename__ = "wi027_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    id: int = id_()
+    title: str = string(120)
 
     comments: ClassVar[MorphMany[Wi027Comment]] = MorphMany(Wi027Comment, name="commentable")
 
 
 class Wi027Video(Model):
     __tablename__ = "wi027_videos"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    id: int = id_()
+    name: str = string(120)
 
     comments: ClassVar[MorphMany[Wi027Comment]] = MorphMany(Wi027Comment, name="commentable")
 

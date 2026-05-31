@@ -8,34 +8,30 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
-from arvel.database import Model
+from arvel.database import Model, field, id_, relationship, string
+from arvel.database.columns import datetime as datetime_col
 from arvel.database.orm.relations import BelongsTo
-from sqlalchemy import DateTime, ForeignKey, Integer, String, event
+from sqlalchemy import event
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class Wi036User(Model):
     __tablename__ = "wi036_users"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), default="")
-    updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=None
-    )
-    posts: Mapped[list[Wi036Post]] = relationship(
+    id: int = id_()
+    name: str = string(80, default="")
+    updated_at: datetime | None = datetime_col(nullable=True, default=None)
+    posts: list[Wi036Post] = relationship(
         "Wi036Post", back_populates="author", init=False, default_factory=list
     )
 
 
 class Wi036Post(Model):
     __tablename__ = "wi036_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), default="")
-    user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("wi036_users.id"), nullable=True, default=None
-    )
-    author: Mapped[Wi036User | None] = relationship("Wi036User", back_populates="posts", init=False)
+    id: int = id_()
+    title: str = string(120, default="")
+    user_id: int | None = field(foreign_key="wi036_users.id", default=None)
+    author: Wi036User | None = relationship("Wi036User", back_populates="posts", init=False)
 
     __touches__: ClassVar[tuple[str, ...]] = ("author_relation",)
 
@@ -175,7 +171,7 @@ class TestPush:
 
         await loaded.refresh()
         assert loaded.name == "renamed"
-        fresh_post = await Wi036Post.query().where(Wi036Post.user_id == user.id).first()
+        fresh_post = await Wi036Post.query().where(Wi036Post.__table__.c.user_id == user.id).first()
         assert fresh_post is not None and fresh_post.title == "edited"
 
     async def test_push_skips_unloaded_relations(

@@ -11,7 +11,6 @@ from arvel.database import (
     Model,
     SoftDeletes,
     Timestamps,
-    datetime,
     enum,
     id_,
     string,
@@ -46,16 +45,16 @@ class User(
     __tablename__ = "users"
 
     _auth_password_field: ClassVar[str] = "password"  # noqa: S105
-    default_guard_name: str = "api"
+    default_guard_name: ClassVar[str] = "api"
 
     id: int = id_()
     name: str = string(120)
     email: str = string(254, unique=True, index=True)
-    email_verified_at: _datetime | None = datetime(nullable=True, default=None)
-    password: str = string(255)
+    email_verified_at: _datetime | None = None
+    password: str
     locale: str = string(10, default="en")
     theme: str = enum(["light", "dark", "system"], name="users_theme", default="system")
-    suspended_at: _datetime | None = datetime(nullable=True, default=None)
+    suspended_at: _datetime | None = None
     remember_token: str | None = string(100, nullable=True, default=None)
 
     roles: ClassVar[MorphToMany[Role]] = MorphToMany(

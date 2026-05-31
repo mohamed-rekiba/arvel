@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import pytest
 from arvel.context.facade import Context
-from arvel.database.model import Model
+from arvel.database import Model, id_, integer, string
 from arvel_audit import REDACTED, AuditEntry
 from arvel_audit.auditable import Auditable
-from sqlalchemy import Integer, String, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 pytestmark = pytest.mark.asyncio
 
@@ -17,23 +16,23 @@ pytestmark = pytest.mark.asyncio
 class Widget(Model, Auditable):
     __tablename__ = "audit_widgets"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    price: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    id: int = id_()
+    name: str = string(100)
+    price: int = integer(default=0)
 
 
 class SecretCard(Model, Auditable):
     __tablename__ = "audit_secret_cards"
     __audit_redact__ = {"card_number", "cvv"}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    card_number: Mapped[str] = mapped_column(String(32), nullable=False)
-    cvv: Mapped[str] = mapped_column(String(8), nullable=False)
-    holder: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    id: int = id_()
+    card_number: str = string(32)
+    cvv: str = string(8)
+    holder: str = string(100, default="")
 
 
 async def _entries(session: AsyncSession) -> list[AuditEntry]:
-    result = await session.execute(select(AuditEntry).order_by(AuditEntry.id.asc()))
+    result = await session.execute(select(AuditEntry).order_by(AuditEntry.__table__.c.id.asc()))
     return list(result.scalars().all())
 
 

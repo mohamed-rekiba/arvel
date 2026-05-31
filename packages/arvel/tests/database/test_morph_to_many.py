@@ -10,12 +10,11 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 import pytest
-from arvel.database import Model, Timestamps
+from arvel.database import Model, Timestamps, id_, string
 from arvel.database.exceptions import UnknownRelationError
 from arvel.database.orm import MorphToMany
 from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 mtm_taggables = Table(
     "mtm_taggables",
@@ -28,14 +27,14 @@ mtm_taggables = Table(
 
 class MtmTag(Model, Timestamps):
     __tablename__ = "mtm_tags"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    name: str = string(80)
 
 
 class MtmPost(Model):
     __tablename__ = "mtm_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    title: str = string(80)
     tags: ClassVar[MorphToMany[MtmTag]] = MorphToMany(
         MtmTag, table=mtm_taggables, name="taggable", related_key="tag_id"
     )
@@ -43,8 +42,8 @@ class MtmPost(Model):
 
 class MtmVideo(Model):
     __tablename__ = "mtm_videos"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    title: str = string(80)
     tags: ClassVar[MorphToMany[MtmTag]] = MorphToMany(
         MtmTag, table=mtm_taggables, name="taggable", related_key="tag_id"
     )

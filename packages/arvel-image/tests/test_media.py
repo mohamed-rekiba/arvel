@@ -18,7 +18,6 @@ pytest.importorskip("PIL", reason="arvel-image depends on Pillow")
 # Imported at module level so SA can resolve string-form annotations
 # (``from __future__ import annotations`` stringifies ``Mapped[int]``;
 # SQLAlchemy looks the name up in this module's globals).
-from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -219,8 +218,8 @@ def _host_user_class() -> type[Any]:
         # by packages/arvel/tests/ when the full suite runs together.
         __tablename__ = "media_test_users"
 
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
         def register_media_collections(self) -> None:
             (
@@ -527,8 +526,8 @@ async def test_failing_conversion_raises_and_leaves_no_partial_file(
     class HostBad(Model, HasMedia, Timestamps):
         __tablename__ = "boom_hosts"
 
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
         def register_media_collections(self) -> None:
             (

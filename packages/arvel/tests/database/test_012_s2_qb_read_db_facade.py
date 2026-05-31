@@ -10,35 +10,30 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, foreign_id, id_, integer, relationship, string
 from arvel.database.db import DB
-from sqlalchemy import ForeignKey, Integer, String, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 # ─── Test models ─────────────────────────────────────────────────────────────
 
 
 class AuthorS2(Model):
     __tablename__ = "authors_s2"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    name: Mapped[str] = mapped_column(String(80))
-    score: Mapped[int] = mapped_column(Integer, default=0)
-    books: Mapped[list[BookS2]] = relationship(
+    id: int = id_()
+    name: str = string(80)
+    score: int = integer(default=0)
+    books: list[BookS2] = relationship(
         "BookS2", back_populates="author", init=False, default_factory=list
     )
 
 
 class BookS2(Model):
     __tablename__ = "books_s2"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    title: Mapped[str] = mapped_column(String(200))
-    author_id: Mapped[int] = mapped_column(Integer, ForeignKey("authors_s2.id"))
-    author: Mapped[AuthorS2 | None] = relationship("AuthorS2", back_populates="books", init=False)
+    id: int = id_()
+    title: str = string(200)
+    author_id: int = foreign_id("authors_s2.id")
+    author: AuthorS2 | None = relationship("AuthorS2", back_populates="books", init=False)
 
 
 async def _setup(engine: AsyncEngine) -> None:

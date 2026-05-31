@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from arvel.database.model import Model
+from arvel.database import Model, id_, string
 from arvel_audit import ActivityQuery, MissingActivityDescription, activity
 from arvel_audit.auditable import Auditable
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 pytestmark = pytest.mark.asyncio
 
@@ -16,17 +14,17 @@ pytestmark = pytest.mark.asyncio
 class Account(Model):
     __tablename__ = "activity_accounts"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    id: int = id_()
+    name: str = string(100)
 
 
 class Report(Model, Auditable):
     __tablename__ = "activity_reports"
     __audit_redact__ = {"token"}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(100), nullable=False)
-    token: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    id: int = id_()
+    title: str = string(100)
+    token: str = string(100, default="")
 
 
 async def test_full_chain_records_subject_and_causer(tables: None, session: AsyncSession) -> None:

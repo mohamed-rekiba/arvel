@@ -12,28 +12,27 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any, ClassVar
 
-from arvel.database import Model
+from arvel.database import Model, id_, integer, string
+from arvel.database import datetime as datetime_col
 from arvel.database.orm import HasOneOfMany
-from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 _BASE = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 class Wi030Comment(Model):
     __tablename__ = "wi030_comments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(200), nullable=False)
-    wi030_post_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    id: int = id_()
+    body: str = string(200)
+    wi030_post_id: int = integer()
+    created_at: datetime = datetime_col(timezone=True)
 
 
 class Wi030Post(Model):
     __tablename__ = "wi030_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    id: int = id_()
+    title: str = string(120)
 
     latest_comment: ClassVar[HasOneOfMany[Wi030Comment]] = HasOneOfMany(
         Wi030Comment, column="created_at", aggregate="max"

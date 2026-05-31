@@ -20,7 +20,6 @@ import pytest
 pytest.importorskip("arvel_image", reason="arvel_image is the package under test")
 pytest.importorskip("PIL", reason="arvel-image depends on Pillow")
 
-from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -73,8 +72,8 @@ def _host_046() -> type[Any]:
     class Host046(Model, HasMedia, Timestamps):
         __tablename__ = "media_046_hosts"
 
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(120)
+        id: int = id_()
+        name: str = string(120)
 
         def register_media_collections(self) -> None:
             MediaCollection("avatar", single_file=True).with_conversions(
@@ -172,7 +171,7 @@ async def test_rollback_on_conversion_failure_deletes_row_and_file(
         from sqlalchemy import select
 
         sess = get_active_session()
-        result = await sess.execute(select(Media).where(Media.model_id == str(host.id)))
+        result = await sess.execute(select(Media).filter_by(model_id=str(host.id)))
         rows = list(result.scalars())
         assert rows == [], "orphaned Media row found after conversion failure"
 

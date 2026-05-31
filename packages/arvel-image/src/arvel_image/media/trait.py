@@ -106,7 +106,7 @@ async def get_media_ordered(host: HasMedia, collection: str) -> list[Media]:
         .where(Media.model_type == _model_type_for(host))
         .where(Media.model_id == str(host.host_pk()))
         .where(Media.collection_name == collection)
-        .order_by(nullslast(asc(Media.order_column)), asc(Media.id))
+        .order_by(nullslast(asc(Media.__table__.c.order_column)), asc(Media.__table__.c.id))
     )
     return list(await query.all())
 
@@ -258,7 +258,7 @@ class HasMedia:
             Media.query()
             .where(Media.model_type == _model_type_for(self))
             .where(Media.model_id == str(self.host_pk()))
-            .order_by(nullslast(asc(Media.order_column)), asc(Media.id))
+            .order_by(nullslast(asc(Media.__table__.c.order_column)), asc(Media.__table__.c.id))
         )
         return list(await query.all())
 
