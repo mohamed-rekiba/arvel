@@ -919,3 +919,27 @@ events:
       docs/site/docs/social-auth.md; arvel[auth-social] extra. Tests: 34 package tests pass;
       mypy/pyright/ruff/bandit clean. 002 S1–S5 DONE — epic 002 complete.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-039"
+    event_id: "EV-058"
+    timestamp: "2026-05-31T06:30:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      Backlog 003 (all stories) — arvel-search companion package, Scout-style full-text search. S1
+      Searchable mixin: declare __searchable__; lifecycle hooks (created/updated/restored/deleted)
+      auto-wired at class definition sync to the engine; only declared columns are indexed (sensitive
+      columns warn at class-def time); search_index_name() defaults to __tablename__; to_searchable_array
+      includes the key plus declared columns. SEARCH_QUEUE_SYNC dispatches SearchIndexJob/SearchRemoveJob
+      that re-load rows by key for committed-state indexing. S2 SearchBuilder fluent API: where/limit/
+      offset/get/keys/count/raw/first/paginate; hydration preserves engine relevance order; query
+      forwarded verbatim (no injection); SearchEngineNotConfigured on missing engine. S3 multi-driver
+      via SEARCH_DRIVER: database (SQL ILIKE, bound params), meilisearch + elasticsearch (REST over
+      httpx, no SDKs), with register_driver() for custom engines and UnknownSearchDriverError on bad
+      names. S4 null (no-op) + collection (in-memory substring) drivers and Search.fake()/SearchFake
+      (assert_indexed/assert_removed/assert_nothing_indexed/assert_indexed_count). Search facade with
+      fake()/restore(). Docs: docs/site/docs/search.md; arvel[search] extra. Tests: 59 package tests
+      pass; mypy/pyright/ruff clean. 003 S1–S4 DONE — epic 003 complete.
+    handoff_id: null

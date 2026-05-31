@@ -1,0 +1,37 @@
+[project]
+name = "arvel-search"
+version = "0.1.0" # x-release-please-version
+description = "Scout-style full-text search for Arvel — Meilisearch, Elasticsearch, database, collection, and null drivers."
+readme = "README.md"
+requires-python = ">=3.14"
+license = { text = "MIT" }
+authors = [{ name = "Arvel contributors" }]
+keywords = ["arvel", "search", "full-text", "meilisearch", "elasticsearch", "scout"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+dependencies = [
+    "arvel",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.1",
+    "sqlalchemy[asyncio]>=2.0.49",
+    "httpx>=0.28.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/mohamed-rekiba/arvel"
+Documentation = "https://github.com/mohamed-rekiba/arvel/tree/main/packages/arvel-search"
+Repository = "https://github.com/mohamed-rekiba/arvel"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/arvel_search"]
+include = ["src/arvel_search/py.typed"]

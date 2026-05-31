@@ -17,6 +17,7 @@ arvel = { workspace = true }
 arvel-permission = { workspace = true }
 arvel-image = { workspace = true }
 arvel-auth-social = { workspace = true }
+arvel-search = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -24,6 +25,7 @@ dev = [
     "arvel-permission",
     "arvel-image",
     "arvel-auth-social",
+    "arvel-search",
     "bandit>=1.9.4",
     "coverage[toml]>=7.14.0",
     "cyclonedx-bom>=7.3.0",
@@ -129,6 +131,19 @@ ignore = [
 ]
 "packages/arvel-auth-social/src/arvel_auth_social/providers/**" = [
     "PLR0913", # OAuth provider constructors carry the full credential + endpoint param set
+]
+"packages/arvel-search/src/arvel_search/exceptions.py" = [
+    "N818", # SearchEngineNotConfigured is a public API name, not an *Error
+]
+"packages/arvel-search/src/arvel_search/engines/**" = [
+    "ARG002",  # Engine protocol methods keep a fixed (index, documents, key) signature
+    "PLR0913", # the REST drivers' private _request helper carries the full httpx knob set
+]
+"packages/arvel-search/src/arvel_search/searchable.py" = [
+    "PLC0415", # Bus/jobs imported lazily inside dispatch to break the queue import cycle
+]
+"packages/arvel-search/src/arvel_search/facade.py" = [
+    "PLC0415", # SearchFake imported lazily to keep test doubles out of the prod path
 ]
 "packages/arvel-ecommerce-demo/backend/app/http/controllers/i18n.py" = [
     "RUF001", # intentional Turkish locale strings — dotless-i is correct spelling
@@ -321,7 +336,7 @@ disallow_any_explicit = false
 explicit_package_bases = true
 namespace_packages = true
 plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
-mypy_path = "packages/arvel/src:packages/arvel-permission/src:packages/arvel-image/src:packages/arvel-auth-social/src:packages/arvel-auth-social"
+mypy_path = "packages/arvel/src:packages/arvel-permission/src:packages/arvel-image/src:packages/arvel-auth-social/src:packages/arvel-auth-social:packages/arvel-search/src"
 files = [
     "packages/arvel/src",
     "packages/arvel/tests",
@@ -331,6 +346,11 @@ files = [
     "packages/arvel-image/tests",
     "packages/arvel-auth-social/src",
     "packages/arvel-auth-social/tests",
+    "packages/arvel-search/src",
+    # arvel-search tests share a test-only model across files, which promotes
+    # the dir to a sys.path root and would expose `conftest` globally — colliding
+    # with other packages' `conftest` under the flat run. Checked in isolation
+    # via a dedicated `mypy packages/arvel-search/tests` step (see Makefile).
 ]
 # The skeleton tree is template content, not framework source — it runs under
 # a generated project's sys.path (where `bootstrap.app` exists), not the
@@ -405,6 +425,8 @@ include = [
     "packages/arvel-image/tests",
     "packages/arvel-auth-social/src",
     "packages/arvel-auth-social/tests",
+    "packages/arvel-search/src",
+    "packages/arvel-search/tests",
 ]
 # The skeleton tree is template content, not framework source — it runs
 # under a generated project's sys.path, not the framework's, so imports
@@ -423,6 +445,8 @@ extraPaths = [
     "packages/arvel-permission/src",
     "packages/arvel-image/src",
     "packages/arvel-auth-social/src",
+    "packages/arvel-search/src",
+    "packages/arvel-search/tests",
 ]
 # All `report*` checks promoted to error. Per `enforce-quality-gates.mdc`,
 # warnings are not acceptable: every finding must be resolved with a real
@@ -452,6 +476,7 @@ testpaths = [
     "packages/arvel-permission/tests",
     "packages/arvel-image/tests",
     "packages/arvel-auth-social/tests",
+    "packages/arvel-search/tests",
 ]
 markers = [
     "slow: marks tests as slow",
