@@ -344,7 +344,7 @@ await post.tags.save(existing_tag, pivot={"priority": 7})
 Use `MorphOne` or `MorphMany` when several models share the same child table.
 
 ```python
-from arvel.database import Model, integer, string
+from arvel.database import Model, integer, string, text
 from arvel.database.orm import MorphMany, MorphOne
 
 

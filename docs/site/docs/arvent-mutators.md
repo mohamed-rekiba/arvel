@@ -17,7 +17,7 @@ already holds the right SQL shape and you just want a cleaner Python view.
 
 ```python
 from enum import StrEnum
-from arvel.database import EnumType, column
+from arvel.database import EnumType, Model, column
 
 
 class Status(StrEnum):
@@ -51,21 +51,30 @@ class User(Model):
 
 ### Encrypted
 
+`EncryptedType` takes a raw **32-byte** AES-256 key. Load it from config — never hardcode it — and decode it to bytes before passing it in:
+
 ```python
-from arvel.database import EncryptedType, column
+import base64
+import os
+
+from arvel.database import EncryptedType, Model, column
+
+_KEY = base64.b64decode(os.environ["DB_ENCRYPTION_KEY"])  # exactly 32 bytes
 
 
 class User(Model):
-    secret: str = column(EncryptedType(key_b64=os.environ["APP_KEY"]))
+    secret: str = column(EncryptedType(_KEY))
 ```
 
 AES-GCM authenticated encryption, transparent to your application code. See [Encryption](encryption.md) and ADR-014 for details.
 
-For searchable encryption (deterministic IV, equal plaintext → equal ciphertext):
+For searchable encryption (deterministic IV, equal plaintext → equal ciphertext), pass `deterministic=True`:
 
 ```python
-secret: str = column(EncryptedType(key_b64=..., mode="search"))
+secret: str = column(EncryptedType(_KEY, deterministic=True))
 ```
+
+> **Deterministic mode leaks equality.** Two rows with the same plaintext produce the same ciphertext — that's what makes the column searchable by equality, but it also reveals which rows share a value. Use it only for lookup columns where that tradeoff is acceptable.
 
 ### JSON
 
@@ -83,17 +92,18 @@ For the strict + typed version, prefer `PydanticType` with a model.
 
 ### Hashed
 
-For columns that store a digest (not encryption — see [Hashing](hashing.md)):
+For columns that store a one-way digest (not encryption — see [Hashing](hashing.md)), use the `"hashed"` attribute cast:
 
 ```python
-from arvel.database import HashedType, column
+from arvel.database import Model, string
 
 
 class Token(Model):
-    value: str = column(HashedType("sha256"))
+    __casts__ = {"value": "hashed"}
+    value: str = string(255)
 ```
 
-Writing `token.value = "secret"` stores the SHA-256 hex. The plaintext is never written to the column. Useful for API key storage (ADR-030).
+Writing `token.value = "secret"` stores the hash (argon2/bcrypt via the `Hash` facade); the plaintext is never written to the column. An already-hashed digest assigned to the attribute passes through unchanged, so re-saving a loaded row doesn't double-hash it. Useful for API key storage (ADR-030).
 
 ## Lightweight attribute casts (`__casts__`)
 
@@ -298,10 +308,19 @@ mutate a backing column directly, so reach for it only when that's fine.
 ## Default values
 
 ```python
+from datetime import UTC, datetime
+
+from sqlalchemy import DateTime
+
+from arvel.database import Model, boolean, mapped_column
+
+
 class Post(Model):
     published: bool = boolean(default=False)
     # mapped_column here only because the datetime() helper name-clashes with the type.
-    created_at: datetime = mapped_column(default=lambda: datetime.now(UTC))
+    created_at: datetime = mapped_column(
+        DateTime(timezone=True), default_factory=lambda: datetime.now(UTC), init=False
+    )
 ```
 
 For dynamic defaults (timestamps, UUIDs), pass a callable. The framework provides shortcuts:
@@ -345,7 +364,7 @@ class User(Model):
     country_code: str = column(UpperString(2))
 ```
 
-Now `user.country_code = "us"` stores `"US"`. `column()` is the generic helper for any custom `TypeDecorator` — same kwargs (`nullable`, `unique`, `index`, `default`) as the named helpers, and the same clean annotation (`country_code: str`), so you never reach for `mapped_column` just to attach a custom type.
+Now `user.country_code = "us"` stores `"US"`. `column()` is the generic helper for any custom `TypeDecorator` — it takes `primary_key`, `nullable`, `unique`, `index`, `init`, `default`, `default_factory`, and `server_default`, and the same clean annotation (`country_code: str`), so you never reach for `mapped_column` just to attach a custom type.
 
 ## Where to next?
 

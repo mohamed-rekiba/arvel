@@ -762,7 +762,7 @@ def column(
     named helpers don't cover. Same kwargs as the rest of the vocabulary, so
     models never reach for ``mapped_column``::
 
-        api_key: str = column(EncryptedType(key_b64=os.environ["APP_KEY"]))
+        api_key: str = column(EncryptedType(app_encryption_key))  # 32-byte AES-256 key
         profile: Profile | None = column(PydanticType(Profile), nullable=True, default=None)
         id: str = column(String(36), primary_key=True, init=False, default_factory=new_uuid)
 
