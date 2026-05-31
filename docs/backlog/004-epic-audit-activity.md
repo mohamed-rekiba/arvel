@@ -38,7 +38,7 @@ The key improvement over `arvel_old`: `Auditable` auto-records via an observer โ
 **Requirement Refs**: Brainstorm design ยง Phase 2C
 **Priority**: Must
 **Complexity**: Medium
-**Status**: Draft
+**Status**: Done
 
 ---
 
@@ -65,7 +65,7 @@ The key improvement over `arvel_old`: `Auditable` auto-records via an observer โ
 **Requirement Refs**: Brainstorm design ยง Phase 2C
 **Priority**: Must
 **Complexity**: Small
-**Status**: Draft
+**Status**: Done
 
 ---
 
@@ -92,7 +92,7 @@ The key improvement over `arvel_old`: `Auditable` auto-records via an observer โ
 **Requirement Refs**: Brainstorm design ยง Phase 2C
 **Priority**: Should
 **Complexity**: Small
-**Status**: Draft
+**Status**: Done
 
 ---
 
@@ -117,7 +117,7 @@ The key improvement over `arvel_old`: `Auditable` auto-records via an observer โ
 **Requirement Refs**: Brainstorm design ยง Phase 2C
 **Priority**: Must
 **Complexity**: Small
-**Status**: Draft
+**Status**: Done
 
 ---
 

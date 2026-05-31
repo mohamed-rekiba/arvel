@@ -943,3 +943,33 @@ events:
       fake()/restore(). Docs: docs/site/docs/search.md; arvel[search] extra. Tests: 59 package tests
       pass; mypy/pyright/ruff clean. 003 S1–S4 DONE — epic 003 complete.
     handoff_id: null
+
+  - work_item_id: "WI-arvel-040"
+    event_id: "EV-059"
+    timestamp: "2026-05-31T07:30:00+03:00"
+    from_stage: "execution"
+    to_stage: "operations"
+    role: "qa-engineer"
+    result: "pass"
+    notes: >
+      Backlog 004 (all stories) — arvel-audit companion package: automatic audit trail +
+      fluent activity log. S1 Auditable mixin auto-wires created/updating/updated/deleting/deleted
+      at class definition (install_audit_observers, idempotent; re-asserted in AuditServiceProvider.boot
+      via wire_all_auditable). Records AuditEntry in the same transaction: created => new={all cols}/
+      old={}; updated => changed cols before+after (old captured on the pre-flush "updating" hook since
+      SQLAlchemy clears history at flush); deleted => last values/new={}. __audit_redact__ masks columns
+      as "***" before the row is written (never plaintext at rest); __audit_exclude__ omits columns.
+      actor_id from Context.get("user_id"), None when unbound. AuditValues TypeDecorator stores old/new
+      JSON, AES-256-GCM encrypted when AUDIT_ENCRYPT_VALUES=true (lazy APP_KEY resolve). S2 AuditLog query
+      API (for_model/by_actor/action/since/until/get/first/count/paginate), InvalidAuditAction on bad
+      action, ORM Paginator for pages; results are unredacted history (access control is the app's job).
+      S3 activity(log, session).log().by().on().with_properties().save() => ActivityEntry;
+      MissingActivityDescription without log(); subject's __audit_redact__ keys stripped from properties at
+      save; ActivityQuery for_subject/by_causer. S4 audit:install publishes two migrations (audit_entries
+      idx (model_type,model_id); activity_entries idx (subject_type,subject_id)+(causer_type,causer_id)),
+      idempotent unless --force. Stage 4b folded in (confidential): redaction-before-write, optional
+      at-rest encryption, non-null model_type/model_id, composite indexes. Docs: docs/site/docs/audit.md;
+      arvel[audit] extra. arvel-audit/tests type-checked in isolation (hyphenated-package conftest
+      collision, mirrors arvel-search). Tests: 24 package tests pass; mypy/pyright/ruff clean.
+      004 S1–S4 DONE — epic 004 complete.
+    handoff_id: null

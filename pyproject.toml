@@ -18,6 +18,7 @@ arvel-permission = { workspace = true }
 arvel-image = { workspace = true }
 arvel-auth-social = { workspace = true }
 arvel-search = { workspace = true }
+arvel-audit = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -26,6 +27,7 @@ dev = [
     "arvel-image",
     "arvel-auth-social",
     "arvel-search",
+    "arvel-audit",
     "bandit>=1.9.4",
     "coverage[toml]>=7.14.0",
     "cyclonedx-bom>=7.3.0",
@@ -134,6 +136,16 @@ ignore = [
 ]
 "packages/arvel-search/src/arvel_search/exceptions.py" = [
     "N818", # SearchEngineNotConfigured is a public API name, not an *Error
+]
+"packages/arvel-audit/src/arvel_audit/exceptions.py" = [
+    "N818", # InvalidAuditAction / MissingActivityDescription are public API names, not *Error
+]
+"packages/arvel-audit/src/arvel_audit/types.py" = [
+    "ARG002",  # TypeDecorator.process_*_param must keep SQLAlchemy's `dialect` name
+    "PLC0415", # Crypt imported lazily so importing the model never needs APP_KEY
+]
+"packages/arvel-audit/src/arvel_audit/auditable.py" = [
+    "SLF001", # observer stashes a private capture attr on the instance between hooks
 ]
 "packages/arvel-search/src/arvel_search/engines/**" = [
     "ARG002",  # Engine protocol methods keep a fixed (index, documents, key) signature
@@ -336,7 +348,7 @@ disallow_any_explicit = false
 explicit_package_bases = true
 namespace_packages = true
 plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
-mypy_path = "packages/arvel/src:packages/arvel-permission/src:packages/arvel-image/src:packages/arvel-auth-social/src:packages/arvel-auth-social:packages/arvel-search/src"
+mypy_path = "packages/arvel/src:packages/arvel-permission/src:packages/arvel-image/src:packages/arvel-auth-social/src:packages/arvel-auth-social:packages/arvel-search/src:packages/arvel-audit/src"
 files = [
     "packages/arvel/src",
     "packages/arvel/tests",
@@ -346,11 +358,13 @@ files = [
     "packages/arvel-image/tests",
     "packages/arvel-auth-social/src",
     "packages/arvel-auth-social/tests",
+    "packages/arvel-audit/src",
     "packages/arvel-search/src",
-    # arvel-search tests share a test-only model across files, which promotes
-    # the dir to a sys.path root and would expose `conftest` globally — colliding
-    # with other packages' `conftest` under the flat run. Checked in isolation
-    # via a dedicated `mypy packages/arvel-search/tests` step (see Makefile).
+    # arvel-search and arvel-audit tests are namespace dirs under hyphenated
+    # packages, so each tests/conftest resolves to the bare module `conftest`
+    # and would collide with the others (and with arvel-permission) under the
+    # flat run. Checked in isolation via dedicated `mypy packages/<pkg>/tests`
+    # steps (see Makefile).
 ]
 # The skeleton tree is template content, not framework source — it runs under
 # a generated project's sys.path (where `bootstrap.app` exists), not the
@@ -425,6 +439,8 @@ include = [
     "packages/arvel-image/tests",
     "packages/arvel-auth-social/src",
     "packages/arvel-auth-social/tests",
+    "packages/arvel-audit/src",
+    "packages/arvel-audit/tests",
     "packages/arvel-search/src",
     "packages/arvel-search/tests",
 ]
@@ -445,6 +461,7 @@ extraPaths = [
     "packages/arvel-permission/src",
     "packages/arvel-image/src",
     "packages/arvel-auth-social/src",
+    "packages/arvel-audit/src",
     "packages/arvel-search/src",
     "packages/arvel-search/tests",
 ]
@@ -476,6 +493,7 @@ testpaths = [
     "packages/arvel-permission/tests",
     "packages/arvel-image/tests",
     "packages/arvel-auth-social/tests",
+    "packages/arvel-audit/tests",
     "packages/arvel-search/tests",
 ]
 markers = [
