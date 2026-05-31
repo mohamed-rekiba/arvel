@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from arvel.database import Model
 from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -82,9 +84,9 @@ async def test_having_operator_form(engine: AsyncEngine, session: AsyncSession) 
 
     def _tag(row: object) -> object:
         if isinstance(row, dict):
-            return row["tag"]
+            return cast("dict[str, object]", row)["tag"]
         if isinstance(row, tuple):
-            return row[0]
+            return cast("tuple[object, ...]", row)[0]
         return row
 
     # only tag 'x' has more than one row

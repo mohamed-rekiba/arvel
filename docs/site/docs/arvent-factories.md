@@ -133,6 +133,58 @@ comments = await CommentFactory().for_user(alice).count(20).create()
 # All 20 comments share the same author
 ```
 
+## Many-to-many: `has_attached`
+
+Create related rows and link them through a pivot table, with optional pivot columns:
+
+```python
+user = await (
+    UserFactory()
+    .has_attached("roles", RoleFactory(), count=2, pivot={"assigned_by": "system"})
+    .create()
+)
+roles = await user.roles.all()  # 2 roles, each pivot row has assigned_by="system"
+```
+
+The related factory's own `has` / `has_attached` / callbacks run too, so you can nest.
+
+## Soft-deleted rows: `trashed()`
+
+For models using `SoftDeletes`, build rows that land already soft-deleted:
+
+```python
+user = await UserFactory().trashed().create()
+user.trashed()                                     # True
+await User.where(User.id == user.id).first()       # None — hidden by the scope
+await User.with_trashed().where(User.id == user.id).first()  # found
+```
+
+Raises `AttributeError` if the model doesn't use `SoftDeletes`.
+
+## Faker in callbacks
+
+`after_making` and `after_creating` callbacks receive a shared Faker instance:
+
+```python
+await (
+    UserFactory()
+    .after_creating(lambda user, faker: setattr(user, "bio", faker.sentence()))
+    .create()
+)
+```
+
+Faker is a dev dependency; if it isn't installed the second argument is `None`.
+
+## Quiet creation and connection routing
+
+```python
+# Mute model lifecycle events during the whole build
+user = await UserFactory().create_quietly()
+
+# Persist through a named connection registered with DB.configure_named(...)
+user = await UserFactory().connection("reporting").create()
+```
+
 ## In seeders
 
 ```python

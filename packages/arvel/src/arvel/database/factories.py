@@ -5,21 +5,68 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, Generic, Self, TypeIs, TypeVar
 
-from arvel.database.session import get_active_session
+from arvel.database.session import (
+    get_active_session,
+    reset_active_session,
+    set_active_session,
+)
 
 if TYPE_CHECKING:
     from arvel.database.model import Model
 
 T = TypeVar("T", bound="Model")
 
-# Callback signatures used by ``after_making`` / ``after_creating``. The
-# second positional argument is the "faker" — currently always ``None``,
-# but kept in the contract for future Faker integration.
+# Callback signatures used by ``after_making`` / ``after_creating``. The second
+# positional argument is a ``faker.Faker`` instance (or ``None`` if Faker isn't
+# installed — it's a dev-only dependency).
 AfterMakingCallback = Callable[[T, Any], None]
 AfterCreatingCallback = Callable[[T, Any], "None | Awaitable[Any]"]
 
 # Global sequence counters keyed by (factory_class, field_name)
 _SEQUENCE_COUNTERS: dict[str, int] = {}
+
+# Lazily-built shared Faker. Sentinel distinguishes "not tried yet" from "tried,
+# not installed" so we only attempt the import once. Stored in a one-slot list so
+# reassignment isn't flagged as constant redefinition.
+_unset: Any = object()
+_faker_cache: list[Any] = [_unset]
+
+
+def _faker() -> Any:
+    """Return a shared ``Faker`` instance, or ``None`` if Faker isn't installed."""
+    if _faker_cache[0] is _unset:
+        try:
+            from faker import Faker
+        except ImportError:
+            _faker_cache[0] = None
+        else:
+            _faker_cache[0] = Faker()
+    return _faker_cache[0]
+
+
+def _now() -> Any:
+    from datetime import UTC, datetime
+
+    return datetime.now(UTC)
+
+
+def _as_list(value: Any) -> list[Any]:
+    """Normalize a single instance or list into a ``list[Any]``."""
+    items: list[Any] = []
+    if isinstance(value, list):
+        items += value
+    else:
+        items.append(value)
+    return items
+
+
+def _primary_key_value(instance: Any) -> Any:
+    """Return the single-column primary-key value of a mapped instance."""
+    from sqlalchemy.orm import class_mapper
+
+    mapper = class_mapper(instance.__class__)
+    pk_col = mapper.primary_key[0]
+    return getattr(instance, mapper.get_property_by_column(pk_col).key)
 
 
 def sequence(factory_cls_name: str, field: str) -> int:
@@ -56,11 +103,14 @@ class Factory(Generic[T]):
         self._count: int = 1
         self._state_overrides: list[dict[str, Any]] = []
         self._has: list[tuple[str, Factory[Any], int]] = []
+        self._has_attached: list[tuple[str, Factory[Any], int, dict[str, Any]]] = []
         self._for: list[tuple[str, Any]] = []
         self._sequences: list[tuple[str, Callable[[int], Any]]] = []
         self._after_making: list[AfterMakingCallback[T]] = []
         self._after_creating: list[AfterCreatingCallback[T]] = []
         self._recycle: dict[type[Any], list[Any]] = {}
+        self._trashed: bool = False
+        self._connection: str | None = None
 
     def definition(self) -> dict[str, Any]:
         raise NotImplementedError(
@@ -84,6 +134,35 @@ class Factory(Generic[T]):
 
     def has(self, relation: str, factory: Factory[Any], *, count: int = 1) -> Self:
         self._has.append((relation, factory, count))
+        return self
+
+    def has_attached(
+        self,
+        relation: str,
+        factory: Factory[Any],
+        *,
+        count: int = 1,
+        pivot: dict[str, Any] | None = None,
+    ) -> Self:
+        """Create related rows and link them through a many-to-many pivot.
+
+        ``pivot`` columns are written on every pivot row (e.g. ``{"role": "admin"}``).
+        """
+        self._has_attached.append((relation, factory, count, dict(pivot or {})))
+        return self
+
+    def trashed(self) -> Self:
+        """Mark created rows as soft-deleted (``deleted_at`` set). Needs ``SoftDeletes``."""
+        if getattr(self.model, "__arvel_soft_delete_column__", None) is None:
+            raise AttributeError(
+                f"{self.model.__name__} does not use SoftDeletes — trashed() unavailable."
+            )
+        self._trashed = True
+        return self
+
+    def connection(self, name: str) -> Self:
+        """Persist created rows through the named DB connection instead of the default."""
+        self._connection = name
         return self
 
     def for_(self, relation: str, instance: Any) -> Self:
@@ -125,12 +204,37 @@ class Factory(Generic[T]):
                 fk_attr, fk_val = _resolve_for_attr(self.model, rel, parent)
                 attrs[fk_attr] = fk_val
             instance = self.model(**attrs)
+            if self._trashed:
+                col = getattr(self.model, "__arvel_soft_delete_column__", "deleted_at")
+                setattr(instance, col, _now())
             for cb in self._after_making:
-                cb(instance, None)
+                cb(instance, _faker())
             instances.append(instance)
         return instances[0] if self._count == 1 else instances
 
     async def create(self) -> T | list[T]:
+        if self._connection is None:
+            return await self._create_in_active_session()
+        from arvel.database.db import DB
+
+        maker = DB.session_maker_for(self._connection)
+        async with maker() as session:
+            token = set_active_session(session)
+            try:
+                result = await self._create_in_active_session()
+                await session.commit()
+                return result
+            finally:
+                reset_active_session(token)
+
+    async def create_quietly(self) -> T | list[T]:
+        """Like ``create()`` but mutes model lifecycle events for the whole build."""
+        from arvel.database.events import without_events
+
+        async with without_events():
+            return await self.create()
+
+    async def _create_in_active_session(self) -> T | list[T]:
         import asyncio
 
         session = get_active_session()
@@ -146,8 +250,13 @@ class Factory(Generic[T]):
                 # Expire the relationship collection so subsequent accesses
                 # (and eager-load queries) see the new children from the DB.
                 session.expire(inst, [rel])
+            for rel, attach_factory, n, pivot in self._has_attached:
+                children = _as_list(await attach_factory.count(n).create())
+                accessor = getattr(inst, rel)
+                for child in children:
+                    await accessor.attach(_primary_key_value(child), **pivot)
             for cb in self._after_creating:
-                result = cb(inst, None)
+                result = cb(inst, _faker())
                 if asyncio.iscoroutine(result):
                     await result
         return instances[0] if self._count == 1 else instances

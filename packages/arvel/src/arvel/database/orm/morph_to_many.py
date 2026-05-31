@@ -13,17 +13,19 @@ cast on INSERT.
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
 
-from sqlalchemy import Table, delete, insert, select, update
+from sqlalchemy import String, Table, delete, insert, select, update
+from sqlalchemy import cast as sa_cast
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Mapper
 
 from arvel.database.orm._eager import clear_eager_relation, get_eager_relation
 from arvel.database.orm.belongs_to_many import SyncIds, SyncResult, normalize_sync_ids
+from arvel.database.orm.morph_map import get_morph_alias
 from arvel.database.session import get_active_session
 
 if TYPE_CHECKING:
@@ -80,7 +82,7 @@ class MorphToManyAccessor(Generic[T]):
 
     @property
     def _owner_type(self) -> str:
-        return type(self._owner).__name__
+        return get_morph_alias(type(self._owner))
 
     @property
     def _owner_id(self) -> str:
@@ -341,5 +343,254 @@ class MorphToMany(Generic[T]):
             type_column=self._type_col,
             id_column=self._id_col,
             related_foreign_key=self._rfk,
+            attr_name=self._attr_name,
+        )
+
+
+@dataclass(frozen=True)
+class MorphedByManyLink:
+    """Pivot metadata for the inverse of MorphToMany (the polymorphic side).
+
+    ``related_type`` pins the morph discriminator to the *related* model's alias,
+    and ``owner_foreign_key`` is the pivot column holding the owner's own PK.
+    """
+
+    table: Table
+    related_model: type[Any]
+    type_column: str
+    id_column: str
+    owner_foreign_key: str
+    related_type: str
+
+
+class MorphedByManyAccessor(Generic[T]):
+    """Inverse of MorphToMany: e.g. ``tag.posts`` over the ``taggables`` pivot.
+
+    The pivot's ``{name}_type``/``{name}_id`` describe the *related* rows, and a
+    plain owner FK column (``related_key``) holds this owner's PK. So we filter
+    ``{name}_type == alias(related)`` and join ``{name}_id`` back to the related
+    PK (string-cast, since the column is VARCHAR).
+    """
+
+    def __init__(
+        self,
+        owner: Model,
+        related_model: type[T],
+        table: Table,
+        type_column: str,
+        id_column: str,
+        owner_foreign_key: str,
+        attr_name: str | None = None,
+    ) -> None:
+        self._owner = owner
+        self._related_model = related_model
+        self._table = table
+        self._type_col = type_column
+        self._id_col = id_column
+        self._ofk = owner_foreign_key
+        self._attr_name = attr_name
+        owner_mapper: Mapper[Any] = cast("Mapper[Any]", sa_inspect(type(owner)))
+        pk_key = owner_mapper.primary_key[0].key
+        if pk_key is None:
+            raise TypeError(f"{type(owner).__name__} primary key column has no key")
+        self._owner_key: str = pk_key
+
+    def _invalidate_cache(self) -> None:
+        if self._attr_name is not None:
+            clear_eager_relation(self._owner, self._attr_name)
+
+    @property
+    def _related_type(self) -> str:
+        return get_morph_alias(self._related_model)
+
+    @property
+    def _owner_id(self) -> Any:
+        return getattr(self._owner, self._owner_key)
+
+    def _related_pk_col(self) -> Any:
+        mapper = sa_inspect(self._related_model)
+        if mapper is None:
+            raise TypeError(f"{self._related_model} is not a mapped SQLAlchemy class")
+        return mapper.primary_key[0]
+
+    def _owner_where(self) -> tuple[Any, Any]:
+        return (
+            self._table.c[self._ofk] == self._owner_id,
+            self._table.c[self._type_col] == self._related_type,
+        )
+
+    def __aiter__(self) -> AsyncIterator[T]:
+        return self._iter_related()
+
+    async def _iter_related(self) -> AsyncGenerator[T]:
+        if self._attr_name is not None:
+            cached = get_eager_relation(self._owner, self._attr_name)
+            if cached is not None:
+                for row in cached:
+                    yield cast("T", row)
+                return
+        session = get_active_session()
+        pk_col = self._related_pk_col()
+        owner_pred, type_pred = self._owner_where()
+        stmt = (
+            select(self._related_model)
+            .join(self._table, self._table.c[self._id_col] == sa_cast(pk_col, String))
+            .where(owner_pred)
+            .where(type_pred)
+        )
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            yield row
+
+    async def all(self) -> list[T]:
+        """Return all related rows linked to this owner through the morph pivot."""
+        return [row async for row in self]
+
+    async def attach(self, related_id: int, **pivot_kwargs: Any) -> bool:
+        """Insert pivot row. Returns True if new, False if already present."""
+        session = get_active_session()
+        owner_pred, type_pred = self._owner_where()
+        check = (
+            select(self._table)
+            .where(owner_pred)
+            .where(type_pred)
+            .where(self._table.c[self._id_col] == str(related_id))
+        )
+        if (await session.execute(check)).fetchone() is not None:
+            return False
+        await session.execute(
+            insert(self._table).values(
+                **{
+                    self._ofk: self._owner_id,
+                    self._type_col: self._related_type,
+                    self._id_col: str(related_id),
+                    **pivot_kwargs,
+                }
+            )
+        )
+        await session.flush()
+        self._invalidate_cache()
+        return True
+
+    async def detach(self, related_id: int) -> None:
+        """Remove the pivot row for related_id. No-op if absent."""
+        session = get_active_session()
+        owner_pred, type_pred = self._owner_where()
+        await session.execute(
+            delete(self._table)
+            .where(owner_pred)
+            .where(type_pred)
+            .where(self._table.c[self._id_col] == str(related_id))
+        )
+        await session.flush()
+        self._invalidate_cache()
+
+    async def _current_ids(self) -> set[int]:
+        session = get_active_session()
+        owner_pred, type_pred = self._owner_where()
+        stmt = select(self._table.c[self._id_col]).where(owner_pred).where(type_pred)
+        return {int(v) for v in (await session.execute(stmt)).scalars()}
+
+    async def sync(self, related_ids: SyncIds) -> SyncResult:
+        """Replace pivot rows so they match related_ids, returning what changed."""
+        desired = normalize_sync_ids(related_ids)
+        current_ids = await self._current_ids()
+        result: SyncResult = {"attached": [], "detached": [], "updated": []}
+        for rid in current_ids - set(desired):
+            await self.detach(rid)
+            result["detached"].append(rid)
+        for rid, attrs in desired.items():
+            if rid not in current_ids:
+                await self.attach(rid, **attrs)
+                result["attached"].append(rid)
+        return result
+
+    async def toggle(self, related_id: int) -> str:
+        """Attach if absent, detach if present. Returns 'attached' or 'detached'."""
+        if related_id in await self._current_ids():
+            await self.detach(related_id)
+            return "detached"
+        await self.attach(related_id)
+        return "attached"
+
+
+class MorphedByMany(Generic[T]):
+    """Inverse-side descriptor for a polymorphic many-to-many relation.
+
+    Declared on the model that the pivot's ``{name}_type``/``{name}_id`` point at
+    from the *other* direction. Mirrors Laravel's ``morphedByMany``::
+
+        class Tag(Model):
+            posts: ClassVar[MorphedByMany[Post]] = MorphedByMany(
+                Post, table=taggables, name="taggable", related_key="tag_id"
+            )
+    """
+
+    def __init__(
+        self,
+        related_model: type[T] | Callable[[], type[T]],
+        *,
+        table: Table,
+        name: str,
+        related_key: str,
+    ) -> None:
+        # Inverse relations commonly point at a model defined later in the module,
+        # so accept a `lambda: Model` thunk and resolve it lazily.
+        self._related_ref = related_model
+        self._resolved: type[T] | None = None
+        self._table = table
+        self._name = name
+        self._type_col = f"{name}_type"
+        self._id_col = f"{name}_id"
+        self._ofk = related_key
+        self._attr_name: str | None = None
+
+    def __set_name__(self, owner: type[Any], name: str) -> None:
+        self._attr_name = name
+
+    @property
+    def table(self) -> Table:
+        return self._table
+
+    @property
+    def related_model(self) -> type[T]:
+        if self._resolved is None:
+            ref = self._related_ref
+            self._resolved = ref() if callable(ref) and not isinstance(ref, type) else ref
+        return self._resolved
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def link_spec(self) -> MorphedByManyLink:
+        related = self.related_model
+        return MorphedByManyLink(
+            table=self._table,
+            related_model=related,
+            type_column=self._type_col,
+            id_column=self._id_col,
+            owner_foreign_key=self._ofk,
+            related_type=get_morph_alias(related),
+        )
+
+    @overload
+    def __get__(self, obj: None, objtype: type) -> MorphedByMany[T]: ...
+
+    @overload
+    def __get__(self, obj: Any, objtype: type) -> MorphedByManyAccessor[T]: ...
+
+    def __get__(
+        self, obj: Any, objtype: type | None = None
+    ) -> MorphedByMany[T] | MorphedByManyAccessor[T]:
+        if obj is None:
+            return self
+        return MorphedByManyAccessor(
+            owner=obj,
+            related_model=self.related_model,
+            table=self._table,
+            type_column=self._type_col,
+            id_column=self._id_col,
+            owner_foreign_key=self._ofk,
             attr_name=self._attr_name,
         )

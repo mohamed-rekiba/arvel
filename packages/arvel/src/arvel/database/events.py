@@ -8,6 +8,10 @@ from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar, cast
 
+from pydantic import ConfigDict
+
+from arvel.events.event import Event as _BusEvent
+
 if TYPE_CHECKING:
     from arvel.container import Container
     from arvel.database.model import Model
@@ -40,13 +44,28 @@ class _ObserverRuntime:
     container: ClassVar[Container | None] = None
 
 
-# Events fired from arvel's async persistence methods.
+# Events fired from arvel's async persistence methods. ``trashed`` marks a soft
+# delete (vs ``deleted`` which fires for both); ``force_deleted`` marks a hard
+# delete; ``replicating`` fires on the fresh clone before it's returned.
 _ASYNC_EVENTS = frozenset(
-    {"created", "saved", "saving", "updated", "deleted", "retrieved", "restored"}
+    {
+        "created",
+        "saved",
+        "saving",
+        "updated",
+        "deleted",
+        "retrieved",
+        "restored",
+        "trashed",
+        "force_deleted",
+        "replicating",
+    }
 )
 
 # Before-hooks; ``False`` return aborts the pending write.
-_CANCELLABLE_EVENTS = frozenset({"creating", "updating", "deleting", "restoring"})
+_CANCELLABLE_EVENTS = frozenset(
+    {"creating", "updating", "deleting", "restoring", "force_deleting"}
+)
 
 
 def _get_observers(model_cls: type[Any]) -> list[Any]:
@@ -70,12 +89,29 @@ async def _dispatch_observer(observer: Any, event_name: str, instance: Any) -> b
     return None
 
 
+async def _dispatch_mapped_event(model_cls: type[Any], event_name: str, instance: Any) -> None:
+    """Dispatch the ``__dispatches_events__`` event for ``event_name`` on the app bus, if any."""
+    mapping: dict[str, type[Any]] | None = getattr(model_cls, "__dispatches_events__", None)
+    if not mapping:
+        return
+    event_cls = mapping.get(event_name)
+    if event_cls is None:
+        return
+    from arvel.facades.event import Event as EventFacade
+
+    # No dispatcher bound (e.g. pure DB tests) — skip rather than raise.
+    if EventFacade.dispatcher is None:
+        return
+    await EventFacade.dispatch(event_cls(model=instance))
+
+
 async def fire_async(model_cls: type[Any], event_name: str, instance: Any) -> None:
     """Await all observer callbacks registered for ``event_name`` on ``model_cls``."""
     if _suppress_events.get():
         return
     for observer in _get_observers(model_cls):
         await _dispatch_observer(observer, event_name, instance)
+    await _dispatch_mapped_event(model_cls, event_name, instance)
 
 
 async def fire_cancellable(model_cls: type[Any], event_name: str, instance: Any) -> None:
@@ -91,17 +127,33 @@ async def fire_cancellable(model_cls: type[Any], event_name: str, instance: Any)
         cancelled = await _dispatch_observer(observer, event_name, instance)
         if cancelled is False:
             raise OperationCancelledError(model_cls.__name__, event_name)
+    await _dispatch_mapped_event(model_cls, event_name, instance)
+
+
+class ModelEvent(_BusEvent):
+    """Base for ``__dispatches_events__`` events. Carries the model instance.
+
+    ``arbitrary_types_allowed`` lets the ORM instance ride along unvalidated.
+    """
+
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+    model: Any
 
 
 class Observer(Generic[T]):
     """Base class for lifecycle observers.
 
     Subclasses can implement any combination of sync or async methods:
-    ``creating / created / updating / updated / deleting / deleted /
-    restoring / restored / saving / saved / retrieved``.
+    ``creating / created / updating / updated / deleting / deleted / trashed /
+    force_deleting / force_deleted / restoring / restored / replicating /
+    saving / saved / retrieved``.
 
-    ``creating``, ``updating``, ``deleting``, and ``restoring`` may return
-    ``False`` to abort the pending operation.
+    ``creating``, ``updating``, ``deleting``, ``restoring``, and
+    ``force_deleting`` may return ``False`` to abort the pending operation.
+
+    ``trashed`` fires only on a soft delete, ``force_deleted`` only on a hard
+    delete (``deleted`` fires for both), and ``replicating`` fires on a fresh
+    clone from ``replicate()`` before it's returned.
 
     ``after_commit`` is called after the surrounding transaction commits. It
     receives the model instance and should be used for side-effects that must
@@ -178,7 +230,24 @@ def observe(model_cls: type[T], observer: type[Any] | Observer[T]) -> None:
     bind_observer(model_cls, observer)
 
 
+class _CallbackObserver:
+    """One-event observer wrapping a ``callback(instance)`` (backs ``Model.on``)."""
+
+    def __init__(self, event_name: str, callback: Callable[[Any], Any]) -> None:
+        # Store under the event name so _dispatch_observer's getattr finds it.
+        # Stash the callback as a plain attribute, not a bound method.
+        setattr(self, event_name, callback)
+
+
+def register_callback(
+    model_cls: type[Any], event_name: str, callback: Callable[[Any], Any]
+) -> None:
+    """Register a callable for one lifecycle event (Eloquent's ``Model::created(...)``)."""
+    _get_observers(model_cls).append(_CallbackObserver(event_name, callback))
+
+
 __all__ = [
+    "ModelEvent",
     "Observer",
     "bind_observer",
     "clear_observers",
@@ -188,5 +257,6 @@ __all__ = [
     "fire_async",
     "fire_cancellable",
     "observe",
+    "register_callback",
     "without_events",
 ]

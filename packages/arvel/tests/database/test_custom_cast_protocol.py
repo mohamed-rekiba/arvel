@@ -118,5 +118,5 @@ def test_unknown_string_cast_raises_at_definition() -> None:
 
 
 def test_non_spec_value_raises_type_error() -> None:
-    with pytest.raises(TypeError, match="must be a str or a CastsAttributes"):
+    with pytest.raises(TypeError, match="cast spec must be a str"):
         _define_model_with_casts("cast_bad2", {"x": 123})
