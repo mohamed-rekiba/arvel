@@ -9,7 +9,7 @@ import pytest_asyncio
 from arvel.database import Model
 from arvel_search import Search, SearchManager
 from sqlalchemy.ext.asyncio import AsyncEngine
-from support import make_config
+from search_support import make_config
 
 
 @pytest.fixture(autouse=True)

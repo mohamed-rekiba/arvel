@@ -7,7 +7,7 @@ from arvel.database import Model, id_, string
 from arvel_search import Search, SearchEngineNotConfigured, SearchManager
 from arvel_search.builder import SearchBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
-from support import Article
+from search_support import Article
 
 
 async def _seed(count: int) -> list[Article]:
