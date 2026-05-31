@@ -13,7 +13,7 @@ from arvel_search.engines import (
     NullEngine,
 )
 from arvel_search.exceptions import UnknownSearchDriverError
-from support import make_config
+from search_support import make_config
 
 
 class TestDriverResolution:

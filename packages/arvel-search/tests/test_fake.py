@@ -7,7 +7,7 @@ from arvel.database import Model, id_, string
 from arvel_search import Search
 from arvel_search.searchable import Searchable
 from sqlalchemy.ext.asyncio import AsyncSession
-from support import Article
+from search_support import Article
 
 
 class FakeDoc(Model, Searchable):

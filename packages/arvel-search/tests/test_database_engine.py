@@ -8,7 +8,7 @@ from arvel_search.dtos import SearchQuery
 from arvel_search.engines import DatabaseEngine
 from arvel_search.exceptions import SearchError
 from sqlalchemy.ext.asyncio import AsyncSession
-from support import Article, make_config
+from search_support import Article, make_config
 
 
 async def _bind_database() -> SearchManager:
