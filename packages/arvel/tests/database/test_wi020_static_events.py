@@ -79,9 +79,7 @@ class TestModelOn:
         with pytest.raises(OperationCancelledError):
             await Wi020Doc.create(title="blocked")
 
-    async def test_async_callback_runs(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_async_callback_runs(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         clear_observers(Wi020Doc)
         seen: list[str] = []

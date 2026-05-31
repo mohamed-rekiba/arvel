@@ -4,25 +4,27 @@ from __future__ import annotations
 
 import sys
 from collections.abc import AsyncGenerator, Callable, Generator
-from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager, suppress
 from contextvars import ContextVar
 from dataclasses import InitVar
 from datetime import UTC, date
 from datetime import datetime as _datetime
 from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
-from functools import partial
+from functools import partial, wraps
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
     NamedTuple,
     Protocol,
+    Self,
     TypeGuard,
     TypeVar,
     cast,
     dataclass_transform,
     get_origin,
+    overload,
 )
 
 from pydantic import BaseModel
@@ -69,12 +71,14 @@ from arvel.database.exceptions import (
     ModelNotFoundError,
     ReadOnlyModelError,
     RelationNotLoadedError,
+    UnknownRelationError,
 )
 from arvel.database.query_mixin import QueryMixin
 from arvel.database.session import get_active_session
 from arvel.support.str import Str
 
 if TYPE_CHECKING:
+    from arvel.database.collection import ModelCollection
     from arvel.database.orm.relations import BelongsTo, HasMany, HasOne
 
 ModelT = TypeVar("ModelT", bound="Model")
@@ -210,6 +214,7 @@ _CAST_DISPATCH: dict[str, Callable[[Any], Any]] = {
 }
 _VALID_CASTS: frozenset[str] = frozenset(_CAST_DISPATCH)
 
+
 def _object_serialize(value: Any) -> Any:
     if hasattr(value, "__dict__"):
         result: dict[str, Any] = dict(value.__dict__)
@@ -225,9 +230,7 @@ _BUILTIN_SERIALIZERS: dict[str, Callable[[Any], Any]] = {
 
 # JSON collection casts stay read-path only on write — coercing to dict/list in
 # memory breaks String-column INSERTs. Use TypeDecorator for column-level JSON.
-_WRITE_SKIP_CASTS: frozenset[str] = frozenset(
-    {"dict", "list", "array", "object", "collection"}
-)
+_WRITE_SKIP_CASTS: frozenset[str] = frozenset({"dict", "list", "array", "object", "collection"})
 
 # Write-only casts: applied on assignment, never on read. `hashed` would corrupt a
 # stored digest if re-hashed on every attribute access.
@@ -418,6 +421,73 @@ def _should_auto_wrap(attr_name: str, annotation: Any, value: Any) -> bool:
 
 _MappedAlias: Any = Mapped
 
+_RELATION_RETURN_NAMES = frozenset({"HasMany", "HasOne", "BelongsTo"})
+
+# CPython code-flag bits: 0x04 = *args, 0x08 = **kwargs.
+_VARARGS_OR_KWARGS = 0x04 | 0x08
+
+
+def _relation_method_kind(value: Any) -> str | None:
+    """Return the relation type name when *value* is a zero-arg relation accessor.
+
+    A relation accessor is a plain instance method taking only ``self`` whose
+    return annotation is ``HasMany`` / ``HasOne`` / ``BelongsTo``. The framework's
+    own ``has_many``/``has_one``/``belongs_to`` builders take extra arguments, so
+    they're excluded — only Laravel-style accessors like ``def orders(self)`` match.
+    """
+    if isinstance(value, (staticmethod, classmethod)) or not callable(value):
+        return None
+    code = getattr(value, "__code__", None)
+    if code is None or code.co_argcount != 1 or (code.co_flags & _VARARGS_OR_KWARGS):
+        return None
+    annotation = getattr(value, "__annotations__", {}).get("return")
+    if annotation is None:
+        return None
+    if isinstance(annotation, str):
+        head = annotation.split("[", 1)[0].rsplit(".", 1)[-1].strip()
+    else:
+        origin = get_origin(annotation) or annotation
+        head = getattr(origin, "__name__", "")
+    return head if head in _RELATION_RETURN_NAMES else None
+
+
+def _wrap_relation_method(name: str, fn: Callable[[Any], Any]) -> Callable[[Any], Any]:
+    """Tag the builder a relation accessor returns with its accessor name.
+
+    Lets ``await u.orders().get()`` serve eager-loaded rows from the owner's cache
+    after ``with_("orders")``. ``wraps`` keeps the original signature/annotations,
+    so static type checkers still see ``-> HasMany[Order]``.
+    """
+
+    @wraps(fn)
+    def wrapper(self: Any) -> Any:
+        rel = fn(self)
+        with suppress(AttributeError):
+            rel._relation_name = name
+        return rel
+
+    return wrapper
+
+
+def _register_relation_methods(
+    bases: tuple[type, ...], namespace: dict[str, Any]
+) -> dict[str, Any]:
+    """Wrap zero-arg relation accessors + record their names for the eager engine.
+
+    Returns the (possibly updated) namespace. Inherited accessor names carry over.
+    """
+    fk_relations: set[str] = set()
+    for base in bases:
+        fk_relations |= set(getattr(base, "__arvel_fk_relations__", ()))
+    wrapped: dict[str, Any] = {}
+    for attr_name, value in namespace.items():
+        if _relation_method_kind(value) is not None:
+            fk_relations.add(attr_name)
+            wrapped[attr_name] = _wrap_relation_method(attr_name, value)
+    if not wrapped and not fk_relations:
+        return namespace
+    return {**namespace, **wrapped, "__arvel_fk_relations__": frozenset(fk_relations)}
+
 
 @dataclass_transform(
     kw_only_default=True,
@@ -507,6 +577,10 @@ class _ModelMeta(DCTransformDeclarative):
             if module is not None and not hasattr(module, "Mapped"):
                 module.__dict__["Mapped"] = Mapped
 
+        # Wrap method-style FK relation accessors (has_many/has_one/belongs_to) so
+        # they're eager-loadable via with_("name") and serve cached results on read-back.
+        namespace = _register_relation_methods(bases, namespace)
+
         return super().__new__(mcs, name, bases, namespace, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
@@ -564,6 +638,20 @@ def unwrap_method(raw: Any) -> Callable[..., Any]:
     if isinstance(raw, (staticmethod, classmethod)):
         return cast("Callable[..., Any]", boxed.__func__)
     return cast("Callable[..., Any]", boxed)
+
+
+def _resolve_related_model(owner_cls: type[Any], related: type[Any] | str) -> type[Any]:
+    """Resolve a related model given as a class or its class-name string.
+
+    String targets let bidirectional relations skip the import — the same reason
+    Eloquent and SQLAlchemy ``relationship()`` accept class-name strings.
+    """
+    if not isinstance(related, str):
+        return related
+    for mapper in owner_cls.registry.mappers:
+        if mapper.class_.__name__ == related:
+            return cast("type[Any]", mapper.class_)
+    raise UnknownRelationError(owner_cls.__name__, related)
 
 
 # Task-local switch for Model.unguarded(): suspends mass-assignment checks.
@@ -646,6 +734,11 @@ class ActiveRecord(QueryMixin):
     # Names of parent relation accessor methods whose timestamps get bumped on save.
     # Eloquent's $touches. Each entry is a method returning a BelongsTo builder.
     __touches__: ClassVar[tuple[str, ...]] = ()
+
+    # Method-style FK relation accessor names (has_many/has_one/belongs_to),
+    # populated per-class by _ModelMeta. The eager engine reads this to recognize
+    # which methods are eager-loadable via with_("name").
+    __arvel_fk_relations__: ClassVar[frozenset[str]] = frozenset()
 
     # Timestamp controls (Eloquent parity). Set __timestamps__ = False to opt out;
     # point CREATED_AT/UPDATED_AT at custom columns. Auto-fill hooks attach in
@@ -910,6 +1003,12 @@ class ActiveRecord(QueryMixin):
             for item in related:
                 if isinstance(item, Model):
                     await item._push(visited)
+        # Method-style FK relations live in the per-instance eager cache, not on
+        # the mapper, so cascade over those too.
+        for cached in vars(self).get("__arvel_eager_relations__", {}).values():
+            for item in cached:
+                if isinstance(item, Model):
+                    await item._push(visited)
 
     async def delete(self) -> Any:
         from arvel.database.events import fire_after_commit, fire_async, fire_cancellable
@@ -1053,8 +1152,12 @@ class ActiveRecord(QueryMixin):
         skip = set(except_ or [])
         # Eloquent drops the PK and timestamps on a fresh copy; don't carry over a
         # soft-delete flag either, or the clone would start life already trashed.
-        skip.update({getattr(type(self), "CREATED_AT", "created_at"),
-                     getattr(type(self), "UPDATED_AT", "updated_at")})
+        skip.update(
+            {
+                getattr(type(self), "CREATED_AT", "created_at"),
+                getattr(type(self), "UPDATED_AT", "updated_at"),
+            }
+        )
         soft_field = getattr(type(self), "__arvel_soft_delete_column__", None)
         if soft_field:
             skip.add(soft_field)
@@ -1330,8 +1433,7 @@ class ActiveRecord(QueryMixin):
             raw = {
                 k: v
                 for k, v in self.__dict__.items()
-                if not k.startswith("_sa_")
-                and k not in ("_instance_hidden", "_arvel_attr_cache")
+                if not k.startswith("_sa_") and k not in ("_instance_hidden", "_arvel_attr_cache")
             }
             visible: list[str] | None = getattr(type(self), "__visible__", None)
             if visible is not None:
@@ -1443,6 +1545,16 @@ class Model(
                 event.listen(cls, "before_update", _set_timestamps_on_update, propagate=True)
 
     @classmethod
+    async def all(cls) -> ModelCollection[Self]:
+        # Narrows QueryMixin.all()'s list[Self] to the real runtime type so callers
+        # get the relation-aware helpers (.load(), model_keys(), ...) without query().
+        return cast("ModelCollection[Self]", await cls.query().all())
+
+    @classmethod
+    async def get(cls) -> ModelCollection[Self]:
+        return cast("ModelCollection[Self]", await cls.query().get())
+
+    @classmethod
     def add_global_scope(
         cls,
         name: str,
@@ -1498,53 +1610,108 @@ class Model(
                 value = resolved.write(self, name, value)
         super().__setattr__(name, value)
 
+    @overload
     def has_many(
         self,
         related: type[RelatedT],
         *,
         foreign_key: str | None = None,
         local_key: str | None = None,
-    ) -> HasMany[RelatedT]:
+    ) -> HasMany[RelatedT]: ...
+    @overload
+    def has_many(
+        self,
+        related: str,
+        *,
+        foreign_key: str | None = None,
+        local_key: str | None = None,
+    ) -> HasMany[Any]: ...
+    def has_many(
+        self,
+        related: type[RelatedT] | str,
+        *,
+        foreign_key: str | None = None,
+        local_key: str | None = None,
+    ) -> HasMany[Any]:
         from arvel.database.orm.relations import HasMany
 
+        related_cls = _resolve_related_model(type(self), related)
         lk = local_key or _pk_name(type(self))
         fk = foreign_key or f"{Str.snake(type(self).__name__)}_{lk}"
         owner_pk = getattr(self, lk)
-        col = getattr(related, fk)
-        qb: HasMany[RelatedT] = HasMany(related, owner=self, fk_col=fk, owner_pk=owner_pk)
+        col = getattr(related_cls, fk)
+        qb: HasMany[Any] = HasMany(
+            related_cls, owner=self, fk_col=fk, owner_pk=owner_pk, local_key=lk
+        )
         return qb.where(col == owner_pk)
 
+    @overload
     def has_one(
         self,
         related: type[RelatedT],
         *,
         foreign_key: str | None = None,
         local_key: str | None = None,
-    ) -> HasOne[RelatedT]:
+    ) -> HasOne[RelatedT]: ...
+    @overload
+    def has_one(
+        self,
+        related: str,
+        *,
+        foreign_key: str | None = None,
+        local_key: str | None = None,
+    ) -> HasOne[Any]: ...
+    def has_one(
+        self,
+        related: type[RelatedT] | str,
+        *,
+        foreign_key: str | None = None,
+        local_key: str | None = None,
+    ) -> HasOne[Any]:
         from arvel.database.orm.relations import HasOne
 
+        related_cls = _resolve_related_model(type(self), related)
         lk = local_key or _pk_name(type(self))
         fk = foreign_key or f"{Str.snake(type(self).__name__)}_{lk}"
         owner_pk = getattr(self, lk)
-        col = getattr(related, fk)
-        qb: HasOne[RelatedT] = HasOne(related, owner=self, fk_col=fk, owner_pk=owner_pk)
+        col = getattr(related_cls, fk)
+        qb: HasOne[Any] = HasOne(
+            related_cls, owner=self, fk_col=fk, owner_pk=owner_pk, local_key=lk
+        )
         return qb.where(col == owner_pk)
 
+    @overload
     def belongs_to(
         self,
         related: type[RelatedT],
         *,
         foreign_key: str | None = None,
         owner_key: str | None = None,
-    ) -> BelongsTo[RelatedT]:
+    ) -> BelongsTo[RelatedT]: ...
+    @overload
+    def belongs_to(
+        self,
+        related: str,
+        *,
+        foreign_key: str | None = None,
+        owner_key: str | None = None,
+    ) -> BelongsTo[Any]: ...
+    def belongs_to(
+        self,
+        related: type[RelatedT] | str,
+        *,
+        foreign_key: str | None = None,
+        owner_key: str | None = None,
+    ) -> BelongsTo[Any]:
         from arvel.database.orm.relations import BelongsTo
 
-        ok = owner_key or _pk_name(related)
-        fk = foreign_key or f"{Str.snake(related.__name__)}_{ok}"
+        related_cls = _resolve_related_model(type(self), related)
+        ok = owner_key or _pk_name(related_cls)
+        fk = foreign_key or f"{Str.snake(related_cls.__name__)}_{ok}"
         fk_value = getattr(self, fk, None)
-        pk_col = getattr(related, ok)
-        qb: BelongsTo[RelatedT] = BelongsTo(
-            related, owner=self, fk_attr=fk, owner_key=ok, fk_present=fk_value is not None
+        pk_col = getattr(related_cls, ok)
+        qb: BelongsTo[Any] = BelongsTo(
+            related_cls, owner=self, fk_attr=fk, owner_key=ok, fk_present=fk_value is not None
         )
         if fk_value is not None:
             qb = qb.where(pk_col == fk_value)

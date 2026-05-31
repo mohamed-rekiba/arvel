@@ -60,9 +60,7 @@ class TestRestoreOrCreate:
         same = await Wi022Account.restore_or_create({"email": "live@x.io"})
         assert same.id == acct.id
 
-    async def test_creates_when_missing(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_creates_when_missing(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         made = await Wi022Account.restore_or_create({"email": "new@x.io"}, {"name": "N"})
         assert made.id is not None
@@ -108,9 +106,7 @@ class TestForceDestroy:
         assert removed == 2
         assert len(await Wi022Account.with_trashed().get()) == 0
 
-    async def test_force_destroy_varargs(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_force_destroy_varargs(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         a = await Wi022Account.create(email="a@x.io", name="a")
         removed = await Wi022Account.force_destroy(a.id)

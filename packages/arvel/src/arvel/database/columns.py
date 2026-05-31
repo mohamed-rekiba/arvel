@@ -9,15 +9,18 @@ the model layer speak the same language::
     t.string("email", 255).unique().index()
     t.foreign_id("user_id", references="users.id")
 
-    # Model (columns module)
-    id:      Mapped[int] = id_()
-    name:    Mapped[str] = string(255)
-    email:   Mapped[str] = string(255, unique=True, index=True)
-    user_id: Mapped[int] = foreign_id("users.id")
+    # Model (columns module) — plain annotation, recommended
+    id:      int = id_()
+    name:    str = string(255)
+    email:   str = string(255, unique=True, index=True)
+    user_id: int = foreign_id("users.id")
 
-Each helper returns ``Mapped[T]`` so the model attribute remains fully typed
-for pyright / mypy. The runtime value is a SQLAlchemy ``mapped_column(...)``
-result, picked up by the declarative metaclass exactly as before.
+The helpers return ``Mapped[T]`` and the model metaclass wraps the plain
+annotation, so ``id: int = id_()`` is all you write and the runtime value is a
+SQLAlchemy ``mapped_column(...)`` the declarative scan picks up. mypy's SQLA
+plugin understands this; pyright (no SQLA plugin) doesn't run the metaclass, so
+under ``--strict`` it flags the assignment — annotate ``id: Mapped[int] = id_()``
+to silence it. Framework mixins use the ``Mapped[T]`` form for that reason.
 
 Why kwargs and not a fluent chain (``string(255).unique().index()``)? The
 chain shape would require the model metaclass to intercept ``_ColumnBuilder``
@@ -32,7 +35,7 @@ import enum as _enum
 import uuid as _uuid
 from datetime import datetime as _datetime
 from decimal import Decimal
-from typing import Any, Final, Literal, cast, overload
+from typing import Any, Final, Literal, TypeVar, cast, overload
 
 from sqlalchemy import (
     JSON,
@@ -50,6 +53,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import TypeEngine
+
+_T = TypeVar("_T")
 
 
 class _MutableJSONList(MutableList[Any]):
@@ -106,6 +112,7 @@ _UNSET: Final = _Unset()
 __all__ = [
     "big_integer",
     "boolean",
+    "column",
     "datetime",
     "decimal",
     "enum",
@@ -610,6 +617,55 @@ def enum(
     if not isinstance(default, _Unset):
         kw["default"] = default
     return mapped_column(sa_type, **kw)
+
+
+@overload
+def column(
+    type_: TypeEngine[_T] | type[TypeEngine[_T]],
+    *,
+    nullable: Literal[False] = ...,
+    unique: bool = ...,
+    index: bool = ...,
+    init: bool = ...,
+    default: _T | _Unset = ...,
+) -> Mapped[_T]: ...
+@overload
+def column(
+    type_: TypeEngine[_T] | type[TypeEngine[_T]],
+    *,
+    nullable: Literal[True],
+    unique: bool = ...,
+    index: bool = ...,
+    init: bool = ...,
+    default: _T | None | _Unset = ...,
+) -> Mapped[_T | None]: ...
+def column(
+    type_: TypeEngine[_T] | type[TypeEngine[_T]],
+    *,
+    nullable: bool = False,
+    unique: bool = False,
+    index: bool = False,
+    init: bool = True,
+    default: _T | None | _Unset = _UNSET,
+) -> Mapped[_T | None]:
+    """Column backed by an arbitrary SQLAlchemy type.
+
+    The escape hatch for custom ``TypeDecorator`` types — ``EncryptedType``,
+    ``PydanticType``, ``HashedType``, and friends — that the named helpers
+    don't wrap. Keeps the same kwargs and ``Mapped[T]`` typing as the rest of
+    the vocabulary, so user models never need to reach for ``mapped_column``
+    directly::
+
+        api_key: str = column(EncryptedType(key_b64=os.environ["APP_KEY"]))
+        profile: Profile = column(PydanticType(Profile), nullable=True, default=None)
+
+    ``T`` is carried from the type's Python side, so ``EncryptedType`` (a
+    ``TypeDecorator[str]``) yields ``Mapped[str]``.
+    """
+    kw: dict[str, Any] = {"nullable": nullable, "unique": unique, "index": index, "init": init}
+    if not isinstance(default, _Unset):
+        kw["default"] = default
+    return mapped_column(type_, **kw)
 
 
 def tsvector(*, nullable: bool = True) -> Mapped[str | None]:

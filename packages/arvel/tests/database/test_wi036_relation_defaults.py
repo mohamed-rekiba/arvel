@@ -35,9 +35,7 @@ class Wi036Post(Model):
     user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("wi036_users.id"), nullable=True, default=None
     )
-    author: Mapped[Wi036User | None] = relationship(
-        "Wi036User", back_populates="posts", init=False
-    )
+    author: Mapped[Wi036User | None] = relationship("Wi036User", back_populates="posts", init=False)
 
     __touches__: ClassVar[tuple[str, ...]] = ("author_relation",)
 
@@ -142,9 +140,7 @@ class TestEagerControl:
         finally:
             event.remove(engine.sync_engine, "before_cursor_execute", counter)
 
-    async def test_with_still_eager_loads(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_with_still_eager_loads(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         user = await Wi036User.create(name="u")
         await Wi036Post.create(title="a", user_id=user.id)

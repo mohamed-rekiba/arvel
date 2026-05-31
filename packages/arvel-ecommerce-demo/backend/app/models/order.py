@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from arvel.database import (
     Model,
@@ -13,11 +13,16 @@ from arvel.database import (
     decimal,
     enum,
     foreign_id,
-    has_many_attr,
     jsonb,
     text,
     uuid_id,
 )
+
+if TYPE_CHECKING:
+    from arvel.database import BelongsTo, HasMany
+
+    from app.models.order_item import OrderItem
+    from app.models.user import User
 
 _ORDER_STATUSES = ("pending", "confirmed", "processing", "shipped", "delivered", "cancelled")
 
@@ -31,7 +36,12 @@ class Order(Model, Timestamps, SoftDeletes):
     total: Decimal = decimal(10, 2, default=Decimal(0))
     shipping_address: Any = jsonb(default=dict)
     note: str | None = text(nullable=True, default=None)
-    items: list[Any] = has_many_attr("OrderItem", fk="order_id")
+
+    def items(self) -> HasMany[OrderItem]:
+        return self.has_many("OrderItem", foreign_key="order_id")
+
+    def user(self) -> BelongsTo[User]:
+        return self.belongs_to("User", foreign_key="user_id")
 
 
 __all__ = ["Order"]

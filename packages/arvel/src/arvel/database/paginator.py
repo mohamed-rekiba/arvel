@@ -56,7 +56,7 @@ def resolve_page(page_name: str = "page", default: int = 1) -> int:
         return default
     try:
         page = int(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     return page if page >= 1 else default
 
@@ -269,9 +269,7 @@ class Paginator(Generic[T]):
         elements.append({"url": next_url, "label": "Next &raquo;", "active": False})
         return elements
 
-    def to_response(
-        self, items_serializer: Callable[[T], Any] | None = None
-    ) -> dict[str, Any]:
+    def to_response(self, items_serializer: Callable[[T], Any] | None = None) -> dict[str, Any]:
         """Laravel's flat ``LengthAwarePaginator`` envelope (``current_page`` … ``total``).
 
         URLs honor ``appends``/``with_query_string``/``fragment`` and the request path. The

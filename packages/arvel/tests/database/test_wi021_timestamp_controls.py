@@ -89,9 +89,7 @@ class TestTimestampToggle:
 
 
 class TestCustomColumns:
-    async def test_custom_columns_filled(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_custom_columns_filled(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         row = await Wi021Custom.create(title="a")
         assert row.inserted_at is not None
@@ -99,18 +97,14 @@ class TestCustomColumns:
 
 
 class TestTouch:
-    async def test_touch_bumps_updated_at(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_touch_bumps_updated_at(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         row = await Wi021Stamped.create(title="a")
         object.__setattr__(row, "updated_at", datetime(2000, 1, 1, tzinfo=UTC))
         await row.touch()
         assert row.updated_at.year != 2000
 
-    async def test_touch_named_attribute(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_touch_named_attribute(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         row = await Wi021Custom.create(title="a")
         await row.touch("inserted_at")
@@ -146,9 +140,7 @@ class TestWithoutTimestamps:
         assert row.created_at is None
         assert row.updated_at is None
 
-    async def test_restores_after_block(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_restores_after_block(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         async with Wi021Nullable.without_timestamps():
             await Wi021Nullable.create(title="quiet")

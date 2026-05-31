@@ -31,12 +31,8 @@ class Wi033Post(Model):
     __tablename__ = "wi033_posts"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
     title: Mapped[str] = mapped_column(String(120))
-    user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("wi033_users.id"), default=None
-    )
-    author: Mapped[Wi033User | None] = relationship(
-        "Wi033User", back_populates="posts", init=False
-    )
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wi033_users.id"), default=None)
+    author: Mapped[Wi033User | None] = relationship("Wi033User", back_populates="posts", init=False)
     comments: Mapped[list[Wi033Comment]] = relationship(
         "Wi033Comment", back_populates="post", init=False, default_factory=list
     )
@@ -47,9 +43,7 @@ class Wi033Comment(Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
     body: Mapped[str] = mapped_column(String(200))
     spam: Mapped[bool] = mapped_column(default=False)
-    post_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("wi033_posts.id"), default=None
-    )
+    post_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wi033_posts.id"), default=None)
     post: Mapped[Wi033Post | None] = relationship(
         "Wi033Post", back_populates="comments", init=False
     )
@@ -61,9 +55,7 @@ async def _setup(engine: AsyncEngine) -> None:
 
 
 class TestNestedWhereHas:
-    async def test_walks_both_hops(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_walks_both_hops(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         u_has = await Wi033User.create(name="has")
         u_none = await Wi033User.create(name="none")
@@ -82,21 +74,29 @@ class TestNestedWhereHas:
         p = await Wi033Post.create(title="p", user_id=u.id)
         await Wi033Comment.create(body="ham", post_id=p.id, spam=False)
 
-        match = await Wi033User.query().where_has(
-            "posts.comments", lambda q: q.where(Wi033Comment.spam == False)  # noqa: E712
-        ).get()
+        match = (
+            await Wi033User.query()
+            .where_has(
+                "posts.comments",
+                lambda q: q.where(Wi033Comment.spam == False),  # noqa: E712
+            )
+            .get()
+        )
         assert [x.name for x in match] == ["u"]
 
-        none = await Wi033User.query().where_has(
-            "posts.comments", lambda q: q.where(Wi033Comment.spam == True)  # noqa: E712
-        ).get()
+        none = (
+            await Wi033User.query()
+            .where_has(
+                "posts.comments",
+                lambda q: q.where(Wi033Comment.spam == True),  # noqa: E712
+            )
+            .get()
+        )
         assert none == []
 
 
 class TestOperatorCount:
-    async def test_where_has_with_count(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_where_has_with_count(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         few = await Wi033Post.create(title="few")
         many = await Wi033Post.create(title="many")
@@ -126,9 +126,7 @@ class TestOperatorCount:
 
 
 class TestOrVariants:
-    async def test_or_where_has(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_or_where_has(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         commented = await Wi033Post.create(title="commented")
         await Wi033Post.create(title="special")
@@ -136,16 +134,11 @@ class TestOrVariants:
         await Wi033Comment.create(body="x", post_id=commented.id)
 
         rows = await (
-            Wi033Post.query()
-            .where(Wi033Post.title == "special")
-            .or_where_has("comments")
-            .get()
+            Wi033Post.query().where(Wi033Post.title == "special").or_where_has("comments").get()
         )
         assert {p.title for p in rows} == {"commented", "special"}
 
-    async def test_or_doesnt_have(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_or_doesnt_have(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         await Wi033Post.create(title="empty")
         full = await Wi033Post.create(title="full")
@@ -159,9 +152,7 @@ class TestOrVariants:
         )
         assert {p.title for p in rows} == {"empty"}
 
-    async def test_or_where_relation(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_or_where_relation(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         p1 = await Wi033Post.create(title="p1")
         p2 = await Wi033Post.create(title="p2")
@@ -188,9 +179,14 @@ class TestDoesntHaveConstraint:
         await Wi033Comment.create(body="s", post_id=spam_only.id, spam=True)
         await Wi033Comment.create(body="h", post_id=ham.id, spam=False)
 
-        rows = await Wi033Post.query().doesnt_have(
-            "comments", lambda q: q.where(Wi033Comment.spam == False)  # noqa: E712
-        ).get()
+        rows = (
+            await Wi033Post.query()
+            .doesnt_have(
+                "comments",
+                lambda q: q.where(Wi033Comment.spam == False),  # noqa: E712
+            )
+            .get()
+        )
         assert {p.title for p in rows} == {"spam_only"}
 
 
@@ -206,18 +202,21 @@ class TestWithWhereHas:
         await Wi033Comment.create(body="spam", post_id=empty.id, spam=True)
 
         session.expire_all()
-        rows = await Wi033Post.query().with_where_has(
-            "comments", lambda q: q.where(Wi033Comment.spam == False)  # noqa: E712
-        ).get()
+        rows = (
+            await Wi033Post.query()
+            .with_where_has(
+                "comments",
+                lambda q: q.where(Wi033Comment.spam == False),  # noqa: E712
+            )
+            .get()
+        )
         assert [p.title for p in rows] == ["p"]
         # Eager-loaded collection is filtered by the same constraint.
         assert [c.body for c in rows[0].comments] == ["keep"]
 
 
 class TestWhereBelongsTo:
-    async def test_filters_by_parent_fk(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_filters_by_parent_fk(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         author = await Wi033User.create(name="author")
         other = await Wi033User.create(name="other")
@@ -227,9 +226,7 @@ class TestWhereBelongsTo:
         rows = await Wi033Post.query().where_belongs_to(author).get()
         assert [p.title for p in rows] == ["mine"]
 
-    async def test_explicit_relation_name(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_explicit_relation_name(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         author = await Wi033User.create(name="a")
         await Wi033Post.create(title="t", user_id=author.id)

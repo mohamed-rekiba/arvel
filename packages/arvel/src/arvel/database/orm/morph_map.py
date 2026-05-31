@@ -25,6 +25,7 @@ from arvel.database.exceptions import ORMError
 if TYPE_CHECKING:
     from arvel.database.model import Model
 
+
 class _MorphState:
     """Process-global morph registry. Mutated in place to avoid `global` rebinds."""
 

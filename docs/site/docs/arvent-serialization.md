@@ -21,7 +21,7 @@ user.to_json(indent=2)
 
 ### Value-object columns (custom `PydanticType`)
 
-Columns backed by a Pydantic value object — anything declared with `mapped_column(PydanticType(MyModel), ...)` — serialize as the nested object shape, not as a flattened scalar. `to_dict()` returns the model dump as a `dict`, and `to_json()` produces the matching JSON payload. If your API contract needs a different shape (a flat string, a custom field set, etc.), expose the field via a [Pydantic schema](arvent.md#generating-a-model) — that's exactly what the boundary schemas are for. The serialization layer never silently flattens; that's a [JSON Resource](arvent-resources.md) concern.
+Columns backed by a Pydantic value object — anything declared with `column(PydanticType(MyModel), ...)` — serialize as the nested object shape, not as a flattened scalar. `to_dict()` returns the model dump as a `dict`, and `to_json()` produces the matching JSON payload. If your API contract needs a different shape (a flat string, a custom field set, etc.), expose the field via a [Pydantic schema](arvent.md#generating-a-model) — that's exactly what the boundary schemas are for. The serialization layer never silently flattens; that's a [JSON Resource](arvent-resources.md) concern.
 
 ## Hiding fields
 
@@ -38,9 +38,9 @@ class User(Model, Timestamps):
 
     __hidden__: ClassVar[list[str]] = ["password", "remember_token"]
 
-    id: Mapped[int] = id_()
-    email: Mapped[str] = string(180, unique=True)
-    password: Mapped[str] = string(255)
+    id: int = id_()
+    email: str = string(180, unique=True)
+    password: str = string(255)
 ```
 
 `__hidden__` is a deny-list — listed attributes never appear in serialised output. The mirror image is `__visible__`, an allow-list of attributes that ARE included. Define one or the other, not both — `__visible__` wins when both are set.
@@ -80,9 +80,9 @@ class User(Model, Timestamps):
 
     __appends__: ClassVar[list[str]] = ["full_name"]
 
-    id: Mapped[int] = id_()
-    first_name: Mapped[str] = string(80)
-    last_name: Mapped[str] = string(80)
+    id: int = id_()
+    first_name: str = string(80)
+    last_name: str = string(80)
 
     @accessor
     def full_name(self) -> str:

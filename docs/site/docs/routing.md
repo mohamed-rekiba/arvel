@@ -75,15 +75,13 @@ Type a path parameter with a `Model` subclass and Arvel will resolve the row fro
 
 ```python
 from arvel import Route
-from arvel.database import Model
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from arvel.database import Model, id_, string
 
 
 class Post(Model):
     __tablename__ = "posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: int = id_()
+    title: str = string(80)
 
 
 @Route.get("/posts/{post}")
@@ -106,8 +104,8 @@ class Article(Model):
 
     route_key_name: ClassVar[str] = "slug"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    slug: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    id: int = id_()
+    slug: str = string(80, unique=True)
 
 
 @Route.get("/articles/{article}")

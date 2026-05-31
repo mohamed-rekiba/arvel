@@ -17,7 +17,7 @@ already holds the right SQL shape and you just want a cleaner Python view.
 
 ```python
 from enum import StrEnum
-from arvel.database import EnumType
+from arvel.database import EnumType, column
 
 
 class Status(StrEnum):
@@ -26,7 +26,7 @@ class Status(StrEnum):
 
 
 class Post(Model):
-    status: Mapped[Status] = mapped_column(EnumType(Status), default=Status.DRAFT)
+    status: Status = column(EnumType(Status), default=Status.DRAFT)
 ```
 
 `Post.status` is a `Status` value in Python, stored as the string `"draft"` or `"published"` in the database.
@@ -35,7 +35,7 @@ class Post(Model):
 
 ```python
 from pydantic import BaseModel
-from arvel.database import PydanticType
+from arvel.database import PydanticType, column
 
 
 class Settings(BaseModel):
@@ -44,7 +44,7 @@ class Settings(BaseModel):
 
 
 class User(Model):
-    settings: Mapped[Settings] = mapped_column(PydanticType(Settings))
+    settings: Settings = column(PydanticType(Settings))
 ```
 
 `User.settings` is a `Settings` instance in Python, stored as a JSON column in the database.
@@ -52,11 +52,11 @@ class User(Model):
 ### Encrypted
 
 ```python
-from arvel.database import EncryptedType
+from arvel.database import EncryptedType, column
 
 
 class User(Model):
-    secret: Mapped[str] = mapped_column(EncryptedType(key_b64=os.environ["APP_KEY"]))
+    secret: str = column(EncryptedType(key_b64=os.environ["APP_KEY"]))
 ```
 
 AES-GCM authenticated encryption, transparent to your application code. See [Encryption](encryption.md) and ADR-014 for details.
@@ -64,7 +64,7 @@ AES-GCM authenticated encryption, transparent to your application code. See [Enc
 For searchable encryption (deterministic IV, equal plaintext → equal ciphertext):
 
 ```python
-secret: Mapped[str] = mapped_column(EncryptedType(key_b64=..., mode="search"))
+secret: str = column(EncryptedType(key_b64=..., mode="search"))
 ```
 
 ### JSON
@@ -72,11 +72,11 @@ secret: Mapped[str] = mapped_column(EncryptedType(key_b64=..., mode="search"))
 Plain JSON without Pydantic validation:
 
 ```python
-from sqlalchemy import JSON
+from arvel.database import json
 
 
 class User(Model):
-    metadata: Mapped[dict] = mapped_column(JSON)
+    metadata: dict = json()
 ```
 
 For the strict + typed version, prefer `PydanticType` with a model.
@@ -86,11 +86,11 @@ For the strict + typed version, prefer `PydanticType` with a model.
 For columns that store a digest (not encryption — see [Hashing](hashing.md)):
 
 ```python
-from arvel.database import HashedType
+from arvel.database import HashedType, column
 
 
 class Token(Model):
-    value: Mapped[str] = mapped_column(HashedType("sha256"))
+    value: str = column(HashedType("sha256"))
 ```
 
 Writing `token.value = "secret"` stores the SHA-256 hex. The plaintext is never written to the column. Useful for API key storage (ADR-030).
@@ -104,8 +104,7 @@ For value-level coercion that doesn't need a custom SQLAlchemy type — like
 name to a cast type name.
 
 ```python
-from arvel.database import Model
-from sqlalchemy import String
+from arvel.database import Model, integer, string
 
 
 class Post(Model):
@@ -118,12 +117,12 @@ class Post(Model):
         "expires_on": "date",
         "queued_at": "timestamp",
     }
-    published: Mapped[int] = mapped_column(default=0)
-    view_count: Mapped[str] = mapped_column(String(20), default="0")
-    meta: Mapped[str] = mapped_column(String(500), default="{}")
-    published_at: Mapped[str] = mapped_column(String(40), default=None)
-    expires_on: Mapped[str] = mapped_column(String(10), default=None)
-    queued_at: Mapped[int] = mapped_column(default=0)
+    published: int = integer(default=0)
+    view_count: str = string(20, default="0")
+    meta: str = string(500, default="{}")
+    published_at: str = string(40, default=None)
+    expires_on: str = string(10, default=None)
+    queued_at: int = integer(default=0)
 ```
 
 Reading any of these attributes runs the value through the cast on the way
@@ -200,10 +199,10 @@ class Article(Model):
         "tags": "collection",                   # JSON -> Collection
         "scheduled_at": "datetime:%Y-%m-%d %H:%M",
     }
-    status: Mapped[str] = mapped_column(String(40), default=None)
-    meta: Mapped[str] = mapped_column(String(255), default="{}")
-    tags: Mapped[str] = mapped_column(String(255), default="[]")
-    scheduled_at: Mapped[str] = mapped_column(String(40), default=None)
+    status: str = string(40, default=None)
+    meta: str = string(255, default="{}")
+    tags: str = string(255, default="[]")
+    scheduled_at: str = string(40, default=None)
 
 
 a = Article(status="published")
@@ -233,8 +232,8 @@ class Account(Model):
         "labels": "encrypted:collection",   # -> Collection
     }
     __hidden__ = ["ssn"]               # keep it out of to_dict()
-    ssn: Mapped[str] = mapped_column(String(512), default=None)
-    recovery_codes: Mapped[str] = mapped_column(String(512), default=None)
+    ssn: str = string(512, default=None)
+    recovery_codes: str = string(512, default=None)
 ```
 
 The stored column value is ciphertext; the attribute and `to_dict()` expose the
@@ -281,8 +280,8 @@ from arvel.database import Attribute, Model
 
 
 class User(Model):
-    first_name: Mapped[str] = string(50)
-    last_name: Mapped[str] = string(50)
+    first_name: str = string(50)
+    last_name: str = string(50)
 
     full_name = Attribute.make(
         get=lambda m: f"{m.first_name} {m.last_name}".strip(),
@@ -300,21 +299,24 @@ mutate a backing column directly, so reach for it only when that's fine.
 
 ```python
 class Post(Model):
-    published: Mapped[bool] = mapped_column(default=False)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC))
+    published: bool = boolean(default=False)
+    # mapped_column here only because the datetime() helper name-clashes with the type.
+    created_at: datetime = mapped_column(default=lambda: datetime.now(UTC))
 ```
 
 For dynamic defaults (timestamps, UUIDs), pass a callable. The framework provides shortcuts:
 
 ```python
-from arvel.database import Timestamps, Uuid
+import uuid
+
+from arvel.database import Timestamps, uuid_id
 
 
 class Post(Model, Timestamps):
-    id: Mapped[str] = mapped_column(Uuid, primary_key=True)
+    id: uuid.UUID = uuid_id()
 ```
 
-`Timestamps` adds `created_at` / `updated_at` and manages them on save. `Uuid` defaults to a fresh UUIDv7 (time-ordered) per row.
+`Timestamps` adds `created_at` / `updated_at` and manages them on save. `uuid_id()` gives a UUIDv7 (time-ordered) primary key, generated per row.
 
 ## Writing custom casts
 
@@ -336,11 +338,14 @@ class UpperString(TypeDecorator):
 ```
 
 ```python
+from arvel.database import column
+
+
 class User(Model):
-    country_code: Mapped[str] = mapped_column(UpperString(2))
+    country_code: str = column(UpperString(2))
 ```
 
-Now `user.country_code = "us"` stores `"US"`.
+Now `user.country_code = "us"` stores `"US"`. `column()` is the generic helper for any custom `TypeDecorator` — same kwargs (`nullable`, `unique`, `index`, `default`) and `Mapped[T]` typing as the named helpers, so you never reach for `mapped_column` just to attach a custom type.
 
 ## Where to next?
 

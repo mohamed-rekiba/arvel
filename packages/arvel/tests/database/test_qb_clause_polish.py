@@ -51,13 +51,7 @@ async def test_or_where_between(engine: AsyncEngine, session: AsyncSession) -> N
 async def test_explicit_grouping_precedence(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
     # (qty == 1 OR qty == 9) AND tag == 'x' -> a, c   (explicit grouping)
-    rows = (
-        await Widget.where(qty=1)
-        .or_where(Widget.qty == 9)
-        .where(tag="x")
-        .order_by("name")
-        .all()
-    )
+    rows = await Widget.where(qty=1).or_where(Widget.qty == 9).where(tag="x").order_by("name").all()
     assert [r.name for r in rows] == ["a", "c"]
 
 

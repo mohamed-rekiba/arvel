@@ -1,10 +1,9 @@
 """FK relation helpers: HasMany, HasOne, BelongsTo, HasManyThrough, HasOneThrough.
 
-Each is a QueryBuilder subclass pre-scoped to a FK WHERE clause.
-
-Also provides ``has_many_attr`` — a class-attribute declarator that wraps
-``relationship()`` for viewonly one-to-many associations.  Kept in this module
-(not ``orm/__init__.py``) so the init stays a re-export hub.
+Each is a QueryBuilder subclass pre-scoped to a FK WHERE clause. Defined as
+zero-arg accessor methods on a model (``def orders(self) -> HasMany[Order]``),
+they power lazy queries, eager loading (``with_("orders")``), cached read-back,
+and ``where_has`` / ``with_count`` from a single declaration.
 """
 
 from __future__ import annotations
@@ -15,8 +14,9 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 from sqlalchemy import inspect as sqla_inspect
 from sqlalchemy import select
-from sqlalchemy.orm import Mapped, Mapper, declared_attr, relationship
+from sqlalchemy.orm import Mapper
 
+from arvel.database.orm._eager import get_eager_relation
 from arvel.database.query import QueryBuilder
 from arvel.database.session import get_active_session
 
@@ -35,6 +35,22 @@ class ThroughSpec:
     fk1: str = ""
     fk2: str = ""
     local_key: str = "id"
+
+
+@dataclass(frozen=True, slots=True)
+class FkMethodLink:
+    """Resolved shape of a method-style FK relation (``has_many``/``has_one``/``belongs_to``).
+
+    The eager engine reads this to batch-load and to build ``where_has``/``has``
+    subqueries. ``related_col`` and ``local_col`` name the two sides of the join:
+    rows match where ``related.<related_col> == owner.<local_col>``.
+    """
+
+    related_model: type[Any]
+    direction: str  # "has_many" | "has_one" | "belongs_to"
+    related_col: str
+    local_col: str
+    name: str
 
 
 class _OfMany(QueryBuilder[T], Generic[T]):
@@ -77,18 +93,41 @@ class HasMany(_OfMany[T], Generic[T]):
         owner: Any = None,
         fk_col: str | None = None,
         owner_pk: Any = None,
+        local_key: str | None = None,
     ) -> None:
         super().__init__(model, stmt)
         self._owner = owner
         self._fk_col = fk_col
         self._owner_pk = owner_pk
+        self._local_key = local_key
+        # Set by the metaclass relation-method wrapper; lets terminal ops serve
+        # eager-loaded results from the owner's cache instead of re-querying.
+        self._relation_name: str | None = None
 
     def _clone(self, stmt: Any = None) -> HasMany[T]:
         new = super()._clone(stmt)
         new._owner = self._owner
         new._fk_col = self._fk_col
         new._owner_pk = self._owner_pk
+        new._local_key = self._local_key
+        new._relation_name = self._relation_name
         return new
+
+    async def all(self) -> Any:
+        if self._owner is not None and self._relation_name is not None:
+            cached = get_eager_relation(self._owner, self._relation_name)
+            if cached is not None:
+                from arvel.database.collection import ModelCollection
+
+                rows: list[Any] = list(cached)
+                return ModelCollection(rows)
+        return await super().all()
+
+    def link_spec(self, name: str) -> FkMethodLink:
+        """Resolved join shape for the eager engine and where_has/has subqueries."""
+        if self._fk_col is None or self._local_key is None:
+            raise TypeError(f"{type(self).__name__} relation is missing fk/local key")
+        return FkMethodLink(self._model, "has_many", self._fk_col, self._local_key, name)
 
     async def save(self, instance: Any) -> Any:
         """Set the FK on the instance to this owner's PK and persist through the model."""
@@ -124,18 +163,36 @@ class HasOne(_OfMany[T], Generic[T]):
         owner: Any = None,
         fk_col: str | None = None,
         owner_pk: Any = None,
+        local_key: str | None = None,
     ) -> None:
         super().__init__(model, stmt)
         self._owner = owner
         self._fk_col = fk_col
         self._owner_pk = owner_pk
+        self._local_key = local_key
+        self._relation_name: str | None = None
 
     def _clone(self, stmt: Any = None) -> HasOne[T]:
         new = super()._clone(stmt)
         new._owner = self._owner
         new._fk_col = self._fk_col
         new._owner_pk = self._owner_pk
+        new._local_key = self._local_key
+        new._relation_name = self._relation_name
         return new
+
+    async def first(self) -> T | None:
+        if self._owner is not None and self._relation_name is not None:
+            cached = get_eager_relation(self._owner, self._relation_name)
+            if cached is not None:
+                return cast("T | None", cached[0]) if cached else None
+        return await super().first()
+
+    def link_spec(self, name: str) -> FkMethodLink:
+        """Resolved join shape for the eager engine and where_has/has subqueries."""
+        if self._fk_col is None or self._local_key is None:
+            raise TypeError(f"{type(self).__name__} relation is missing fk/local key")
+        return FkMethodLink(self._model, "has_one", self._fk_col, self._local_key, name)
 
     async def save(self, instance: Any) -> Any:
         if self._fk_col:
@@ -173,6 +230,7 @@ class BelongsTo(QueryBuilder[T], Generic[T]):
         # False when the owner's FK is null — first() must not match an arbitrary row.
         self._fk_present = fk_present
         self._default: Any = _UNSET
+        self._relation_name: str | None = None
 
     def _clone(self, stmt: Any = None) -> BelongsTo[T]:
         new = super()._clone(stmt)
@@ -181,6 +239,7 @@ class BelongsTo(QueryBuilder[T], Generic[T]):
         new._owner_key = self._owner_key
         new._fk_present = self._fk_present
         new._default = self._default
+        new._relation_name = self._relation_name
         return new
 
     def with_default(
@@ -210,12 +269,24 @@ class BelongsTo(QueryBuilder[T], Generic[T]):
         return instance
 
     async def first(self) -> T | None:
+        if self._owner is not None and self._relation_name is not None:
+            cached = get_eager_relation(self._owner, self._relation_name)
+            if cached is not None:
+                if cached:
+                    return cast("T | None", cached[0])
+                return self._build_default()
         if not self._fk_present:
             return self._build_default()
         result = await super().first()
         if result is None:
             return self._build_default()
         return result
+
+    def link_spec(self, name: str) -> FkMethodLink:
+        """Resolved join shape for the eager engine and where_has/has subqueries."""
+        if self._fk_attr is None:
+            raise TypeError(f"{type(self).__name__} relation is missing fk attribute")
+        return FkMethodLink(self._model, "belongs_to", self._owner_key, self._fk_attr, name)
 
     async def associate(self, related: Any) -> None:
         """Set the FK on the owner instance to point to related.pk (no persist)."""
@@ -311,81 +382,11 @@ class HasOneThrough(HasManyThrough[T], Generic[T]):
         return result.scalars().first()
 
 
-class _HasManyAttr:
-    """Descriptor sentinel for ``has_many_attr``.
-
-    Replaces itself with a ``declared_attr``-wrapped relationship during class
-    creation (via ``__set_name__``), so ``MappedAsDataclass`` never sees the
-    attribute in ``__annotations__`` and never includes it in ``__init__``.
-    """
-
-    __slots__ = ("_fk", "_local_pk", "_target")
-
-    def __init__(self, target: str, fk: str, local_pk: str = "id") -> None:
-        self._target = target
-        self._fk = fk
-        self._local_pk = local_pk
-
-    def __set_name__(self, owner: type[Any], name: str) -> None:
-        target = self._target
-        fk = self._fk
-        local_pk = self._local_pk
-
-        def _rel(cls: type[Any]) -> Any:
-            # String-form join deferred to the SA mapper registry — safe with
-            # circular model imports because SA resolves strings lazily.
-            join_expr = f"foreign({target}.{fk}) == {cls.__name__}.{local_pk}"
-            return relationship(
-                target,
-                primaryjoin=join_expr,
-                uselist=True,
-                init=False,
-                viewonly=True,
-                lazy="raise_on_sql",
-            )
-
-        _rel.__annotations__["return"] = Mapped[list[Any]]
-        # Install the real declared_attr and erase the annotation so that
-        # MappedAsDataclass does not treat this as a dataclass field.
-        setattr(owner, name, declared_attr(_rel))
-        owner.__annotations__.pop(name, None)
-
-    def __get__(self, obj: Any, objtype: Any = None) -> _HasManyAttr:
-        # Defensive fallback — should never be reached after __set_name__.
-        return self
-
-
-def has_many_attr(
-    target: str,
-    *,
-    fk: str,
-    local_pk: str = "id",
-) -> Any:
-    """Class-attribute declarator for a viewonly has-many ORM relationship.
-
-    Works with any annotation; the annotation is removed from the class before
-    ``MappedAsDataclass`` processes it, so the attribute is never included in
-    ``__init__``::
-
-        catalog_products: list[Any] = has_many_attr("ProductCatalog", fk="category_id")
-
-    Usable with ``where_has`` / ``doesnt_have`` / ``has``::
-
-        Category.where_has(Category.catalog_products, lambda q: q.where(...))
-
-    Accessing the attribute on an unloaded instance raises
-    ``sqlalchemy.exc.InvalidRequestError`` instead of issuing a silent lazy
-    query (``lazy="raise_on_sql"``).
-    """
-    return _HasManyAttr(target, fk=fk, local_pk=local_pk)
-
-
 __all__ = [
     "BelongsTo",
+    "FkMethodLink",
     "HasMany",
     "HasManyThrough",
     "HasOne",
     "HasOneThrough",
-    "_HasManyAttr",
-    "has_many_attr",
 ]

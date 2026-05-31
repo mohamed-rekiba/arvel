@@ -6,7 +6,7 @@ Model subclass without calling query() explicitly.
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Mapping
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Self, cast
 
 if TYPE_CHECKING:
@@ -563,14 +563,14 @@ class QueryMixin:
     # ── terminal (read) ───────────────────────────────────────────────────
 
     @classmethod
-    async def all(cls) -> list[Self]:
-        # Runtime type is ModelCollection[Self]; annotated as list[Self] because
-        # QueryMixin's Self isn't bound to Model (ModelCollection's TypeVar is).
-        return cast("list[Self]", await cls.query().all())
+    async def all(cls) -> Sequence[Self]:
+        # Sequence (not list) so Model can override with the covariant ModelCollection[Self]:
+        # QueryMixin's Self isn't bound to Model, but ModelCollection's TypeVar is.
+        return cast("Sequence[Self]", await cls.query().all())
 
     @classmethod
-    async def get(cls) -> list[Self]:
-        return cast("list[Self]", await cls.query().get())
+    async def get(cls) -> Sequence[Self]:
+        return cast("Sequence[Self]", await cls.query().get())
 
     @classmethod
     async def first(cls) -> Self | None:

@@ -43,9 +43,7 @@ async def _seed() -> tuple[SqUser, SqUser]:
     return alice, bob
 
 
-async def test_from_sub_selects_derived_table(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_from_sub_selects_derived_table(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     await _seed()
 
@@ -60,23 +58,17 @@ async def test_join_sub_inner(engine: AsyncEngine, session: AsyncSession) -> Non
     alice, _bob = await _seed()
 
     high_value = SqOrder.where(SqOrder.amount >= 100)
-    rows = await SqUser.join_sub(
-        high_value, "hv", lambda hv: hv.c.user_id == SqUser.id
-    ).get()
+    rows = await SqUser.join_sub(high_value, "hv", lambda hv: hv.c.user_id == SqUser.id).get()
 
     assert {u.id for u in rows} == {alice.id}
 
 
-async def test_left_join_sub_keeps_unmatched(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_left_join_sub_keeps_unmatched(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     alice, bob = await _seed()
 
     high_value = SqOrder.where(SqOrder.amount >= 100)
-    rows = await SqUser.left_join_sub(
-        high_value, "hv", lambda hv: hv.c.user_id == SqUser.id
-    ).get()
+    rows = await SqUser.left_join_sub(high_value, "hv", lambda hv: hv.c.user_id == SqUser.id).get()
 
     # Both users survive the LEFT JOIN even though Bob has no high-value order.
     assert {u.id for u in rows} == {alice.id, bob.id}
@@ -101,15 +93,13 @@ async def test_select_sub_appends_correlated_column(
     assert by_name["Bob"].top_amount == 25
 
 
-async def test_add_select_appends_expression(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_add_select_appends_expression(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     await _seed()
 
-    rows = await SqUser.add_select(func.upper(SqUser.name).label("upper_name")).order_by(
-        "name"
-    ).get()
+    rows = (
+        await SqUser.add_select(func.upper(SqUser.name).label("upper_name")).order_by("name").get()
+    )
 
     by_name = {u.name: u for u in rows}
     assert by_name["Alice"].upper_name == "ALICE"

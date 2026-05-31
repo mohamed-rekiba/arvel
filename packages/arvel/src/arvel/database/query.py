@@ -51,7 +51,7 @@ from arvel.database.exceptions import (
     MultipleResultsError,
     UnknownRelationError,
 )
-from arvel.database.orm._eager import set_eager_relation
+from arvel.database.orm._eager import get_eager_relation, set_eager_relation
 from arvel.database.paginator import (
     Paginator,
     build_page_url,
@@ -68,6 +68,7 @@ if TYPE_CHECKING:
     from arvel.database.orm.has_one_of_many import HasOneOfManyLink
     from arvel.database.orm.morph import MorphChildLink
     from arvel.database.orm.morph_to_many import MorphedByManyLink, MorphToManyLink
+    from arvel.database.orm.relations import FkMethodLink
     from arvel.database.query_mixin import QueryMixin
 
 T = TypeVar("T", bound="QueryMixin")
@@ -228,6 +229,9 @@ def _belongs_to_relation_for(mapper: Mapper[Any], parent: object) -> Any:
     raise UnknownRelationError(mapper.class_.__name__, f"<belongs_to {type(parent).__name__}>")
 
 
+_NO_FK_RELATIONS: frozenset[str] = frozenset()
+
+
 @dataclass(frozen=True)
 class _RelationTarget:
     """Resolved relation — SQLAlchemy relationship, BelongsToMany, MorphToMany, or MorphTo."""
@@ -240,6 +244,7 @@ class _RelationTarget:
     morph_name: str | None = None
     morph_child_link: MorphChildLink | None = None
     one_of_many_link: HasOneOfManyLink | None = None
+    fk_method_link: FkMethodLink | None = None
 
 
 def _resolve_morph_descriptor(model: type[Any], descriptor: Any) -> _RelationTarget | None:
@@ -273,6 +278,24 @@ def _resolve_descriptor_relation(model: type[Any], descriptor: Any) -> _Relation
     return _resolve_morph_descriptor(model, descriptor)
 
 
+def _fk_method_link_for(model: type[Any], name: str) -> FkMethodLink:
+    """Introspect a method-style FK relation accessor into a ``FkMethodLink``.
+
+    Calls the accessor on an instrumented blank instance (no ``__init__``), so
+    the relation builder is constructed without needing a persisted owner.
+    """
+    from sqlalchemy.orm.instrumentation import manager_of_class
+
+    from arvel.database.orm.relations import BelongsTo, HasMany, HasOne
+
+    # Only called for names already in __arvel_fk_relations__, so the class is mapped.
+    probe = manager_of_class(model).new_instance()
+    rel = getattr(probe, name)()
+    if isinstance(rel, (HasMany, HasOne, BelongsTo)):
+        return rel.link_spec(name)
+    raise UnknownRelationError(model.__name__, name)
+
+
 def _resolve_relation(model: type[Any], name: str | Any) -> _RelationTarget:
     if not isinstance(name, str):
         # Accept InstrumentedAttribute / QueryableAttribute — extract the key.
@@ -281,9 +304,11 @@ def _resolve_relation(model: type[Any], name: str | Any) -> _RelationTarget:
     if rel is not None:
         return _RelationTarget(kind="sa", sa_rel=rel)
     target = _resolve_descriptor_relation(model, getattr(model, name, None))
-    if target is None:
-        raise UnknownRelationError(model.__name__, name)
-    return target
+    if target is not None:
+        return target
+    if name in getattr(model, "__arvel_fk_relations__", _NO_FK_RELATIONS):
+        return _RelationTarget(kind="fk_method", fk_method_link=_fk_method_link_for(model, name))
+    raise UnknownRelationError(model.__name__, name)
 
 
 def _primary_key_column(model: type[Any]) -> Any:
@@ -340,6 +365,11 @@ def _pivot_exists_select(
     return related_cls, sub
 
 
+def _fk_method_join_cols(model: type[Any], link: FkMethodLink) -> tuple[Any, Any]:
+    """(column on related, column on owner) that the join equates for an FK relation."""
+    return getattr(link.related_model, link.related_col), getattr(model, link.local_col)
+
+
 def _relation_exists_select(
     model: type[Any], target: _RelationTarget
 ) -> tuple[type[Any], Select[Any]]:
@@ -350,6 +380,12 @@ def _relation_exists_select(
         related_cls = rel.mapper.class_
         local_col, remote_col = _local_remote(rel)
         return related_cls, select(related_cls).where(remote_col == local_col)
+    if target.kind == "fk_method":
+        link = target.fk_method_link
+        if link is None:
+            raise UnknownRelationError(model.__name__, "?")
+        related_col, owner_col = _fk_method_join_cols(model, link)
+        return link.related_model, select(link.related_model).where(related_col == owner_col)
     if target.kind == "morph_child":
         clink = target.morph_child_link
         if clink is None:
@@ -404,8 +440,11 @@ def validate_relation_head(model: type[Any], relation_path: str) -> None:
     mapper = _mapper_of(model)
     head, _, tail = relation_path.partition(".")
     head, _ = _expand_association_proxy(model, mapper, head, tail)
-    if head not in {r.key for r in mapper.relationships}:
-        raise UnknownRelationError(model.__name__, head)
+    if head in {r.key for r in mapper.relationships}:
+        return
+    if head in getattr(model, "__arvel_fk_relations__", _NO_FK_RELATIONS):
+        return
+    raise UnknownRelationError(model.__name__, head)
 
 
 def _selectin_loader_for_path(
@@ -553,9 +592,26 @@ def _btm_count_subquery(model: type[Any], target: _RelationTarget) -> Any:
     )
 
 
+def _fk_method_count_subquery(model: type[Any], target: _RelationTarget) -> Any:
+    from sqlalchemy import func as sqla_func
+
+    link = target.fk_method_link
+    if link is None:
+        raise UnknownRelationError(model.__name__, "?")
+    related_cls = link.related_model
+    related_col, owner_col = _fk_method_join_cols(model, link)
+    stmt = select(sqla_func.count()).where(related_col == owner_col)
+    scope_where = _global_scope_whereclause(related_cls)
+    if scope_where is not None:
+        stmt = stmt.where(scope_where)
+    return stmt.correlate(model).scalar_subquery()
+
+
 def _count_subquery(model: type[Any], target: _RelationTarget) -> Any:
     if target.kind == "sa":
         return _sa_count_subquery(model, target)
+    if target.kind == "fk_method":
+        return _fk_method_count_subquery(model, target)
     if target.kind == "mtm":
         return _mtm_count_subquery(model, target)
     if target.kind == "morph_child":
@@ -709,16 +765,25 @@ def _is_async_relation(model: type[Any], path: str) -> bool:
         target = _resolve_relation(model, head)
     except UnknownRelationError:
         return False
-    return target.kind in ("btm", "mtm", "mbm", "morph_to", "morph_child", "one_of_many")
+    return target.kind in (
+        "btm",
+        "mtm",
+        "mbm",
+        "morph_to",
+        "morph_child",
+        "one_of_many",
+        "fk_method",
+    )
 
 
 @dataclass(frozen=True)
 class _Chaperone:
-    """A requested inverse-parent hydration for an eager-loaded SA relation."""
+    """A requested inverse-parent hydration for an eager-loaded relation."""
 
     head: str
     inverse: str
     uselist: bool
+    fk_method: bool = False
 
 
 def _infer_inverse_relation(parent_model: type[Any], head_rel: RelationshipProperty[Any]) -> str:
@@ -735,10 +800,30 @@ def _infer_inverse_relation(parent_model: type[Any], head_rel: RelationshipPrope
     )
 
 
+def _infer_inverse_fk_method(parent_model: type[Any], related_cls: type[Any], head: str) -> str:
+    """Find the child's belongs_to method that points back at the parent model."""
+    names = getattr(related_cls, "__arvel_fk_relations__", _NO_FK_RELATIONS)
+    for name in names:
+        link = _fk_method_link_for(related_cls, name)
+        if link.direction == "belongs_to" and link.related_model is parent_model:
+            return name
+    raise UnknownRelationError(
+        related_cls.__name__,
+        f"<inverse of {parent_model.__name__}.{head}>",
+    )
+
+
 def _apply_chaperones(chaperones: Sequence[_Chaperone], parents: Sequence[Any]) -> None:
     """Hydrate each child's inverse with the already-loaded parent (no query, identity kept)."""
     for chap in chaperones:
         for parent in parents:
+            if chap.fk_method:
+                children = get_eager_relation(parent, chap.head)
+                if children is None:
+                    continue
+                for child in children:
+                    set_eager_relation(child, chap.inverse, [parent])
+                continue
             loaded = getattr(parent, chap.head, None)
             if loaded is None:
                 continue
@@ -920,6 +1005,64 @@ async def _load_one_of_many_path(
         await _load_async_relation_path(olink.related_model, winners, tail, constraint)
 
 
+async def _batch_load_fk_method(
+    model: type[Any],
+    parents: list[Any],
+    name: str,
+    link: FkMethodLink,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None,
+) -> list[Any]:
+    """Load a method-style FK relation for every parent in a single query.
+
+    Eloquent's ``HasOneOrMany``/``BelongsTo`` eager match: one
+    ``WHERE related.<col> IN (owner keys)``, group rows by that column, then
+    stash each parent's slice (capped to one row for has-one/belongs-to).
+    """
+    related_cls = link.related_model
+    related_col = getattr(related_cls, link.related_col)
+    owner_values = [getattr(p, link.local_col) for p in parents]
+    distinct = {v for v in owner_values if v is not None}
+
+    qb: QueryBuilder[Any] = QueryBuilder(
+        related_cls, select(related_cls).where(related_col.in_(distinct))
+    )
+    if constraint is not None:
+        qb = constraint(qb)
+    result = await get_active_session().execute(qb.apply_global_scopes())
+    children = list(result.scalars().all())
+
+    grouped: dict[Any, list[Any]] = {}
+    for child in children:
+        grouped.setdefault(getattr(child, link.related_col), []).append(child)
+
+    single = link.direction in ("has_one", "belongs_to")
+    flat: list[Any] = []
+    for parent in parents:
+        related = grouped.get(getattr(parent, link.local_col), [])
+        if single:
+            related = related[:1]
+        set_eager_relation(parent, name, related)
+        flat.extend(related)
+    return _dedupe_by_pk(related_cls, flat)
+
+
+async def _load_fk_method_path(
+    model: type[Any],
+    parents: list[Any],
+    head: str,
+    tail: str,
+    target: _RelationTarget,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None,
+) -> None:
+    link = target.fk_method_link
+    if link is None:
+        raise UnknownRelationError(model.__name__, head)
+    related = await _batch_load_fk_method(model, parents, head, link, None if tail else constraint)
+    if not tail or not related:
+        return
+    await _load_async_relation_path(link.related_model, related, tail, constraint)
+
+
 async def _load_async_relation_path(
     model: type[Any],
     parents: list[Any],
@@ -937,6 +1080,9 @@ async def _load_async_relation_path(
         return
     if target.kind == "one_of_many":
         await _load_one_of_many_path(parents, head, tail, target, constraint)
+        return
+    if target.kind == "fk_method":
+        await _load_fk_method_path(model, parents, head, tail, target, constraint)
         return
     if target.kind not in ("btm", "mtm", "mbm"):
         raise UnknownRelationError(model.__name__, head)
@@ -1080,15 +1226,11 @@ def _boundary_cursors(
     if backward:
         # We arrived here walking back, so a next page always exists.
         next_cursor = _encode_cursor(_params(items[-1]), points_to_next=True)
-        prev_cursor = (
-            _encode_cursor(_params(items[0]), points_to_next=False) if has_more else None
-        )
+        prev_cursor = _encode_cursor(_params(items[0]), points_to_next=False) if has_more else None
         return next_cursor, prev_cursor
 
     next_cursor = _encode_cursor(_params(items[-1]), points_to_next=True) if has_more else None
-    prev_cursor = (
-        _encode_cursor(_params(items[0]), points_to_next=False) if had_cursor else None
-    )
+    prev_cursor = _encode_cursor(_params(items[0]), points_to_next=False) if had_cursor else None
     return next_cursor, prev_cursor
 
 
@@ -1756,9 +1898,9 @@ class QueryBuilder(Generic[T]):
                     else:
                         validate_relation_head(self._model, path)
                         self._eager_loads.append(_AsyncEagerSpec(path, callback))
-                        chap = self._chaperone_from_callback(path, callback)
-                        if chap is not None:
-                            self._chaperones.append(chap)
+                    chap = self._chaperone_from_callback(path, callback)
+                    if chap is not None:
+                        self._chaperones.append(chap)
             elif type(item) is str:
                 if _is_async_relation(self._model, item):
                     self._async_eager.append(_AsyncEagerSpec(item, None))
@@ -1788,27 +1930,41 @@ class QueryBuilder(Generic[T]):
         """Run *callback* on a probe builder; if it called chaperone(), resolve the inverse."""
         head = path.partition(".")[0]
         head_rel = _mapper_of(self._model).relationships.get(head)
-        if head_rel is None:
+        if head_rel is not None:
+            related_cls: type[Any] = head_rel.mapper.class_
+            uselist = bool(head_rel.uselist)
+            fk_method = False
+        elif head in getattr(self._model, "__arvel_fk_relations__", _NO_FK_RELATIONS):
+            link = _fk_method_link_for(self._model, head)
+            related_cls = link.related_model
+            uselist = link.direction == "has_many"
+            fk_method = True
+        else:
             return None
-        related_cls = head_rel.mapper.class_
         probe: QueryBuilder[Any] = callback(QueryBuilder(related_cls, select(related_cls)))
         request = probe._chaperone_request
         if request is False:
             return None
-        inverse = (
-            request if isinstance(request, str) else _infer_inverse_relation(self._model, head_rel)
-        )
-        return _Chaperone(head=head, inverse=inverse, uselist=bool(head_rel.uselist))
+        if isinstance(request, str):
+            inverse = request
+        elif head_rel is not None:
+            inverse = _infer_inverse_relation(self._model, head_rel)
+        else:
+            inverse = _infer_inverse_fk_method(self._model, related_cls, head)
+        return _Chaperone(head=head, inverse=inverse, uselist=uselist, fk_method=fk_method)
 
     async def _eager_load_async(self, items: Sequence[Any]) -> None:
-        """Apply chaperones, then run any pending batched async eager loads."""
+        """Run pending batched async eager loads, then hydrate chaperone inverses.
+
+        Chaperones run last: method-style children land in the eager cache only
+        after the async load, and SA relations are already loaded by the main query.
+        """
         parents = list(items)
+        if self._async_eager and parents:
+            for spec in self._async_eager:
+                await _load_async_relation_path(self._model, parents, spec.path, spec.constraint)
         if self._chaperones and parents:
             _apply_chaperones(self._chaperones, parents)
-        if not self._async_eager or not parents:
-            return
-        for spec in self._async_eager:
-            await _load_async_relation_path(self._model, parents, spec.path, spec.constraint)
 
     def with_aggregate(
         self,
@@ -2713,9 +2869,7 @@ class QueryBuilder(Generic[T]):
                 return
             last_id = getattr(batch[-1], column)
 
-    async def chunk(
-        self, size: int, callback: Callable[[list[T]], Awaitable[bool | None]]
-    ) -> None:
+    async def chunk(self, size: int, callback: Callable[[list[T]], Awaitable[bool | None]]) -> None:
         """Process rows in OFFSET batches. Return ``False`` from the callback to stop."""
         base = self._ordered_for_offset()
         page = 1
@@ -3156,9 +3310,7 @@ class SimplePaginator(Generic[TItem]):
             "next": build_page_url(base_url, next_page, query=query) if next_page else None,
         }
 
-    def to_response(
-        self, items_serializer: Callable[[TItem], Any] | None = None
-    ) -> dict[str, Any]:
+    def to_response(self, items_serializer: Callable[[TItem], Any] | None = None) -> dict[str, Any]:
         """Laravel's flat ``Paginator`` (simple) envelope — no ``total``/``last_page``."""
         path = resolve_path(self.path)
         from_ = (self.current_page - 1) * self.per_page + 1 if self.items else None
@@ -3279,9 +3431,7 @@ class CursorPaginator(Generic[TItem]):
             },
         }
 
-    def to_response(
-        self, items_serializer: Callable[[TItem], Any] | None = None
-    ) -> dict[str, Any]:
+    def to_response(self, items_serializer: Callable[[TItem], Any] | None = None) -> dict[str, Any]:
         """Laravel's flat ``CursorPaginator`` envelope with ``next_cursor``/``prev_cursor`` URLs."""
         from arvel.database.paginator import build_cursor_url
 

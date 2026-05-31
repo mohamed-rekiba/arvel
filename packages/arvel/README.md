@@ -2,7 +2,14 @@
 
 The Laravel of Python — built natively on FastAPI + Pydantic + SQLAlchemy, end-to-end type-safe.
 
-> **Status.** Ships: Container, Application, ServiceProvider, Config, support primitives, HTTP, ORM, Cache, Session, Storage, Queue, and Auth (WI-arvel-007). Console, Events, Mail, Notifications, Broadcasting, and Scheduler land in subsequent work items.
+> **Status:** Pre-alpha — `v0.3.0`. Public API may change before `1.0`.
+
+Shipped subsystems: service container, typed config, HTTP (routing, form requests,
+resources, middleware), the Arvent ORM (Eloquent-style relations, soft deletes, scopes,
+the schema DSL, and a fluent `QueryBuilder`), cache, session, storage, queues, events,
+broadcasting, mail, notifications, scheduling, and auth (JWT + session + token guards,
+`Gate`/`Policy`, password resets, email verification). See the full docs at
+[arvel.dev](https://arvel.dev).
 
 ## Install
 
