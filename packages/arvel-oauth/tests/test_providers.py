@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
+import time
 from urllib.parse import parse_qs, urlparse
 
 import httpx
+import jwt
 import pytest
 from arvel_oauth.dtos import OAuthToken
 from arvel_oauth.exceptions import OAuthExchangeError
@@ -13,6 +16,13 @@ from arvel_oauth.providers import (
     GitHubProvider,
     GoogleProvider,
 )
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    NoEncryption,
+    PrivateFormat,
+)
+from jwt.algorithms import ECAlgorithm
 
 from tests.support import mock_client
 
@@ -115,14 +125,6 @@ async def test_github_uses_emails_api_when_profile_email_private() -> None:
 
 
 def test_apple_client_secret_is_signed_jwt() -> None:
-    import jwt
-    from cryptography.hazmat.primitives.asymmetric import ec
-    from cryptography.hazmat.primitives.serialization import (
-        Encoding,
-        NoEncryption,
-        PrivateFormat,
-    )
-
     key = ec.generate_private_key(ec.SECP256R1())
     pem = key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()).decode()
 
@@ -139,26 +141,43 @@ def test_apple_client_secret_is_signed_jwt() -> None:
     assert header["alg"] == "ES256"
 
 
-async def test_apple_get_user_reads_id_token() -> None:
-    import jwt
-    from cryptography.hazmat.primitives.asymmetric import ec
-    from cryptography.hazmat.primitives.serialization import (
-        Encoding,
-        NoEncryption,
-        PrivateFormat,
-    )
-
+def _apple_signing_keypair() -> tuple[ec.EllipticCurvePrivateKey, str, dict[str, object]]:
+    """An ES256 keypair plus the public JWK Apple would publish for it."""
     key = ec.generate_private_key(ec.SECP256R1())
     pem = key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()).decode()
-    id_token = jwt.encode(
-        {
-            "sub": "apple-sub",
-            "email": "a@privaterelay.appleid.com",
-            "email_verified": "true",
-            "aud": "com.app.client",
-        },
+    jwk = json.loads(ECAlgorithm(ECAlgorithm.SHA256).to_jwk(key.public_key()))
+    jwk |= {"kid": "apple-key-1", "alg": "ES256", "use": "sig"}
+    return key, pem, jwk
+
+
+def _apple_id_token(key: ec.EllipticCurvePrivateKey, **claims: object) -> str:
+    now = int(time.time())
+    payload: dict[str, object] = {
+        "iss": "https://appleid.apple.com",
+        "aud": "com.app.client",
+        "sub": "apple-sub",
+        "iat": now,
+        "exp": now + 3600,
+        **claims,
+    }
+    return jwt.encode(payload, key, algorithm="ES256", headers={"kid": "apple-key-1"})
+
+
+def _apple_jwks_client(jwk: dict[str, object]) -> httpx.AsyncClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/keys"):
+            return httpx.Response(200, json={"keys": [jwk]})
+        return httpx.Response(404)
+
+    return mock_client(handler)
+
+
+async def test_apple_get_user_verifies_id_token_signature() -> None:
+    key, pem, jwk = _apple_signing_keypair()
+    id_token = _apple_id_token(
         key,
-        algorithm="ES256",
+        email="a@privaterelay.appleid.com",
+        email_verified="true",
     )
 
     provider = AppleProvider(
@@ -167,8 +186,47 @@ async def test_apple_get_user_reads_id_token() -> None:
         key_id="K",
         private_key=pem,
         redirect_uri="https://app.test/cb",
+        http_client=_apple_jwks_client(jwk),
     )
     user = await provider.get_user(OAuthToken(access_token="at", id_token=id_token))
     assert user.provider_id == "apple-sub"
     assert user.email == "a@privaterelay.appleid.com"
     assert user.email_verified is True
+
+
+async def test_apple_rejects_id_token_signed_by_wrong_key() -> None:
+    _, pem, jwk = _apple_signing_keypair()
+    attacker_key = ec.generate_private_key(ec.SECP256R1())
+    forged = _apple_id_token(attacker_key, email="attacker@evil.test")
+
+    provider = AppleProvider(
+        client_id="com.app.client",
+        team_id="T",
+        key_id="K",
+        private_key=pem,
+        redirect_uri="https://app.test/cb",
+        http_client=_apple_jwks_client(jwk),
+    )
+    with pytest.raises(OAuthExchangeError, match="failed verification"):
+        await provider.get_user(OAuthToken(access_token="at", id_token=forged))
+
+
+async def test_apple_rejects_id_token_with_unknown_kid() -> None:
+    key, pem, jwk = _apple_signing_keypair()
+    id_token = jwt.encode(
+        {"iss": "https://appleid.apple.com", "aud": "com.app.client", "sub": "x"},
+        key,
+        algorithm="ES256",
+        headers={"kid": "rotated-away"},
+    )
+
+    provider = AppleProvider(
+        client_id="com.app.client",
+        team_id="T",
+        key_id="K",
+        private_key=pem,
+        redirect_uri="https://app.test/cb",
+        http_client=_apple_jwks_client(jwk),
+    )
+    with pytest.raises(OAuthExchangeError, match="no key for kid"):
+        await provider.get_user(OAuthToken(access_token="at", id_token=id_token))
