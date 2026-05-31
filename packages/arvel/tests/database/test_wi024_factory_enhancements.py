@@ -87,9 +87,7 @@ class TestHasAttached:
         assert len(roles) == 2
         rows = (
             await session.execute(
-                select(wi024_role_user.c.assigned_by).where(
-                    wi024_role_user.c.user_id == user.id
-                )
+                select(wi024_role_user.c.assigned_by).where(wi024_role_user.c.user_id == user.id)
             )
         ).all()
         assert [r[0] for r in rows] == ["system", "system"]

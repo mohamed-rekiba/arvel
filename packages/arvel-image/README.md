@@ -120,15 +120,15 @@ arvel migrate
 ### Add `HasMedia` to a model
 
 ```python
-from arvel.database import Model, Timestamps
+from arvel.database import Model, Timestamps, id_, string
 from arvel_image import HasMedia, MediaCollection, Conversion
 
 
 class Post(Model, Timestamps, HasMedia):
-    __table__ = "posts"
+    __tablename__ = "posts"
 
-    id: int
-    title: str
+    id: int = id_()
+    title: str = string(200)
 
     def register_media_collections(self) -> None:
         (

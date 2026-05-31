@@ -63,9 +63,7 @@ _ASYNC_EVENTS = frozenset(
 )
 
 # Before-hooks; ``False`` return aborts the pending write.
-_CANCELLABLE_EVENTS = frozenset(
-    {"creating", "updating", "deleting", "restoring", "force_deleting"}
-)
+_CANCELLABLE_EVENTS = frozenset({"creating", "updating", "deleting", "restoring", "force_deleting"})
 
 
 def _get_observers(model_cls: type[Any]) -> list[Any]:

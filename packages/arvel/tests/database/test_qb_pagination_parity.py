@@ -147,9 +147,7 @@ async def test_cursor_paginate_emits_both_cursors(
     assert first.prev_cursor is None  # first page has no previous
     assert first.next_cursor is not None
 
-    second = await PgItem.order_by(PgItem.id).cursor_paginate(
-        per_page=4, cursor=first.next_cursor
-    )
+    second = await PgItem.order_by(PgItem.id).cursor_paginate(per_page=4, cursor=first.next_cursor)
     assert second.prev_cursor is not None
     assert second.next_cursor is not None
     # second page continues right after the first
@@ -161,13 +159,9 @@ async def test_cursor_paginate_previous_page_round_trips(
 ) -> None:
     await _seed(engine, 12)
     first = await PgItem.order_by(PgItem.id).cursor_paginate(per_page=4)
-    second = await PgItem.order_by(PgItem.id).cursor_paginate(
-        per_page=4, cursor=first.next_cursor
-    )
+    second = await PgItem.order_by(PgItem.id).cursor_paginate(per_page=4, cursor=first.next_cursor)
     # walk back from the second page using its prev_cursor
-    back = await PgItem.order_by(PgItem.id).cursor_paginate(
-        per_page=4, cursor=second.prev_cursor
-    )
+    back = await PgItem.order_by(PgItem.id).cursor_paginate(per_page=4, cursor=second.prev_cursor)
     assert [i.id for i in back.items] == [i.id for i in first.items]
 
 

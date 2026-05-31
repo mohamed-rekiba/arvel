@@ -118,7 +118,7 @@ from typing import ClassVar
 
 from arvel.database import Model, Timestamps
 from arvel.database.columns import id_, string
-from arvel.database.orm import Mapped, MorphToMany
+from arvel.database.orm import MorphToMany
 from arvel_permission import HasPermissions, HasRoles, Permission, Role
 from arvel_permission.models import model_has_permissions, model_has_roles
 
@@ -126,8 +126,8 @@ from arvel_permission.models import model_has_permissions, model_has_roles
 class User(Model, Timestamps, HasRoles, HasPermissions):
     __tablename__ = "users"
 
-    id: Mapped[int] = id_()
-    name: Mapped[str] = string(255)
+    id: int = id_()
+    name: str = string(255)
     default_guard_name = "web"
 
     roles: ClassVar[MorphToMany[Role]] = MorphToMany(

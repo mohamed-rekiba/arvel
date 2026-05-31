@@ -97,25 +97,30 @@ def test_framework_relationships_use_mapped_annotation() -> None:
     )
 
 
-def test_make_model_stub_uses_mapped_annotation() -> None:
-    """The ``make:model`` generator stub must teach the typed shape.
+def test_make_model_stub_uses_bare_column_helpers() -> None:
+    """The ``make:model`` generator stub must teach the bare helper shape.
 
     Reads the source file directly rather than the module's private template
     constant — keeps the test stable across template renames and avoids
     pyright's ``reportPrivateUsage`` for cross-module ``_TEMPLATE`` access.
 
-    Also verifies the stub uses :mod:`arvel.database.columns` helpers (the L2
-    lesson from research 002) so newly-generated models start from the typed,
-    helper-based shape instead of raw ``mapped_column(...)`` calls.
+    Columns use the plain annotation (``id: int = id_()``) — the model
+    metaclass wraps it in ``Mapped[int]`` at runtime — together with the
+    helpers from :mod:`arvel.database.columns`, not raw ``mapped_column(...)``
+    calls. ``Mapped[...]`` stays mandatory for relationships (covered by
+    :func:`test_framework_relationships_use_mapped_annotation`), so the
+    column-only stub doesn't import it.
     """
     from arvel.console.commands import make_model
 
     module_path = make_model.__file__
     assert module_path is not None, "make_model module must be loaded from a file"
     source = Path(module_path).read_text(encoding="utf-8")
-    assert "Mapped[" in source, "make:model stub must use ``Mapped[...]`` typing"
-    assert "from sqlalchemy.orm import Mapped" in source, (
-        "make:model stub must import ``Mapped`` so users start from the typed shape"
+    assert "id: int = id_()" in source, "make:model stub must use the bare column annotation"
+    assert "name: str = string(255)" in source, "make:model stub must use bare helper columns"
+    assert "from sqlalchemy.orm import Mapped" not in source, (
+        "the column-only make:model stub must not import ``Mapped`` — "
+        "the metaclass wraps the bare annotation"
     )
     assert "from arvel.database import" in source and "id_" in source and "string" in source, (
         "make:model stub must import + use ``arvel.database.columns`` helpers "

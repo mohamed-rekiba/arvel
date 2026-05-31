@@ -54,15 +54,15 @@ except InvalidCiphertext:
 For Arvent model columns whose values must be encrypted at rest, use `EncryptedType`:
 
 ```python
-from arvel.database import EncryptedType, Model
+from arvel.database import EncryptedType, Model, column, id_, string
 
 
 class User(Model):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str]
-    api_key: Mapped[str] = mapped_column(EncryptedType(key_b64=os.environ["APP_KEY"]))
+    id: int = id_()
+    email: str = string(255)
+    api_key: str = column(EncryptedType(key_b64=os.environ["APP_KEY"]))
 ```
 
 When you write `user.api_key = "..."`, Arvel encrypts on the way in. When you read `user.api_key`, it decrypts on the way out. Queries against the column will only match exact ciphertexts — see [search mode](#search-mode) below for searchable encryption.
@@ -74,7 +74,7 @@ The `EncryptedType` uses AES-GCM envelope encryption with a **per-row random IV*
 For columns you need to query by value (e.g. searching by encrypted email), use deterministic IVs:
 
 ```python
-api_key: Mapped[str] = mapped_column(
+api_key: str = column(
     EncryptedType(key_b64=os.environ["APP_KEY"], mode="search"),
 )
 ```

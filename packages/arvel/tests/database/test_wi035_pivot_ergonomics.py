@@ -57,9 +57,7 @@ async def _setup(engine: AsyncEngine) -> None:
 
 
 class TestWithPivot:
-    async def test_pivot_columns_hydrated(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_pivot_columns_hydrated(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         post = await Wi035Post.create(title="p")
         tag = await Wi035Tag.create(name="python")
@@ -72,9 +70,7 @@ class TestWithPivot:
 
 
 class TestWithTimestamps:
-    async def test_attach_sets_timestamps(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_attach_sets_timestamps(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         post = await Wi035Post.create(title="p")
         tag = await Wi035Tag.create(name="t")
@@ -87,9 +83,7 @@ class TestWithTimestamps:
 
 
 class TestOrderByPivot:
-    async def test_orders_by_pivot_column(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_orders_by_pivot_column(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         post = await Wi035Post.create(title="p")
         a = await Wi035Tag.create(name="a")

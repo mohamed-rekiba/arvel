@@ -196,11 +196,10 @@ async def test_product_service_uses_get_media_for_images() -> None:
 
     with patch("app.services.product_service.ProductCatalog") as product_catalog_cls:
         product_query = MagicMock()
-        product_query.where.return_value = product_query
         product_query.where_json_path.return_value = MagicMock(
             first=AsyncMock(return_value=published)
         )
-        product_catalog_cls.query.return_value = product_query
+        product_catalog_cls.where.return_value = product_query
         product_catalog_cls.real_status = MagicMock()
 
         result = await ProductService().get_published_by_slug("test")

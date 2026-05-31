@@ -7,20 +7,20 @@ Arvent deliberately does **not** ship its own ORM core. Every `Model` is a SQLAl
 ## Defining a model
 
 ```python
-from arvel.database import Mapped
-
 from arvel.database import Model, SoftDeletes, Timestamps, id_, string, text
 
 
 class Post(Model, Timestamps, SoftDeletes):
     __tablename__ = "posts"
 
-    id: Mapped[int] = id_()
-    title: Mapped[str] = string(200)
-    body: Mapped[str] = text()
+    id: int = id_()
+    title: str = string(200)
+    body: str = text()
 ```
 
 The helpers in [`arvel.database.columns`](#typed-column-helpers) — `id_`, `string`, `text`, `integer`, `big_integer`, `boolean`, `datetime`, `json`, `foreign_id` — are thin wrappers around `mapped_column(...)` that return `Mapped[T]`. They mirror the [migration DSL](migrations.md) vocabulary, so model code and `make:migration` output line up by inspection.
+
+> **Annotation style.** Write the plain form — `id: int = id_()`, not `id: Mapped[int] = id_()`. The model metaclass wraps it in `Mapped[int]` at runtime, and mypy's SQLAlchemy plugin understands it. The one exception is a column with no helper on the right — a bare `name: Mapped[str]` declaration keeps `Mapped`, since there's no `mapped_column(...)` value for the metaclass to wrap. If you run pyright in `--strict` mode, use the `Mapped[T]` form everywhere: pyright has no SQLAlchemy plugin, so it flags the plain annotation.
 
 `Timestamps` adds `created_at` / `updated_at` columns and manages them automatically on insert/update. `SoftDeletes` adds a `deleted_at` column and silently excludes soft-deleted rows from every query unless you call `.with_trashed()`.
 
@@ -42,23 +42,26 @@ The helpers in [`arvel.database.columns`](#typed-column-helpers) — `id_`, `str
 
 > **Email validation belongs at the API boundary, not on the column.** Use `string(254, unique=True)` for the model, and `EmailStr` on your Pydantic input schemas (`UserCreate`, `UserUpdate`). The storage layer stays plain VARCHAR — indexed, simple, fast — and the validation runs once at the boundary where invalid input is caught and rejected with a 422. See the [Email validation](#email-validation) section below and [ADR-077](https://github.com/mohamed-rekiba/arvel/blob/main/docs/adr/ADR-077-email-validation-at-boundary.md) for the rationale.
 
-The helpers are additive — fall back to `mapped_column(...)` whenever you need something the helpers don't cover (custom server-side defaults, computed columns, dialect-specific types):
+The helpers are additive. For a custom column type — an `EncryptedType`, `PydanticType`, or any SQLAlchemy `TypeDecorator` — use `column(the_type, ...)`, which keeps the same kwargs and `Mapped[T]` typing (see [Mutators / Casts](arvent-mutators.md)). Drop all the way down to `mapped_column(...)` only for things no helper covers — server-side defaults, computed columns, or a primary key with custom flags:
 
 ```python
-from sqlalchemy import JSON, String
-from arvel.database import Mapped, mapped_column
+from datetime import datetime
+from sqlalchemy import DateTime, func
 
-from arvel.database import Model, Timestamps, id_, string
+from arvel.database import Model, Timestamps, id_, mapped_column, string
 
 
 class Profile(Model, Timestamps):
     __tablename__ = "profiles"
 
-    id: Mapped[int] = id_()
-    display_name: Mapped[str] = string(120)
+    id: int = id_()
+    display_name: str = string(120)
 
-    # Drop down to mapped_column when a column needs something the helpers don't cover.
-    preferences: Mapped[dict] = mapped_column(JSON, default=dict)
+    # server_default is computed by the DB, not Python — no helper (or column())
+    # covers it, so drop down to mapped_column.
+    last_seen_at: datetime = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), init=False
+    )
 ```
 
 ### Email validation
@@ -68,15 +71,15 @@ Emails persist as plain VARCHAR. Validation happens at the API boundary with Pyd
 **Model side** — a normal `string(254, unique=True)` column:
 
 ```python
-from arvel.database import Mapped, Model, Timestamps, id_, string
+from arvel.database import Model, Timestamps, id_, string
 
 
 class User(Model, Timestamps):
     __tablename__ = "users"
 
-    id: Mapped[int] = id_()
-    name: Mapped[str] = string(255)
-    email: Mapped[str] = string(254, unique=True)
+    id: int = id_()
+    name: str = string(255)
+    email: str = string(254, unique=True)
 ```
 
 The `UNIQUE` constraint already implies a unique index — no separate `index=True` needed. Length `254` is the practical RFC-5321 maximum.
@@ -132,14 +135,14 @@ uv run arvel make:model Post
 
 from __future__ import annotations
 
-from arvel.database import Mapped, Model, Timestamps, id_, string
+from arvel.database import Model, Timestamps, id_, string
 
 
 class Post(Model, Timestamps):
     __tablename__ = "posts"
 
-    id: Mapped[int] = id_()
-    name: Mapped[str] = string(255)
+    id: int = id_()
+    name: str = string(255)
 ```
 
 Once the model exists, `make:schema` generates a matching Pydantic boundary:
@@ -285,14 +288,14 @@ n = await Post.where(published=True).increment("views", 1, extra={"trending": Tr
 posts = await Post.with_("author", "comments").get()
 ```
 
-Unknown relations raise `RelationNotLoadedError` at runtime — no silent N+1. See [Relationships](arvent-relationships.md).
+A typo'd relation name raises `UnknownRelationError` the moment you call `with_()` — no silent no-op. After `with_("comments")`, reading a method-style relation (`await post.comments().get()`) is served from the eager cache; without it, the call runs its own explicit query — never a hidden N+1. Pivot and polymorphic descriptors go further and raise if accessed unloaded. See [Relationships](arvent-relationships.md).
 
 ## Casts
 
 ```python
 from enum import StrEnum
 from pydantic import BaseModel
-from arvel.database import Mapped, mapped_column
+from arvel.database import column
 
 from arvel.database import EncryptedType, EnumType, Model, PydanticType, id_
 
@@ -308,10 +311,10 @@ class Status(StrEnum):
 
 class User(Model):
     __tablename__ = "users"
-    id: Mapped[int] = id_()
-    settings: Mapped[Settings] = mapped_column(PydanticType(Settings))
-    status: Mapped[Status] = mapped_column(EnumType(Status))
-    secret: Mapped[str] = mapped_column(EncryptedType(key_b64=...))
+    id: int = id_()
+    settings: Settings = column(PydanticType(Settings))
+    status: Status = column(EnumType(Status))
+    secret: str = column(EncryptedType(key_b64=...))
 ```
 
 `EncryptedType` uses AES-GCM envelope encryption with a per-row IV (random mode) or a deterministic IV (search mode). See [Encryption](encryption.md) and ADR-014 for the threat model.
@@ -430,8 +433,8 @@ class Import(Model):
 class Audit(Model):
     CREATED_AT = "inserted_at"   # custom column names
     UPDATED_AT = "changed_at"
-    inserted_at: Mapped[datetime | None] = datetime_col(nullable=True, init=False, default=None)
-    changed_at: Mapped[datetime | None] = datetime_col(nullable=True, init=False, default=None)
+    inserted_at: datetime | None = datetime_col(nullable=True, init=False, default=None)
+    changed_at: datetime | None = datetime_col(nullable=True, init=False, default=None)
 ```
 
 `touch()` sets `UPDATED_AT` to now and saves (firing events); pass a column to bump a different one,
@@ -562,8 +565,8 @@ from arvel.database import HasUlids, Model
 
 class Document(Model, HasUlids):
     __tablename__ = "documents"
-    id: Mapped[str] = mapped_column(String(26), primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    id: str = mapped_column(String(26), primary_key=True, init=False, default=None)
+    title: str = string(120)
 
 
 doc = await Document.create(title="Spec")
@@ -589,7 +592,7 @@ class AuditLog(Model, Timestamps, Prunable):
 
     def prunable_query(self) -> QueryBuilder:  # type: ignore[override]
         cutoff = dt.now(UTC) - timedelta(days=90)
-        return type(self).query().where(type(self).created_at < cutoff)
+        return type(self).where(type(self).created_at < cutoff)
 ```
 
 Then wire `model:prune` into the scheduler to keep the table lean:
@@ -612,9 +615,9 @@ query builder.
 ```python
 class Post(Model):
     __tablename__ = "posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
-    category: Mapped[str] = mapped_column(String(20), nullable=False, default="general")
+    id: int = id_()
+    status: str = string(20, default="draft")
+    category: str = string(20, default="general")
 
     def scope_active(self, query):
         return query.where(Post.status == "active")
@@ -658,8 +661,8 @@ from typing import Any
 
 class Post(Model):
     __tablename__ = "posts"
-    title: Mapped[str] = string(80)
-    tenant_id: Mapped[str] = string(40)
+    title: str = string(80)
+    tenant_id: str = string(40)
 
 
 def _tenant_filter(qb: QueryBuilder[Any]) -> QueryBuilder[Any]:
@@ -719,7 +722,7 @@ Animal.add_global_scope("not_archived", lambda qb: qb.where(Animal.archived.is_(
 
 class Dog(Animal):
     __tablename__ = "dogs"
-    name: Mapped[str] = string(40)
+    name: str = string(40)
 
 
 await Dog.all()    # applies "not_archived"
@@ -782,16 +785,14 @@ API. All SELECT paths work identically to a regular model — `find`, `first`,
 ### Regular view
 
 ```python
-from arvel.database import Mapped
-
 from arvel.database import ViewModel, big_integer, id_
 
 
 class ActiveUserStats(ViewModel):
     __tablename__ = "v_active_user_stats"   # must already exist in the DB
 
-    id: Mapped[int] = id_()
-    post_count: Mapped[int] = big_integer()
+    id: int = id_()
+    post_count: int = big_integer()
 ```
 
 ```python
@@ -817,8 +818,8 @@ class DailyOrderStats(ViewModel):
     __tablename__ = "mv_daily_order_stats"
     __is_materialized_view__ = True
 
-    date: Mapped[str] = id_()
-    order_count: Mapped[int] = big_integer()
+    date: str = id_()
+    order_count: int = big_integer()
 ```
 
 ```python
@@ -875,6 +876,6 @@ The test walks every `.py` file under both packages with the AST module, so any 
 ## Where to next?
 
 - [Relationships](arvent-relationships.md) — has-one, has-many, belongs-to, belongs-to-many, polymorphic.
-- [Collections](collections.md) — the model-aware container returned by queries.
+- [Model collections](arvent-collections.md) — the model-aware container returned by queries.
 - [Mutators / Casts](arvent-mutators.md) — type conversion, encryption, JSON columns.
 - [Factories](arvent-factories.md) — generating test data.

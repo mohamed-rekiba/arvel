@@ -2,19 +2,9 @@
 
 Tables are often related to each other — a post belongs to a user, a user has many posts, a post has many tags. Arvel ships first-class support for the common relation types, including polymorphic and many-to-many.
 
-## Two styles
+## How relations are declared
 
-Arvel has two complementary ways to declare relationships.
-
-**Method style** — an instance method that returns a `QueryBuilder` you can further chain before executing. Use this for write paths, conditional filters, and paginated reads.
-
-**Descriptor style** — a class-level descriptor (`has_many_attr`, `BelongsToMany`, `MorphOne`, `MorphMany`). Use this when you want to eager-load the relation with `with_()`, filter with `where_has()`, or count with `with_count()`.
-
-The two styles are complementary — you can declare the same logical relation both ways on one model when you need both read and write ergonomics.
-
-## Has many
-
-### Method style (chainable queries, write path)
+Foreign-key relations — **has many**, **has one**, and **belongs to** — are plain instance methods that return a relation builder. One declaration gives you everything: chainable lazy queries, writes, eager loading with `with_()`, existence checks with `where_has()`, and counts with `with_count()`. This mirrors Laravel, where `$user->posts()` is the query and `$user->posts` is the loaded collection.
 
 ```python
 from arvel.database import Model
@@ -27,6 +17,12 @@ class User(Model):
     def posts(self) -> HasMany["Post"]:
         return self.has_many(Post)
 ```
+
+Pivot and polymorphic relations — `BelongsToMany`, `MorphOne`, `MorphMany`, `MorphTo`, `MorphToMany`, `MorphedByMany`, `HasOneOfMany` — are class-level **descriptors**, since they carry pivot tables or discriminator columns that don't fit a single FK. They get their own sections below.
+
+## Has many
+
+A `has_many` method returns a `HasMany` builder. Call it (`user.posts()`) to get a `QueryBuilder` scoped to `WHERE user_id = user.id`, then chain and execute:
 
 ```python
 posts = await user.posts().get()
@@ -43,60 +39,49 @@ await user.posts().save_many([draft1, draft2])
 
 `save()`, `create()`, and their `_many` batch forms all go through `Model.save()` / `Model.create()`, so observer events (`creating` / `created` / `saving` / `saved`), mutators, and timestamps all run — writing through a relation is not a shortcut around the model lifecycle.
 
-The method returns a `QueryBuilder` scoped to `WHERE user_id = user.id` — every builder method chains normally before the terminal `get()` / `first()` / `count()`.
+### Eager loading and existence queries
 
-### Descriptor style (eager loading, existence queries)
-
-When you nearly always load posts alongside users — and want `with_()` or `where_has()` support — declare it as a class attribute instead:
+The same method-style relation is eager-loadable. Pass its name to `with_()`, `where_has()`, `has()`, `doesnt_have()`, and `with_count()`:
 
 ```python
-from typing import Any
-from arvel.database import Model, has_many_attr
-
-
-class User(Model):
-    __tablename__ = "users"
-
-    posts: list[Any] = has_many_attr("Post", fk="user_id")
-```
-
-`has_many_attr` automatically:
-
-- Builds the SA `relationship()` with the correct `primaryjoin`, resolved lazily through the mapper registry (safe for circular imports).
-- Sets `lazy="raise_on_sql"` — accessing the attribute on an instance that wasn't loaded with `with_()` raises `sqlalchemy.exc.InvalidRequestError` immediately instead of issuing a silent query.
-- Sets `viewonly=True` — the collection is read-only; writes still go through the method-style relation.
-
-```python
-# one query — no N+1
+# one query for users + one for posts — no N+1
 users = await User.with_("posts").all()
 
 for user in users:
-    print(user.posts)   # already loaded, no extra query
-
-# Accessing without eager loading raises, never silent-queries
-user = await User.find(1)
-_ = user.posts          # raises InvalidRequestError
+    posts = await user.posts().get()   # served from the eager cache, no extra query
 ```
 
-Use `where_has`, `doesnt_have`, and `has` with the class-level attribute:
+After `with_("posts")`, calling `user.posts().get()` reads from the per-instance eager cache instead of querying. Without eager loading it runs a normal scoped query — there's no silent N+1 because the call is always explicit.
 
 ```python
 # Users who have at least one post
-active = await User.where_has(User.posts).all()
+active = await User.where_has("posts").all()
 
 # Users with no posts
-empty = await User.doesnt_have(User.posts).all()
+empty = await User.doesnt_have("posts").all()
 
 # Users with at least 5 posts
-prolific = await User.has(User.posts, ">=", 5).all()
+prolific = await User.has("posts", ">=", 5).all()
 
 # Users with a post matching a condition
 with_published = await User.where_has(
-    User.posts, lambda q: q.where(Post.status == "published")
+    "posts", lambda q: q.where(Post.status == "published")
 ).all()
 ```
 
-The annotation (`list[Any]`, `list[Post]`, or just `Any`) has no effect on runtime behaviour — use whatever helps your type checker.
+Reference the relation by its string name (`"posts"`) — the method itself isn't a class attribute you can pass.
+
+### Referencing a related model by name
+
+`has_many`, `has_one`, and `belongs_to` accept either the related class or its name as a string. The string form sidesteps circular imports — no top-level import of the related model is needed, so two models that point at each other stay clean:
+
+```python
+class User(Model):
+    def orders(self) -> HasMany["Order"]:
+        return self.has_many("Order", foreign_key="user_id")
+```
+
+The name resolves against the mapper registry the first time the relation runs, so the target class only has to be imported *somewhere* before then — not in this module.
 
 ## Has one
 
@@ -165,14 +150,14 @@ inverse to the already-loaded parent — so the loop stays query-free and you ge
 ```python
 posts = await Post.with_({"comments": lambda q: q.chaperone()}).all()
 for p in posts:
-    for c in p.comments:
-        assert c.post is p          # the loaded post, no query
+    for c in await p.comments().get():
+        assert await c.post().first() is p     # the loaded post, no query
 ```
 
 It composes with a filter — `lambda q: q.where(Comment.published == True).chaperone()` filters the
-eager-loaded children and hydrates their inverse. The inverse relation is resolved from `back_populates`
-or inferred from the child's many-to-one; pass it explicitly when it can't be inferred:
-`q.chaperone("post")`.
+eager-loaded children and hydrates their inverse. The inverse is inferred from the child's `belongs_to`
+back to the parent (or `back_populates` for SA relationships); pass it explicitly when it can't be
+inferred: `q.chaperone("post")`.
 
 ### Non-`id` primary keys
 
@@ -242,8 +227,9 @@ Saving a comment now also touches its post — handy for cache invalidation keye
 ```python
 user = await User.with_("posts").first()
 user.name = "renamed"
-user.posts[0].title = "edited"
-await user.push()   # saves the user and the post
+posts = await user.posts().get()
+posts[0].title = "edited"
+await user.push()   # saves the user and the edited post
 ```
 
 ## Many to many
@@ -639,13 +625,13 @@ class Country(Model):
 
 ## Eager loading
 
-Load relations alongside the parent query with `with_()` to avoid N+1. **This only works with descriptor-style relations** (`has_many_attr`, `BelongsToMany`, `MorphOne`, `MorphMany`).
+Load relations alongside the parent query with `with_()` to avoid N+1. It works with every relation — the method-style FK relations (`has_many` / `has_one` / `belongs_to`) and the pivot/polymorphic descriptors (`BelongsToMany`, `MorphOne`, `MorphMany`, `MorphToMany`).
 
 ```python
 users = await User.with_("posts").all()
 
 for user in users:
-    print(user.posts)    # loaded, no extra query
+    posts = await user.posts().get()    # served from the eager cache, no extra query
 ```
 
 Nested relations use dot notation:
@@ -679,37 +665,37 @@ Eager loads are deferred until the query runs, so you can edit the set after `wi
 
 ```python
 # Drop a relation a base query or scope added
-users = await User.query().with_("posts", "profile").without("posts").get()
+users = await User.with_("posts", "profile").without("posts").get()
 
 # Replace whatever was queued with exactly these
-users = await User.query().with_("posts").with_only("profile").get()
+users = await User.with_("posts").with_only("profile").get()
 ```
 
 `without(*names)` removes queued loads by name; `with_only(*relations)` clears the queue and registers only what you pass.
 
 ## Querying through relations
 
-`where_has`, `doesnt_have`, and `has` work with descriptor-style attributes and every pivot descriptor (`BelongsToMany`, `MorphToMany`, `MorphedByMany`):
+`where_has`, `doesnt_have`, and `has` work with the method-style FK relations and every pivot descriptor (`BelongsToMany`, `MorphToMany`, `MorphedByMany`). Reference each relation by its string name:
 
 ```python
 # At least one matching related row
-users = await User.where_has(User.posts).all()
+users = await User.where_has("posts").all()
 
 # Constrained existence check
 users = await User.where_has(
-    User.posts, lambda q: q.where(Post.status == "published")
+    "posts", lambda q: q.where(Post.status == "published")
 ).all()
 
 # No related rows
-users = await User.doesnt_have(User.posts).all()
+users = await User.doesnt_have("posts").all()
 
 # Count-based — at least 5
-users = await User.has(User.posts, ">=", 5).all()
+users = await User.has("posts", ">=", 5).all()
 
 # BelongsToMany pivot
-posts = await Post.where_has(Post.tags).all()
+posts = await Post.where_has("tags").all()
 posts = await Post.where_has(
-    Post.tags, lambda q: q.where_pivot("is_featured", True)
+    "tags", lambda q: q.where_pivot("is_featured", True)
 ).all()
 ```
 
@@ -721,13 +707,13 @@ posts = await Post.where_has(
 
 ```python
 # Users who have at least one post that has at least one comment
-users = await User.query().where_has("posts.comments").get()
+users = await User.where_has("posts.comments").get()
 
 # Posts with 3 or more comments
-posts = await Post.query().where_has("comments", None, ">=", 3).get()
+posts = await Post.where_has("comments", None, ">=", 3).get()
 
 # Posts with 2+ non-spam comments (constraint applies at the leaf hop)
-posts = await Post.query().where_has(
+posts = await Post.where_has(
     "comments", lambda q: q.where(Comment.spam == False), ">=", 2
 ).get()
 ```
@@ -736,7 +722,7 @@ A constrained `doesnt_have` means "no related row matching the constraint":
 
 ```python
 # Posts with no non-spam comment
-posts = await Post.query().doesnt_have(
+posts = await Post.doesnt_have(
     "comments", lambda q: q.where(Comment.spam == False)
 ).get()
 ```
@@ -745,8 +731,7 @@ posts = await Post.query().doesnt_have(
 
 ```python
 posts = await (
-    Post.query()
-    .where(Post.title == "special")
+    Post.where(Post.title == "special")
     .or_where_has("comments")
     .get()
 )
@@ -793,7 +778,7 @@ users = await User.with_exists("orders").all()               # .orders_exists
 
 Attribute name pattern: `{relation}_{aggregate}_{column}` — `posts_count`, `orders_sum_total_cents`, `orders_max_total_cents`. `with_count` uses `{relation}_count` and `with_exists` uses `{relation}_exists`.
 
-These only work with descriptor-style relations. All of `with_count`/`with_sum`/`with_avg`/`with_min`/`with_max`/`with_exists` accept SQLA relationships **and** every pivot descriptor (`BelongsToMany`, `MorphToMany`, `MorphedByMany`) — pivot aggregates join through the pivot table — and raise `UnknownRelationError` for an unknown relation.
+All of `with_count`/`with_sum`/`with_avg`/`with_min`/`with_max`/`with_exists` accept the method-style FK relations **and** every pivot descriptor (`BelongsToMany`, `MorphToMany`, `MorphedByMany`) — pivot aggregates join through the pivot table — and raise `UnknownRelationError` for an unknown relation.
 
 ### Aliasing and constrained aggregates
 
@@ -837,23 +822,20 @@ Each loader accepts the same `constraint=` closure as its eager counterpart.
 
 ## N+1 prevention
 
-The attribute style (`has_many_attr`, `BelongsToMany`, `MorphOne`, `MorphMany`) enforces `lazy="raise_on_sql"`. Accessing a relation without loading it raises `sqlalchemy.exc.InvalidRequestError` immediately — the N+1 bug is visible at the line that caused it:
+Method-style FK relations can't silently N+1: reading one is always an explicit call (`user.posts().get()`), never an attribute access that fires a hidden query. Eager-load with `with_()` and the call serves from the per-instance cache instead of querying:
 
 ```python
-# Fine — loaded
+# one query for users + one for posts
 users = await User.with_("posts").all()
-_ = users[0].posts    # no error
+for user in users:
+    posts = await user.posts().get()    # cache hit, no query
 
-# Raises — not loaded
+# Without with_(), each call runs its own scoped query — but it's explicit, not hidden
 user = await User.find(1)
-_ = user.posts        # InvalidRequestError: 'User.posts' is not available due to lazy='raise_on_sql'
+posts = await user.posts().get()        # one query, by your own hand
 ```
 
-Method-style relations don't have this guard because they're not attributes — you always call them explicitly:
-
-```python
-posts = await user.posts().get()    # always explicit, no silent query
-```
+The pivot and polymorphic descriptors (`BelongsToMany`, `MorphOne`, `MorphMany`, `MorphToMany`) enforce `lazy="raise_on_sql"`, so accessing one without eager loading raises `sqlalchemy.exc.InvalidRequestError` at the offending line rather than issuing a silent query.
 
 ### Testing for N+1
 
@@ -869,7 +851,7 @@ async def test_list_users_no_n_plus_one() -> None:
     with QueryLog.assert_max_queries(2):
         users = await User.with_("posts").all()
         for user in users:
-            _ = user.posts    # must not query
+            _ = await user.posts().get()    # cache hit, must not query
 ```
 
 The context manager raises `AssertionError` if the actual query count exceeds the limit.

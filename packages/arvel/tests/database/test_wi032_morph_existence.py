@@ -72,14 +72,12 @@ class TestWhereHasMorph:
         await _comment_on("on-post", post)
         await _comment_on("on-video", video)
 
-        rows = await Wi032Comment.query().where_has_morph(
-            "commentable", [Wi032Post]
-        ).get()
+        rows = await Wi032Comment.query().where_has_morph("commentable", [Wi032Post]).get()
         assert {r.body for r in rows} == {"on-post"}
 
-        both = await Wi032Comment.query().where_has_morph(
-            "commentable", [Wi032Post, Wi032Video]
-        ).get()
+        both = (
+            await Wi032Comment.query().where_has_morph("commentable", [Wi032Post, Wi032Video]).get()
+        )
         assert {r.body for r in both} == {"on-post", "on-video"}
 
     async def test_per_type_constraint_receives_type(
@@ -91,11 +89,15 @@ class TestWhereHasMorph:
         await _comment_on("a", keep)
         await _comment_on("b", drop)
 
-        rows = await Wi032Comment.query().where_has_morph(
-            "commentable",
-            [Wi032Post],
-            lambda q, _t: q.where(Wi032Post.title == "keep"),
-        ).get()
+        rows = (
+            await Wi032Comment.query()
+            .where_has_morph(
+                "commentable",
+                [Wi032Post],
+                lambda q, _t: q.where(Wi032Post.title == "keep"),
+            )
+            .get()
+        )
         assert {r.body for r in rows} == {"a"}
 
     async def test_honours_registered_morph_aliases(
@@ -107,9 +109,7 @@ class TestWhereHasMorph:
         c = await _comment_on("aliased-comment", post)
         assert c.commentable_type == "post"
 
-        rows = await Wi032Comment.query().where_has_morph(
-            "commentable", [Wi032Post]
-        ).get()
+        rows = await Wi032Comment.query().where_has_morph("commentable", [Wi032Post]).get()
         assert {r.body for r in rows} == {"aliased-comment"}
 
     async def test_empty_types_matches_nothing(
@@ -131,9 +131,7 @@ class TestWhereHasMorph:
 
 
 class TestHasMorph:
-    async def test_count_operator(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_count_operator(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         post = await Wi032Post.create(title="p")
         video = await Wi032Video.create(name="v")
@@ -141,14 +139,14 @@ class TestHasMorph:
         await _comment_on("y", video)
 
         # Each comment morphs to exactly one parent → has_morph >= 1 matches both types.
-        rows = await Wi032Comment.query().has_morph(
-            "commentable", [Wi032Post, Wi032Video], ">=", 1
-        ).get()
+        rows = (
+            await Wi032Comment.query()
+            .has_morph("commentable", [Wi032Post, Wi032Video], ">=", 1)
+            .get()
+        )
         assert {r.body for r in rows} == {"x", "y"}
 
-        only_posts = await Wi032Comment.query().has_morph(
-            "commentable", [Wi032Post], ">=", 1
-        ).get()
+        only_posts = await Wi032Comment.query().has_morph("commentable", [Wi032Post], ">=", 1).get()
         assert {r.body for r in only_posts} == {"x"}
 
 
@@ -162,7 +160,9 @@ class TestWhereMorphRelation:
         await _comment_on("k", keep)
         await _comment_on("d", drop)
 
-        rows = await Wi032Comment.query().where_morph_relation(
-            "commentable", [Wi032Post], "title", "keep"
-        ).get()
+        rows = (
+            await Wi032Comment.query()
+            .where_morph_relation("commentable", [Wi032Post], "title", "keep")
+            .get()
+        )
         assert {r.body for r in rows} == {"k"}

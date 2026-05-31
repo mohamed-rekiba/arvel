@@ -48,9 +48,7 @@ class Wi034Comment(Model):
     body: Mapped[str] = mapped_column(String(200))
     rating: Mapped[int] = mapped_column(Integer, default=0)
     spam: Mapped[bool] = mapped_column(default=False)
-    post_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("wi034_posts.id"), default=None
-    )
+    post_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wi034_posts.id"), default=None)
     post: Mapped[Wi034Post | None] = relationship(
         "Wi034Post", back_populates="comments", init=False
     )
@@ -72,17 +70,17 @@ class TestEagerAggregates:
     async def test_with_avg(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         p = await _seed_post("p", [2, 4, 6])
-        rows = await Wi034Post.query().with_avg("comments", "rating").where(
-            Wi034Post.id == p.id
-        ).get()
+        rows = (
+            await Wi034Post.query().with_avg("comments", "rating").where(Wi034Post.id == p.id).get()
+        )
         assert rows[0].comments_avg_rating == 4
 
     async def test_with_min(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         p = await _seed_post("p", [3, 7, 5])
-        rows = await Wi034Post.query().with_min("comments", "rating").where(
-            Wi034Post.id == p.id
-        ).get()
+        rows = (
+            await Wi034Post.query().with_min("comments", "rating").where(Wi034Post.id == p.id).get()
+        )
         assert rows[0].comments_min_rating == 3
 
     async def test_with_exists(self, engine: AsyncEngine, session: AsyncSession) -> None:
@@ -106,9 +104,9 @@ class TestPivotAwareSum:
         await post.tags.attach(t1.id)
         await post.tags.attach(t2.id)
 
-        rows = await Wi034Post.query().with_sum("tags", "weight").where(
-            Wi034Post.id == post.id
-        ).get()
+        rows = (
+            await Wi034Post.query().with_sum("tags", "weight").where(Wi034Post.id == post.id).get()
+        )
         assert rows[0].tags_sum_weight == 25
 
 
@@ -116,23 +114,30 @@ class TestAliasAndConstraint:
     async def test_count_alias(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         p = await _seed_post("p", [1, 2])
-        rows = await Wi034Post.query().with_count("comments as comment_total").where(
-            Wi034Post.id == p.id
-        ).get()
+        rows = (
+            await Wi034Post.query()
+            .with_count("comments as comment_total")
+            .where(Wi034Post.id == p.id)
+            .get()
+        )
         assert rows[0].comment_total == 2
 
-    async def test_count_with_constraint(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_count_with_constraint(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         p = await Wi034Post.create(title="p")
         await Wi034Comment.create(body="ham", post_id=p.id, spam=False)
         await Wi034Comment.create(body="ham2", post_id=p.id, spam=False)
         await Wi034Comment.create(body="spam", post_id=p.id, spam=True)
 
-        rows = await Wi034Post.query().with_count(
-            "comments", constraint=lambda q: q.where(Wi034Comment.spam == False)  # noqa: E712
-        ).where(Wi034Post.id == p.id).get()
+        rows = (
+            await Wi034Post.query()
+            .with_count(
+                "comments",
+                constraint=lambda q: q.where(Wi034Comment.spam == False),  # noqa: E712
+            )
+            .where(Wi034Post.id == p.id)
+            .get()
+        )
         assert rows[0].comments_count == 2
 
     async def test_sum_alias_and_constraint(
@@ -143,12 +148,17 @@ class TestAliasAndConstraint:
         await Wi034Comment.create(body="a", post_id=p.id, rating=5, spam=False)
         await Wi034Comment.create(body="b", post_id=p.id, rating=3, spam=True)
 
-        rows = await Wi034Post.query().with_sum(
-            "comments",
-            "rating",
-            alias="ham_score",
-            constraint=lambda q: q.where(Wi034Comment.spam == False),  # noqa: E712
-        ).where(Wi034Post.id == p.id).get()
+        rows = (
+            await Wi034Post.query()
+            .with_sum(
+                "comments",
+                "rating",
+                alias="ham_score",
+                constraint=lambda q: q.where(Wi034Comment.spam == False),  # noqa: E712
+            )
+            .where(Wi034Post.id == p.id)
+            .get()
+        )
         assert rows[0].ham_score == 5
 
 

@@ -74,7 +74,7 @@ class ProductService:
         category_slug: str | None = None,
     ) -> dict[str, Any]:
         """Cursor-paginated storefront listing via ProductCatalog ORM."""
-        query = ProductCatalog.query().where(ProductCatalog.real_status == "visible")
+        query = ProductCatalog.where(ProductCatalog.real_status == "visible")
         if category_slug is not None:
             query = query.where_json_path("category_slug", locale, category_slug)
 
@@ -98,8 +98,7 @@ class ProductService:
 
     async def get_published_by_slug(self, slug: str, locale: str = "en") -> dict[str, Any] | None:
         product = (
-            await ProductCatalog.query()
-            .where(ProductCatalog.real_status == "visible")
+            await ProductCatalog.where(ProductCatalog.real_status == "visible")
             .where_json_path("slug", locale, slug)
             .first()
         )
@@ -116,8 +115,7 @@ class ProductService:
     ) -> list[dict[str, Any]]:
         sv = ProductCatalog.search_vector
         products: list[ProductCatalog] = (
-            await ProductCatalog.query()
-            .where(ProductCatalog.real_status == "visible")
+            await ProductCatalog.where(ProductCatalog.real_status == "visible")
             .where_full_text(sv, q, tsquery_fn="plainto_tsquery", lang="simple")
             .order_by_relevance(sv, q, lang="simple")
             .limit(limit)

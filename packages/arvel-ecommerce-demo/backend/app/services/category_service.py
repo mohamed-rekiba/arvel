@@ -21,7 +21,7 @@ class CategoryService:
         items = cast(
             "list[Category]",
             await Category.where_has(
-                Category.catalog_products,
+                "catalog_products",
                 lambda q: q.where(ProductCatalog.real_status == "visible"),
             )
             .order_by_raw("name->>'en'")

@@ -12,7 +12,7 @@ The 2026-05-20 SQLModel investigation surfaced a recurring question: should the 
 Three options were on the table:
 
 - **A — VARCHAR + boundary validation.** Persist `VARCHAR(254)`. Validate the format on the Pydantic input schemas (`UserCreate`, `UserUpdate`) via `EmailStr`. This is the conventional Laravel / Rails / Django shape.
-- **B — JSON value object.** Ship an `EmailAddress` Pydantic `BaseModel`, persist it through `PydanticType` as a JSON payload (`{"value": "alice@example.com"}`), and surface a typed `Mapped[EmailAddress]` column. The column itself carries the validation.
+- **B — JSON value object.** Ship an `EmailAddress` Pydantic `BaseModel`, persist it through `PydanticType` as a JSON payload (`{"value": "alice@example.com"}`), and surface a typed `EmailAddress`-valued column. The column itself carries the validation.
 - **C — VARCHAR-backed `TypeDecorator`.** Store `VARCHAR(254)` but use a `TypeDecorator` that converts `str ↔ EmailAddress` at the boundary so the attribute reads as a value object while the on-disk shape stays plain text.
 
 Option B was prototyped and shipped briefly. It worked on SQLite but failed on PostgreSQL — `data type json has no default operator class for access method "btree"` — until the column type was switched to `JSONB` with a dialect-aware `load_dialect_impl`. The fix landed, the cross-dialect tests passed, and the implementation was complete and correct.
@@ -25,7 +25,7 @@ It was also overengineered for the actual need.
 
 - The framework ships **no** `email()` column helper.
 - The framework ships **no** `EmailAddress` value object.
-- `make:schema` upgrades any `String` column named `email` or matching `*_email` to `EmailStr` in the generated `Read` / `Create` / `Update` schemas. The upgrade is purely at the boundary; the model side stays `Mapped[str]`.
+- `make:schema` upgrades any `String` column named `email` or matching `*_email` to `EmailStr` in the generated `Read` / `Create` / `Update` schemas. The upgrade is purely at the boundary; the model side stays a plain `str`.
 - `Blueprint.email()` is removed; the migration call is `t.string("email", 254).unique()`.
 
 The general-purpose improvements that were uncovered while implementing Option B — `PydanticType.load_dialect_impl` returning `JSONB` on PostgreSQL — are kept. They benefit every future `PydanticType` column (e.g. settings, preferences) and have no email-specific coupling.
@@ -53,7 +53,7 @@ The general-purpose improvements that were uncovered while implementing Option B
 A `VARCHAR`-backed `TypeDecorator` that converts `str ↔ EmailAddress` was considered. It preserves the on-disk simplicity of Option A and adds typed attribute reads. But:
 
 - It re-introduces `EmailAddress` and its full API surface — `@validates` recipes, `to_dict()` shape, kwarg-shorthand semantics — for a value object that exists only because the column was clever. That's the value-object cost of Option B without the JSON storage cost.
-- `Mapped[str]` reads exactly as well as `Mapped[EmailAddress]` once the boundary validation is in place. Nobody reads `user.email` and wishes it had domain methods that don't exist.
+- A plain `str` reads exactly as well as an `EmailAddress` value object once the boundary validation is in place. Nobody reads `user.email` and wishes it had domain methods that don't exist.
 
 Defer C until at least two real value-object columns exist.
 
@@ -63,7 +63,7 @@ Defer C until at least two real value-object columns exist.
 
 - Smaller framework surface: `arvel.database` exports two fewer symbols (`email`, `EmailAddress`). The schema DSL drops one method (`Blueprint.email`).
 - No dialect-awareness burden on the email path. The cross-dialect test matrix for emails is exactly the matrix the `string()` helper already covers.
-- The example app is conventional. New contributors recognize `email: Mapped[str] = string(254, unique=True)` immediately.
+- The example app is conventional. New contributors recognize `email: str = string(254, unique=True)` immediately.
 - `make:schema` now does meaningful work on email columns automatically — the validation gap is closed without any user action.
 
 ### Negative

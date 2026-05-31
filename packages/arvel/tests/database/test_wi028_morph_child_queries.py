@@ -134,9 +134,7 @@ class TestWhereHas:
 
 
 class TestWithCount:
-    async def test_with_count_adds_column(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_with_count_adds_column(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         p1 = await Wi028Post.create(title="A")
         await p1.comments.create(body="a1")

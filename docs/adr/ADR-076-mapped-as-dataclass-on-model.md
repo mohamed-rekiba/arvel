@@ -43,7 +43,7 @@ class Model(MappedAsDataclass, DeclarativeBase, ActiveRecord,
 - Typos in column names (`User(naem=...)`) become type-errors under mypy and pyright strict mode.
 - Nullable-vs-non-nullable mistakes (`User(name=None)`) become type-errors when the column is non-nullable.
 - The L2 `arvel.database.columns` helpers (`id_`, `string(...)`, …) compose with the typed constructor without any change — they already return `Mapped[T]`.
-- `make:model` (and the L5 architecture test that backs it) gains a real reason to emit `Mapped[T]` on every column. The drift between framework-generated stubs and hand-written models shrinks to zero.
+- `make:model` emits the bare helper form (`id: int = id_()`); the model metaclass (`_ModelMeta`, ADR-046) wraps it in `Mapped[int]` at runtime. The drift between framework-generated stubs and hand-written models shrinks to zero. (See the column-style update below.)
 
 **Negative**:
 
@@ -53,8 +53,18 @@ class Model(MappedAsDataclass, DeclarativeBase, ActiveRecord,
 
 **Enforcement**:
 
-- The L5 architecture test extends to assert every framework `mapped_column(...)` carries a `Mapped[T]` annotation, and that the `make:model` template renders the same.
+- The L5 architecture test asserts every framework `relationship(...)` carries a `Mapped[...]` annotation (`test_framework_relationships_use_mapped_annotation`), and that the `make:model` stub uses the column helpers (`test_make_model_stub_uses_bare_column_helpers`).
 - Type-only tests under `tests/typing/` assert `User(naem=...)` is a pyright/mypy error.
+
+## Update (2026-05-31) — column annotation style
+
+Column declarations use the **bare** form in app code and generated stubs: `id: int = id_()`, not `id: Mapped[int] = id_()`. `_ModelMeta` wraps the helper's `Mapped[T]` return at runtime, and mypy's SQLAlchemy plugin reads it correctly. `Mapped[...]` stays **required** for:
+
+- relationships (enforced by `test_framework_relationships_use_mapped_annotation`),
+- columns with no helper on the right-hand side (`name: Mapped[str]`), since the metaclass has no `mapped_column(...)` value to wrap, and
+- framework-internal code, which runs under its own pyright-strict gate.
+
+Pyright-strict *app* users may opt into `Mapped[T]` everywhere — pyright has no SQLAlchemy plugin, so it flags the bare form. The runtime behaviour is identical either way.
 
 ## Status & Next Step
 
