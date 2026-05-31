@@ -10,7 +10,7 @@ from arvel_search import Search, SearchManager
 from arvel_search.dtos import SearchQuery
 from arvel_search.searchable import Searchable
 from sqlalchemy.ext.asyncio import AsyncSession
-from support import Article, make_config
+from search_support import Article, make_config
 
 
 class TestMixinDefaults:

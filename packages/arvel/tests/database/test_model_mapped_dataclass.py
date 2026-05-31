@@ -16,7 +16,7 @@ from arvel.database import Model, Timestamps, field, id_, relationship, string
 # ─── fixtures ────────────────────────────────────────────────────────────────
 
 
-class Article(Model, Timestamps):
+class ArticleDC(Model, Timestamps):
     __tablename__ = "articles_dc_test"
 
     id: int = id_(init=False)
@@ -30,42 +30,42 @@ class Tag(Model):
     id: int = id_(init=False)
     name: str = string(80)
     article_id: int | None = field(foreign_key="articles_dc_test.id", default=None)
-    article: Article | None = relationship("Article", init=False)
+    article: ArticleDC | None = relationship("ArticleDC", init=False)
 
 
 # ─── FR-076-001: typed keyword-only __init__ ─────────────────────────────────
 
 
 def test_model_is_dataclass() -> None:
-    assert dataclasses.is_dataclass(Article)
+    assert dataclasses.is_dataclass(ArticleDC)
     assert dataclasses.is_dataclass(Tag)
 
 
 def test_constructor_accepts_typed_keyword_args() -> None:
-    a = Article(title="Hello", body="World")
+    a = ArticleDC(title="Hello", body="World")
     assert a.title == "Hello"
     assert a.body == "World"
 
 
 def test_constructor_optional_field_has_default() -> None:
-    a = Article(title="Hello")
+    a = ArticleDC(title="Hello")
     assert a.body is None
 
 
 def test_constructor_is_keyword_only() -> None:
-    for param in inspect.signature(Article).parameters.values():
+    for param in inspect.signature(ArticleDC).parameters.values():
         assert param.kind is inspect.Parameter.KEYWORD_ONLY
 
 
 def test_server_managed_pk_not_in_init() -> None:
     """id_ fields with init=False must not appear in the constructor."""
-    fields = {f.name: f for f in dataclasses.fields(Article)}
+    fields = {f.name: f for f in dataclasses.fields(ArticleDC)}
     assert fields["id"].init is False
 
 
 def test_timestamps_not_in_init() -> None:
     """Timestamps mixin fields must not appear in the constructor."""
-    fields = {f.name: f for f in dataclasses.fields(Article)}
+    fields = {f.name: f for f in dataclasses.fields(ArticleDC)}
     assert fields["created_at"].init is False
     assert fields["updated_at"].init is False
 
@@ -81,7 +81,7 @@ def test_relationship_not_in_init() -> None:
 
 def test_missing_required_field_raises() -> None:
     with pytest.raises(TypeError):
-        Article()  # type: ignore[call-arg]  # intentional negative test
+        ArticleDC()  # type: ignore[call-arg]  # intentional negative test
 
 
 # ─── FR-076-003: dataclass_transform metaclass propagates to subclasses ──────
@@ -99,7 +99,7 @@ def test_custom_model_class_is_dataclass() -> None:
 
 def test_instance_hidden_is_class_var_not_dataclass_field() -> None:
     """_instance_hidden must be ClassVar — not a dataclass field."""
-    field_names = {f.name for f in dataclasses.fields(Article)}
+    field_names = {f.name for f in dataclasses.fields(ArticleDC)}
     assert "_instance_hidden" not in field_names
 
 
@@ -109,9 +109,9 @@ def test_instance_hidden_is_class_var_not_dataclass_field() -> None:
 @pytest.mark.asyncio
 async def test_to_dict_includes_mapped_columns(engine: Any, session: Any) -> None:
     async with engine.begin() as conn:
-        await conn.run_sync(Article.metadata.create_all)
+        await conn.run_sync(ArticleDC.metadata.create_all)
 
-    a = Article(title="Dict test", body="some body")
+    a = ArticleDC(title="Dict test", body="some body")
     session.add(a)
     await session.flush()
 
