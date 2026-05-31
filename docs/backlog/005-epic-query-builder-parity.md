@@ -37,15 +37,19 @@ EXTRACT (PG) / STRFTIME (SQLite); `where_date`/`where_time` compose year/month/d
 **As a** developer building dynamic filters, **I want** `where(lambda q: q.where(...).or_where(...))` to produce a parenthesized boolean group, **so that** I can express `(A AND B) OR C` trees without dropping to raw SQLAlchemy.
 
 **Acceptance Criteria**:
-- [ ] Given a closure passed to `where`, when compiled, then its conditions are wrapped in parentheses and joined with the outer boolean.
-- [ ] Given `or_where(closure)`, when compiled, then the group is OR-joined to the preceding clause.
-- [ ] Nested closures (group within group) compile correctly.
+- [x] Given a closure passed to `where`, when compiled, then its conditions are wrapped in parentheses and joined with the outer boolean.
+- [x] Given `or_where(closure)`, when compiled, then the group is OR-joined to the preceding clause.
+- [x] Nested closures (group within group) compile correctly.
 
 **Documentation Requirements**:
-- [ ] Document grouped-where with a `(A AND B) OR C` example.
+- [x] Document grouped-where with a `(A AND B) OR C` example.
 
 **Priority**: Must
 **Complexity**: Medium
+**Status**: DONE — WI-arvel-001, ADR-123 (`test_qb_conditionals_existence.py`). `where`/`or_where`
+accept a closure; `_grouped_whereclause` wraps its predicates in parentheses before AND/OR-joining
+to the accumulated WHERE. A closure that adds no predicate raises (no silent empty group). Docs:
+queries.md "Nested groups".
 
 ### Story 3: Subquery FROM / JOIN / SELECT
 **As a** developer writing reporting queries, **I want** `from_sub`, `join_sub`/`left_join_sub`, `select_sub`, and `add_select`, **so that** I can build derived-table and ranked-subquery queries the way Laravel does.
@@ -66,11 +70,15 @@ columns or SQLAlchemy expressions). Appended columns attach onto the model insta
 **As a** developer porting Laravel code, **I want** `unless(cond, cb, default=None)` and `tap(cb)`, **so that** inverse-conditional and mid-chain inspection read the same as Laravel.
 
 **Acceptance Criteria**:
-- [ ] Given `unless(False, cb)`, when called, then `cb` runs; given `unless(True, cb)`, then it doesn't.
-- [ ] Given `tap(cb)`, when called, then `cb` receives the builder and the original builder is returned unchanged.
+- [x] Given `unless(False, cb)`, when called, then `cb` runs; given `unless(True, cb)`, then it doesn't.
+- [x] Given `tap(cb)`, when called, then `cb` receives the builder and the original builder is returned unchanged.
 
 **Priority**: Should
 **Complexity**: Small
+**Status**: DONE — WI-arvel-001, ADR-123 (`test_qb_conditionals_existence.py`). `unless(cond, cb,
+default=None)` is the inverse of `when` (runs `default` when truthy); `tap(cb)` passes the builder to
+the callback and returns it unchanged regardless of the callback's return. Docs: queries.md
+"Conditional query construction".
 
 ### Story 5: LIKE helpers and multi-column WHERE sugar
 **As a** developer building search, **I want** `where_like`/`where_not_like` (with case-sensitivity flag) and `where_all`/`where_none` across columns, **so that** search filters don't need manual `or_()`/`ilike` assembly.
@@ -106,12 +114,15 @@ design; the flag selects LIKE vs ILIKE (case-sensitive on PG).
 **As a** developer doing existence checks, **I want** `exists()` to run `SELECT EXISTS(SELECT 1 ... LIMIT 1)` and a `doesnt_exist()` companion, **so that** auth/validation checks don't pay for a full `COUNT(*)` subquery.
 
 **Acceptance Criteria**:
-- [ ] Given `exists()`, when executed, then it emits an `EXISTS`-based query, not `count() > 0`.
-- [ ] Given `doesnt_exist()`, then it returns the negation.
-- [ ] Existing call sites that relied on `exists()` keep their behavior (regression tests pass).
+- [x] Given `exists()`, when executed, then it emits an `EXISTS`-based query, not `count() > 0`.
+- [x] Given `doesnt_exist()`, then it returns the negation.
+- [x] Existing call sites that relied on `exists()` keep their behavior (regression tests pass).
 
 **Priority**: Must
 **Complexity**: Small
+**Status**: DONE — WI-arvel-001, ADR-123 (`test_qb_conditionals_existence.py`). `exists()` runs
+`SELECT EXISTS(SELECT 1 ... LIMIT 1)` so the planner short-circuits on the first match; `doesnt_exist()`
+negates it. Docs: queries.md "Subqueries and EXISTS".
 
 ### Story 8: Write-path completeness
 **As a** developer running idempotent ingests, **I want** `insert_or_ignore`, a batched dialect-complete `upsert` (returning affected count), `truncate`, `insert_using`, and `increment_each`/`decrement_each`, **so that** sync and bulk flows match Laravel.
@@ -150,7 +161,7 @@ array (`on_each_side`) + `&laquo; Previous`/`Next &raquo;` bookends; `appends`/`
 `prev_cursor`, walks both ways) with flat `to_response()`.
 
 **Documentation Requirements**:
-- [ ] Document the JSON envelope shapes and the cursor encoding.
+- [x] Document the JSON envelope shapes and the cursor encoding.
 
 **Priority**: Should
 **Complexity**: Large

@@ -365,6 +365,20 @@ qb = qb.when(role,   lambda q, v: q.where(role=v))
 users = await qb.get()
 ```
 
+`unless()` is the inverse — the callback runs when the condition is falsy, with an optional
+`default` for the truthy case:
+
+```python
+qb = qb.unless(show_drafts, lambda q: q.where(published=True))
+```
+
+`tap()` hands you the builder mid-chain (for logging or conditional branches) and returns it
+unchanged, whatever the callback returns:
+
+```python
+qb = qb.tap(lambda q: print(q.to_sql()))
+```
+
 ## Column-to-column comparison
 
 ```python
