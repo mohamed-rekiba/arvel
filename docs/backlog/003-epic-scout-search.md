@@ -38,7 +38,7 @@ Fixes two critical bugs from `arvel_old`: `Searchable.search()` was hardcoded to
 **Requirement Refs**: Brainstorm design § Phase 2B
 **Priority**: Must
 **Complexity**: Medium
-**Status**: Draft
+**Status**: Done
 
 ---
 
@@ -66,7 +66,7 @@ Fixes two critical bugs from `arvel_old`: `Searchable.search()` was hardcoded to
 **Requirement Refs**: Brainstorm design § Phase 2B
 **Priority**: Must
 **Complexity**: Small
-**Status**: Draft
+**Status**: Done
 
 ---
 
@@ -94,7 +94,7 @@ Fixes two critical bugs from `arvel_old`: `Searchable.search()` was hardcoded to
 **Requirement Refs**: Brainstorm design § Phase 2B
 **Priority**: Must
 **Complexity**: Medium
-**Status**: Draft
+**Status**: Done
 
 ---
 
@@ -120,7 +120,7 @@ Fixes two critical bugs from `arvel_old`: `Searchable.search()` was hardcoded to
 **Requirement Refs**: Brainstorm design § Phase 2B
 **Priority**: Must
 **Complexity**: Small
-**Status**: Draft
+**Status**: Done
 
 ---
 
