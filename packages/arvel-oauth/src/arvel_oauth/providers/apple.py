@@ -2,8 +2,9 @@
 
 Apple is unusual: the ``client_secret`` is a short-lived ES256 JWT signed with
 your private key, and identity lives in the ``id_token`` (there's no userinfo
-endpoint). Per OIDC core, an ``id_token`` received directly from the token
-endpoint over TLS may be trusted without re-verifying the signature.
+endpoint). We verify the ``id_token`` signature against Apple's published JWKS
+rather than trusting it blindly — TLS protects transport, but the JWKS check is
+what proves Apple actually minted the token.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from typing import cast
 
 import httpx
 import jwt
+from jwt import PyJWK, PyJWKSet
 
 from arvel_oauth.dtos import OAuthToken, OAuthUser
 from arvel_oauth.exceptions import OAuthExchangeError
@@ -21,6 +23,9 @@ from arvel_oauth.providers.base import OAuthProvider
 _AUTHORIZE = "https://appleid.apple.com/auth/authorize"
 # OAuth token endpoint URL, not a credential.
 _TOKEN = "https://appleid.apple.com/auth/token"  # noqa: S105 # nosec B105
+_JWKS = "https://appleid.apple.com/auth/keys"
+_ISSUER = "https://appleid.apple.com"
+# Audience of the client_secret JWT we sign — same host as the issuer, different claim.
 _AUDIENCE = "https://appleid.apple.com"
 _SECRET_TTL = 15777000  # ~6 months, Apple's documented maximum.
 
@@ -82,14 +87,7 @@ class AppleProvider(OAuthProvider):
     async def get_user(self, token: OAuthToken) -> OAuthUser:
         if token.id_token is None:
             raise OAuthExchangeError("Apple token response had no id_token.")
-        claims = cast(
-            "dict[str, object]",
-            jwt.decode(
-                token.id_token,
-                options={"verify_signature": False},
-                audience=self.client_id,
-            ),
-        )
+        claims = await self._verify_id_token(token.id_token)
         email = _str_or_none(claims.get("email"))
         return OAuthUser(
             provider=self.name,
@@ -100,6 +98,37 @@ class AppleProvider(OAuthProvider):
             avatar=None,
             raw=dict(claims),
         )
+
+    async def _verify_id_token(self, id_token: str) -> dict[str, object]:
+        try:
+            kid = jwt.get_unverified_header(id_token).get("kid")
+        except jwt.InvalidTokenError as exc:
+            raise OAuthExchangeError(f"Apple id_token header is malformed: {exc}") from exc
+        if not isinstance(kid, str):
+            raise OAuthExchangeError("Apple id_token is missing a 'kid' header.")
+        signing_key = await self._signing_key(kid)
+        try:
+            decoded = jwt.decode(
+                id_token,
+                signing_key,
+                algorithms=["ES256"],
+                audience=self.client_id,
+                issuer=_ISSUER,
+            )
+        except jwt.InvalidTokenError as exc:
+            raise OAuthExchangeError(f"Apple id_token failed verification: {exc}") from exc
+        return cast("dict[str, object]", decoded)
+
+    async def _signing_key(self, kid: str) -> PyJWK:
+        async with self._client() as client:
+            response = await client.get(_JWKS)
+        if response.status_code >= httpx.codes.BAD_REQUEST:
+            raise OAuthExchangeError(f"Apple JWKS fetch failed (HTTP {response.status_code}).")
+        jwks = PyJWKSet.from_dict(self._json(response))
+        for key in jwks.keys:
+            if key.key_id == kid:
+                return key
+        raise OAuthExchangeError(f"Apple JWKS has no key for kid {kid!r}.")
 
 
 def _apple_bool(value: object) -> bool:
