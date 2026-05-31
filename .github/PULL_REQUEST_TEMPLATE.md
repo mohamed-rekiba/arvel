@@ -22,10 +22,10 @@ Fixes #
 ## Testing
 
 - [ ] New/updated unit tests
-- [ ] All existing tests pass (`pytest tests/`)
-- [ ] Linter clean (`ruff check src/ tests/`)
-- [ ] Formatter clean (`ruff format --check src/ tests/`)
-- [ ] Type check clean (`ty check`)
+- [ ] All existing tests pass (`make test`)
+- [ ] Linter clean (`uv run ruff check`)
+- [ ] Formatter clean (`uv run ruff format --check`)
+- [ ] Type check clean (`uv run mypy` + `uv run pyright`)
 
 ## Security Checklist
 
