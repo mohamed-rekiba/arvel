@@ -196,9 +196,9 @@ class TestRelationshipAnnotationWrapping:
 
 # ---------------------------------------------------------------------------
 # AC-004: Mixins use framework column helpers (not raw mapped_column)
-# Note: Timestamps/SoftDeletes extend MappedAsDataclass directly (not _ModelMeta),
-# so they are exempt from auto-wrapping. They keep Mapped[T] internally as
-# framework-managed code. The goal here is they use the datetime() helper.
+# Note: Timestamps/SoftDeletes use ModelMeta, so their plain annotations get
+# auto-wrapped in Mapped[T] just like user models. The goal here is they use
+# the datetime() helper with clean annotations.
 # ---------------------------------------------------------------------------
 
 
@@ -263,11 +263,11 @@ class TestDemoModelsNoMappedImport:
         ],
     )
     def test_no_mapped_wrapper_on_left_side(self, model_file: str) -> None:
-        """Columns must use plain type annotations, not 'field: Mapped[T] = helper()'."""
+        """Columns must use plain type annotations, never the SQLAlchemy wrapper."""
         import re
 
         src = (MODELS_DIR / model_file).read_text()
-        # Match class-level attribute annotations: '    field: Mapped[T]'
+        # Detect a class-level attribute annotation still carrying the wrapper.
         # Exclude 'def' lines (method return types) and ClassVar lines
         mapped_annotations = re.findall(r"^    \w+\s*:\s*Mapped\[", src, re.MULTILINE)
         assert not mapped_annotations, (

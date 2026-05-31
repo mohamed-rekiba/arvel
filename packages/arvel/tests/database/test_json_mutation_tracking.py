@@ -9,18 +9,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from arvel.database import Model
-from arvel.database.columns import json
-from sqlalchemy import Integer, String
+from arvel.database import Model, id_, json, string
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class JmtDoc(Model):
     __tablename__ = "jmt_docs"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(80))
-    meta: Mapped[Any] = json(default=dict)
+    id: int = id_()
+    title: str = string(80)
+    meta: Any = json(default=dict)
 
 
 async def _setup(engine: AsyncEngine) -> None:

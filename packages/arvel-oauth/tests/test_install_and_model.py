@@ -46,7 +46,7 @@ async def test_tokens_encrypted_at_rest(async_session: AsyncSession) -> None:
 
     # Raw column value must be ciphertext, not the plaintext token.
     raw = await async_session.execute(
-        select(OAuthAccount.tokens).where(OAuthAccount.id == account.id)
+        select(OAuthAccount.__table__.c.tokens).where(OAuthAccount.__table__.c.id == account.id)
     )
     stored = raw.scalar_one()
     assert isinstance(stored, dict)

@@ -46,30 +46,21 @@ def _src(path: Path) -> str:
 
 def test_cart_item_cart_id_has_no_default_factory() -> None:
     src = _src(CART_ITEM_MODEL)
-    assert "cart_id" in src
-    # The FK column must NOT have a default_factory
-    assert (
-        "cart_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, default_factory"
-        not in src
-    )
+    # Clean FK helper, never a default_factory PK pattern
+    assert "cart_id: uuid.UUID = foreign_uuid(" in src
+    assert "default_factory" not in src
 
 
 def test_cart_item_product_id_has_no_default_factory() -> None:
     src = _src(CART_ITEM_MODEL)
-    assert "product_id" in src
-    assert (
-        "product_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, default_factory"
-        not in src
-    )
+    assert "product_id: uuid.UUID = foreign_uuid(" in src
+    assert "default_factory" not in src
 
 
 def test_order_item_order_id_has_no_default_factory() -> None:
     src = _src(ORDER_ITEM_MODEL)
-    assert "order_id" in src
-    assert (
-        "order_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, default_factory"
-        not in src
-    )
+    assert "order_id: uuid.UUID = foreign_uuid(" in src
+    assert "default_factory" not in src
 
 
 # ── FR-002: uuid_id() in framework ───────────────────────────────────────────

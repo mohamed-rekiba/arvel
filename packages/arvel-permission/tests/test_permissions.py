@@ -17,13 +17,12 @@ from arvel.database.session import use_session
 from arvel_permission.models import Role, model_has_roles
 from arvel_permission.traits import HasRoles
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import Mapped
 
 
 class _GuardUser(Model, HasRoles):
     __tablename__ = "users_guard_scope"
-    id: Mapped[int] = id_(init=False)
-    default_guard_name: str = "web"
+    id: int = id_(init=False)
+    default_guard_name: ClassVar[str] = "web"
 
     roles: ClassVar[MorphToMany[Role]] = MorphToMany(
         Role, table=model_has_roles, name="model", related_key="role_id"

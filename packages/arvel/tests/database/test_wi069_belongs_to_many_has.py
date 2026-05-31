@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.database.orm import BelongsToMany
 from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 post_tag_wi069 = Table(
     "wi069_post_tags",
@@ -21,14 +20,14 @@ post_tag_wi069 = Table(
 
 class Wi069Tag(Model):
     __tablename__ = "wi069_tags"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: int = id_()
+    name: str = string(80)
 
 
 class Wi069Post(Model):
     __tablename__ = "wi069_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    title: str = string(200)
 
     tags: ClassVar[BelongsToMany[Wi069Tag]] = BelongsToMany(
         Wi069Tag,
@@ -70,7 +69,7 @@ class TestWhereHasBelongsToMany:
 
         rows = (
             await Wi069Post.query()
-            .where_has("tags", lambda q: q.where(Wi069Tag.name == "featured"))
+            .where_has("tags", lambda q: q.where(Wi069Tag.__table__.c.name == "featured"))
             .all()
         )
         assert len(rows) == 1

@@ -3,45 +3,39 @@
 from __future__ import annotations
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, boolean, field, id_, relationship, string
 from arvel.database.exceptions import UnknownRelationError
 from arvel.database.query_logging import QueryLog
-from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class Wi071Country(Model):
     __tablename__ = "wi071_countries"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    users: Mapped[list[Wi071User]] = relationship(
+    id: int = id_()
+    name: str = string(80)
+    users: list[Wi071User] = relationship(
         "Wi071User", back_populates="country", init=False, default_factory=list
     )
 
 
 class Wi071User(Model):
     __tablename__ = "wi071_users"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    country_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("wi071_countries.id"), nullable=True, default=None
-    )
-    country: Mapped[Wi071Country | None] = relationship(
-        "Wi071Country", back_populates="users", init=False
-    )
-    posts: Mapped[list[Wi071Post]] = relationship(
+    id: int = id_()
+    name: str = string(80)
+    country_id: int | None = field(foreign_key="wi071_countries.id", default=None, nullable=True)
+    country: Wi071Country | None = relationship("Wi071Country", back_populates="users", init=False)
+    posts: list[Wi071Post] = relationship(
         "Wi071Post", back_populates="author", init=False, default_factory=list
     )
 
 
 class Wi071Post(Model):
     __tablename__ = "wi071_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(200))
-    published: Mapped[bool] = mapped_column(default=False)
-    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wi071_users.id"), default=None)
-    author: Mapped[Wi071User | None] = relationship("Wi071User", back_populates="posts", init=False)
+    id: int = id_()
+    title: str = string(200)
+    published: bool = boolean(default=False)
+    user_id: int | None = field(foreign_key="wi071_users.id", default=None)
+    author: Wi071User | None = relationship("Wi071User", back_populates="posts", init=False)
 
 
 async def _setup(engine: AsyncEngine) -> None:

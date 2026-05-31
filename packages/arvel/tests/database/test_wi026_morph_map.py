@@ -12,25 +12,23 @@ from __future__ import annotations
 from typing import ClassVar
 
 import pytest
-from arvel.database import Model, morph_map, require_morph_map
+from arvel.database import Model, id_, integer, morph_map, require_morph_map, string
 from arvel.database.orm import MorphMapError, MorphOne, get_morph_alias, resolve_morph_class
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Wi026Image(Model):
     __tablename__ = "wi026_images"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    url: Mapped[str] = mapped_column(String(200), nullable=False)
-    imageable_type: Mapped[str] = mapped_column(String(60), nullable=False)
-    imageable_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    id: int = id_()
+    url: str = string(200)
+    imageable_type: str = string(60)
+    imageable_id: int = integer()
 
 
 class Wi026Post(Model):
     __tablename__ = "wi026_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    id: int = id_()
+    title: str = string(120)
 
     image: ClassVar[MorphOne[Wi026Image]] = MorphOne(Wi026Image, name="imageable")
 

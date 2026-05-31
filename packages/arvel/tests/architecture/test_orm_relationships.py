@@ -1,21 +1,22 @@
-"""SQLAlchemy relationship typing guardrail (lesson L5 from SQLModel research).
+"""SQLAlchemy relationship annotation guardrail.
 
-Every ORM ``relationship(...)`` declaration in the framework source MUST carry
-a ``Mapped[...]`` annotation::
+Every ORM ``relationship(...)`` declaration in the framework source uses the
+**clean** annotation — no wrapper envelope::
 
-    # BAD — the SQLModel shape; pyright/mypy see ``Any`` for ``user.posts``
+    # Arvel's relationship() returns Any, so the plain annotation drives the
+    # type and the metaclass wraps it at build time, like the column helpers.
     posts: list["Post"] = relationship(back_populates="author")
 
-    # GOOD — SQLAlchemy typed declarative
-    posts: Mapped[list["Post"]] = relationship(back_populates="author")
+A relationship attribute that still carries the SQLAlchemy wrapper fails this
+guardrail.
 
-This test walks every Python file under ``arvel.*`` and fails if any
-relationship-bound class attribute is missing the ``Mapped[...]`` envelope.
+This mirrors the column guardrail in the demo's ``test_056`` (no ``Mapped[T]``
+on the left side). It walks every Python file under ``arvel.*`` and fails if a
+relationship-bound class attribute still carries the ``Mapped[...]`` wrapper.
 
-Why a runtime AST test (not a mypy/pyright assertion)? The bug it catches is
-silent — the bad shape compiles, runs, and only fails at type-check time. A
-test makes it visible in the same CI lane as the rest of the suite, and
-catches the regression even in modules pyright temporarily skips.
+Why a runtime AST test (not a mypy/pyright assertion)? It keeps the convention
+visible in the same CI lane as the rest of the suite, and catches a regression
+even in modules pyright temporarily skips.
 """
 
 from __future__ import annotations
@@ -79,21 +80,22 @@ def _violations_in(path: Path) -> list[str]:
                 continue
             if not _is_relationship_call(stmt.value):
                 continue
-            if _annotation_uses_mapped(stmt.annotation):
+            if not _annotation_uses_mapped(stmt.annotation):
                 continue
             target = ast.unparse(stmt.target) if hasattr(ast, "unparse") else "<?>"
             bad.append(f"{path}:{stmt.lineno} {node.name}.{target}")
     return bad
 
 
-def test_framework_relationships_use_mapped_annotation() -> None:
-    """No ``relationship(...)`` in ``arvel.*`` may sit on a bare annotation."""
+def test_framework_relationships_use_clean_annotation() -> None:
+    """No ``relationship(...)`` in ``arvel.*`` may carry a ``Mapped[...]`` wrapper."""
     violations: list[str] = []
     for path in _iter_python_files(PACKAGE_ROOT):
         violations.extend(_violations_in(path))
 
     assert not violations, (
-        "SQLAlchemy typed relationships require ``Mapped[...]``:\n  " + "\n  ".join(violations)
+        "Relationships use the clean annotation (the metaclass wraps it); "
+        "drop the ``Mapped[...]`` wrapper:\n  " + "\n  ".join(violations)
     )
 
 
@@ -107,9 +109,9 @@ def test_make_model_stub_uses_bare_column_helpers() -> None:
     Columns use the plain annotation (``id: int = id_()``) — the model
     metaclass wraps it in ``Mapped[int]`` at runtime — together with the
     helpers from :mod:`arvel.database.columns`, not raw ``mapped_column(...)``
-    calls. ``Mapped[...]`` stays mandatory for relationships (covered by
-    :func:`test_framework_relationships_use_mapped_annotation`), so the
-    column-only stub doesn't import it.
+    calls. Relationships are clean too (covered by
+    :func:`test_framework_relationships_use_clean_annotation`), so the stub
+    never needs to import ``Mapped``.
     """
     from arvel.console.commands import make_model
 

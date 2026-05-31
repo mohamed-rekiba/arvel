@@ -8,13 +8,15 @@ an implementation detail of the framework::
 
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy.orm import (
     Mapped,
     declared_attr,
     foreign,
     mapped_column,
-    relationship,
 )
+from sqlalchemy.orm import relationship as _sa_relationship
 
 from arvel.database.orm._column_attr import column_attr
 from arvel.database.orm.belongs_to_many import BelongsToMany, BelongsToManyAccessor
@@ -58,6 +60,18 @@ from arvel.database.orm.relations import (
     HasOne,
     RecursiveLink,
 )
+
+
+def relationship(*args: Any, **kwargs: Any) -> Any:
+    """Like SQLAlchemy's ``relationship()`` but typed ``Any``, so the plain
+    annotation drives the type: ``posts: list[Post] = relationship(...)``.
+
+    The model metaclass wraps the annotation in ``Mapped[list[Post]]`` at build
+    time, exactly like the column helpers. Returns the real SQLAlchemy
+    ``RelationshipProperty`` at runtime.
+    """
+    return _sa_relationship(*args, **kwargs)
+
 
 __all__ = [
     "Ancestors",

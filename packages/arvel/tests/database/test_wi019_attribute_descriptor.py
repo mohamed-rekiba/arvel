@@ -9,9 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Attribute, Model
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from arvel.database import Attribute, Model, id_, integer, string
 
 
 def _split_name(_model: Any, value: str) -> dict[str, str]:
@@ -21,11 +19,9 @@ def _split_name(_model: Any, value: str) -> dict[str, str]:
 
 class _Person(Model):
     __tablename__ = "wi019_people"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    first_name: Mapped[str] = mapped_column(String(50), default="")
-    last_name: Mapped[str] = mapped_column(String(50), default="")
+    id: int = id_()
+    first_name: str = string(50, default="")
+    last_name: str = string(50, default="")
 
     full_name = Attribute.make(
         get=lambda m: f"{m.first_name} {m.last_name}".strip(),
@@ -38,10 +34,8 @@ class _Person(Model):
 
 class _Counter(Model):
     __tablename__ = "wi019_counters"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    base: Mapped[int] = mapped_column(Integer, default=0)
+    id: int = id_()
+    base: int = integer(default=0)
 
     doubled = Attribute.make(
         get=lambda m: m.base * 2,
@@ -77,10 +71,8 @@ class TestUnifiedReadWrite:
     def test_non_mapping_setter_raises(self) -> None:
         class _Bad(Model):
             __tablename__ = "wi019_bad"
-            id: Mapped[int] = mapped_column(
-                Integer, primary_key=True, autoincrement=True, init=False, default=None
-            )
-            name: Mapped[str] = mapped_column(String(50), default="")
+            id: int = id_()
+            name: str = string(50, default="")
             virt = Attribute.make(get=lambda m: m.name, set=lambda _m, v: v)
 
         b = _Bad()

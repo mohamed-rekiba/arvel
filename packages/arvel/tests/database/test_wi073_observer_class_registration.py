@@ -5,17 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 from arvel.container import Container
-from arvel.database import Model, Observer
+from arvel.database import Model, Observer, id_, string
 from arvel.database.events import clear_observers, configure_observer_container
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Wi073Note(Model):
     __tablename__ = "wi073_notes"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    body: str = string(200)
 
 
 async def _setup(engine: AsyncEngine) -> None:

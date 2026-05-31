@@ -9,6 +9,7 @@ from contextvars import ContextVar
 from dataclasses import InitVar
 from datetime import UTC, date
 from datetime import datetime as _datetime
+from datetime import time as _time
 from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 from functools import partial, wraps
@@ -16,6 +17,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    Final,
     NamedTuple,
     Protocol,
     Self,
@@ -26,9 +28,10 @@ from typing import (
     get_origin,
     overload,
 )
+from uuid import UUID
 
 from pydantic import BaseModel
-from sqlalchemy import event, select
+from sqlalchemy import DateTime, Numeric, String, event, select
 from sqlalchemy import inspect as sqla_inspect
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -54,6 +57,7 @@ from arvel.database.columns import (
     datetime,
     decimal,
     enum,
+    field,
     foreign_id,
     foreign_string,
     foreign_uuid,
@@ -428,6 +432,67 @@ def _should_auto_wrap(attr_name: str, annotation: Any, value: Any) -> bool:
     return True
 
 
+# Annotation prefixes that are never inferred columns (special forms / already mapped).
+_NON_COLUMN_ANNOTATION_PREFIXES: Final = ("Mapped[", "Mapped", "ClassVar", "InitVar")
+
+
+def _is_column_candidate_annotation(attr_name: str, annotation: Any) -> bool:
+    """True when a plain annotation could be inferred into a column.
+
+    Excludes dunders, ``ClassVar``/``InitVar``, and anything already ``Mapped``.
+    Used for the bare (``name: str``) and plain-default (``age: int | None = None``)
+    forms — the helper-assigned form is handled by ``_should_auto_wrap``.
+    """
+    if attr_name.startswith("__") and attr_name.endswith("__"):
+        return False
+    if isinstance(annotation, str):
+        return not annotation.strip().startswith(_NON_COLUMN_ANNOTATION_PREFIXES)
+    origin = get_origin(annotation)
+    if origin is Mapped or origin is ClassVar:
+        return False
+    return not isinstance(annotation, InitVar)
+
+
+# Literal-ish defaults that fold into an inferred mapped_column(default=...).
+# A closed allowlist on purpose — relation descriptors (HasMany, BelongsToMany,
+# ...), accessors, scopes and other ORM constructs assigned as class attributes
+# are model behavior, not column defaults, and must pass through untouched.
+_PLAIN_DEFAULT_TYPES: Final = (
+    type(None),
+    bool,
+    int,
+    float,
+    complex,
+    str,
+    bytes,
+    Decimal,
+    _datetime,
+    date,
+    _time,
+    UUID,
+    Enum,
+)
+
+
+def _is_plain_default(value: object) -> bool:
+    """True when *value* is a literal-ish column default (see ``_PLAIN_DEFAULT_TYPES``)."""
+    return isinstance(value, _PLAIN_DEFAULT_TYPES)
+
+
+def _inferred_column(*, default: object = None, has_default: bool = False) -> MappedColumn[Any]:
+    """Build a typeless column for an inferred field; SQL type comes from the annotation.
+
+    For bare annotations (``name: str``) no default rides along; for plain
+    defaults (``age: int | None = None``) the value does. Mutable columns
+    (lists, dicts) have no inferred SQL type and must use ``json()`` — a bare
+    ``tags: list = []`` errors at mapper config, the intended nudge, so no
+    instance ever shares a mutable default.
+    """
+    if has_default:
+        return mapped_column(default=default)
+    return mapped_column()
+
+
 _MappedAlias: Any = Mapped
 
 _RECURSIVE_RETURN_NAMES = frozenset({"Descendants", "Ancestors"})
@@ -538,6 +603,7 @@ def _register_relation_methods(
         datetime,
         decimal,
         enum,
+        field,
         foreign_id,
         foreign_string,
         foreign_uuid,
@@ -551,19 +617,15 @@ def _register_relation_methods(
         uuid,
     ),
 )
-class _ModelMeta(DCTransformDeclarative):
+class ModelMeta(DCTransformDeclarative):
     """Metaclass for Arvel ORM models (SQLAlchemy DeclarativeBase + dataclass_transform).
 
     Auto-wraps plain type annotations with ``Mapped[T]`` when the assigned
     value is a ``MappedColumn`` or ``RelationshipProperty``. This lets models
-    use plain annotations instead of the SQLAlchemy ``Mapped[T]`` wrapper::
+    use plain annotations instead of the SQLAlchemy wrapper::
 
-        # Plain annotation (recommended)
         id: int = id_()
         name: str = string(255)
-
-        # Also accepted (framework mixins use this style)
-        id: Mapped[int] = id_()
 
     Resolves ``Post.active()`` to a ``scope_active`` method when the class
     has one (Laravel-style local-scope auto-discovery).
@@ -578,13 +640,28 @@ class _ModelMeta(DCTransformDeclarative):
     ) -> Any:
         annotations: dict[str, Any] = namespace.get("__annotations__", {})
         new_annotations: dict[str, Any] = {}
+        injected_values: dict[str, Any] = {}
         needs_mapped_in_module = False
 
         module_name: str = namespace.get("__module__", "")
 
         for attr_name, annotation in annotations.items():
+            has_value = attr_name in namespace
             value = namespace.get(attr_name)
-            if not _should_auto_wrap(attr_name, annotation, value):
+
+            do_wrap = _should_auto_wrap(attr_name, annotation, value)
+            if not do_wrap and _is_column_candidate_annotation(attr_name, annotation):
+                # Infer a column from a bare annotation (`name: str`) or a plain
+                # Python default (`age: int | None = None`). SQLAlchemy resolves
+                # the SQL type from the wrapped Mapped[T] via type_annotation_map.
+                if not has_value:
+                    injected_values[attr_name] = _inferred_column()
+                    do_wrap = True
+                elif _is_plain_default(value):
+                    injected_values[attr_name] = _inferred_column(default=value, has_default=True)
+                    do_wrap = True
+
+            if not do_wrap:
                 new_annotations[attr_name] = annotation
                 continue
 
@@ -599,8 +676,8 @@ class _ModelMeta(DCTransformDeclarative):
                 # subscripting a generic with a runtime variable.
                 new_annotations[attr_name] = _MappedAlias[annotation]
 
-        if new_annotations != annotations:
-            namespace = {**namespace, "__annotations__": new_annotations}
+        if new_annotations != annotations or injected_values:
+            namespace = {**namespace, **injected_values, "__annotations__": new_annotations}
 
         if needs_mapped_in_module and module_name:
             module = sys.modules.get(module_name)
@@ -770,11 +847,11 @@ class ActiveRecord(QueryMixin):
     __touches__: ClassVar[tuple[str, ...]] = ()
 
     # Method-style FK relation accessor names (has_many/has_one/belongs_to),
-    # populated per-class by _ModelMeta. The eager engine reads this to recognize
+    # populated per-class by ModelMeta. The eager engine reads this to recognize
     # which methods are eager-loadable via with_("name").
     __arvel_fk_relations__: ClassVar[frozenset[str]] = frozenset()
     # Self-referential recursive relation accessor names (descendants/ancestors),
-    # populated per-class by _ModelMeta. Eager-loadable via with_tree("name").
+    # populated per-class by ModelMeta. Eager-loadable via with_tree("name").
     __arvel_recursive_relations__: ClassVar[frozenset[str]] = frozenset()
 
     # Timestamp controls (Eloquent parity). Set __timestamps__ = False to opt out;
@@ -1520,7 +1597,7 @@ class ActiveRecord(QueryMixin):
 
 
 class Model(
-    MappedAsDataclass, DeclarativeBase, ActiveRecord, metaclass=_ModelMeta, init=True, kw_only=True
+    MappedAsDataclass, DeclarativeBase, ActiveRecord, metaclass=ModelMeta, init=True, kw_only=True
 ):
     """Base class for every Arvel model.
 
@@ -1528,11 +1605,12 @@ class Model(
     (``kw_only=True``) so every concrete subclass gets a typed, keyword-only
     ``__init__`` derived from its ``Mapped[T]`` column annotations. The
     :class:`ActiveRecord` mixin provides the Eloquent-style class and instance
-    API. The :class:`_ModelMeta` metaclass forwards unknown class-level
+    API. The :class:`ModelMeta` metaclass forwards unknown class-level
     attribute lookups to ``cls.query()``.
 
     Rules for model authors:
-    - Annotate every column: ``name: Mapped[str] = string(100)``
+    - Annotate columns with the plain Python type: ``name: str = string(100)``,
+      ``id: int = id_()``. The metaclass wraps it in ``Mapped[T]`` at build time.
     - Server-managed fields (auto-increment PKs, timestamps, soft-delete
       tombstones) must carry ``init=False`` so they don't appear in ``__init__``.
       The :func:`~arvel.database.columns.id_` helper already does this.
@@ -1541,6 +1619,15 @@ class Model(
     """
 
     __abstract__ = True
+
+    # Laravel-flavored defaults for type-inferred columns (bare annotations and
+    # plain defaults). Explicit helpers always win; this only fills the gaps when
+    # a column's type is left to SQLAlchemy's annotation inference.
+    type_annotation_map: ClassVar[dict[Any, Any]] = {
+        str: String(255),
+        _datetime: DateTime(timezone=True),
+        Decimal: Numeric(10, 2),
+    }
 
     def __init_subclass__(cls, **kw: Any) -> None:
         super().__init_subclass__(**kw)
@@ -1875,21 +1962,22 @@ def _set_timestamps_on_update(_mapper: Mapper[Any], _conn: Any, target: Any) -> 
         setattr(model, updated, _datetime.now(UTC))
 
 
-class Timestamps(MappedAsDataclass):
+class Timestamps(MappedAsDataclass, metaclass=ModelMeta):
     """Mixin adding ``created_at`` and ``updated_at`` (auto-populated on save).
 
     Extends ``MappedAsDataclass`` so SQLAlchemy recognises it as a typed-
     dataclass mixin — required by SQLA 2.0 and will be enforced in 2.1.
-    Both columns are ``init=False``; ``Model.__init_subclass__`` wires the
-    mapper-event hooks that populate them (honoring ``__timestamps__`` and
-    the ``CREATED_AT`` / ``UPDATED_AT`` constants).
+    Uses ``ModelMeta`` so the plain annotations get wrapped in ``Mapped[T]``,
+    same as user models. Both columns are ``init=False``; ``Model.__init_subclass__``
+    wires the mapper-event hooks that populate them (honoring ``__timestamps__``
+    and the ``CREATED_AT`` / ``UPDATED_AT`` constants).
     """
 
-    created_at: Mapped[_datetime] = datetime(nullable=False, init=False, default=None)
-    updated_at: Mapped[_datetime] = datetime(nullable=False, init=False, default=None)
+    created_at: _datetime = datetime(nullable=False, init=False, default=None)
+    updated_at: _datetime = datetime(nullable=False, init=False, default=None)
 
 
-class SoftDeletes(MappedAsDataclass):
+class SoftDeletes(MappedAsDataclass, metaclass=ModelMeta):
     """Mixin adding ``deleted_at`` and turning ``delete()`` into a soft delete.
 
     Extends ``MappedAsDataclass`` so SQLAlchemy recognises it as a typed-
@@ -1898,7 +1986,7 @@ class SoftDeletes(MappedAsDataclass):
     QueryBuilder to override.
     """
 
-    deleted_at: Mapped[_datetime | None] = datetime(nullable=True, init=False, default=None)
+    deleted_at: _datetime | None = datetime(nullable=True, init=False, default=None)
 
     __arvel_soft_delete_column__: ClassVar[str] = "deleted_at"
     __arvel_global_scopes__: ClassVar[dict[str, Any]] = {}
@@ -2066,4 +2154,12 @@ class ViewModel(Model):
         Schema.refresh_materialized_view(cls.__tablename__, concurrently=concurrently)
 
 
-__all__ = ["ActiveRecord", "Model", "Prunable", "SoftDeletes", "Timestamps", "ViewModel"]
+__all__ = [
+    "ActiveRecord",
+    "Model",
+    "ModelMeta",
+    "Prunable",
+    "SoftDeletes",
+    "Timestamps",
+    "ViewModel",
+]

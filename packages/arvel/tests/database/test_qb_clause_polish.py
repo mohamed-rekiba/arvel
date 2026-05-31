@@ -4,18 +4,16 @@ from __future__ import annotations
 
 from typing import cast
 
-from arvel.database import Model
-from sqlalchemy import Integer, String
+from arvel.database import Model, id_, integer, string
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Widget(Model):
     __tablename__ = "polish_widgets"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(40), default="")
-    tag: Mapped[str] = mapped_column(String(20), default="")
-    qty: Mapped[int] = mapped_column(Integer, default=0)
+    id: int = id_()
+    name: str = string(40, default="")
+    tag: str = string(20, default="")
+    qty: int = integer(default=0)
 
 
 async def _seed(engine: AsyncEngine) -> None:
@@ -37,7 +35,9 @@ async def test_or_where_in_ors_onto_chain(engine: AsyncEngine, session: AsyncSes
 async def test_or_where_ors_onto_chain(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
     # name == 'a' OR tag == 'z' -> a, d (proves OR onto the chain, not AND)
-    rows = await Widget.where(name="a").or_where(Widget.tag == "z").order_by("name").all()
+    rows = (
+        await Widget.where(name="a").or_where(Widget.__table__.c.tag == "z").order_by("name").all()
+    )
     assert [r.name for r in rows] == ["a", "d"]
 
 
@@ -51,7 +51,13 @@ async def test_or_where_between(engine: AsyncEngine, session: AsyncSession) -> N
 async def test_explicit_grouping_precedence(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
     # (qty == 1 OR qty == 9) AND tag == 'x' -> a, c   (explicit grouping)
-    rows = await Widget.where(qty=1).or_where(Widget.qty == 9).where(tag="x").order_by("name").all()
+    rows = (
+        await Widget.where(qty=1)
+        .or_where(Widget.__table__.c.qty == 9)
+        .where(tag="x")
+        .order_by("name")
+        .all()
+    )
     assert [r.name for r in rows] == ["a", "c"]
 
 

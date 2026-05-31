@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Self, cast
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import InstrumentedAttribute
+    from sqlalchemy.sql.elements import ColumnElement
     from sqlalchemy.sql.selectable import CTE
 
     from arvel.database.paginator import Paginator
@@ -273,7 +274,7 @@ class QueryMixin:
     @classmethod
     def where_full_text(
         cls,
-        col: InstrumentedAttribute[Any],
+        col: ColumnElement[Any] | InstrumentedAttribute[Any],
         query: str,
         *,
         tsquery_fn: str = "plainto_tsquery",
@@ -284,7 +285,7 @@ class QueryMixin:
     @classmethod
     def order_by_relevance(
         cls,
-        col: InstrumentedAttribute[Any],
+        col: ColumnElement[Any] | InstrumentedAttribute[Any],
         query: str,
         *,
         lang: str = "english",

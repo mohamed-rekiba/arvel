@@ -8,17 +8,15 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from arvel.database import Model, Timestamps, accessor
-from sqlalchemy import Integer, String
+from arvel.database import Model, Timestamps, accessor, id_, integer, string
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Widget(Model, Timestamps):
     __tablename__ = "dirty_widgets"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    price: Mapped[int] = mapped_column(Integer, default=0)
+    id: int = id_()
+    name: str = string(80)
+    price: int = integer(default=0)
 
     __appends__: ClassVar[list[str] | None] = ["label"]
 

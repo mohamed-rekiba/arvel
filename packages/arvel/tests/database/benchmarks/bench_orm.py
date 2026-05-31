@@ -19,17 +19,16 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from arvel.database import Model, Timestamps
+from arvel.database import Model, Timestamps, id_, string
 from arvel.database.orm import BelongsToMany
 from arvel.database.session import set_active_session
-from sqlalchemy import Column, ForeignKey, Integer, String, Table, select
+from sqlalchemy import Column, ForeignKey, Integer, Table, select
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import Mapped, mapped_column
 
 # ─── Schema ──────────────────────────────────────────────────────────────────
 
@@ -44,15 +43,15 @@ bench_post_tag = Table(
 class BenchTag(Model):
     __tablename__ = "bench_tags"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: int = id_()
+    name: str = string(80)
 
 
 class BenchPost(Model, Timestamps):
     __tablename__ = "bench_posts"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    title: str = string(200)
 
     tags: BelongsToMany[BenchTag] = BelongsToMany(
         BenchTag,

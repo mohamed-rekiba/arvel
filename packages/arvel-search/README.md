@@ -24,8 +24,8 @@ class Article(Model, Searchable):
     __tablename__ = "articles"
     __searchable__ = ("title", "body")
 
-    title: Mapped[str]
-    body: Mapped[str]
+    title: str
+    body: str
 
 
 # Saving auto-indexes; deleting auto-removes.

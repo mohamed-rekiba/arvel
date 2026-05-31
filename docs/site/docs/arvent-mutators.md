@@ -249,8 +249,8 @@ For computed attributes that don't map to a single column, define a property:
 
 ```python
 class User(Model):
-    first_name: Mapped[str]
-    last_name: Mapped[str]
+    first_name: str
+    last_name: str
 
     @property
     def full_name(self) -> str:
@@ -345,7 +345,7 @@ class User(Model):
     country_code: str = column(UpperString(2))
 ```
 
-Now `user.country_code = "us"` stores `"US"`. `column()` is the generic helper for any custom `TypeDecorator` — same kwargs (`nullable`, `unique`, `index`, `default`) and `Mapped[T]` typing as the named helpers, so you never reach for `mapped_column` just to attach a custom type.
+Now `user.country_code = "us"` stores `"US"`. `column()` is the generic helper for any custom `TypeDecorator` — same kwargs (`nullable`, `unique`, `index`, `default`) as the named helpers, and the same clean annotation (`country_code: str`), so you never reach for `mapped_column` just to attach a custom type.
 
 ## Where to next?
 

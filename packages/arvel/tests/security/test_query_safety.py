@@ -5,16 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model
-from sqlalchemy import Integer, String
+from arvel.database import Model, id_, string
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class SafeWidget(Model):
     __tablename__ = "safe_widgets"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    id: int = id_()
+    name: str = string(100)
 
 
 async def _create_tables(engine: Any) -> None:

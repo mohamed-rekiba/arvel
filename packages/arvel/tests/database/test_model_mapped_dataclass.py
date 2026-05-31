@@ -11,9 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from arvel.database import Model, Timestamps, id_, string
-from sqlalchemy import ForeignKey, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from arvel.database import Model, Timestamps, field, id_, relationship, string
 
 # ─── fixtures ────────────────────────────────────────────────────────────────
 
@@ -21,20 +19,18 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 class Article(Model, Timestamps):
     __tablename__ = "articles_dc_test"
 
-    id: Mapped[int] = id_(init=False)
-    title: Mapped[str] = string(200)
-    body: Mapped[str | None] = mapped_column(String(5000), nullable=True, default=None)
+    id: int = id_(init=False)
+    title: str = string(200)
+    body: str | None = string(5000, nullable=True, default=None)
 
 
 class Tag(Model):
     __tablename__ = "tags_dc_test"
 
-    id: Mapped[int] = id_(init=False)
-    name: Mapped[str] = string(80)
-    article_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("articles_dc_test.id"), nullable=True, default=None
-    )
-    article: Mapped[Article | None] = relationship("Article", init=False)
+    id: int = id_(init=False)
+    name: str = string(80)
+    article_id: int | None = field(foreign_key="articles_dc_test.id", default=None)
+    article: Article | None = relationship("Article", init=False)
 
 
 # ─── FR-076-001: typed keyword-only __init__ ─────────────────────────────────

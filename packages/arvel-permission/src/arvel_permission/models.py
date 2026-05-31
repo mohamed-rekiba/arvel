@@ -21,9 +21,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar, Self
 
-from arvel.database.columns import id_, integer, string
+from arvel.database.columns import field
 from arvel.database.model import Model, Timestamps
-from arvel.database.orm import BelongsToMany, Mapped
+from arvel.database.orm import BelongsToMany
 from sqlalchemy import (
     Column,
     ForeignKey,
@@ -70,10 +70,10 @@ class Role(Model, Timestamps):
     __tablename__ = "roles"
     __table_args__ = (UniqueConstraint("name", "guard_name", name="roles_name_guard_unique"),)
 
-    id: Mapped[int] = id_(init=False)
-    name: Mapped[str] = string(125)
-    guard_name: Mapped[str] = string(125, default="web")
-    level: Mapped[int] = integer(default=0)
+    id: int = field(default=None, primary_key=True, init=False)
+    name: str = field(length=125)
+    guard_name: str = field(length=125, default="web")
+    level: int = 0
 
     if TYPE_CHECKING:
         # Real descriptor assigned at module end (breaks the Role↔Permission cycle).
@@ -89,7 +89,7 @@ class Role(Model, Timestamps):
         """Find a role by name/guard. Raises ``RoleDoesNotExist`` if absent."""
         from arvel_permission.exceptions import RoleDoesNotExist  # noqa: PLC0415
 
-        stmt = select(cls).where(cls.name == name, cls.guard_name == guard).limit(1)
+        stmt = select(cls).filter_by(name=name, guard_name=guard).limit(1)
         result = await session.execute(stmt)
         role = result.scalar_one_or_none()
         if role is None:
@@ -103,7 +103,7 @@ class Role(Model, Timestamps):
     @classmethod
     async def find_or_create(cls, name: str, *, session: AsyncSession, guard: str = "web") -> Self:
         """Return existing role by name/guard or create it."""
-        stmt = select(cls).where(cls.name == name, cls.guard_name == guard).limit(1)
+        stmt = select(cls).filter_by(name=name, guard_name=guard).limit(1)
         result = await session.execute(stmt)
         existing = result.scalar_one_or_none()
         if existing is not None:
@@ -120,9 +120,9 @@ class Permission(Model, Timestamps):
     __tablename__ = "permissions"
     __table_args__ = (UniqueConstraint("name", "guard_name", name="permissions_name_guard_unique"),)
 
-    id: Mapped[int] = id_(init=False)
-    name: Mapped[str] = string(125)
-    guard_name: Mapped[str] = string(125, default="web")
+    id: int = field(default=None, primary_key=True, init=False)
+    name: str = field(length=125)
+    guard_name: str = field(length=125, default="web")
 
     if TYPE_CHECKING:
         # Real descriptor assigned at module end (breaks the Role↔Permission cycle).
@@ -137,7 +137,7 @@ class Permission(Model, Timestamps):
         """Find a permission by name/guard. Raises ``PermissionDoesNotExist`` if absent."""
         from arvel_permission.exceptions import PermissionDoesNotExist  # noqa: PLC0415
 
-        stmt = select(cls).where(cls.name == name, cls.guard_name == guard).limit(1)
+        stmt = select(cls).filter_by(name=name, guard_name=guard).limit(1)
         result = await session.execute(stmt)
         perm = result.scalar_one_or_none()
         if perm is None:
@@ -153,7 +153,7 @@ class Permission(Model, Timestamps):
     @classmethod
     async def find_or_create(cls, name: str, *, session: AsyncSession, guard: str = "web") -> Self:
         """Return existing permission by name/guard or create it."""
-        stmt = select(cls).where(cls.name == name, cls.guard_name == guard).limit(1)
+        stmt = select(cls).filter_by(name=name, guard_name=guard).limit(1)
         result = await session.execute(stmt)
         existing = result.scalar_one_or_none()
         if existing is not None:

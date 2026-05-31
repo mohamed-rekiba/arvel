@@ -4,22 +4,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from arvel.database import Model
+from arvel.database import Model, foreign_id, id_, string
 from arvel.database.tree import TreeNode
-from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Category(Model):
     __tablename__ = "cte_categories"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
-    parent_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("cte_categories.id"), nullable=True, default=None
-    )
+    id: int = id_()
+    name: str = string(80)
+    parent_id: int | None = foreign_id("cte_categories.id", nullable=True)
 
 
 async def _create_tables(engine: Any) -> None:
@@ -53,7 +47,7 @@ async def test_with_cte_attaches_cte(engine: Any, session: AsyncSession) -> None
     await _create_tables(engine)
     from sqlalchemy import select
 
-    roots_cte = select(Category).where(Category.parent_id.is_(None)).cte("roots")
+    roots_cte = select(Category).where(Category.__table__.c.parent_id.is_(None)).cte("roots")
     sql = Category.with_cte("roots", roots_cte).to_sql()
     assert "WITH" in sql.upper()
     assert "roots" in sql
@@ -64,8 +58,8 @@ async def test_with_cte_multiple_chains(engine: Any, session: AsyncSession) -> N
     await _create_tables(engine)
     from sqlalchemy import select
 
-    cte_a = select(Category).where(Category.parent_id.is_(None)).cte("cte_a")
-    cte_b = select(Category).where(Category.name == "x").cte("cte_b")
+    cte_a = select(Category).where(Category.__table__.c.parent_id.is_(None)).cte("cte_a")
+    cte_b = select(Category).where(Category.__table__.c.name == "x").cte("cte_b")
     sql = Category.with_cte("cte_a", cte_a).with_cte("cte_b", cte_b).to_sql()
     assert "cte_a" in sql
     assert "cte_b" in sql
@@ -81,14 +75,14 @@ async def test_recursive_returns_recursive_query_builder(
     await _create_tables(engine)
     from arvel.database.query import RecursiveQueryBuilder
 
-    builder = Category.where(Category.parent_id.is_(None)).recursive("parent_id")
+    builder = Category.where(Category.__table__.c.parent_id.is_(None)).recursive("parent_id")
     assert isinstance(builder, RecursiveQueryBuilder)
 
 
 async def test_recursive_sql_contains_with_recursive(engine: Any, session: AsyncSession) -> None:
     """Rendered SQL includes WITH RECURSIVE clause."""
     await _create_tables(engine)
-    sql = Category.where(Category.parent_id.is_(None)).recursive("parent_id").to_sql()
+    sql = Category.where(Category.__table__.c.parent_id.is_(None)).recursive("parent_id").to_sql()
     upper = sql.upper()
     assert "WITH" in upper
     assert "RECURSIVE" in upper
@@ -99,7 +93,7 @@ async def test_recursive_depth_col_in_sql(engine: Any, session: AsyncSession) ->
     await _create_tables(engine)
     sql = (
         Category.query()
-        .where(Category.parent_id.is_(None))
+        .where(Category.__table__.c.parent_id.is_(None))
         .recursive("parent_id", depth_col="depth")
         .to_sql()
     )
@@ -129,7 +123,7 @@ async def test_as_tree_returns_list_of_tree_nodes(engine: Any, session: AsyncSes
     await _build_tree(engine, session)
     trees = await (
         Category.query()
-        .where(Category.parent_id.is_(None))
+        .where(Category.__table__.c.parent_id.is_(None))
         .recursive("parent_id", depth_col="depth")
         .as_tree()
     )
@@ -146,7 +140,7 @@ async def test_as_tree_assembles_children(engine: Any, session: AsyncSession) ->
     await _build_tree(engine, session)
     trees = await (
         Category.query()
-        .where(Category.parent_id.is_(None))
+        .where(Category.__table__.c.parent_id.is_(None))
         .recursive("parent_id", depth_col="depth")
         .as_tree()
     )
@@ -161,7 +155,7 @@ async def test_as_tree_nested_grandchildren(engine: Any, session: AsyncSession) 
     await _build_tree(engine, session)
     trees = await (
         Category.query()
-        .where(Category.parent_id.is_(None))
+        .where(Category.__table__.c.parent_id.is_(None))
         .recursive("parent_id", depth_col="depth")
         .as_tree()
     )
@@ -193,7 +187,7 @@ async def test_as_tree_single_round_trip(engine: Any, session: AsyncSession) -> 
     try:
         await (
             Category.query()
-            .where(Category.parent_id.is_(None))
+            .where(Category.__table__.c.parent_id.is_(None))
             .recursive("parent_id", depth_col="depth")
             .as_tree()
         )

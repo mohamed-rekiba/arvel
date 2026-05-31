@@ -5,21 +5,17 @@ to_raw_sql, get_bindings, explain, DB.enable_query_log/get_query_log, DB.pretend
 
 from __future__ import annotations
 
-from arvel.database import Model
+from arvel.database import Model, id_, integer, string
 from arvel.database.db import DB
 from arvel.database.session import reset_active_session, set_active_session
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class DbgItem(Model):
     __tablename__ = "dbg_items"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
-    score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    id: int = id_()
+    name: str = string(80)
+    score: int = integer(default=0)
 
 
 async def _setup(engine: AsyncEngine) -> None:

@@ -50,11 +50,11 @@ class PublishableMixin:
 class TranslatableMixin:
     """Helpers for reading and writing JSONB i18n fields.
 
-    Models with multilingual JSONB columns (e.g. ``name: Mapped[dict]``) inherit
+    Models with multilingual JSONB columns (e.g. ``name: dict[str, Any]``) inherit
     this mixin to get locale-aware get/set without boilerplate::
 
         class Category(TranslatableMixin, Model):
-            name: Mapped[dict] = ...
+            name: dict[str, Any] = jsonb(default=dict)
 
         category.get_translation("name", "ar")   # → Arabic name or falls back to "en"
         category.set_translation("name", "fr", "Électronique")

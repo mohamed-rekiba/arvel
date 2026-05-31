@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from arvel.database import Model, Observer, SoftDeletes, Timestamps
+from arvel.database import Model, Observer, SoftDeletes, Timestamps, id_, string
 from arvel.database.events import clear_observers
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Memo(Model, Timestamps, SoftDeletes):
     __tablename__ = "memos_q"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    body: str = string(200)
 
 
 class Tally(Observer[Memo]):

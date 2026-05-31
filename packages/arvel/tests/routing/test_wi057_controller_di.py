@@ -23,16 +23,14 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import pytest_asyncio
 from arvel.container import Container
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.http.controller import Controller
 from arvel.http.middleware.database_transaction import DatabaseTransaction
 from arvel.http.requests import FormRequest
 from arvel.routing import Route, Router
 from fastapi import FastAPI
 from pydantic import BaseModel
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.orm import Mapped, mapped_column
 from starlette.testclient import TestClient
 
 if TYPE_CHECKING:
@@ -47,8 +45,8 @@ class _WidgetCtrlModel(Model):
 
     __tablename__ = "wi057_widget_ctrl"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: int = id_()
+    name: str = string(80)
 
 
 @pytest_asyncio.fixture

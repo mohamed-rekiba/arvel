@@ -2,27 +2,25 @@
 
 from __future__ import annotations
 
-from arvel.database import Model
-from sqlalchemy import ForeignKey, Integer, String
+from arvel.database import Model, field, id_, relationship, string
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class CcbUser(Model):
     __tablename__ = "ccb_users"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    posts: Mapped[list[CcbPost]] = relationship(
+    id: int = id_()
+    name: str = string(80)
+    posts: list[CcbPost] = relationship(
         "CcbPost", back_populates="author", init=False, default_factory=list
     )
 
 
 class CcbPost(Model):
     __tablename__ = "ccb_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120))
-    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("ccb_users.id"), default=None)
-    author: Mapped[CcbUser | None] = relationship("CcbUser", back_populates="posts", init=False)
+    id: int = id_()
+    title: str = string(120)
+    user_id: int | None = field(foreign_key="ccb_users.id", default=None)
+    author: CcbUser | None = relationship("CcbUser", back_populates="posts", init=False)
 
 
 async def _setup(engine: AsyncEngine) -> None:

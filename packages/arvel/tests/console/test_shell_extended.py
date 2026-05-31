@@ -97,14 +97,12 @@ class TestAutoImportUserModels:
                 """
                 from __future__ import annotations
 
-                from sqlalchemy.orm import Mapped, mapped_column
-
-                from arvel.database import Model
+                from arvel.database import Model, id_
 
 
                 class Post(Model):
                     __tablename__ = "shell_ext_posts"
-                    id: Mapped[int] = mapped_column(primary_key=True, init=False, default=None)
+                    id: int = id_()
                 """
             )
         )
@@ -133,14 +131,12 @@ class TestAutoImportUserModels:
                 """
                 from __future__ import annotations
 
-                from sqlalchemy.orm import Mapped, mapped_column
-
-                from arvel.database import Model
+                from arvel.database import Model, id_
 
 
                 class Tag(Model):
                     __tablename__ = "shell_ext_tags"
-                    id: Mapped[int] = mapped_column(primary_key=True, init=False, default=None)
+                    id: int = id_()
                 """
             )
         )
@@ -168,14 +164,12 @@ class TestAutoImportUserModels:
                 """
                 from __future__ import annotations
 
-                from sqlalchemy.orm import Mapped, mapped_column
-
-                from arvel.database import Model
+                from arvel.database import Model, id_
 
 
                 class Cache(Model):
                     __tablename__ = "shell_ext_cache"
-                    id: Mapped[int] = mapped_column(primary_key=True, init=False, default=None)
+                    id: int = id_()
                 """
             )
         )
@@ -253,14 +247,12 @@ class TestShellBanner:
                 """
                 from __future__ import annotations
 
-                from sqlalchemy.orm import Mapped, mapped_column
-
-                from arvel.database import Model
+                from arvel.database import Model, id_
 
 
                 class Article(Model):
                     __tablename__ = "shell_ext_articles"
-                    id: Mapped[int] = mapped_column(primary_key=True, init=False, default=None)
+                    id: int = id_()
                 """
             )
         )
@@ -337,14 +329,12 @@ class TestIPythonNamespaceWiring:
                 """
                 from __future__ import annotations
 
-                from sqlalchemy.orm import Mapped, mapped_column
-
-                from arvel.database import Model
+                from arvel.database import Model, id_
 
 
                 class Widget(Model):
                     __tablename__ = "shell_ext_widgets"
-                    id: Mapped[int] = mapped_column(primary_key=True, init=False, default=None)
+                    id: int = id_()
                 """
             )
         )

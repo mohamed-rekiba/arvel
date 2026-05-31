@@ -27,17 +27,16 @@ Add `Auditable` to a model. Lifecycle hooks wire automatically at class definiti
 is nothing to register per model.
 
 ```python
-from arvel.database import Model
+from arvel.database import Model, id_, integer, string
 from arvel_audit import Auditable
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Invoice(Model, Auditable):
     __tablename__ = "invoices"
 
-    id: Mapped[int] = mapped_column(primary_key=True, init=False)
-    number: Mapped[str] = mapped_column()
-    amount: Mapped[int] = mapped_column(default=0)
+    id: int = id_()
+    number: str = string(255)
+    amount: int = integer(default=0)
 ```
 
 What gets recorded:

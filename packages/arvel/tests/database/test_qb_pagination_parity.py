@@ -8,24 +8,20 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlparse
 
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.database.paginator import (
     PaginationRequest,
     Paginator,
     reset_pagination_request,
     set_pagination_request,
 )
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class PgItem(Model):
     __tablename__ = "pg_items"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    name: Mapped[str] = mapped_column(String(40), nullable=False)
+    id: int = id_()
+    name: str = string(40)
 
 
 async def _seed(engine: AsyncEngine, n: int) -> None:

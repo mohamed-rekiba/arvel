@@ -9,18 +9,16 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model, Observer, SoftDeletes, Timestamps
+from arvel.database import Model, Observer, SoftDeletes, Timestamps, id_, string
 from arvel.database.events import clear_observers
 from arvel.database.exceptions import OperationCancelledError
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Paper(Model, Timestamps, SoftDeletes):
     __tablename__ = "fdr_papers"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120))
+    id: int = id_()
+    title: str = string(120)
 
 
 class Recorder(Observer[Paper]):

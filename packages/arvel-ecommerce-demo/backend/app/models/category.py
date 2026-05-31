@@ -11,7 +11,6 @@ from arvel.database import (
     SoftDeletes,
     Timestamps,
     TranslatableMixin,
-    datetime,
     enum,
     foreign_uuid,
     jsonb,
@@ -31,7 +30,7 @@ class Category(TranslatableMixin, Model, Timestamps, SoftDeletes):
     name: Any = jsonb(default=dict)
     slug: Any = jsonb(default=dict)
     status: str = enum(["draft", "published"], name="categories_status", default="published")
-    published_at: _datetime | None = datetime(nullable=True, default=None)
+    published_at: _datetime | None = None
     parent_id: uuid.UUID | None = foreign_uuid("categories.id", nullable=True)
 
     def catalog_products(self) -> HasMany[ProductCatalog]:

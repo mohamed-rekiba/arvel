@@ -632,16 +632,15 @@ from typing import Self
 
 from arvel.database import Model, foreign_id, id_, relationship, string
 from arvel.database.orm.relations import Ancestors, Descendants
-from sqlalchemy.orm import Mapped
 
 
 class Category(Model):
-    id: Mapped[int] = id_()
-    name: Mapped[str] = string(120)
-    parent_id: Mapped[int | None] = foreign_id("categories.id", nullable=True)
+    id: int = id_()
+    name: str = string(120)
+    parent_id: int | None = foreign_id("categories.id", nullable=True)
     # The tree edge. `with_tree("descendants")` hydrates this in memory so you can
     # walk `node.children` synchronously — see "Eager loading" below.
-    children: Mapped[list[Category]] = relationship(default_factory=list)
+    children: list[Category] = relationship(default_factory=list)
 
     def descendants(self) -> Descendants[Self]:
         return self.has_many_recursive(parent_key="parent_id")

@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel_search import Search, SearchEngineNotConfigured, SearchManager
 from arvel_search.builder import SearchBuilder
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 from support import Article
 
 
@@ -115,7 +113,7 @@ class TestUnrelatedModel:
     def test_plain_model_has_no_search(self) -> None:
         class Plain(Model):
             __tablename__ = "plain_things"
-            id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-            name: Mapped[str] = mapped_column(String(50), nullable=False)
+            id: int = id_()
+            name: str = string(50)
 
         assert not hasattr(Plain, "search")

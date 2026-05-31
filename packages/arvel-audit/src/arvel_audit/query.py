@@ -20,6 +20,11 @@ if TYPE_CHECKING:
     from arvel.database.model import Model
     from sqlalchemy.ext.asyncio import AsyncSession
 
+# Clean models type class attributes as their Python type, not ColumnElement.
+# Reference the Core columns directly for filters and ordering.
+_audit = AuditEntry.__table__.c
+_activity = ActivityEntry.__table__.c
+
 
 class AuditLog:
     """Query ``audit_entries`` by model, actor, action, and time window."""
@@ -29,33 +34,33 @@ class AuditLog:
         self._filters: list[ColumnElement[bool]] = []
 
     def for_model(self, instance: Model) -> Self:
-        self._filters.append(AuditEntry.model_type == morph_type(instance))
-        self._filters.append(AuditEntry.model_id == model_key(instance))
+        self._filters.append(_audit.model_type == morph_type(instance))
+        self._filters.append(_audit.model_id == model_key(instance))
         return self
 
     def by_actor(self, actor_id: object) -> Self:
-        self._filters.append(AuditEntry.actor_id == str(actor_id))
+        self._filters.append(_audit.actor_id == str(actor_id))
         return self
 
     def action(self, action: str) -> Self:
         if action not in AUDIT_ACTIONS:
             raise InvalidAuditAction(action, AUDIT_ACTIONS)
-        self._filters.append(AuditEntry.action == action)
+        self._filters.append(_audit.action == action)
         return self
 
     def since(self, moment: datetime) -> Self:
-        self._filters.append(AuditEntry.created_at >= moment)
+        self._filters.append(_audit.created_at >= moment)
         return self
 
     def until(self, moment: datetime) -> Self:
-        self._filters.append(AuditEntry.created_at <= moment)
+        self._filters.append(_audit.created_at <= moment)
         return self
 
     async def get(self) -> list[AuditEntry]:
         stmt = (
             select(AuditEntry)
             .where(*self._filters)
-            .order_by(AuditEntry.created_at.asc(), AuditEntry.id.asc())
+            .order_by(_audit.created_at.asc(), _audit.id.asc())
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -64,7 +69,7 @@ class AuditLog:
         stmt = (
             select(AuditEntry)
             .where(*self._filters)
-            .order_by(AuditEntry.created_at.asc(), AuditEntry.id.asc())
+            .order_by(_audit.created_at.asc(), _audit.id.asc())
             .limit(1)
         )
         result = await self._session.execute(stmt)
@@ -80,7 +85,7 @@ class AuditLog:
         stmt = (
             select(AuditEntry)
             .where(*self._filters)
-            .order_by(AuditEntry.created_at.asc(), AuditEntry.id.asc())
+            .order_by(_audit.created_at.asc(), _audit.id.asc())
             .offset((current - 1) * per_page)
             .limit(per_page)
         )
@@ -97,24 +102,24 @@ class ActivityQuery:
         self._filters: list[ColumnElement[bool]] = []
 
     def in_log(self, log_name: str) -> Self:
-        self._filters.append(ActivityEntry.log_name == log_name)
+        self._filters.append(_activity.log_name == log_name)
         return self
 
     def for_subject(self, instance: Model) -> Self:
-        self._filters.append(ActivityEntry.subject_type == morph_type(instance))
-        self._filters.append(ActivityEntry.subject_id == model_key(instance))
+        self._filters.append(_activity.subject_type == morph_type(instance))
+        self._filters.append(_activity.subject_id == model_key(instance))
         return self
 
     def by_causer(self, instance: Model) -> Self:
-        self._filters.append(ActivityEntry.causer_type == morph_type(instance))
-        self._filters.append(ActivityEntry.causer_id == model_key(instance))
+        self._filters.append(_activity.causer_type == morph_type(instance))
+        self._filters.append(_activity.causer_id == model_key(instance))
         return self
 
     async def get(self) -> list[ActivityEntry]:
         stmt = (
             select(ActivityEntry)
             .where(*self._filters)
-            .order_by(ActivityEntry.created_at.asc(), ActivityEntry.id.asc())
+            .order_by(_activity.created_at.asc(), _activity.id.asc())
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -123,7 +128,7 @@ class ActivityQuery:
         stmt = (
             select(ActivityEntry)
             .where(*self._filters)
-            .order_by(ActivityEntry.created_at.asc(), ActivityEntry.id.asc())
+            .order_by(_activity.created_at.asc(), _activity.id.asc())
             .limit(1)
         )
         result = await self._session.execute(stmt)

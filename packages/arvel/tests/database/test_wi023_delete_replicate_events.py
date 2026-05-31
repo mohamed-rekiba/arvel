@@ -12,24 +12,22 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model, Observer, SoftDeletes, Timestamps
+from arvel.database import Model, Observer, SoftDeletes, Timestamps, id_, string
 from arvel.database.events import clear_observers
 from arvel.database.exceptions import OperationCancelledError
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Wi023Soft(Model, Timestamps, SoftDeletes):
     __tablename__ = "wi023_soft"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    id: int = id_()
+    name: str = string(100)
 
 
 class Wi023Hard(Model):
     __tablename__ = "wi023_hard"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    id: int = id_()
+    name: str = string(100)
 
 
 class _Recorder(Observer[Any]):

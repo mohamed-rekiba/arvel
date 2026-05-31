@@ -10,22 +10,18 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model
-from sqlalchemy import Integer, String
+from arvel.database import Model, id_, integer, string
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 # ─── Test models ─────────────────────────────────────────────────────────────
 
 
 class ArticleS5(Model):
     __tablename__ = "articles_s5"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    title: Mapped[str] = mapped_column(String(200))
-    score: Mapped[int] = mapped_column(Integer, default=0)
-    published: Mapped[int] = mapped_column(Integer, default=0)  # stored as 0/1
+    id: int = id_()
+    title: str = string(200)
+    score: int = integer(default=0)
+    published: int = integer(default=0)  # stored as 0/1
 
 
 async def _setup(engine: AsyncEngine) -> None:
@@ -61,10 +57,8 @@ async def test_boolean_cast_from_int(engine: AsyncEngine, session: AsyncSession)
     class CastBool(Model):
         __tablename__ = "cast_bool"
         __casts__ = {"published": "boolean"}
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        published: Mapped[int] = mapped_column(Integer, default=0)
+        id: int = id_()
+        published: int = integer(default=0)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -78,10 +72,8 @@ async def test_integer_cast(engine: AsyncEngine, session: AsyncSession) -> None:
     class CastInt(Model):
         __tablename__ = "cast_int"
         __casts__ = {"score": "integer"}
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        score: Mapped[str] = mapped_column(String(20), default="0")
+        id: int = id_()
+        score: str = string(20, default="0")
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -96,10 +88,8 @@ async def test_dict_cast_from_json(engine: AsyncEngine, session: AsyncSession) -
     class CastDict(Model):
         __tablename__ = "cast_dict"
         __casts__ = {"meta": "dict"}
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        meta: Mapped[str] = mapped_column(String(500), default="{}")
+        id: int = id_()
+        meta: str = string(500, default="{}")
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -124,10 +114,8 @@ def test_invalid_cast_literal_raises_at_definition() -> None:
                 "__tablename__": "bad_cast",
                 "__casts__": {"field": "not_a_valid_cast"},
                 "__annotations__": {"id": "Mapped[int]", "field": "Mapped[str]"},
-                "id": mapped_column(
-                    Integer, primary_key=True, autoincrement=True, init=False, default=None
-                ),
-                "field": mapped_column(String(80), default="x"),
+                "id": id_(),
+                "field": string(80, default="x"),
             },
         )
 

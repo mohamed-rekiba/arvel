@@ -7,22 +7,71 @@ Arvent deliberately does **not** ship its own ORM core. Every `Model` is a SQLAl
 ## Defining a model
 
 ```python
-from arvel.database import Model, SoftDeletes, Timestamps, id_, string, text
+from datetime import datetime
+
+from arvel.database import Model, SoftDeletes, Timestamps, field, text
 
 
 class Post(Model, Timestamps, SoftDeletes):
     __tablename__ = "posts"
 
-    id: int = id_()
-    title: str = string(200)
-    body: str = text()
+    id: int | None = field(default=None, primary_key=True)
+    title: str                            # VARCHAR(255), NOT NULL — required
+    slug: str = field(unique=True, index=True)
+    views: int = 0                        # INTEGER, NOT NULL, default 0
+    body: str = text()                    # TEXT — a type a bare `str` can't carry
+    published_at: datetime | None = None  # nullable, tz-aware TIMESTAMP
 ```
 
-The helpers in [`arvel.database.columns`](#typed-column-helpers) — `id_`, `string`, `text`, `integer`, `big_integer`, `boolean`, `datetime`, `json`, `foreign_id` — are thin wrappers around `mapped_column(...)` that return `Mapped[T]`. They mirror the [migration DSL](migrations.md) vocabulary, so model code and `make:migration` output line up by inspection.
+Arvent reads the Python annotation to build the column — the SQLModel-shaped look. Four declaration forms coexist; reach for the simplest one that fits:
 
-> **Annotation style.** Write the plain form — `id: int = id_()`, not `id: Mapped[int] = id_()`. The model metaclass wraps it in `Mapped[int]` at runtime, and mypy's SQLAlchemy plugin understands it. The one exception is a column with no helper on the right — a bare `name: Mapped[str]` declaration keeps `Mapped`, since there's no `mapped_column(...)` value for the metaclass to wrap. If you run pyright in `--strict` mode, use the `Mapped[T]` form everywhere: pyright has no SQLAlchemy plugin, so it flags the plain annotation.
+| You write | You get | In `__init__` |
+|---|---|---|
+| `title: str` | `VARCHAR(255)`, NOT NULL | required |
+| `views: int = 0` | `INTEGER`, NOT NULL, default `0` | optional |
+| `published_at: datetime \| None = None` | nullable `TIMESTAMP` | optional |
+| `id: int \| None = field(default=None, primary_key=True)` | `INTEGER PRIMARY KEY` | optional |
+| `body: str = text()` | explicit SQL type (`TEXT`) | per-helper |
+
+A **bare annotation** infers the column type and makes it `NOT NULL` and required. A **plain default** makes the column optional and (for `| None`) nullable. [`field(...)`](#the-field-helper) carries the options a type can't express — primary key, `unique`, `index`, `foreign_key`, `length`. The [typed helpers](#typed-column-helpers) (`text`, `jsonb`, `enum`, `decimal`, `foreign_id`, `column`) stay the vocabulary for SQL-specific types.
+
+Inferred types follow SQLAlchemy's defaults plus a few Laravel-flavored ones: `str → VARCHAR(255)`, `datetime → TIMESTAMP` (tz-aware), `Decimal → NUMERIC(10, 2)`, `int → INTEGER`, `bool → BOOLEAN`. A type with no SQL mapping (a bare `list` or `dict`) errors at mapper config — that's the nudge to reach for [`json()`](#typed-column-helpers).
+
+> **Every annotated attribute is a column.** Model *config* — a default guard name, a feature flag, a cache key — must be a `ClassVar`, or inference maps it to a column you never wanted:
+>
+> ```python
+> class User(Model, Timestamps):
+>     id: int | None = field(default=None, primary_key=True)
+>     email: str = field(unique=True)
+>     default_guard_name: ClassVar[str] = "api"  # config, not a column
+> ```
+
+> **Type-checking.** Every form here — bare, plain default, `field(...)`, and the [typed helpers](#typed-column-helpers) (`id_()`, `string()`, …) — passes `mypy --strict` and `pyright --strict` with zero suppressions. The helpers return `Any` (like SQLModel's `Field`), so the attribute's static type is exactly what you annotate; the metaclass wraps it in `Mapped[T]` at runtime. You never write `Mapped[...]` on a column.
 
 `Timestamps` adds `created_at` / `updated_at` columns and manages them automatically on insert/update. `SoftDeletes` adds a `deleted_at` column and silently excludes soft-deleted rows from every query unless you call `.with_trashed()`.
+
+### The `field()` helper
+
+`field(...)` is the escape hatch for the column *options* a bare annotation can't carry. The column *type* still comes from the annotation; `field()` only adds the flags:
+
+```python
+from arvel.database import Model, Timestamps, field
+
+
+class Member(Model, Timestamps):
+    __tablename__ = "members"
+
+    id: int | None = field(default=None, primary_key=True)
+    email: str = field(unique=True, index=True)
+    handle: str = field(length=64)                  # VARCHAR(64)
+    team_id: int = field(foreign_key="teams.id", on_delete="CASCADE")
+```
+
+It accepts `default` / `default_factory`, `primary_key`, `unique`, `index`, `nullable`, `foreign_key` (+ `on_delete` / `on_update`), `length`, `init`, and `server_default`. A primary key you never set yourself — `field(default=None, primary_key=True)` — is filled by the database on INSERT. `field()` returns `Any`, so the attribute's static type is exactly what you annotate.
+
+> **`field()` foreign keys are not indexed by default.** Unlike [`foreign_id()`](#typed-column-helpers) — which defaults `index=True` — `field(foreign_key=...)` leaves the column unindexed. Pass `index=True` (e.g. `field(foreign_key="teams.id", index=True)`), or use `foreign_id()` for an indexed FK out of the box.
+>
+> **For server-filled primary keys, prefer `id_()` / `uuid_id()`.** They default `init=False` (the key stays out of `__init__`) and set autoincrement explicitly. `field(primary_key=True)` keeps the key in `__init__` as an optional argument — fine when you sometimes set it yourself, redundant when the database always does.
 
 ### Typed column helpers
 
@@ -42,7 +91,7 @@ The helpers in [`arvel.database.columns`](#typed-column-helpers) — `id_`, `str
 
 > **Email validation belongs at the API boundary, not on the column.** Use `string(254, unique=True)` for the model, and `EmailStr` on your Pydantic input schemas (`UserCreate`, `UserUpdate`). The storage layer stays plain VARCHAR — indexed, simple, fast — and the validation runs once at the boundary where invalid input is caught and rejected with a 422. See the [Email validation](#email-validation) section below and [ADR-077](https://github.com/mohamed-rekiba/arvel/blob/main/docs/adr/ADR-077-email-validation-at-boundary.md) for the rationale.
 
-The helpers are additive. For a custom column type — an `EncryptedType`, `PydanticType`, or any SQLAlchemy `TypeDecorator` — use `column(the_type, ...)`, which keeps the same kwargs and `Mapped[T]` typing (see [Mutators / Casts](arvent-mutators.md)). Drop all the way down to `mapped_column(...)` only for things no helper covers — server-side defaults, computed columns, or a primary key with custom flags:
+The helpers are additive. For a custom column type — an `EncryptedType`, `PydanticType`, or any SQLAlchemy `TypeDecorator` — use `column(the_type, ...)`, which takes the same kwargs as the named helpers (see [Mutators / Casts](arvent-mutators.md)). Drop all the way down to `mapped_column(...)` only for things no helper covers — server-side defaults, computed columns, or a primary key with custom flags:
 
 ```python
 from datetime import datetime

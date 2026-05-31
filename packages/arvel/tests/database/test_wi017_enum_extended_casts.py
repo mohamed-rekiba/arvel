@@ -23,10 +23,9 @@ from types import SimpleNamespace
 from typing import Any, ClassVar, cast
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, column, id_
 from arvel.support.collections import Collection
 from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Status(Enum):
@@ -48,14 +47,12 @@ class _Article(Model):
         "tags": "collection",
         "scheduled_at": "datetime:%Y-%m-%d %H:%M",
     }
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    status: Mapped[Any] = mapped_column(String(40), default=None)
-    priority: Mapped[Any] = mapped_column(Integer, default=None)
-    meta: Mapped[Any] = mapped_column(String(255), default=None)
-    tags: Mapped[Any] = mapped_column(String(255), default=None)
-    scheduled_at: Mapped[Any] = mapped_column(String(40), default=None)
+    id: int = id_()
+    status: Any = column(String(40), nullable=True, default=None)
+    priority: Any = column(Integer, nullable=True, default=None)
+    meta: Any = column(String(255), nullable=True, default=None)
+    tags: Any = column(String(255), nullable=True, default=None)
+    scheduled_at: Any = column(String(40), nullable=True, default=None)
 
 
 def _raw(instance: Any, name: str) -> Any:

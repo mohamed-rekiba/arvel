@@ -12,13 +12,12 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from arvel.database import Model, Timestamps
+from arvel.database import Model, Timestamps, column, id_, integer, string
 
 # RED: arvel.database.orm.MorphOne / MorphMany do not exist yet
 from arvel.database.orm import MorphMany, MorphOne
-from sqlalchemy import Integer, String
+from sqlalchemy import String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 # ─── Schema ──────────────────────────────────────────────────────────────────
 
@@ -28,11 +27,11 @@ class MorphImage(Model, Timestamps):
 
     __tablename__ = "morph_images"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    id: int = id_()
+    url: str = string(2048)
     # discriminator columns — set by the descriptor, never manually
-    imageable_type: Mapped[str] = mapped_column(String(255), nullable=False)
-    imageable_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    imageable_type: str = string(255)
+    imageable_id: int = integer()
 
 
 class MorphComment(Model, Timestamps):
@@ -40,17 +39,17 @@ class MorphComment(Model, Timestamps):
 
     __tablename__ = "morph_comments"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(1000), nullable=False)
-    commentable_type: Mapped[str] = mapped_column(String(255), nullable=False)
-    commentable_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    id: int = id_()
+    body: str = string(1000)
+    commentable_type: str = string(255)
+    commentable_id: int = integer()
 
 
 class MorphPost(Model, Timestamps):
     __tablename__ = "morph_posts"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    title: str = string(200)
 
     image: ClassVar[MorphOne[MorphImage]] = MorphOne(MorphImage, name="imageable")
     comments: ClassVar[MorphMany[MorphComment]] = MorphMany(MorphComment, name="commentable")
@@ -61,8 +60,8 @@ class MorphVideo(Model, Timestamps):
 
     __tablename__ = "morph_videos"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    title: str = string(200)
 
     image: ClassVar[MorphOne[MorphImage]] = MorphOne(MorphImage, name="imageable")
 
@@ -72,8 +71,8 @@ class MorphArticle(Model, Timestamps):
 
     __tablename__ = "morph_articles"
 
-    slug: Mapped[str] = mapped_column(String(80), primary_key=True)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    slug: str = column(String(80), primary_key=True)
+    title: str = string(200)
 
     comments: ClassVar[MorphMany[MorphComment]] = MorphMany(MorphComment, name="commentable")
 

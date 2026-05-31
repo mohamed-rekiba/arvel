@@ -5,17 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import DatabaseSeeder, Factory, Model
-from sqlalchemy import Integer, String
+from arvel.database import DatabaseSeeder, Factory, Model, id_, integer, string
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Person(Model):
     __tablename__ = "people_f"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
-    age: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    id: int = id_()
+    name: str = string(80)
+    age: int = integer(default=0)
 
 
 class PersonFactory(Factory[Person]):

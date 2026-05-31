@@ -3,20 +3,18 @@
 from __future__ import annotations
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel_search import Search
 from arvel_search.searchable import Searchable
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 from support import Article
 
 
 class FakeDoc(Model, Searchable):
     __tablename__ = "fake_docs"
     __searchable__ = ("title",)
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(50), nullable=False)
+    id: int = id_()
+    title: str = string(50)
 
 
 class TestSearchFake:

@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime as _datetime
 
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped
-
-from arvel.database.columns import column, datetime, string, text
+from arvel.database.columns import field, text
 from arvel.database.model import Model, Timestamps
 
 
@@ -21,15 +18,15 @@ class DatabaseNotification(Model, Timestamps):
 
     __tablename__ = "notifications"
 
-    id: Mapped[str] = column(String(36), primary_key=True)
-    type: Mapped[str] = string(255)
-    notifiable_type: Mapped[str] = string(255)
-    notifiable_id: Mapped[str] = string(255)
-    data: Mapped[str] = text()
-    # ``DatabaseChannel.send()`` writes ``datetime.now(UTC)`` (timezone-aware),
-    # so the column must be timezone-aware. SQLite ignores the flag; Postgres /
-    # MySQL reject mixing aware and naive datetimes.
-    read_at: Mapped[_datetime | None] = datetime(nullable=True, default=None)
+    id: str = field(length=36, primary_key=True)
+    type: str
+    notifiable_type: str
+    notifiable_id: str
+    data: str = text()
+    # tz-aware: DatabaseChannel.send() writes datetime.now(UTC). SQLite ignores
+    # the flag; Postgres/MySQL reject mixing aware and naive datetimes. The
+    # datetime annotation maps to DateTime(timezone=True) via type_annotation_map.
+    read_at: _datetime | None = None
 
 
 __all__ = ["DatabaseNotification"]

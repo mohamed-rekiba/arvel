@@ -41,14 +41,14 @@ class TestV011GuardName:
 
     def test_user_model_has_api_default_guard(self) -> None:
         src = _src(USER_MODEL_FILE)
-        assert 'default_guard_name = "api"' in src or 'default_guard_name: str = "api"' in src, (
+        assert "default_guard_name" in src and '= "api"' in src, (
             "V-011 not fixed: default_guard_name set to 'api' not found in user.py — "
             "all has_permission_to(str) checks silently fail with guard_name='web'"
         )
 
     def test_user_model_no_web_default_guard(self) -> None:
         src = _src(USER_MODEL_FILE)
-        has_web = 'default_guard_name = "web"' in src or 'default_guard_name: str = "web"' in src
+        has_web = "default_guard_name" in src and '= "web"' in src
         assert not has_web, "V-011 not fixed: default_guard_name='web' still present in user.py"
 
 

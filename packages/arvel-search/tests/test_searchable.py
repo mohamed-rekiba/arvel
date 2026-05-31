@@ -5,13 +5,11 @@ from __future__ import annotations
 import warnings
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel_search import Search, SearchManager
 from arvel_search.dtos import SearchQuery
 from arvel_search.searchable import Searchable
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 from support import Article, make_config
 
 
@@ -23,8 +21,8 @@ class TestMixinDefaults:
         class Custom(Model, Searchable):
             __tablename__ = "customs"
             __search_index__ = "custom_index"
-            id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-            name: Mapped[str] = mapped_column(String(50), nullable=False)
+            id: int = id_()
+            name: str = string(50)
 
         assert Custom.search_index_name() == "custom_index"
 
@@ -46,9 +44,9 @@ class TestSensitiveFieldWarning:
             class Leaky(Model, Searchable):
                 __tablename__ = "leaky"
                 __searchable__ = ("title", "password")
-                id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-                title: Mapped[str] = mapped_column(String(50), nullable=False)
-                password: Mapped[str] = mapped_column(String(50), nullable=False)
+                id: int = id_()
+                title: str = string(50)
+                password: str = string(50)
 
         assert Leaky.search_index_name() == "leaky"
 
@@ -59,8 +57,8 @@ class TestSensitiveFieldWarning:
             class Clean(Model, Searchable):
                 __tablename__ = "clean"
                 __searchable__ = ("title",)
-                id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-                title: Mapped[str] = mapped_column(String(50), nullable=False)
+                id: int = id_()
+                title: str = string(50)
 
         assert Clean.searchable_columns() == ("title",)
 

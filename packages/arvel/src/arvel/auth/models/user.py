@@ -16,11 +16,8 @@ from datetime import UTC
 from datetime import datetime as _datetime
 from typing import ClassVar
 
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped
-
 from arvel.auth.mixins import Authenticatable, HasApiTokens
-from arvel.database.columns import column, datetime, string, text
+from arvel.database.columns import field, text
 from arvel.database.model import Model, SoftDeletes, Timestamps
 
 
@@ -61,16 +58,14 @@ class User(Model, Timestamps, SoftDeletes, Authenticatable, HasApiTokens):
     ]
     __hidden__: ClassVar[list[str] | None] = ["password", "remember_token"]
 
-    id: Mapped[str] = column(String(36), primary_key=True, init=False, default_factory=_new_id)
-    # Required columns (no default — must precede columns with defaults)
-    name: Mapped[str] = string(255)
-    email: Mapped[str] = string(254, unique=True, index=True)
-    password: Mapped[str] = string(255)
-    # Optional columns
-    email_verified_at: Mapped[_datetime | None] = datetime(nullable=True, default=None)
-    suspended_at: Mapped[_datetime | None] = datetime(nullable=True, default=None)
-    remember_token: Mapped[str | None] = string(100, nullable=True, default=None)
-    locale: Mapped[str | None] = text(nullable=True, default=None)
+    id: str = field(length=36, primary_key=True, init=False, default_factory=_new_id)
+    name: str
+    email: str = field(length=254, unique=True, index=True)
+    password: str
+    email_verified_at: _datetime | None = None
+    suspended_at: _datetime | None = None
+    remember_token: str | None = field(length=100, default=None)
+    locale: str | None = text(nullable=True, default=None)
 
     @property
     def is_verified(self) -> bool:

@@ -7,23 +7,21 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from arvel.database import ReadOnlyModelError, ViewModel
+from arvel.database import ReadOnlyModelError, ViewModel, id_
 from arvel.database.query import QueryBuilder
-from sqlalchemy import Integer
-from sqlalchemy.orm import Mapped, mapped_column
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
 
 class ArticleStats(ViewModel):
     __tablename__ = "v_article_stats"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
+    id: int = id_()
 
 
 class ArticleStatsMat(ViewModel):
     __tablename__ = "mv_article_stats"
     __is_materialized_view__ = True
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
+    id: int = id_()
 
 
 # ── class-level flags ─────────────────────────────────────────────────────────

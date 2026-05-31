@@ -25,37 +25,30 @@ from datetime import UTC, date, datetime, timezone
 from typing import Any, ClassVar
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, column, id_
 from arvel.database.exceptions import CastError, ORMError
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String
 
 
 class _DatetimeModel(Model):
     __tablename__ = "wi063_datetime"
     __casts__: ClassVar[dict[str, str]] = {"field": "datetime"}
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    field: Mapped[Any] = mapped_column(String(80), default=None)
+    id: int = id_()
+    field: Any = column(String(80), default=None)
 
 
 class _DateModel(Model):
     __tablename__ = "wi063_date"
     __casts__: ClassVar[dict[str, str]] = {"field": "date"}
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    field: Mapped[Any] = mapped_column(String(80), default=None)
+    id: int = id_()
+    field: Any = column(String(80), default=None)
 
 
 class _TimestampModel(Model):
     __tablename__ = "wi063_timestamp"
     __casts__: ClassVar[dict[str, str]] = {"field": "timestamp"}
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    field: Mapped[Any] = mapped_column(String(80), default=None)
+    id: int = id_()
+    field: Any = column(String(80), default=None)
 
 
 def _build(model_cls: type[Model], value: object) -> Any:

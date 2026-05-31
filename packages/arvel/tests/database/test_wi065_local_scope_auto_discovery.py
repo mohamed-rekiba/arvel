@@ -17,31 +17,29 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model, QueryBuilder
-from sqlalchemy import Integer, String
+from arvel.database import Model, QueryBuilder, id_, string
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class _Post(Model):
     __tablename__ = "posts_wi065"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(80), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
-    category: Mapped[str] = mapped_column(String(20), nullable=False, default="general")
+    id: int = id_()
+    title: str = string(80)
+    status: str = string(20, default="draft")
+    category: str = string(20, default="general")
 
     def scope_active(self, query: QueryBuilder[_Post]) -> QueryBuilder[_Post]:
-        return query.where(_Post.status == "active")
+        return query.where(_Post.__table__.c.status == "active")
 
     def scope_published(self, query: QueryBuilder[_Post]) -> QueryBuilder[_Post]:
-        return query.where(_Post.status != "draft")
+        return query.where(_Post.__table__.c.status != "draft")
 
     def scope_in_category(
         self,
         query: QueryBuilder[_Post],
         category: str,
     ) -> QueryBuilder[_Post]:
-        return query.where(_Post.category == category)
+        return query.where(_Post.__table__.c.category == category)
 
 
 async def _setup(engine: Any) -> None:
@@ -123,11 +121,11 @@ class TestDiscoveryRules:
 
         class _OtherPost(Model):
             __tablename__ = "posts_wi065_other"
-            id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-            status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+            id: int = id_()
+            status: str = string(20, default="draft")
 
             def active(self, query: QueryBuilder[_OtherPost]) -> QueryBuilder[_OtherPost]:
-                return query.where(_OtherPost.status == "active")
+                return query.where(_OtherPost.__table__.c.status == "active")
 
         await _setup(engine)
         # Class-level: no discovery, instance method shadows nothing usable here
@@ -156,8 +154,8 @@ class TestScopeSelfShape:
 
         class _Tagged(Model):
             __tablename__ = "posts_wi065_tagged"
-            id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-            status: Mapped[str] = mapped_column(String(20), nullable=False, default="x")
+            id: int = id_()
+            status: str = string(20, default="x")
 
             def scope_anything(self, query: QueryBuilder[_Tagged]) -> QueryBuilder[_Tagged]:
                 captured.append(self)

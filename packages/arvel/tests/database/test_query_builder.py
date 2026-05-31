@@ -5,17 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model, QueryBuilder
-from sqlalchemy import Integer, String
+from arvel.database import Model, QueryBuilder, id_, integer, string
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class WidgetB(Model):
     __tablename__ = "widgets_b"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
-    qty: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    id: int = id_()
+    name: str = string(80)
+    qty: int = integer(default=0)
 
 
 async def _create_tables(engine: Any) -> None:
@@ -134,7 +132,7 @@ async def test_to_sql_includes_where_clause(engine: Any, session: AsyncSession) 
 async def test_to_sql_includes_order_by(engine: Any, session: AsyncSession) -> None:
     """to_sql() includes ORDER BY clause."""
     await _create_tables(engine)
-    sql = WidgetB.order_by(WidgetB.qty.desc()).to_sql()
+    sql = WidgetB.order_by(WidgetB.__table__.c.qty.desc()).to_sql()
     lower = sql.lower()
     assert "order" in lower and "by" in lower and "qty" in lower
 

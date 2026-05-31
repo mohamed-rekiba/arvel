@@ -12,12 +12,11 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.database.orm import MorphedByMany, MorphToMany
 from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 wi029_taggables = Table(
     "wi029_taggables",
@@ -30,8 +29,8 @@ wi029_taggables = Table(
 
 class Wi029Tag(Model):
     __tablename__ = "wi029_tags"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    name: str = string(80)
 
     posts: ClassVar[MorphedByMany[Wi029Post]] = MorphedByMany(
         lambda: Wi029Post, table=wi029_taggables, name="taggable", related_key="tag_id"
@@ -43,8 +42,8 @@ class Wi029Tag(Model):
 
 class Wi029Post(Model):
     __tablename__ = "wi029_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    title: str = string(80)
 
     tags: ClassVar[MorphToMany[Wi029Tag]] = MorphToMany(
         Wi029Tag, table=wi029_taggables, name="taggable", related_key="tag_id"
@@ -53,8 +52,8 @@ class Wi029Post(Model):
 
 class Wi029Video(Model):
     __tablename__ = "wi029_videos"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    title: str = string(80)
 
     tags: ClassVar[MorphToMany[Wi029Tag]] = MorphToMany(
         Wi029Tag, table=wi029_taggables, name="taggable", related_key="tag_id"
@@ -179,5 +178,10 @@ class TestInverseRelationQueries:
         await tag.posts.attach(p1.id)
         await tag.posts.attach(p2.id)
 
-        tags = await Wi029Tag.query().with_count("posts").where(Wi029Tag.id == tag.id).get()
+        tags = (
+            await Wi029Tag.query()
+            .with_count("posts")
+            .where(Wi029Tag.__table__.c.id == tag.id)
+            .get()
+        )
         assert tags[0].posts_count == 2
