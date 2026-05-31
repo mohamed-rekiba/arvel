@@ -68,7 +68,7 @@ if TYPE_CHECKING:
     from arvel.database.orm.has_one_of_many import HasOneOfManyLink
     from arvel.database.orm.morph import MorphChildLink
     from arvel.database.orm.morph_to_many import MorphedByManyLink, MorphToManyLink
-    from arvel.database.orm.relations import FkMethodLink
+    from arvel.database.orm.relations import FkMethodLink, RecursiveLink
     from arvel.database.query_mixin import QueryMixin
 
 T = TypeVar("T", bound="QueryMixin")
@@ -245,6 +245,7 @@ class _RelationTarget:
     morph_child_link: MorphChildLink | None = None
     one_of_many_link: HasOneOfManyLink | None = None
     fk_method_link: FkMethodLink | None = None
+    recursive_link: RecursiveLink | None = None
 
 
 def _resolve_morph_descriptor(model: type[Any], descriptor: Any) -> _RelationTarget | None:
@@ -296,6 +297,19 @@ def _fk_method_link_for(model: type[Any], name: str) -> FkMethodLink:
     raise UnknownRelationError(model.__name__, name)
 
 
+def _recursive_link_for(model: type[Any], name: str) -> RecursiveLink:
+    """Introspect a recursive relation accessor (``descendants``/``ancestors``)."""
+    from sqlalchemy.orm.instrumentation import manager_of_class
+
+    from arvel.database.orm.relations import Ancestors, Descendants
+
+    probe = manager_of_class(model).new_instance()
+    rel = getattr(probe, name)()
+    if isinstance(rel, (Descendants, Ancestors)):
+        return rel.link_spec(name)
+    raise UnknownRelationError(model.__name__, name)
+
+
 def _resolve_relation(model: type[Any], name: str | Any) -> _RelationTarget:
     if not isinstance(name, str):
         # Accept InstrumentedAttribute / QueryableAttribute — extract the key.
@@ -308,6 +322,8 @@ def _resolve_relation(model: type[Any], name: str | Any) -> _RelationTarget:
         return target
     if name in getattr(model, "__arvel_fk_relations__", _NO_FK_RELATIONS):
         return _RelationTarget(kind="fk_method", fk_method_link=_fk_method_link_for(model, name))
+    if name in getattr(model, "__arvel_recursive_relations__", _NO_FK_RELATIONS):
+        return _RelationTarget(kind="recursive", recursive_link=_recursive_link_for(model, name))
     raise UnknownRelationError(model.__name__, name)
 
 
@@ -386,6 +402,14 @@ def _relation_exists_select(
             raise UnknownRelationError(model.__name__, "?")
         related_col, owner_col = _fk_method_join_cols(model, link)
         return link.related_model, select(link.related_model).where(related_col == owner_col)
+    if target.kind == "recursive":
+        rlink = target.recursive_link
+        rel_name = rlink.name if rlink is not None else "?"
+        raise TypeError(
+            f"{model.__name__}.{rel_name} is a recursive relation; where_has/with_count "
+            "over a recursive CTE aren't supported. Use with_tree() to eager-load it, or "
+            "filter the walk with a constraint."
+        )
     if target.kind == "morph_child":
         clink = target.morph_child_link
         if clink is None:
@@ -443,6 +467,8 @@ def validate_relation_head(model: type[Any], relation_path: str) -> None:
     if head in {r.key for r in mapper.relationships}:
         return
     if head in getattr(model, "__arvel_fk_relations__", _NO_FK_RELATIONS):
+        return
+    if head in getattr(model, "__arvel_recursive_relations__", _NO_FK_RELATIONS):
         return
     raise UnknownRelationError(model.__name__, head)
 
@@ -754,6 +780,15 @@ class _AsyncEagerSpec:
     constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None
 
 
+@dataclass(frozen=True)
+class _TreeEagerSpec:
+    """A pending batched eager-load for a recursive (descendants/ancestors) relation."""
+
+    name: str
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None
+    max_depth: int | None
+
+
 # whereHasMorph's closure gets the concrete type so it can branch per polymorphic target.
 _MorphConstraint = Callable[["QueryBuilder[Any]", type[Any]], "QueryBuilder[Any]"]
 
@@ -1063,6 +1098,111 @@ async def _load_fk_method_path(
     await _load_async_relation_path(link.related_model, related, tail, constraint)
 
 
+def _self_ref_children_relation(model: type[Any], parent_key: str) -> str | None:
+    """Name of the self-referential one-to-many relation keyed on ``parent_key``.
+
+    A model declares the tree edge once as ``children: Mapped[list[Self]] =
+    relationship(...)``. ``with_tree`` finds it here so it can hydrate each node's
+    direct children in memory — then you walk ``node.children`` synchronously with
+    no extra query. Returns None when no such relation is declared.
+    """
+    for rel in _mapper_of(model).relationships:
+        if not rel.uselist or rel.mapper.class_ is not model:
+            continue
+        pairs = rel.local_remote_pairs or ()
+        if any(remote.key == parent_key for _, remote in pairs):
+            return rel.key
+    return None
+
+
+async def _load_recursive_tree(model: type[Any], parents: list[Any], spec: _TreeEagerSpec) -> None:
+    """Eager-load a recursive relation for every parent in one adjacency CTE.
+
+    Seeds the CTE with all parent keys, then fans each row back to its parent via
+    the ``_root_id`` the CTE carries. Each parent's cached slice is its flat
+    subtree (descendants) or ancestor chain — ``.get()``/``.as_tree()`` serve it
+    without re-querying.
+
+    For ``descendants``, when the model declares a self-referential ``children``
+    relation, every loaded node's direct children are hydrated in place so the
+    result is a navigable tree: ``root.children[i].children`` walks the whole
+    subtree as plain models, no ``as_tree()`` and no further queries.
+    """
+    from arvel.database.orm.relations import build_adjacency_cte
+
+    link = _recursive_link_for(model, spec.name)
+    related_cls = link.related_model
+
+    # Default every parent to an empty slice so a childless node caches as loaded.
+    for parent in parents:
+        set_eager_relation(parent, spec.name, [])
+
+    roots = {getattr(p, link.id_key) for p in parents}
+    distinct = [r for r in roots if r is not None]
+    if not distinct:
+        return
+
+    sub_qb: QueryBuilder[Any] = QueryBuilder(related_cls, select(related_cls))
+    if spec.constraint is not None:
+        sub_qb = spec.constraint(sub_qb)
+    base_where = sub_qb.apply_global_scopes().whereclause
+    max_depth = spec.max_depth if spec.max_depth is not None else link.max_depth
+
+    full_cte = build_adjacency_cte(
+        related_cls,
+        id_key=link.id_key,
+        parent_key=link.parent_key,
+        direction=link.direction,
+        roots=distinct,
+        max_depth=max_depth,
+        base_where=base_where,
+    )
+    id_attr = getattr(related_cls, link.id_key)
+    stmt = (
+        select(related_cls, full_cte.c._root_id)
+        .join(full_cte, id_attr == full_cte.c._node_id)
+        .order_by(full_cte.c._tree_depth)
+    )
+    result = await get_active_session().execute(stmt)
+
+    grouped: dict[Any, list[Any]] = {}
+    all_nodes: list[Any] = []
+    for row in result.all():
+        grouped.setdefault(row[1], []).append(row[0])
+        all_nodes.append(row[0])
+    by_pk = {getattr(p, link.id_key): p for p in parents}
+    for root_id, kids in grouped.items():
+        parent = by_pk.get(root_id)
+        if parent is not None:
+            set_eager_relation(parent, spec.name, kids)
+
+    if link.direction == "descendants":
+        _hydrate_children_graph(related_cls, parents, all_nodes, link)
+
+
+def _hydrate_children_graph(
+    model: type[Any], parents: list[Any], nodes: list[Any], link: RecursiveLink
+) -> None:
+    """Attach each node's direct children in memory for synchronous tree walking.
+
+    No-op when the model has no self-referential ``children`` relation — flat
+    ``.get()`` / ``.as_tree()`` still serve from the per-owner cache.
+    """
+    children_rel = _self_ref_children_relation(model, link.parent_key)
+    if children_rel is None:
+        return
+    by_parent: dict[Any, list[Any]] = {}
+    for node in nodes:
+        by_parent.setdefault(getattr(node, link.parent_key), []).append(node)
+    # Seed parents plus every loaded node get a committed children collection;
+    # depth-capped or pruned branches surface as an empty list, not a lazy load.
+    seen: dict[Any, Any] = {getattr(p, link.id_key): p for p in parents}
+    for node in nodes:
+        seen[getattr(node, link.id_key)] = node
+    for pk, node in seen.items():
+        set_committed_value(node, children_rel, by_parent.get(pk, []))
+
+
 async def _load_async_relation_path(
     model: type[Any],
     parents: list[Any],
@@ -1252,6 +1392,8 @@ class QueryBuilder(Generic[T]):
         self._select_columns: list[Any] | None = None
         self._raw_select_expr: str | None = None  # for select_raw()
         self._async_eager: list[_AsyncEagerSpec] = []
+        # Recursive (descendants/ancestors) eager loads, run after the main query.
+        self._tree_eager: list[_TreeEagerSpec] = []
         # Sync (selectinload) eager loads, applied in apply_global_scopes so without()/
         # with_only() can drop or replace them before the SELECT is built.
         self._eager_loads: list[_AsyncEagerSpec] = []
@@ -1319,6 +1461,7 @@ class QueryBuilder(Generic[T]):
         new._select_columns = list(self._select_columns) if self._select_columns else None
         new._raw_select_expr = self._raw_select_expr
         new._async_eager = list(self._async_eager)
+        new._tree_eager = list(self._tree_eager)
         new._eager_loads = list(self._eager_loads)
         new._chaperone_request = self._chaperone_request
         new._chaperones = list(self._chaperones)
@@ -1872,6 +2015,7 @@ class QueryBuilder(Generic[T]):
         clone = self._clone()
         clone._eager_loads = []
         clone._async_eager = []
+        clone._tree_eager = []
         clone._chaperones = []
         clone._register_eager(relations)
         return clone
@@ -1882,7 +2026,27 @@ class QueryBuilder(Generic[T]):
         clone = self._clone()
         clone._eager_loads = [s for s in clone._eager_loads if s.path not in drop]
         clone._async_eager = [s for s in clone._async_eager if s.path not in drop]
+        clone._tree_eager = [s for s in clone._tree_eager if s.name not in drop]
         clone._chaperones = [c for c in clone._chaperones if c.head not in drop]
+        return clone
+
+    def with_tree(
+        self,
+        relation: str,
+        *,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+        max_depth: int | None = None,
+    ) -> Self:
+        """Eager-load a recursive (``descendants``/``ancestors``) relation in one query.
+
+        ``constraint`` filters the walk at every level (e.g. only visible nodes);
+        ``max_depth`` caps the number of hops. After loading, each parent's
+        ``.descendants().get()`` / ``.as_tree()`` serve from cache without re-querying.
+        """
+        if relation not in getattr(self._model, "__arvel_recursive_relations__", _NO_FK_RELATIONS):
+            raise UnknownRelationError(self._model.__name__, relation)
+        clone = self._clone()
+        clone._tree_eager.append(_TreeEagerSpec(relation, constraint, max_depth))
         return clone
 
     def _register_eager(
@@ -1890,10 +2054,13 @@ class QueryBuilder(Generic[T]):
         relations: Sequence[str | Mapping[str, Callable[[QueryBuilder[Any]], QueryBuilder[Any]]]],
     ) -> None:
         """Record eager-load requests onto this builder (mutates in place)."""
+        recursive = getattr(self._model, "__arvel_recursive_relations__", _NO_FK_RELATIONS)
         for item in relations:
             if isinstance(item, Mapping):
                 for path, callback in item.items():
-                    if _is_async_relation(self._model, path):
+                    if path.partition(".")[0] in recursive:
+                        self._tree_eager.append(_TreeEagerSpec(path, callback, None))
+                    elif _is_async_relation(self._model, path):
                         self._async_eager.append(_AsyncEagerSpec(path, callback))
                     else:
                         validate_relation_head(self._model, path)
@@ -1902,7 +2069,9 @@ class QueryBuilder(Generic[T]):
                     if chap is not None:
                         self._chaperones.append(chap)
             elif type(item) is str:
-                if _is_async_relation(self._model, item):
+                if item.partition(".")[0] in recursive:
+                    self._tree_eager.append(_TreeEagerSpec(item, None, None))
+                elif _is_async_relation(self._model, item):
                     self._async_eager.append(_AsyncEagerSpec(item, None))
                 else:
                     validate_relation_head(self._model, item)
@@ -1963,6 +2132,9 @@ class QueryBuilder(Generic[T]):
         if self._async_eager and parents:
             for spec in self._async_eager:
                 await _load_async_relation_path(self._model, parents, spec.path, spec.constraint)
+        if self._tree_eager and parents:
+            for tree_spec in self._tree_eager:
+                await _load_recursive_tree(self._model, parents, tree_spec)
         if self._chaperones and parents:
             _apply_chaperones(self._chaperones, parents)
 
@@ -3566,50 +3738,14 @@ class RecursiveQueryBuilder(QueryBuilder[T]):
         return Collection(rows)
 
     async def as_tree(self) -> list[TreeNode[T]]:
-        from arvel.database.tree import TreeNode
+        from arvel.database.tree import assemble_forest
 
-        full_cte, has_depth = self._build_id_depth_cte()
+        full_cte, _ = self._build_id_depth_cte()
         id_attr = _resolve_column(self._model, self._id_key)
-
-        if has_depth:
-            stmt = (
-                select(self._model, full_cte.c._tree_depth)
-                .join(full_cte, id_attr == full_cte.c[self._id_key])
-                .order_by(full_cte.c._tree_depth)
-            )
-        else:
-            stmt = select(self._model, func.literal(0).label("_tree_depth")).join(
-                full_cte, id_attr == full_cte.c[self._id_key]
-            )
-
-        session = get_active_session()
-        result = await session.execute(stmt)
-        rows = result.all()
-
-        id_key = self._id_key
-        parent_key = self._parent_key
-
-        nodes: dict[Any, TreeNode[T]] = {}
-        ordered_pks: list[Any] = []
-
-        for row in rows:
-            obj = cast("T", row[0])
-            depth = int(row[1])
-            pk = getattr(obj, id_key)
-            nodes[pk] = TreeNode(node=obj, depth=depth, children=[])
-            ordered_pks.append(pk)
-
-        roots: list[TreeNode[T]] = []
-        for pk in ordered_pks:
-            node = nodes[pk]
-            obj = node.node
-            parent_pk = getattr(obj, parent_key, None)
-            if parent_pk is None or parent_pk not in nodes:
-                roots.append(node)
-            else:
-                nodes[parent_pk].children.append(node)
-
-        return roots
+        stmt = select(self._model).join(full_cte, id_attr == full_cte.c[self._id_key])
+        result = await get_active_session().execute(stmt)
+        rows = list(result.scalars().all())
+        return assemble_forest(rows, id_key=self._id_key, parent_key=self._parent_key)
 
 
 from arvel.database.tree import TreeNode  # noqa: E402

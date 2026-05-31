@@ -58,7 +58,9 @@ from arvel.database.model import (
     ViewModel,
 )
 from arvel.database.orm import (
+    Ancestors,
     BelongsTo,
+    Descendants,
     HasMany,
     HasOne,
     Mapped,
@@ -82,11 +84,13 @@ from arvel.database.query import CursorPaginator, QueryBuilder, SimplePaginator
 from arvel.database.schema import Blueprint, ForeignKeyAction, IdType, Schema
 from arvel.database.scope import GlobalScope, SoftDeleteScope, scope
 from arvel.database.seeders import DatabaseSeeder, Seeder
+from arvel.database.tree import TreeNode
 from arvel.support.collections import Collection
 
 __all__ = [
     "DB",
     "ActiveRecord",
+    "Ancestors",
     "Attribute",
     "BelongsTo",
     "Blueprint",
@@ -96,6 +100,7 @@ __all__ = [
     "DatabaseConnectionError",
     "DatabaseSeeder",
     "DecryptionError",
+    "Descendants",
     "DomainService",
     "EncryptedType",
     "EnumType",
@@ -139,6 +144,7 @@ __all__ = [
     "TableQueryBuilder",
     "Timestamps",
     "TranslatableMixin",
+    "TreeNode",
     "UnknownRelationError",
     "ViewModel",
     "accessor",
