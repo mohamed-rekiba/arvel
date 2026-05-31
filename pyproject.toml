@@ -16,7 +16,7 @@ members = ["packages/*"]
 arvel = { workspace = true }
 arvel-permission = { workspace = true }
 arvel-image = { workspace = true }
-arvel-auth-social = { workspace = true }
+arvel-oauth = { workspace = true }
 arvel-search = { workspace = true }
 arvel-audit = { workspace = true }
 
@@ -25,7 +25,7 @@ dev = [
     "arvel[all]",
     "arvel-permission",
     "arvel-image",
-    "arvel-auth-social",
+    "arvel-oauth",
     "arvel-search",
     "arvel-audit",
     "bandit>=1.9.4",
@@ -125,13 +125,13 @@ ignore = [
 "packages/arvel-permission/src/arvel_permission/models.py" = [
     "ARG002", # TypeDecorator.process_*_param must keep SQLAlchemy's `dialect` name
 ]
-"packages/arvel-auth-social/src/arvel_auth_social/exceptions.py" = [
-    "N818",    # SocialProviderNotFound / InvalidOAuthState / DuplicateSocialAccount are public API names
+"packages/arvel-oauth/src/arvel_oauth/exceptions.py" = [
+    "N818",    # ProviderNotFound / InvalidOAuthState / DuplicateOAuthAccount are public API names
 ]
-"packages/arvel-auth-social/src/arvel_auth_social/models.py" = [
+"packages/arvel-oauth/src/arvel_oauth/models.py" = [
     "ARG002", # TypeDecorator.process_*_param must keep SQLAlchemy's `dialect` name
 ]
-"packages/arvel-auth-social/src/arvel_auth_social/providers/**" = [
+"packages/arvel-oauth/src/arvel_oauth/providers/**" = [
     "PLR0913", # OAuth provider constructors carry the full credential + endpoint param set
 ]
 "packages/arvel-search/src/arvel_search/exceptions.py" = [
@@ -348,7 +348,7 @@ disallow_any_explicit = false
 explicit_package_bases = true
 namespace_packages = true
 plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
-mypy_path = "packages/arvel/src:packages/arvel-permission/src:packages/arvel-image/src:packages/arvel-auth-social/src:packages/arvel-auth-social:packages/arvel-search/src:packages/arvel-audit/src"
+mypy_path = "packages/arvel/src:packages/arvel-permission/src:packages/arvel-image/src:packages/arvel-oauth/src:packages/arvel-oauth:packages/arvel-search/src:packages/arvel-audit/src"
 files = [
     "packages/arvel/src",
     "packages/arvel/tests",
@@ -356,8 +356,8 @@ files = [
     "packages/arvel-permission/tests",
     "packages/arvel-image/src",
     "packages/arvel-image/tests",
-    "packages/arvel-auth-social/src",
-    "packages/arvel-auth-social/tests",
+    "packages/arvel-oauth/src",
+    "packages/arvel-oauth/tests",
     "packages/arvel-audit/src",
     "packages/arvel-search/src",
     # arvel-search and arvel-audit tests are namespace dirs under hyphenated
@@ -437,8 +437,8 @@ include = [
     "packages/arvel-permission/tests",
     "packages/arvel-image/src",
     "packages/arvel-image/tests",
-    "packages/arvel-auth-social/src",
-    "packages/arvel-auth-social/tests",
+    "packages/arvel-oauth/src",
+    "packages/arvel-oauth/tests",
     "packages/arvel-audit/src",
     "packages/arvel-audit/tests",
     "packages/arvel-search/src",
@@ -460,7 +460,7 @@ extraPaths = [
     "packages/arvel/src",
     "packages/arvel-permission/src",
     "packages/arvel-image/src",
-    "packages/arvel-auth-social/src",
+    "packages/arvel-oauth/src",
     "packages/arvel-audit/src",
     "packages/arvel-search/src",
     "packages/arvel-search/tests",
@@ -492,7 +492,7 @@ testpaths = [
     "packages/arvel/tests",
     "packages/arvel-permission/tests",
     "packages/arvel-image/tests",
-    "packages/arvel-auth-social/tests",
+    "packages/arvel-oauth/tests",
     "packages/arvel-audit/tests",
     "packages/arvel-search/tests",
 ]

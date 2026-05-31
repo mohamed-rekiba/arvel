@@ -753,7 +753,7 @@ work_items:
       Gates: arvel database 1001 passed (+7); mypy/pyright/ruff clean. 006-S8 DONE.
 
   - id: "WI-arvel-038"
-    name: "arvel-auth-social — OAuth2/OIDC social login package (backlog 002, all stories)"
+    name: "arvel-oauth — OAuth2/OIDC social login package (backlog 002, all stories)"
     complexity: "L3"
     risk_tier: 3
     data_classification: "confidential"
@@ -767,14 +767,14 @@ work_items:
     has_frontend: false
     state_file: null
     notes: >
-      New arvel-auth-social workspace package. Providers (Google/GitHub/Microsoft/Apple/generic OIDC)
+      New arvel-oauth workspace package. Providers (Google/GitHub/Microsoft/Apple/generic OIDC)
       over a shared OAuthProvider base with injectable httpx client. PKCE on by default
       (secrets.token_urlsafe(96), S256-only); CSRF state in HttpOnly SameSite=Lax cookie verified
-      server-side. OIDC auto-discovery with HTTPS-only guard (SOCIAL_ALLOW_HTTP_ISSUER dev opt-out).
-      SocialAccount model stores tokens via EncryptedJson (AES-256-GCM from APP_KEY, lazy key resolve);
-      UNIQUE(provider, provider_id), provider_id verbatim. SocialAccountLinker: verified-email linking,
-      unverified placeholder email, DuplicateSocialAccount guard. AuthService.issue_for() mints a token
-      pair for an already-authenticated identity. auth:social:install publishes the migration. Stage 4b
+      server-side. OIDC auto-discovery with HTTPS-only guard (OAUTH_ALLOW_HTTP_ISSUER dev opt-out).
+      OAuthAccount model stores tokens via EncryptedJson (AES-256-GCM from APP_KEY, lazy key resolve);
+      UNIQUE(provider, provider_id), provider_id verbatim. OAuthAccountLinker: verified-email linking,
+      unverified placeholder email, DuplicateOAuthAccount guard. AuthService.issue_for() mints a token
+      pair for an already-authenticated identity. oauth:install publishes the migration. Stage 4b
       security covered inline (PKCE, encrypted tokens, HTTPS-only discovery, state CSRF). Gates: 34
       package tests pass; mypy/pyright/ruff/bandit clean. 002 S1–S5 DONE — epic 002 complete.
 

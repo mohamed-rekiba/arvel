@@ -10,9 +10,9 @@ resolution-markers = [
 members = [
     "arvel",
     "arvel-audit",
-    "arvel-auth-social",
     "arvel-ecommerce-demo",
     "arvel-image",
+    "arvel-oauth",
     "arvel-permission",
     "arvel-search",
     "arvel-workspace",
@@ -353,8 +353,8 @@ all = [
     { name = "aiosmtplib" },
     { name = "aiosqlite" },
     { name = "arvel-audit" },
-    { name = "arvel-auth-social" },
     { name = "arvel-image" },
+    { name = "arvel-oauth" },
     { name = "arvel-permission" },
     { name = "arvel-search" },
     { name = "asyncpg" },
@@ -380,9 +380,6 @@ all = [
 ]
 audit = [
     { name = "arvel-audit" },
-]
-auth-social = [
-    { name = "arvel-auth-social" },
 ]
 azure = [
     { name = "azure-storage-blob" },
@@ -415,6 +412,9 @@ mail = [
 mysql = [
     { name = "aiomysql" },
     { name = "pymysql" },
+]
+oauth = [
+    { name = "arvel-oauth" },
 ]
 openapi = [
     { name = "openapi-spec-validator" },
@@ -461,10 +461,10 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.18.4" },
     { name = "anyio", specifier = ">=4.13.0" },
     { name = "argon2-cffi", specifier = ">=25.1.0" },
-    { name = "arvel", extras = ["bcrypt", "redis", "postgres", "mysql", "sqlite", "queue", "queue-redis", "queue-amqp", "mail", "s3", "gcs", "azure", "jwt", "broadcasting", "shell", "permission", "image", "auth-social", "search", "audit", "openapi", "dev"], marker = "extra == 'all'", editable = "packages/arvel" },
+    { name = "arvel", extras = ["bcrypt", "redis", "postgres", "mysql", "sqlite", "queue", "queue-redis", "queue-amqp", "mail", "s3", "gcs", "azure", "jwt", "broadcasting", "shell", "permission", "image", "oauth", "search", "audit", "openapi", "dev"], marker = "extra == 'all'", editable = "packages/arvel" },
     { name = "arvel-audit", marker = "extra == 'audit'", editable = "packages/arvel-audit" },
-    { name = "arvel-auth-social", marker = "extra == 'auth-social'", editable = "packages/arvel-auth-social" },
     { name = "arvel-image", marker = "extra == 'image'", editable = "packages/arvel-image" },
+    { name = "arvel-oauth", marker = "extra == 'oauth'", editable = "packages/arvel-oauth" },
     { name = "arvel-permission", marker = "extra == 'permission'", editable = "packages/arvel-permission" },
     { name = "arvel-search", marker = "extra == 'search'", editable = "packages/arvel-search" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31.0" },
@@ -512,7 +512,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.47.0" },
     { name = "websockets", marker = "extra == 'broadcasting'", specifier = ">=16.0" },
 ]
-provides-extras = ["bcrypt", "redis", "postgres", "mysql", "sqlite", "queue", "queue-redis", "queue-amqp", "mail", "s3", "gcs", "azure", "jwt", "broadcasting", "shell", "openapi", "permission", "image", "auth-social", "search", "audit", "dev", "all"]
+provides-extras = ["bcrypt", "redis", "postgres", "mysql", "sqlite", "queue", "queue-redis", "queue-amqp", "mail", "s3", "gcs", "azure", "jwt", "broadcasting", "shell", "openapi", "permission", "image", "oauth", "search", "audit", "dev", "all"]
 
 [[package]]
 name = "arvel-audit"
@@ -530,29 +530,6 @@ requires-dist = [
     { name = "arvel", editable = "packages/arvel" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pydantic-settings", specifier = ">=2.14.1" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.49" },
-]
-
-[[package]]
-name = "arvel-auth-social"
-version = "0.4.0"
-source = { editable = "packages/arvel-auth-social" }
-dependencies = [
-    { name = "arvel" },
-    { name = "httpx" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pyjwt", extra = ["crypto"] },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "arvel", editable = "packages/arvel" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "pydantic", specifier = ">=2.13.4" },
-    { name = "pydantic-settings", specifier = ">=2.14.1" },
-    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.49" },
 ]
 
@@ -616,6 +593,29 @@ requires-dist = [
 provides-extras = ["heif"]
 
 [[package]]
+name = "arvel-oauth"
+version = "0.4.0"
+source = { editable = "packages/arvel-oauth" }
+dependencies = [
+    { name = "arvel" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "arvel", editable = "packages/arvel" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "pydantic-settings", specifier = ">=2.14.1" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13.0" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.49" },
+]
+
+[[package]]
 name = "arvel-permission"
 version = "0.3.0"
 source = { editable = "packages/arvel-permission" }
@@ -663,8 +663,8 @@ dev = [
     { name = "aiosqlite" },
     { name = "arvel", extra = ["all"] },
     { name = "arvel-audit" },
-    { name = "arvel-auth-social" },
     { name = "arvel-image" },
+    { name = "arvel-oauth" },
     { name = "arvel-permission" },
     { name = "arvel-search" },
     { name = "bandit" },
@@ -693,8 +693,8 @@ dev = [
     { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "arvel", extras = ["all"], editable = "packages/arvel" },
     { name = "arvel-audit", editable = "packages/arvel-audit" },
-    { name = "arvel-auth-social", editable = "packages/arvel-auth-social" },
     { name = "arvel-image", editable = "packages/arvel-image" },
+    { name = "arvel-oauth", editable = "packages/arvel-oauth" },
     { name = "arvel-permission", editable = "packages/arvel-permission" },
     { name = "arvel-search", editable = "packages/arvel-search" },
     { name = "bandit", specifier = ">=1.9.4" },
