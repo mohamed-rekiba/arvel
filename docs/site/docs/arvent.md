@@ -75,17 +75,29 @@ It accepts `default` / `default_factory`, `primary_key`, `unique`, `index`, `nul
 
 ### Typed column helpers
 
-| Helper | SQL type | Equivalent `mapped_column(...)` |
+Every helper takes keyword-only options. Omitting `default` makes the column a **required** keyword argument in the generated `__init__`; pass `default=None` (or any value) to make it optional. The `init` flag controls whether the column appears in `__init__` at all.
+
+| Helper | SQL type | Notes |
 |---|---|---|
-| `id_(*, autoincrement=True)` | `INTEGER PRIMARY KEY` | `mapped_column(Integer, primary_key=True, autoincrement=...)` |
-| `string(length=255, *, nullable=False, unique=False, index=False, default=None)` | `VARCHAR(length)` | `mapped_column(String(length), ...)` |
-| `text(*, nullable=False, default=None)` | `TEXT` | `mapped_column(Text, ...)` |
-| `integer(*, nullable=False, default=None, index=False)` | `INTEGER` | `mapped_column(Integer, ...)` |
-| `big_integer(*, nullable=False, default=None, index=False)` | `BIGINT` | `mapped_column(BigInteger, ...)` |
-| `boolean(*, nullable=False, default=None)` | `BOOLEAN` | `mapped_column(Boolean, ...)` |
-| `datetime(*, nullable=False, default=None, index=False)` | `TIMESTAMP` | `mapped_column(DateTime, ...)` |
-| `json(*, nullable=False, default=None)` | `JSON` / `JSONB` | `mapped_column(JSON, ...)` |
-| `foreign_id(references, *, on="id", nullable=False, index=True, ondelete=None)` | `INTEGER REFERENCES …` | `mapped_column(ForeignKey(...), ...)` |
+| `id_(*, autoincrement=True, init=False)` | `INTEGER PRIMARY KEY` | Auto-increment surrogate key; stays out of `__init__`. |
+| `uuid_id(*, init=False)` | `UUID PRIMARY KEY` | UUIDv7 (time-ordered), generated per row. |
+| `uuid(*, nullable=False, unique=False, index=False, as_uuid=True, init=True)` | `UUID` | `as_uuid=False` stores/returns a string. |
+| `string(length=255, *, nullable=False, unique=False, index=False, init=True)` | `VARCHAR(length)` | The default workhorse for short text. |
+| `text(*, nullable=False)` | `TEXT` | Unbounded text. |
+| `integer(*, nullable=False, unique=False, index=False, init=True)` | `INTEGER` | |
+| `big_integer(*, nullable=False, unique=False)` | `BIGINT` | |
+| `boolean(*, nullable=False)` | `BOOLEAN` | |
+| `datetime(*, timezone=True, nullable=False, init=True)` | `TIMESTAMP` | tz-aware by default; pass `timezone=False` for naive. |
+| `decimal(precision=10, scale=2, *, nullable=False)` | `NUMERIC(precision, scale)` | Fixed-precision money/amounts. |
+| `json(*, nullable=False, init=True)` | `JSON` | In-place edits are tracked (see below). |
+| `jsonb(*, nullable=False)` | `JSONB` (PostgreSQL) | Binary JSON; GIN-indexable. |
+| `enum(values_or_enum, *, name=None, nullable=False)` | `ENUM` | Accepts an `Enum` class or a list/tuple of strings. |
+| `foreign_id(references, *, on_delete=None, on_update=None, nullable=False, index=True)` | `INTEGER` FK | `references` is `"table.column"`; indexed by default. |
+| `foreign_uuid(references, *, on_delete=None, on_update=None, nullable=False, index=True)` | `UUID` FK | For `uuid_id()`-keyed parents. |
+| `foreign_string(references, *, length=36, on_delete=None, on_update=None, nullable=False, index=True)` | `VARCHAR(length)` FK | For string/VARCHAR-keyed parents. |
+| `column(type_, *, primary_key=False, nullable=False, unique=False, index=False, init=True, default_factory=None, server_default=None)` | any SQLAlchemy type | Escape hatch for a custom `TypeDecorator`. |
+| `nullable_column(type_, *, unique=False, index=False, init=True)` | any type, `NULL` | The `\| None` sibling of `column`. |
+| `tsvector(*, nullable=True, init=False)` | `TSVECTOR` (PostgreSQL) | Full-text search vector. |
 
 > **In-place JSON edits are tracked.** `json()` and `jsonb()` wrap the value so editing a dict or list root in place marks the row dirty — `model.meta["k"] = v` then `await model.save()` persists, no reassignment needed. Roots must be a dict or list; a scalar root raises `TypeError` since there's nothing to track in place.
 
@@ -474,6 +486,13 @@ Mix in `Timestamps` for the usual `created_at` / `updated_at` columns, auto-fill
 bumped on update. Three controls cover the edge cases:
 
 ```python
+from datetime import datetime
+
+# The datetime() column helper clashes with the datetime type — alias it.
+from arvel.database import Model
+from arvel.database import datetime as datetime_col
+
+
 class Import(Model):
     __timestamps__ = False  # opt out — no auto-fill at all
     ...
@@ -610,11 +629,13 @@ Mix in `HasUuids` or `HasUlids` and declare a string PK with `init=False, defaul
 generated on insert:
 
 ```python
-from arvel.database import HasUlids, Model
+from sqlalchemy import String
+
+from arvel.database import HasUlids, Model, column, string
 
 class Document(Model, HasUlids):
     __tablename__ = "documents"
-    id: str = mapped_column(String(26), primary_key=True, init=False, default=None)
+    id: str = column(String(26), primary_key=True, init=False, default=None)
     title: str = string(120)
 
 
@@ -794,7 +815,7 @@ from __future__ import annotations
 
 import uuid
 
-from arvel.database import Model, column_attr, uuid_id
+from arvel.database import Model, column_attr, jsonb, uuid_id
 
 
 class ProductBase:
@@ -867,7 +888,7 @@ class DailyOrderStats(ViewModel):
     __tablename__ = "mv_daily_order_stats"
     __is_materialized_view__ = True
 
-    date: str = id_()
+    report_date: str = field(primary_key=True)   # the view's grain
     order_count: int = big_integer()
 ```
 
@@ -895,14 +916,14 @@ For materialized-view backed resources (e.g. `PublishedProduct` over `Product`),
 model directly.
 
 ```python
-from arvel.database import ReadModelPolicy, ReadModelPolicyViolation
+from arvel.database import ReadModelPolicy, ReadModelPolicyViolationError
 from app.models import Product, PublishedProduct
 
 policy = ReadModelPolicy(read_model=PublishedProduct, write_model=Product)
 
 def test_cart_service_uses_published_boundary():
     with policy.guard():
-        with pytest.raises(ReadModelPolicyViolation):
+        with pytest.raises(ReadModelPolicyViolationError):
             # Any query that reaches Product._apply_global_scopes() raises.
             Product.query().where(Product.id == some_id)
 ```
