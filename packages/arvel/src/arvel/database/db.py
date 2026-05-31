@@ -283,17 +283,27 @@ class DB:
         cls._named_makers[name] = session_maker
 
     @classmethod
-    def connection(cls, name: str | None = None) -> _DBProxy:
+    def forget_named(cls, name: str) -> None:
+        """Drop a named connection registered with ``configure_named``. No-op if absent."""
+        cls._named_makers.pop(name, None)
+
+    @classmethod
+    def session_maker_for(cls, name: str | None = None) -> async_sessionmaker[AsyncSession]:
+        """Return the session maker for a connection (default when ``name`` is None)."""
         if name is None:
             if cls._session_maker is None:
                 raise RuntimeError("DB not configured. Call DB.configure() first.")
-            return _DBProxy(cls._session_maker)
+            return cls._session_maker
         maker = cls._named_makers.get(name)
         if maker is None:
             raise RuntimeError(
                 f"No named connection '{name}' registered with DB.configure_named()."
             )
-        return _DBProxy(maker)
+        return maker
+
+    @classmethod
+    def connection(cls, name: str | None = None) -> _DBProxy:
+        return _DBProxy(cls.session_maker_for(name))
 
     @classmethod
     def table(cls, table_name: str) -> TableQueryBuilder:

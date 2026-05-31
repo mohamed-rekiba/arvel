@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 class Person(Model):
     __tablename__ = "lj_people"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    first: Mapped[str] = mapped_column(String(40), default="")
+    given: Mapped[str] = mapped_column(String(40), default="")
     last: Mapped[str] = mapped_column(String(40), default="")
     city: Mapped[str] = mapped_column(String(40), default="")
 
@@ -26,9 +26,9 @@ class Pet(Model):
 async def _seed(engine: AsyncEngine) -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
-    await Person.create(first="Alice", last="Adams", city="Austin")
-    await Person.create(first="Bob", last="Brown", city="Boston")
-    await Person.create(first="alan", last="Atwood", city="Austin")
+    await Person.create(given="Alice", last="Adams", city="Austin")
+    await Person.create(given="Bob", last="Brown", city="Boston")
+    await Person.create(given="alan", last="Atwood", city="Austin")
     await Pet.create(owner_id=1, species="cat")
     await Pet.create(owner_id=2, species="dog")
 
@@ -38,8 +38,8 @@ async def _seed(engine: AsyncEngine) -> None:
 
 async def test_where_like_case_insensitive(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
-    rows = await Person.where_like("first", "al%").order_by("id").all()
-    assert {r.first for r in rows} == {"Alice", "alan"}
+    rows = await Person.where_like("given", "al%").order_by("id").all()
+    assert {r.given for r in rows} == {"Alice", "alan"}
 
 
 async def test_where_like_case_sensitive_uses_plain_like(
@@ -48,36 +48,36 @@ async def test_where_like_case_sensitive_uses_plain_like(
     await _seed(engine)
     # SQLite LIKE is case-insensitive for ASCII by design, so assert the SQL form:
     # case_sensitive -> plain LIKE; default -> ILIKE (lower() folding under the generic dialect).
-    cs_sql = Person.where_like("first", "al%", case_sensitive=True).to_sql().lower()
-    ci_sql = Person.where_like("first", "al%").to_sql().lower()
+    cs_sql = Person.where_like("given", "al%", case_sensitive=True).to_sql().lower()
+    ci_sql = Person.where_like("given", "al%").to_sql().lower()
     assert "like" in cs_sql and "lower(" not in cs_sql
     assert "lower(" in ci_sql
 
 
 async def test_where_not_like(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
-    rows = await Person.where_not_like("first", "al%").all()
-    assert [r.first for r in rows] == ["Bob"]
+    rows = await Person.where_not_like("given", "al%").all()
+    assert [r.given for r in rows] == ["Bob"]
 
 
 async def test_or_where_like_composes(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
-    rows = await Person.where(city="Boston").or_where_like("first", "ali%").order_by("id").all()
-    assert {r.first for r in rows} == {"Bob", "Alice"}
+    rows = await Person.where(city="Boston").or_where_like("given", "ali%").order_by("id").all()
+    assert {r.given for r in rows} == {"Bob", "Alice"}
 
 
 async def test_where_all(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
     # both first and last start with 'A' (case-insensitive)
-    rows = await Person.where_all(["first", "last"], "ilike", "a%").order_by("id").all()
-    assert {r.first for r in rows} == {"Alice", "alan"}
+    rows = await Person.where_all(["given", "last"], "ilike", "a%").order_by("id").all()
+    assert {r.given for r in rows} == {"Alice", "alan"}
 
 
 async def test_where_none(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
     # neither first nor last starts with 'A' -> only Bob
-    rows = await Person.where_none(["first", "last"], "ilike", "a%").all()
-    assert [r.first for r in rows] == ["Bob"]
+    rows = await Person.where_none(["given", "last"], "ilike", "a%").all()
+    assert [r.given for r in rows] == ["Bob"]
 
 
 # ── S6: joins ────────────────────────────────────────────────────────────────
@@ -90,7 +90,7 @@ async def test_join_on_closure(engine: AsyncEngine, session: AsyncSession) -> No
         .where(Pet.species == "cat")
         .all()
     )
-    assert [r.first for r in rows] == ["Alice"]
+    assert [r.given for r in rows] == ["Alice"]
 
 
 async def test_join_on_or_on(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -103,7 +103,7 @@ async def test_join_on_or_on(engine: AsyncEngine, session: AsyncSession) -> None
         .order_by("id")
         .all()
     )
-    assert [r.first for r in rows] == ["Alice", "Bob"]
+    assert [r.given for r in rows] == ["Alice", "Bob"]
 
 
 async def test_cross_join(engine: AsyncEngine, session: AsyncSession) -> None:

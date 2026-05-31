@@ -56,6 +56,12 @@ def reset_global_state() -> Iterator[None]:
 
     _EventFacade.dispatcher = None  # pyright: ignore[reportPrivateUsage]
 
+    # Polymorphic morph map is process-global — clear it so registrations from one
+    # test don't change another test's stored type tokens.
+    from arvel.database.orm.morph_map import reset_morph_map
+
+    reset_morph_map()
+
 
 @pytest.fixture
 def clean_env() -> Iterator[None]:

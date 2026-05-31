@@ -295,3 +295,459 @@ work_items:
       having + having_null/between, pluck(value,key)->dict, count(column), sum()->0. ADR-130.
       Gates green: arvel fast 3483 / permission 75 / ecommerce 407; mypy/pyright/ruff/bandit/
       gitleaks clean.
+
+  - id: "WI-arvel-017"
+    name: "Enum + extended built-in casts (backlog 006 S6)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T23:00:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      __casts__ now accepts an Enum subclass (read->member, write/serialize->backing value),
+      plus object (JSON->SimpleNamespace, serialize->dict) and collection (JSON->Collection,
+      serialize->list) read-path-only casts, and datetime:FORMAT (strptime with ISO fallback,
+      serialize via strftime). decimal:n already shipped in WI-arvel-005. to_dict serialize
+      now skips None (symmetric with read). ADR-136. Gates: arvel database suite 830 passed;
+      mypy/pyright/ruff clean on model.py.
+
+  - id: "WI-arvel-018"
+    name: "Declarative encrypted casts + app Encrypter (backlog 006 S3)"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "confidential"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T23:20:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      New arvel.encryption.Encrypter (AES-256-GCM, key HKDF-derived from APP_KEY, wire format v2
+      distinct from EncryptedType v1) + Crypt facade (caches per APP_KEY, set_encrypter for
+      tests, MissingAppKeyError when unset). __casts__ encrypted / encrypted:json|array|object|
+      collection: write encrypts (JSON-encodes for non-string), read decrypts (+ decode;
+      object->SimpleNamespace, collection->Collection), serialize emits dict/list. to_dict
+      exposes decrypted value (Eloquent toArray parity; pair with __hidden__). Random IV/write,
+      not equality-searchable. ADR-137. Note Tier3/confidential (PII) but no auth-flow change;
+      security embedded in QA (A04: key from APP_KEY env, never code). Gates: arvel database
+      846 passed (+16); session 65; mypy/pyright/ruff/bandit clean. 006-S3 DONE.
+
+  - id: "WI-arvel-019"
+    name: "Unified Attribute descriptor (backlog 006 S5)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T23:35:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      arvel.database.attributes.Attribute — data descriptor (get/set/__set_name__) assigned as a
+      class attr; fires via the descriptor protocol since Model.__getattribute__/__setattr__
+      delegate to object. Attribute.make(get=, set=); should_cache() memoizes per instance in
+      __dict__['_arvel_attr_cache'], invalidated on write through the attr (no column dependency
+      tracking, like Laravel). set returns a Mapping[str, Any] of column->value (each routed
+      through normal setattr/casts); non-mapping raises TypeError; get-only=read-only,
+      set-only=write-only. Cache key excluded from model_serialize fallback. Exported from
+      arvel.database. ADR-138. Gates: arvel database 855 passed (+9); mypy/pyright/ruff clean.
+      006-S5 DONE.
+  - id: "WI-arvel-020"
+    name: "Static event registration + custom event objects (backlog 006 S9)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T23:00:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      Three lightweight lifecycle-wiring shortcuts. Model.on(event, cb) wraps the callable in a
+      one-event _CallbackObserver and appends to the same observer list observe() uses, so
+      callbacks share the dispatch path (cancellable False-return + async await). __observed_by__
+      auto-registers observers in __init_subclass__ from cls.__dict__ (not inherited) via
+      bind_observer. __dispatches_events__ maps a lifecycle name to a ModelEvent subclass dispatched
+      on the Event facade after the observer loop in fire_async/fire_cancellable; no dispatcher
+      bound => silently skipped (pure-DB tests stay green). ModelEvent is a top-level frozen Pydantic
+      Event (arbitrary_types_allowed, model: Any) — defined directly, not via factory, so subclassing
+      type-checks under strict. Also fixed pre-existing strict-pyright findings surfaced by the gate
+      run: test_qb_like_and_joins column 'first' renamed to 'given' (shadowed QueryMixin.first), plus
+      cast() narrowing in test_qb_clause_polish/test_wi017/test_wi018 and unused-symbol cleanups.
+      ADR-139. Gates: arvel database+events 892 passed; mypy/pyright/ruff/bandit clean. 006-S9 DONE.
+  - id: "WI-arvel-021"
+    name: "Timestamp controls (backlog 006 S12)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T23:15:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      Eloquent timestamp parity. Three ClassVars on Model: __timestamps__ (bool, default True),
+      CREATED_AT/UPDATED_AT (str, default created_at/updated_at). Hook attachment moved from
+      Timestamps.__init_subclass__ to Model.__init_subclass__ — before_insert/before_update mapper
+      events attach only when __timestamps__ is truthy AND the model has the named attribute, so
+      plain models pay nothing, the mixin still works, and custom-column models (declare own cols +
+      set the constants) get auto-fill with no mixin. Hooks read the typed constants (str ClassVar,
+      no Any widening). without_timestamps() async CM backed by _suppress_timestamps ContextVar
+      (task-local, like without_events) skips auto-fill inside the block for imports/backfills.
+      touch(attribute=None) sets the column to now and save()s (fires events); touch_quietly wraps
+      without_events. replicate() now drops the constant-named timestamp cols. ADR-140. Gates: arvel
+      database+events 901 passed (+9); mypy/pyright/ruff/bandit clean. 006-S12 DONE.
+  - id: "WI-arvel-022"
+    name: "Soft-delete upsert + bulk restore (backlog 006 S10)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T23:30:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      restore_or_create/create_or_restore (QueryBuilder + Model classmethods): search with_trashed
+      by attributes, restore if trashed() else return, create with merged dicts if none — no
+      duplicate of a soft-deleted row. Bulk QueryBuilder.restore() = single UPDATE deleted_at=NULL
+      over current WHERE (inverse of delete()'s soft branch, touches updated_at); pair with
+      only_trashed()/with_trashed since the default scope hides trashed rows; raises AttributeError
+      without SoftDeletes; bulk bypasses per-row events (Eloquent parity). Instance trashed() helper
+      (False without SoftDeletes). force_destroy(*ids) accepts varargs or one iterable, routes
+      where_in(pk, ids).force_delete() (strips soft scope so trashed included), single-PK. ADR-141.
+      Gates: arvel database+events 909 passed (+8); mypy/pyright/ruff/bandit clean. 006-S10 DONE.
+  - id: "WI-arvel-023"
+    name: "Distinct soft/hard-delete + replicate events (backlog 006 S11)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T23:45:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      events.py registries gained trashed/force_deleted/replicating (async) + force_deleting
+      (cancellable). Soft delete() fires trashed then deleted; deleted still fires for both delete
+      kinds. force_delete() fires force_deleting->deleting->deleted->force_deleted and never trashed;
+      both before-hooks cancellable. replicate() fires replicating on the clone before return. Bulk
+      QB deletes stay event-free (set-based, Eloquent parity, ADR-142-04). ADR-142. Gates: arvel
+      database+events 914 passed (+5); mypy/pyright/ruff/bandit clean. 006-S11 DONE.
+  - id: "WI-arvel-024"
+    name: "Factory enhancements (backlog 006 S13)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T00:00:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      Factory: has_attached(relation, factory, count, pivot) M2M attach; trashed() state (sets
+      soft-delete col post-construction, AttributeError without SoftDeletes); after_*/callbacks get a
+      shared lazily-imported faker.Faker (None if absent); create_quietly() = create() in
+      without_events(); connection(name) routes the build through DB.session_maker_for(name) active
+      session + commit. Added DB.session_maker_for() + DB.forget_named(). ADR-143. Gates: arvel
+      database+events 921 passed (+7); mypy/pyright/ruff/bandit clean. 006-S13 DONE.
+  - id: "WI-arvel-025"
+    name: "Attribute API polish bundle (backlog 006 S14 — final Epic 006 story)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T00:20:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      Model helpers: append/set_appends (per-instance appends merged in to_dict via _collect_appends),
+      make_hidden_if/make_visible_if (bool|predicate, chainable), only/except_, get_key_name/get_key
+      (tuple for composite), qualify_column, is_same/is_not, discard_changes (revert dirty to
+      committed_state). HasUuids/HasUlids plain mixins: shared before_insert hook fills empty string
+      PK from new_unique_id() (uuid4 / Crockford ULID); _UniqueIdProvider Protocol for type safety.
+      ADR-144. Gates: arvel database+events 936 passed (+15); mypy/pyright/ruff/bandit clean. 006-S14
+      DONE — EPIC 006 (Eloquent Model Parity) COMPLETE.
+  - id: "WI-arvel-026"
+    name: "Morph map foundation (backlog 007 S1 — first Epic 007 story)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T01:00:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      New orm/morph_map.py: morph_map() register/return (merge|replace), require_morph_map() strict,
+      get_morph_alias (write token), resolve_morph_class (read token: map then registry scan),
+      reset_morph_map (test isolation). Model.get_morph_class(). All morph write/read paths route
+      through get_morph_alias (MorphOne/Many, MorphToMany, query morph-existence). Supersedes ADR-022
+      default token. ADR-145. Gates: arvel database+events 948 passed (+12); mypy/pyright/ruff/bandit
+      clean. 007-S1 DONE. Foundation for S2 (MorphTo), S3, S4, S7.
+  - id: "WI-arvel-027"
+    name: "MorphTo inverse relation (backlog 007 S2)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T01:40:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      MorphTo(name=) descriptor + MorphToAccessor (resolve parent via resolve_morph_class + load by
+      id; null -> None). associate/dissociate set/clear type+id together (associate primes cache).
+      batch_load_morph_to: group by token, one SELECT per distinct type, cache parent per child.
+      Query builder: _RelationTarget.morph_name + kind "morph_to" wired into _resolve_relation /
+      _is_async_relation / _load_async_relation_path (leaf only). ADR-146. Gates: arvel database+
+      events 953 passed (+5); mypy/pyright/ruff/bandit clean. 007-S2 DONE.
+  - id: "WI-arvel-028"
+    name: "MorphOne/MorphMany query + eager integration (backlog 007 S3)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T02:20:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      MorphChildLink + link_spec; MorphOne/MorphMany __set_name__ + eager-cache reads;
+      batch_load_morph_children (one batched query, grouped per owner). Query builder kind
+      "morph_child" wired into _resolve_relation / _exists_subquery / _count_subquery
+      (_morph_child_count_subquery) / _is_async_relation / _load_async_relation_path. Public
+      is_async_relation + load_async_relation_path; Model.load() routes async relations to the
+      batched loader. with_/where_has/doesnt_have/with_count/Model.load all work for morph children.
+      ADR-147. Gates: arvel database+events 960 passed (+7); mypy/pyright/ruff/bandit clean. 007-S3
+      DONE.
+  - id: "WI-arvel-029"
+    name: "morphedByMany — inverse morph pivot (backlog 007 S4)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T03:00:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      MorphedByMany descriptor/accessor/link: inverse of MorphToMany. Pins {name}_type to the related
+      model's alias, joins {name}_id to the related PK (string-cast), owner PK in the related_key FK
+      column. Accessor all/attach/detach/toggle/sync; lazy related-model thunk for forward refs. Query
+      builder "mbm" kind wired into resolve/exists/count/eager paths; _exists_subquery and
+      _count_subquery refactored into per-kind dispatchers to satisfy C901/PLR0911. ADR-148. Gates:
+      arvel database+test_events 967 passed (+7); mypy/pyright/ruff/bandit clean. 007-S4 DONE.
+  - id: "WI-arvel-030"
+    name: "has-one-of-many — latest/oldest/of_many (backlog 007 S5)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T04:00:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      Method style: _OfMany base on HasMany/HasOne adds latest_of_many/oldest_of_many/of_many.
+      Descriptor: HasOneOfMany + accessor + link + batch_load_one_of_many (one grouped subquery,
+      PK tiebreaker). Query builder "one_of_many" kind; _resolve_relation and
+      _load_async_relation_path refactored into dispatchers (C901/PLR0911). ADR-149. Gates: arvel
+      database+test_events 973 passed (+6); mypy/pyright/ruff/bandit clean. 007-S5 DONE.
+  - id: "WI-arvel-031"
+    name: "chaperone — inverse parent hydration (backlog 007 S6)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T04:40:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      QueryBuilder.chaperone() marks a with_() closure; with_() records _Chaperone and _eager_load_async
+      hydrates each child's inverse via set_committed_value (identity preserved, no query). Inverse via
+      explicit name / back_populates / MANYTOONE inference. SA has-one/has-many scope. ADR-150. Gates:
+      arvel database 949 passed; mypy/pyright/ruff/bandit clean. 007-S6 DONE.
+  - id: "WI-arvel-032"
+    name: "polymorphic existence queries — where_has_morph/has_morph (backlog 007 S7)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T05:20:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      where_has_morph (per-type EXISTS union, alias-pinned, scoped, constraint(query, type)),
+      has_morph (count-based), where_morph_relation (column sugar). Honours registered morph_map.
+      Non-MorphTo raises UnknownRelationError. ADR-151. Gates: arvel database 956 passed (+7);
+      mypy/pyright/ruff/bandit clean. 007-S7 DONE.
+  - id: "WI-arvel-033"
+    name: "relation-querying completeness — nested where_has/or_*/where_belongs_to (backlog 007 S8)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T22:30:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      Recursive _has_predicate backs nested where_has paths, operator+count, constrained doesnt_have,
+      or_where_has/or_doesnt_have/or_where_relation, with_where_has (filter + eager same constraint),
+      and where_belongs_to (FK inferred via MANYTOONE target match or named). ADR-152. Gates: arvel
+      database 967 passed (+11); mypy/pyright/ruff/bandit clean. 007-S8 DONE.
+  - id: "WI-arvel-034"
+    name: "relationship aggregate completeness — with_avg/min/exists + pivot sum + load_* (backlog 007 S9)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T23:10:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      Unified _aggregate_column/with_aggregate backs with_count/sum/avg/min/max/exists (pivot-aware,
+      soft-delete scoped, aliasing via "as"/alias=, constraint closures). Instance loaders
+      load_count/load_sum/load_exists/load_aggregate cache the scalar on the instance. ADR-153. Gates:
+      arvel database 978 passed (+11); mypy/pyright/ruff/bandit clean. 007-S9 DONE.
+  - id: "WI-arvel-035"
+    name: "pivot ergonomics — with_pivot/with_timestamps/order_by_pivot/where_pivot_* (backlog 007 S10)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T23:40:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      BelongsToMany pivot ergonomics: PivotConfig + fluent with_pivot/with_timestamps/as_, pivot
+      hydration (SimpleNamespace), pivot timestamps on attach/update, order_by_pivot, where_pivot_in/
+      _not_in/_between/_null, create/save on the relation. Custom Pivot model via using deferred
+      (ADR-154-06). ADR-154. Gates: arvel database 984 passed (+6); mypy/pyright/ruff/bandit clean.
+      007-S10 DONE.
+
+  - id: "WI-arvel-036"
+    name: "relation defaults / eager control / cascade save — with_default/without/with_only/$touches/push (backlog 007 S11)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-30T23:55:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      BelongsTo.with_default (empty/dict/callback; fk_present short-circuit). Eager loads deferred to
+      apply_global_scopes via _eager_loads so without()/with_only() can edit before the SELECT;
+      head still validated eagerly. __touches__ → Model._touch_parents after save. push() cascades
+      save across loaded relations. Eager column selection deferred (ADR-155-04). ADR-155. Gates:
+      arvel database 994 passed (+10); mypy/pyright/ruff clean. 007-S11 DONE — epic 007 complete.
+
+  - id: "WI-arvel-037"
+    name: "Eloquent-style ModelCollection — load/model_keys/find/only/diff/to_query/fresh (backlog 006 S8)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T00:35:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: library increment)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      ModelCollection(Collection[T]) returned by all()/get() for model rows. Key-aware (get_key):
+      model_keys/find/contains/only/except_/diff/intersect. Batch load/load_missing (async via
+      epic-007 path, SA via select+selectinload). to_query/fresh/make_hidden/make_visible. ADR-156.
+      Gates: arvel database 1001 passed (+7); mypy/pyright/ruff clean. 006-S8 DONE.

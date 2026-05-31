@@ -28,12 +28,21 @@ from sqlalchemy import (
     cast as sqla_cast,
 )
 from sqlalchemy import (
+    false as sqla_false,
+)
+from sqlalchemy import (
     inspect as sqla_inspect,
 )
 from sqlalchemy.dialects.postgresql import REGCONFIG
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.associationproxy import AssociationProxy, AssociationProxyInstance
-from sqlalchemy.orm import InstrumentedAttribute, Mapper, selectinload
+from sqlalchemy.orm import (
+    InstrumentedAttribute,
+    Mapper,
+    RelationshipProperty,
+    selectinload,
+)
+from sqlalchemy.orm.attributes import set_committed_value
 from sqlalchemy.sql.elements import ColumnElement
 
 from arvel.database.exceptions import (
@@ -56,7 +65,9 @@ if TYPE_CHECKING:
     from sqlalchemy.sql.expression import CTE
 
     from arvel.database.orm.belongs_to_many import BelongsToManyLink
-    from arvel.database.orm.morph_to_many import MorphToManyLink
+    from arvel.database.orm.has_one_of_many import HasOneOfManyLink
+    from arvel.database.orm.morph import MorphChildLink
+    from arvel.database.orm.morph_to_many import MorphedByManyLink, MorphToManyLink
     from arvel.database.query_mixin import QueryMixin
 
 T = TypeVar("T", bound="QueryMixin")
@@ -209,35 +220,70 @@ def _local_remote(rel: Any) -> tuple[Any, Any]:
     return local, remote
 
 
+def _belongs_to_relation_for(mapper: Mapper[Any], parent: object) -> Any:
+    """Find the many-to-one relationship on *mapper* pointing at *parent*'s class."""
+    for rel in mapper.relationships:
+        if rel.direction.name == "MANYTOONE" and isinstance(parent, rel.mapper.class_):
+            return rel
+    raise UnknownRelationError(mapper.class_.__name__, f"<belongs_to {type(parent).__name__}>")
+
+
 @dataclass(frozen=True)
 class _RelationTarget:
-    """Resolved relation — a SQLAlchemy relationship, BelongsToMany, or MorphToMany."""
+    """Resolved relation — SQLAlchemy relationship, BelongsToMany, MorphToMany, or MorphTo."""
 
     kind: str
     sa_rel: Any | None = None
     btm_link: BelongsToManyLink | None = None
     mtm_link: MorphToManyLink | None = None
+    mbm_link: MorphedByManyLink | None = None
+    morph_name: str | None = None
+    morph_child_link: MorphChildLink | None = None
+    one_of_many_link: HasOneOfManyLink | None = None
+
+
+def _resolve_morph_descriptor(model: type[Any], descriptor: Any) -> _RelationTarget | None:
+    from arvel.database.orm.morph import MorphMany, MorphOne, MorphTo
+    from arvel.database.orm.morph_map import get_morph_alias
+
+    if isinstance(descriptor, MorphTo):
+        return _RelationTarget(kind="morph_to", morph_name=descriptor.name)
+    if isinstance(descriptor, (MorphOne, MorphMany)):
+        return _RelationTarget(
+            kind="morph_child", morph_child_link=descriptor.link_spec(get_morph_alias(model))
+        )
+    return None
+
+
+def _resolve_descriptor_relation(model: type[Any], descriptor: Any) -> _RelationTarget | None:
+    """Map a custom relation descriptor to a `_RelationTarget`, or None if unknown."""
+    from arvel.database.orm.belongs_to_many import BelongsToMany
+    from arvel.database.orm.has_one_of_many import HasOneOfMany
+    from arvel.database.orm.morph_map import get_morph_alias
+    from arvel.database.orm.morph_to_many import MorphedByMany, MorphToMany
+
+    if isinstance(descriptor, BelongsToMany):
+        return _RelationTarget(kind="btm", btm_link=descriptor.link_spec())
+    if isinstance(descriptor, MorphToMany):
+        return _RelationTarget(kind="mtm", mtm_link=descriptor.link_spec(get_morph_alias(model)))
+    if isinstance(descriptor, MorphedByMany):
+        return _RelationTarget(kind="mbm", mbm_link=descriptor.link_spec())
+    if isinstance(descriptor, HasOneOfMany):
+        return _RelationTarget(kind="one_of_many", one_of_many_link=descriptor.link_spec())
+    return _resolve_morph_descriptor(model, descriptor)
 
 
 def _resolve_relation(model: type[Any], name: str | Any) -> _RelationTarget:
     if not isinstance(name, str):
         # Accept InstrumentedAttribute / QueryableAttribute — extract the key.
         name = name.key
-    mapper = _mapper_of(model)
-    rel = mapper.relationships.get(name)
+    rel = _mapper_of(model).relationships.get(name)
     if rel is not None:
         return _RelationTarget(kind="sa", sa_rel=rel)
-
-    from arvel.database.orm.belongs_to_many import BelongsToMany
-    from arvel.database.orm.morph_to_many import MorphToMany
-
-    descriptor = getattr(model, name, None)
-    if isinstance(descriptor, BelongsToMany):
-        return _RelationTarget(kind="btm", btm_link=descriptor.link_spec())
-    if isinstance(descriptor, MorphToMany):
-        return _RelationTarget(kind="mtm", mtm_link=descriptor.link_spec(model.__name__))
-
-    raise UnknownRelationError(model.__name__, name)
+    target = _resolve_descriptor_relation(model, getattr(model, name, None))
+    if target is None:
+        raise UnknownRelationError(model.__name__, name)
+    return target
 
 
 def _primary_key_column(model: type[Any]) -> Any:
@@ -250,44 +296,81 @@ def _global_scope_whereclause(related_cls: type[Any]) -> Any:
     return scoped.whereclause
 
 
-def _exists_subquery(
-    model: type[Any],
-    target: _RelationTarget,
-    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
-) -> Select[Any]:
+def _pivot_exists_select(
+    model: type[Any], target: _RelationTarget
+) -> tuple[type[Any], Select[Any]]:
+    """Existence subquery for a pivot-backed relation (mtm / mbm / btm)."""
+    local_col = _primary_key_column(model)
+    if target.kind == "mtm":
+        mlink = target.mtm_link
+        if mlink is None:
+            raise UnknownRelationError(model.__name__, "?")
+        related_cls = mlink.related_model
+        remote_col = _primary_key_column(related_cls)
+        sub = (
+            select(related_cls)
+            .join(mlink.table, mlink.table.c[mlink.related_foreign_key] == remote_col)
+            .where(mlink.table.c[mlink.id_column] == sqla_cast(local_col, String))
+            .where(mlink.table.c[mlink.type_column] == mlink.owner_type)
+        )
+        return related_cls, sub
+    if target.kind == "mbm":
+        blink = target.mbm_link
+        if blink is None:
+            raise UnknownRelationError(model.__name__, "?")
+        related_cls = blink.related_model
+        remote_col = _primary_key_column(related_cls)
+        sub = (
+            select(related_cls)
+            .join(blink.table, blink.table.c[blink.id_column] == sqla_cast(remote_col, String))
+            .where(blink.table.c[blink.owner_foreign_key] == local_col)
+            .where(blink.table.c[blink.type_column] == blink.related_type)
+        )
+        return related_cls, sub
+    link = target.btm_link
+    if link is None:
+        raise UnknownRelationError(model.__name__, "?")
+    related_cls = link.related_model
+    remote_col = _primary_key_column(related_cls)
+    sub = (
+        select(related_cls)
+        .join(link.table, link.table.c[link.related_foreign_key] == remote_col)
+        .where(link.table.c[link.foreign_key] == local_col)
+    )
+    return related_cls, sub
+
+
+def _relation_exists_select(
+    model: type[Any], target: _RelationTarget
+) -> tuple[type[Any], Select[Any]]:
     if target.kind == "sa":
         rel = target.sa_rel
         if rel is None:
             raise UnknownRelationError(model.__name__, "?")
         related_cls = rel.mapper.class_
         local_col, remote_col = _local_remote(rel)
-        sub: Select[Any] = select(related_cls).where(remote_col == local_col)
-    elif target.kind == "mtm":
-        mlink = target.mtm_link
-        if mlink is None:
+        return related_cls, select(related_cls).where(remote_col == local_col)
+    if target.kind == "morph_child":
+        clink = target.morph_child_link
+        if clink is None:
             raise UnknownRelationError(model.__name__, "?")
-        pivot = mlink.table
-        related_cls = mlink.related_model
+        related_cls = clink.related_model
         local_col = _primary_key_column(model)
-        remote_col = _primary_key_column(related_cls)
         sub = (
             select(related_cls)
-            .join(pivot, pivot.c[mlink.related_foreign_key] == remote_col)
-            .where(pivot.c[mlink.id_column] == sqla_cast(local_col, String))
-            .where(pivot.c[mlink.type_column] == mlink.owner_type)
+            .where(getattr(related_cls, f"{clink.name}_id") == local_col)
+            .where(getattr(related_cls, f"{clink.name}_type") == clink.owner_type)
         )
-    else:
-        link = target.btm_link
-        if link is None:
-            raise UnknownRelationError(model.__name__, "?")
-        pivot = link.table
-        related_cls = link.related_model
-        local_col = _primary_key_column(model)
-        pivot_fk = pivot.c[link.foreign_key]
-        pivot_rfk = pivot.c[link.related_foreign_key]
-        remote_col = _primary_key_column(related_cls)
-        sub = select(related_cls).join(pivot, pivot_rfk == remote_col).where(pivot_fk == local_col)
+        return related_cls, sub
+    return _pivot_exists_select(model, target)
 
+
+def _exists_subquery(
+    model: type[Any],
+    target: _RelationTarget,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+) -> Select[Any]:
+    related_cls, sub = _relation_exists_select(model, target)
     # Honour the related model's global scopes (soft deletes) — Laravel's whereHas/has
     # never counts trashed related rows.
     sub_qb: QueryBuilder[Any] = QueryBuilder(related_cls, sub)
@@ -314,6 +397,15 @@ def _expand_association_proxy(
         expanded = f"{expanded}.{tail}"
     new_head, _, new_tail = expanded.partition(".")
     return new_head, new_tail
+
+
+def validate_relation_head(model: type[Any], relation_path: str) -> None:
+    """Raise UnknownRelationError if *relation_path*'s head isn't a relation on *model*."""
+    mapper = _mapper_of(model)
+    head, _, tail = relation_path.partition(".")
+    head, _ = _expand_association_proxy(model, mapper, head, tail)
+    if head not in {r.key for r in mapper.relationships}:
+        raise UnknownRelationError(model.__name__, head)
 
 
 def _selectin_loader_for_path(
@@ -351,44 +443,87 @@ def _selectin_loader_for_path(
     return loader
 
 
-def _count_subquery(model: type[Any], target: _RelationTarget) -> Any:
+def _morph_child_count_subquery(model: type[Any], target: _RelationTarget) -> Any:
     from sqlalchemy import func as sqla_func
 
-    if target.kind == "sa":
-        rel = target.sa_rel
-        if rel is None:
-            raise UnknownRelationError(model.__name__, "?")
-        related_cls = rel.mapper.class_
-        local_col, remote_col = _local_remote(rel)
-        stmt = select(sqla_func.count()).where(remote_col == local_col)
-        scope_where = _global_scope_whereclause(related_cls)
-        if scope_where is not None:
-            stmt = stmt.where(scope_where)
-        return stmt.correlate(model).scalar_subquery()
+    clink = target.morph_child_link
+    if clink is None:
+        raise UnknownRelationError(model.__name__, "?")
+    related_cls = clink.related_model
+    local_col = _primary_key_column(model)
+    stmt = (
+        select(sqla_func.count())
+        .select_from(related_cls)
+        .where(getattr(related_cls, f"{clink.name}_id") == local_col)
+        .where(getattr(related_cls, f"{clink.name}_type") == clink.owner_type)
+    )
+    scope_where = _global_scope_whereclause(related_cls)
+    if scope_where is not None:
+        stmt = stmt.where(scope_where)
+    return stmt.correlate(model).scalar_subquery()
 
-    if target.kind == "mtm":
-        mlink = target.mtm_link
-        if mlink is None:
-            raise UnknownRelationError(model.__name__, "?")
-        pivot = mlink.table
-        related_cls = mlink.related_model
-        local_col = _primary_key_column(model)
-        remote_col = _primary_key_column(related_cls)
-        pivot_rfk = pivot.c[mlink.related_foreign_key]
-        scope_where = _global_scope_whereclause(related_cls)
-        base = (
-            select(sqla_func.count())
-            .where(pivot.c[mlink.id_column] == sqla_cast(local_col, String))
-            .where(pivot.c[mlink.type_column] == mlink.owner_type)
-        )
-        if scope_where is None:
-            return base.select_from(pivot).correlate(model).scalar_subquery()
-        return (
-            base.select_from(pivot.join(related_cls, pivot_rfk == remote_col))
-            .where(scope_where)
-            .correlate(model)
-            .scalar_subquery()
-        )
+
+def _mbm_count_subquery(model: type[Any], target: _RelationTarget) -> Any:
+    from sqlalchemy import func as sqla_func
+
+    blink = target.mbm_link
+    if blink is None:
+        raise UnknownRelationError(model.__name__, "?")
+    pivot = blink.table
+    local_col = _primary_key_column(model)
+    return (
+        select(sqla_func.count())
+        .select_from(pivot)
+        .where(pivot.c[blink.owner_foreign_key] == local_col)
+        .where(pivot.c[blink.type_column] == blink.related_type)
+        .correlate(model)
+        .scalar_subquery()
+    )
+
+
+def _sa_count_subquery(model: type[Any], target: _RelationTarget) -> Any:
+    from sqlalchemy import func as sqla_func
+
+    rel = target.sa_rel
+    if rel is None:
+        raise UnknownRelationError(model.__name__, "?")
+    related_cls = rel.mapper.class_
+    local_col, remote_col = _local_remote(rel)
+    stmt = select(sqla_func.count()).where(remote_col == local_col)
+    scope_where = _global_scope_whereclause(related_cls)
+    if scope_where is not None:
+        stmt = stmt.where(scope_where)
+    return stmt.correlate(model).scalar_subquery()
+
+
+def _mtm_count_subquery(model: type[Any], target: _RelationTarget) -> Any:
+    from sqlalchemy import func as sqla_func
+
+    mlink = target.mtm_link
+    if mlink is None:
+        raise UnknownRelationError(model.__name__, "?")
+    pivot = mlink.table
+    related_cls = mlink.related_model
+    local_col = _primary_key_column(model)
+    remote_col = _primary_key_column(related_cls)
+    scope_where = _global_scope_whereclause(related_cls)
+    base = (
+        select(sqla_func.count())
+        .where(pivot.c[mlink.id_column] == sqla_cast(local_col, String))
+        .where(pivot.c[mlink.type_column] == mlink.owner_type)
+    )
+    if scope_where is None:
+        return base.select_from(pivot).correlate(model).scalar_subquery()
+    return (
+        base.select_from(pivot.join(related_cls, pivot.c[mlink.related_foreign_key] == remote_col))
+        .where(scope_where)
+        .correlate(model)
+        .scalar_subquery()
+    )
+
+
+def _btm_count_subquery(model: type[Any], target: _RelationTarget) -> Any:
+    from sqlalchemy import func as sqla_func
 
     link = target.btm_link
     if link is None:
@@ -397,7 +532,6 @@ def _count_subquery(model: type[Any], target: _RelationTarget) -> Any:
     related_cls = link.related_model
     local_col = _primary_key_column(model)
     pivot_fk = pivot.c[link.foreign_key]
-    pivot_rfk = pivot.c[link.related_foreign_key]
     remote_col = _primary_key_column(related_cls)
     scope_where = _global_scope_whereclause(related_cls)
     if scope_where is None:
@@ -411,12 +545,149 @@ def _count_subquery(model: type[Any], target: _RelationTarget) -> Any:
     # Soft-deletable pivot target: join the related table so the scope can filter trashed rows.
     return (
         select(sqla_func.count())
-        .select_from(pivot.join(related_cls, pivot_rfk == remote_col))
+        .select_from(pivot.join(related_cls, pivot.c[link.related_foreign_key] == remote_col))
         .where(pivot_fk == local_col)
         .where(scope_where)
         .correlate(model)
         .scalar_subquery()
     )
+
+
+def _count_subquery(model: type[Any], target: _RelationTarget) -> Any:
+    if target.kind == "sa":
+        return _sa_count_subquery(model, target)
+    if target.kind == "mtm":
+        return _mtm_count_subquery(model, target)
+    if target.kind == "morph_child":
+        return _morph_child_count_subquery(model, target)
+    if target.kind == "mbm":
+        return _mbm_count_subquery(model, target)
+    return _btm_count_subquery(model, target)
+
+
+def _count_op(cnt: ColumnElement[Any], operator: str, count: int) -> ColumnElement[bool]:
+    ops: dict[str, ColumnElement[bool]] = {
+        ">=": cnt >= count,
+        ">": cnt > count,
+        "<=": cnt <= count,
+        "<": cnt < count,
+        "=": cnt == count,
+        "!=": cnt != count,
+    }
+    return ops.get(operator, cnt >= count)
+
+
+def _constrained_count_subquery(
+    model: type[Any],
+    target: _RelationTarget,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None,
+) -> Any:
+    """Correlated COUNT over a relation's rows, honouring a constraint + global scopes."""
+    related_cls, sel = _relation_exists_select(model, target)
+    sub_qb: QueryBuilder[Any] = QueryBuilder(related_cls, sel)
+    if constraint is not None:
+        sub_qb = constraint(sub_qb)
+    scoped = sub_qb.apply_global_scopes()
+    return scoped.with_only_columns(func.count()).scalar_subquery()
+
+
+def _split_relation_alias(spec: str) -> tuple[str, str | None]:
+    """Parse ``"comments as total"`` into ``("comments", "total")``; plain name → no alias."""
+    lowered = spec.lower()
+    marker = " as "
+    if marker in lowered:
+        idx = lowered.index(marker)
+        return spec[:idx].strip(), spec[idx + len(marker) :].strip()
+    return spec.strip(), None
+
+
+def _aggregate_label(name: str, agg: str, col: str | None) -> str:
+    """Default column label for an aggregate, matching Eloquent's naming."""
+    if agg == "count":
+        return f"{name}_count"
+    if agg == "exists":
+        return f"{name}_exists"
+    return f"{name}_{agg}_{col}"
+
+
+def _aggregate_column(
+    model: type[Any],
+    target: _RelationTarget,
+    agg: str,
+    col: str | None,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None,
+) -> Any:
+    """Correlated aggregate over a relation's rows (pivot-aware, scoped, optionally constrained)."""
+    if agg == "count" and constraint is None:
+        return _count_subquery(model, target)
+    if agg == "count":
+        return _constrained_count_subquery(model, target, constraint)
+    related_cls, sel = _relation_exists_select(model, target)
+    sub_qb: QueryBuilder[Any] = QueryBuilder(related_cls, sel)
+    if constraint is not None:
+        sub_qb = constraint(sub_qb)
+    scoped = sub_qb.apply_global_scopes()
+    if agg == "exists":
+        return scoped.exists()
+    agg_funcs: dict[str, Callable[[Any], ColumnElement[Any]]] = {
+        "sum": func.sum,
+        "avg": func.avg,
+        "min": func.min,
+        "max": func.max,
+    }
+    if agg not in agg_funcs or col is None:
+        raise ValueError(f"unsupported aggregate {agg!r} or missing column")
+    return scoped.with_only_columns(agg_funcs[agg](getattr(related_cls, col))).scalar_subquery()
+
+
+async def load_aggregate_for(
+    instance: Any,
+    relation: str,
+    agg: str,
+    col: str | None = None,
+    *,
+    alias: str | None = None,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+) -> Any:
+    """Compute an aggregate over *instance*'s relation, cache it on the instance, and return it."""
+    model: Any = instance.__class__
+    name, parsed_alias = _split_relation_alias(relation)
+    label = alias or parsed_alias or _aggregate_label(name, agg, col)
+    target = _resolve_relation(model, name)
+    column = _aggregate_column(model, target, agg, col, constraint)
+    pk_col = _primary_key_column(model)
+    stmt = select(column.label(label)).select_from(model).where(pk_col == instance.get_key())
+    result = await get_active_session().execute(stmt)
+    value = result.scalar()
+    with contextlib.suppress(AttributeError, TypeError):
+        object.__setattr__(instance, label, value)
+    return value
+
+
+def _has_predicate(
+    model: type[Any],
+    path: str,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None,
+    operator: str,
+    count: int,
+) -> ColumnElement[bool]:
+    """Existence predicate for a (possibly nested) relation path.
+
+    The leaf hop carries the operator/count and the constraint; intermediate hops are plain
+    correlated ``EXISTS`` wrappers, so ``where_has("posts.comments", ...)`` walks both hops.
+    """
+    from sqlalchemy import exists as sqla_exists
+
+    head, _, tail = path.partition(".")
+    target = _resolve_relation(model, head)
+    if not tail:
+        if operator == ">=" and count == 1:
+            return sqla_exists(_exists_subquery(model, target, constraint))
+        return _count_op(_constrained_count_subquery(model, target, constraint), operator, count)
+    related_cls, base_sel = _relation_exists_select(model, target)
+    nested = _has_predicate(related_cls, tail, constraint, operator, count)
+    sub_qb: QueryBuilder[Any] = QueryBuilder(related_cls, base_sel).where(nested)
+    return sqla_exists(sub_qb.apply_global_scopes())
 
 
 @dataclass(frozen=True)
@@ -427,14 +698,68 @@ class _AsyncEagerSpec:
     constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None
 
 
+# whereHasMorph's closure gets the concrete type so it can branch per polymorphic target.
+_MorphConstraint = Callable[["QueryBuilder[Any]", type[Any]], "QueryBuilder[Any]"]
+
+
 def _is_async_relation(model: type[Any], path: str) -> bool:
-    """True when *path*'s head is a MorphToMany/BelongsToMany descriptor."""
+    """True when *path*'s head is a MorphToMany/BelongsToMany/MorphTo descriptor."""
     head = path.partition(".")[0]
     try:
         target = _resolve_relation(model, head)
     except UnknownRelationError:
         return False
-    return target.kind in ("btm", "mtm")
+    return target.kind in ("btm", "mtm", "mbm", "morph_to", "morph_child", "one_of_many")
+
+
+@dataclass(frozen=True)
+class _Chaperone:
+    """A requested inverse-parent hydration for an eager-loaded SA relation."""
+
+    head: str
+    inverse: str
+    uselist: bool
+
+
+def _infer_inverse_relation(parent_model: type[Any], head_rel: RelationshipProperty[Any]) -> str:
+    """Find the child→parent relation to hydrate: back_populates, else the many-to-one back."""
+    if head_rel.back_populates:
+        return str(head_rel.back_populates)
+    related_mapper = head_rel.mapper
+    for candidate in related_mapper.relationships:
+        if candidate.mapper.class_ is parent_model and candidate.direction.name == "MANYTOONE":
+            return str(candidate.key)
+    raise UnknownRelationError(
+        related_mapper.class_.__name__,
+        f"<inverse of {parent_model.__name__}.{head_rel.key}>",
+    )
+
+
+def _apply_chaperones(chaperones: Sequence[_Chaperone], parents: Sequence[Any]) -> None:
+    """Hydrate each child's inverse with the already-loaded parent (no query, identity kept)."""
+    for chap in chaperones:
+        for parent in parents:
+            loaded = getattr(parent, chap.head, None)
+            if loaded is None:
+                continue
+            children = loaded if chap.uselist else [loaded]
+            for child in children:
+                set_committed_value(child, chap.inverse, parent)
+
+
+def is_async_relation(model: type[Any], path: str) -> bool:
+    """Public: True when *path* loads through the async (descriptor) eager engine."""
+    return _is_async_relation(model, path)
+
+
+async def load_async_relation_path(
+    model: type[Any],
+    parents: list[Any],
+    path: str,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+) -> None:
+    """Public: batch-load an async descriptor relation onto *parents* (used by Model.load)."""
+    await _load_async_relation_path(model, parents, path, constraint)
 
 
 def _owner_pk_key(model: type[Any]) -> str:
@@ -442,6 +767,18 @@ def _owner_pk_key(model: type[Any]) -> str:
     if pk_key is None:
         raise TypeError(f"{model.__name__} primary key column has no key")
     return pk_key
+
+
+def _constraint_where(
+    related_cls: type[Any],
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None,
+) -> Any | None:
+    """Extract the WHERE clause a constraint closure builds on the related model."""
+    if constraint is None:
+        return None
+    sub_qb: QueryBuilder[Any] = QueryBuilder(related_cls, select(related_cls))
+    sub_qb = constraint(sub_qb)
+    return sub_qb.statement.whereclause
 
 
 def _dedupe_by_pk(model: type[Any], objs: list[Any]) -> list[Any]:
@@ -488,6 +825,19 @@ async def _batch_load_async(
             .where(mlink.table.c[mlink.type_column] == mlink.owner_type)
             .where(owner_col.in_({str(v) for v in owner_values}))
         )
+    elif target.kind == "mbm":
+        blink = target.mbm_link
+        if blink is None:
+            raise UnknownRelationError(model.__name__, attr_name)
+        related_cls = blink.related_model
+        owner_col = blink.table.c[blink.owner_foreign_key]
+        related_pk = sqla_cast(_primary_key_column(related_cls), String)
+        stmt = (
+            select(related_cls, owner_col.label(owner_label))
+            .join(blink.table, blink.table.c[blink.id_column] == related_pk)
+            .where(blink.table.c[blink.type_column] == blink.related_type)
+            .where(owner_col.in_(set(owner_values)))
+        )
     else:
         link = target.btm_link
         if link is None:
@@ -525,6 +875,51 @@ async def _batch_load_async(
     return _dedupe_by_pk(related_cls, flat)
 
 
+async def _load_morph_to_path(parents: list[Any], head: str, target: _RelationTarget) -> None:
+    from arvel.database.orm.morph import batch_load_morph_to
+
+    if target.morph_name is None:
+        raise UnknownRelationError("?", head)
+    # Polymorphic parent — nested paths through a morphTo aren't resolvable
+    # statically (the parent type varies per row), so morphTo is a leaf here.
+    await batch_load_morph_to(parents, target.morph_name, head)
+
+
+async def _load_morph_child_path(
+    parents: list[Any],
+    head: str,
+    tail: str,
+    target: _RelationTarget,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None,
+) -> None:
+    from arvel.database.orm.morph import batch_load_morph_children
+
+    clink = target.morph_child_link
+    if clink is None:
+        raise UnknownRelationError("?", head)
+    where = _constraint_where(clink.related_model, constraint) if not tail else None
+    children = await batch_load_morph_children(parents, clink, head, where)
+    if tail and children:
+        await _load_async_relation_path(clink.related_model, children, tail, constraint)
+
+
+async def _load_one_of_many_path(
+    parents: list[Any],
+    head: str,
+    tail: str,
+    target: _RelationTarget,
+    constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None,
+) -> None:
+    from arvel.database.orm.has_one_of_many import batch_load_one_of_many
+
+    olink = target.one_of_many_link
+    if olink is None:
+        raise UnknownRelationError("?", head)
+    winners = await batch_load_one_of_many(parents, olink, head)
+    if tail and winners:
+        await _load_async_relation_path(olink.related_model, winners, tail, constraint)
+
+
 async def _load_async_relation_path(
     model: type[Any],
     parents: list[Any],
@@ -534,13 +929,22 @@ async def _load_async_relation_path(
     """Batch-load *path* (optionally nested, e.g. ``roles.permissions``)."""
     head, _, tail = path.partition(".")
     target = _resolve_relation(model, head)
-    if target.kind not in ("btm", "mtm"):
+    if target.kind == "morph_to":
+        await _load_morph_to_path(parents, head, target)
+        return
+    if target.kind == "morph_child":
+        await _load_morph_child_path(parents, head, tail, target, constraint)
+        return
+    if target.kind == "one_of_many":
+        await _load_one_of_many_path(parents, head, tail, target, constraint)
+        return
+    if target.kind not in ("btm", "mtm", "mbm"):
         raise UnknownRelationError(model.__name__, head)
     # A constraint closure applies to the leaf relation, as in Eloquent.
     related = await _batch_load_async(model, parents, head, target, None if tail else constraint)
     if not tail or not related:
         return
-    link = target.mtm_link or target.btm_link
+    link = target.mtm_link or target.btm_link or target.mbm_link
     if link is None:
         return
     await _load_async_relation_path(link.related_model, related, tail, constraint)
@@ -706,6 +1110,12 @@ class QueryBuilder(Generic[T]):
         self._select_columns: list[Any] | None = None
         self._raw_select_expr: str | None = None  # for select_raw()
         self._async_eager: list[_AsyncEagerSpec] = []
+        # Sync (selectinload) eager loads, applied in apply_global_scopes so without()/
+        # with_only() can drop or replace them before the SELECT is built.
+        self._eager_loads: list[_AsyncEagerSpec] = []
+        # Set by chaperone() inside a with_() closure; read back to hydrate inverses.
+        self._chaperone_request: str | bool = False
+        self._chaperones: list[_Chaperone] = []
         # WHERE lives here, not on _stmt, so or_where can OR onto the whole chain.
         self._where_predicate: ColumnElement[bool] | None = None
 
@@ -767,6 +1177,9 @@ class QueryBuilder(Generic[T]):
         new._select_columns = list(self._select_columns) if self._select_columns else None
         new._raw_select_expr = self._raw_select_expr
         new._async_eager = list(self._async_eager)
+        new._eager_loads = list(self._eager_loads)
+        new._chaperone_request = self._chaperone_request
+        new._chaperones = list(self._chaperones)
         new._where_predicate = self._where_predicate
         return new
 
@@ -1305,122 +1718,264 @@ class QueryBuilder(Generic[T]):
         self,
         *relations: str | Mapping[str, Callable[[QueryBuilder[Any]], QueryBuilder[Any]]],
     ) -> Self:
-        stmt = self._stmt
-        async_specs: list[_AsyncEagerSpec] = list(self._async_eager)
+        clone = self._clone()
+        clone._register_eager(relations)
+        return clone
+
+    def with_only(
+        self,
+        *relations: str | Mapping[str, Callable[[QueryBuilder[Any]], QueryBuilder[Any]]],
+    ) -> Self:
+        """Replace all pending eager loads with exactly *relations* (Eloquent's withOnly)."""
+        clone = self._clone()
+        clone._eager_loads = []
+        clone._async_eager = []
+        clone._chaperones = []
+        clone._register_eager(relations)
+        return clone
+
+    def without(self, *relations: str) -> Self:
+        """Drop the named relations from the pending eager loads (Eloquent's without)."""
+        drop = set(relations)
+        clone = self._clone()
+        clone._eager_loads = [s for s in clone._eager_loads if s.path not in drop]
+        clone._async_eager = [s for s in clone._async_eager if s.path not in drop]
+        clone._chaperones = [c for c in clone._chaperones if c.head not in drop]
+        return clone
+
+    def _register_eager(
+        self,
+        relations: Sequence[str | Mapping[str, Callable[[QueryBuilder[Any]], QueryBuilder[Any]]]],
+    ) -> None:
+        """Record eager-load requests onto this builder (mutates in place)."""
         for item in relations:
             if isinstance(item, Mapping):
                 for path, callback in item.items():
                     if _is_async_relation(self._model, path):
-                        async_specs.append(_AsyncEagerSpec(path, callback))
+                        self._async_eager.append(_AsyncEagerSpec(path, callback))
                     else:
-                        stmt = stmt.options(
-                            _selectin_loader_for_path(self._model, path, constraint=callback)
-                        )
+                        validate_relation_head(self._model, path)
+                        self._eager_loads.append(_AsyncEagerSpec(path, callback))
+                        chap = self._chaperone_from_callback(path, callback)
+                        if chap is not None:
+                            self._chaperones.append(chap)
             elif type(item) is str:
                 if _is_async_relation(self._model, item):
-                    async_specs.append(_AsyncEagerSpec(item, None))
+                    self._async_eager.append(_AsyncEagerSpec(item, None))
                 else:
-                    stmt = stmt.options(_selectin_loader_for_path(self._model, item))
+                    validate_relation_head(self._model, item)
+                    self._eager_loads.append(_AsyncEagerSpec(item, None))
             else:
                 raise TypeError(
                     f"{self._model.__name__}.with_() expects str relation paths or "
                     f"dict[str, callback] mappings, got {type(item).__name__}."
                 )
-        clone = self._clone(stmt)
-        clone._async_eager = async_specs
+
+    def chaperone(self, relation: str | None = None) -> Self:
+        """Inside a with_() closure: hydrate each child's inverse parent on eager load.
+
+        `Post.query().with_({"comments": lambda q: q.chaperone()})` makes
+        `comment.post` return the already-loaded post (identity preserved) without a
+        query. Pass `relation` to name the inverse explicitly when it can't be inferred.
+        """
+        clone = self._clone()
+        clone._chaperone_request = relation if relation is not None else True
         return clone
 
+    def _chaperone_from_callback(
+        self, path: str, callback: Callable[[QueryBuilder[Any]], QueryBuilder[Any]]
+    ) -> _Chaperone | None:
+        """Run *callback* on a probe builder; if it called chaperone(), resolve the inverse."""
+        head = path.partition(".")[0]
+        head_rel = _mapper_of(self._model).relationships.get(head)
+        if head_rel is None:
+            return None
+        related_cls = head_rel.mapper.class_
+        probe: QueryBuilder[Any] = callback(QueryBuilder(related_cls, select(related_cls)))
+        request = probe._chaperone_request
+        if request is False:
+            return None
+        inverse = (
+            request if isinstance(request, str) else _infer_inverse_relation(self._model, head_rel)
+        )
+        return _Chaperone(head=head, inverse=inverse, uselist=bool(head_rel.uselist))
+
     async def _eager_load_async(self, items: Sequence[Any]) -> None:
-        """Run any pending batched MorphToMany/BelongsToMany eager loads."""
-        if not self._async_eager or not items:
-            return
+        """Apply chaperones, then run any pending batched async eager loads."""
         parents = list(items)
+        if self._chaperones and parents:
+            _apply_chaperones(self._chaperones, parents)
+        if not self._async_eager or not parents:
+            return
         for spec in self._async_eager:
             await _load_async_relation_path(self._model, parents, spec.path, spec.constraint)
 
-    def with_count(self, *relations: str) -> Self:
+    def with_aggregate(
+        self,
+        relation: str,
+        agg: str,
+        col: str | None = None,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> Self:
+        """Add a correlated aggregate column over a relation (pivot-aware, soft-delete scoped).
+
+        ``relation`` may carry an ``" as <alias>"`` suffix; an explicit ``alias`` wins.
+        Raises UnknownRelationError for relations the model doesn't define.
+        """
+        name, parsed_alias = _split_relation_alias(relation)
+        label = alias or parsed_alias or _aggregate_label(name, agg, col)
+        target = _resolve_relation(self._model, name)
+        column = _aggregate_column(self._model, target, agg, col, constraint).label(label)
+        clone = self._clone()
+        clone._stmt = self._stmt.add_columns(column)
+        clone._select_columns = ["__with_agg__"]
+        return clone
+
+    def with_count(
+        self,
+        *relations: str,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> Self:
         """Add {relation}_count columns via correlated COUNT subqueries.
 
         Honours the related model's soft-delete scope and supports belongs-to-many.
-        Raises UnknownRelationError for relations the model doesn't define.
+        Each relation may carry an ``" as <alias>"`` suffix.
         """
-        stmt = self._stmt
-        for rel_name in relations:
-            target = _resolve_relation(self._model, rel_name)
-            count_sub = _count_subquery(self._model, target).label(f"{rel_name}_count")
-            stmt = stmt.add_columns(count_sub)
-        clone = self._clone()
-        clone._stmt = stmt
-        clone._select_columns = ["__with_count__"]
+        clone = self
+        for spec in relations:
+            clone = clone.with_aggregate(spec, "count", constraint=constraint)
         return clone
 
-    def with_sum(self, relation: str, col: str) -> Self:
-        """Add {relation}_sum_{col} column via correlated SUM subquery."""
-        from sqlalchemy import func as sqla_func
+    def with_sum(
+        self,
+        relation: str,
+        col: str,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> Self:
+        """Add a {relation}_sum_{col} column via correlated SUM subquery."""
+        return self.with_aggregate(relation, "sum", col, alias=alias, constraint=constraint)
 
-        stmt = self._stmt
-        mapper = _mapper_of(self._model)
-        rel = mapper.relationships.get(relation)
-        if rel is not None:
-            local_col, remote_col = _local_remote(rel)
-            sum_col = getattr(rel.mapper.class_, col)
-            sum_sub = (
-                select(sqla_func.sum(sum_col))
-                .where(remote_col == local_col)
-                .correlate(self._model)
-                .scalar_subquery()
-                .label(f"{relation}_sum_{col}")
-            )
-            stmt = stmt.add_columns(sum_sub)
-        clone = self._clone()
-        clone._stmt = stmt
-        clone._select_columns = ["__with_agg__"]
-        return clone
+    def with_avg(
+        self,
+        relation: str,
+        col: str,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> Self:
+        """Add a {relation}_avg_{col} column via correlated AVG subquery."""
+        return self.with_aggregate(relation, "avg", col, alias=alias, constraint=constraint)
 
-    def with_max(self, relation: str, col: str) -> Self:
-        from sqlalchemy import func as sqla_func
+    def with_min(
+        self,
+        relation: str,
+        col: str,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> Self:
+        """Add a {relation}_min_{col} column via correlated MIN subquery."""
+        return self.with_aggregate(relation, "min", col, alias=alias, constraint=constraint)
 
-        stmt = self._stmt
-        mapper = _mapper_of(self._model)
-        rel = mapper.relationships.get(relation)
-        if rel is not None:
-            local_col, remote_col = _local_remote(rel)
-            agg_col = getattr(rel.mapper.class_, col)
-            max_sub = (
-                select(sqla_func.max(agg_col))
-                .where(remote_col == local_col)
-                .correlate(self._model)
-                .scalar_subquery()
-                .label(f"{relation}_max_{col}")
-            )
-            stmt = stmt.add_columns(max_sub)
-        clone = self._clone()
-        clone._stmt = stmt
-        clone._select_columns = ["__with_agg__"]
-        return clone
+    def with_max(
+        self,
+        relation: str,
+        col: str,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> Self:
+        """Add a {relation}_max_{col} column via correlated MAX subquery."""
+        return self.with_aggregate(relation, "max", col, alias=alias, constraint=constraint)
+
+    def with_exists(
+        self,
+        relation: str,
+        *,
+        alias: str | None = None,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> Self:
+        """Add a boolean {relation}_exists column via correlated EXISTS."""
+        return self.with_aggregate(relation, "exists", alias=alias, constraint=constraint)
 
     def where_has(
         self,
         relation: str | Any,
         constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+        operator: str = ">=",
+        count: int = 1,
     ) -> Self:
-        """Filter to rows that have at least one matching related row."""
-        from sqlalchemy import exists as sqla_exists
+        """Filter to rows with matching related rows.
 
-        target = _resolve_relation(self._model, relation)
-        sub = _exists_subquery(self._model, target, constraint)
-        return self._and(sqla_exists(sub))
+        Supports nested paths (``"posts.comments"``), a constraint closure on the leaf relation,
+        and an operator/count (``where_has("comments", c, ">=", 3)``).
+        """
+        path = relation if isinstance(relation, str) else relation.key
+        return self._and(_has_predicate(self._model, path, constraint, operator, count))
+
+    def or_where_has(
+        self,
+        relation: str | Any,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+        operator: str = ">=",
+        count: int = 1,
+    ) -> Self:
+        """OR-joined ``where_has``."""
+        path = relation if isinstance(relation, str) else relation.key
+        return self._or(_has_predicate(self._model, path, constraint, operator, count))
+
+    def with_where_has(
+        self,
+        relation: str | Any,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> Self:
+        """Filter by the relation AND eager-load it with the same constraint (withWhereHas)."""
+        name = relation if isinstance(relation, str) else relation.key
+        filtered = self.where_has(name, constraint)
+        if constraint is None:
+            return filtered.with_(name)
+        return filtered.with_({name: constraint})
 
     def where_relation(self, relation: str | Any, column: str, value: Any) -> Self:
         """Filter to rows whose related model has ``column == value`` (Eloquent's whereRelation)."""
         return self.where_has(relation, lambda q: q.where(**{column: value}))
 
-    def doesnt_have(self, relation: str | Any) -> Self:
-        from sqlalchemy import exists as sqla_exists
+    def or_where_relation(self, relation: str | Any, column: str, value: Any) -> Self:
+        """OR-joined ``where_relation``."""
+        return self.or_where_has(relation, lambda q: q.where(**{column: value}))
 
-        target = _resolve_relation(self._model, relation)
-        sub = _exists_subquery(self._model, target)
-        return self._and(~sqla_exists(sub))
+    def doesnt_have(
+        self,
+        relation: str | Any,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> Self:
+        """Filter to rows with no matching related row (optionally constrained)."""
+        path = relation if isinstance(relation, str) else relation.key
+        return self._and(~_has_predicate(self._model, path, constraint, ">=", 1))
+
+    def or_doesnt_have(
+        self,
+        relation: str | Any,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> Self:
+        """OR-joined ``doesnt_have``."""
+        path = relation if isinstance(relation, str) else relation.key
+        return self._or(~_has_predicate(self._model, path, constraint, ">=", 1))
+
+    def where_belongs_to(self, parent: Any, relation: str | None = None) -> Self:
+        """Filter to rows whose belongs-to FK points at *parent* (Eloquent's whereBelongsTo)."""
+        mapper = _mapper_of(self._model)
+        rel = (
+            mapper.relationships[relation]
+            if relation is not None
+            else _belongs_to_relation_for(mapper, parent)
+        )
+        local_col, remote_col = _local_remote(rel)
+        return self._and(local_col == getattr(parent, remote_col.key))
 
     def has(self, relation: str | Any, operator: str = ">=", count: int = 1) -> Self:
         target = _resolve_relation(self._model, relation)
@@ -1435,6 +1990,103 @@ class QueryBuilder(Generic[T]):
         }
         cond = op_map.get(operator, cnt_sub >= count)
         return self._and(cond)
+
+    def _morph_to_name(self, relation: str | Any) -> str:
+        """Resolve *relation* to a MorphTo's name, or raise if it isn't one."""
+        target = _resolve_relation(self._model, relation)
+        if target.kind != "morph_to" or target.morph_name is None:
+            raise UnknownRelationError(self._model.__name__, str(relation))
+        return target.morph_name
+
+    def _morph_type_exists(
+        self,
+        name: str,
+        type_model: type[Any],
+        constraint: _MorphConstraint | None,
+    ) -> ColumnElement[bool]:
+        from sqlalchemy import exists as sqla_exists
+
+        from arvel.database.orm.morph_map import get_morph_alias
+
+        type_col = getattr(self._model, f"{name}_type")
+        id_col = getattr(self._model, f"{name}_id")
+        remote_pk = _primary_key_column(type_model)
+        sub_qb: QueryBuilder[Any] = QueryBuilder(
+            type_model, select(type_model).where(remote_pk == id_col)
+        )
+        if constraint is not None:
+            sub_qb = constraint(sub_qb, type_model)
+        alias = get_morph_alias(type_model)
+        return and_(type_col == alias, sqla_exists(sub_qb.apply_global_scopes()))
+
+    def _morph_type_count(
+        self,
+        name: str,
+        type_model: type[Any],
+        constraint: _MorphConstraint | None,
+        operator: str,
+        count: int,
+    ) -> ColumnElement[bool]:
+        from arvel.database.orm.morph_map import get_morph_alias
+
+        type_col = getattr(self._model, f"{name}_type")
+        id_col = getattr(self._model, f"{name}_id")
+        remote_pk = _primary_key_column(type_model)
+        cnt = select(func.count()).select_from(type_model).where(remote_pk == id_col)
+        where = (
+            _constraint_where(type_model, lambda q: constraint(q, type_model))
+            if constraint
+            else None
+        )
+        if where is not None:
+            cnt = cnt.where(where)
+        scope = _global_scope_whereclause(type_model)
+        if scope is not None:
+            cnt = cnt.where(scope)
+        cnt_sub = cnt.correlate(self._model).scalar_subquery()
+        op_map: dict[str, ColumnElement[bool]] = {
+            ">=": cnt_sub >= count,
+            ">": cnt_sub > count,
+            "<=": cnt_sub <= count,
+            "<": cnt_sub < count,
+            "=": cnt_sub == count,
+            "!=": cnt_sub != count,
+        }
+        return and_(type_col == get_morph_alias(type_model), op_map.get(operator, cnt_sub >= count))
+
+    def where_has_morph(
+        self,
+        relation: str | Any,
+        types: Sequence[type[Any]],
+        constraint: _MorphConstraint | None = None,
+    ) -> Self:
+        """Filter to rows whose MorphTo points at one of *types*, with an optional constraint.
+
+        Mirrors Eloquent's ``whereHasMorph`` — a union of per-type ``EXISTS`` subqueries. The
+        constraint closure receives ``(query, type_model)`` so it can branch on the concrete type.
+        """
+        name = self._morph_to_name(relation)
+        preds = [self._morph_type_exists(name, tm, constraint) for tm in types]
+        return self._and(or_(*preds) if preds else sqla_false())
+
+    def has_morph(
+        self,
+        relation: str | Any,
+        types: Sequence[type[Any]],
+        operator: str = ">=",
+        count: int = 1,
+        constraint: _MorphConstraint | None = None,
+    ) -> Self:
+        """Count-based polymorphic existence — Eloquent's ``hasMorph``."""
+        name = self._morph_to_name(relation)
+        preds = [self._morph_type_count(name, tm, constraint, operator, count) for tm in types]
+        return self._and(or_(*preds) if preds else sqla_false())
+
+    def where_morph_relation(
+        self, relation: str | Any, types: Sequence[type[Any]], column: str, value: Any
+    ) -> Self:
+        """Polymorphic ``whereRelation`` — morphed parent must have ``column == value``."""
+        return self.where_has_morph(relation, types, lambda q, _t: q.where(**{column: value}))
 
     def where_pivot(self, column: str, value: Any) -> Self:
         """Filter via pivot table column — only valid on BelongsToManyAccessor.
@@ -1524,6 +2176,10 @@ class QueryBuilder(Generic[T]):
         stmt = target._stmt
         if target._where_predicate is not None:
             stmt = stmt.where(target._where_predicate)
+        for spec in self._eager_loads:
+            stmt = stmt.options(
+                _selectin_loader_for_path(self._model, spec.path, constraint=spec.constraint)
+            )
         for _name, cte in self._ctes:
             stmt = stmt.add_cte(cte)
         return stmt
@@ -1699,6 +2355,29 @@ class QueryBuilder(Generic[T]):
         await saveable.save()
         return instance
 
+    async def restore_or_create(
+        self, attributes: dict[str, Any], values: dict[str, Any] | None = None
+    ) -> T:
+        """Restore a trashed match (or return a live one); create with both dicts if none exists.
+
+        Avoids duplicating a row that was soft-deleted — the restore-if-trashed-else-create flow
+        common in sync/import jobs.
+        """
+        instance = await self.with_trashed().where(**attributes).first()
+        if instance is not None:
+            restorable = cast("Any", instance)
+            if callable(getattr(restorable, "trashed", None)) and restorable.trashed():
+                await restorable.restore()
+            return instance
+        model_factory = cast("_ModelFactory", self._model)
+        return cast("T", await model_factory.create(**{**attributes, **(values or {})}))
+
+    async def create_or_restore(
+        self, attributes: dict[str, Any], values: dict[str, Any] | None = None
+    ) -> T:
+        """Alias of ``restore_or_create`` — Eloquent ships both spellings."""
+        return await self.restore_or_create(attributes, values)
+
     async def sole(self) -> T:
         """Return exactly one row. Raises if zero or more than one row matches."""
         stmt = self.apply_global_scopes()
@@ -1742,6 +2421,7 @@ class QueryBuilder(Generic[T]):
         return instance
 
     async def all(self) -> Any:
+        from arvel.database.collection import ModelCollection
         from arvel.support.collections import Collection
 
         stmt = self.apply_global_scopes()
@@ -1783,13 +2463,13 @@ class QueryBuilder(Generic[T]):
                 items.append(cast("T", obj))
             await self._fire_retrieved(items)
             await self._eager_load_async(items)
-            return Collection(items)
+            return ModelCollection(cast("list[Any]", items))
 
         result = await get_active_session().execute(stmt)
         scalars = list(result.scalars().all())
         await self._fire_retrieved(scalars)
         await self._eager_load_async(scalars)
-        return Collection(scalars)
+        return ModelCollection(scalars)
 
     async def get(self) -> Any:
         return await self.all()
@@ -2406,6 +3086,32 @@ class QueryBuilder(Generic[T]):
         session = get_active_session()
         table = _table_of(self._model)
         stmt = sqla_delete(table)
+        where_clause = self.apply_global_scopes().whereclause
+        if where_clause is not None:
+            stmt = stmt.where(where_clause)
+        result = cast("CursorResult[Any]", await session.execute(stmt))
+        await session.flush()
+        return int(result.rowcount)
+
+    async def restore(self) -> int:
+        """Clear ``deleted_at`` on matching rows in one UPDATE. Returns rows affected.
+
+        Pair with ``only_trashed()`` / ``with_trashed()`` — the default soft-delete scope
+        hides trashed rows, so a plain ``query().restore()`` would match nothing. Like every
+        bulk write, this bypasses per-row model events (Eloquent parity).
+        """
+        self._assert_writable("restore")
+        soft_field: str | None = getattr(self._model, "__arvel_soft_delete_column__", None)
+        if soft_field is None:
+            raise AttributeError(
+                f"{self._model.__name__} does not use SoftDeletes — restore() unavailable."
+            )
+        from sqlalchemy import update as sqla_update
+
+        session = get_active_session()
+        table = _table_of(self._model)
+        values = self._touch_updated_at({soft_field: None})
+        stmt = sqla_update(table).values(values)
         where_clause = self.apply_global_scopes().whereclause
         if where_clause is not None:
             stmt = stmt.where(where_clause)

@@ -6,8 +6,9 @@ full contract.
 
 from __future__ import annotations
 
-from arvel.database.attributes import CastsAttributes, accessor, mutator
+from arvel.database.attributes import Attribute, CastsAttributes, accessor, mutator
 from arvel.database.casts import DecryptionError, EncryptedType, EnumType, PydanticType
+from arvel.database.collection import ModelCollection
 from arvel.database.columns import (
     big_integer,
     boolean,
@@ -28,7 +29,7 @@ from arvel.database.columns import (
 )
 from arvel.database.db import DB, TableQueryBuilder
 from arvel.database.domain import DomainService
-from arvel.database.events import Observer, fire_after_commit
+from arvel.database.events import ModelEvent, Observer, fire_after_commit
 from arvel.database.exceptions import (
     DatabaseConnectionError,
     MassAssignmentError,
@@ -45,15 +46,28 @@ from arvel.database.exceptions import (
 from arvel.database.factories import Factory
 from arvel.database.migrations import Migration
 from arvel.database.mixins import PublishableMixin, TranslatableMixin, parse_trashed_mode
-from arvel.database.model import ActiveRecord, Model, Prunable, SoftDeletes, Timestamps, ViewModel
+from arvel.database.model import (
+    ActiveRecord,
+    HasUlids,
+    HasUuids,
+    Model,
+    Prunable,
+    SoftDeletes,
+    Timestamps,
+    ViewModel,
+)
 from arvel.database.orm import (
     Mapped,
+    MorphMapError,
     column_attr,
     declared_attr,
     foreign,
     has_many_attr,
     mapped_column,
+    morph_map,
+    morph_map_required,
     relationship,
+    require_morph_map,
 )
 from arvel.database.paginator import Paginator
 from arvel.database.policy import (
@@ -70,6 +84,7 @@ from arvel.support.collections import Collection
 __all__ = [
     "DB",
     "ActiveRecord",
+    "Attribute",
     "Blueprint",
     "CastsAttributes",
     "Collection",
@@ -83,6 +98,8 @@ __all__ = [
     "Factory",
     "ForeignKeyAction",
     "GlobalScope",
+    "HasUlids",
+    "HasUuids",
     "IdType",
     "ImmutableReadModelError",
     "Mapped",
@@ -90,7 +107,10 @@ __all__ = [
     "Migration",
     "MigrationNotReversibleError",
     "Model",
+    "ModelCollection",
+    "ModelEvent",
     "ModelNotFoundError",
+    "MorphMapError",
     "MultipleResultsError",
     "Observer",
     "OperationCancelledError",
@@ -133,9 +153,12 @@ __all__ = [
     "json",
     "jsonb",
     "mapped_column",
+    "morph_map",
+    "morph_map_required",
     "mutator",
     "parse_trashed_mode",
     "relationship",
+    "require_morph_map",
     "scope",
     "string",
     "text",

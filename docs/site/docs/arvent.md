@@ -354,12 +354,19 @@ Post.observe(PostObserver)
 
 All writes also emit `saving` / `saved`. Every read that hydrates a model emits
 `retrieved` — once per row, whether you call `find`, `first`, `get`, `all`,
-`sole`, `paginate`, or `chunk`. `force_delete()` fires `deleting` / `deleted`,
-and `restore()` fires `restoring` / `restored`.
+`sole`, `paginate`, or `chunk`.
 
-Return `False` from `creating`, `updating`, `deleting`, or `restoring` to abort
-the pending operation. Arvel raises `OperationCancelledError` and does not flush
-the change.
+A soft delete also fires `trashed` (so you can tell it apart from a hard delete);
+`deleted` fires for both kinds. `force_delete()` fires `force_deleting` →
+`deleting` → `deleted` → `force_deleted` and never fires `trashed`. `restore()`
+fires `restoring` / `restored`. `replicate()` fires `replicating` on the clone
+before returning it. Bulk query-builder deletes (`query().delete()`, `restore()`,
+`force_delete()`) are set-based statements and fire no per-row events — operate on
+instances when you need them.
+
+Return `False` from `creating`, `updating`, `deleting`, `restoring`, or
+`force_deleting` to abort the pending operation. Arvel raises
+`OperationCancelledError` and does not flush the change.
 
 ```python
 from arvel.database.exceptions import OperationCancelledError
@@ -368,6 +375,73 @@ from arvel.database.exceptions import OperationCancelledError
 class Guard(Observer):
     def updating(self, post: Post) -> bool:
         return post.is_published  # False cancels save
+```
+
+### Lightweight wiring without a full observer
+
+Three shortcuts cover the common cases where a whole observer class is overkill.
+
+**Single callback** — `Model.on(event, callback)` registers one callable for one event. It runs
+alongside any observers and through the same dispatch path, so cancellable hooks and async
+callbacks behave identically:
+
+```python
+Post.on("created", lambda p: log.info("created %s", p.id))
+Post.on("creating", lambda p: bool(p.title))  # False aborts the insert
+```
+
+**Auto-register observers** — declare `__observed_by__` and the observers bind at class-definition
+time (no `observe()` call in a provider):
+
+```python
+class Post(Model):
+    __observed_by__ = [PostObserver]
+```
+
+**Dispatch custom events on the bus** — map a lifecycle name to a `ModelEvent` subclass. When that
+lifecycle fires, the event (carrying the instance under `.model`) is dispatched on the `Event`
+facade, so any listener can react:
+
+```python
+from arvel.database import ModelEvent
+
+
+class PostCreated(ModelEvent):
+    pass
+
+
+class Post(Model):
+    __dispatches_events__ = {"created": PostCreated}
+```
+
+If the event bus isn't booted, the dispatch is skipped — model writes never hard-depend on it.
+
+## Timestamps
+
+Mix in `Timestamps` for the usual `created_at` / `updated_at` columns, auto-filled on insert and
+bumped on update. Three controls cover the edge cases:
+
+```python
+class Import(Model):
+    __timestamps__ = False  # opt out — no auto-fill at all
+    ...
+
+
+class Audit(Model):
+    CREATED_AT = "inserted_at"   # custom column names
+    UPDATED_AT = "changed_at"
+    inserted_at: Mapped[datetime | None] = datetime_col(nullable=True, init=False, default=None)
+    changed_at: Mapped[datetime | None] = datetime_col(nullable=True, init=False, default=None)
+```
+
+`touch()` sets `UPDATED_AT` to now and saves (firing events); pass a column to bump a different one,
+e.g. `await post.touch("published_at")`. `touch_quietly()` does the same without events.
+
+For backfills, suspend auto-fill for a block and supply your own timestamps:
+
+```python
+async with Order.without_timestamps():
+    await Order.create(created_at=imported_at, ...)  # auto-fill skipped
 ```
 
 ## Service provider & request-scoped transactions
@@ -417,6 +491,87 @@ all_posts = await Post.with_trashed().get()
 trash = await Post.only_trashed().get()
 trash_count = await Post.only_trashed().count()
 ```
+
+### Restore and force-destroy
+
+`restore_or_create` is the soft-delete-aware upsert: it searches *including* trashed rows, restores a match in place, and only creates when nothing exists — so a soft-deleted row is reused instead of duplicated. `create_or_restore` is an alias.
+
+```python
+# Reuses a trashed row with this email, else creates one
+account = await Account.restore_or_create(
+    {"email": "a@b.com"},
+    {"plan": "pro"},  # extra fields on create
+)
+
+account.trashed()  # bool — is deleted_at set?
+```
+
+Bulk restore clears `deleted_at` in a single UPDATE. The default scope hides trashed rows, so pair it with `only_trashed()` (or `with_trashed().where(...)`):
+
+```python
+restored = await Post.only_trashed().where("author_id", 7).restore()  # -> count
+```
+
+`force_destroy` hard-deletes by primary key, trashed rows included. It takes either varargs or one iterable:
+
+```python
+await Post.force_destroy(1, 2, 3)
+await Post.force_destroy(stale_ids)
+```
+
+Bulk `restore()` bypasses per-row events, like every bulk write. Instance `restore()` still fires `restoring` / `restored`.
+
+## Attribute helpers
+
+A grab-bag of Eloquent-style helpers on every model:
+
+```python
+# Per-instance appended accessors (in addition to class-level __appends__)
+user.append("full_name")
+user.set_appends(["full_name", "avatar_url"])
+
+# Conditional visibility (bool or a self-predicate)
+user.make_hidden_if(not request.user.is_admin, "email")
+user.make_visible_if(lambda u: u.is_public, "phone")
+
+# Subsets of to_dict()
+user.only("id", "name")          # just these keys
+user.except_("password_hash")    # everything but these
+
+# Primary key
+User.get_key_name()              # "id"
+user.get_key()                   # the PK value (a tuple for composite keys)
+User.qualify_column("email")     # "users.email"
+
+# Identity (same type + same non-null key)
+user.is_same(other)
+user.is_not(other)
+
+# Throw away unsaved changes
+user.name = "typo"
+user.discard_changes()           # name reverts to the loaded value
+```
+
+### UUID / ULID primary keys
+
+Mix in `HasUuids` or `HasUlids` and declare a string PK with `init=False, default=None`. The key is
+generated on insert:
+
+```python
+from arvel.database import HasUlids, Model
+
+class Document(Model, HasUlids):
+    __tablename__ = "documents"
+    id: Mapped[str] = mapped_column(String(26), primary_key=True, init=False, default=None)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+
+
+doc = await Document.create(title="Spec")
+doc.id  # e.g. "01KSX…" — a sortable 26-char ULID
+```
+
+`HasUuids` fills a UUID v4 instead. Both expose `new_unique_id()` (a classmethod you can override).
+ULIDs sort by their 10-char time prefix, so newer rows order after older ones.
 
 ## Prunable
 
