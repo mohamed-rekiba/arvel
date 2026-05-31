@@ -67,6 +67,19 @@ combined = numbers.reduce(lambda carry, n: carry + n, 0)
 
 For most cases, `.sum()`, `.avg()`, etc. cover what you need without writing reducers.
 
+## Finding and set operations
+
+```python
+numbers = Collection([1, 2, 3, 4])
+
+numbers.find(3)        # 3 — first item equal to the argument, or None
+numbers.only(2, 4)     # Collection([2, 4]) — keep only the listed values
+numbers.except_(2, 4)  # Collection([1, 3]) — drop the listed values
+numbers.contains(3)    # True
+```
+
+`find`, `only`, and `except_` compare by value (`==`), so they work on unhashable members too. On a [ModelCollection](arvent-collections.md) these same methods key off the primary key instead — `posts.only(1, 3)` selects by id, not by equality.
+
 ## Lazy collections
 
 For large datasets, use a `LazyCollection` to defer evaluation until you actually need values:

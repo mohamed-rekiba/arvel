@@ -66,6 +66,8 @@ posts.diff(published)       # posts not in `published` (by key)
 posts.intersect(published)  # posts also in `published` (by key)
 ```
 
+These are the same `find`/`contains`/`only`/`except_`/`diff`/`intersect` methods as the base [Collection](collections.md) — `ModelCollection` overrides them to compare by primary key instead of by value or object identity.
+
 ## Re-querying
 
 ```python
