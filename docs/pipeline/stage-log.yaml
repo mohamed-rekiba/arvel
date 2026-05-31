@@ -902,21 +902,21 @@ events:
     role: "qa-engineer"
     result: "pass"
     notes: >
-      Backlog 002 (all stories) — arvel-auth-social companion package. S1 built-in providers
+      Backlog 002 (all stories) — arvel-oauth companion package. S1 built-in providers
       (Google/GitHub/Microsoft/Apple) + generic OIDC over a shared OAuthProvider base with injectable
-      httpx client; SocialAuthManager resolves configured providers, SocialProviderNotFound lists what
+      httpx client; OAuthManager resolves configured providers, ProviderNotFound lists what
       is configured. S2 redirect/callback HTTP flow: /auth/{provider}/redirect sets state + PKCE
       cookies; /callback verifies state (422 on mismatch), exchanges code, links account, issues a
-      session; provider errors redirect to SOCIAL_ERROR_REDIRECT_URL. S3 PKCE on by default
+      session; provider errors redirect to OAUTH_ERROR_REDIRECT_URL. S3 PKCE on by default
       (secrets.token_urlsafe(96), S256-only, per-provider opt-out). S4 OIDC auto-discovery with
       trailing-slash normalisation, OIDCDiscoveryError on failure, HTTPS-only guard
-      (SOCIAL_ALLOW_HTTP_ISSUER dev opt-out, enforced in OIDCProvider.discover). S5 SocialAccount model
+      (OAUTH_ALLOW_HTTP_ISSUER dev opt-out, enforced in OIDCProvider.discover). S5 OAuthAccount model
       (EncryptedJson tokens via AES-256-GCM/APP_KEY, UNIQUE(provider, provider_id), provider_id
-      verbatim), SocialAccountLinker (verified-email linking, unverified placeholder email,
-      DuplicateSocialAccount guard), auth:social:install publishes the migration. AuthService.issue_for
+      verbatim), OAuthAccountLinker (verified-email linking, unverified placeholder email,
+      DuplicateOAuthAccount guard), oauth:install publishes the migration. AuthService.issue_for
       added to core to mint a token pair post-social-login. Stage 4b folded in (Tier 3 / confidential):
       PKCE, encrypted token storage, HTTPS-only discovery, HttpOnly SameSite=Lax state cookie. Docs:
-      docs/site/docs/social-auth.md; arvel[auth-social] extra. Tests: 34 package tests pass;
+      docs/site/docs/oauth.md; arvel[oauth] extra. Tests: 34 package tests pass;
       mypy/pyright/ruff/bandit clean. 002 S1–S5 DONE — epic 002 complete.
     handoff_id: null
 
