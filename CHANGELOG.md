@@ -10,6 +10,16 @@ All notable changes to **Arvel** are documented in this file. Format follows
 
 ### Added
 
+- **Recursive tree relations**: self-referential `descendants` / `ancestors`
+  relations declared as zero-arg accessors (`has_many_recursive` /
+  `belongs_to_recursive`). Lazy `.get()` returns the flat subtree and
+  `.as_tree()` assembles a `TreeNode` forest, each from a single recursive CTE.
+  `with_tree()` eager-loads the whole forest for a result set in one adjacency
+  CTE (no N+1), with optional `constraint` and `max_depth` pushed down to SQL.
+  When the model declares a self-referential `children` relation, `with_tree`
+  hydrates it in place so the loaded subtree is walkable as plain models
+  (`node.children[i].children`) synchronously — no `as_tree()` call and no extra
+  query. `where_has` / `with_count` over a recursive relation raise a clear error.
 - **Base Collection lookups and set operations**: `Collection.find`,
   `Collection.only`, and `Collection.except_` now live on the base collection
   (comparing members by value), completing the `contains`/`diff`/`intersect`
