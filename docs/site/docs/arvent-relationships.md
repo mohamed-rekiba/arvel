@@ -623,6 +623,102 @@ class Country(Model):
 
 `Country.posts()` builds a single SQL JOIN: `countries → users → posts`.
 
+## Recursive relations (trees)
+
+When a model points at itself with a `parent_id`, you've got an adjacency-list tree. Declare `descendants` (walk down) and `ancestors` (walk up) the same way you declare any other relation — zero-arg accessors:
+
+```python
+from typing import Self
+
+from arvel.database import Model, foreign_id, id_, relationship, string
+from arvel.database.orm.relations import Ancestors, Descendants
+from sqlalchemy.orm import Mapped
+
+
+class Category(Model):
+    id: Mapped[int] = id_()
+    name: Mapped[str] = string(120)
+    parent_id: Mapped[int | None] = foreign_id("categories.id", nullable=True)
+    # The tree edge. `with_tree("descendants")` hydrates this in memory so you can
+    # walk `node.children` synchronously — see "Eager loading" below.
+    children: Mapped[list[Category]] = relationship(default_factory=list)
+
+    def descendants(self) -> Descendants[Self]:
+        return self.has_many_recursive(parent_key="parent_id")
+
+    def ancestors(self) -> Ancestors[Self]:
+        return self.belongs_to_recursive(parent_key="parent_id")
+```
+
+`parent_key` defaults to `"parent_id"`, so for the common case you can call `self.has_many_recursive()` with no arguments. The `children` relation is optional — declare it only when you want to walk the loaded tree node-by-node (the next section).
+
+### Lazy read-back
+
+Each accessor runs one recursive CTE. `.get()` returns the flat subtree; `.as_tree()` returns a `TreeNode` forest assembled in-memory (zero extra queries):
+
+```python
+category = await Category.find(1)
+
+flat = await category.descendants().get()        # ModelCollection[Category]
+tree = await category.descendants().as_tree()    # list[TreeNode[Category]]
+
+for node in tree:                                 # direct children at depth 0
+    print(node.node.name, node.depth)
+    for child in node.children:                   # grandchildren at depth 1, ...
+        print("  ", child.node.name)
+
+trail = await category.ancestors().get()          # root → ... → parent
+```
+
+A `TreeNode` carries the model (`node`), its `depth` (roots at 0), and `children`.
+
+### Filtering and capping the walk
+
+Chain `.where(...)` to filter every level — pruning a node prunes its whole branch — and `.with_max_depth(n)` to cap the number of hops:
+
+```python
+visible = await category.descendants().where(Category.status == "visible").get()
+direct = await category.descendants().with_max_depth(1).get()   # children only
+```
+
+### Eager loading with `with_tree()`
+
+Loading descendants for a whole result set lazily is N+1. `with_tree()` loads the entire subtree for every parent in **one** query (a single CTE seeded by all parent ids) and wires it up as a navigable tree. When the model declares a `children` relation, you walk it synchronously — no `await`, no `as_tree()`, just plain models:
+
+```python
+roots = await (
+    Category.where(Category.parent_id.is_(None))
+    .with_tree("descendants")
+    .get()
+)
+
+for root in roots:
+    for child in root.children:          # direct children, already loaded
+        for grandchild in child.children:  # and so on, all depths — no query
+            ...
+```
+
+Every node in the loaded subtree has its `children` populated; a leaf's `children` is an empty list, never a lazy load. If you'd rather have depth metadata, `await root.descendants().as_tree()` still serves a `TreeNode` forest from the same cache with no extra query.
+
+`with_tree()` takes the same knobs as the lazy walk:
+
+```python
+await (
+    Category.query()
+    .with_tree(
+        "descendants",
+        constraint=lambda q: q.where(Category.status == "visible"),
+        max_depth=3,
+    )
+    .get()
+)
+```
+
+Both `constraint` and `max_depth` are optional. Passing a recursive relation to plain `with_()` works too and loads it with defaults.
+
+!!! note "Acyclic data"
+    The walk assumes the tree is acyclic. If a row can become its own ancestor, set `max_depth` to bound the recursion. With `max_depth` (or a pruning `constraint`), nodes at the boundary report `children == []` because their children weren't loaded. `where_has` / `with_count` over a recursive relation aren't supported — use `with_tree()` to load it, then inspect the loaded subtree. Synchronous `children` walking is for `descendants`; `ancestors` reads back via `.get()` / `.as_tree()`.
+
 ## Eager loading
 
 Load relations alongside the parent query with `with_()` to avoid N+1. It works with every relation — the method-style FK relations (`has_many` / `has_one` / `belongs_to`) and the pivot/polymorphic descriptors (`BelongsToMany`, `MorphOne`, `MorphMany`, `MorphToMany`).

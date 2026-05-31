@@ -8,17 +8,18 @@ and ``where_has`` / ``with_count`` from a single declaration.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 from sqlalchemy import inspect as sqla_inspect
-from sqlalchemy import select
-from sqlalchemy.orm import Mapper
+from sqlalchemy import literal, select
+from sqlalchemy.orm import Mapper, aliased
 
 from arvel.database.orm._eager import get_eager_relation
 from arvel.database.query import QueryBuilder
 from arvel.database.session import get_active_session
+from arvel.database.tree import TreeNode, assemble_forest
 
 if TYPE_CHECKING:
     from arvel.database.model import Model
@@ -51,6 +52,218 @@ class FkMethodLink:
     related_col: str
     local_col: str
     name: str
+
+
+@dataclass(frozen=True, slots=True)
+class RecursiveLink:
+    """Resolved shape of a self-referential recursive relation.
+
+    ``direction`` is ``"descendants"`` (walk down via ``parent_key``) or
+    ``"ancestors"`` (walk up). The eager engine reads this to seed one batched
+    adjacency CTE across every parent.
+    """
+
+    related_model: type[Any]
+    direction: str
+    id_key: str
+    parent_key: str
+    name: str
+    max_depth: int | None
+
+
+def build_adjacency_cte(
+    model: type[Any],
+    *,
+    id_key: str,
+    parent_key: str,
+    direction: str,
+    roots: Sequence[Any],
+    max_depth: int | None,
+    base_where: Any = None,
+) -> Any:
+    """Build a recursive adjacency-list CTE seeded by *roots*.
+
+    The CTE carries ``_node_id``, ``_parent_id``, ``_root_id`` (the seeding row a
+    node descends from / leads up to) and ``_tree_depth`` (1 at the first hop).
+    ``_root_id`` is what lets eager loading fan a single query's rows back to the
+    right parent. ``base_where`` (global scopes + caller constraint) is applied to
+    both members, so a soft-deleted node prunes its branch.
+    """
+    id_attr = getattr(model, id_key)
+    parent_attr = getattr(model, parent_key)
+    # __tablename__ is guaranteed on every model; the variable dodges B009's
+    # "use attribute access" rule (the attr isn't statically known on the class).
+    _tbl_attr = "__tablename__"
+    table_name: str = getattr(model, _tbl_attr)
+    cte_name = f"{table_name}_adjacency"
+
+    if direction == "descendants":
+        anchor = select(
+            id_attr.label("_node_id"),
+            parent_attr.label("_parent_id"),
+            parent_attr.label("_root_id"),
+            literal(1).label("_tree_depth"),
+        ).where(parent_attr.in_(roots))
+        if base_where is not None:
+            anchor = anchor.where(base_where)
+        cte = anchor.cte(cte_name, recursive=True)
+        recursive = select(
+            id_attr.label("_node_id"),
+            parent_attr.label("_parent_id"),
+            cte.c._root_id.label("_root_id"),
+            (cte.c._tree_depth + 1).label("_tree_depth"),
+        ).join(cte, parent_attr == cte.c._node_id)
+        if max_depth is not None:
+            recursive = recursive.where(cte.c._tree_depth < max_depth)
+        if base_where is not None:
+            recursive = recursive.where(base_where)
+        return cte.union_all(recursive)
+
+    root_alias = aliased(model, name="_adjacency_root")
+    root_id_attr = getattr(root_alias, id_key)
+    root_parent_attr = getattr(root_alias, parent_key)
+    anchor = (
+        select(
+            id_attr.label("_node_id"),
+            parent_attr.label("_parent_id"),
+            root_id_attr.label("_root_id"),
+            literal(1).label("_tree_depth"),
+        )
+        .select_from(model)
+        .join(root_alias, root_parent_attr == id_attr)
+        .where(root_id_attr.in_(roots))
+    )
+    if base_where is not None:
+        anchor = anchor.where(base_where)
+    cte = anchor.cte(cte_name, recursive=True)
+    recursive = select(
+        id_attr.label("_node_id"),
+        parent_attr.label("_parent_id"),
+        cte.c._root_id.label("_root_id"),
+        (cte.c._tree_depth + 1).label("_tree_depth"),
+    ).join(cte, id_attr == cte.c._parent_id)
+    if max_depth is not None:
+        recursive = recursive.where(cte.c._tree_depth < max_depth)
+    if base_where is not None:
+        recursive = recursive.where(base_where)
+    return cte.union_all(recursive)
+
+
+class _Recursive(QueryBuilder[T], Generic[T]):
+    """Self-referential recursive relation builder (descendants / ancestors).
+
+    Lazy ``.get()`` returns the flat subtree as a ModelCollection; ``.as_tree()``
+    returns a TreeNode forest. ``with_tree(...)`` eager-loads it in one query and
+    both terminals then serve from the per-owner cache. Chained ``.where(...)``
+    filters the walk at every level.
+    """
+
+    _direction: str = "descendants"
+
+    def __init__(
+        self,
+        model: type[T],
+        stmt: Any = None,
+        *,
+        owner: Any = None,
+        owner_pk: Any = None,
+        id_key: str = "id",
+        parent_key: str = "parent_id",
+        max_depth: int | None = None,
+    ) -> None:
+        super().__init__(model, stmt)
+        self._owner = owner
+        self._owner_pk = owner_pk
+        self._id_key = id_key
+        self._parent_key = parent_key
+        self._max_depth = max_depth
+        self._relation_name: str | None = None
+
+    def _clone(self, stmt: Any = None) -> Any:
+        new = super()._clone(stmt)
+        new._owner = self._owner
+        new._owner_pk = self._owner_pk
+        new._id_key = self._id_key
+        new._parent_key = self._parent_key
+        new._max_depth = self._max_depth
+        new._relation_name = self._relation_name
+        return new
+
+    def with_max_depth(self, depth: int) -> Any:
+        """Cap the walk to *depth* hops (1 = direct children/parent)."""
+        clone = self._clone()
+        clone._max_depth = depth
+        return clone
+
+    def link_spec(self, name: str) -> RecursiveLink:
+        """Resolved shape for the eager engine."""
+        return RecursiveLink(
+            self._model, self._direction, self._id_key, self._parent_key, name, self._max_depth
+        )
+
+    def _base_where(self) -> Any:
+        # Folds global scopes (soft deletes) and any chained .where() into one
+        # predicate over the model's columns, applied to both CTE members.
+        return self.apply_global_scopes().whereclause
+
+    async def _fetch_rows(self, roots: Iterable[Any]) -> list[Any]:
+        distinct = [r for r in roots if r is not None]
+        if not distinct:
+            return []
+        full_cte = build_adjacency_cte(
+            self._model,
+            id_key=self._id_key,
+            parent_key=self._parent_key,
+            direction=self._direction,
+            roots=distinct,
+            max_depth=self._max_depth,
+            base_where=self._base_where(),
+        )
+        id_attr = getattr(self._model, self._id_key)
+        stmt = (
+            select(self._model, full_cte.c._root_id, full_cte.c._tree_depth)
+            .join(full_cte, id_attr == full_cte.c._node_id)
+            .order_by(full_cte.c._tree_depth)
+        )
+        result = await get_active_session().execute(stmt)
+        return list(result.all())
+
+    def _cached(self) -> list[Any] | None:
+        if self._owner is not None and self._relation_name is not None:
+            return get_eager_relation(self._owner, self._relation_name)
+        return None
+
+    async def all(self) -> Any:
+        from arvel.database.collection import ModelCollection
+
+        cached = self._cached()
+        if cached is not None:
+            return ModelCollection(list(cached))
+        rows = await self._fetch_rows([self._owner_pk])
+        nodes: list[Any] = [row[0] for row in rows]
+        return ModelCollection(nodes)
+
+    async def as_tree(self) -> list[TreeNode[T]]:
+        """Assemble the walked rows into a TreeNode forest (roots = first hop)."""
+        cached = self._cached()
+        if cached is not None:
+            nodes = list(cached)
+        else:
+            rows = await self._fetch_rows([self._owner_pk])
+            nodes = [row[0] for row in rows]
+        return assemble_forest(nodes, id_key=self._id_key, parent_key=self._parent_key)
+
+
+class Descendants(_Recursive[T], Generic[T]):
+    """All rows below the owner, found by walking ``parent_key`` downward."""
+
+    _direction = "descendants"
+
+
+class Ancestors(_Recursive[T], Generic[T]):
+    """All rows above the owner, found by walking ``parent_key`` upward."""
+
+    _direction = "ancestors"
 
 
 class _OfMany(QueryBuilder[T], Generic[T]):
@@ -383,10 +596,14 @@ class HasOneThrough(HasManyThrough[T], Generic[T]):
 
 
 __all__ = [
+    "Ancestors",
     "BelongsTo",
+    "Descendants",
     "FkMethodLink",
     "HasMany",
     "HasManyThrough",
     "HasOne",
     "HasOneThrough",
+    "RecursiveLink",
+    "build_adjacency_cte",
 ]

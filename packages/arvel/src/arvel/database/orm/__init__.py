@@ -49,12 +49,22 @@ from arvel.database.orm.morph_to_many import (
     MorphToManyAccessor,
     MorphToManyLink,
 )
-from arvel.database.orm.relations import BelongsTo, FkMethodLink, HasMany, HasOne
+from arvel.database.orm.relations import (
+    Ancestors,
+    BelongsTo,
+    Descendants,
+    FkMethodLink,
+    HasMany,
+    HasOne,
+    RecursiveLink,
+)
 
 __all__ = [
+    "Ancestors",
     "BelongsTo",
     "BelongsToMany",
     "BelongsToManyAccessor",
+    "Descendants",
     "FkMethodLink",
     "HasMany",
     "HasOne",
@@ -76,6 +86,7 @@ __all__ = [
     "MorphedByMany",
     "MorphedByManyAccessor",
     "MorphedByManyLink",
+    "RecursiveLink",
     "column_attr",
     "declared_attr",
     "foreign",

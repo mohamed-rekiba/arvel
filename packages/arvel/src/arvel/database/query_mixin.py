@@ -419,6 +419,16 @@ class QueryMixin:
         return cls.query().with_(*relations)
 
     @classmethod
+    def with_tree(
+        cls,
+        relation: str,
+        *,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+        max_depth: int | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().with_tree(relation, constraint=constraint, max_depth=max_depth)
+
+    @classmethod
     def with_count(
         cls,
         *relations: str,
