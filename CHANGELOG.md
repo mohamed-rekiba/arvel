@@ -10,6 +10,10 @@ All notable changes to **Arvel** are documented in this file. Format follows
 
 ### Added
 
+- **Base Collection lookups and set operations**: `Collection.find`,
+  `Collection.only`, and `Collection.except_` now live on the base collection
+  (comparing members by value), completing the `contains`/`diff`/`intersect`
+  family. `ModelCollection` overrides all of them to key off the primary key.
 - **Critical framework bug-fix closure** (Epic 043 — WI-arvel-076): event
   listener dispatch now resolves provider-created listeners through the
   application container, and queued `ListenerJob` uses the bound event

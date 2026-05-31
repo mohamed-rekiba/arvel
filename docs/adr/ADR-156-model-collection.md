@@ -27,7 +27,8 @@ Status: Accepted
 
 `model_keys()`, `find(key)`, `contains(key|model|predicate)`, `only(*keys)`, `except_(*keys)`,
 `diff(other)`, and `intersect(other)` all key off `get_key()` (the model's PK) rather than object
-identity — overriding the base `Collection.diff`/`intersect`/`contains` which used `id()`/`in`.
+identity — overriding the base `Collection.find`/`only`/`except_`/`contains`/`diff`/`intersect`,
+which compare by value or object identity.
 
 ## ADR-156-03: batch load / load_missing
 
