@@ -116,6 +116,12 @@ class Collection(list[T], Generic[T]):
             return any(fn_or_value(item) for item in self)
         return fn_or_value in self
 
+    def find(self, value: T, /) -> T | None:
+        for item in self:
+            if item == value:
+                return item
+        return None
+
     def every(self, fn: Callable[[T], bool]) -> bool:
         return all(fn(item) for item in self)
 
@@ -180,6 +186,13 @@ class Collection(list[T], Generic[T]):
     def diff(self, other: list[T]) -> Collection[T]:
         other_ids = {id(x) for x in other}
         return Collection(item for item in self if id(item) not in other_ids)
+
+    def only(self, *values: T) -> Collection[T]:
+        # `in` compares by ==, so this works for unhashable members too.
+        return Collection(item for item in self if item in values)
+
+    def except_(self, *values: T) -> Collection[T]:
+        return Collection(item for item in self if item not in values)
 
     def merge(self, other: list[T]) -> Collection[T]:
         return Collection(list(self) + list(other))

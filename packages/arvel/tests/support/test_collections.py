@@ -149,6 +149,13 @@ def test_contains() -> None:
     assert coll.contains(lambda n: n > 2)
 
 
+def test_find_returns_matching_value() -> None:
+    items = Collection([Item("a", 1), Item("b", 2)])
+    assert items.find(Item("b", 2)) == Item("b", 2)
+    assert items.find(Item("z", 9)) is None
+    assert Collection([1, 2, 3]).find(2) == 2
+
+
 def test_every_and_some() -> None:
     coll = Collection([2, 4, 6])
     assert coll.every(lambda n: n % 2 == 0)
@@ -222,6 +229,18 @@ def test_key_by() -> None:
 
 
 # ── set operations ────────────────────────────────────────────────────────────
+
+
+def test_only_keeps_listed_values() -> None:
+    coll = Collection([1, 2, 3, 4])
+    assert list(coll.only(2, 4)) == [2, 4]
+    assert list(coll.only()) == []
+
+
+def test_except_drops_listed_values() -> None:
+    coll = Collection([1, 2, 3, 4])
+    assert list(coll.except_(2, 4)) == [1, 3]
+    assert list(coll.except_()) == [1, 2, 3, 4]
 
 
 def test_merge() -> None:
