@@ -24,13 +24,15 @@ plaintext (64 chars). The plaintext only ever travels in the
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC
+from datetime import datetime as _datetime
 from typing import ClassVar
 
-from sqlalchemy import DateTime, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped
 
 from arvel.database.attributes import accessor
+from arvel.database.columns import column, datetime, string
 from arvel.database.model import Model, Timestamps
 
 
@@ -62,20 +64,11 @@ class RefreshToken(Model, Timestamps):
     ]
     __hidden__: ClassVar[list[str] | None] = ["token_hash"]
 
-    id: Mapped[str] = mapped_column(
-        String(36),
-        primary_key=True,
-        init=False,
-        default_factory=_new_id,
-    )
-    user_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
-    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        default=None,
-    )
+    id: Mapped[str] = column(String(36), primary_key=True, init=False, default_factory=_new_id)
+    user_id: Mapped[str] = string(36, index=True)
+    token_hash: Mapped[str] = string(64, unique=True)
+    expires_at: Mapped[_datetime] = datetime()
+    revoked_at: Mapped[_datetime | None] = datetime(nullable=True, default=None)
 
     @accessor
     def is_expired(self) -> bool:
@@ -83,7 +76,7 @@ class RefreshToken(Model, Timestamps):
         exp = self.expires_at
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=UTC)
-        return exp <= datetime.now(tz=UTC)
+        return exp <= _datetime.now(tz=UTC)
 
     @accessor
     def is_active(self) -> bool:
