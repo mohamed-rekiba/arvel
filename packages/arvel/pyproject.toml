@@ -67,9 +67,10 @@ openapi = ["openapi-spec-validator>=0.7.1"]
 permission = ["arvel-permission"]
 image = ["arvel-image"]
 auth-social = ["arvel-auth-social"]
+search = ["arvel-search"]
 dev = ["faker>=40.18.0", "fakeredis>=2.35.1", "moto[s3]>=5.2.1"]
 all = [
-    "arvel[bcrypt,redis,postgres,mysql,sqlite,queue,queue-redis,queue-amqp,mail,s3,gcs,azure,jwt,broadcasting,shell,permission,image,auth-social,openapi,dev]",
+    "arvel[bcrypt,redis,postgres,mysql,sqlite,queue,queue-redis,queue-amqp,mail,s3,gcs,azure,jwt,broadcasting,shell,permission,image,auth-social,search,openapi,dev]",
 ]
 
 [project.scripts]

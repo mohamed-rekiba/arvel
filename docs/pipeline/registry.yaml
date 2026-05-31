@@ -777,3 +777,30 @@ work_items:
       pair for an already-authenticated identity. auth:social:install publishes the migration. Stage 4b
       security covered inline (PKCE, encrypted tokens, HTTPS-only discovery, state CSRF). Gates: 34
       package tests pass; mypy/pyright/ruff/bandit clean. 002 S1–S5 DONE — epic 002 complete.
+
+  - id: "WI-arvel-039"
+    name: "arvel-search — Scout-style full-text search package (backlog 003, all stories)"
+    complexity: "L3"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-05-31T06:00:00+03:00"
+    target: null
+    schema: "squad-os-default (adapted: companion package)"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: >
+      New arvel-search workspace package. Searchable mixin auto-wires lifecycle hooks at class
+      definition to sync records to the configured engine; __searchable__ limits indexed columns
+      (sensitive-name warning), key always included. Document-oriented Engine contract
+      (upsert_documents/remove_documents/search/flush). Drivers: database (SQL ILIKE, bound params),
+      meilisearch + elasticsearch (REST over httpx, no SDKs), collection (in-memory substring), null
+      (no-op). SearchManager.create_driver/register_driver, UnknownSearchDriverError on bad names.
+      SearchBuilder fluent API (where/limit/offset/get/keys/count/raw/first/paginate) hydrating hits in
+      relevance order; SearchEngineNotConfigured when unbound. Search facade + Search.fake()/SearchFake
+      assertions. SEARCH_QUEUE_SYNC queues SearchIndexJob/SearchRemoveJob for committed-state indexing.
+      Docs: docs/site/docs/search.md; arvel[search] extra. Gates: 59 package tests pass;
+      mypy/pyright/ruff clean. 003 S1–S4 DONE — epic 003 complete.

@@ -39,6 +39,7 @@ format-check:  ## Ruff format --check
 .PHONY: typecheck
 typecheck:  ## mypy --strict + pyright --strict (scope driven by pyproject.toml)
 	uv run mypy
+	uv run mypy packages/arvel-search/tests
 	uv run pyright
 
 .PHONY: test
