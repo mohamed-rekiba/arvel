@@ -5,12 +5,10 @@ from __future__ import annotations
 from typing import ClassVar
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.database.exceptions import MassAssignmentError
 from arvel.facades.hash import Hash
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Account(Model):
@@ -18,9 +16,9 @@ class Account(Model):
     __casts__: ClassVar[dict[str, str]] = {"password": "hashed"}
     __fillable__: ClassVar[list[str] | None] = ["email"]
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    email: Mapped[str] = mapped_column(String(120), nullable=False)
-    password: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    id: int = id_()
+    email: str = string(120)
+    password: str = string(255, default="")
 
 
 async def _create_tables(engine: AsyncEngine) -> None:

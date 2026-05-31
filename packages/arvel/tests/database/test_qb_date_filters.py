@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import datetime
 
-from arvel.database import Model
-from sqlalchemy import DateTime, Integer, String
+from arvel.database import Model, column, id_, string
+from sqlalchemy import DateTime
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Event(Model):
     __tablename__ = "date_events"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(20), default="")
-    at: Mapped[datetime.datetime] = mapped_column(
+    id: int = id_()
+    name: str = string(20, default="")
+    at: datetime.datetime = column(
         DateTime, default=datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
     )
 

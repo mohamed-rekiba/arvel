@@ -19,18 +19,16 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from arvel.database import Model, QueryBuilder, SoftDeletes
+from arvel.database import Model, QueryBuilder, SoftDeletes, id_, string
 from arvel.database.scope import GlobalScope, SoftDeleteScope
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class _Tenant(Model):
     __tablename__ = "tenants_wi066"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    tenant_id: Mapped[str] = mapped_column(String(40), nullable=False, default="t1")
-    name: Mapped[str] = mapped_column(String(40), nullable=False, default="x")
+    id: int = id_()
+    tenant_id: str = string(40, default="t1")
+    name: str = string(40, default="x")
 
 
 async def _setup(engine: Any) -> None:
@@ -59,7 +57,7 @@ class TestAddGlobalScopeCallable:
         await _Tenant.create(tenant_id="t2", name="b")
 
         def _only_t1(qb: QueryBuilder[Any]) -> QueryBuilder[Any]:
-            return qb.where(_Tenant.tenant_id == "t1")
+            return qb.where(_Tenant.__table__.c.tenant_id == "t1")
 
         _Tenant.add_global_scope("tenant_filter", _only_t1)
 
@@ -76,7 +74,7 @@ class TestAddGlobalScopeCallable:
         await _Tenant.create(tenant_id="t2", name="b")
 
         def _only_t1(qb: QueryBuilder[Any]) -> QueryBuilder[Any]:
-            return qb.where(_Tenant.tenant_id == "t1")
+            return qb.where(_Tenant.__table__.c.tenant_id == "t1")
 
         _Tenant.add_global_scope("tenant_filter", _only_t1)
 
@@ -95,7 +93,7 @@ class _OnlyNamed(GlobalScope):
         self.name = name
 
     def apply(self, qb: QueryBuilder[Any]) -> QueryBuilder[Any]:
-        return qb.where(_Tenant.name == self.name)
+        return qb.where(_Tenant.__table__.c.name == self.name)
 
 
 class TestAddGlobalScopeInstance:
@@ -119,12 +117,12 @@ class TestAddGlobalScopeInstance:
 
 class _Animal(Model):
     __abstract__ = True
-    species: Mapped[str] = mapped_column(String(40), nullable=False, default="cat")
+    species: str = string(40, default="cat")
 
 
 class _Pet(_Animal):
     __tablename__ = "pets_wi066"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
+    id: int = id_()
 
 
 class TestGlobalScopeInheritance:
@@ -133,7 +131,7 @@ class TestGlobalScopeInheritance:
         _clear_global_scopes(_Pet)
 
         def _only_cats(qb: QueryBuilder[Any]) -> QueryBuilder[Any]:
-            return qb.where(_Animal.species == "cat")
+            return qb.where(_Animal.__table__.c.species == "cat")
 
         _Animal.add_global_scope("only_cats", _only_cats)
 
@@ -171,8 +169,8 @@ class TestGlobalScopeInheritance:
 
 class _Note(SoftDeletes, Model):
     __tablename__ = "notes_wi066"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+    id: int = id_()
+    body: str = string(80, default="")
 
 
 class TestSoftDeleteScope:

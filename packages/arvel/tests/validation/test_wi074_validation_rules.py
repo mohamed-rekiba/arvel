@@ -7,23 +7,21 @@ import zlib
 from dataclasses import dataclass
 from typing import Any
 
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.http.exceptions import HttpExceptionHandler
 from arvel.http.requests import FormRequest
 from arvel.routing import Route, Router
 from arvel.validation import Validator
 from fastapi import FastAPI
 from pydantic import BaseModel
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 from starlette.testclient import TestClient
 
 
 class Wi074Post(Model):
     __tablename__ = "wi074_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    email: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    email: str = string(200)
 
 
 async def _setup(engine: AsyncEngine, session: AsyncSession) -> None:

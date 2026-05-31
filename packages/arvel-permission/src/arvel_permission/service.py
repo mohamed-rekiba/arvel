@@ -152,11 +152,7 @@ class PermissionRegistrar:
                 self._roles[key] = cached
                 return cached
         role_model = self._config.role_model
-        stmt = (
-            select(role_model)
-            .where(role_model.name == name, role_model.guard_name == guard)
-            .limit(1)
-        )
+        stmt = select(role_model).filter_by(name=name, guard_name=guard).limit(1)
         result = await self._session.execute(stmt)
         role = result.scalar_one_or_none()
         if role is not None and self._config.cache_enabled:
@@ -174,11 +170,7 @@ class PermissionRegistrar:
                 self._permissions[key] = cached
                 return cached
         permission_model = self._config.permission_model
-        stmt = (
-            select(permission_model)
-            .where(permission_model.name == name, permission_model.guard_name == guard)
-            .limit(1)
-        )
+        stmt = select(permission_model).filter_by(name=name, guard_name=guard).limit(1)
         result = await self._session.execute(stmt)
         perm = result.scalar_one_or_none()
         if perm is not None and self._config.cache_enabled:

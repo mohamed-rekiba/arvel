@@ -11,10 +11,8 @@ import json
 from decimal import Decimal
 from typing import Any, ClassVar
 
-from arvel.database import CastsAttributes, Model
-from sqlalchemy import Integer, Numeric, String
+from arvel.database import CastsAttributes, Model, decimal, id_, integer, string
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class AsJson(CastsAttributes):
@@ -32,10 +30,10 @@ class Toggle(Model):
         "amount": "decimal:2",
         "meta": AsJson,
     }
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    active: Mapped[Any] = mapped_column(Integer, default=0)
-    amount: Mapped[Any] = mapped_column(Numeric(10, 2), default=Decimal(0))
-    meta: Mapped[Any] = mapped_column(String(500), default="{}")
+    id: int = id_()
+    active: Any = integer(default=0)
+    amount: Any = decimal(10, 2, default=Decimal(0))
+    meta: Any = string(500, default="{}")
 
 
 async def _setup(engine: AsyncEngine) -> None:

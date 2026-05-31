@@ -18,10 +18,8 @@ from datetime import UTC, date, datetime
 from typing import Any, ClassVar
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.database.exceptions import CastError
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class _Post(Model):
@@ -35,17 +33,15 @@ class _Post(Model):
         "amount": "float",
         "code": "string",
     }
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    published_at: Mapped[Any] = mapped_column(String(80), default=None)
-    publish_on: Mapped[Any] = mapped_column(String(80), default=None)
-    epoch: Mapped[Any] = mapped_column(String(80), default=None)
-    is_active: Mapped[Any] = mapped_column(String(80), default=None)
-    quantity: Mapped[Any] = mapped_column(String(80), default=None)
-    amount: Mapped[Any] = mapped_column(String(80), default=None)
-    code: Mapped[Any] = mapped_column(String(80), default=None)
-    title: Mapped[Any] = mapped_column(String(80), default=None)
+    id: int = id_()
+    published_at: Any = string(80, nullable=True, default=None)
+    publish_on: Any = string(80, nullable=True, default=None)
+    epoch: Any = string(80, nullable=True, default=None)
+    is_active: Any = string(80, nullable=True, default=None)
+    quantity: Any = string(80, nullable=True, default=None)
+    amount: Any = string(80, nullable=True, default=None)
+    code: Any = string(80, nullable=True, default=None)
+    title: Any = string(80, nullable=True, default=None)
 
 
 def _raw(instance: Any, name: str) -> Any:
@@ -212,10 +208,8 @@ class _ParentCasts(Model):
 
 class _ChildCasts(_ParentCasts):
     __tablename__ = "wi068_child_casts"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    flag: Mapped[Any] = mapped_column(String(80), default=None)
+    id: int = id_()
+    flag: Any = string(80, nullable=True, default=None)
 
 
 class TestInheritedCasts:

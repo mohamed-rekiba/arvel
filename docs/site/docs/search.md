@@ -19,18 +19,17 @@ uv add "arvel[search]"
 Add `Searchable` to a model and declare `__searchable__`:
 
 ```python
-from arvel.database import Model
+from arvel.database import Model, string
 from arvel_search import Searchable
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Article(Model, Searchable):
     __tablename__ = "articles"
     __searchable__ = ("title", "body")
 
-    title: Mapped[str] = mapped_column(nullable=False)
-    body: Mapped[str] = mapped_column(nullable=False)
-    secret_notes: Mapped[str] = mapped_column(nullable=False)  # never indexed
+    title: str = string(255)
+    body: str = string(255)
+    secret_notes: str = string(255)  # never indexed
 ```
 
 That's it — no observer code. Saving an `Article` indexes it; updating re-indexes;

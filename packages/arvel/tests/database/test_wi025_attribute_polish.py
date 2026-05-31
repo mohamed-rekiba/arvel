@@ -8,11 +8,10 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from arvel.database import HasUlids, HasUuids, Model
+from arvel.database import HasUlids, HasUuids, Model, column, id_, string
 from arvel.database.attributes import accessor
-from sqlalchemy import Integer, String
+from sqlalchemy import String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 _CROCKFORD_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
@@ -20,9 +19,9 @@ _CROCKFORD_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 class Wi025Person(Model):
     __tablename__ = "wi025_people"
     __hidden__: ClassVar[list[str] | None] = ["secret"]
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
-    secret: Mapped[str] = mapped_column(String(80), nullable=False, default="x")
+    id: int = id_()
+    name: str = string(80)
+    secret: str = string(80, default="x")
 
     @accessor
     def display(self) -> str:
@@ -31,14 +30,14 @@ class Wi025Person(Model):
 
 class Wi025UuidDoc(Model, HasUuids):
     __tablename__ = "wi025_uuid_docs"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: str = column(String(36), primary_key=True, init=False, default=None)
+    title: str = string(80)
 
 
 class Wi025UlidDoc(Model, HasUlids):
     __tablename__ = "wi025_ulid_docs"
-    id: Mapped[str] = mapped_column(String(26), primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: str = column(String(26), primary_key=True, init=False, default=None)
+    title: str = string(80)
 
 
 async def _setup(engine: AsyncEngine) -> None:

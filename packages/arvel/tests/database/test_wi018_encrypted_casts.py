@@ -13,13 +13,12 @@ from types import SimpleNamespace
 from typing import Any, ClassVar, cast
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, column, id_
 from arvel.database.exceptions import DecryptionError
 from arvel.encryption import Encrypter
 from arvel.facades.crypt import Crypt
 from arvel.support.collections import Collection
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String
 
 _KEY = bytes(range(32))
 
@@ -39,13 +38,11 @@ class _Secret(Model):
         "profile": "encrypted:object",
         "tags": "encrypted:collection",
     }
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    ssn: Mapped[Any] = mapped_column(String(512), default=None)
-    prefs: Mapped[Any] = mapped_column(String(512), default=None)
-    profile: Mapped[Any] = mapped_column(String(512), default=None)
-    tags: Mapped[Any] = mapped_column(String(512), default=None)
+    id: int = id_()
+    ssn: Any = column(String(512), nullable=True, default=None)
+    prefs: Any = column(String(512), nullable=True, default=None)
+    profile: Any = column(String(512), nullable=True, default=None)
+    tags: Any = column(String(512), nullable=True, default=None)
 
 
 def _raw(instance: Any, name: str) -> Any:
@@ -137,10 +134,8 @@ def _define_bad_model() -> type[Model]:
     class Bad(Model):
         __tablename__ = "wi018_bad"
         __casts__: ClassVar[dict[str, str]] = {"x": "encrypted:bogus"}
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        x: Mapped[Any] = mapped_column(String(80), default=None)
+        id: int = id_()
+        x: Any = column(String(80), nullable=True, default=None)
 
     return Bad
 

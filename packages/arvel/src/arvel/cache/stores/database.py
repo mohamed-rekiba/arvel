@@ -7,13 +7,16 @@ import random
 import time
 from typing import Any, cast
 
-from sqlalchemy import Integer, String, Text, delete
+from sqlalchemy import String, delete
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
+
+from arvel.database.columns import column, integer, text
+from arvel.database.model import ModelMeta
 
 
-class _CacheBase(DeclarativeBase):
+class _CacheBase(MappedAsDataclass, DeclarativeBase, metaclass=ModelMeta, kw_only=True):
     pass
 
 
@@ -22,9 +25,9 @@ class CacheEntry(_CacheBase):
 
     __tablename__ = "cache_entries"
 
-    key: Mapped[str] = mapped_column(String(255), primary_key=True)
-    value: Mapped[str] = mapped_column(Text, nullable=False)
-    expires_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    key: str = column(String(255), primary_key=True)
+    value: str = text()
+    expires_at: int = integer()
 
 
 class DatabaseStore:
@@ -123,7 +126,8 @@ class DatabaseStore:
                 "CursorResult[Any]",
                 await session.execute(
                     delete(CacheEntry).where(
-                        CacheEntry.expires_at != 0, CacheEntry.expires_at < now
+                        CacheEntry.__table__.c.expires_at != 0,
+                        CacheEntry.__table__.c.expires_at < now,
                     )
                 ),
             )

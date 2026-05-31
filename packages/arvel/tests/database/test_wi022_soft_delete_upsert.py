@@ -6,20 +6,16 @@ the instance ``trashed()`` helper, and ``force_destroy(ids)``.
 
 from __future__ import annotations
 
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.database.model import SoftDeletes
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Wi022Account(Model, SoftDeletes):
     __tablename__ = "wi022_accounts"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    email: Mapped[str] = mapped_column(String(120), default="")
-    name: Mapped[str] = mapped_column(String(120), default="")
+    id: int = id_()
+    email: str = string(120, default="")
+    name: str = string(120, default="")
 
 
 async def _setup(engine: AsyncEngine) -> None:

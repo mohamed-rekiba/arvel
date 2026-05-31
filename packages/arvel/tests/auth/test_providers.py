@@ -7,36 +7,28 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from arvel.database import Model, id_, string
 
 
 class _UserA(Model):
     __tablename__ = "auth_test_users_a"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    email: Mapped[str] = mapped_column(String(255), unique=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
+    id: int = id_()
+    email: str = string(255, unique=True)
+    password_hash: str = string(255)
 
 
 class _UserB(Model):
     __tablename__ = "auth_test_users_b"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    email: Mapped[str] = mapped_column(String(255))
-    password_hash: Mapped[str] = mapped_column(String(255))
+    id: int = id_()
+    email: str = string(255)
+    password_hash: str = string(255)
 
 
 class _UserC(Model):
     __tablename__ = "auth_test_users_c"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    email: Mapped[str] = mapped_column(String(255), unique=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
+    id: int = id_()
+    email: str = string(255, unique=True)
+    password_hash: str = string(255)
 
 
 # ─── FR-007-028: DatabaseUserProvider.by_id ───────────────────────────────────

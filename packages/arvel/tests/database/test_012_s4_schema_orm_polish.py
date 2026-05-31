@@ -8,11 +8,9 @@ All tests are RED until implementation is complete.
 from __future__ import annotations
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, id_, integer, string
 from arvel.database.schema import Blueprint, Schema
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 # ─── FR-012-022: Schema column modification and introspection ─────────────────
 
@@ -153,11 +151,9 @@ async def test_fillable_blocks_non_listed_field(engine: AsyncEngine, session: As
     class ProtectedPost(Model):
         __tablename__ = "protected_posts"
         __fillable__ = ["title"]
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        title: Mapped[str] = mapped_column(String(200))
-        slug: Mapped[str] = mapped_column(String(200), nullable=True)
+        id: int = id_()
+        title: str = string(200)
+        slug: str | None = string(200, nullable=True, default=None)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -170,10 +166,8 @@ async def test_fillable_allows_listed_field(engine: AsyncEngine, session: AsyncS
     class AllowedPost(Model):
         __tablename__ = "allowed_posts"
         __fillable__ = ["title"]
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        title: Mapped[str] = mapped_column(String(200))
+        id: int = id_()
+        title: str = string(200)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -188,11 +182,9 @@ async def test_guarded_blocks_guarded_field(engine: AsyncEngine, session: AsyncS
     class GuardedModel(Model):
         __tablename__ = "guarded_model"
         __guarded__ = ["admin_only"]
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
-        admin_only: Mapped[str] = mapped_column(String(80), nullable=True)
+        id: int = id_()
+        name: str = string(80)
+        admin_only: str | None = string(80, nullable=True, default=None)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -209,10 +201,8 @@ async def test_guarded_wildcard_blocks_all_mass_assignment(
     class GuardAllModel(Model):
         __tablename__ = "guard_all_model"
         __guarded__ = ["*"]
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
+        id: int = id_()
+        name: str = string(80)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -226,11 +216,9 @@ async def test_no_protection_when_neither_set(engine: AsyncEngine, session: Asyn
 
     class OpenModel(Model):
         __tablename__ = "open_model"
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
-        note: Mapped[str] = mapped_column(String(200), nullable=True)
+        id: int = id_()
+        name: str = string(80)
+        note: str | None = string(200, nullable=True, default=None)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -246,11 +234,9 @@ async def test_hidden_fields_excluded_from_dict(engine: AsyncEngine, session: As
     class SecureUser(Model):
         __tablename__ = "secure_users"
         __hidden__ = ["password"]
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
-        password: Mapped[str] = mapped_column(String(200))
+        id: int = id_()
+        name: str = string(80)
+        password: str = string(200)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -267,11 +253,9 @@ async def test_visible_limits_dict_to_listed_fields(
     class VisibleUser(Model):
         __tablename__ = "visible_users"
         __visible__ = ["id", "name"]
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
-        email: Mapped[str] = mapped_column(String(200))
+        id: int = id_()
+        name: str = string(80)
+        email: str = string(200)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -285,11 +269,9 @@ async def test_visible_limits_dict_to_listed_fields(
 async def test_make_hidden_per_instance(engine: AsyncEngine, session: AsyncSession) -> None:
     class PlainUser(Model):
         __tablename__ = "plain_users"
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
-        score: Mapped[int] = mapped_column(Integer, default=0)
+        id: int = id_()
+        name: str = string(80)
+        score: int = integer(default=0)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -310,10 +292,8 @@ async def test_touch_updates_updated_at(engine: AsyncEngine, session: AsyncSessi
 
     class TimedItem(Model, Timestamps):
         __tablename__ = "timed_items"
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
+        id: int = id_()
+        name: str = string(80)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -332,11 +312,9 @@ async def test_touch_updates_updated_at(engine: AsyncEngine, session: AsyncSessi
 async def test_replicate_creates_unsaved_copy(engine: AsyncEngine, session: AsyncSession) -> None:
     class ReplicaModel(Model):
         __tablename__ = "replica_models"
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
-        note: Mapped[str] = mapped_column(String(200), nullable=True)
+        id: int = id_()
+        name: str = string(80)
+        note: str | None = string(200, nullable=True, default=None)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -352,11 +330,9 @@ async def test_replicate_creates_unsaved_copy(engine: AsyncEngine, session: Asyn
 async def test_replicate_except_excludes_fields(engine: AsyncEngine, session: AsyncSession) -> None:
     class ExceptModel(Model):
         __tablename__ = "except_models"
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
-        slug: Mapped[str] = mapped_column(String(80), nullable=True)
+        id: int = id_()
+        name: str = string(80)
+        slug: str | None = string(80, nullable=True, default=None)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -374,10 +350,8 @@ async def test_replicate_except_excludes_fields(engine: AsyncEngine, session: As
 async def test_retrieved_event_fires(engine: AsyncEngine, session: AsyncSession) -> None:
     class TrackedModel(Model):
         __tablename__ = "tracked_models"
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
+        id: int = id_()
+        name: str = string(80)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -399,10 +373,8 @@ async def test_retrieved_event_fires(engine: AsyncEngine, session: AsyncSession)
 async def test_saving_and_saved_events_fire(engine: AsyncEngine, session: AsyncSession) -> None:
     class SavingModel(Model):
         __tablename__ = "saving_models"
-        id: Mapped[int] = mapped_column(
-            Integer, primary_key=True, autoincrement=True, init=False, default=None
-        )
-        name: Mapped[str] = mapped_column(String(80))
+        id: int = id_()
+        name: str = string(80)
 
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)

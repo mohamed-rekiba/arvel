@@ -25,13 +25,13 @@ The lower-risk lessons (L2-L6) from the same investigation shipped in the 2026-0
 
 ```python
 class Model(MappedAsDataclass, DeclarativeBase, ActiveRecord,
-            metaclass=_ModelMeta, init=True, kw_only=True):
+            metaclass=ModelMeta, init=True, kw_only=True):
     ...
 ```
 
 ## Rationale
 
-1. **First-party SQLA.** `MappedAsDataclass` is shipped by SQLAlchemy itself; no third dependency, no metaclass fusion. Composes cleanly with `_ModelMeta` (ADR-046) and `ActiveRecord`.
+1. **First-party SQLA.** `MappedAsDataclass` is shipped by SQLAlchemy itself; no third dependency, no metaclass fusion. Composes cleanly with `ModelMeta` (ADR-046) and `ActiveRecord`.
 2. **Typed where the value lives.** The constructor is generated from the same `Mapped[T]` annotations that already drive ORM mapping. One source of truth — the column annotation — for both runtime and types.
 3. **Kw-only matches existing idiom.** `User.create(...)` and `User(...)` already read like keyword construction in every example app; positional construction would be a footgun.
 4. **No SQLModel.** The alternative of bringing in SQLModel was rejected in research 002 §3.5 — its Pyright behaviour is unsupported (issue marked **not_planned**), it reintroduces Pydantic at the persistence layer (the framework already uses Pydantic strictly at API boundaries via `PydanticType` + `to_pydantic()`), and its `Relationship(...)` forward refs are broken on Python 3.14 / PEP 649, which Arvel targets.
@@ -42,8 +42,8 @@ class Model(MappedAsDataclass, DeclarativeBase, ActiveRecord,
 
 - Typos in column names (`User(naem=...)`) become type-errors under mypy and pyright strict mode.
 - Nullable-vs-non-nullable mistakes (`User(name=None)`) become type-errors when the column is non-nullable.
-- The L2 `arvel.database.columns` helpers (`id_`, `string(...)`, …) compose with the typed constructor without any change — they already return `Mapped[T]`.
-- `make:model` emits the bare helper form (`id: int = id_()`); the model metaclass (`_ModelMeta`, ADR-046) wraps it in `Mapped[int]` at runtime. The drift between framework-generated stubs and hand-written models shrinks to zero. (See the column-style update below.)
+- The L2 `arvel.database.columns` helpers (`id_`, `string(...)`, …) compose with the typed constructor — they return `Any`, so the plain annotation drives the type (see the column-style update below).
+- `make:model` emits the bare helper form (`id: int = id_()`); the model metaclass (`ModelMeta`, ADR-046) wraps it in `Mapped[int]` at runtime. The drift between framework-generated stubs and hand-written models shrinks to zero.
 
 **Negative**:
 
@@ -53,18 +53,18 @@ class Model(MappedAsDataclass, DeclarativeBase, ActiveRecord,
 
 **Enforcement**:
 
-- The L5 architecture test asserts every framework `relationship(...)` carries a `Mapped[...]` annotation (`test_framework_relationships_use_mapped_annotation`), and that the `make:model` stub uses the column helpers (`test_make_model_stub_uses_bare_column_helpers`).
+- The architecture test asserts framework `relationship(...)` declarations use the clean annotation (`test_framework_relationships_use_clean_annotation`), and that the `make:model` stub uses the column helpers (`test_make_model_stub_uses_bare_column_helpers`).
 - Type-only tests under `tests/typing/` assert `User(naem=...)` is a pyright/mypy error.
 
 ## Update (2026-05-31) — column annotation style
 
-Column declarations use the **bare** form in app code and generated stubs: `id: int = id_()`, not `id: Mapped[int] = id_()`. `_ModelMeta` wraps the helper's `Mapped[T]` return at runtime, and mypy's SQLAlchemy plugin reads it correctly. `Mapped[...]` stays **required** for:
+`Mapped[...]` is gone from every model declaration — app code, generated stubs, framework-internal models (`CacheEntry`), the `Timestamps`/`SoftDeletes` mixins, **and relationships**: `id: int = id_()`, `children: list[Post] = relationship(...)`, never the `Mapped[...]` wrapper. Three pieces make this clean under **both** mypy and pyright strict:
 
-- relationships (enforced by `test_framework_relationships_use_mapped_annotation`),
-- columns with no helper on the right-hand side (`name: Mapped[str]`), since the metaclass has no `mapped_column(...)` value to wrap, and
-- framework-internal code, which runs under its own pyright-strict gate.
+- Every column helper in `arvel.database.columns` returns `Any` (like SQLModel's `Field`), and Arvel's `relationship()` is a thin wrapper that also returns `Any`. So the plain annotation is the sole source of the Python type — no SQLAlchemy mypy-plugin dependency, no pyright false positives.
+- `ModelMeta` rewrites the annotation to `Mapped[T]` at class-build time and, for a **bare** annotation with no helper (`name: str`), injects a `mapped_column()` to back it. So no-helper columns are clean too. It wraps relationship-bound annotations the same way.
+- The framework's own non-`Model` declarative classes get the clean syntax by using `ModelMeta` as their metaclass: the `Timestamps`/`SoftDeletes` mixins (over `MappedAsDataclass`) and the cache store's `_CacheBase` (a standalone `DeclarativeBase`). No special-casing left.
 
-Pyright-strict *app* users may opt into `Mapped[T]` everywhere — pyright has no SQLAlchemy plugin, so it flags the bare form. The runtime behaviour is identical either way.
+This supersedes the earlier same-day note that had helpers returning `Mapped[T]` and kept `Mapped` for relationships and framework mixins — none of that is needed now.
 
 ## Status & Next Step
 

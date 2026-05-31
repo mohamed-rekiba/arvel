@@ -7,12 +7,19 @@ from collections.abc import Callable
 from typing import Any, cast
 
 import pytest
-from arvel.database import DecryptionError, EncryptedType, EnumType, Model, PydanticType
+from arvel.database import (
+    DecryptionError,
+    EncryptedType,
+    EnumType,
+    Model,
+    PydanticType,
+    column,
+    id_,
+)
 from pydantic import BaseModel
-from sqlalchemy import Integer, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Dialect
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 def _sqlite_dialect() -> Dialect:
@@ -33,10 +40,8 @@ class Preferences(BaseModel):
 
 class UserPrefs(Model):
     __tablename__ = "user_prefs_c"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    prefs: Mapped[Preferences | None] = mapped_column(
-        PydanticType(Preferences), nullable=True, default=None
-    )
+    id: int = id_()
+    prefs: Preferences | None = column(PydanticType(Preferences), nullable=True, default=None)
 
 
 async def _setup(engine: Any) -> None:
@@ -84,10 +89,8 @@ class TaskStatus(enum.StrEnum):
 
 class TaskC(Model):
     __tablename__ = "tasks_c"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    status: Mapped[TaskStatus] = mapped_column(
-        EnumType(TaskStatus), nullable=False, default=TaskStatus.pending
-    )
+    id: int = id_()
+    status: TaskStatus = column(EnumType(TaskStatus), default=TaskStatus.pending)
 
 
 async def test_enum_type_round_trip(engine: Any, session: AsyncSession) -> None:
@@ -118,16 +121,14 @@ WRONG_KEY = bytes.fromhex("11" * 32)
 
 class SecretCol(Model):
     __tablename__ = "secret_col_random"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str | None] = mapped_column(EncryptedType(KEY), nullable=True, default=None)
+    id: int = id_()
+    body: str | None = column(EncryptedType(KEY), nullable=True, default=None)
 
 
 class SecretColDet(Model):
     __tablename__ = "secret_col_det"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str | None] = mapped_column(
-        EncryptedType(KEY, deterministic=True), nullable=True, default=None
-    )
+    id: int = id_()
+    body: str | None = column(EncryptedType(KEY, deterministic=True), nullable=True, default=None)
 
 
 async def test_encrypted_random_round_trip(engine: Any, session: AsyncSession) -> None:
@@ -172,10 +173,8 @@ async def test_encrypted_wrong_key_raises_decryption_error(
     class WrongKeyModel(Model):
         __tablename__ = "secret_col_random"
         __table_args__ = {"extend_existing": True}
-        id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-        body: Mapped[str | None] = mapped_column(
-            EncryptedType(WRONG_KEY), nullable=True, default=None
-        )
+        id: int = id_()
+        body: str | None = column(EncryptedType(WRONG_KEY), nullable=True, default=None)
 
     with pytest.raises(DecryptionError):
         await WrongKeyModel.first()

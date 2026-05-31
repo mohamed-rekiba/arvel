@@ -4,18 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from arvel.database import Model
-from sqlalchemy import ForeignKey, Integer, String
+from arvel.database import Model, foreign_id, id_, string
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class RelUser(Model):
     __tablename__ = "rel_users"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: int = id_()
+    name: str = string(80)
 
     def posts(self) -> Any:
         # FK inferred as rel_user_id (snake_case of RelUser + _id)
@@ -27,11 +23,9 @@ class RelUser(Model):
 
 class RelPost(Model):
     __tablename__ = "rel_posts"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
-    rel_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("rel_users.id"))
+    id: int = id_()
+    title: str = string(200)
+    rel_user_id: int = foreign_id("rel_users.id")
 
     def author(self) -> Any:
         # FK inferred as rel_user_id (snake_case of RelUser + _id) on this model
@@ -40,11 +34,9 @@ class RelPost(Model):
 
 class RelProfile(Model):
     __tablename__ = "rel_profiles"
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, init=False, default=None
-    )
-    bio: Mapped[str] = mapped_column(String(500), nullable=False)
-    rel_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("rel_users.id"))
+    id: int = id_()
+    bio: str = string(500)
+    rel_user_id: int = foreign_id("rel_users.id")
 
 
 async def _create_tables(engine: Any) -> None:

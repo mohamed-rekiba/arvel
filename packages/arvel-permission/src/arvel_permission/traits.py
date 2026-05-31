@@ -40,7 +40,7 @@ from arvel_permission.models import (
 from arvel_permission.service import GuardMismatchError
 
 if TYPE_CHECKING:
-    from arvel.database.orm import Mapped, MorphToMany
+    from arvel.database.orm import MorphToMany
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from arvel_permission.config import PermissionConfig
@@ -52,6 +52,12 @@ class _ModelWithTable(Protocol):
 
 def _primary_key_column(model: type[object]) -> ColumnElement[Any]:
     return typing_cast("type[_ModelWithTable]", model).__table__.c["id"]
+
+
+def _column(model: type[object], name: str) -> ColumnElement[Any]:
+    # Clean models type class attributes as their Python type, not ColumnElement.
+    # Go through the Core table to compare a column against a literal.
+    return typing_cast("type[_ModelWithTable]", model).__table__.c[name]
 
 
 def _enum_or_str(value: str) -> str:
@@ -155,12 +161,12 @@ class HasRoles:
     ``model_has_roles`` pivot.
     """
 
-    default_guard_name: str = "web"
+    default_guard_name: ClassVar[str] = "web"
 
     if TYPE_CHECKING:
         # Type hints only — the host supplies the real descriptor.
         roles: ClassVar[MorphToMany[Role]]
-        id: Mapped[int]
+        id: int
 
     async def assign_role(self, *roles: Role | str) -> Self:
         guard = self.default_guard_name
@@ -257,10 +263,10 @@ class HasRoles:
         pk = _primary_key_column(cls)
         subq = (
             select(cast(model_has_roles.c.model_id, Integer))
-            .join(Role, Role.id == model_has_roles.c.role_id)
+            .join(Role, model_has_roles.c.role_id == Role.id)
             .where(
-                Role.name == role_name,
-                Role.guard_name == guard,
+                _column(Role, "name") == role_name,
+                _column(Role, "guard_name") == guard,
                 model_has_roles.c.model_type == cls.__name__,
             )
         )
@@ -280,10 +286,10 @@ class HasRoles:
         pk = _primary_key_column(cls)
         subq = (
             select(cast(model_has_roles.c.model_id, Integer))
-            .join(Role, Role.id == model_has_roles.c.role_id)
+            .join(Role, model_has_roles.c.role_id == Role.id)
             .where(
-                Role.name == role_name,
-                Role.guard_name == guard,
+                _column(Role, "name") == role_name,
+                _column(Role, "guard_name") == guard,
                 model_has_roles.c.model_type == cls.__name__,
             )
         )
@@ -299,14 +305,14 @@ class HasPermissions:
     inherited via roles are merged in ``get_all_permissions``.
     """
 
-    default_guard_name: str = "web"
+    default_guard_name: ClassVar[str] = "web"
     wildcard_permission: bool = True
 
     if TYPE_CHECKING:
         permissions: ClassVar[MorphToMany[Permission]]
         # Present when the host also mixes in HasRoles; guarded at runtime.
         roles: ClassVar[MorphToMany[Role]]
-        id: Mapped[int]
+        id: int
 
     async def give_permission_to(self, *perms: Permission | str) -> Self:
         guard = self.default_guard_name
@@ -454,10 +460,10 @@ class HasPermissions:
         pk = _primary_key_column(cls)
         subq = (
             select(cast(model_has_permissions.c.model_id, Integer))
-            .join(Permission, Permission.id == model_has_permissions.c.permission_id)
+            .join(Permission, model_has_permissions.c.permission_id == Permission.id)
             .where(
-                Permission.name == perm_name,
-                Permission.guard_name == guard,
+                _column(Permission, "name") == perm_name,
+                _column(Permission, "guard_name") == guard,
                 model_has_permissions.c.model_type == cls.__name__,
             )
         )
@@ -477,10 +483,10 @@ class HasPermissions:
         pk = _primary_key_column(cls)
         subq = (
             select(cast(model_has_permissions.c.model_id, Integer))
-            .join(Permission, Permission.id == model_has_permissions.c.permission_id)
+            .join(Permission, model_has_permissions.c.permission_id == Permission.id)
             .where(
-                Permission.name == perm_name,
-                Permission.guard_name == guard,
+                _column(Permission, "name") == perm_name,
+                _column(Permission, "guard_name") == guard,
                 model_has_permissions.c.model_type == cls.__name__,
             )
         )

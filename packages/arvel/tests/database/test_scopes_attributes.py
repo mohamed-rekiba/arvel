@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from arvel.database import GlobalScope, Model, QueryBuilder, accessor, mutator, scope
-from sqlalchemy import Integer, String
+from arvel.database import GlobalScope, Model, QueryBuilder, accessor, id_, mutator, scope, string
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class ActiveOnly(GlobalScope):
@@ -20,10 +18,10 @@ _global_scope = ActiveOnly()
 
 class Account(Model):
     __tablename__ = "accounts_g"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    first_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    last_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    id: int = id_()
+    first_name: str = string(50)
+    last_name: str = string(50)
+    status: str = string(20, default="active")
 
     __arvel_global_scopes__: ClassVar[dict[str, Any]] = {
         "active": _global_scope.apply,
@@ -41,9 +39,9 @@ class Account(Model):
 
 class Member(Model):
     __tablename__ = "members_mut"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(50), nullable=False)
-    password: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    name: str = string(50)
+    password: str = string(200)
 
     @mutator("password")
     def set_password(self, value: str) -> str:

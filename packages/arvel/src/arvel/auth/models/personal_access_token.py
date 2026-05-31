@@ -12,10 +12,7 @@ from datetime import UTC
 from datetime import datetime as _datetime
 from typing import ClassVar
 
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped
-
-from arvel.database.columns import column, datetime, json, string
+from arvel.database.columns import field, json
 from arvel.database.model import Model, Timestamps
 
 
@@ -52,14 +49,14 @@ class PersonalAccessToken(Model, Timestamps):
     ]
     __hidden__: ClassVar[list[str] | None] = ["token"]
 
-    id: Mapped[str] = column(String(36), primary_key=True, init=False, default_factory=_new_id)
-    tokenable_type: Mapped[str] = string(255)
-    tokenable_id: Mapped[str] = string(36, index=True)
-    name: Mapped[str] = string(255)
-    token: Mapped[str] = string(64, unique=True)
-    abilities: Mapped[list[str]] = json(default=list)
-    last_used_at: Mapped[_datetime | None] = datetime(nullable=True, default=None)
-    expires_at: Mapped[_datetime | None] = datetime(nullable=True, default=None)
+    id: str = field(length=36, primary_key=True, init=False, default_factory=_new_id)
+    tokenable_type: str
+    tokenable_id: str = field(length=36, index=True)
+    name: str
+    token: str = field(length=64, unique=True)
+    abilities: list[str] = json(default=list)
+    last_used_at: _datetime | None = None
+    expires_at: _datetime | None = None
 
     @property
     def is_expired(self) -> bool:

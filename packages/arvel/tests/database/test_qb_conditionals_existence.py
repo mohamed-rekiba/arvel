@@ -5,19 +5,18 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, id_, integer, string
 from arvel.database.query import QueryBuilder
-from sqlalchemy import Integer, String, event
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Gadget(Model):
     __tablename__ = "gadgets_qcx"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
-    qty: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    tag: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    id: int = id_()
+    name: str = string(80)
+    qty: int = integer(default=0)
+    tag: str = string(40, default="")
 
 
 async def _create_tables(engine: Any) -> None:

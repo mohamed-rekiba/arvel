@@ -15,14 +15,13 @@ See `docs/qa/RTM-026.md` for the full traceability matrix.
 from __future__ import annotations
 
 import io
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import pytest
 
 pytest.importorskip("arvel_image", reason="arvel_image is the package under test")
 pytest.importorskip("PIL", reason="arvel-image depends on Pillow")
 
-from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -91,10 +90,10 @@ def _isolation_host_a() -> type[Any]:
     class IsoA(Model, HasMedia, Timestamps):
         __tablename__ = "iso_a"
 
-        id: Mapped[int] = id_()
-        label: Mapped[str] = string(80)
+        id: int = id_()
+        label: str = string(80)
 
-        register_called: int = 0
+        register_called: ClassVar[int] = 0
 
         def register_media_collections(self) -> None:
             type(self).register_called += 1
@@ -116,8 +115,8 @@ def _isolation_host_b() -> type[Any]:
     class IsoB(Model, HasMedia, Timestamps):
         __tablename__ = "iso_b"
 
-        id: Mapped[int] = id_()
-        label: Mapped[str] = string(80)
+        id: int = id_()
+        label: str = string(80)
 
         def register_media_collections(self) -> None:
             MediaCollection("gallery").register_on(self)
@@ -140,8 +139,8 @@ async def test_media_delete_cascades_to_conversion_files(
 
     class HostC(Model, HasMedia, Timestamps):
         __tablename__ = "host_c"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(80)
+        id: int = id_()
+        name: str = string(80)
 
         def register_media_collections(self) -> None:
             (
@@ -247,8 +246,8 @@ async def test_media_get_path_and_temporary_url(
 
     class HostD(Model, HasMedia, Timestamps):
         __tablename__ = "host_d"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(80)
+        id: int = id_()
+        name: str = string(80)
 
         def register_media_collections(self) -> None:
             MediaCollection("avatar", single_file=True).register_on(self)
@@ -284,8 +283,8 @@ async def test_get_first_media_returns_first_or_none(
 
     class HostE(Model, HasMedia, Timestamps):
         __tablename__ = "host_e"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(80)
+        id: int = id_()
+        name: str = string(80)
 
         def register_media_collections(self) -> None:
             MediaCollection("gallery").register_on(self)
@@ -322,8 +321,8 @@ async def test_unknown_collection_raises_when_registry_is_strict(
 
     class HostF(Model, HasMedia, Timestamps):
         __tablename__ = "host_f"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(80)
+        id: int = id_()
+        name: str = string(80)
 
         def register_media_collections(self) -> None:
             MediaCollection("avatar", single_file=True).register_on(self)
@@ -353,8 +352,8 @@ async def test_add_media_accepts_filesystem_path(
 
     class HostG(Model, HasMedia, Timestamps):
         __tablename__ = "host_g"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(80)
+        id: int = id_()
+        name: str = string(80)
 
         def register_media_collections(self) -> None:
             MediaCollection("docs").register_on(self)
@@ -389,8 +388,8 @@ async def test_add_media_accepts_file_like_object(
 
     class HostH(Model, HasMedia, Timestamps):
         __tablename__ = "host_h"
-        id: Mapped[int] = id_()
-        name: Mapped[str] = string(80)
+        id: int = id_()
+        name: str = string(80)
 
         def register_media_collections(self) -> None:
             MediaCollection("docs").register_on(self)

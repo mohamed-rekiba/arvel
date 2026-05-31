@@ -92,7 +92,9 @@ class TestDatabaseStoreSql:
         # under every dialect (it's reserved in MySQL — raw SQL fails there).
         async with store.session_maker() as session:
             await session.execute(
-                update(CacheEntry).where(CacheEntry.key == "test-int:expired").values(expires_at=1)
+                update(CacheEntry)
+                .where(CacheEntry.__table__.c.key == "test-int:expired")
+                .values(expires_at=1)
             )
             await session.commit()
         assert await store.gc(max_lifetime=3600) >= 1

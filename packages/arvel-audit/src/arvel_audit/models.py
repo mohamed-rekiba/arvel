@@ -9,10 +9,9 @@ from __future__ import annotations
 from datetime import datetime as _datetime
 from typing import Any, ClassVar
 
-from arvel.database import column, datetime, id_, json, string
+from arvel.database import column, field, json
 from arvel.database.model import Model
 from sqlalchemy import Index
-from sqlalchemy.orm import Mapped
 
 from arvel_audit.config import AuditConfig
 from arvel_audit.types import AuditValues
@@ -32,14 +31,14 @@ class AuditEntry(Model):
     # Append-only: created_at is auto-set on insert; there is no updated_at.
     UPDATED_AT: ClassVar[str] = ""
 
-    id: Mapped[int] = id_(init=False)
-    action: Mapped[str] = string(20)
-    model_type: Mapped[str] = string(255)
-    model_id: Mapped[str] = string(64)
-    old_values: Mapped[dict[str, Any]] = column(AuditValues(encrypt=_ENCRYPT_VALUES))
-    new_values: Mapped[dict[str, Any]] = column(AuditValues(encrypt=_ENCRYPT_VALUES))
-    actor_id: Mapped[str | None] = string(64, nullable=True)
-    created_at: Mapped[_datetime] = datetime(nullable=False, init=False, default=None)
+    id: int = field(default=None, primary_key=True, init=False)
+    action: str = field(length=20)
+    model_type: str
+    model_id: str = field(length=64)
+    old_values: dict[str, Any] = column(AuditValues(encrypt=_ENCRYPT_VALUES))
+    new_values: dict[str, Any] = column(AuditValues(encrypt=_ENCRYPT_VALUES))
+    actor_id: str | None = field(length=64)
+    created_at: _datetime = field(init=False, default=None)
 
 
 class ActivityEntry(Model):
@@ -52,15 +51,15 @@ class ActivityEntry(Model):
     )
     UPDATED_AT: ClassVar[str] = ""
 
-    id: Mapped[int] = id_(init=False)
-    log_name: Mapped[str] = string(100)
-    description: Mapped[str] = string(2000)
-    subject_type: Mapped[str | None] = string(255, nullable=True)
-    subject_id: Mapped[str | None] = string(64, nullable=True)
-    causer_type: Mapped[str | None] = string(255, nullable=True)
-    causer_id: Mapped[str | None] = string(64, nullable=True)
-    properties: Mapped[dict[str, Any]] = json()
-    created_at: Mapped[_datetime] = datetime(nullable=False, init=False, default=None)
+    id: int = field(default=None, primary_key=True, init=False)
+    log_name: str = field(length=100)
+    description: str = field(length=2000)
+    subject_type: str | None
+    subject_id: str | None = field(length=64)
+    causer_type: str | None
+    causer_id: str | None = field(length=64)
+    properties: dict[str, Any] = json()
+    created_at: _datetime = field(init=False, default=None)
 
 
 __all__ = ["AUDIT_ACTIONS", "ActivityEntry", "AuditEntry"]

@@ -5,18 +5,16 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from arvel.database import Model, UnknownRelationError
-from sqlalchemy import Integer, String
+from arvel.database import Model, UnknownRelationError, id_, integer, string
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Bag(Model):
     __tablename__ = "bags_m"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(40), nullable=False)
-    qty: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    note: Mapped[str | None] = mapped_column(String(80), nullable=True, default=None)
+    id: int = id_()
+    name: str = string(40)
+    qty: int = integer(default=0)
+    note: str | None = string(80, nullable=True, default=None)
 
 
 async def _setup(engine: Any) -> None:
@@ -86,7 +84,7 @@ async def test_group_by_and_having_compile(engine: Any, session: AsyncSession) -
     await _setup(engine)
     for i in range(3):
         await Bag.create(name="dup", qty=i)
-    qb = Bag.group_by("name").having(func.count(Bag.id) > 2)
+    qb = Bag.group_by("name").having(func.count(Bag.__table__.c.id) > 2)
     # We don't run the query — group_by + having should compile.
     compiled = qb._stmt.compile(dialect=engine.dialect)  # pyright: ignore[reportPrivateUsage]  # test compiles the private SQL stmt directly
     assert "GROUP BY" in str(compiled).upper()

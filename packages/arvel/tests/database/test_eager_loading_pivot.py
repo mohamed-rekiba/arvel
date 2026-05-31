@@ -10,12 +10,11 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.database.orm import BelongsToMany, MorphToMany
 from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 el_taggables = Table(
     "el_taggables",
@@ -35,20 +34,20 @@ el_post_topic = Table(
 
 class ElTag(Model):
     __tablename__ = "el_tags"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    name: str = string(80)
 
 
 class ElTopic(Model):
     __tablename__ = "el_topics"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    name: str = string(80)
 
 
 class ElPost(Model):
     __tablename__ = "el_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    title: str = string(80)
     tags: ClassVar[MorphToMany[ElTag]] = MorphToMany(
         ElTag, table=el_taggables, name="taggable", related_key="tag_id"
     )

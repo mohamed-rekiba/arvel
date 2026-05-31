@@ -6,12 +6,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from arvel.context.facade import Context
-from arvel.database.model import Model
+from arvel.database import Model, id_, string
 from arvel_audit import AuditLog, InvalidAuditAction
 from arvel_audit.auditable import Auditable
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 pytestmark = pytest.mark.asyncio
 
@@ -19,8 +17,8 @@ pytestmark = pytest.mark.asyncio
 class Order(Model, Auditable):
     __tablename__ = "audit_orders"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="new")
+    id: int = id_()
+    status: str = string(20, default="new")
 
 
 async def test_for_model_returns_chronological_history(tables: None, session: AsyncSession) -> None:

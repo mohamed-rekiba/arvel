@@ -11,34 +11,32 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from arvel.database import Model
+from arvel.database import Model, id_, integer, string
 from arvel.database.orm import MorphMany, MorphOne
-from sqlalchemy import Integer, String
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Wi028Comment(Model):
     __tablename__ = "wi028_comments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(200), nullable=False)
-    commentable_type: Mapped[str] = mapped_column(String(60), nullable=False)
-    commentable_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    id: int = id_()
+    body: str = string(200)
+    commentable_type: str = string(60)
+    commentable_id: int = integer()
 
 
 class Wi028Image(Model):
     __tablename__ = "wi028_images"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    url: Mapped[str] = mapped_column(String(200), nullable=False)
-    imageable_type: Mapped[str] = mapped_column(String(60), nullable=False)
-    imageable_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    id: int = id_()
+    url: str = string(200)
+    imageable_type: str = string(60)
+    imageable_id: int = integer()
 
 
 class Wi028Post(Model):
     __tablename__ = "wi028_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    id: int = id_()
+    title: str = string(120)
 
     comments: ClassVar[MorphMany[Wi028Comment]] = MorphMany(Wi028Comment, name="commentable")
     image: ClassVar[MorphOne[Wi028Image]] = MorphOne(Wi028Image, name="imageable")
@@ -118,7 +116,7 @@ class TestWhereHas:
         titles = [
             p.title
             for p in await Wi028Post.query()
-            .where_has("comments", lambda q: q.where(Wi028Comment.body == "keep"))
+            .where_has("comments", lambda q: q.where(Wi028Comment.__table__.c.body == "keep"))
             .get()
         ]
         assert titles == ["match"]
@@ -140,7 +138,12 @@ class TestWithCount:
         await p1.comments.create(body="a1")
         await p1.comments.create(body="a2")
 
-        posts = await Wi028Post.query().with_count("comments").where(Wi028Post.id == p1.id).get()
+        posts = (
+            await Wi028Post.query()
+            .with_count("comments")
+            .where(Wi028Post.__table__.c.id == p1.id)
+            .get()
+        )
         assert posts[0].comments_count == 2
 
 

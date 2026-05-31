@@ -9,29 +9,28 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 import pytest
-from arvel.database import Model, SoftDeletes, Timestamps
+from arvel.database import Model, SoftDeletes, Timestamps, field, id_, relationship, string
 from arvel.database.exceptions import UnknownRelationError
 from arvel.database.orm import BelongsToMany
-from sqlalchemy import Column, ForeignKey, Integer, String, Table
+from sqlalchemy import Column, ForeignKey, Integer, Table
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class Blog(Model):
     __tablename__ = "rcsd_blogs"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    comments: Mapped[list[Comment]] = relationship(
+    id: int = id_()
+    name: str = string(80)
+    comments: list[Comment] = relationship(
         "Comment", back_populates="blog", init=False, default_factory=list
     )
 
 
 class Comment(Model, Timestamps, SoftDeletes):
     __tablename__ = "rcsd_comments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(200))
-    blog_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("rcsd_blogs.id"), default=None)
-    blog: Mapped[Blog | None] = relationship("Blog", back_populates="comments", init=False)
+    id: int = id_()
+    body: str = string(200)
+    blog_id: int | None = field(foreign_key="rcsd_blogs.id", default=None)
+    blog: Blog | None = relationship("Blog", back_populates="comments", init=False)
 
 
 rcsd_blog_label = Table(
@@ -44,14 +43,14 @@ rcsd_blog_label = Table(
 
 class Label(Model, Timestamps, SoftDeletes):
     __tablename__ = "rcsd_labels"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    name: str = string(80)
 
 
 class TaggedBlog(Model):
     __tablename__ = "rcsd_tagged_blogs"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
+    id: int = id_()
+    name: str = string(80)
     labels: ClassVar[BelongsToMany[Label]] = BelongsToMany(
         Label, table=rcsd_blog_label, foreign_key="blog_id", related_foreign_key="label_id"
     )

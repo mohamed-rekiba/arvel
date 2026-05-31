@@ -8,22 +8,20 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from arvel.database import Model
+from arvel.database import Model, id_, string
 from arvel.database.session import get_active_session
 from arvel.http.middleware.database_transaction import DatabaseTransaction
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class TxModel(Model):
     __tablename__ = "tx_models"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    label: Mapped[str] = mapped_column(String(80), nullable=False)
+    id: int = id_()
+    label: str = string(80)
 
 
 @pytest_asyncio.fixture

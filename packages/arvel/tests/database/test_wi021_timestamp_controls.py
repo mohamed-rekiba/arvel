@@ -9,48 +9,46 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import ClassVar
 
-from arvel.database import Model, Observer
+from arvel.database import Model, Observer, id_, string
 from arvel.database.columns import datetime as ts_column
 from arvel.database.events import clear_observers
 from arvel.database.model import Timestamps
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Wi021Stamped(Model, Timestamps):
     __tablename__ = "wi021_stamped"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), default="")
+    id: int = id_()
+    title: str = string(120, default="")
 
 
 class Wi021NoStamps(Model):
     __tablename__ = "wi021_no_stamps"
     __timestamps__ = False
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    created_at: Mapped[datetime | None] = ts_column(nullable=True, init=False, default=None)
-    updated_at: Mapped[datetime | None] = ts_column(nullable=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), default="")
+    id: int = id_()
+    created_at: datetime | None = ts_column(nullable=True, init=False, default=None)
+    updated_at: datetime | None = ts_column(nullable=True, init=False, default=None)
+    title: str = string(120, default="")
 
 
 class Wi021Custom(Model):
     __tablename__ = "wi021_custom"
     CREATED_AT: ClassVar[str] = "inserted_at"
     UPDATED_AT: ClassVar[str] = "changed_at"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    inserted_at: Mapped[datetime | None] = ts_column(nullable=True, init=False, default=None)
-    changed_at: Mapped[datetime | None] = ts_column(nullable=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), default="")
+    id: int = id_()
+    inserted_at: datetime | None = ts_column(nullable=True, init=False, default=None)
+    changed_at: datetime | None = ts_column(nullable=True, init=False, default=None)
+    title: str = string(120, default="")
 
 
 class Wi021Nullable(Model):
     """Nullable timestamp columns so ``without_timestamps`` can leave them empty."""
 
     __tablename__ = "wi021_nullable"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    created_at: Mapped[datetime | None] = ts_column(nullable=True, init=False, default=None)
-    updated_at: Mapped[datetime | None] = ts_column(nullable=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), default="")
+    id: int = id_()
+    created_at: datetime | None = ts_column(nullable=True, init=False, default=None)
+    updated_at: datetime | None = ts_column(nullable=True, init=False, default=None)
+    title: str = string(120, default="")
 
 
 async def _setup(engine: AsyncEngine) -> None:

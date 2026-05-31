@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 import pytest
-from arvel.database import Model, Observer
+from arvel.database import Model, Observer, id_, string
 from arvel.database.events import clear_observers
 from arvel.database.exceptions import OperationCancelledError
-from sqlalchemy import Integer, String, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Wi072Note(Model):
     __tablename__ = "wi072_notes"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    body: str = string(200)
 
 
 async def _setup(engine: AsyncEngine) -> None:
@@ -107,7 +106,7 @@ class TestCancellableBeforeHooks:
 
         assert exc.value.event_name == "updating"
         result = await session.execute(
-            select(Wi072Note.body).where(Wi072Note.id == note.id),
+            select(Wi072Note.__table__.c.body).where(Wi072Note.__table__.c.id == note.id),
             execution_options={"autoflush": False},
         )
         assert result.scalar_one() == "keep"

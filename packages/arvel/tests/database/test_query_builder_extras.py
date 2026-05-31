@@ -8,31 +8,27 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from arvel.database import Model, Timestamps
-from sqlalchemy import ForeignKey, Integer, String
+from arvel.database import Model, Timestamps, foreign_id, id_, integer, relationship, string
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class QbeAuthor(Model, Timestamps):
     __tablename__ = "qbe_authors"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    hits: Mapped[int] = mapped_column(Integer, default=0)
-    books: Mapped[list[QbeBook]] = relationship(
+    id: int = id_()
+    name: str = string(80)
+    hits: int = integer(default=0)
+    books: list[QbeBook] = relationship(
         "QbeBook", back_populates="author", init=False, default_factory=list
     )
 
 
 class QbeBook(Model, Timestamps):
     __tablename__ = "qbe_books"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120))
-    genre: Mapped[str] = mapped_column(String(40), default="fiction")
-    author_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("qbe_authors.id"), default=None
-    )
-    author: Mapped[QbeAuthor | None] = relationship("QbeAuthor", back_populates="books", init=False)
+    id: int = id_()
+    title: str = string(120)
+    genre: str = string(40, default="fiction")
+    author_id: int | None = foreign_id("qbe_authors.id", nullable=True)
+    author: QbeAuthor | None = relationship("QbeAuthor", back_populates="books", init=False)
 
 
 async def _setup(engine: AsyncEngine) -> None:

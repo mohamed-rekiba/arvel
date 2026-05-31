@@ -10,33 +10,31 @@ from collections.abc import Iterator
 from typing import Any, ClassVar
 
 import pytest
-from arvel.database import Model
+from arvel.database import Model, id_, integer, string
 from arvel.database.exceptions import UnknownRelationError
 from arvel.database.orm import MorphTo
 from arvel.database.orm.morph_map import get_morph_alias, morph_map, reset_morph_map
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Wi032Post(Model):
     __tablename__ = "wi032_posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    id: int = id_()
+    title: str = string(120)
 
 
 class Wi032Video(Model):
     __tablename__ = "wi032_videos"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    id: int = id_()
+    name: str = string(120)
 
 
 class Wi032Comment(Model):
     __tablename__ = "wi032_comments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    body: Mapped[str] = mapped_column(String(200), nullable=False)
-    commentable_type: Mapped[str] = mapped_column(String(60), nullable=True, default=None)
-    commentable_id: Mapped[int] = mapped_column(Integer, nullable=True, default=None)
+    id: int = id_()
+    body: str = string(200)
+    commentable_type: str | None = string(60, nullable=True, default=None)
+    commentable_id: int | None = integer(nullable=True, default=None)
 
     commentable: ClassVar[MorphTo[Any]] = MorphTo(name="commentable")
 
@@ -94,7 +92,7 @@ class TestWhereHasMorph:
             .where_has_morph(
                 "commentable",
                 [Wi032Post],
-                lambda q, _t: q.where(Wi032Post.title == "keep"),
+                lambda q, _t: q.where(Wi032Post.__table__.c.title == "keep"),
             )
             .get()
         )

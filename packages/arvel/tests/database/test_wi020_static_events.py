@@ -13,20 +13,18 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 import pytest
-from arvel.database import Model, ModelEvent, Observer
+from arvel.database import Model, ModelEvent, Observer, id_, string
 from arvel.database.events import clear_observers
 from arvel.database.exceptions import OperationCancelledError
 from arvel.facades.event import Event
 from arvel.testing.fakes.event import EventFake
-from sqlalchemy import Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Wi020Doc(Model):
     __tablename__ = "wi020_docs"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    title: str = string(200)
 
 
 class _AuditObserver(Observer["Wi020Observed"]):
@@ -39,8 +37,8 @@ class _AuditObserver(Observer["Wi020Observed"]):
 class Wi020Observed(Model):
     __tablename__ = "wi020_observed"
     __observed_by__: ClassVar[list[type[Any]] | None] = [_AuditObserver]
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    title: str = string(200)
 
 
 class Wi020EvtCreated(ModelEvent):
@@ -50,8 +48,8 @@ class Wi020EvtCreated(ModelEvent):
 class Wi020Evt(Model):
     __tablename__ = "wi020_evt"
     __dispatches_events__: ClassVar[dict[str, type[Any]] | None] = {"created": Wi020EvtCreated}
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    id: int = id_()
+    title: str = string(200)
 
 
 async def _setup(engine: AsyncEngine) -> None:
