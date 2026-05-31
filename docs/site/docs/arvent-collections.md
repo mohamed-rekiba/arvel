@@ -20,13 +20,13 @@ posts.model_keys()
 Once you've eager-loaded relations, the collection gives you batch-friendly accessors:
 
 ```python
-posts = await Post.with_("author").get()
+posts = await Post.get()
 
-# Group by author
-by_author = posts.group_by(lambda p: p.author.id)
+# Group by the foreign key column — no relation load needed
+by_author = posts.group_by(lambda p: p.author_id)
 
-# Pluck author IDs off the loaded relation
-author_ids = posts.map(lambda p: p.author.id).unique()
+# Pluck author IDs straight off the column
+author_ids = posts.map(lambda p: p.author_id).unique()
 ```
 
 `pluck(key)` reads a single attribute (`getattr(item, key)`) — it doesn't walk dotted paths. For nested values, `map` with a lambda as above.
@@ -40,7 +40,9 @@ posts = await Post.get()
 await posts.load("author", "comments")
 
 for post in posts:
-    print(post.author.name, len(post.comments))
+    author = await post.author().first()      # served from the cache
+    comments = await post.comments().get()    # served from the cache
+    print(author.name, len(comments))
 ```
 
 `load` batches: pivot, morph, and one-of-many relations load through the descriptor batch loader, plain relations through one `select(... pk IN keys)` + `selectinload` — a fixed number of queries regardless of collection size. No N+1. `load_missing` loads only relations not already populated, and raises `UnknownRelationError` on a misspelled name.

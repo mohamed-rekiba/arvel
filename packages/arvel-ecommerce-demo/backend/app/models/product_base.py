@@ -12,7 +12,7 @@ Columns NOT declared here and why:
                                    because the view JOIN can yield NULLs).
 
   ``status``   ``@declared_attr`` maps to a generic string column; ``Product``
-                           overrides with the Enum-typed mapped_column. The view exposes
+                           overrides with the Enum-typed ``enum()`` column. The view exposes
                            the raw ``p.status`` value from the ``products`` table.
 
 Mutations (save / create / delete) are intentionally absent from ``ProductBase``:
@@ -153,7 +153,7 @@ class ProductBase(ProductMediaMixin, TranslatableMixin, MappedAsDataclass):
     @column_attr
     def status(self) -> str:
         # Generic string mapping for ProductCatalog (view column).
-        # Product overrides this with the Enum-typed mapped_column.
+        # Product overrides this with the Enum-typed enum() column.
         return string(50, nullable=False, default="draft")
 
 

@@ -49,11 +49,15 @@ from arvel.database.orm.morph_to_many import (
     MorphToManyAccessor,
     MorphToManyLink,
 )
-from arvel.database.orm.relations import has_many_attr
+from arvel.database.orm.relations import BelongsTo, FkMethodLink, HasMany, HasOne
 
 __all__ = [
+    "BelongsTo",
     "BelongsToMany",
     "BelongsToManyAccessor",
+    "FkMethodLink",
+    "HasMany",
+    "HasOne",
     "HasOneOfMany",
     "HasOneOfManyAccessor",
     "HasOneOfManyLink",
@@ -76,7 +80,6 @@ __all__ = [
     "declared_attr",
     "foreign",
     "get_morph_alias",
-    "has_many_attr",
     "mapped_column",
     "morph_map",
     "morph_map_required",

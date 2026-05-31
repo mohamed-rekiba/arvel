@@ -37,15 +37,14 @@ If you're not using `AuthServiceProvider`, add `email_verified_at` to your User 
 
 ```python
 from datetime import UTC, datetime as _datetime
-from sqlalchemy.orm import Mapped
 from arvel.database import Model, datetime, id_, string
 
 
 class User(Model):
     __tablename__ = "users"
-    id: Mapped[int] = id_()
-    email: Mapped[str] = string(255, unique=True)
-    email_verified_at: Mapped[_datetime | None] = datetime(nullable=True)
+    id: int = id_()
+    email: str = string(255, unique=True)
+    email_verified_at: _datetime | None = datetime(nullable=True)
 ```
 
 ### Send the verification email

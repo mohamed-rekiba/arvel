@@ -104,9 +104,7 @@ class TestKeyHelpers:
 
 
 class TestIdentity:
-    async def test_is_same_and_is_not(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_is_same_and_is_not(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         a = await Wi025Person.create(name="A")
         b = await Wi025Person.create(name="B")
@@ -117,9 +115,7 @@ class TestIdentity:
 
 
 class TestDiscardChanges:
-    async def test_discard_reverts_dirty(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_discard_reverts_dirty(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         p = await Wi025Person.create(name="Ada")
         p.name = "Changed"

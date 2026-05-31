@@ -52,7 +52,7 @@ transformed through your resource class:
 ```python
 @Route.get("/users")
 async def index(request: Request) -> Response:
-    page = await User.query().paginate(per_page=20)
+    page = await User.paginate(per_page=20)
     return UserResource.collection(page).response(request)
 ```
 
@@ -106,7 +106,7 @@ Merge extra keys into the root response envelope without subclassing:
 ```python
 @Route.get("/users")
 async def index(request: Request) -> Response:
-    page = await User.query().paginate(per_page=20)
+    page = await User.paginate(per_page=20)
     return (
         UserResource.collection(page)
         .additional({"meta": {"trace_id": request.state.trace_id}})

@@ -261,7 +261,7 @@ inserted = await User.insert_or_ignore([
 ])
 
 # INSERT INTO … SELECT — copy rows from another query (global scopes honored).
-copied = await Archive.insert_using(["email"], User.query().where("active", False).select("email"))
+copied = await Archive.insert_using(["email"], User.where("active", False).select("email"))
 
 # Bump several columns in one UPDATE.
 await Post.where(id=post_id).increment_each({"views": 1, "shares": 2})

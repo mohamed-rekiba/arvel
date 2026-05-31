@@ -60,9 +60,7 @@ async def client() -> AsyncGenerator[TestClient]:
         config, http_client=httpx.AsyncClient(transport=httpx.MockTransport(_google_handler))
     )
     auth = AuthService(jwt=JwtConfig(secret=_JWT_SECRET))
-    controller = OAuthController(
-        manager=manager, config=config, auth=auth, cookie_secure=False
-    )
+    controller = OAuthController(manager=manager, config=config, auth=auth, cookie_secure=False)
 
     app = FastAPI()
     HttpExceptionHandler().register(app)

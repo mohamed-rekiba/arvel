@@ -4,10 +4,18 @@ from __future__ import annotations
 
 from datetime import UTC
 from datetime import datetime as _datetime
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from arvel.auth.mixins import Authenticatable, HasApiTokens
-from arvel.database import Model, SoftDeletes, Timestamps, datetime, enum, id_, string
+from arvel.database import (
+    Model,
+    SoftDeletes,
+    Timestamps,
+    datetime,
+    enum,
+    id_,
+    string,
+)
 from arvel.database.orm import MorphToMany
 from arvel_permission.models import (
     Permission,
@@ -16,6 +24,12 @@ from arvel_permission.models import (
     model_has_roles,
 )
 from arvel_permission.traits import HasPermissions, HasRoles
+
+if TYPE_CHECKING:
+    from arvel.database import HasMany, HasOne
+
+    from app.models.cart import Cart
+    from app.models.order import Order
 
 
 class User(
@@ -50,6 +64,12 @@ class User(
     permissions: ClassVar[MorphToMany[Permission]] = MorphToMany(
         Permission, table=model_has_permissions, name="model", related_key="permission_id"
     )
+
+    def orders(self) -> HasMany[Order]:
+        return self.has_many("Order", foreign_key="user_id")
+
+    def cart(self) -> HasOne[Cart]:
+        return self.has_one("Cart", foreign_key="user_id")
 
     async def is_admin(self) -> bool:
         return await self.has_any_role("admin", "super_admin")

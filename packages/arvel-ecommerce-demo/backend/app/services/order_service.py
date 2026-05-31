@@ -100,21 +100,28 @@ class OrderService:
         return result
 
     async def list_orders(self, user_id: int) -> list[dict[str, Any]]:
-        orders: list[Order] = await Order.where(user_id=user_id).order_by("-created_at").all()
+        # Eager-load items in one batched query — no per-order line-item lookup.
+        orders: list[Order] = (
+            await Order.where(user_id=user_id).with_("items").order_by("-created_at").all()
+        )
         results = []
         for o in orders:
             row = self._format_order(o)
-            row["items"] = await self._get_order_items(str(o.id))
+            items = await o.items().get()
+            row["items"] = self._format_items(items)
             results.append(row)
         return results
 
     async def get_order(self, order_id: str, user_id: int) -> dict[str, Any] | None:
         oid = uuid.UUID(order_id)
-        order: Order | None = await Order.where(Order.id == oid, Order.user_id == user_id).first()
+        order: Order | None = (
+            await Order.where(Order.id == oid, Order.user_id == user_id).with_("items").first()
+        )
         if order is None:
             return None
         result = self._format_order(order)
-        result["items"] = await self._get_order_items(str(order.id))
+        items = await order.items().get()
+        result["items"] = self._format_items(items)
         return result
 
     async def admin_list_orders(
@@ -132,7 +139,10 @@ class OrderService:
         if status is not None:
             qb = qb.where(status=status)
         total: int = await qb.count()
-        orders: list[Order] = await qb.order_by("-created_at").limit(limit).offset(offset).all()
+        # Eager-load items so the per-order formatter never re-queries.
+        orders: list[Order] = (
+            await qb.with_("items").order_by("-created_at").limit(limit).offset(offset).all()
+        )
         user_ids = list({o.user_id for o in orders})
         users: list[User] = (
             await User.with_trashed().where(User.id.in_(user_ids)).all() if user_ids else []
@@ -141,7 +151,8 @@ class OrderService:
         results = []
         for o in orders:
             row = self._format_order(o)
-            row["items"] = await self._get_order_items(str(o.id))
+            items = await o.items().get()
+            row["items"] = self._format_items(items)
             u = user_map.get(o.user_id)
             row["user"] = (
                 {"id": u.id, "name": u.name, "email": u.email}
@@ -153,11 +164,14 @@ class OrderService:
 
     async def admin_get_order(self, order_id: str) -> dict[str, Any] | None:
         oid = uuid.UUID(order_id)
-        order: Order | None = await Order.with_trashed().where(Order.id == oid).first()
+        order: Order | None = (
+            await Order.with_trashed().where(Order.id == oid).with_("items").first()
+        )
         if order is None:
             return None
         result = self._format_order(order)
-        result["items"] = await self._get_order_items(str(order.id))
+        items = await order.items().get()
+        result["items"] = self._format_items(items)
         u: User | None = await User.with_trashed().where(User.id == order.user_id).first()
         result["user"] = (
             {"id": u.id, "name": u.name, "email": u.email}
@@ -251,9 +265,11 @@ class OrderService:
         }
         return target in allowed.get(current, set())
 
-    async def _get_order_items(self, order_id: str) -> list[dict[str, Any]]:
-        oid = uuid.UUID(order_id)
-        items: list[OrderItem] = await OrderItem.where(order_id=oid).order_by("created_at").all()
+    @staticmethod
+    def _format_items(items: list[OrderItem]) -> list[dict[str, Any]]:
+        # Autoincrement id preserves insertion order — same ordering as the old
+        # created_at sort, without re-querying the eager-loaded relation.
+        ordered = sorted(items, key=lambda i: i.id)
         return [
             {
                 "id": str(i.id),
@@ -264,7 +280,7 @@ class OrderService:
                 "subtotal": float(i.subtotal),
                 "product": {"name": {"en": i.product_name_snapshot or ""}},
             }
-            for i in items
+            for i in ordered
         ]
 
     @staticmethod

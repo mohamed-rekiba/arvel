@@ -21,6 +21,7 @@ from arvel.database import columns as columns_module
 from arvel.database.columns import (
     big_integer,
     boolean,
+    column,
     datetime,
     foreign_id,
     id_,
@@ -44,6 +45,18 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, relationship
+from sqlalchemy.types import TypeDecorator
+
+
+class _UpperString(TypeDecorator[str]):
+    """Custom TypeDecorator used to exercise the generic ``column()`` helper."""
+
+    impl = String
+    cache_ok = True
+
+    def process_bind_param(self, value: str | None, dialect: object) -> str | None:
+        return value.upper() if value is not None else value
+
 
 # ─── helper-shape tests (column type + flags) ────────────────────────────────
 
@@ -154,6 +167,18 @@ def test_foreign_id_attaches_foreign_key() -> None:
     assert fks[0].ondelete == "CASCADE"
 
 
+def test_column_wraps_an_arbitrary_custom_type() -> None:
+    col = _column_from(column(_UpperString(50), unique=True))
+    assert isinstance(col.type, _UpperString)
+    assert col.nullable is False
+    assert col.unique is True
+
+
+def test_column_nullable_flag_is_honoured() -> None:
+    col = _column_from(column(_UpperString(50), nullable=True, default=None))
+    assert col.nullable is True
+
+
 # ─── integration: model declared with the helpers behaves identically ───────
 
 
@@ -183,6 +208,13 @@ class _SoftAccount(Model, SoftDeletes):
 
     id: Mapped[int] = id_()
     name: Mapped[str] = string(120)
+
+
+class _Vault(Model):
+    __tablename__ = "vault_columns_test"
+
+    id: Mapped[int] = id_()
+    secret: Mapped[str] = column(_UpperString(50))
 
 
 async def _create_tables(engine: Any) -> None:
@@ -223,6 +255,17 @@ async def test_helper_model_inherits_timestamps(engine: Any, session: AsyncSessi
     assert isinstance(row.updated_at, _datetime)
 
 
+async def test_column_routes_custom_type_bind_processing(
+    engine: Any, session: AsyncSession
+) -> None:
+    """A column() field runs the custom type's bind processing on write."""
+    await _create_tables(engine)
+    row = await _Vault.create(secret="hunter2")
+    # Refresh past the identity map to read what actually landed in the column.
+    await row.refresh()
+    assert row.secret == "HUNTER2"
+
+
 def test_all_helpers_are_exported_from_arvel_database() -> None:
     """Every helper is part of ``arvel.database``'s public surface."""
     import arvel.database as adb
@@ -234,6 +277,7 @@ def test_all_helpers_are_exported_from_arvel_database() -> None:
         "integer",
         "big_integer",
         "boolean",
+        "column",
         "datetime",
         "json",
         "foreign_id",

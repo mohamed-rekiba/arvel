@@ -1,42 +1,48 @@
-"""WI-arvel-088 — ORM Relations DX: immediate cleanup (Stories 4, 5, 6, 7).
+"""Method-style FK relations: eager loading + N+1 elimination (Laravel DX).
 
-RED state: all tests fail until implementation is complete.
-
-FR-001  has_many_attr declarator replaces has_many
-FR-002  Declarator implementation lives in orm/relations.py only
-FR-003  Declarator-generated relationships use lazy="raise_on_sql"
-FR-004  QueryLog.assert_max_queries(n) context manager
+Relations are defined once as zero-arg accessor methods returning ``HasMany`` /
+``HasOne`` / ``BelongsTo``. The same definition powers lazy queries, eager
+loading (``with_("items")``), cached read-back (``await owner.items().get()``),
+and ``where_has`` / ``with_count`` — no separate descriptor declaration.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, ClassVar
 
-import pytest
-from arvel.database import Model, has_many_attr
+from arvel.database import Model, foreign_id, id_, string
 from arvel.database.query_logging import QueryLog
-from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped
 
-# ─── Test models (mirrors the has_many_attr use case from the ecommerce demo) ─
-
-
-class Wi088Owner(Model):
-    __tablename__ = "wi088_owners"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    name: Mapped[str] = mapped_column(String(80))
-    # Declared via has_many_attr — must use lazy="raise_on_sql" (FR-003)
-    items: list[Any] = has_many_attr("Wi088Item", fk="owner_id")
+if TYPE_CHECKING:
+    from arvel.database.orm.relations import BelongsTo, HasMany, HasOne
 
 
-class Wi088Item(Model):
-    __tablename__ = "wi088_items"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
-    label: Mapped[str] = mapped_column(String(80))
-    owner_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("wi088_owners.id"), nullable=True, default=None
-    )
+class RelOwner(Model):
+    __tablename__ = "rel_owners"
+    __guarded__: ClassVar[list[str] | None] = []
+
+    id: Mapped[int] = id_()
+    name: Mapped[str] = string(80)
+
+    def items(self) -> HasMany[RelItem]:
+        return self.has_many(RelItem, foreign_key="owner_id")
+
+    def latest_item(self) -> HasOne[RelItem]:
+        return self.has_one(RelItem, foreign_key="owner_id")
+
+
+class RelItem(Model):
+    __tablename__ = "rel_items"
+    __guarded__: ClassVar[list[str] | None] = []
+
+    id: Mapped[int] = id_()
+    label: Mapped[str] = string(80)
+    owner_id: Mapped[int | None] = foreign_id("rel_owners.id", nullable=True)
+
+    def owner(self) -> BelongsTo[RelOwner]:
+        return self.belongs_to(RelOwner, foreign_key="owner_id")
 
 
 async def _setup(engine: AsyncEngine) -> None:
@@ -46,141 +52,193 @@ async def _setup(engine: AsyncEngine) -> None:
         await conn.run_sync(BaseModel.metadata.create_all)
 
 
-# ─── FR-001: has_many_attr importable from arvel.database ─────────────────────
+async def _seed() -> tuple[RelOwner, RelOwner]:
+    o1 = await RelOwner.create(name="o1")
+    o2 = await RelOwner.create(name="o2")
+    await RelItem.create(label="a", owner_id=o1.id)
+    await RelItem.create(label="b", owner_id=o1.id)
+    await RelItem.create(label="c", owner_id=o2.id)
+    return o1, o2
 
 
-class TestFR001HasManyAttrImport:
-    def test_has_many_attr_importable_from_arvel_database(self) -> None:
-        """has_many_attr must be importable from the top-level package."""
-        from arvel.database import has_many_attr
-
-        assert callable(has_many_attr)
-
-    def test_has_many_no_longer_in_arvel_database_all(self) -> None:
-        """has_many (the declarator) must be removed from arvel.database.__all__."""
-        import arvel.database as db_mod
-
-        assert "has_many" not in db_mod.__all__, (
-            "'has_many' should be removed from arvel.database.__all__; use has_many_attr instead"
-        )
-
-    def test_has_many_attr_in_arvel_database_all(self) -> None:
-        """has_many_attr must be in arvel.database.__all__."""
-        import arvel.database as db_mod
-
-        assert "has_many_attr" in db_mod.__all__
+# ─── Registration ─────────────────────────────────────────────────────────────
 
 
-# ─── FR-002: Implementation in orm/relations.py, not orm/__init__.py ──────────
+class TestRegistration:
+    def test_accessors_are_registered(self) -> None:
+        """The metaclass records zero-arg relation accessors for the eager engine."""
+        assert "items" in RelOwner.__arvel_fk_relations__
+        assert "latest_item" in RelOwner.__arvel_fk_relations__
+        assert "owner" in RelItem.__arvel_fk_relations__
+
+    def test_builder_helpers_not_registered(self) -> None:
+        """``has_many`` and friends take arguments — they're not accessors."""
+        assert "has_many" not in RelOwner.__arvel_fk_relations__
+        assert "belongs_to" not in RelItem.__arvel_fk_relations__
 
 
-class TestFR002PlacementGuard:
-    def test_has_many_attr_defined_in_orm_relations(self) -> None:
-        """has_many_attr must be defined in orm/relations, not orm/__init__."""
-        import arvel.database.orm as orm_mod
-        import arvel.database.orm.relations as relations_mod
-
-        # Must exist in relations.py
-        assert hasattr(relations_mod, "has_many_attr"), (
-            "has_many_attr must be defined in arvel.database.orm.relations"
-        )
-        # The function in orm/__init__ must be the same object imported from relations
-        assert getattr(orm_mod, "has_many_attr", None) is relations_mod.has_many_attr, (
-            "orm/__init__.py must re-export has_many_attr from orm/relations, not define it"
-        )
-
-    def test_orm_init_contains_no_function_implementations(self) -> None:
-        """orm/__init__.py must not contain any function definitions (re-exports only)."""
-        import ast
-        import inspect
-        from pathlib import Path
-
-        import arvel.database.orm as orm_mod
-
-        src_file = inspect.getfile(orm_mod)
-        tree = ast.parse(Path(src_file).read_text())
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                pytest.fail(
-                    f"orm/__init__.py contains a function definition: {node.name}. "
-                    "It must be a re-export hub only."
-                )
+# ─── Eager loading (has_many) ──────────────────────────────────────────────────
 
 
-# ─── FR-003: lazy="raise_on_sql" on declarator-generated relationships ─────────
+class TestEagerHasMany:
+    async def test_no_n_plus_one(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        """with_("items") + cached read-back stays at two queries for any owner count."""
+        await _setup(engine)
+        await _seed()
 
+        with QueryLog.assert_max_queries(2):
+            owners = await RelOwner.with_("items").all()
+            counts = {o.name: len(await o.items().get()) for o in owners}
 
-class TestFR003LazyRaise:
-    async def test_unloaded_relation_raises_on_access(
+        assert counts == {"o1": 2, "o2": 1}
+
+    async def test_lazy_path_still_queries(
         self, engine: AsyncEngine, session: AsyncSession
     ) -> None:
-        """Accessing an unloaded has_many_attr attribute must raise, not lazy-load."""
-        import sqlalchemy.exc
-
+        """Without with_(), the accessor falls through to a real query."""
         await _setup(engine)
-        owner = await Wi088Owner.create(name="Lazy Trap")
-        await Wi088Item.create(label="item1", owner_id=owner.id)
+        o1, _ = await _seed()
 
-        # Fetch the owner without eager loading
-        fresh_owner = await Wi088Owner.find(owner.id)
-        assert fresh_owner is not None
+        fresh = await RelOwner.find(o1.id)
+        assert fresh is not None
+        items = await fresh.items().get()
+        assert len(items) == 2
 
-        # Accessing a has_many_attr-declared attribute without with_() must raise
-        # This test requires that the attribute be declared via has_many_attr with
-        # lazy="raise_on_sql". The Wi088Owner.items attribute is set up by the
-        # test fixture below.
-        with pytest.raises((sqlalchemy.exc.InvalidRequestError, AttributeError)):
-            # Trigger access — must not silently lazy-load
-            _ = fresh_owner.items
 
-    async def test_loaded_relation_accessible_after_with(
+# ─── Eager loading (has_one / belongs_to) ──────────────────────────────────────
+
+
+class TestEagerHasOneBelongsTo:
+    async def test_has_one_cached_readback(
         self, engine: AsyncEngine, session: AsyncSession
     ) -> None:
-        """After with_('items'), the attribute must be accessible without raising."""
         await _setup(engine)
-        owner = await Wi088Owner.create(name="Eager OK")
-        await Wi088Item.create(label="x", owner_id=owner.id)
+        await _seed()
 
-        owners = await Wi088Owner.with_("items").all()
-        assert len(owners) == 1
-        # Must not raise
-        items = owners[0].items
-        assert len(items) == 1
+        owners = await RelOwner.with_("latest_item").all()
+        with QueryLog.assert_max_queries(0):
+            for owner in owners:
+                assert await owner.latest_item().first() is not None
 
-
-# ─── FR-004: QueryLog.assert_max_queries ─────────────────────────────────────
-
-
-class TestFR004AssertMaxQueries:
-    async def test_passes_when_query_count_within_limit(
+    async def test_belongs_to_cached_readback(
         self, engine: AsyncEngine, session: AsyncSession
     ) -> None:
-        """assert_max_queries should not raise when count <= n."""
         await _setup(engine)
-        await Wi088Owner.create(name="q1")
+        await _seed()
 
+        items = await RelItem.with_("owner").all()
+        with QueryLog.assert_max_queries(0):
+            owners = [await it.owner().first() for it in items]
+        assert all(o is not None for o in owners)
+        assert {o.name for o in owners if o is not None} == {"o1", "o2"}
+
+
+# ─── Chaperone (inverse hydration over method relations) ───────────────────────
+
+
+class TestChaperone:
+    async def test_inverse_inferred_no_extra_query(
+        self, engine: AsyncEngine, session: AsyncSession
+    ) -> None:
+        """chaperone() hydrates each child's belongs_to back to the loaded owner."""
+        await _setup(engine)
+        await _seed()
+
+        owners = await RelOwner.with_({"items": lambda q: q.chaperone()}).all()
+        target = next(o for o in owners if o.name == "o1")
+
+        with QueryLog.assert_max_queries(0):
+            items = await target.items().get()
+            for item in items:
+                assert await item.owner().first() is target
+
+    async def test_explicit_inverse_name(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        await _seed()
+
+        owners = await RelOwner.with_({"items": lambda q: q.chaperone("owner")}).all()
+        target = next(o for o in owners if o.name == "o1")
+
+        with QueryLog.assert_max_queries(0):
+            for item in await target.items().get():
+                assert await item.owner().first() is target
+
+
+# ─── where_has / with_count over method relations ──────────────────────────────
+
+
+class TestRelationConstraints:
+    async def test_where_has(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        await RelOwner.create(name="childless")
+        await _seed()
+
+        with_items = await RelOwner.where_has("items").get()
+        assert {o.name for o in with_items} == {"o1", "o2"}
+
+    async def test_where_has_with_constraint(
+        self, engine: AsyncEngine, session: AsyncSession
+    ) -> None:
+        await _setup(engine)
+        await _seed()
+
+        matched = await RelOwner.where_has("items", lambda q: q.where(RelItem.label == "c")).get()
+        assert {o.name for o in matched} == {"o2"}
+
+    async def test_with_count(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        await _seed()
+
+        owners = await RelOwner.with_count("items").get()
+        by_name = {o.name: o.items_count for o in owners}
+        assert by_name == {"o1": 2, "o2": 1}
+
+
+# ─── Lazy batch load onto fetched instances ────────────────────────────────────
+
+
+class TestLoadAfterFetch:
+    async def test_collection_load(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        """ModelCollection.load() batches a method-style relation into the cache."""
+        await _setup(engine)
+        await _seed()
+
+        owners = await RelOwner.all()
+        await owners.load("items")
+        with QueryLog.assert_max_queries(0):
+            counts = {o.name: len(await o.items().get()) for o in owners}
+        assert counts == {"o1": 2, "o2": 1}
+
+    async def test_model_load(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        o1, _ = await _seed()
+
+        fresh = await RelOwner.find(o1.id)
+        assert fresh is not None
+        await fresh.load("items")
+        with QueryLog.assert_max_queries(0):
+            assert len(await fresh.items().get()) == 2
+
+
+# ─── QueryLog.assert_max_queries ───────────────────────────────────────────────
+
+
+class TestAssertMaxQueries:
+    async def test_passes_within_limit(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        await RelOwner.create(name="q1")
         with QueryLog.assert_max_queries(5) as log:
-            await Wi088Owner.all()
-
+            await RelOwner.all()
         assert len(log.queries) <= 5
 
-    async def test_fails_when_query_count_exceeds_limit(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
-        """assert_max_queries must raise AssertionError when count > n."""
+    async def test_fails_when_exceeded(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        import pytest
+
         await _setup(engine)
-        for i in range(3):
-            await Wi088Owner.create(name=f"o{i}")
-
+        await RelOwner.create(name="o0")
         with pytest.raises(AssertionError, match="queries"), QueryLog.assert_max_queries(0):
-            await Wi088Owner.all()
+            await RelOwner.all()
 
-    def test_assert_max_queries_is_static_contextmanager(self) -> None:
-        """assert_max_queries must exist as a static method on QueryLog."""
-        assert hasattr(QueryLog, "assert_max_queries"), "QueryLog.assert_max_queries must exist"
-
-        # Must be a context manager factory
+    def test_is_context_manager_factory(self) -> None:
         cm = QueryLog.assert_max_queries(10)
-        assert hasattr(cm, "__enter__") or hasattr(cm, "__aenter__"), (
-            "QueryLog.assert_max_queries(n) must return a context manager"
-        )
+        assert hasattr(cm, "__enter__") or hasattr(cm, "__aenter__")

@@ -34,9 +34,7 @@ class Wi037Post(Model):
     user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("wi037_users.id"), nullable=True, default=None
     )
-    author: Mapped[Wi037User | None] = relationship(
-        "Wi037User", back_populates="posts", init=False
-    )
+    author: Mapped[Wi037User | None] = relationship("Wi037User", back_populates="posts", init=False)
 
 
 async def _setup(engine: AsyncEngine) -> None:
@@ -104,9 +102,7 @@ class TestSetOps:
 
 
 class TestLoad:
-    async def test_load_batches_relation(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_load_batches_relation(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         u1 = await Wi037User.create(name="u1")
         u2 = await Wi037User.create(name="u2")
@@ -136,7 +132,7 @@ class TestLoad:
     ) -> None:
         await _setup(engine)
         await Wi037User.create(name="a")
-        users = await Wi037User.query().get()
+        users = await Wi037User.get()
         with pytest.raises(UnknownRelationError):
             await users.load("not_a_relation")
 
@@ -168,7 +164,7 @@ class TestLoadMissing:
         await Wi037Post.create(title="p1", user_id=u1.id)
         session.expire_all()
 
-        users = await Wi037User.query().get()
+        users = await Wi037User.get()
         await users.load_missing("posts")
         assert users[0].posts[0].title == "p1"
 
@@ -213,7 +209,7 @@ class TestVisibility:
     ) -> None:
         await _setup(engine)
         await Wi037User.create(name="a", secret="x")
-        users = await Wi037User.query().get()
+        users = await Wi037User.get()
 
         users.make_hidden("secret")
         assert "secret" not in users[0].to_dict()

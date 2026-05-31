@@ -53,7 +53,7 @@ async def test_retrieved_fires_once_per_row_on_all(
     await RevTag.create(name="a")
     await RevTag.create(name="b")
     counter.count = 0
-    rows: Any = await RevTag.query().all()
+    rows: Any = await RevTag.all()
     assert len(rows) == 2
     assert counter.count == 2
 

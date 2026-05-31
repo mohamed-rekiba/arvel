@@ -149,16 +149,18 @@ arvel make:model Item --migration
 Edit `app/models/item.py`:
 
 ```python
-from arvel.database import Model, Timestamps
+from decimal import Decimal
+
+from arvel.database import Model, Timestamps, boolean, decimal, id_, string
 
 
 class Item(Model, Timestamps):
-    __table__ = "items"
+    __tablename__ = "items"
 
-    id: int
-    name: str
-    price: float
-    is_active: bool = True
+    id: int = id_()
+    name: str = string(255)
+    price: Decimal = decimal(10, 2)
+    is_active: bool = boolean(default=True)
 ```
 
 Run the migration:

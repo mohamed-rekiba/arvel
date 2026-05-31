@@ -53,15 +53,11 @@ async def _setup(engine: AsyncEngine) -> None:
         await conn.run_sync(Model.metadata.create_all)
 
 
-async def test_insert_or_ignore_skips_conflicts(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_insert_or_ignore_skips_conflicts(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     await WTag.create(slug="a", label="original")
 
-    await WTag.insert_or_ignore(
-        [{"slug": "a", "label": "dupe"}, {"slug": "b", "label": "fresh"}]
-    )
+    await WTag.insert_or_ignore([{"slug": "a", "label": "dupe"}, {"slug": "b", "label": "fresh"}])
 
     rows = {t.slug: t.label for t in await WTag.order_by("slug").all()}
     assert rows == {"a": "original", "b": "fresh"}
@@ -91,9 +87,7 @@ async def test_upsert_single_statement_returns_count(
     assert await WTag.count() == 2
 
 
-async def test_truncate_empties_table(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_truncate_empties_table(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     await WTag.create(slug="t1", label="a")
     await WTag.create(slug="t2", label="b")
@@ -104,9 +98,7 @@ async def test_truncate_empties_table(
     assert await WTag.count() == 0
 
 
-async def test_insert_using_from_select(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_insert_using_from_select(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     await WSource.create(label="from-source-1")
     await WSource.create(label="from-source-2")
@@ -118,15 +110,11 @@ async def test_insert_using_from_select(
     assert names == ["from-source-1", "from-source-2"]
 
 
-async def test_increment_each_bumps_multiple(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_increment_each_bumps_multiple(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     await WCounter.create(name="c", hits=1, misses=1)
 
-    affected = await WCounter.where(WCounter.name == "c").increment_each(
-        {"hits": 5, "misses": 2}
-    )
+    affected = await WCounter.where(WCounter.name == "c").increment_each({"hits": 5, "misses": 2})
     assert affected == 1
 
     c = await WCounter.where(WCounter.name == "c").first()
@@ -134,9 +122,7 @@ async def test_increment_each_bumps_multiple(
     assert (c.hits, c.misses) == (6, 3)
 
 
-async def test_decrement_each_bumps_multiple(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_decrement_each_bumps_multiple(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     await WCounter.create(name="d", hits=10, misses=10)
 
@@ -145,5 +131,3 @@ async def test_decrement_each_bumps_multiple(
     d = await WCounter.where(WCounter.name == "d").first()
     assert d is not None
     assert (d.hits, d.misses) == (7, 9)
-
-

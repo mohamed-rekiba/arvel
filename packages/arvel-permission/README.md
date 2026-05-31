@@ -48,15 +48,15 @@ arvel migrate
 Mix `HasRoles` and `HasPermissions` into any model:
 
 ```python
-from arvel.database import Model, Timestamps
+from arvel.database import Model, Timestamps, id_, string
 from arvel_permission import HasRoles, HasPermissions
 
 
 class User(Model, Timestamps, HasRoles, HasPermissions):
-    __table__ = "users"
+    __tablename__ = "users"
 
-    id: int
-    email: str
+    id: int = id_()
+    email: str = string(254, unique=True)
 ```
 
 Manage roles and permissions:

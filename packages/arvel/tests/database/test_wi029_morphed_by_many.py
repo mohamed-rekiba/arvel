@@ -87,9 +87,7 @@ class TestInverseAccessor:
         titles = [p.title for p in await tag.posts.all()]
         assert titles == ["hello"]
 
-    async def test_inverse_attach_detach(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_inverse_attach_detach(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         tag = await Wi029Tag.create(name="rust")
         p1 = await Wi029Post.create(title="a")

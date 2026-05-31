@@ -4,10 +4,11 @@ Arvel models extend :class:`arvel.database.Model` (which composes
 SQLAlchemy :class:`DeclarativeBase` with Arvel's ``ActiveRecord``
 mixin). Columns use the typed helpers in :mod:`arvel.database.columns`
 (``id_``, ``string``, ``integer``, …) — each is a thin wrapper around
-:func:`sqlalchemy.orm.mapped_column` that returns ``Mapped[T]``, so
-pyright and mypy strict mode see the column type without any extra
-annotation work. Drop down to ``mapped_column(...)`` when a column needs
-something the helpers don't cover.
+:func:`sqlalchemy.orm.mapped_column` that returns ``Mapped[T]``. Write
+the plain annotation (``id: int = id_()``); the model metaclass wraps it
+in ``Mapped[int]`` at runtime. ``Mapped[...]`` is still required for
+relationships and for columns with no helper on the right. Drop down to
+``mapped_column(...)`` when a column needs something the helpers don't cover.
 
 The default stub includes a primary key, a sample text column, and the
 :class:`arvel.database.Timestamps` mixin so ``created_at`` /
@@ -41,15 +42,14 @@ _TEMPLATE_MODEL = '''"""{title} — ORM model."""
 from __future__ import annotations
 
 from arvel.database import Model, Timestamps, id_, string
-from sqlalchemy.orm import Mapped
 
 
 class {title}(Model, Timestamps):
     __tablename__ = "{table}"
     __guarded__ = ["*"]
 
-    id: Mapped[int] = id_()
-    name: Mapped[str] = string(255)
+    id: int = id_()
+    name: str = string(255)
 '''
 
 _TEMPLATE_VIEW = '''"""{title} — read-only view model."""
@@ -57,13 +57,12 @@ _TEMPLATE_VIEW = '''"""{title} — read-only view model."""
 from __future__ import annotations
 
 from arvel.database import ViewModel, id_
-from sqlalchemy.orm import Mapped
 
 
 class {title}(ViewModel):
     __tablename__ = "{table}"
 
-    id: Mapped[int] = id_()
+    id: int = id_()
     # define columns to match your view\'s shape
 '''
 
@@ -72,14 +71,13 @@ _TEMPLATE_MATERIALIZED_VIEW = '''"""{title} — materialized view model."""
 from __future__ import annotations
 
 from arvel.database import ViewModel, id_
-from sqlalchemy.orm import Mapped
 
 
 class {title}(ViewModel):
     __tablename__ = "{table}"
     __is_materialized_view__ = True
 
-    id: Mapped[int] = id_()
+    id: int = id_()
     # define columns to match your view\'s shape
 '''
 

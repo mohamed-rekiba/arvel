@@ -24,9 +24,7 @@ class Wi031Comment(Model):
     __tablename__ = "wi031_comments"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False, default=None)
     body: Mapped[str] = mapped_column(String(80))
-    post_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("wi031_posts.id"), default=None
-    )
+    post_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wi031_posts.id"), default=None)
     post: Mapped[Wi031Post | None] = relationship(
         "Wi031Post", back_populates="comments", init=False
     )
@@ -109,9 +107,7 @@ class TestChaperone:
         assert len(loaded.comments) == 1
         assert loaded.comments[0].post is loaded
 
-    async def test_explicit_inverse_name(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_explicit_inverse_name(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         post = await Wi031Post.create(title="explicit")
         await Wi031Comment.create(body="x", post_id=post.id)

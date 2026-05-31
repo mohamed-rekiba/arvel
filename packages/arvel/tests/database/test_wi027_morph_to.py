@@ -89,9 +89,7 @@ class TestAssociateDissociate:
         # Cache primed by associate — no DB round-trip needed.
         assert (await comment.commentable) is video
 
-    async def test_dissociate_clears_both(
-        self, engine: AsyncEngine, session: AsyncSession
-    ) -> None:
+    async def test_dissociate_clears_both(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         post = await Wi027Post.create(title="p")
         comment = await post.comments.create(body="c")
