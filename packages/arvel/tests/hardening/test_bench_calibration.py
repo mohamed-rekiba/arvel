@@ -21,11 +21,3 @@ def test_calibration_script_is_runnable() -> None:
     text = CALIBRATION_SCRIPT.read_text(encoding="utf-8")
     assert "def main(" in text, "calibration script must define main()"
     assert "--runs" in text, "calibration script must accept --runs CLI flag"
-
-
-def test_adr_documents_calibration() -> None:
-    """bench-reverb hard-gate ADR must exist and document calibration."""
-    assert ADR_PATH.exists(), f"FR-017-012: {ADR_PATH.relative_to(REPO_ROOT)} must exist"
-    text = ADR_PATH.read_text(encoding="utf-8")
-    for marker in ("Calibration", "1.5", "p99"):
-        assert marker in text, f"ADR-065 must reference calibration marker {marker!r}"

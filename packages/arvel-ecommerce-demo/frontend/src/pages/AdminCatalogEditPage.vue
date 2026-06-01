@@ -95,7 +95,9 @@ const { data: productWrapper, isPending: loadingProduct } =
   useAdminProductsShowApiAdminProductsProductIdGet(idRef, { query: { enabled: fetchProduct } })
 
 const { data: categoryWrapper, isPending: loadingCategory } =
-  useAdminCategoriesShowApiAdminCategoriesCategoryIdGet(idRef, { query: { enabled: fetchCategory } })
+  useAdminCategoriesShowApiAdminCategoriesCategoryIdGet(idRef, {
+    query: { enabled: fetchCategory },
+  })
 
 const { data: vendorWrapper, isPending: loadingVendor } =
   useAdminVendorsShowApiAdminVendorsVendorIdGet(idRef, { query: { enabled: fetchVendor } })
@@ -289,18 +291,21 @@ function onSaveError(err: unknown): void {
   toast.error(msg)
 }
 
-const { mutate: createProduct, isPending: creatingProduct } = useAdminProductsStoreApiAdminProductsPost(
-  { mutation: { onSuccess: onCreated, onError: onSaveError } },
-)
+const { mutate: createProduct, isPending: creatingProduct } =
+  useAdminProductsStoreApiAdminProductsPost({
+    mutation: { onSuccess: onCreated, onError: onSaveError },
+  })
 
 const { mutate: createCategory, isPending: creatingCategory } =
   useAdminCategoriesStoreApiAdminCategoriesPost({
     mutation: { onSuccess: onCreated, onError: onSaveError },
   })
 
-const { mutate: createVendor, isPending: creatingVendor } = useAdminVendorsStoreApiAdminVendorsPost({
-  mutation: { onSuccess: onCreated, onError: onSaveError },
-})
+const { mutate: createVendor, isPending: creatingVendor } = useAdminVendorsStoreApiAdminVendorsPost(
+  {
+    mutation: { onSuccess: onCreated, onError: onSaveError },
+  },
+)
 
 const saving = computed(
   () =>
