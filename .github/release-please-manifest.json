@@ -2,7 +2,7 @@
   "packages/arvel": "0.4.0",
   "packages/arvel-permission": "0.4.0",
   "packages/arvel-image": "0.4.0",
-  "packages/arvel-oauth": "0.4.0",
+  "packages/arvel-oauth": "0.5.0",
   "packages/arvel-search": "0.5.0",
   "packages/arvel-audit": "0.5.0"
 }
