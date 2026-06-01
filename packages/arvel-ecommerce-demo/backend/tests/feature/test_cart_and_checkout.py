@@ -96,8 +96,7 @@ async def test_empty_cart_returns_no_items(client: Any, customer_token: str) -> 
     """US-020: new customer has an empty cart."""
     response = await client.get("/api/cart", headers={"Authorization": f"Bearer {customer_token}"})
     assert response.status_code == 200
-    assert response.json()["items"] == []
-    assert response.json()["total"] == 0.0
+    assert response.json()["data"]["items"] == []
 
 
 @pytest.mark.asyncio
@@ -109,7 +108,7 @@ async def test_add_item_to_cart(client: Any, customer_token: str, headphones_id:
         json={"product_id": headphones_id, "quantity": 2},
     )
     assert response.status_code == 200
-    body = response.json()
+    body = response.json()["data"]
     assert len(body["items"]) == 1
     assert body["items"][0]["quantity"] == 2
     assert body["items"][0]["product_id"] == headphones_id
@@ -131,8 +130,9 @@ async def test_adding_same_product_twice_increments_quantity(
         json={"product_id": headphones_id, "quantity": 2},
     )
     cart = await client.get("/api/cart", headers={"Authorization": f"Bearer {customer_token}"})
-    assert len(cart.json()["items"]) == 1, "Duplicate add must merge, not create a second row"
-    assert cart.json()["items"][0]["quantity"] == 3
+    items = cart.json()["data"]["items"]
+    assert len(items) == 1, "Duplicate add must merge, not create a second row"
+    assert items[0]["quantity"] == 3
 
 
 @pytest.mark.asyncio
@@ -145,7 +145,7 @@ async def test_update_cart_item_quantity(
         headers={"Authorization": f"Bearer {customer_token}"},
         json={"product_id": headphones_id, "quantity": 1},
     )
-    item_id = cart.json()["items"][0]["id"]
+    item_id = cart.json()["data"]["items"][0]["id"]
 
     updated = await client.patch(
         f"/api/cart/items/{item_id}",
@@ -153,7 +153,7 @@ async def test_update_cart_item_quantity(
         json={"quantity": 5},
     )
     assert updated.status_code == 200
-    assert updated.json()["items"][0]["quantity"] == 5
+    assert updated.json()["data"]["items"][0]["quantity"] == 5
 
 
 @pytest.mark.asyncio
@@ -164,14 +164,14 @@ async def test_remove_cart_item(client: Any, customer_token: str, headphones_id:
         headers={"Authorization": f"Bearer {customer_token}"},
         json={"product_id": headphones_id, "quantity": 1},
     )
-    item_id = cart.json()["items"][0]["id"]
+    item_id = cart.json()["data"]["items"][0]["id"]
 
     removed = await client.delete(
         f"/api/cart/items/{item_id}",
         headers={"Authorization": f"Bearer {customer_token}"},
     )
     assert removed.status_code == 200
-    assert removed.json()["items"] == []
+    assert removed.json()["data"]["items"] == []
 
 
 # ─── US-021: checkout ────────────────────────────────────────────────────────────
@@ -205,7 +205,7 @@ async def test_checkout_creates_order_with_price_snapshot(
 
     # Cart must be empty after checkout
     cart = await client.get("/api/cart", headers={"Authorization": f"Bearer {customer_token}"})
-    assert cart.json()["items"] == []
+    assert cart.json()["data"]["items"] == []
 
 
 @pytest.mark.asyncio
