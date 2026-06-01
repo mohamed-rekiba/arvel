@@ -7,10 +7,12 @@ from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
 from arvel.database import PublishableMixin
+from arvel.logging.facade import Log
 
 from app.http.controllers._schemas import CreateCategoryPayload, UpdateCategoryPayload
 from app.models.category import Category
 from app.models.product_catalog import ProductCatalog
+from app.support.labels import label
 
 
 class CategoryService:
@@ -59,6 +61,7 @@ class CategoryService:
         return await Category.where(Category.id == cid).first()
 
     async def create(self, payload: CreateCategoryPayload) -> Category:
+        Log.debug("category.creating", name=label(payload.name))
         category = await Category.create(
             name=payload.name,
             slug=payload.slug,
@@ -70,9 +73,11 @@ class CategoryService:
         )
         if category is None:
             raise RuntimeError("Category creation failed.")
+        Log.debug("category.created", category_id=str(category.id))
         return category
 
     async def update(self, category: Category, payload: UpdateCategoryPayload) -> Category:
+        Log.debug("category.updating", category_id=str(category.id))
         for key, value in payload.model_dump(exclude_unset=True).items():
             if key == "parent_id" and value is not None:
                 category.parent_id = uuid.UUID(value)
@@ -83,28 +88,39 @@ class CategoryService:
                 payload.status, payload.published_at
             )
         await category.save()
+        Log.debug("category.updated", category_id=str(category.id))
         return category
 
     async def publish(self, category: Category) -> Category:
+        Log.debug("category.publishing", category_id=str(category.id))
         category.status = "published"
         category.published_at = datetime.now(UTC)
         await category.save()
+        Log.debug("category.published", category_id=str(category.id))
         return category
 
     async def unpublish(self, category: Category) -> Category:
+        Log.debug("category.unpublishing", category_id=str(category.id))
         category.status = "draft"
         category.published_at = None
         await category.save()
+        Log.debug("category.unpublished", category_id=str(category.id))
         return category
 
     async def delete(self, category: Category) -> None:
+        Log.debug("category.deleting", category_id=str(category.id))
         await category.delete()
+        Log.debug("category.deleted", category_id=str(category.id))
 
     async def force_delete(self, category: Category) -> None:
+        Log.debug("category.force_deleting", category_id=str(category.id))
         await category.force_delete()
+        Log.debug("category.force_deleted", category_id=str(category.id))
 
     async def restore(self, category: Category) -> Category:
+        Log.debug("category.restoring", category_id=str(category.id))
         await category.restore()
+        Log.debug("category.restored", category_id=str(category.id))
         return category
 
     def to_dict(self, category: Category) -> dict[str, Any]:

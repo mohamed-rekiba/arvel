@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from arvel.logging.facade import Log
+
 from app.models.user import User
 
 
@@ -67,31 +69,41 @@ class UserService:
         user: User | None = await User.find(user_id)
         if user is None:
             return None
+        Log.debug("user.suspending", user_id=user_id)
         await user.suspend()
+        Log.debug("user.suspended", user_id=user_id)
         return await self._format_user(user)
 
     async def unsuspend(self, user_id: int) -> dict[str, Any] | None:
         user: User | None = await User.find(user_id)
         if user is None:
             return None
+        Log.debug("user.unsuspending", user_id=user_id)
         await user.unsuspend()
+        Log.debug("user.unsuspended", user_id=user_id)
         return await self._format_user(user)
 
     async def soft_delete(self, user_id: int) -> None:
         user: User | None = await User.find(user_id)
         if user is not None:
+            Log.debug("user.deleting", user_id=user_id)
             await user.delete()
+            Log.debug("user.deleted", user_id=user_id)
 
     async def force_delete(self, user_id: int) -> None:
         user: User | None = await User.with_trashed().where(User.id == user_id).first()
         if user is not None:
+            Log.debug("user.force_deleting", user_id=user_id)
             await user.force_delete()
+            Log.debug("user.force_deleted", user_id=user_id)
 
     async def restore(self, user_id: int) -> dict[str, Any] | None:
         user: User | None = await User.with_trashed().where(User.id == user_id).first()
         if user is None:
             return None
+        Log.debug("user.restoring", user_id=user_id)
         await user.restore()
+        Log.debug("user.restored", user_id=user_id)
         return await self._format_user(user)
 
     @staticmethod

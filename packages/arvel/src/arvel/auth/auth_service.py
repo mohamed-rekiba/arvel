@@ -39,6 +39,7 @@ from arvel.auth.token_pair import TokenPair
 from arvel.database.db import DB
 from arvel.facades.event import Event as EventFacade
 from arvel.facades.hash import Hash
+from arvel.logging.facade import Log
 
 _DEFAULT_ACCESS_TTL = timedelta(minutes=15)
 _DEFAULT_REFRESH_TTL = timedelta(days=14)
@@ -105,6 +106,7 @@ class AuthService:
         user_cls = self._user_cls
         password_hash = Hash.make(password)
         normalised = email.strip().lower()
+        Log.debug("auth.registering")
         async with DB.transaction():
             try:
                 user = await user_cls.create(
@@ -114,11 +116,13 @@ class AuthService:
                     locale=locale,
                 )
             except IntegrityError as exc:
+                Log.debug("auth.register.rejected", reason="email_taken")
                 msg = f"email {email!r} is already registered"
                 raise EmailAlreadyRegisteredError(msg) from exc
         await EventFacade.dispatch(
             Registered(user_id=str(user.id), email=normalised, occurred_at=_now())
         )
+        Log.debug("auth.registered", user_id=str(user.id))
         return user
 
     # ─── Login ─────────────────────────────────────────────────────────────
@@ -136,20 +140,24 @@ class AuthService:
         """
         user_cls = self._user_cls
         normalised = email.strip().lower()
+        Log.debug("auth.login.attempt")
         user = await user_cls.where(email=normalised).first()
 
         if user is None or not Hash.check(password, str(getattr(user, "password", ""))):
             await self._dispatch_login_failed(normalised)
+            Log.debug("auth.login.failed", reason="invalid_credentials")
             msg = "invalid credentials"
             raise InvalidCredentialsError(msg)
 
         if getattr(user, "suspended_at", None) is not None:
             await self._dispatch_login_failed(normalised, user_id=str(user.id))
+            Log.debug("auth.login.failed", user_id=str(user.id), reason="suspended")
             msg = "account suspended"
             raise AccountSuspendedError(msg)
 
         if getattr(user, "email_verified_at", None) is None:
             await self._dispatch_login_failed(normalised, user_id=str(user.id))
+            Log.debug("auth.login.failed", user_id=str(user.id), reason="email_unverified")
             msg = "email not verified"
             raise EmailNotVerifiedError(msg)
 
@@ -157,6 +165,7 @@ class AuthService:
         await EventFacade.dispatch(
             LoggedIn(user_id=str(user.id), email=normalised, occurred_at=_now())
         )
+        Log.debug("auth.login.succeeded", user_id=str(user.id))
         return user, tokens
 
     async def issue_for(self, *, user_id: str, email: str = "") -> TokenPair:
@@ -179,15 +188,18 @@ class AuthService:
         """
         user_cls = self._user_cls
         digest = hash_refresh_token(refresh_token)
+        Log.debug("auth.refreshing")
 
         async with DB.transaction():
             row = await RefreshToken.where(token_hash=digest).first()
             if row is None:
+                Log.debug("auth.refresh.rejected", reason="unknown_token")
                 msg = "refresh token unknown"
                 raise InvalidCredentialsError(msg)
 
             if row.is_expired:
                 await row.delete()
+                Log.debug("auth.refresh.rejected", reason="expired_token")
                 msg = "refresh token expired"
                 raise InvalidCredentialsError(msg)
 
@@ -196,10 +208,12 @@ class AuthService:
 
             user = await user_cls.find(_coerce_pk(user_id_str))
             if user is None:
+                Log.debug("auth.refresh.rejected", reason="user_gone")
                 msg = "user no longer exists"
                 raise InvalidCredentialsError(msg)
 
         tokens = await self._issue_pair(user_id=user_id_str)
+        Log.debug("auth.refreshed", user_id=user_id_str)
         return user, tokens
 
     async def revoke_family(self, *, user_id: str) -> int:
@@ -238,6 +252,7 @@ class AuthService:
         user = await user_cls.find(_coerce_pk(user_id_str))
         email = str(getattr(user, "email", ""))
         await EventFacade.dispatch(LoggedOut(user_id=user_id_str, email=email, occurred_at=_now()))
+        Log.debug("auth.logged_out", user_id=user_id_str)
 
     # ─── Me ────────────────────────────────────────────────────────────────
 

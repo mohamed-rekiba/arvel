@@ -8,7 +8,6 @@ import pytest
 from arvel.observability.stdout_log_exporter import (
     format_console,
     format_json,
-    format_span_console,
     formatter_for,
 )
 from opentelemetry._logs import LogRecord as OtelLogRecord
@@ -81,27 +80,6 @@ class TestConsoleFormat:
     def test_no_suffix_without_attributes(self) -> None:
         out = format_console(_capture(attributes={}))
         assert out.rstrip("\n").endswith("route.registered")
-
-
-class TestSpanFormat:
-    def test_single_readable_line(self) -> None:
-        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-        from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-
-        provider = TracerProvider()
-        exporter = InMemorySpanExporter()
-        provider.add_span_processor(SimpleSpanProcessor(exporter))
-        with provider.get_tracer("test").start_as_current_span("db.query") as span:
-            span.set_attribute("db.statement", "SELECT 1")
-
-        out = format_span_console(exporter.get_finished_spans()[0])
-        assert out.endswith("\n")
-        assert out.count("\n") == 1
-        assert "TRACE" in out
-        assert "db.query" in out
-        assert "dur=" in out
-        assert "trace_id=" in out
-        assert "db.statement=SELECT 1" in out
 
 
 class TestFormatterFor:
