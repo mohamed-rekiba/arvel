@@ -314,7 +314,7 @@ wheels = [
 
 [[package]]
 name = "arvel"
-version = "0.0.0"
+version = "0.4.0"
 source = { editable = "packages/arvel" }
 dependencies = [
     { name = "alembic" },
@@ -638,7 +638,7 @@ requires-dist = [
 
 [[package]]
 name = "arvel-search"
-version = "0.4.0"
+version = "0.5.0"
 source = { editable = "packages/arvel-search" }
 dependencies = [
     { name = "arvel" },
