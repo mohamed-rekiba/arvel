@@ -1,7 +1,6 @@
-"""Eloquent-parity (backlog 005, S11): debugging + query-log parity.
+"""Eloquent-parity: debugging + query-log parity.
 
-to_raw_sql, get_bindings, explain, DB.enable_query_log/get_query_log, DB.pretend.
-"""
+to_raw_sql, get_bindings, explain, DB.enable_query_log/get_query_log, DB.pretend."""
 
 from __future__ import annotations
 

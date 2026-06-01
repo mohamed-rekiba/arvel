@@ -1,8 +1,7 @@
-"""Eloquent-parity (backlog 005, S10): streaming and chunking completeness.
+"""Eloquent-parity: streaming and chunking completeness.
 
-stream() server-side cursor; descending keyset chunk/lazy variants; callback
-early-termination via returning False; offset chunk auto-orders by PK.
-"""
+stream server-side cursor; descending keyset chunk/lazy variants; callback
+early-termination via returning False; offset chunk auto-orders by PK."""
 
 from __future__ import annotations
 

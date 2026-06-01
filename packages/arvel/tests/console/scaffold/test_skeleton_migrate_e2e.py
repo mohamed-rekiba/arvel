@@ -1,12 +1,12 @@
 """End-to-end skeleton boot → ``arvel migrate`` regression.
 
-Guard against the WI-022 escape that motivated ADR-075's auto-baseline rework:
+Guard against the escape that motivated the auto-baseline rework:
 
 - ``arvel new my-app`` rendered the skeleton with a hand-pruned
-  ``bootstrap/providers.py`` that listed only ``HttpServiceProvider``.
+ ``bootstrap/providers.py`` that listed only ``HttpServiceProvider``.
 - ``arvel migrate`` therefore couldn't resolve ``AsyncEngine`` (no
-  ``DatabaseServiceProvider``) and ``ConsoleServiceProvider`` was missing too,
-  so provider commands never attached.
+ ``DatabaseServiceProvider``) and ``ConsoleServiceProvider`` was missing too,
+ so provider commands never attached.
 - The unit suite passed because ``MigrateCommand`` tests use a fake container.
 
 This test renders the real skeleton, drops a no-op migration into
@@ -131,7 +131,7 @@ def test_rendered_skeleton_writes_to_file_based_sqlite_from_dotenv(tmp_path: Pat
     """End-to-end regression: ``DB_URL`` in ``.env`` must drive the
     engine onto a real on-disk sqlite file.
 
-    Pre-fix story: ``DbConfig`` ignored ``DB_URL`` entirely (no
+    Before the fix: ``DbConfig`` ignored ``DB_URL`` entirely (no
     ``connection_url`` field), so the engine silently defaulted to
     ``sqlite+aiosqlite:///:memory:``. ``arvel migrate`` reported
     "Ran 1 migration(s)" but no file ever appeared — the schema lived only in
@@ -208,7 +208,7 @@ def test_rendered_skeleton_tinker_binds_active_session_for_active_record(
     """End-to-end regression for the ``arvel tinker`` ``NoActiveSessionError`` bug.
 
     The original failure was: a developer ran ``arvel tinker``, typed
-    ``await User.first()``, and got ``NoActiveSessionError`` because
+    ``await User.first``, and got ``NoActiveSessionError`` because
     ``DatabaseServiceProvider`` binds the session-maker but never pushes an
     ``AsyncSession`` onto the ``_ACTIVE_SESSION`` ContextVar — that's done by
     HTTP middleware (per-request) and by test fixtures (per-test) but NEVER
@@ -219,10 +219,10 @@ def test_rendered_skeleton_tinker_binds_active_session_for_active_record(
     1. Render the real packaged skeleton.
     2. Bootstrap the framework Application the way ``arvel`` does.
     3. Build a ``ShellCommand`` namespace (this is what tinker calls before
-       launching IPython).
+    launching IPython).
     4. Inside an ``asyncio.run(...)`` coroutine — exactly how IPython
-       evaluates each ``await`` cell — call ``get_active_session()`` and use
-       it to execute a query against the migrated schema.
+    evaluates each ``await`` cell — call ``get_active_session`` and use
+    it to execute a query against the migrated schema.
 
     If the ContextVar fails to propagate through asyncio task creation, this
     test catches it instead of the user.
@@ -285,7 +285,7 @@ def test_rendered_skeleton_binds_console_application(rendered_project: Path) -> 
     Pre-fix this raised ``BindingResolutionError`` (visible in the original
     ``arvel migrate`` traceback as
     ``ConsoleServiceProvider not bound; provider commands unavailable``) and
-    every provider-supplied command — schedule:list, schedule:work, queue:* —
+    every provider-supplied command — schedule:list, schedule:work, queue:*
     silently disappeared from the CLI. Resolving the Application + finding at
     least one provider-attached command is enough to lock the invariant.
     """

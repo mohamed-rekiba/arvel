@@ -1,9 +1,8 @@
-"""Eloquent-parity (backlog 006, S4): cast-aware dirty tracking.
+"""Eloquent-parity: cast-aware dirty tracking.
 
 is_dirty/get_dirty compare cast values, not raw storage, so "1" vs 1, decimal
 strings, and re-serialized JSON don't read as dirty. get_original returns the
-cast value; get_raw_original returns the pre-cast committed value.
-"""
+cast value; get_raw_original returns the pre-cast committed value."""
 
 from __future__ import annotations
 

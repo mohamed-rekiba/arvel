@@ -1,4 +1,4 @@
-"""Eloquent-parity (backlog 005, S12 partial): DB.transactional retry on deadlock."""
+"""Eloquent-parity: DB.transactional retry on deadlock."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Eloquent-parity (backlog 006, S7): without_events() + quiet persistence."""
+"""Eloquent-parity: without_events + quiet persistence."""
 
 from __future__ import annotations
 

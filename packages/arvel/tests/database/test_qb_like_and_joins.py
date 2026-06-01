@@ -1,4 +1,4 @@
-"""Eloquent-parity (backlog 005, S5 + S6): LIKE helpers, multi-column WHERE, join completeness."""
+"""Eloquent-parity: LIKE helpers, multi-column WHERE, join completeness."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ async def _seed(engine: AsyncEngine) -> None:
     await Pet.create(owner_id=2, species="dog")
 
 
-# ── S5: LIKE + multi-column ──────────────────────────────────────────────────
+# ── LIKE + multi-column ──────────────────────────────────────────────────
 
 
 async def test_where_like_case_insensitive(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -45,7 +45,7 @@ async def test_where_like_case_sensitive_uses_plain_like(
 ) -> None:
     await _seed(engine)
     # SQLite LIKE is case-insensitive for ASCII by design, so assert the SQL form:
-    # case_sensitive -> plain LIKE; default -> ILIKE (lower() folding under the generic dialect).
+    # case_sensitive -> plain LIKE; default -> ILIKE (lower folding under the generic dialect).
     cs_sql = Person.where_like("given", "al%", case_sensitive=True).to_sql().lower()
     ci_sql = Person.where_like("given", "al%").to_sql().lower()
     assert "like" in cs_sql and "lower(" not in cs_sql
@@ -78,7 +78,7 @@ async def test_where_none(engine: AsyncEngine, session: AsyncSession) -> None:
     assert [r.given for r in rows] == ["Bob"]
 
 
-# ── S6: joins ────────────────────────────────────────────────────────────────
+# ── joins ────────────────────────────────────────────────────────────────
 
 
 async def test_join_on_closure(engine: AsyncEngine, session: AsyncSession) -> None:
