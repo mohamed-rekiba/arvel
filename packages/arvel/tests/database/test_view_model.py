@@ -142,13 +142,16 @@ async def test_refresh_view_concurrently_passes_flag(
 
 
 def _run_make_model(tmp_path: Path, *args: str) -> tuple[int, str]:
+    import contextlib
+
     from arvel.console import Application
     from arvel.console.commands.make_model import MakeModelCommand
     from typer.testing import CliRunner
 
     app = Application(commands=[MakeModelCommand()])
     runner = CliRunner()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+
+    with contextlib.chdir(tmp_path):
         result = runner.invoke(app.typer_app, ["make:model", *args])
     return result.exit_code, result.output
 
@@ -156,7 +159,6 @@ def _run_make_model(tmp_path: Path, *args: str) -> tuple[int, str]:
 def test_make_model_default_generates_model(tmp_path: Path) -> None:
     code, output = _run_make_model(tmp_path, "ArticleStats")
     assert code == 0, output
-    # isolated_filesystem writes files inside tmp_path's subdirectory
     generated = list(tmp_path.glob("**/article_stats.py"))
     assert generated, f"file not found in {list(tmp_path.rglob('*.py'))}"
     text = generated[0].read_text()

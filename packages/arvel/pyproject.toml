@@ -19,13 +19,13 @@ classifiers = [
 
 dependencies = [
     "alembic>=1.18.4",
-    "pyyaml>=6.0.2",
+    "pyyaml>=6.0.3",
     "anyio>=4.13.0",
     "argon2-cffi>=25.1.0",
     "croniter>=6.2.2",
     "cryptography>=48.0.0",
     "email-validator>=2.3.0",
-    "fastapi>=0.136.1",
+    "fastapi>=0.136.3",
     "httpx>=0.28.1",
     "itsdangerous>=2.2.0",
     "jinja2>=3.1.6",
@@ -33,18 +33,18 @@ dependencies = [
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
     "python-dotenv>=1.2.2",
-    "sqlalchemy[asyncio]>=2.0.49",
-    "starlette>=1.0.1",
-    "opentelemetry-sdk>=1.42.0",
-    "opentelemetry-exporter-otlp-proto-grpc>=1.41.1",
-    "opentelemetry-exporter-otlp-proto-http>=1.41.1",
-    "opentelemetry-exporter-prometheus>=0.62b1",
-    "opentelemetry-instrumentation-fastapi>=0.62b1",
-    "opentelemetry-instrumentation-sqlalchemy>=0.63b0",
-    "opentelemetry-instrumentation-logging>=0.62b1",
+    "sqlalchemy[asyncio]>=2.0.50",
+    "starlette>=1.2.1",
+    "opentelemetry-sdk>=1.42.1",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.42.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.42.1",
+    "opentelemetry-exporter-prometheus>=0.63b1",
+    "opentelemetry-instrumentation-fastapi>=0.63b1",
+    "opentelemetry-instrumentation-sqlalchemy>=0.63b1",
+    "opentelemetry-instrumentation-logging>=0.63b1",
     "structlog>=25.5.0",
-    "typer>=0.25.1",
-    "uvicorn[standard]>=0.47.0",
+    "typer>=0.26.4",
+    "uvicorn[standard]>=0.48.0",
 ]
 
 [project.optional-dependencies]
@@ -56,21 +56,21 @@ sqlite = ["aiosqlite>=0.22.1"]
 queue = ["taskiq>=0.12.4"]
 queue-redis = ["taskiq-redis>=1.2.2"]
 queue-amqp = ["taskiq-aio-pika>=0.6.0"]
-mail = ["aiosmtplib>=5.1.0", "premailer>=3.10.0"]
+mail = ["aiosmtplib>=5.1.1", "premailer>=3.10.0"]
 s3 = ["aioboto3>=15.5.0", "boto3>=1.40.61"]
 gcs = ["google-cloud-storage>=3.10.1"]
 azure = ["azure-storage-blob>=12.29.0"]
 jwt = ["authlib>=1.7.2", "pyjwt[crypto]>=2.13.0"]
 broadcasting = ["websockets>=16.0"]
-shell = ["ipython>=9.13.0"]
-openapi = ["openapi-spec-validator>=0.7.1"]
+shell = ["ipython>=9.14.0"]
+openapi = ["openapi-spec-validator>=0.9.0"]
 permission = ["arvel-permission"]
 image = ["arvel-image"]
 image-heif = ["arvel-image[heif]"]
 oauth = ["arvel-oauth"]
 search = ["arvel-search"]
 audit = ["arvel-audit"]
-dev = ["faker>=40.18.0", "fakeredis>=2.35.1", "moto[s3]>=5.2.1"]
+dev = ["faker>=40.19.1", "fakeredis>=2.36.0", "moto[s3]>=5.2.1"]
 all = [
     "arvel[bcrypt,redis,postgres,mysql,sqlite,queue,queue-redis,queue-amqp,mail,s3,gcs,azure,jwt,broadcasting,shell,permission,image,image-heif,oauth,search,audit,openapi,dev]",
 ]
