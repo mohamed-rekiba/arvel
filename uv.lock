@@ -314,7 +314,7 @@ wheels = [
 
 [[package]]
 name = "arvel"
-version = "0.5.0"
+version = "0.5.1"
 source = { editable = "packages/arvel" }
 dependencies = [
     { name = "alembic" },
@@ -598,7 +598,7 @@ provides-extras = ["heif"]
 
 [[package]]
 name = "arvel-oauth"
-version = "0.5.0"
+version = "0.5.1"
 source = { editable = "packages/arvel-oauth" }
 dependencies = [
     { name = "arvel" },

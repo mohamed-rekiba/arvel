@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-oauth-v0.5.0...arvel-oauth-v0.5.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* **tests:** resolve pyright strict errors in TestClient/CliRunner usage ([f772a6c](https://github.com/mohamed-rekiba/arvel/commit/f772a6c1d5dfc889d12c93b8c4f4b6c2fbef208e))
+
+
+### Documentation
+
+* **packages:** point package URLs to arvel.dev docs ([4f8d5bd](https://github.com/mohamed-rekiba/arvel/commit/4f8d5bd0d32c443601cb3f4ced566aa493f6c289))
+
 ## [0.5.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-oauth-v0.4.0...arvel-oauth-v0.5.0) (2026-06-01)
 
 
