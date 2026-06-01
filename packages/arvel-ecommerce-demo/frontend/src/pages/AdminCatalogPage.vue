@@ -78,8 +78,10 @@ const pageParams = computed<AdminProductsIndexApiAdminProductsGetParams>(() => (
   trashed: trashedMode.value,
 }))
 
-const { data: productsData, isPending: loadingProducts } =
-  useAdminProductsIndexApiAdminProductsGet(pageParams, { query: { enabled: isProducts } })
+const { data: productsData, isPending: loadingProducts } = useAdminProductsIndexApiAdminProductsGet(
+  pageParams,
+  { query: { enabled: isProducts } },
+)
 const { data: categoriesData, isPending: loadingCategories } =
   useAdminCategoriesIndexApiAdminCategoriesGet(pageParams, { query: { enabled: isCategories } })
 const { data: vendorsData, isPending: loadingVendors } = useAdminVendorsIndexApiAdminVendorsGet(
@@ -272,10 +274,11 @@ const { mutate: forceDeleteCategory } =
   useAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete({
     mutation: { onSuccess: onForceDeleted, onError: onMutationError },
   })
-const { mutate: forceDeleteVendor } =
-  useAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete({
+const { mutate: forceDeleteVendor } = useAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete(
+  {
     mutation: { onSuccess: onForceDeleted, onError: onMutationError },
-  })
+  },
+)
 
 const { mutate: publishProduct } = useAdminProductsPublishApiAdminProductsProductIdPublishPatch({
   mutation: { onSuccess: onPublished, onError: onMutationError },
@@ -407,12 +410,15 @@ function handleRestore(id: string): void {
               {{ t('admin.catalog.loading') }}
             </td>
           </tr>
-          <tr v-for="{ item: record, depth } in rows" :key="record.id" class="hover:bg-app-bg-raised">
+          <tr
+            v-for="{ item: record, depth } in rows"
+            :key="record.id"
+            class="hover:bg-app-bg-raised"
+          >
             <td class="px-6 py-4 text-sm font-medium text-fg">
               <span :style="depth ? { paddingInlineStart: `${depth * 1.25}rem` } : undefined">
-                <span v-if="depth" class="text-fg-faint" aria-hidden="true">└ </span>{{
-                  itemName(record)
-                }}
+                <span v-if="depth" class="text-fg-faint" aria-hidden="true">└ </span
+                >{{ itemName(record) }}
               </span>
             </td>
             <td class="px-6 py-4">

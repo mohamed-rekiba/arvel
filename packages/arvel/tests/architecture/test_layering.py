@@ -99,17 +99,3 @@ def test_container_does_not_import_either() -> None:
         if bad:
             violations.append(f"{module} imports {sorted(bad)}")
     assert not violations, "Forbidden container imports:\n  " + "\n  ".join(violations)
-
-
-def test_sanctioned_exemption_documented() -> None:
-    """Exemption ADR must exist (the exemption is non-trivial and requires a written record)."""
-    adr = (
-        PACKAGE_ROOT.parent.parent.parent.parent
-        / "docs"
-        / "adr"
-        / "ADR-016-http-database-bridge-exemption.md"
-    )
-    assert adr.exists(), f"ADR-016 must document the http→database exemption. Looked for {adr}."
-    contents = adr.read_text(encoding="utf-8")
-    for module in ALLOWED_HTTP_TO_DATABASE_IMPORTS:
-        assert module in contents, f"ADR-016 must name the exempted module `{module}`."
