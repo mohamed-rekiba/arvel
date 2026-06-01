@@ -48,7 +48,7 @@ The scaffolder is a single Typer command (`new`) with three flags (`--no-install
 - **Stale skeleton shim removed** — `packages/arvel/src/arvel/_skeleton/arvel` (the pre-WI-005 console-shim file) is deleted. The real `arvel` binary on the user's PATH supersedes it.
 - **Tests** — moved to `packages/arvel/tests/console/scaffold/`. The two arvel-cli-only tests (`test_script_rename.py`, `test_smoke.py`) were obsolete after the merge and removed.
 - **Package deleted** — `packages/arvel-cli/` is gone.
-- **Workspace + tooling** — `tool.uv.workspace` (root `pyproject.toml`), `[tool.mypy]` paths/files, `[tool.pyright]` includes/extraPaths, `[tool.pytest.ini_options].testpaths`, `Makefile` `SRC` / `sbom` / `build` targets, and every CI workflow (`ci.yml`, `security.yml`, `release.yml`, `publish.yml`, `release-please-config.json`, `release-please-manifest.json`) all drop the `arvel-cli` track.
+- **Workspace + tooling** — `tool.uv.workspace` (root `pyproject.toml`), `[tool.mypy]` paths/files, `[tool.pyright]` includes/extraPaths, `[tool.pytest.ini_options].testpaths`, `Makefile` `SRC` / `sbom` / `build` targets, and every CI workflow (`ci.yml`, `security.yml`, `release-please.yml`, `publish.yml`, `release-please-config.json`, `release-please-manifest.json`) all drop the `arvel-cli` track.
 - **Installers** — `install.sh` and `install.ps1` install `arvel` (instead of `arvel-cli`). The "next steps" line is `arvel new my-app`.
 - **Docs** — `installation.md`, `starter-kits.md`, `structure.md`, `artisan.md`, `releases.md`, `contributions.md`, `sail.md`, `pint.md`, `homestead.md`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `docs/ops/README.md` all switched from the two-binary story (`arvel-cli` + `arvel-new`) to one-binary (`arvel new`).
 
