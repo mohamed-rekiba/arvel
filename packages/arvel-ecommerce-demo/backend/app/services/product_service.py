@@ -14,10 +14,12 @@ from typing import Any, TypedDict
 
 from arvel.database import TranslatableMixin
 from arvel.database.exceptions import InvalidCursorError
+from arvel.logging.facade import Log
 
 from app.models.product import Product
 from app.models.product_base import IMAGES_COLLECTION
 from app.models.product_catalog import ProductCatalog
+from app.support.labels import label
 from app.support.products_catalog import refresh_products_catalog
 
 
@@ -201,6 +203,7 @@ class ProductService:
     # ─── admin create / update ────────────────────────────────────────────────
 
     async def create(self, data: dict[str, Any]) -> dict[str, Any]:
+        Log.debug("product.creating", name=label(data.get("name")))
         product: Product = await Product.create(
             name=data.get("name", {}),
             slug=data.get("slug", {}),
@@ -211,9 +214,11 @@ class ProductService:
             category_id=uuid.UUID(str(data["category_id"])) if data.get("category_id") else None,
             vendor_id=uuid.UUID(str(data["vendor_id"])) if data.get("vendor_id") else None,
         )
+        Log.debug("product.created", product_id=str(product.id))
         return self._product_to_admin(product)
 
     async def update(self, product_id: str, changes: dict[str, Any]) -> dict[str, Any]:
+        Log.debug("product.updating", product_id=product_id, fields=sorted(changes))
         pid = uuid.UUID(product_id)
         product: Product | None = await Product.with_trashed().where(Product.id == pid).first()
         if product is None:
@@ -226,31 +231,39 @@ class ProductService:
             elif key in {"name", "slug", "description", "stock_qty", "status"}:
                 setattr(product, key, val)
         await product.save()
+        Log.debug("product.updated", product_id=product_id)
         return self._product_to_admin(product)
 
     # ─── admin lifecycle ──────────────────────────────────────────────────────
 
     async def soft_delete(self, product_id: str) -> None:
+        Log.debug("product.deleting", product_id=product_id)
         pid = uuid.UUID(product_id)
         product: Product | None = await Product.where(Product.id == pid).first()
         if product is not None:
             await product.delete()
+            Log.debug("product.deleted", product_id=product_id)
 
     async def force_delete(self, product_id: str) -> None:
+        Log.debug("product.force_deleting", product_id=product_id)
         pid = uuid.UUID(product_id)
         product: Product | None = await Product.with_trashed().where(Product.id == pid).first()
         if product is not None:
             await product.force_delete()
+            Log.debug("product.force_deleted", product_id=product_id)
 
     async def restore(self, product_id: str) -> dict[str, Any] | None:
+        Log.debug("product.restoring", product_id=product_id)
         pid = uuid.UUID(product_id)
         product: Product | None = await Product.with_trashed().where(Product.id == pid).first()
         if product is None:
             return None
         await product.restore()
+        Log.debug("product.restored", product_id=product_id)
         return self._product_to_admin(product)
 
     async def publish(self, product_id: str) -> dict[str, Any] | None:
+        Log.debug("product.publishing", product_id=product_id)
         pid = uuid.UUID(product_id)
         product: Product | None = await Product.with_trashed().where(Product.id == pid).first()
         if product is None:
@@ -258,15 +271,18 @@ class ProductService:
         product.status = "published"
         product.published_at = datetime.now(UTC)
         await product.save()
+        Log.debug("product.published", product_id=product_id)
         return self._product_to_admin(product)
 
     async def unpublish(self, product_id: str) -> dict[str, Any] | None:
+        Log.debug("product.unpublishing", product_id=product_id)
         pid = uuid.UUID(product_id)
         product: Product | None = await Product.with_trashed().where(Product.id == pid).first()
         if product is None:
             return None
         product.status = "draft"
         await product.save()
+        Log.debug("product.unpublished", product_id=product_id)
         return self._product_to_admin(product)
 
     # ─── stock ────────────────────────────────────────────────────────────────
