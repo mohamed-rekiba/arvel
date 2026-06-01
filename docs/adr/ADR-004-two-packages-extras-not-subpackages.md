@@ -1,7 +1,8 @@
-# ADR-004 — Two PyPI packages at 0.x; defer sub-splitting; use optional extras for drivers
+# ADR-004 — Single `arvel` package with optional extras; companions as separate distributions
 
+**Status**: Accepted (revised — see Notes)
 **Date**: 2026-05-17
-**Status**: Accepted
+**Last reconciled**: 2026-06-01
 **Deciders**: Solution Architect (autonomous)
 **Scope**: PyPI distribution surface
 
@@ -9,73 +10,48 @@
 
 ## Context
 
-Laravel ships ~30 first-party packages: `illuminate/database`, `illuminate/queue`, `illuminate/mail`, etc. Each can be installed independently. The constellation is held together by Composer's metadata graph.
-
-For Python, the equivalent question is: do we ship `arvel-container`, `arvel-orm`, `arvel-queue`, `arvel-mail`, …? Or one `arvel` with optional extras?
+Laravel ships ~30 first-party packages, each installable independently, held together by Composer's metadata graph. Python's equivalent question: ship `arvel-container`, `arvel-orm`, `arvel-queue`, … or one `arvel` with optional extras?
 
 ## Options considered
 
 ### Option A — One package per subsystem (Laravel pattern)
 
-**Pros**: Users only install what they use; smaller dependency footprint per app.
-**Cons**:
-- 30+ packages to release in lock-step → release engineering nightmare.
-- Cross-package imports are awkward in Python (no Composer-equivalent metadata graph).
-- Type stubs and circular-dep avoidance get harder.
-- Discoverability suffers — "where is `Mailable`?" requires `arvel-mail`, not obvious.
-- At 0.x with rapid breaking changes, this multiplies coordination cost.
+**Pros**: install only what you use. **Cons**: 30+ lock-step releases; awkward cross-package imports in Python; harder type stubs and circular-dep avoidance; poor discoverability; multiplies coordination cost at 0.x.
 
-### Option B — Single `arvel` package with optional extras (chosen at 0.x)
+### Option B — Single `arvel` package with optional extras (chosen for core)
 
-**Pros**:
-- `pip install arvel[redis,postgres,queue]` is the same UX as Laravel — only install drivers you need.
-- Core code lives together; one import path; one `__all__`.
-- One release artifact; one CHANGELOG; one upgrade guide.
-- Easy refactor — moving code between subsystems doesn't break user installs.
+**Pros**: `pip install arvel[redis,postgres,queue]` mirrors Laravel UX; core code lives together under one import path and one `__all__`; one release artifact, CHANGELOG, and upgrade guide; refactor-friendly. **Cons**: all optional-import paths land in site-packages (small disk cost, no runtime cost — driver modules lazy-import); requires discipline on extras boundaries (enforced by import-error tests).
 
-**Cons**:
-- A user installing `arvel` gets *all* the optional-imports paths in their site-packages tree even if they don't use them (small disk cost; not a runtime cost since we lazy-import driver modules).
-- We have to be disciplined about optional-extras boundaries (mitigated by import-error tests).
+### Option C — Hybrid: split major subsystems when real demand emerges
 
-### Option C — Hybrid: split major subsystems after 1.0 if real demand emerges
-
-**Pros**: Best of both — start simple, split when you have evidence; allows community to fork sub-packages.
-**Cons**: Requires careful API design now so we *could* split later.
+Considered for post-1.0; partially realized already via the companion packages below.
 
 ## Decision
 
-**Option B at 0.x, Option C considered post-1.0.**
+The **core framework ships as a single `arvel` package** with optional extras for drivers. **Self-contained companions ship as their own PyPI distributions** and are surfaced as extras on `arvel`. There is no separate `arvel-cli` package — the CLI binary ships inside `arvel`.
 
-Concretely, during 0.x we ship two packages:
+Driver/integration extras on `arvel` (from `packages/arvel/pyproject.toml`):
 
-1. `arvel` — the framework
-2. `arvel-cli` — the global CLI for `arvel new myapp`
+`bcrypt`, `redis`, `postgres`, `mysql`, `sqlite`, `queue`, `queue-redis`, `queue-amqp`, `mail`, `s3`, `gcs`, `azure`, `jwt`, `broadcasting`, `shell`, `openapi`, `dev`.
 
-Optional extras on `arvel`:
-- `arvel[postgres]` → `asyncpg`, `psycopg[binary]`
-- `arvel[mysql]` → `aiomysql`, `pymysql`
-- `arvel[sqlite]` → `aiosqlite`
-- `arvel[redis]` → `redis[hiredis]`
-- `arvel[queue]` → `taskiq[redis]`
-- `arvel[mail-ses]` → `aioboto3` (post-Phase 8)
-- `arvel[mail-resend]` → driver SDK (post-Phase 8)
-- `arvel[storage-s3]` → `aioboto3` (post-Phase 5)
-- `arvel[storage-gcs]` → `gcloud-aio-storage` (post-Phase 5)
-- `arvel[storage-azure]` → `azure-storage-blob` (post-Phase 5)
-- `arvel[broadcasting]` → `websockets` (post-Phase 9)
-- `arvel[auth-jwt]` → `pyjwt[crypto]` (post-Phase 6)
-- `arvel[auth-oauth]` → `authlib` (post-Phase 6)
+Companion-package extras (each pulls a separate distribution):
 
-Post-1.0, if a subsystem outgrows the extras pattern (e.g., the broadcasting WS server becomes its own daemon), we may split it into a sibling package then.
+`permission` → `arvel-permission`, `image` → `arvel-image`, `image-heif` → `arvel-image[heif]`, `oauth` → `arvel-oauth`, `search` → `arvel-search`, `audit` → `arvel-audit`.
+
+`arvel[all]` aggregates everything.
 
 ## Consequences
 
-- Driver modules must be lazy-imported with a clear `ImportError` ("install `arvel[redis]` to use Redis cache").
-- Each optional extra has its own driver-availability test in CI (the test is skipped if the extra isn't installed; CI installs all extras).
-- `arvel-cli` stays tiny — just clones the skeleton + replaces template tokens. No runtime dep on `arvel`.
+- Driver modules lazy-import with a clear `ImportError` pointing at the extra to install (e.g. "install `arvel[redis]`").
+- Each extra has a driver-availability test; CI installs all extras.
+- Companions depend on `arvel` but version and release on their own track.
 
-## References
+## Current implementation
 
-- Laravel's package boundaries: https://github.com/illuminate/
-- Django's "extras_require" pattern.
-- pip extras_require: https://packaging.python.org/en/latest/specifications/dependency-specifiers/#extras
+- Extras: `packages/arvel/pyproject.toml` (`[project.optional-dependencies]`).
+- Companions: `packages/arvel-*`; docs at `docs-fresh/packages/overview.md`.
+
+## Notes
+
+- **Revised from the original**: the original ADR specified exactly two packages (`arvel` + `arvel-cli`). The CLI was folded into the `arvel` binary (ADR-126, ADR-126), and several subsystems graduated to standalone companion distributions (`arvel-audit`, `arvel-image`, `arvel-oauth`, `arvel-permission`, `arvel-search`). The core principle — single core package, drivers as extras — holds.
+- The original `mail-ses` / `mail-resend` / `auth-jwt` / `auth-oauth` / `storage-*` extra names were consolidated into the current set above.
