@@ -189,3 +189,60 @@ def test_route_group_state_restored_on_exception() -> None:
     routes = Router.singleton().routes()
     assert any(r.path == "/loose" and r.handler is loose for r in routes)
     assert not any(r.path == "/api/loose" for r in routes)
+
+
+def test_route_group_applies_tags_to_inner_routes() -> None:
+    from arvel.routing import Route, Router
+
+    Router.reset_singleton()
+
+    with Route.group(prefix="/api/admin", tags=["Admin Products"]):
+
+        @Route.get("/products")
+        async def products() -> dict[str, Any]:
+            return {}
+
+    route = next(
+        r
+        for r in Router.singleton().routes()
+        if r.path == "/api/admin/products" and r.handler is products
+    )
+    assert route.extras["tags"] == ["Admin Products"]
+
+
+def test_nested_groups_concatenate_tags_and_per_route_tags_append() -> None:
+    from arvel.routing import Route, Router
+
+    Router.reset_singleton()
+
+    with Route.group(tags=["Admin"]), Route.group(tags=["Products"]):
+
+        @Route.get("/products", tags=["Catalog"])
+        async def products() -> dict[str, Any]:
+            return {}
+
+    route = next(
+        r for r in Router.singleton().routes() if r.path == "/products" and r.handler is products
+    )
+    assert route.extras["tags"] == ["Admin", "Products", "Catalog"]
+
+
+def test_group_tags_surface_in_openapi_schema() -> None:
+    from arvel.routing import Route, Router
+    from fastapi import FastAPI
+
+    Router.reset_singleton()
+
+    with Route.group(prefix="/api", tags=["Catalog"]):
+
+        @Route.get("/products", name="products.index")
+        async def products() -> dict[str, Any]:
+            return {}
+
+        assert callable(products)
+
+    app = FastAPI()
+    Router.singleton().register_with_app(app)
+
+    operation = app.openapi()["paths"]["/api/products"]["get"]
+    assert operation["tags"] == ["Catalog"]
