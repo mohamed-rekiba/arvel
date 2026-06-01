@@ -1,77 +1,81 @@
 # Contribution Guide
 
-Thanks for your interest in Arvel. The framework aims to give Python the Laravel-style developer experience without giving up `mypy --strict` and `pyright --strict`. Contributions that move in that direction are very welcome.
+Thanks for your interest in Arvel. The goal is to give Python the Laravel-style developer experience without giving up `mypy --strict` and `pyright --strict`. Contributions that move in that direction are very welcome.
 
-## Quick start
+<a name="quick-start"></a>
+## Quick Start
 
 ```bash
 git clone https://github.com/mohamed-rekiba/arvel.git
 cd arvel
-make sync            # uv sync --all-extras
-make ci              # lint + format-check + typecheck + coverage
+make dev    # uv sync --all-packages --all-extras
+make ci     # lint + format-check + typecheck + coverage + docs
 ```
 
-You need Python 3.14+ and [uv](https://docs.astral.sh/uv/) 0.9+.
+You need Python 3.14+ and [uv](https://docs.astral.sh/uv/). The repo is a uv workspace — one virtualenv, one lockfile.
 
-## Repository layout
+<a name="repository-layout"></a>
+## Repository Layout
 
 ```
 packages/
-  arvel/              # the framework + CLI scaffolder (PyPI: arvel)
-    src/arvel/
-      _skeleton/      # packaged project skeleton (used by `arvel new`)
-      console/        # CLI infrastructure + every built-in command
-      ...             # facades, ORM, HTTP, queue, events, etc.
+  arvel/                 # the framework + CLI (PyPI: arvel)
+    src/arvel/           # facades, ORM, HTTP, queue, events, console, …
+      _skeleton/         # project skeleton used by `arvel new`
+    src/arvent/          # the ORM package
     tests/
-benchmarks/           # smoke + future micro-benchmarks
+  arvel-oauth/           # OAuth2 / OIDC social login
+  arvel-permission/      # roles & permissions
+  arvel-image/           # image manipulation + media library
+  arvel-search/          # full-text search
+  arvel-audit/           # audit trails & activity logs
+  arvel-ecommerce-demo/  # reference app
+benchmarks/              # smoke + micro-benchmarks
 docs/
-  architecture/       # SADs
-  adr/                # decision records
-  prd/                # product requirements
-  pipeline/           # stage-log + handoffs (audit trail)
-  site/               # this user-facing docs site
+  site/                  # this user-facing docs site (MkDocs)
+  architecture/ adr/ prd/ pipeline/  # design + audit trail
 ```
 
-We use a uv workspace; a single virtualenv and lockfile.
-
+<a name="workflow"></a>
 ## Workflow
 
-1. **Open an issue first** for anything non-trivial. We use a structured SDLC pipeline (`docs/pipeline/`) and prefer to align scope before coding.
-2. **Branch from `main`**. Use `feat/`, `fix/`, `docs/`, `refactor/`, `test/`, `chore/`, `ci/` prefixes.
-3. **Conventional Commits** for every commit. Release Please uses commit messages to compute versions and the changelog.
-4. **Run `make ci` before pushing.** All gates must pass locally.
-5. **Open a PR.** Keep it under 400 lines where possible. Link the issue and reference any FR/NFR IDs.
+1. **Open an issue first** for anything non-trivial — align on scope before coding.
+2. **Branch from `main`** with a `feat/`, `fix/`, `docs/`, `refactor/`, `test/`, `chore/`, or `ci/` prefix.
+3. **Use [Conventional Commits](https://www.conventionalcommits.org)** for every commit — Release Please reads them to compute versions and the changelog.
+4. **Run `make ci` before pushing.** Every gate must pass locally.
+5. **Open a PR.** Keep it under 400 lines where you can, and link the issue.
 
-## Coding standards
+<a name="coding-standards"></a>
+## Coding Standards
 
 - `mypy --strict` and `pyright --strict` must both pass — no exceptions.
 - `ruff check` and `ruff format` must be clean.
-- New code needs tests. Aim for **≥ 90%** coverage on `arvel/` and prefer behavioral tests over implementation tests.
-- Public API additions need:
-    - An entry in the relevant API doc.
-    - A test that imports the symbol via the public path.
-    - A docstring that explains *why*, not *what*.
-- Comment hygiene: comments explain *why*; the code already says *what*.
+- New code needs tests. Coverage gates at **90%**; prefer behavioral tests over implementation tests.
+- A public API addition needs an entry in the relevant doc, a test that imports it via its public path, and a docstring that explains *why*, not *what*.
+- Comments explain *why* — the code already says *what*.
 
+<a name="security"></a>
 ## Security
 
-If you spot a security issue, **do not open a public PR**. Follow [SECURITY.md](https://github.com/mohamed-rekiba/arvel/blob/main/SECURITY.md).
+Spotted a security issue? **Don't open a public PR.** Follow [SECURITY.md](https://github.com/mohamed-rekiba/arvel/blob/main/SECURITY.md).
 
-For non-security PRs, the security workflow (bandit, pip-audit, gitleaks, semgrep) runs automatically. Findings at **high** or **critical** severity block merge.
+For everything else, the security workflow (bandit, pip-audit, gitleaks, semgrep) runs automatically. Findings at **high** or **critical** severity block the merge.
 
-## Release process
+<a name="release-process"></a>
+## Release Process
 
-Releases are fully automated via [Release Please](https://github.com/googleapis/release-please).
+Releases are automated with [Release Please](https://github.com/googleapis/release-please):
 
 1. Merge Conventional Commits into `main`.
-2. Release Please opens a release PR that bumps the affected package's version and updates `CHANGELOG.md`.
-3. Merging that PR creates a GitHub Release, which triggers PyPI publishing via [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) — no API tokens.
-4. Each artifact is signed with Sigstore and accompanied by a CycloneDX SBOM.
+2. Release Please opens a release PR that bumps the version and updates `CHANGELOG.md`.
+3. Merging it creates a GitHub Release, which publishes to PyPI via [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) — no API tokens.
+4. Each artifact is signed with Sigstore and ships with a CycloneDX SBOM.
 
 Releases are tagged with the `arvel-vX.Y.Z` prefix.
 
-## Getting help
+<a name="getting-help"></a>
+## Getting Help
 
-- Architecture questions → check the architecture documents and ADRs first.
+- Architecture questions → start with the architecture docs and ADRs.
 - Process questions → the pipeline audit trail has the full SDLC record.
-- Anything else → open a Discussion or join the dev chat (link in the README).
+- Anything else → open a GitHub Discussion.

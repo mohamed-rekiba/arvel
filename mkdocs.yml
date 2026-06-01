@@ -102,6 +102,8 @@ extra:
 plugins:
   - search:
       separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  # Converts GitHub-style callouts (> [!NOTE]) into Material admonitions at build time.
+  - gh-admonitions
   - minify:
       minify_html: true
 
@@ -158,104 +160,61 @@ markdown_extensions:
 # Page tree
 nav:
   - Home: index.md
-  - Prologue:
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Directory Structure: getting-started/project-structure.md
+  - Core Concepts:
+      - Request Lifecycle: core-concepts/lifecycle.md
+      - Service Container: core-concepts/service-container.md
+      - Service Providers: core-concepts/service-providers.md
+      - Configuration: core-concepts/configuration.md
+      - Facades: core-concepts/facades.md
+  - The Basics:
+      - Routing: the-basics/routing.md
+      - Controllers: the-basics/controllers.md
+      - Validation: the-basics/validation.md
+      - API Resources: the-basics/resources.md
+      - Middleware: the-basics/middleware.md
+      - Error Handling: the-basics/error-handling.md
+  - Arvent ORM:
+      - Models & CRUD: orm/models.md
+      - Relationships: orm/relationships.md
+      - Query Builder: orm/query-builder.md
+      - Migrations: orm/migrations.md
+      - Casts, Accessors & Mutators: orm/casts.md
+  - Features:
+      - Authentication: features/authentication.md
+      - Authorization: features/authorization.md
+      - Encryption: features/encryption.md
+      - Cache: features/cache.md
+      - Session: features/session.md
+      - File Storage: features/storage.md
+      - Mail: features/mail.md
+      - Notifications: features/notifications.md
+      - Events: features/events.md
+      - Queues: features/queues.md
+      - Broadcasting: features/broadcasting.md
+      - Task Scheduling: features/scheduling.md
+      - Localization: features/localization.md
+      - Logging: features/logging.md
+      - Testing: features/testing.md
+  - Frontend:
+      - Frontend Integration: frontend/integration.md
+  - CLI:
+      - Command Reference: cli/commands.md
+  - Packages:
+      - Overview: packages/README.md
+      - Arvel OAuth2/OIDC: packages/oauth.md
+      - Arvel Permission: packages/permission.md
+      - Arvel Image: packages/image.md
+      - Arvel Search: packages/search.md
+      - Arvel Audit: packages/audit.md
+      - Arvel Ecommerce Demo: packages/ecommerce-demo.md
+  - Reference:
       - Release Notes: releases.md
       - Upgrade Guide: upgrade.md
       - Contribution Guide: contributions.md
-  - Getting Started:
-      - Installation: installation.md
-      - Configuration: configuration.md
-      - Directory Structure: structure.md
-      - Frontend: frontend.md
-      - Frontend API (Orval): orval.md
-      - Deployment: deployment.md
-  - Architecture Concepts:
-      - Request Lifecycle: lifecycle.md
-      - Service Container: container.md
-      - Service Providers: providers.md
-      - Facades: facades.md
-  - The Basics:
-      - Routing: routing.md
-      - Middleware: middleware.md
-      - CSRF Protection: csrf.md
-      - Controllers: controllers.md
-      - Requests: requests.md
-      - Responses: responses.md
-      - Views: views.md
-      - Templates: templates.md
-      - URL Generation: urls.md
-      - Session: session.md
-      - Validation: validation.md
-      - Error Handling: errors.md
-      - Logging: logging.md
-  - Digging Deeper:
-      - Console: console.md
-      - Broadcasting: broadcasting.md
-      - Cache: cache.md
-      - Collections: collections.md
-      - Concurrency: concurrency.md
-      - Context: context.md
-      - Contracts: contracts.md
-      - Events: events.md
-      - File Storage: filesystem.md
-      - Helpers: helpers.md
-      - HTTP Client: http-client.md
-      - Image Manipulation: image.md
-      - Localization: localization.md
-      - Mail: mail.md
-      - Notifications: notifications.md
-      - Package Development: packages.md
-      - Queues: queues.md
-      - Rate Limiting: rate-limiting.md
-      - Search: search.md
-      - Audit & Activity Log: audit.md
-      - Strings: strings.md
-      - Task Scheduling: scheduling.md
-  - Security:
-      - Authentication: authentication.md
-      - Authorization: authorization.md
-      - Email Verification: verification.md
-      - Encryption: encryption.md
-      - Hashing: hashing.md
-      - Roles & Permissions: permission.md
-      - Password Reset: passwords.md
-  - Database:
-      - Getting Started: database.md
-      - Query Builder: queries.md
-      - Pagination: pagination.md
-      - Migrations: migrations.md
-      - Seeding: seeding.md
-      - Redis: redis.md
-  - Arvent ORM:
-      - Getting Started: arvent.md
-      - Relationships: arvent-relationships.md
-      - Collections: arvent-collections.md
-      - Mutators / Casts: arvent-mutators.md
-      - API Resources: arvent-resources.md
-      - Serialization: arvent-serialization.md
-      - Factories: arvent-factories.md
-  - Testing:
-      - Getting Started: testing.md
-      - HTTP Tests: http-tests.md
-      - Console Tests: console-tests.md
-      - Browser Tests: browser-tests.md
-      - Database: database-testing.md
-      - Mocking: mocking.md
-  - Patterns: patterns.md
-  - Packages:
-      - Auth Scaffolding: auth-scaffolding.md
-      - OAuth & OIDC Login: oauth.md
-      - Full-Text Search: search.md
-      - Audit & Activity Log: audit.md
-      - Queue Monitoring: queue-monitoring.md
-      - High Performance: high-performance.md
-      - Code Style: code-style.md
-      - Live Validation: live-validation.md
-      - CLI Prompts: cli-prompts.md
-      - App Monitoring: app-monitoring.md
-      - Reverb: reverb.md
-      - Docker Dev: docker-dev.md
-      - API Tokens: api-tokens.md
-      - Observability: observability.md
+      - Glossary: glossary.md
 
 strict: true

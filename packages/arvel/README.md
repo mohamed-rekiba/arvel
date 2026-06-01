@@ -2,14 +2,15 @@
 
 The Laravel of Python — built natively on FastAPI + Pydantic + SQLAlchemy, end-to-end type-safe.
 
-> **Status:** Pre-alpha — `v0.3.0`. Public API may change before `1.0`.
+> **Status:** Pre-alpha — `v0.3.0`. The public API can still change before `1.0`.
 
-Shipped subsystems: service container, typed config, HTTP (routing, form requests,
-resources, middleware), the Arvent ORM (Eloquent-style relations, soft deletes, scopes,
-the schema DSL, and a fluent `QueryBuilder`), cache, session, storage, queues, events,
-broadcasting, mail, notifications, scheduling, and auth (JWT + session + token guards,
-`Gate`/`Policy`, password resets, email verification). See the full docs at
-[arvel.dev](https://arvel.dev).
+Arvel is a batteries-included application framework for async Python. It layers a service container,
+typed configuration, an Eloquent-style ORM (Arvent), an HTTP stack (routing, form requests, API
+resources, middleware), cache, sessions, storage, queues, events, broadcasting, mail, notifications,
+scheduling, and auth on top of the standard async stack — without replacing FastAPI, Pydantic, or
+SQLAlchemy.
+
+Full documentation lives at **[arvel.dev](https://arvel.dev)**.
 
 ## Install
 
@@ -19,12 +20,17 @@ pip install arvel
 pip install 'arvel[postgres,redis,queue]'
 ```
 
+Arvel requires **Python 3.14+**.
+
 ## Hello, Arvel
+
+The framework boots through an `Application`. You register configuration and service providers, then
+resolve services from the container:
 
 ```python
 from pathlib import Path
+
 from arvel import Application, ServiceProvider
-from arvel.facades import Config
 from arvel.config import ArvelSettings
 
 
@@ -63,6 +69,41 @@ async def main() -> None:
     await app.shutdown()
 ```
 
+In a generated project you don't write this by hand — `arvel new` scaffolds `bootstrap/app.py` and
+`bootstrap/providers.py`, and `arvel serve` runs the ASGI app for you.
+
+## What's inside
+
+| Area | Highlights |
+|---|---|
+| **Container & providers** | Constructor injection, singletons, contextual bindings, `dep()` for FastAPI `Depends` |
+| **Config** | `ArvelSettings` (pydantic-settings), `@register`, `Config.of(...)`, the `config()` helper |
+| **HTTP** | `Route` decorators, `FormRequest` validation, `JsonResource`/`ResourceCollection`, middleware |
+| **Arvent ORM** | `Model`, typed relations, soft deletes, scopes, attribute casts, a schema DSL → Alembic |
+| **Auth** | JWT / session / token guards, `Gate` and policies, password resets, email verification |
+| **Queues** | `Job`, the `Bus` facade, retries with backoff, dead-letter queue, graceful workers |
+| **Events** | Typed `Event` models, inline and `ShouldQueue` listeners, the `Event` facade |
+| **Mail & notifications** | Mailables (envelope/content), SMTP/log/array drivers, multi-channel notifications |
+| **Cache / session / storage** | Pluggable drivers behind `Cache`, `Session`, and `Storage` facades |
+| **Scheduling & broadcasting** | Cron-style scheduler, Reverb-compatible WebSocket server |
+
+## CLI
+
+Installing the package puts the `arvel` binary on your PATH. A few common commands:
+
+```bash
+arvel new my-app           # scaffold a project
+arvel serve --reload       # run the ASGI dev server
+arvel make:model Post -m   # generate a model + migration
+arvel migrate              # run pending migrations
+arvel queue:work           # process queued jobs
+arvel schedule:work        # run the scheduler
+arvel route:list           # inspect registered routes
+arvel about                # show framework + environment info
+```
+
+Run `arvel --help` for the full list.
+
 ## License
 
-MIT
+MIT — see [LICENSE](../../LICENSE).

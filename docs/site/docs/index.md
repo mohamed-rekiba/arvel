@@ -18,7 +18,7 @@ A Python web framework that feels good to write and impossible to misuse &mdash;
 </p>
 
 <div class="arvel-hero__actions" markdown>
-[Get started](installation.md){ .md-button .md-button--primary }
+[Get started](getting-started/installation.md){ .md-button .md-button--primary }
 [View on GitHub](https://github.com/mohamed-rekiba/arvel){ .md-button }
 </div>
 
@@ -157,7 +157,7 @@ One command line for the work you do every day: start an app, generate files, ru
 
     Generate a scheduled command with `arvel make:command DailyReport` then register it in your `App\Console\Kernel`.
 
-For Docker, CI setup, and source builds see [Installation](installation.md). For the full command reference see [Console](console.md).
+For Docker, CI setup, and source builds see [Installation](getting-started/installation.md). For the full command reference see [CLI commands](cli/commands.md).
 
 ## Why Arvel?
 
