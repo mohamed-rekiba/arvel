@@ -1,10 +1,9 @@
-"""WI-arvel-062 — Epic 049 Story 16: Paginator.links() returns URL strings.
+"""Paginator.links returns URL strings.
 
-`Paginator.to_dict()` puts integer page numbers in `links` — fine for math,
+`Paginator.to_dict` puts integer page numbers in `links` — fine for math,
 useless for HATEOAS clients. `Paginator.links(base_url, *, query=None)` builds
 the {first, prev, next, last} URL dict, encoding the `page` query parameter
-and preserving any caller-supplied filters.
-"""
+and preserving any caller-supplied filters."""
 
 from __future__ import annotations
 

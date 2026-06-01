@@ -1,9 +1,7 @@
-"""QA-Pre tests for WI-arvel-044 framework fixes.
+"""Source-inspection tests for auth/ORM framework fixes.
 
-Source-inspection style (no live DB) — checks that the implementation
-matches the patterns required by PRD-044 ACs. All tests must FAIL before
-the implementation and PASS after.
-"""
+No live DB — reads implementation source and checks patterns. Must fail before
+the fix lands and pass after."""
 
 from __future__ import annotations
 
@@ -52,11 +50,11 @@ def _extract_class(src: str, class_name: str) -> str:
     return out
 
 
-# ── FR-001: Authenticate uses AuthManager (F-009 + F-016) ─────────────────────
+# ── Authenticate uses AuthManager  ─────────────────────
 
 
 class TestAuthenticateUsesAuthManager:
-    """AC-001a/b/c/d: Authenticate must resolve AuthManager, not Guard."""
+    """Authenticate must resolve AuthManager, not Guard."""
 
     def test_authenticate_imports_auth_manager(self) -> None:
         """Authenticate should import or reference AuthManager."""
@@ -82,14 +80,14 @@ class TestAuthenticateUsesAuthManager:
         )
 
 
-# ── FR-002: QueryBuilder.find() respects global scopes (F-012) ─────────────────
+# ── QueryBuilder.find respects global scopes  ─────────────────
 
 
 class TestQueryBuilderFindUsesScopes:
-    """AC-002a/b/c: QueryBuilder.find() must not call session.get()."""
+    """QueryBuilder.find must not call session.get."""
 
     def test_query_builder_find_no_session_get(self) -> None:
-        """session.get() bypasses scopes — must be replaced with scoped QB."""
+        """session.get bypasses scopes — must be replaced with scoped QB."""
         src = _src("arvel.database.query")
         lines = src.splitlines()
         in_find = False
@@ -108,21 +106,21 @@ class TestQueryBuilderFindUsesScopes:
                     break
 
     def test_query_builder_find_uses_where(self) -> None:
-        """find() should apply a where clause on the PK for scope compatibility."""
+        """find should apply a where clause on the PK for scope compatibility."""
         find_src = _extract_method(_src("arvel.database.query"), "async def find(self, pk")
         assert ".first()" in find_src or "first()" in find_src, (
             "F-012: QueryBuilder.find() must call .first() after a scoped where clause."
         )
 
 
-# ── FR-004: CursorPaginator.to_dict() + SimplePaginator.to_dict() (F-029) ──────
+# ── CursorPaginator.to_dict + SimplePaginator.to_dict  ──────
 
 
 class TestPaginatorToDictMethods:
-    """AC-004a/b/c: Both paginator types must have to_dict()."""
+    """Both paginator types must have to_dict."""
 
     def test_cursor_paginator_has_to_dict(self) -> None:
-        """CursorPaginator must expose to_dict()."""
+        """CursorPaginator must expose to_dict."""
         cursor_src = _extract_class(_src("arvel.database.query"), "CursorPaginator")
         assert "def to_dict" in cursor_src, (
             "F-029: CursorPaginator is missing to_dict(). "
@@ -130,7 +128,7 @@ class TestPaginatorToDictMethods:
         )
 
     def test_simple_paginator_has_to_dict(self) -> None:
-        """SimplePaginator must expose to_dict()."""
+        """SimplePaginator must expose to_dict."""
         simple_src = _extract_class(_src("arvel.database.query"), "SimplePaginator")
         assert "def to_dict" in simple_src, (
             "F-029: SimplePaginator is missing to_dict(). "
@@ -138,56 +136,56 @@ class TestPaginatorToDictMethods:
         )
 
     def test_cursor_paginator_to_dict_returns_next_cursor(self) -> None:
-        """CursorPaginator.to_dict() must include next_cursor in links."""
+        """CursorPaginator.to_dict must include next_cursor in links."""
         cursor_src = _extract_class(_src("arvel.database.query"), "CursorPaginator")
         assert "next_cursor" in cursor_src and "to_dict" in cursor_src, (
             "F-029: CursorPaginator.to_dict() must expose next_cursor in links."
         )
 
 
-# ── FR-005: Model.save() fires correct events (F-035) ──────────────────────────
+# ── Model.save fires correct events  ──────────────────────────
 
 
 class TestModelSaveFiresCorrectEvents:
-    """AC-005a/b/c/d: save() must fire 'created' for new and 'updated' for existing."""
+    """save must fire 'created' for new and 'updated' for existing."""
 
     def test_model_save_detects_pending(self) -> None:
-        """save() must check inspect().pending before choosing event."""
+        """save must check inspect.pending before choosing event."""
         save_src = _extract_method(_src("arvel.database.model"), "async def save(self)")
         assert "pending" in save_src, (
             "F-035: Model.save() must check inspect(self).pending to detect new vs existing rows."
         )
 
     def test_model_save_fires_created_event(self) -> None:
-        """save() must fire 'created' for new instances."""
+        """save must fire 'created' for new instances."""
         src = _src("arvel.database.model")
         assert '"created"' in src or "'created'" in src, (
             "F-035: Model.save() must fire the 'created' event for new model instances."
         )
 
     def test_model_save_fires_updated_event(self) -> None:
-        """save() must fire 'updated' for existing instances."""
+        """save must fire 'updated' for existing instances."""
         src = _src("arvel.database.model")
         assert '"updated"' in src or "'updated'" in src, (
             "F-035: Model.save() must fire the 'updated' event for persistent model instances."
         )
 
 
-# ── FR-006: Model.fresh() uses query builder (F-036) ───────────────────────────
+# ── Model.fresh uses query builder  ───────────────────────────
 
 
 class TestModelFreshUsesQueryBuilder:
-    """AC-006a/b: fresh() must route through the scoped query builder."""
+    """fresh must route through the scoped query builder."""
 
     def test_model_fresh_no_raw_select(self) -> None:
-        """fresh() must not build a raw select() statement."""
+        """fresh must not build a raw select statement."""
         fresh_src = _extract_method(_src("arvel.database.model"), "async def fresh(self)")
         assert "select(" not in fresh_src or "query()" in fresh_src, (
             "F-036: Model.fresh() must route through type(self).query() instead of raw select()."
         )
 
     def test_model_fresh_calls_query(self) -> None:
-        """fresh() should call .query() to pick up global scopes."""
+        """fresh should call .query to pick up global scopes."""
         fresh_src = _extract_method(_src("arvel.database.model"), "async def fresh(self)")
         assert ".query()" in fresh_src or "query()" in fresh_src, (
             "F-036: Model.fresh() must use type(self).query() to apply global scopes."

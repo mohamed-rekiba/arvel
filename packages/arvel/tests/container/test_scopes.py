@@ -1,4 +1,4 @@
-"""FR-001-014: Scopes (singleton, scoped, transient) + scope() / ascope() context managers."""
+"""Scopes (singleton, scoped, transient) + scope() / ascope() context managers."""
 
 from __future__ import annotations
 

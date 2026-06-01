@@ -1,4 +1,4 @@
-"""Tests for Session Redis Store — FR-006-019."""
+"""Tests for Session Redis Store."""
 
 from __future__ import annotations
 

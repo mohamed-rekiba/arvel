@@ -9,6 +9,6 @@ intentionally import-free so adding a new file does not require updating
 Available migrations:
 
 - ``create_users_table.py`` — canonical authenticatable model (Laravel parity).
-- ``create_refresh_tokens_table.py`` — opaque refresh-token store (ADR-078).
+- ``create_refresh_tokens_table.py`` — opaque refresh-token store.
 - ``create_personal_access_tokens_table.py`` — token guard storage.
 """

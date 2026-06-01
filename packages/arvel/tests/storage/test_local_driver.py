@@ -1,4 +1,4 @@
-"""Tests for LocalDriver — FR-006-027."""
+"""Tests for LocalDriver."""
 
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ class TestLocalDriverBasicOps:
 
 
 class TestLocalDriverPathTraversal:
-    """FR-006-027: Path traversal prevention (NFR-006-006)."""
+    """Path traversal prevention ()."""
 
     @pytest.mark.asyncio
     async def test_traversal_above_root_raises(self, driver: LocalDriver) -> None:

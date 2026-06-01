@@ -1,4 +1,4 @@
-"""Tests for QueueServiceProvider — FR-008-014..016."""
+"""Tests for QueueServiceProvider"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from arvel.queue.providers.queue_service_provider import QueueServiceProvider
 
 
 class TestQueueServiceProvider:
-    """FR-008-014: QueueServiceProvider registers QueueManager and Bus."""
+    """QueueServiceProvider registers QueueManager and Bus."""
 
     def test_register_binds_queue_manager(self) -> None:
         app = Application()
@@ -38,7 +38,7 @@ class TestQueueServiceProvider:
 
     @pytest.mark.asyncio
     async def test_shutdown_calls_driver_close(self) -> None:
-        """FR-008-016: Provider shutdown cleans up driver connections."""
+        """Provider shutdown cleans up driver connections."""
         app = Application()
         provider = QueueServiceProvider(app)
         provider.register()
@@ -61,7 +61,7 @@ class TestQueueServiceProvider:
     async def test_queue_work_command_receives_failed_job_store(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """WI-047: provider-created workers must persist exhausted jobs."""
+        """provider-created workers must persist exhausted jobs."""
         from arvel.queue.commands.queue_work import QueueWorkCommand
         from arvel.queue.failed_job_store import FailedJobStore
 

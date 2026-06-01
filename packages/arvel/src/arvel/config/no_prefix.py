@@ -1,7 +1,7 @@
 """``NoPrefix`` marker for ``Annotated[T, NoPrefix]`` on ``ArvelSettings`` fields.
 
 Fields annotated with ``NoPrefix`` bypass the auto-derived ``env_prefix`` and read from
-the bare uppercase field name. See PRD-002 FR-002-027 and FB-005.
+the bare uppercase field name.
 """
 
 from __future__ import annotations

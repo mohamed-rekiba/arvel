@@ -1,6 +1,6 @@
 """Create the ``password_resets`` table — DB-backed reset-token storage.
 
-Per ADR-087 and ADR-088, password reset uses a one-shot DB-backed token
+Password reset uses a one-shot DB-backed token
 flow. The broker mints a 32-byte URL-safe plaintext, stores its sha256 hex
 digest here keyed by email, and emails the plaintext to the user. On
 ``POST /api/auth/reset-password`` the broker rehashes the supplied token,
@@ -8,13 +8,13 @@ looks it up, and (on success) DELETEs the row so it can't be replayed.
 
 Schema:
 
-- ``email``       — lookup key. UNIQUE so a second forgot-password call
-                    invalidates the first (UPSERT semantics in the broker).
-- ``token``       — sha256 hex digest (64 chars) of the user-facing token.
-                    Never stored as plaintext.
-- ``created_at``  — supports the TTL check (default 60 minutes via
-                    ``config.auth.passwords.ttl_minutes``) and the
-                    ``arvel auth:clear-resets`` console command.
+- ``email`` — lookup key. UNIQUE so a second forgot-password call
+ invalidates the first (UPSERT semantics in the broker).
+- ``token`` — sha256 hex digest (64 chars) of the user-facing token.
+ Never stored as plaintext.
+- ``created_at`` — supports the TTL check (default 60 minutes via
+ ``config.auth.passwords.ttl_minutes``) and the
+ ``arvel auth:clear-resets`` console command.
 
 Apps wanting a different schema (e.g. composite keys for multi-tenant
 setups) can ignore this migration and ship their own; the broker only

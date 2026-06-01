@@ -1,4 +1,4 @@
-"""FR-002-015, FR-002-016 — Throttle middleware + RateLimiterStore drivers."""
+"""Throttle middleware + RateLimiterStore drivers."""
 
 from __future__ import annotations
 

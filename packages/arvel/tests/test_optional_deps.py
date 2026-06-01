@@ -1,5 +1,4 @@
-"""Tests for optional-dependency isolation — NFR-006-009.
-
+"""Tests for optional-dependency isolation.
 These tests verify that importing arvel.cache, arvel.session, arvel.storage
 does not raise ImportError even when optional extras (redis, s3, gcs, azure) are
 not installed.

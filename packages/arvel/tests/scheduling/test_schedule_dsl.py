@@ -1,4 +1,4 @@
-"""Tests for the Schedule DSL — FR-015-001..006."""
+"""Tests for the Schedule DSL."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def schedule() -> Schedule:
 
 
 class TestScheduleCall:
-    """FR-015-001 — schedule.call(callable)."""
+    """schedule.call(callable)."""
 
     def test_call_registers_a_task(self, schedule: Schedule) -> None:
         async def my_task() -> None: ...
@@ -46,7 +46,7 @@ class TestScheduleCall:
 
 
 class TestScheduleCommand:
-    """FR-015-001 — schedule.command(name)."""
+    """schedule.command(name)."""
 
     def test_command_registers_a_task(self, schedule: Schedule) -> None:
         schedule.command("cache:clear").dailyAt("02:00")
@@ -58,7 +58,7 @@ class TestScheduleCommand:
 
 
 class TestFrequencyModifiers:
-    """FR-015-002 — frequency modifiers."""
+    """frequency modifiers."""
 
     @pytest.mark.parametrize(
         ("modifier", "expected_cron"),
@@ -121,7 +121,7 @@ class TestFrequencyModifiers:
 
 
 class TestTimezoneOverride:
-    """FR-015-006 — .timezone() override."""
+    """timezone() override."""
 
     def test_timezone_defaults_to_utc(self, schedule: Schedule) -> None:
         async def t() -> None: ...
@@ -139,7 +139,7 @@ class TestTimezoneOverride:
 
 
 class TestModifierBooleans:
-    """FR-015-007, FR-015-008 — withoutOverlapping, onOneServer flags."""
+    """withoutOverlapping, onOneServer flags."""
 
     def test_without_overlapping_defaults_false(self, schedule: Schedule) -> None:
         async def t() -> None: ...

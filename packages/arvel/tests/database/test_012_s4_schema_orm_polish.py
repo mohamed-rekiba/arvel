@@ -1,9 +1,4 @@
-"""WI-arvel-012 Sprint 4 — Schema DSL extensions + ORM polish.
-
-Covers FR-012-022 through FR-012-029.
-
-All tests are RED until implementation is complete.
-"""
+"""Schema DSL extensions and ORM polish."""
 
 from __future__ import annotations
 
@@ -12,7 +7,7 @@ from arvel.database import Model, id_, integer, string
 from arvel.database.schema import Blueprint, Schema
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-# ─── FR-012-022: Schema column modification and introspection ─────────────────
+# ───  Schema column modification and introspection ─────────────────
 
 
 async def test_schema_has_table_true(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -52,7 +47,7 @@ async def test_schema_get_columns(engine: AsyncEngine, session: AsyncSession) ->
     assert "title" in names
 
 
-# ─── FR-012-023: New column types ─────────────────────────────────────────────
+# ───  New column types ─────────────────────────────────────────────
 
 
 def test_blueprint_uuid_method() -> None:
@@ -91,7 +86,7 @@ def test_blueprint_geometry_method() -> None:
     assert col is not None
 
 
-# ─── FR-012-024: Column modifiers and drop helpers ────────────────────────────
+# ───  Column modifiers and drop helpers ────────────────────────────
 
 
 def test_blueprint_drop_timestamps() -> None:
@@ -121,7 +116,7 @@ def test_column_after_modifier() -> None:
     assert col is not None
 
 
-# ─── FR-012-025: FK cascade shorthands ───────────────────────────────────────
+# ───  FK cascade shorthands ───────────────────────────────────────
 
 
 def test_cascade_on_delete_shorthand() -> None:
@@ -142,7 +137,7 @@ def test_restrict_on_delete_shorthand() -> None:
     assert col is not None
 
 
-# ─── FR-012-026: Mass assignment protection ──────────────────────────────────
+# ───  Mass assignment protection ──────────────────────────────────
 
 
 async def test_fillable_blocks_non_listed_field(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -227,7 +222,7 @@ async def test_no_protection_when_neither_set(engine: AsyncEngine, session: Asyn
     assert obj.note == "anything"
 
 
-# ─── FR-012-027: Serialization control ───────────────────────────────────────
+# ───  Serialization control ───────────────────────────────────────
 
 
 async def test_hidden_fields_excluded_from_dict(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -284,7 +279,7 @@ async def test_make_hidden_per_instance(engine: AsyncEngine, session: AsyncSessi
     assert "score" not in (PlainUser.__hidden__ or [])
 
 
-# ─── FR-012-028: Touch and replicate ─────────────────────────────────────────
+# ───  Touch and replicate ─────────────────────────────────────────
 
 
 async def test_touch_updates_updated_at(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -344,7 +339,7 @@ async def test_replicate_except_excludes_fields(engine: AsyncEngine, session: As
     assert clone.slug is None
 
 
-# ─── FR-012-029: Complete model events ───────────────────────────────────────
+# ───  Complete model events ───────────────────────────────────────
 
 
 async def test_retrieved_event_fires(engine: AsyncEngine, session: AsyncSession) -> None:

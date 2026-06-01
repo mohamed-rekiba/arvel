@@ -1,4 +1,4 @@
-"""FR-028-01..16, FR-028-29 — AuthService unit tests.
+"""AuthService unit tests.
 
 The service uses the real ``User`` and ``RefreshToken`` models on an
 in-memory async SQLite database.  An ``EventFake`` recorder asserts that
@@ -39,7 +39,7 @@ _FIXTURE_EMAIL = "alice@example.com"
 _FIXTURE_PASSWORD = "S3cret-pw!"
 
 
-# ─── Fixtures ──────────────────────────────────────────────────────────────
+# Fixtures
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def auth_service(jwt_secret: str) -> AuthService:
     return AuthService(jwt=JwtConfig(secret=jwt_secret))
 
 
-# ─── Helpers ───────────────────────────────────────────────────────────────
+# Helpers
 
 
 async def _seed_verified_user(
@@ -82,7 +82,7 @@ async def _seed_verified_user(
     return user
 
 
-# ─── Register ──────────────────────────────────────────────────────────────
+# Register
 
 
 @pytest.mark.asyncio
@@ -91,7 +91,7 @@ async def test_register_creates_user_and_dispatches_event(
     event_fake: EventFake,
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-01, FR-028-04 — register persists + dispatches Registered."""
+    """register persists + dispatches Registered."""
     user = await auth_service.register(name="Ada", email="ADA@example.com", password="S3cret-pw!")
 
     assert user.email == "ada@example.com"
@@ -108,13 +108,13 @@ async def test_register_rejects_duplicate_email(
     event_fake: EventFake,
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-02 — duplicate email surfaces EmailAlreadyRegisteredError."""
+    """duplicate email surfaces EmailAlreadyRegisteredError."""
     await auth_service.register(name="Bob", email="bob@example.com", password="S3cret-pw!")
     with pytest.raises(EmailAlreadyRegisteredError):
         await auth_service.register(name="Bob2", email="bob@example.com", password="S3cret-pw!")
 
 
-# ─── Login ─────────────────────────────────────────────────────────────────
+# Login
 
 
 @pytest.mark.asyncio
@@ -123,7 +123,7 @@ async def test_login_issues_token_pair_for_verified_user(
     event_fake: EventFake,
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-06 — happy path: login returns (user, TokenPair)."""
+    """happy path: login returns (user, TokenPair)."""
     seeded = await _seed_verified_user(auth_service)
 
     user, tokens = await auth_service.login(email="alice@example.com", password="S3cret-pw!")
@@ -145,7 +145,7 @@ async def test_login_rejects_unverified_email(
     event_fake: EventFake,
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-07 — unverified user → EmailNotVerifiedError + LoginFailed event."""
+    """unverified user → EmailNotVerifiedError + LoginFailed event."""
     await auth_service.register(name="A", email="a@example.com", password="S3cret-pw!")
 
     with pytest.raises(EmailNotVerifiedError):
@@ -159,7 +159,7 @@ async def test_login_rejects_suspended_account(
     event_fake: EventFake,
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-08 — suspended_at set → AccountSuspendedError."""
+    """suspended_at set → AccountSuspendedError."""
     user = await _seed_verified_user(auth_service)
     user.suspended_at = datetime.now(tz=UTC)
     await user.save()
@@ -174,7 +174,7 @@ async def test_login_uniform_401_for_unknown_email_or_bad_password(
     event_fake: EventFake,
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-09 — unknown email and wrong password share InvalidCredentialsError."""
+    """unknown email and wrong password share InvalidCredentialsError."""
     await _seed_verified_user(auth_service)
 
     with pytest.raises(InvalidCredentialsError):
@@ -183,7 +183,7 @@ async def test_login_uniform_401_for_unknown_email_or_bad_password(
         await auth_service.login(email="alice@example.com", password="wrong-password!")
 
 
-# ─── Refresh ───────────────────────────────────────────────────────────────
+# Refresh
 
 
 @pytest.mark.asyncio
@@ -192,7 +192,7 @@ async def test_refresh_rotates_token(
     event_fake: EventFake,
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-13 — refresh deletes old hash, stores new hash, returns new pair."""
+    """refresh deletes old hash, stores new hash, returns new pair."""
     await _seed_verified_user(auth_service)
     _u, first = await auth_service.login(email="alice@example.com", password="S3cret-pw!")
 
@@ -220,7 +220,7 @@ async def test_revoke_family_raises_and_dispatches_when_rows_present(
     event_fake: EventFake,
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-15 — reuse detection helper revokes family + dispatches event."""
+    """reuse detection helper revokes family + dispatches event."""
     user = await _seed_verified_user(auth_service)
     await auth_service.login(email=user.email, password="S3cret-pw!")
     await auth_service.login(email=user.email, password="S3cret-pw!")
@@ -232,7 +232,7 @@ async def test_revoke_family_raises_and_dispatches_when_rows_present(
     EventFacade.assert_dispatched(TokenReuseDetected, times=1)
 
 
-# ─── Logout ────────────────────────────────────────────────────────────────
+# Logout
 
 
 @pytest.mark.asyncio
@@ -241,7 +241,7 @@ async def test_logout_idempotent_for_missing_or_unknown_token(
     event_fake: EventFake,
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-11 — logout swallows missing / unknown tokens silently."""
+    """logout swallows missing / unknown tokens silently."""
     await auth_service.logout(refresh_token=None)
     await auth_service.logout(refresh_token="never-issued")
     EventFacade.assert_not_dispatched(LoggedOut)
@@ -264,7 +264,7 @@ async def test_logout_deletes_row_and_dispatches_event(
     EventFacade.assert_dispatched(LoggedOut, times=1)
 
 
-# ─── Me ────────────────────────────────────────────────────────────────────
+# Me
 
 
 @pytest.mark.asyncio
@@ -273,7 +273,7 @@ async def test_me_returns_user_for_valid_jwt(
     event_fake: EventFake,
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-29 — me() decodes the access JWT and returns the owning user."""
+    """me() decodes the access JWT and returns the owning user."""
     await _seed_verified_user(auth_service)
     _u, tokens = await auth_service.login(email="alice@example.com", password="S3cret-pw!")
 
@@ -283,6 +283,6 @@ async def test_me_returns_user_for_valid_jwt(
 
 @pytest.mark.asyncio
 async def test_me_rejects_invalid_jwt(auth_service: AuthService, setup_db: AsyncSession) -> None:
-    """FR-028-29 — malformed token → InvalidCredentialsError."""
+    """malformed token → InvalidCredentialsError."""
     with pytest.raises(InvalidCredentialsError):
         await auth_service.me(access_token="not.a.jwt")

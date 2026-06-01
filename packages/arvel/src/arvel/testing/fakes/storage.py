@@ -1,4 +1,4 @@
-"""StorageFake + Storage.fake()/.assert_*() — FR-016-011."""
+"""StorageFake + Storage.fake/.assert_* —"""
 
 from __future__ import annotations
 

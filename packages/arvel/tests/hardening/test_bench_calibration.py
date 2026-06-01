@@ -1,4 +1,4 @@
-"""WI-017 / FR-017-008, FR-017-009, FR-017-012."""
+"""Bench reverb calibration script and gate documentation."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ ADR_PATH = REPO_ROOT / "docs" / "adr" / "ADR-065-bench-reverb-hard-gate.md"
 
 
 def test_calibration_script_exists() -> None:
-    """FR-017-009: re-runnable calibration helper must exist."""
+    """re-runnable calibration helper must exist."""
     assert CALIBRATION_SCRIPT.exists(), (
         f"FR-017-009: {CALIBRATION_SCRIPT.relative_to(REPO_ROOT)} must exist"
     )
@@ -24,7 +24,7 @@ def test_calibration_script_is_runnable() -> None:
 
 
 def test_adr_documents_calibration() -> None:
-    """FR-017-012: ADR-065 must exist and document the gate."""
+    """bench-reverb hard-gate ADR must exist and document calibration."""
     assert ADR_PATH.exists(), f"FR-017-012: {ADR_PATH.relative_to(REPO_ROOT)} must exist"
     text = ADR_PATH.read_text(encoding="utf-8")
     for marker in ("Calibration", "1.5", "p99"):

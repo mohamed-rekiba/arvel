@@ -1,8 +1,8 @@
 """Dotted-key config accessor for the path-loaded config system.
 
 Sits alongside the class-based ``Config.of(SettingsClass)`` accessor; this
-one is used by projects that adopt the canonical layout (PRD-004 FR-004-010,
-ADR-018) where ``config/*.py`` files declare module-level attributes that
+one is used by projects that adopt the canonical layout where
+``config/*.py`` files declare module-level attributes that
 need a dotted lookup at runtime — e.g., ``config('database.DEFAULT')``
 resolves to the ``DEFAULT`` attribute on the loaded ``config/database.py``
 module.

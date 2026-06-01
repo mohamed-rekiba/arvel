@@ -1,4 +1,4 @@
-"""FR-003-008..014 — QueryBuilder fluent API."""
+"""QueryBuilder fluent API."""
 
 from __future__ import annotations
 
@@ -111,11 +111,11 @@ async def test_query_builder_is_generic_in_type() -> None:
     assert qb._model is WidgetB  # pyright: ignore[reportPrivateUsage]  # test asserts the private generic-binding invariant
 
 
-# ─── to_sql (FR-010-08, AC-010-11) ───────────────────────────────────────────
+# ─── to_sql  ───────────────────────────────────────────
 
 
 async def test_to_sql_returns_string(engine: Any, session: AsyncSession) -> None:
-    """AC-010-11: to_sql() returns a non-empty string without executing the query."""
+    """to_sql returns a non-empty string without executing the query."""
     await _create_tables(engine)
     sql = WidgetB.to_sql()
     assert isinstance(sql, str)
@@ -123,14 +123,14 @@ async def test_to_sql_returns_string(engine: Any, session: AsyncSession) -> None
 
 
 async def test_to_sql_includes_where_clause(engine: Any, session: AsyncSession) -> None:
-    """to_sql() output includes WHERE conditions."""
+    """to_sql output includes WHERE conditions."""
     await _create_tables(engine)
     sql = WidgetB.where(name="alpha").to_sql()
     assert "alpha" in sql
 
 
 async def test_to_sql_includes_order_by(engine: Any, session: AsyncSession) -> None:
-    """to_sql() includes ORDER BY clause."""
+    """to_sql includes ORDER BY clause."""
     await _create_tables(engine)
     sql = WidgetB.order_by(WidgetB.__table__.c.qty.desc()).to_sql()
     lower = sql.lower()
@@ -138,14 +138,14 @@ async def test_to_sql_includes_order_by(engine: Any, session: AsyncSession) -> N
 
 
 async def test_to_sql_includes_limit(engine: Any, session: AsyncSession) -> None:
-    """to_sql() includes LIMIT clause."""
+    """to_sql includes LIMIT clause."""
     await _create_tables(engine)
     sql = WidgetB.limit(5).to_sql()
     assert "5" in sql
 
 
 async def test_to_sql_does_not_execute_query(engine: Any, session: AsyncSession) -> None:
-    """to_sql() does not execute any DB statement."""
+    """to_sql does not execute any DB statement."""
     await _create_tables(engine)
     query_count = 0
 

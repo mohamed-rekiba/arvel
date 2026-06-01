@@ -1,14 +1,14 @@
-"""WI-arvel-058 — ``Route.resource()`` macro for RESTful resource controllers.
+"""``Route.resource()`` macro for RESTful resource controllers.
 
-Covers Epic 048 Story 3. ``Route.resource("/posts", PostController)`` should
+. ``Route.resource("/posts", PostController)`` should
 register the seven canonical CRUD routes in one call, with conventional names
 (``posts.index``, ``posts.show``, ...) and a singular path parameter for member
-routes (``/posts/{post}``) so [WI-055] implicit model binding works.
+routes (``/posts/{post}``) so [] implicit model binding works.
 
 The builder is fluent — ``only(...)``, ``except_(...)``, and ``names(...)``
 each return the builder so calls chain.
 
-Run BEFORE implementation — every test in this file MUST fail (Red state).
+Run BEFORE implementation — every test in this file MUST fail (RED state).
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ def reset_router() -> None:
     Router.reset_singleton()
 
 
-# ─────────────────────────── Resource controller stub ───────────────────────
+# Resource controller stub
 
 
 class _PostController(Controller):
@@ -60,7 +60,7 @@ def _specs_by_name() -> dict[str, RouteSpec]:
     return {s.name: s for s in Router.singleton().routes() if s.name is not None}
 
 
-# ─────────────────────────── Default 7-route registration ───────────────────
+# Default 7-route registration
 
 
 class TestDefaultRegistration:
@@ -122,7 +122,7 @@ class TestDefaultRegistration:
         assert client.delete("/posts/42").json() == {"hit": "destroy", "post": "42"}
 
 
-# ──────────────────────────── Parameter naming ──────────────────────────────
+# Parameter naming
 
 
 class TestParameterNaming:
@@ -155,7 +155,7 @@ class TestParameterNaming:
         assert paths["destroy"] == "/posts/{article}"
 
 
-# ───────────────────────────── Filters ──────────────────────────────────────
+# Filters
 
 
 class TestOnlyAndExcept:
@@ -191,7 +191,7 @@ class TestOnlyAndExcept:
             Route.resource("/posts", _PostController).only("foo")
 
 
-# ─────────────────────────── Name overrides ─────────────────────────────────
+# Name overrides
 
 
 class TestNamesOverride:
@@ -217,7 +217,7 @@ class TestNamesOverride:
         assert "posts.show" not in names
 
 
-# ─────────────────────── Builder chains return self ─────────────────────────
+# Builder chains return self
 
 
 class TestBuilderFluency:
@@ -240,9 +240,6 @@ class TestBuilderFluency:
         assert "posts.detail" in names
         assert "posts.create" not in names
         assert "posts.edit" not in names
-
-
-# ───────────────────── Composition: middleware + groups ─────────────────────
 
 
 class TestComposition:

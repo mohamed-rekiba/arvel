@@ -1,4 +1,4 @@
-"""Tests for EventDispatcher — FR-009-003..008."""
+"""Tests for EventDispatcher."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ class _UserEvent(Event):
 
 
 class TestEventDispatcher:
-    """FR-009-003: listen() registers a listener."""
+    """listen() registers a listener."""
 
     def test_listen_registers_listener(self) -> None:
         dispatcher = EventDispatcher()
@@ -32,7 +32,7 @@ class TestEventDispatcher:
         assert len(dispatcher.listeners(_OrderEvent)) == 1
 
     def test_listen_is_idempotent(self) -> None:
-        """FR-009-003: registering the same pair twice is idempotent."""
+        """registering the same pair twice is idempotent."""
         dispatcher = EventDispatcher()
 
         class Cap2(Listener[_OrderEvent]):
@@ -45,7 +45,7 @@ class TestEventDispatcher:
 
     @pytest.mark.asyncio
     async def test_dispatch_calls_all_listeners(self) -> None:
-        """FR-009-004: dispatch calls all registered listeners."""
+        """dispatch calls all registered listeners."""
         dispatcher = EventDispatcher()
         seen: list[str] = []
 
@@ -64,7 +64,7 @@ class TestEventDispatcher:
 
     @pytest.mark.asyncio
     async def test_listener_error_does_not_stop_others(self) -> None:
-        """FR-009-005: listener error must not prevent other listeners."""
+        """listener error must not prevent other listeners."""
         dispatcher = EventDispatcher()
         seen: list[str] = []
 
@@ -106,7 +106,7 @@ class TestEventDispatcher:
 
     @pytest.mark.asyncio
     async def test_should_queue_listener_degrades_gracefully_without_bus(self) -> None:
-        """FR-009-008: ShouldQueue falls back to inline when Bus not bound."""
+        """ShouldQueue falls back to inline when Bus not bound."""
         dispatcher = EventDispatcher()
         seen: list[int] = []
 

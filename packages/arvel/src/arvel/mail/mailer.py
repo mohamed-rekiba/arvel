@@ -1,4 +1,4 @@
-"""Mailer — renders mailables and delegates to the active driver (FR-009-015, FR-009-016)."""
+"""Mailer — renders mailables and delegates to the active driver."""
 
 from __future__ import annotations
 

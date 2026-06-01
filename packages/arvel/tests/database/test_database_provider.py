@@ -1,4 +1,4 @@
-"""FR-003-041 + FR-003-042 — DatabaseServiceProvider + DbConfig."""
+"""DatabaseServiceProvider and DbConfig."""
 
 from __future__ import annotations
 
@@ -150,7 +150,7 @@ async def test_database_provider_binds_engine_and_session_maker(
 async def test_database_provider_skips_ping_when_not_configured(
     clean_env: None, tmp_app_path: Path
 ) -> None:
-    """When DB_CONNECTION and DB_URL are both absent, boot() doesn't try to connect."""
+    """When DB_CONNECTION and DB_URL are both absent, boot doesn't try to connect."""
     app = (
         ApplicationBuilder(base_path=tmp_app_path)
         .with_providers([DatabaseServiceProvider])

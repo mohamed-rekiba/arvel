@@ -1,8 +1,7 @@
-"""WI-arvel-035 — Epic 007 Story 10: pivot ergonomics.
+"""Pivot ergonomics.
 
 with_pivot hydration, with_timestamps, order_by_pivot, where_pivot_in/_not_in/_between/_null,
-the `as` accessor name, and create/save on the relation.
-"""
+the `as` accessor name, and create/save on the relation."""
 
 from __future__ import annotations
 

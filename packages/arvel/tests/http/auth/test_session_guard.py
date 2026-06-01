@@ -1,4 +1,4 @@
-"""FR-002-018 — SessionGuard (updated for ADR-031: now reads request.state.session)."""
+"""SessionGuard (updated for now reads request.state.session)."""
 
 from __future__ import annotations
 

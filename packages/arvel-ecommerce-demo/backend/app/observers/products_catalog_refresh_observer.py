@@ -14,6 +14,7 @@ class ProductsCatalogRefreshObserver(Observer[Any]):
 
     Registered on all three models in AppServiceProvider so the materialized view
     stays consistent without scattering refresh calls across every route.
+
     """
 
     async def after_commit(self, _instance: Any) -> None:

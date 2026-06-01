@@ -1,5 +1,4 @@
-"""Tests for CatalogController — FR-032-05 / AC-11..14.
-
+"""Tests for CatalogController.
 Tests are written RED — arvel.i18n.catalog does not exist yet.
 """
 
@@ -22,7 +21,7 @@ def lang_dir(tmp_path: Path) -> Path:
     return d
 
 
-# ─── AC-11: 200 on hit ────────────────────────────────────────────────────────
+#: 200 on hit
 
 
 @pytest.mark.asyncio
@@ -36,7 +35,7 @@ async def test_200_on_hit(lang_dir: Path) -> None:
     assert body["greeting"] == "Hello"
 
 
-# ─── AC-12: 304 on ETag match ────────────────────────────────────────────────
+#: 304 on ETag match
 
 
 @pytest.mark.asyncio
@@ -69,7 +68,7 @@ def test_etag_weak_prefix_also_matches(lang_dir: Path) -> None:
     asyncio.run(run())
 
 
-# ─── AC-13: 404 unknown locale (no enumeration) ──────────────────────────────
+#: 404 unknown locale (no enumeration)
 
 
 @pytest.mark.asyncio
@@ -85,7 +84,7 @@ async def test_404_unknown_locale(lang_dir: Path) -> None:
     assert "es" not in body_str
 
 
-# ─── AC-14: asyncio.Lock prevents duplicate reads ────────────────────────────
+#: asyncio.Lock prevents duplicate reads
 
 
 @pytest.mark.asyncio
@@ -114,7 +113,7 @@ async def test_concurrent_cold_reads_file_read_once(
     assert read_count == 1, f"File read {read_count} times; expected 1"
 
 
-# ─── Cache-Control and Vary headers ──────────────────────────────────────────
+# Cache-Control and Vary headers
 
 
 @pytest.mark.asyncio

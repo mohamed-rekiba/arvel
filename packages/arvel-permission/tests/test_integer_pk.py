@@ -1,8 +1,8 @@
-"""Integer-PK host support for arvel-permission — FR-032-08 / AC-19..20.
+"""Integer-PK hosts: grants persist through MorphToMany without string-id hacks.
 
-The async ``MorphToMany`` accessor str-casts the owner PK into the VARCHAR
-``model_id`` pivot column, so grants persist and survive a fresh session
-without ``_StringId``, ``cast``, or ``type: ignore``.
+The async accessor str-casts the owner PK into the VARCHAR ``model_id`` pivot
+column, so rows survive a fresh session without ``_StringId``, ``cast``, or
+``type: ignore``.
 """
 
 from __future__ import annotations

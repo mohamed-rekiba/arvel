@@ -1,4 +1,4 @@
-"""QA-Pre tests for WI-arvel-042: API contract and permission fixes.
+"""API contract and permission fixes.
 
 All tests are source-inspection tests (no DB, no I/O) that fail before the
 fixes are applied and pass after. They verify the exact structural patterns
@@ -26,7 +26,7 @@ def _src(path: pathlib.Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-# ─── FR-001: stock field name ─────────────────────────────────────────────────
+# ─── stock field name ─────────────────────────────────────────────────
 
 
 class TestV026StockFieldName:
@@ -48,7 +48,7 @@ class TestV026StockFieldName:
         )
 
 
-# ─── FR-002: short_description field name ─────────────────────────────────────
+# ─── short_description field name ─────────────────────────────────────
 
 
 class TestV027ShortDescriptionFieldName:
@@ -71,7 +71,7 @@ class TestV027ShortDescriptionFieldName:
         )
 
 
-# ─── FR-003: /me endpoint enrichment ─────────────────────────────────────────
+# ─── /me endpoint enrichment ─────────────────────────────────────────
 
 
 class TestV028MeEndpointEnrichment:
@@ -102,7 +102,7 @@ class TestV028MeEndpointEnrichment:
         )
 
 
-# ─── FR-004: users.view permission seeded ─────────────────────────────────────
+# ─── users.view permission seeded ─────────────────────────────────────
 
 
 class TestV029UsersViewPermission:
@@ -121,7 +121,7 @@ class TestV029UsersViewPermission:
         )
 
 
-# ─── FR-005: analytics.view and settings.view seeded ─────────────────────────
+# ─── analytics.view and settings.view seeded ─────────────────────────
 
 
 class TestV030AnalyticsSettingsPermissions:
@@ -146,7 +146,7 @@ class TestV030AnalyticsSettingsPermissions:
         )
 
 
-# ─── FR-006: category slug wrapped as dict ────────────────────────────────────
+# ─── category slug wrapped as dict ────────────────────────────────────
 
 
 class TestV031CategorySlugWrapped:
@@ -162,7 +162,7 @@ class TestV031CategorySlugWrapped:
         )
 
 
-# ─── FR-007: optional ProductCard fields ─────────────────────────────────────
+# ─── optional ProductCard fields ─────────────────────────────────────
 
 
 class TestV032OptionalProductCardFields:
@@ -205,7 +205,7 @@ class TestV032OptionalProductCardFields:
         )
 
 
-# ─── FR-008: i18n catalogue completeness ─────────────────────────────────────
+# ─── i18n catalogue completeness ─────────────────────────────────────
 
 
 class TestV033I18nCatalogue:
@@ -244,7 +244,7 @@ class TestV033I18nCatalogue:
             assert count >= 2, f"V-033 not fixed: i18n key '{key}' missing from AR/TR catalogue"
 
 
-# ─── FR-009: exclude_unset in PATCH handler ───────────────────────────────────
+# ─── exclude_unset in PATCH handler ───────────────────────────────────
 
 
 class TestV034ExcludeUnset:
@@ -255,7 +255,7 @@ class TestV034ExcludeUnset:
         )
 
 
-# ─── FR-010: idempotent catalog seeder ───────────────────────────────────────
+# ─── idempotent catalog seeder ───────────────────────────────────────
 
 
 class TestV035IdempotentSeeder:

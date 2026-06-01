@@ -1,6 +1,6 @@
-"""FR-004-002: project-name validation against ``^[a-z][a-z0-9_-]*$``.
+"""project-name validation against ``^[a-z][a-z0-9_-]*$``.
 
-Adversarial cases live in ``test_path_traversal.py`` (NFR-004-003 focus).
+Adversarial cases live in ``test_path_traversal.py`` ( focus).
 This file covers the allowlist regex semantics and length cap.
 """
 

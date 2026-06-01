@@ -1,4 +1,4 @@
-"""AC-010-04..05 — DB.transaction() facade (FR-010-04)."""
+"""DB.transaction() facade and nested savepoints."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ async def test_transaction_commits_on_success(
     engine: Any,
     session_maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """AC-010-04: DB.transaction() commits on successful exit."""
+    """DB.transaction commits on successful exit."""
     await _create_tables(engine)
     DB.configure(session_maker)
 
@@ -85,7 +85,7 @@ async def test_transaction_rolls_back_on_exception(
     engine: Any,
     session_maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """AC-010-04: DB.transaction() rolls back on exception."""
+    """DB.transaction rolls back on exception."""
     await _create_tables(engine)
     DB.configure(session_maker)
 
@@ -103,7 +103,7 @@ async def test_nested_transaction_uses_savepoint(
     engine: Any,
     session_maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """AC-010-05: nested DB.transaction() creates a savepoint, not a second connection."""
+    """nested DB.transaction creates a savepoint, not a second connection."""
     await _create_tables(engine)
     DB.configure(session_maker)
 
@@ -140,7 +140,7 @@ async def test_transaction_inside_active_session_uses_savepoint(
     engine: Any,
     session: AsyncSession,
 ) -> None:
-    """With an active session (HTTP middleware), DB.transaction() uses begin_nested()."""
+    """With an active session (HTTP middleware), DB.transaction uses begin_nested."""
     await _create_tables(engine)
 
     with pytest.raises(ValueError):

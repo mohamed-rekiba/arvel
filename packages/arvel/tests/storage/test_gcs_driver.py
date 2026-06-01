@@ -1,4 +1,4 @@
-"""Tests for GcsDriver — FR-006-030.
+"""Tests for GcsDriver
 
 The ``TestGcsDriverOps`` suite exercises real put/get/exists/delete against
 an ``fsouza/fake-gcs-server`` container booted by the session-scoped
@@ -38,7 +38,7 @@ class GcsEndpoint(Protocol):
 
 class TestGcsDriverImportError:
     def test_helpful_import_error_without_extra(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """FR-006-030: helpful ImportError when arvel[gcs] not installed.
+        """helpful ImportError when arvel[gcs] not installed.
 
         Pinning ``sys.modules["google.cloud.storage"] = None`` is the
         documented way to make Python's import machinery treat a package as
@@ -75,7 +75,7 @@ class TestGcsDriverOps:
         )
 
     async def test_put_and_get(self, driver: GcsDriver) -> None:
-        # Single round-trip covers the four core operations against
+        # Single round-trip the four core operations against
         # fake-gcs-server: absence → put → exists → get → delete → absence.
         assert await driver.exists("ops/put_and_get.txt") is False
         assert await driver.put("ops/put_and_get.txt", b"hello gcs") is True

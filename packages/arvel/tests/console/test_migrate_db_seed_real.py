@@ -1,12 +1,12 @@
-"""WI-arvel-022 — CLI integration tests for migrate / migrate:rollback /
+"""CLI integration tests for migrate / migrate:rollback /
 migrate:status / db:seed against the real Migrator.
 
-Authored Stage 3a (QA-Pre) before execution. These tests use a real
+These tests use a real
 in-memory SQLite engine bound into a hand-rolled framework Application
 to exercise the full CLI → command → Migrator → engine path.
 
-Traces to PRD-022 FR-022-008 (migrate), FR-022-009 (migrate:rollback),
-FR-022-010 (migrate:status), FR-022-011 (db:seed), and FR-022-013 (honest
+Traces to (migrate), (migrate:rollback),
+ (migrate:status), (db:seed), and (honest
 exit codes).
 """
 
@@ -122,7 +122,7 @@ def _make_app_with_engine(tmp_path: Path, engine: AsyncEngine, *cmds: Any) -> Ap
 
     for cmd in cmds:
         assert isinstance(cmd, Command)
-        cmd.app = fake_app  # type: ignore[assignment] — Command.app is the seam WI-021 added
+        cmd.app = fake_app  # type: ignore[assignment] — Command.app is the seam added
 
     return Application(commands=list(cmds))
 
@@ -147,14 +147,14 @@ def engine() -> Iterator[AsyncEngine]:
 
 
 # ============================================================
-# FR-022-008 — MigrateCommand wires real migrator
+# — MigrateCommand wires real migrator
 # ============================================================
 
 
 def test_migrate_with_no_files_prints_nothing_to_migrate(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-008-02: Nothing to migrate. message (not Ran 0 migration(s).)."""
+    """-008-02: Nothing to migrate. message (not Ran 0 migration(s).)."""
     monkeypatch.chdir(project)
     app = _make_app_with_engine(project, engine, MigrateCommand())
     result = invoke_async(runner, app.typer_app, ["migrate"])
@@ -166,7 +166,7 @@ def test_migrate_with_no_files_prints_nothing_to_migrate(
 def test_migrate_applies_pending(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-008-01: applies pending migrations and prints names."""
+    """-008-01: applies pending migrations and prints names."""
     (project / "database" / "migrations" / "2026_01_01_a.py").write_text(_NOOP_UP)
     monkeypatch.chdir(project)
     app = _make_app_with_engine(project, engine, MigrateCommand())
@@ -179,7 +179,7 @@ def test_migrate_applies_pending(
 def test_migrate_dry_run_lists_without_applying(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-008-04: --dry-run lists files, exits 0, no DB writes."""
+    """-008-04: --dry-run lists files, exits 0, no DB writes."""
     (project / "database" / "migrations" / "2026_01_01_a.py").write_text(_NOOP_UP)
     (project / "database" / "migrations" / "2026_01_01_b.py").write_text(_NOOP_UP)
     monkeypatch.chdir(project)
@@ -197,7 +197,7 @@ def test_migrate_dry_run_lists_without_applying(
 def test_migrate_body_failure_exit_code_1_with_stderr(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-008-03: body failure → exit 1, error on stderr."""
+    """-008-03: body failure → exit 1, error on stderr."""
     (project / "database" / "migrations" / "2026_01_01_bad.py").write_text(_RAISING_UP)
     monkeypatch.chdir(project)
     app = _make_app_with_engine(project, engine, MigrateCommand())
@@ -210,14 +210,14 @@ def test_migrate_body_failure_exit_code_1_with_stderr(
 
 
 # ============================================================
-# FR-022-009 — MigrateRollbackCommand wires real migrator
+# — MigrateRollbackCommand wires real migrator
 # ============================================================
 
 
 def test_rollback_with_nothing_applied_prints_nothing(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-009-02."""
+    """-009-02."""
     monkeypatch.chdir(project)
     app = _make_app_with_engine(project, engine, MigrateRollbackCommand())
     result = invoke_async(runner, app.typer_app, ["migrate:rollback"])
@@ -229,7 +229,7 @@ def test_rollback_with_nothing_applied_prints_nothing(
 def test_rollback_after_migrate_undoes_last_batch(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-009-01: prints `Rolled back N migration(s):` + names."""
+    """-009-01: prints `Rolled back N migration(s):` + names."""
     (project / "database" / "migrations" / "2026_01_01_a.py").write_text(_NOOP_UP)
     monkeypatch.chdir(project)
     app_m = _make_app_with_engine(project, engine, MigrateCommand())
@@ -242,14 +242,14 @@ def test_rollback_after_migrate_undoes_last_batch(
 
 
 # ============================================================
-# FR-022-010 — MigrateStatusCommand wires real migrator
+# — MigrateStatusCommand wires real migrator
 # ============================================================
 
 
 def test_status_table_has_header_and_rows(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-010-01 + AC-022-010-02 + AC-022-010-03."""
+    """-010-01 + -010-02 + -010-03."""
     (project / "database" / "migrations" / "2026_01_01_a.py").write_text(_NOOP_UP)
     (project / "database" / "migrations" / "2026_01_02_b.py").write_text(_NOOP_UP)
     monkeypatch.chdir(project)
@@ -271,14 +271,14 @@ def test_status_table_has_header_and_rows(
 
 
 # ============================================================
-# FR-022-011 — DbSeedCommand resolves and runs a seeder
+# — DbSeedCommand resolves and runs a seeder
 # ============================================================
 
 
 def test_db_seed_runs_default_database_seeder(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-011-01: arvel db:seed runs DatabaseSeeder by default."""
+    """-011-01: arvel db:seed runs DatabaseSeeder by default."""
     (project / "database" / "seeders" / "database_seeder.py").write_text(_BASIC_SEEDER)
     monkeypatch.chdir(project)
     app = _make_app_with_engine(project, engine, DbSeedCommand())
@@ -290,7 +290,7 @@ def test_db_seed_runs_default_database_seeder(
 def test_db_seed_with_explicit_seeder_name(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-011-02: arvel db:seed --seeder PostSeeder resolves
+    """-011-02: arvel db:seed --seeder PostSeeder resolves
     database/seeders/post_seeder.py.
 
     Note: we reuse _BASIC_SEEDER source but with a different class name.
@@ -307,7 +307,7 @@ def test_db_seed_with_explicit_seeder_name(
 def test_db_seed_missing_file_exits_2(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-011-03: missing seeder file → exit 2."""
+    """-011-03: missing seeder file → exit 2."""
     monkeypatch.chdir(project)
     app = _make_app_with_engine(project, engine, DbSeedCommand())
     result = invoke_async(runner, app.typer_app, ["db:seed", "--seeder", "Nonexistent"])
@@ -320,7 +320,7 @@ def test_db_seed_missing_file_exits_2(
 def test_db_seed_class_not_found_exits_2(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-011-04: file exists, class missing → exit 2."""
+    """-011-04: file exists, class missing → exit 2."""
     (project / "database" / "seeders" / "wrong_name.py").write_text(
         _BASIC_SEEDER.replace("DatabaseSeeder", "DifferentClass")
     )
@@ -334,7 +334,7 @@ def test_db_seed_class_not_found_exits_2(
 def test_db_seed_body_failure_exits_1(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-022-011-05: seeder run() raises → exit 1."""
+    """-011-05: seeder run raises → exit 1."""
     (project / "database" / "seeders" / "bad_seeder.py").write_text(_RAISING_SEEDER)
     monkeypatch.chdir(project)
     app = _make_app_with_engine(project, engine, DbSeedCommand())

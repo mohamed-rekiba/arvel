@@ -125,7 +125,7 @@ jobs:
           enable-cache: true
       - run: uv sync --all-packages --all-extras --frozen
       - name: Run reverb benchmarks
-        # Hard gate per ADR-065 (WI-017). Thresholds in bench_reverb.py are
+        # Hard gate per ADR-112 (WI-017). Thresholds in bench_reverb.py are
         # the code-internal NFR contract; gate values are 1.5× observed p99.
         # Re-calibrate via benchmarks/scripts/calibrate_bench_reverb.py if
         # flakes appear; never reintroduce continue-on-error.

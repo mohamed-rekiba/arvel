@@ -1,8 +1,7 @@
 """whereHas / has / withCount must honour the related model's soft-delete scope.
 
 Laravel never counts trashed related rows in has/whereHas/withCount, and
-withCount raises for relations the model doesn't define.
-"""
+withCount raises for relations the model doesn't define."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""FR-001-020: Public API surface stability.
+"""Public API surface stability.
 
 Imports MUST succeed for every name we promise in foundations-api.md.
 Stage 3b makes these tests pass.

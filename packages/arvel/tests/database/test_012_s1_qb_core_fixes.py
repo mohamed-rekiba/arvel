@@ -1,14 +1,4 @@
-"""WI-arvel-012 Sprint 1 — QB core fixes + write side.
-
-Covers FR-012-001 through FR-012-005.
-
-All tests are RED until implementation is complete:
-  - FR-001: _ModelMeta forwards class-level QB methods
-  - FR-002: SoftDeletes QB filter (with_trashed / only_trashed)
-  - FR-003: Local scopes callable via QB
-  - FR-004: QB write operations (insert/update/upsert/delete/truncate/increment)
-  - FR-005: Extra aggregates (sum/avg/max/min)
-"""
+"""QueryBuilder core fixes and write-side operations."""
 
 from __future__ import annotations
 
@@ -51,7 +41,7 @@ async def _setup(engine: AsyncEngine) -> None:
         await conn.run_sync(Model.metadata.create_all)
 
 
-# ─── FR-012-001: Model class-level QB forwarding ──────────────────────────────
+# ───  Model class-level QB forwarding ──────────────────────────────
 
 
 async def test_model_classmethod_where_returns_qb(
@@ -92,7 +82,7 @@ async def test_model_find_still_uses_explicit_classmethod(
 
 
 async def test_model_query_still_works(engine: AsyncEngine, session: AsyncSession) -> None:
-    """Model.query() continues to work unchanged."""
+    """Model.query continues to work unchanged."""
     await _setup(engine)
     qb = ItemS1.query()
     assert isinstance(qb, QueryBuilder)
@@ -104,13 +94,13 @@ async def test_model_private_attr_raises(engine: AsyncEngine, session: AsyncSess
         _ = ItemS1.__nonexistent_private__  # intentional: verifies the guard raises AttributeError
 
 
-# ─── FR-012-002: Soft-delete QB filter ────────────────────────────────────────
+# ───  Soft-delete QB filter ────────────────────────────────────────
 
 
 async def test_soft_delete_default_excludes_deleted(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """Model.all() must exclude soft-deleted rows when SoftDeletes is mixed in."""
+    """Model.all must exclude soft-deleted rows when SoftDeletes is mixed in."""
     from arvel.database.model import SoftDeletes
 
     class UserSD(Model, SoftDeletes):
@@ -134,7 +124,7 @@ async def test_soft_delete_default_excludes_deleted(
 async def test_soft_delete_with_trashed_includes_all(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """with_trashed() includes soft-deleted rows."""
+    """with_trashed includes soft-deleted rows."""
     from arvel.database.model import SoftDeletes
 
     class UserWT(Model, SoftDeletes):
@@ -157,7 +147,7 @@ async def test_soft_delete_with_trashed_includes_all(
 
 
 async def test_soft_delete_only_trashed(engine: AsyncEngine, session: AsyncSession) -> None:
-    """only_trashed() returns only soft-deleted rows."""
+    """only_trashed returns only soft-deleted rows."""
     from arvel.database.model import SoftDeletes
 
     class UserOT(Model, SoftDeletes):
@@ -187,7 +177,7 @@ async def test_model_without_soft_deletes_unaffected(
         ItemS1.with_trashed()
 
 
-# ─── FR-012-003: Local scopes callable via QB ─────────────────────────────────
+# ───  Local scopes callable via QB ─────────────────────────────────
 
 
 async def test_local_scope_callable_no_args(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -220,7 +210,7 @@ async def test_undefined_method_raises_attribute_error(
         getattr(PostS1, missing)()
 
 
-# ─── FR-012-004: QB write operations ──────────────────────────────────────────
+# ───  QB write operations ──────────────────────────────────────────
 
 
 async def test_qb_insert_bulk(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -326,7 +316,7 @@ async def test_qb_write_no_session_raises(engine: AsyncEngine) -> None:
         await ItemS1.insert([{"name": "fail", "score": 0}])
 
 
-# ─── FR-012-005: Extra aggregates ─────────────────────────────────────────────
+# ───  Extra aggregates ─────────────────────────────────────────────
 
 
 async def test_sum(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -364,7 +354,7 @@ async def test_min(engine: AsyncEngine, session: AsyncSession) -> None:
 
 async def test_aggregates_return_none_on_empty(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
-    # sum() follows Laravel: 0 for an empty set, not null.
+    # sum follows Laravel: 0 for an empty set, not null.
     assert await ItemS1.where(ItemS1.name == "nope").sum("score") == 0
     assert await ItemS1.where(ItemS1.name == "nope").avg("score") is None
     assert await ItemS1.where(ItemS1.name == "nope").max("score") is None

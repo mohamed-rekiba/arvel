@@ -1,12 +1,7 @@
-"""S-005-11 — Morph relations (MorphOne, MorphMany).
+"""Morph relations (MorphOne, MorphMany).
 
-AC covered:
-  AC-005-018-01  MorphOne accessor returns a single related instance (or None)
-  AC-005-018-02  MorphOne discriminator columns use short class name (ADR-022)
-  AC-005-019-01  MorphMany accessor yields all matching related instances
-  AC-005-020-01  creating via morph accessor sets discriminator columns correctly
-  AC-005-021-01  two different owner types can share the same polymorphic table
-"""
+Single-instance access, short-name discriminators, collections,
+create-via-accessor wiring, and shared polymorphic tables."""
 
 from __future__ import annotations
 
@@ -82,11 +77,11 @@ async def _create_tables(engine: Any) -> None:
         await conn.run_sync(Model.metadata.create_all)
 
 
-# ─── AC-005-018-01: MorphOne returns single instance or None ──────────────────
+# ───  MorphOne returns single instance or None ──────────────────
 
 
 async def test_morph_one_returns_related_instance(engine: Any, session: AsyncSession) -> None:
-    """AC-005-018-01: MorphOne returns the related model instance."""
+    """MorphOne returns the related model instance."""
     await _create_tables(engine)
     post = await MorphPost.create(title="Hello")
     img = await MorphImage.create(
@@ -103,7 +98,7 @@ async def test_morph_one_returns_related_instance(engine: Any, session: AsyncSes
 
 
 async def test_morph_one_returns_none_when_no_related(engine: Any, session: AsyncSession) -> None:
-    """AC-005-018-01: MorphOne returns None when no related row exists."""
+    """MorphOne returns None when no related row exists."""
     await _create_tables(engine)
     post = await MorphPost.create(title="No Image")
 
@@ -135,15 +130,15 @@ async def test_morph_one_returns_first_when_multiple_rows(
     assert result.id == first.id
 
 
-# ─── AC-005-018-02: discriminator uses short class name ──────────────────────
+# ───  discriminator uses short class name ──────────────────────
 
 
 async def test_morph_one_create_sets_short_class_name_discriminator(
     engine: Any, session: AsyncSession
 ) -> None:
-    """AC-005-018-02: creating via MorphOne sets {name}_type to 'MorphPost' (not FQCN)."""
+    """creating via MorphOne sets {name}_type to 'MorphPost' (not FQCN)."""
     await _create_tables(engine)
-    post = await MorphPost.create(title="ADR-022 Post")
+    post = await MorphPost.create(title="ADR-066 Post")
 
     img = await post.image.create(url="https://example.com/photo.jpg")
 
@@ -159,7 +154,7 @@ async def test_morph_one_create_sets_short_class_name_discriminator(
 async def test_morph_many_create_sets_short_class_name_discriminator(
     engine: Any, session: AsyncSession
 ) -> None:
-    """AC-005-018-02: creating via MorphMany sets {name}_type to 'MorphPost'."""
+    """creating via MorphMany sets {name}_type to 'MorphPost'."""
     await _create_tables(engine)
     post = await MorphPost.create(title="Comment Post")
 
@@ -173,11 +168,11 @@ async def test_morph_many_create_sets_short_class_name_discriminator(
     assert row.commentable_id == post.id
 
 
-# ─── AC-005-019-01: MorphMany yields all matching instances ──────────────────
+# ───  MorphMany yields all matching instances ──────────────────
 
 
 async def test_morph_many_yields_all_related(engine: Any, session: AsyncSession) -> None:
-    """AC-005-019-01: MorphMany returns all related instances for this owner."""
+    """MorphMany returns all related instances for this owner."""
     await _create_tables(engine)
     post = await MorphPost.create(title="Multi-Comment")
     other_post = await MorphPost.create(title="Other")
@@ -199,7 +194,7 @@ async def test_morph_many_yields_all_related(engine: Any, session: AsyncSession)
 
 
 async def test_morph_many_returns_empty_list_when_none(engine: Any, session: AsyncSession) -> None:
-    """AC-005-019-01: MorphMany returns [] when no related rows exist."""
+    """MorphMany returns [] when no related rows exist."""
     await _create_tables(engine)
     post = await MorphPost.create(title="No Comments")
 
@@ -208,11 +203,11 @@ async def test_morph_many_returns_empty_list_when_none(engine: Any, session: Asy
     assert comments == []
 
 
-# ─── AC-005-020-01: creating via morph accessor sets discriminator correctly ──
+# ───  creating via morph accessor sets discriminator correctly ──
 
 
 async def test_morph_one_create_via_accessor(engine: Any, session: AsyncSession) -> None:
-    """AC-005-020-01: post.image.create() creates a row with correct discriminator."""
+    """post.image.create creates a row with correct discriminator."""
     await _create_tables(engine)
     post = await MorphPost.create(title="Accessor Post")
 
@@ -223,11 +218,11 @@ async def test_morph_one_create_via_accessor(engine: Any, session: AsyncSession)
     assert img.imageable_id == post.id
 
 
-# ─── AC-005-021-01: two owner types share the same polymorphic table ──────────
+# ───  two owner types share the same polymorphic table ──────────
 
 
 async def test_two_owners_share_polymorphic_table(engine: Any, session: AsyncSession) -> None:
-    """AC-005-021-01: MorphPost and MorphVideo each have their own image row."""
+    """MorphPost and MorphVideo each have their own image row."""
     await _create_tables(engine)
     post = await MorphPost.create(title="Post with image")
     video = await MorphVideo.create(title="Video with image")
@@ -262,7 +257,7 @@ async def test_morph_many_resolves_non_id_primary_key(engine: Any, session: Asyn
 async def test_polymorphic_images_are_isolated_by_owner_type(
     engine: Any, session: AsyncSession
 ) -> None:
-    """AC-005-021-01: MorphOne does not return images belonging to a different owner type."""
+    """MorphOne does not return images belonging to a different owner type."""
     await _create_tables(engine)
     post = await MorphPost.create(title="Post")
     await MorphVideo.create(title="Video")

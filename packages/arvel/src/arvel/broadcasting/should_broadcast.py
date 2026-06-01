@@ -1,4 +1,4 @@
-"""ShouldBroadcast mixin (FR-013-009, ADR-055)."""
+"""ShouldBroadcast mixin."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Tests for facade `.fake()` helpers — FR-016-005..012."""
+"""Tests for facade `.fake()` helpers."""
 
 from __future__ import annotations
 

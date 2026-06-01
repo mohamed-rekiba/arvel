@@ -1,23 +1,21 @@
-"""WI-021 — Console hardening: bootstrap, Context expansion, real wire-up, honest deferral.
-
-Covers (red until Stage 3b):
-  FR-021-01  migrate drives real Alembic (returns N applied count, prints by name)
-  FR-021-02  migrate:rollback drives Alembic downgrade
-  FR-021-03  migrate:status lists every revision with applied/pending state
-  FR-021-04  db:seed runs the named seeder and reports row counts
-  FR-021-05  route:list resolves Router from container; honest "no routes" on empty
-  FR-021-06  cache:clear flushes bound store, honest failure when not registered
-  FR-021-07  cache:forget removes the key, idempotent semantics
-  FR-021-08  key:rotate honest deferral with tracking-issue pointer (exit 2)
-  FR-021-10  arvel entrypoint outside-project wrapper points to arvel-new
-  FR-021-17  discover_commands tolerates any Exception, logs offending entry-point
-  FR-021-18  arvel.console.bootstrap.bootstrap_framework_application + find_project_root
-  FR-021-19  Command.needs_application ClassVar opt-in; entrypoint walks-up & boots
-  FR-021-21  schedule:list and schedule:work honour user's Kernel.schedule via bootstrap
-  FR-021-22  shell command seeds REPL namespace with app/container/facades
-  FR-021-23  Context.warn / comment / alert / newline
-  FR-021-24  Command.call / call_silently delegate to Application.run
-  FR-021-27  cache_commands no longer swallows Exception in _clear/_forget
+"""Console hardening: bootstrap, Context expansion, real wire-up, honest deferral.
+migrate drives real Alembic (returns N applied count, prints by name)
+ migrate:rollback drives Alembic downgrade
+ migrate:status lists every revision with applied/pending state
+ db:seed runs the named seeder and reports row counts
+ route:list resolves Router from container; honest "no routes" on empty
+ cache:clear flushes bound store, honest failure when not registered
+ cache:forget removes the key, idempotent semantics
+ key:rotate honest deferral with tracking-issue pointer (exit 2)
+ arvel entrypoint outside-project wrapper points to arvel-new
+ discover_commands tolerates any Exception, logs offending entry-point
+ arvel.console.bootstrap.bootstrap_framework_application + find_project_root
+ Command.needs_application ClassVar opt-in; entrypoint walks-up & boots
+ schedule:list and schedule:work honour user's Kernel.schedule via bootstrap
+ shell command seeds REPL namespace with app/container/facades
+ Context.warn / comment / alert / newline
+ Command.call / call_silently delegate to Application.run
+ cache_commands no longer swallows Exception in _clear/_forget
 """
 
 from __future__ import annotations
@@ -34,7 +32,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-18 — arvel.console.bootstrap module
+# — arvel.console.bootstrap module
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -55,7 +53,7 @@ class TestBootstrapModule:
         assert find_project_root(tmp_path) == tmp_path
 
     def test_find_project_root_walks_up_to_four_ancestors(self, tmp_path: Path) -> None:
-        """NFR-021-06: walks up to 4 ancestors of start dir."""
+        """walks up to 4 ancestors of start dir."""
         from arvel.console.bootstrap import find_project_root
 
         (tmp_path / "bootstrap").mkdir()
@@ -67,7 +65,7 @@ class TestBootstrapModule:
         assert find_project_root(nested) == tmp_path
 
     def test_find_project_root_stops_at_depth_five(self, tmp_path: Path) -> None:
-        """NFR-021-06: does not walk infinitely; 5 ancestors deep is missed."""
+        """does not walk infinitely; 5 ancestors deep is missed."""
         from arvel.console.bootstrap import find_project_root
 
         (tmp_path / "bootstrap").mkdir()
@@ -134,7 +132,7 @@ class TestBootstrapModule:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-19 — Command.needs_application opt-in marker
+# — Command.needs_application opt-in marker
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -169,7 +167,7 @@ class TestNeedsApplicationMarker:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-23 — Context expansion
+# — Context expansion
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -211,7 +209,7 @@ class TestContextExpansion:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-24 — Command.call / call_silently
+# — Command.call / call_silently
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -303,7 +301,7 @@ class TestCommandCall:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-08 — key:rotate honest deferral
+# — key:rotate honest deferral
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -323,13 +321,13 @@ class TestKeyRotateHonestDeferral:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-06 / FR-021-07 / FR-021-27 — cache:clear / cache:forget honest behavior
+# / / — cache:clear / cache:forget honest behavior
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 class TestCacheCommandsHonest:
     def test_cache_clear_raises_when_facade_unbound(self) -> None:
-        """FR-021-06 + FR-021-27: bare-except swallow gone; failure surfaces."""
+        """+ : bare-except swallow gone; failure surfaces."""
         import asyncio
 
         from arvel.console.commands.cache_commands import clear
@@ -341,7 +339,7 @@ class TestCacheCommandsHonest:
             asyncio.run(clear(None))
 
     def test_cache_forget_raises_when_facade_unbound(self) -> None:
-        """FR-021-07 + FR-021-27: bare-except swallow gone; failure surfaces."""
+        """+ : bare-except swallow gone; failure surfaces."""
         import asyncio
 
         from arvel.console.commands.cache_commands import forget
@@ -354,7 +352,7 @@ class TestCacheCommandsHonest:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-17 — discover_commands tolerates any Exception
+# — discover_commands tolerates any Exception
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -483,7 +481,7 @@ class TestOutsideProjectWrapper:
 
 
 class TestInProjectBootstrap:
-    """Coverage for the in-project bootstrap dispatch path of ``main()``."""
+    """Coverage for the in-project bootstrap dispatch path of ``main``."""
 
     def _make_project(self, tmp_path: Path) -> Path:
         (tmp_path / "bootstrap").mkdir()
@@ -656,13 +654,13 @@ class TestInProjectBootstrap:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-21 — schedule:list / schedule:work honour user Kernel.schedule()
+# — schedule:list / schedule:work honour user Kernel.schedule()
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 class TestSchedulerHonoursUserApp:
     def test_schedule_list_command_opts_into_application(self) -> None:
-        """FR-021-19 + FR-021-21: command declares needs_application=True."""
+        """+ : command declares needs_application=True."""
         from arvel.console.commands.schedule_commands import ScheduleListCommand
 
         assert ScheduleListCommand.needs_application is True
@@ -675,7 +673,7 @@ class TestSchedulerHonoursUserApp:
     def test_schedule_list_resolves_user_schedule_when_app_bound(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """FR-021-21: when app is bound, schedule:list reads container Schedule."""
+        """when app is bound, schedule:list reads container Schedule."""
         from arvel.console import Context
         from arvel.console.commands.schedule_commands import ScheduleListCommand
         from arvel.scheduling import Schedule
@@ -787,7 +785,7 @@ class TestSchedulerHonoursUserApp:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-22 — shell seeds REPL namespace with framework facades
+# — shell seeds REPL namespace with framework facades
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -836,9 +834,9 @@ class TestShellNamespace:
             cmd.release_active_session()
 
     def test_bootstrap_app_omits_session_when_database_provider_missing(self) -> None:
-        """FR-021-22 + (this fix): graceful skip when no ``DatabaseServiceProvider``.
+        """+ (this fix): graceful skip when no ``DatabaseServiceProvider``.
 
-        CLI-only apps (no database wired up) should still get a working REPL —
+        CLI-only apps (no database wired up) should still get a working REPL
         just without the ``session`` binding. ``BindingResolutionError`` from
         ``container.make(async_sessionmaker[...])`` must be swallowed and the
         namespace returned cleanly.
@@ -866,12 +864,12 @@ class TestShellNamespace:
         """The core fix for the ``arvel tinker`` ``NoActiveSessionError`` regression.
 
         With ``DatabaseServiceProvider`` registered on the framework
-        ``Application``, ``build_namespace()`` MUST:
+        ``Application``, ``build_namespace`` MUST:
 
         1. Expose ``session`` in the REPL namespace.
         2. Push that same session onto the active-session ContextVar so
-           ``get_active_session()`` (and therefore ``User.first()`` & friends)
-           returns it inside the REPL.
+        ``get_active_session`` (and therefore ``User.first`` & friends)
+        returns it inside the REPL.
         """
         import os
 
@@ -946,7 +944,7 @@ class TestShellNamespace:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-05 — route:list resolves Router from container; honest empty table
+# — route:list resolves Router from container; honest empty table
 # ─────────────────────────────────────────────────────────────────────────────
 
 

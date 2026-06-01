@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class FileInfo:
-    """Lightweight descriptor passed to accepts_file callbacks (FR-050-25)."""
+    """Lightweight descriptor passed to accepts_file callbacks"""
 
     __slots__ = ("file_name", "mime_type")
 
@@ -30,8 +30,8 @@ class MediaCollection:
     - ``accept_mime_types([...])`` → reject files with non-matching MIME.
     - ``max_file_size(N)`` → reject files exceeding N bytes.
     - ``only_keep_latest(N)`` → prune oldest rows so at most N remain.
-    - ``use_fallback_url(url, conversion=None)`` → default URL when empty (FR-050-15).
-    - ``accepts_file(callback)`` → custom file acceptance callback (FR-050-25).
+    - ``use_fallback_url(url, conversion=None)`` → default URL when empty
+    - ``accepts_file(callback)`` → custom file acceptance callback
     """
 
     def __init__(
@@ -52,10 +52,10 @@ class MediaCollection:
         self.accept_mime_types_list: list[str] | None = None
         self.max_file_size_bytes: int | None = None
         self.keep_latest_n: int | None = None
-        # FR-050-15: per-collection fallback URLs
+        # per-collection fallback URLs
         self._fallback_url: str | None = None
         self._fallback_urls: dict[str, str] = {}
-        # FR-050-25: custom file acceptance callback
+        # custom file acceptance callback
         self._accepts_file_callback: Callable[[FileInfo], bool] | None = None
 
     def with_conversions(self, *conversions: Conversion) -> Self:
@@ -69,22 +69,22 @@ class MediaCollection:
         return self
 
     def use_conversions_disk(self, disk_name: str) -> Self:
-        """Store conversion derivatives on a separate disk (FR-046-03)."""
+        """Store conversion derivatives on a separate disk"""
         self.conversions_disk = disk_name
         return self
 
     def accept_mime_types(self, types: list[str]) -> Self:
-        """Restrict ingestion to the supplied MIME types (FR-046-07)."""
+        """Restrict ingestion to the supplied MIME types"""
         self.accept_mime_types_list = [t.lower() for t in types]
         return self
 
     def max_file_size(self, bytes_: int) -> Self:
-        """Reject files larger than ``bytes_`` (FR-046-07)."""
+        """Reject files larger than ``bytes_``"""
         self.max_file_size_bytes = bytes_
         return self
 
     def only_keep_latest(self, n: int) -> Self:
-        """Prune to the most-recent ``n`` files after each add (FR-046-12).
+        """Prune to the most-recent ``n`` files after each add
 
         Mutually exclusive with ``single_file=True``.
         """
@@ -95,7 +95,7 @@ class MediaCollection:
         return self
 
     def use_fallback_url(self, url: str, conversion: str | None = None) -> Self:
-        """Set a fallback URL returned when the collection is empty (FR-050-15).
+        """Set a fallback URL returned when the collection is empty
 
         ``conversion`` scopes the fallback to a specific conversion name.
         Call-site ``fallback=`` parameter takes precedence over this.
@@ -107,7 +107,7 @@ class MediaCollection:
         return self
 
     def accepts_file(self, callback: Callable[[FileInfo], bool]) -> Self:
-        """Register a callable that accepts or rejects each incoming file (FR-050-25).
+        """Register a callable that accepts or rejects each incoming file
 
         Receives a :class:`FileInfo` with ``.file_name`` and ``.mime_type``.
         Raises :class:`InvalidMimeTypeError` when callback returns ``False``.

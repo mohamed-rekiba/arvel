@@ -1,4 +1,4 @@
-"""WI-arvel-064 — Epic 049 Story 7: ``ResourceCollection(paginator)`` integration.
+"""``ResourceCollection(paginator)`` integration.
 
 When ``JsonResource.collection(...)`` is called with a paginator instead of a
 plain list, the resulting envelope is the paginator's ``{data, meta, links}``
@@ -58,9 +58,7 @@ def _parse(url: str) -> tuple[str, dict[str, list[str]]]:
     return base, parse_qs(parts.query)
 
 
-# ---------------------------------------------------------------------------
 # Paginator (page-number, has total)
-# ---------------------------------------------------------------------------
 
 
 class TestPaginatorCollection:
@@ -154,9 +152,7 @@ class TestPaginatorCollection:
         assert body["links"]["next"] is None
 
 
-# ---------------------------------------------------------------------------
 # SimplePaginator (no total, just prev/next)
-# ---------------------------------------------------------------------------
 
 
 class TestSimplePaginatorCollection:
@@ -196,9 +192,7 @@ class TestSimplePaginatorCollection:
         assert body["links"]["prev"] is None
 
 
-# ---------------------------------------------------------------------------
 # CursorPaginator (opaque cursor)
-# ---------------------------------------------------------------------------
 
 
 class TestCursorPaginatorCollection:
@@ -232,9 +226,7 @@ class TestCursorPaginatorCollection:
         assert body["links"]["next"] is None
 
 
-# ---------------------------------------------------------------------------
 # Regression — list-based collection still works unchanged
-# ---------------------------------------------------------------------------
 
 
 class TestListCollectionRegression:
@@ -252,10 +244,8 @@ class TestListCollectionRegression:
         assert body == {"data": [{"id": 1, "email": "a@x.io"}], "meta": {"count": 1}}
 
 
-# ---------------------------------------------------------------------------
 # Sanity: paginator path still accepts kwarg overrides for items_serializer
 # (i.e. nothing we add breaks the underlying Paginator surface).
-# ---------------------------------------------------------------------------
 
 
 def test_underlying_paginator_to_dict_still_callable_directly() -> None:

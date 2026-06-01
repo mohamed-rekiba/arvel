@@ -1,4 +1,4 @@
-"""EventDispatcher — registry + dispatch logic (FR-009-003..008)."""
+"""EventDispatcher — registry + dispatch logic."""
 
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ logger = Log.channel(__name__)
 class EventDispatcher:
     """In-process synchronous event dispatcher.
 
-    Listeners registered via ``listen()`` are called in registration order.
-    Listeners that implement ShouldQueue are dispatched via Bus (ADR-040).
-    Per-listener errors are caught and logged; remaining listeners still run (FR-009-005).
+    Listeners registered via ``listen`` are called in registration order.
+    Listeners that implement ShouldQueue are dispatched via Bus.
+    Per-listener errors are caught and logged; remaining listeners still run.
     """
 
     def __init__(self, container: Container | None = None) -> None:
@@ -28,7 +28,7 @@ class EventDispatcher:
         self._container = container
 
     def listen(self, event_cls: type[Event], listener_cls: type[Listener[Any]]) -> None:
-        """Register a listener for an event class. Idempotent (FR-009-003)."""
+        """Register a listener for an event class. Idempotent."""
         bucket = self._registry.setdefault(event_cls, [])
         if listener_cls not in bucket:
             bucket.append(listener_cls)
@@ -48,10 +48,10 @@ class EventDispatcher:
         return {event_cls: list(listeners) for event_cls, listeners in self._registry.items()}
 
     async def dispatch(self, event: Event) -> None:
-        """Dispatch event to all registered listeners (FR-009-004).
+        """Dispatch event to all registered listeners.
 
         If the event also mixes in ``ShouldBroadcast``, route it through the
-        Broadcast facade after sync listeners finish (FR-013-010, ADR-055).
+        Broadcast facade after sync listeners finish.
         """
         listeners = self._registry.get(type(event), [])
         for listener_cls in listeners:
@@ -90,7 +90,7 @@ class EventDispatcher:
             )
 
     async def _dispatch_queued(self, listener_cls: type[Listener[Any]], event: Event) -> None:
-        """Enqueue via Bus; fall back to inline if Bus is not bound (FR-009-008)."""
+        """Enqueue via Bus; fall back to inline if Bus is not bound."""
         from arvel.events.listener_job import ListenerJob
 
         try:

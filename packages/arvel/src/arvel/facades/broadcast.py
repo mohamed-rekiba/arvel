@@ -1,4 +1,4 @@
-"""Broadcast facade — classmethod API delegating to BroadcastManager (FR-013-007)."""
+"""Broadcast facade — classmethod API delegating to BroadcastManager."""
 
 from __future__ import annotations
 

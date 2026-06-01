@@ -1,4 +1,4 @@
-"""queue:prune-failed command (WI-arvel-023)."""
+"""queue:prune-failed command."""
 
 from __future__ import annotations
 

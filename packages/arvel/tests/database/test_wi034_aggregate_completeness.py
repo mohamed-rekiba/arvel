@@ -1,8 +1,7 @@
-"""WI-arvel-034 — Epic 007 Story 9: relationship aggregate completeness.
+"""Relationship aggregate completeness.
 
 with_avg/with_min/with_exists, pivot-aware with_sum, aggregate aliasing + constraint closures,
-and instance load_count/load_sum/load_aggregate/load_exists.
-"""
+and instance load_count/load_sum/load_aggregate/load_exists."""
 
 from __future__ import annotations
 

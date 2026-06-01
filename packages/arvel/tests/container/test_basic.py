@@ -1,4 +1,4 @@
-"""FR-001-010: Container basic API — bind, singleton, scoped, instance, alias, introspection."""
+"""Container basic API — bind, singleton, scoped, instance, alias, introspection."""
 
 from __future__ import annotations
 

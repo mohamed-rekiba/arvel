@@ -1,11 +1,4 @@
-"""QA-Pre tests for WI-arvel-043: framework query builder critical fixes.
-
-All tests are source-inspection tests (no DB, no I/O) that fail before
-the fixes are applied and pass after.
-
-Tests verify structural patterns in the source code that ensure correctness —
-they are not end-to-end tests, which require a live PostgreSQL connection.
-"""
+"""Framework query builder critical fixes."""
 
 from __future__ import annotations
 
@@ -47,7 +40,7 @@ def _func_body(src: str, func_name: str) -> str:
     return src[start:end] if end != -1 else src[start:]
 
 
-# ─── FR-001: lock_for_update in first() and sole() ───────────────────────────
+# ─── lock_for_update in first and sole ───────────────────────────
 
 
 class TestF001LockForUpdateInFirst:
@@ -82,7 +75,7 @@ class TestF001LockForUpdateInFirst:
         )
 
 
-# ─── FR-002: order_by("-column") descending shorthand ────────────────────────
+# ─── order_by("-column") descending shorthand ────────────────────────
 
 
 class TestF002OrderByDescShorthand:
@@ -118,7 +111,7 @@ class TestF002OrderByDescShorthand:
         assert "desc" in src, "F-002 not fixed: sqlalchemy.desc must be imported or referenced"
 
 
-# ─── FR-003: where_any() operator surface ────────────────────────────────────
+# ─── where_any operator surface ────────────────────────────────────
 
 
 class TestF003WhereAnyOperators:
@@ -160,7 +153,7 @@ class TestF003WhereAnyOperators:
         )
 
 
-# ─── FR-004: where_json_path() ───────────────────────────────────────────────
+# ─── where_json_path ───────────────────────────────────────────────
 
 
 class TestF004WhereJsonPath:
@@ -188,7 +181,7 @@ class TestF004WhereJsonPath:
         )
 
 
-# ─── FR-005: increment/decrement return rowcount ─────────────────────────────
+# ─── increment/decrement return rowcount ─────────────────────────────
 
 
 class TestF005IncrementDecrement:
@@ -216,13 +209,13 @@ class TestF005IncrementDecrement:
         )
 
 
-# ─── FR-006: Model.find() routes through QB ──────────────────────────────────
+# ─── Model.find routes through QB ──────────────────────────────────
 
 
 class TestF006ModelFindScopedRouting:
     def test_model_find_does_not_use_session_get(self) -> None:
         src = _src(_MODEL_PY)
-        # Find the find() classmethod body
+        # Find the find classmethod body
         start = src.find("async def find(cls, pk")
         end = src.find("\n    @classmethod", start + 1)
         if end == -1:
@@ -244,7 +237,7 @@ class TestF006ModelFindScopedRouting:
         )
 
 
-# ─── FR-007: Paginator.to_dict() and CursorPaginator.has_more ────────────────
+# ─── Paginator.to_dict and CursorPaginator.has_more ────────────────
 
 
 class TestF007PaginatorToDict:
@@ -269,7 +262,7 @@ class TestF007PaginatorToDict:
         assert "has_more" in src, "F-007 not fixed: CursorPaginator must expose a has_more property"
 
 
-# ─── FR-008: RBAC has_permission_to() eager-load guard ───────────────────────
+# ─── RBAC has_permission_to eager-load guard ───────────────────────
 
 
 class TestF008RbacEagerLoadGuard:

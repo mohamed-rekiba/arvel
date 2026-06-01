@@ -1,4 +1,4 @@
-"""RedisBus — cross-process fan-out for Reverb (FR-013-028, NFR-013-010, ADR-056)."""
+"""RedisBus — cross-process fan-out for Reverb."""
 
 from __future__ import annotations
 

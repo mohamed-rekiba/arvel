@@ -18,6 +18,7 @@ async def seed_catalog() -> dict[str, Any]:
     Intentionally has no DB_TX middleware so we can run seeder inserts
     in one transaction and REFRESH MATERIALIZED VIEW in a separate transaction
     after the data is committed (the view query cannot see uncommitted rows).
+
     """
     if env("APP_ENV", "production").lower() == "production":
         raise NotFoundException("Not found.")
@@ -38,6 +39,7 @@ async def seed_catalog() -> dict[str, Any]:
 async def refresh_catalog() -> dict[str, Any]:
     """Trigger an immediate refresh of the products_catalog materialized view.
 
+
     Used by ``make seed`` after ``arvel db:seed`` commits, since the refresh
     must run in a separate transaction to see the newly committed rows.
     Disabled in production.
@@ -50,6 +52,7 @@ async def refresh_catalog() -> dict[str, Any]:
 
 def register_test_routes() -> None:
     """Register test-only routes.
+
 
     Called from routes/api.py on every routing reload. Decorators would only
     fire on first import, so a fresh Application would silently lose these routes.

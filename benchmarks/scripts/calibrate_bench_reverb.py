@@ -1,7 +1,7 @@
 """WI-017 / FR-017-009 — calibrate bench-reverb CI thresholds.
 
 Runs the broadcasting benchmark N times locally, collects the per-run metrics,
-and prints the recommended CI gate values (1.5 x observed p99 per ADR-065).
+and prints the recommended CI gate values (1.5 x observed p99 per ADR-112).
 
 Usage:
     uv run python benchmarks/scripts/calibrate_bench_reverb.py --runs 50
@@ -10,7 +10,7 @@ Output goes to:
     stdout — human-readable summary
     benchmarks/scripts/calibration-results.json — machine-readable raw samples
 
-Rerun whenever the bench or runner changes; update ADR-065's table with the
+Rerun whenever the bench or runner changes; update ADR-112's table with the
 new numbers.
 """
 
@@ -129,7 +129,7 @@ def main() -> int:
         f"\n  publish_p99_ms     {summary['publish_p99_ms']['recommended_gate']:.3f} ms"
         f"\n  rss_delta_raw      {summary['rss_delta_raw']['recommended_gate']:.0f}"
         f"\n  heap_delta_mib     {summary['heap_delta_mib']['recommended_gate_mib']:.2f} MiB"
-        "\n\nUpdate ADR-065 with these values, then update the CI gate "
+        "\n\nUpdate ADR-112 with these values, then update the CI gate "
         "thresholds in .github/workflows/ci.yml."
     )
 

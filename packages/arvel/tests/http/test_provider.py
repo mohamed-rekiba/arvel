@@ -1,4 +1,4 @@
-"""FR-002-024, FR-002-025, FR-002-026 — HttpServiceProvider + into_asgi + serve."""
+"""HttpServiceProvider + into_asgi + serve."""
 
 from __future__ import annotations
 

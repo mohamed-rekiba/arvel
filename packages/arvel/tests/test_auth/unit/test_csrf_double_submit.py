@@ -1,7 +1,7 @@
-"""FR-028-16 — CSRF double-submit middleware (RED state). Closes FB-027-008.
+"""CSRF double-submit middleware (RED state).
 
-The middleware ships as ASGI-native (not BaseHTTPMiddleware) so framework
-exception handlers see CsrfMismatchException correctly.
+Ships ASGI-native (not BaseHTTPMiddleware) so framework exception handlers
+see CsrfMismatchException correctly.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-# ── test ASGI app ─────────────────────────────────────────────────────────────
+# test ASGI app
 
 
 async def _ok_handler(request: Request) -> JSONResponse:
@@ -85,7 +85,7 @@ async def test_exempt_paths_skip_check() -> None:
 
 @pytest.mark.asyncio
 async def test_problemdetailshandler_sees_exception() -> None:
-    """Closes FB-027-008 — CsrfMismatchException is a concrete exception class."""
+    """Closes — CsrfMismatchException is a concrete exception class."""
     exc = CsrfMismatchException("CSRF token mismatch.")
     assert exc.status_code == 403
     assert exc.code == "CSRF_MISMATCH"

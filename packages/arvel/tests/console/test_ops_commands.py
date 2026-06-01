@@ -1,24 +1,4 @@
-"""S-005-04..09 — Operational commands.
-
-AC covered:
-  AC-005-006-01  migrate runs pending migrations
-  AC-005-006-02  migrate exits 0 when nothing to migrate
-  AC-005-007-01  migrate:rollback reverts last batch
-  AC-005-008-01  migrate:status lists all migrations with applied/pending status
-  AC-005-009-01  route:list exits 0 and outputs a table
-  AC-005-009-02  route:list shows method, path, handler columns
-  AC-005-011-01  db:seed runs the DatabaseSeeder by default
-  AC-005-011-02  db:seed --seeder=<Name> runs the named seeder class
-  AC-005-012-01  key:rotate exits 2 when APP_ENV=production and --force not set
-  AC-005-012-02  key:rotate exits 0 on success and prints RotationResult
-  AC-005-012-03  key:rotate --force bypasses APP_ENV guard
-  SEC-005-001    key:rotate production guard
-  AC-005-013-01  about exits 0 and prints arvel version
-  AC-005-013-02  about prints Python version
-  AC-005-014-01  shell exits 0 with --dry-run flag
-  AC-005-014-02  shell uses IPython when available, falls back to code.interact
-  SEC-005-002    shell does not bootstrap Application in unsafe environment
-"""
+"""Operational console commands — migrate, route:list, key:rotate, about, shell."""
 
 from __future__ import annotations
 
@@ -43,11 +23,11 @@ def _app(*cmds: Command) -> Application:
     return Application(commands=list(cmds))
 
 
-# ─── AC-005-006-01 / AC-005-006-02: migrate ──────────────────────────────────
+# ─── migrate ──────────────────────────────────
 
 
 def test_migrate_exits_zero_with_no_pending(tmp_path: Any) -> None:
-    """AC-005-006-02: migrate exits 0 when there are no pending migrations."""
+    """migrate exits 0 when there are no pending migrations."""
     app = _app(MigrateCommand())
     with patch(
         "arvel.console.commands.migrate.MigrateCommand._run_migrations", new_callable=AsyncMock
@@ -58,7 +38,7 @@ def test_migrate_exits_zero_with_no_pending(tmp_path: Any) -> None:
 
 
 def test_migrate_calls_run_migrations(tmp_path: Any) -> None:
-    """AC-005-006-01: migrate invokes the migration runner."""
+    """migrate invokes the migration runner."""
     app = _app(MigrateCommand())
     with patch(
         "arvel.console.commands.migrate.MigrateCommand._run_migrations", new_callable=AsyncMock
@@ -69,15 +49,15 @@ def test_migrate_calls_run_migrations(tmp_path: Any) -> None:
 
 
 # NOTE: migrate:rollback / migrate:status / db:seed real-wire-up coverage
-# lives in tests/console/test_migrate_db_seed_real.py (WI-arvel-022).
+# lives in tests/console/test_migrate_db_seed_real.py.
 # The old stub-era mock tests were removed when the real Migrator landed.
 
 
-# ─── AC-005-009-01 / AC-005-009-02: route:list ───────────────────────────────
+# ─── route:list ───────────────────────────────
 
 
 def test_route_list_exits_zero() -> None:
-    """AC-005-009-01: route:list exits 0."""
+    """route:list exits 0."""
     app = _app(RouteListCommand())
     with patch("arvel.console.commands.route_list.RouteListCommand.get_routes") as mock:
         mock.return_value = []
@@ -86,7 +66,7 @@ def test_route_list_exits_zero() -> None:
 
 
 def test_route_list_shows_method_path_handler_columns() -> None:
-    """AC-005-009-02: route:list table includes method, path, handler columns."""
+    """route:list table includes method, path, handler columns."""
     from arvel.routing import RouteSpec
 
     async def _stub_handler() -> None: ...
@@ -108,18 +88,16 @@ def test_route_list_shows_method_path_handler_columns() -> None:
 
 
 # NOTE: db:seed coverage with real seeder discovery lives in
-# tests/console/test_migrate_db_seed_real.py (WI-arvel-022).
+# tests/console/test_migrate_db_seed_real.py.
 
 
-# ─── SEC-005-001 / FR-021-08: key:rotate ────────────────────────────────────
-# WI-021 / ADR — key:rotate is honest-deferred. The previous "rotate then
-# print RotationResult" tests assumed a working implementation; that work is
-# tracked in FB-022-002. Only the production guard and the deferral exit
-# code are validated here.
+# ─── key:rotate ────────────────────────────────────
+# key:rotate is honest-deferred — rotation isn't implemented yet.
+# Only the production guard and deferral exit code are validated here.
 
 
 def test_key_rotate_exits_2_in_production_without_force(clean_env: Any) -> None:
-    """SEC-005-001: key:rotate exits 2 when APP_ENV=production."""
+    """key:rotate exits 2 when APP_ENV=production."""
     os.environ["APP_ENV"] = "production"
     app = _app(KeyRotateCommand())
     result = runner.invoke(
@@ -132,7 +110,7 @@ def test_key_rotate_exits_2_in_production_without_force(clean_env: Any) -> None:
 def test_key_rotate_exits_2_outside_production_with_deferral_message(
     clean_env: Any,
 ) -> None:
-    """FR-021-08: outside production, exits 2 with FB-022-002 pointer (no false success)."""
+    """outside production, exits 2 with pointer (no false success)."""
     os.environ["APP_ENV"] = "local"
     app = _app(KeyRotateCommand())
     result = runner.invoke(
@@ -143,25 +121,25 @@ def test_key_rotate_exits_2_outside_production_with_deferral_message(
     assert "FB-022-002" in (result.stderr or result.output)
 
 
-# ─── AC-005-013-01 / AC-005-013-02: about ───────────────────────────────────
+# ─── about ───────────────────────────────────
 
 
 def test_about_exits_zero() -> None:
-    """AC-005-013-01: about exits 0."""
+    """about exits 0."""
     app = _app(AboutCommand())
     result = runner.invoke(app.typer_app, ["about"])
     assert result.exit_code == 0
 
 
 def test_about_prints_arvel_version() -> None:
-    """AC-005-013-01: about prints the arvel version string."""
+    """about prints the arvel version string."""
     app = _app(AboutCommand())
     result = runner.invoke(app.typer_app, ["about"])
     assert "arvel" in result.output.lower()
 
 
 def test_about_prints_python_version() -> None:
-    """AC-005-013-02: about prints the Python version."""
+    """about prints the Python version."""
     import sys
 
     app = _app(AboutCommand())
@@ -170,20 +148,20 @@ def test_about_prints_python_version() -> None:
     assert major_minor in result.output
 
 
-# ─── AC-005-014-01 / AC-005-014-02 / SEC-005-002: shell ─────────────────────
+# ─── shell ─────────────────────
 
 
 def test_shell_dry_run_exits_zero() -> None:
-    """AC-005-014-01: shell --dry-run exits 0 without launching a REPL."""
+    """shell --dry-run exits 0 without launching a REPL."""
     app = _app(ShellCommand())
     result = runner.invoke(app.typer_app, ["shell", "--dry-run"])
     assert result.exit_code == 0
 
 
 def test_shell_uses_ipython_when_available(monkeypatch: Any) -> None:
-    """AC-005-014-02: shell uses IPython.embed() with the built namespace as user_ns.
+    """shell uses IPython.embed with the built namespace as user_ns.
 
-    The kwarg name matters: IPython.embed() only honours ``user_ns``, not
+    The kwarg name matters: IPython.embed only honours ``user_ns``, not
     ``local_ns`` — passing the wrong name silently drops the namespace and
     leaves the REPL to fall back to the caller's frame globals.
     """
@@ -208,7 +186,7 @@ def test_shell_uses_ipython_when_available(monkeypatch: Any) -> None:
 
 
 def test_shell_falls_back_to_code_interact_without_ipython(monkeypatch: Any) -> None:
-    """AC-005-014-02: shell falls back to code.interact() when IPython is absent."""
+    """shell falls back to code.interact when IPython is absent."""
     with (
         patch.dict("sys.modules", {"IPython": None}),
         patch("arvel.console.commands.shell.ShellCommand.build_namespace") as boot,

@@ -1,4 +1,4 @@
-"""migrate:reset command (WI-arvel-023)."""
+"""migrate:reset command."""
 
 from __future__ import annotations
 

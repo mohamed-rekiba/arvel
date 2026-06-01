@@ -3,12 +3,12 @@
 Role name == slug (snake_case) for direct `has_role()` compatibility.
 
 Roles:
-- super_admin  — full access, including force-delete and user management
-- admin        — everything except force-delete
+- super_admin — full access, including force-delete and user management
+- admin — everything except force-delete
 - catalog_manager — products, categories, vendors, media
 - order_manager — order operations
 - support_agent — read-only admin + order status updates
-- customer     — storefront only; no admin access
+- customer — storefront only; no admin access
 
 Permissions follow the format ``<resource>.<action>``.
 """

@@ -1,4 +1,4 @@
-"""Tests for QueueConfig — NFR-008-001..006."""
+"""Tests for QueueConfig"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 
 class TestQueueConfig:
-    """NFR-008-001: Configuration via env vars with QUEUE_ prefix."""
+    """Configuration via env vars with QUEUE_ prefix."""
 
     def test_defaults(self) -> None:
         config = QueueConfig()

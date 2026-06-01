@@ -112,7 +112,7 @@ class PostgresEndpoint:
 
 @dataclass(frozen=True)
 class RabbitmqEndpoint:
-    """Connection details for the RabbitMQ emulator (WI-018)."""
+    """Connection details for the RabbitMQ emulator ()."""
 
     url: str
     host: str
@@ -436,8 +436,7 @@ def mysql_endpoint() -> Iterator[MysqlEndpoint]:
 
 @pytest.fixture(scope="session")
 def rabbitmq_endpoint() -> Iterator[RabbitmqEndpoint]:
-    """Boot a RabbitMQ container speaking AMQP, yield connection details (WI-018).
-
+    """Boot a RabbitMQ container speaking AMQP, yield connection details.
     The image is ``rabbitmq:<X>-management-alpine`` pinned in :mod:`._images`
     as :data:`IMAGE_RABBITMQ`. Image variant ``management-alpine`` adds the
     HTTP management plugin (port 15672) so debugging tests can poke the
@@ -533,8 +532,7 @@ def _wait_for_mysql(
 
 
 def _wait_for_rabbitmq(host: str, mgmt_port: int, *, timeout: float = 60.0) -> None:
-    """Poll the RabbitMQ management API until it accepts requests (WI-018).
-
+    """Poll the RabbitMQ management API until it accepts requests.
     The log strategy catches Erlang startup but the AMQP listener and the
     management plugin can lag by a few hundred ms. Polling the management
     health endpoint here closes the race before tests start dialling AMQP.

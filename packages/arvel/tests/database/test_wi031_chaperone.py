@@ -1,4 +1,4 @@
-"""WI-arvel-031 — Epic 007 Story 6: chaperone (inverse parent hydration)."""
+"""Chaperone (inverse parent hydration)."""
 
 from __future__ import annotations
 
@@ -141,7 +141,7 @@ class TestInverseInferenceErrors:
     async def test_uninferable_inverse_raises(
         self, engine: AsyncEngine, session: AsyncSession
     ) -> None:
-        # Kids point back to nothing → chaperone() can't infer the inverse relation.
+        # Kids point back to nothing → chaperone can't infer the inverse relation.
         await _setup(engine)
         with pytest.raises(UnknownRelationError):
             Wi031Orphanage.with_({"kids": lambda q: q.chaperone()})

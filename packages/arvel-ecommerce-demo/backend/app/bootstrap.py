@@ -1,6 +1,6 @@
 """Async application factory for the e-commerce demo integration tests.
 
-Production runs via ``public/asgi.py``.  Integration tests import this
+Production runs via ``public/asgi.py``. Integration tests import this
 module and call ``await create_app()`` which boots the framework in-process
 and returns an :class:`EcommerceApp` that is:
 
@@ -37,6 +37,7 @@ class EcommerceApp:
 
     async def seed(self, name: str) -> None:
         """Run the named seeder group in-process.
+
 
         Wrapped in DB.transaction() so every upsert shares one committed
         session — without this, each DB.select() would create its own

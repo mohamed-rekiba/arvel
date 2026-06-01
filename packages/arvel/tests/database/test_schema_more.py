@@ -16,8 +16,7 @@ class _Rec:
 
     Implements the six `_Executor` protocol methods explicitly so pyright
     sees a concrete protocol match, and falls back to `__getattr__` for
-    non-protocol methods like `rename_table` that Schema.rename duck-types.
-    """
+    non-protocol methods like `rename_table` that Schema.rename duck-types."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = []

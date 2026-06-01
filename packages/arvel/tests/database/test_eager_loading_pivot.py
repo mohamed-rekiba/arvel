@@ -1,10 +1,9 @@
-"""Batched eager-loading for MorphToMany / BelongsToMany via ``with_()``.
+"""Batched eager-loading for MorphToMany / BelongsToMany via ``with_``.
 
 Eloquent parity: ``with_("tags")`` defers, then loads every parent's pivot
 relation in a single ``WHERE pivot.owner_id IN (...)`` query (plus a
 ``morph_type`` filter for MorphToMany), so an N-row list never fans out into
-N per-row lookups.
-"""
+N per-row lookups."""
 
 from __future__ import annotations
 

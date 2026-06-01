@@ -1,10 +1,10 @@
-"""FR-013-015 — BroadcastServiceProvider."""
+"""BroadcastServiceProvider."""
 
 from __future__ import annotations
 
 
 def test_provider_registers_manager_and_facade() -> None:
-    """FR-013-015 AC1+AC2: register() binds BroadcastManager and wires the Broadcast facade."""
+    """+: register binds BroadcastManager and wires the Broadcast facade."""
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.manager import BroadcastManager
     from arvel.container import Container
@@ -28,7 +28,7 @@ def test_provider_registers_manager_and_facade() -> None:
 
 
 def test_provider_registers_console_commands() -> None:
-    """FR-013-015 AC3: provider.commands() returns the reverb:start command."""
+    """provider.commands returns the reverb:start command."""
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.container import Container
     from arvel.providers.broadcast_provider import BroadcastServiceProvider
@@ -47,7 +47,7 @@ def test_provider_registers_console_commands() -> None:
 
 
 def test_provider_uses_default_config_when_unbound() -> None:
-    """FR-013-015 AC4: provider gracefully creates default BroadcastConfig when not bound."""
+    """provider gracefully creates default BroadcastConfig when not bound."""
     from arvel.broadcasting.config import BroadcastConfig
     from arvel.broadcasting.manager import BroadcastManager
     from arvel.container import Container

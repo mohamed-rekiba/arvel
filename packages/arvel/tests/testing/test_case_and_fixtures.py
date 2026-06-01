@@ -1,4 +1,4 @@
-"""Tests for ArvelTestCase + pytest fixtures — FR-016-001, FR-016-003."""
+"""Tests for ArvelTestCase + pytest fixtures."""
 
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ class TestArvelTestCase:
     async def test_setup_creates_app_and_client(self) -> None:
         """asyncSetUp boots the app and binds a client.
 
-        WI-017 / FR-017-002: the defensive skip that previously masked the
-        FB-016-001 qa_post pollution has been removed. If this test fails,
+        the defensive skip that previously masked the
+        qa_post pollution has been removed. If this test fails,
         there is a real bug — either in ArvelTestCase or in a sibling test
         that leaked global state.
         """

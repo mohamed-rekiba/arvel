@@ -1,4 +1,4 @@
-"""WI-019 FB-018-002: poison-pill envelope audit logging.
+"""Poison-pill envelope audit logging.
 
 When a queue driver pops a payload that fails ``JobEnvelope.from_json``,
 the worker swallows the envelope (returns None) so the loop stays alive,

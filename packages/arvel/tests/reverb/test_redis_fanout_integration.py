@@ -1,5 +1,4 @@
-"""Real-Redis integration test for ``RedisBus`` — FR-013-028, ADR-056.
-
+"""Real-Redis integration test for ``RedisBus``
 The existing ``test_redis_fanout.py`` uses ``fakeredis`` to assert in-process
 behaviour. This file boots the real Redis container and verifies the
 cross-process fan-out actually traverses Redis pub/sub: two ``RedisBus``

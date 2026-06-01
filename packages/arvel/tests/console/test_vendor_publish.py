@@ -1,4 +1,4 @@
-"""Tests for the vendor:publish command + ServiceProvider.publishes() API."""
+"""Tests for the vendor:publish command + ServiceProvider.publishes API."""
 
 from __future__ import annotations
 

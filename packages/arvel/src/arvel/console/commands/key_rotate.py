@@ -1,10 +1,9 @@
-"""key:rotate command — honest deferral until FB-022-002 lands.
+"""key:rotate command — honest deferral until key rotation ships.
 
 The real implementation needs to walk every ``EncryptedType`` column across
 the user's mapped tables, re-encrypt each row's payload with the new key, and
 update the row in a transactional batch. That work — including the schema
-discovery, batching strategy, and production guard semantics — is scheduled
-for FB-022-002 and intentionally NOT shipped in WI-021.
+discovery, batching strategy, and production guard semantics — is not shipped yet.
 
 This command exists at the entry-point so users discover it via
 ``arvel --help`` and get an actionable pointer rather than a missing-command

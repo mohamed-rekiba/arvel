@@ -1,16 +1,16 @@
-"""WI-arvel-022 — Error-path coverage for migrate / db_seed via the CLI surface.
+"""Error-path coverage for migrate / db_seed via the CLI surface.
 
 Every branch is exercised by invoking the actual Typer commands; no
 private-helper imports. This keeps coverage honest without violating
 `reportPrivateUsage`.
 
 Branches covered:
-  - migrate / migrate:rollback / migrate:status: bootstrap → exit 2
-  - db:seed: bootstrap → exit 2, empty name → exit 2
-  - db:seed: app.base_path missing/string/callable + invalid type
-  - db:seed: seeder file unloadable (syntax error) → exit 2 with stderr
-  - db:seed: seeder class wrong type (not a Seeder subclass) → exit 2
-  - migrate: container missing / container.make missing / wrong type → exit 2
+ - migrate / migrate:rollback / migrate:status: bootstrap → exit 2
+ - db:seed: bootstrap → exit 2, empty name → exit 2
+ - db:seed: app.base_path missing/string/callable + invalid type
+ - db:seed: seeder file unloadable (syntax error) → exit 2 with stderr
+ - db:seed: seeder class wrong type (not a Seeder subclass) → exit 2
+ - migrate: container missing / container.make missing / wrong type → exit 2
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ class _NoContainerApp:
 
 
 class _NoMakeApp:
-    """Framework app whose container has no `.make()`."""
+    """Framework app whose container has no `.make`."""
 
     def __init__(self) -> None:
         class _Container:
@@ -92,7 +92,7 @@ class _NoMakeApp:
 
 
 class _WrongTypeApp:
-    """Framework app whose container.make() returns something that isn't an AsyncEngine."""
+    """Framework app whose container.make returns something that isn't an AsyncEngine."""
 
     def __init__(self) -> None:
         class _Container:
@@ -420,7 +420,7 @@ async def up(schema: Schema) -> None:
 
 
 def test_migrate_rollback_body_failure_exits_1(tmp_path: Path, engine: AsyncEngine) -> None:
-    """A migration with a raising down() → MigrationFailedError → exit 1."""
+    """A migration with a raising down → MigrationFailedError → exit 1."""
     (tmp_path / "database" / "migrations").mkdir(parents=True)
     (tmp_path / "database" / "migrations" / "2026_01_01_raising.py").write_text(_RAISING_DOWN)
 
@@ -438,7 +438,7 @@ def test_migrate_rollback_body_failure_exits_1(tmp_path: Path, engine: AsyncEngi
 
 
 def test_migrate_rollback_file_missing_down_exits_1(tmp_path: Path, engine: AsyncEngine) -> None:
-    """Migration applied without down() → MigrationFileInvalidError on rollback → exit 1."""
+    """Migration applied without down → MigrationFileInvalidError on rollback → exit 1."""
     (tmp_path / "database" / "migrations").mkdir(parents=True)
     (tmp_path / "database" / "migrations" / "2026_01_01_no_down.py").write_text(
         _MIGRATION_MISSING_DOWN

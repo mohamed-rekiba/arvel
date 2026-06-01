@@ -1,4 +1,4 @@
-"""FR-002-010, FR-002-011, FR-002-012 — JsonResource + ResourceCollection + opt-in schemas."""
+"""JsonResource + ResourceCollection + opt-in schemas."""
 
 from __future__ import annotations
 

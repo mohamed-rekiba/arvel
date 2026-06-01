@@ -1,4 +1,4 @@
-"""Epic 001 Story 2 — session-scoped log context binding."""
+"""session-scoped log context binding."""
 
 from __future__ import annotations
 

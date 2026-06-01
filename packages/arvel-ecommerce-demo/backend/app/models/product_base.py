@@ -1,17 +1,17 @@
 """ProductBase — shared foundation for Product and ProductCatalog.
 
-``ProductMediaMixin``  — HasMedia subclass with the catalog image-conversion config.
-``ProductBase``        — Abstract SQLAlchemy mixin: every column, relation, cast, and
+``ProductMediaMixin`` — HasMedia subclass with the catalog image-conversion config.
+``ProductBase`` — Abstract SQLAlchemy mixin: every column, relation, cast, and
                          behaviour shared between the writable ``Product`` table model
                          and the read-only ``ProductCatalog`` view model.
 
 Columns NOT declared here and why:
-  ``created_at`` / ``updated_at``  Product inherits these via ``Timestamps``; declaring
+  ``created_at`` / ``updated_at`` Product inherits these via ``Timestamps``; declaring
                                    them here would create a duplicate-column conflict.
                                    PublishedProduct declares them directly (nullable,
                                    because the view JOIN can yield NULLs).
 
-  ``status``   ``@declared_attr`` maps to a generic string column; ``Product``
+  ``status`` ``@declared_attr`` maps to a generic string column; ``Product``
                            overrides with the Enum-typed ``enum()`` column. The view exposes
                            the raw ``p.status`` value from the ``products`` table.
 
@@ -66,6 +66,7 @@ class ProductMediaMixin(HasMedia):
 
 class ProductBase(ProductMediaMixin, TranslatableMixin, MappedAsDataclass):
     """Abstract base for Product and PublishedProduct.
+
 
     Uses ``declared_attr`` so each concrete mapper gets its own Column /
     Relationship instance while the declaration lives once. Extends

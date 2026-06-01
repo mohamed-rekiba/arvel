@@ -1,4 +1,4 @@
-"""Failing tests for WI-arvel-044: Framework Parity stories.
+"""Failing tests for Framework Parity stories.
 
 Run BEFORE implementation — all tests here MUST FAIL (RED state).
 """
@@ -29,7 +29,7 @@ def _bare_query_builder() -> QueryBuilder[Any]:
     return QueryBuilder[Any](object, stmt=select(text("1")))
 
 
-# ──────────────────────────── Story 3: Named route URL generation ─────────────
+# Named route URL generation
 
 
 class TestStory3NamedRoutes:
@@ -72,9 +72,6 @@ class TestStory3NamedRoutes:
 
         url = route_helper("orders.items.show", order_id=1, item_id=2)
         assert url == "/orders/1/items/2"
-
-
-# ──────────────────────────── Story 4: Container.call() ──────────────────────
 
 
 class TestStory4ContainerCall:
@@ -123,7 +120,7 @@ class TestStory4ContainerCall:
         assert result == "async_result"
 
 
-# ──────────────────────────── Story 6: abort helpers ─────────────────────────
+# abort helpers
 
 
 class TestStory6AbortHelpers:
@@ -180,7 +177,7 @@ class TestStory6AbortHelpers:
         assert exc_info.value.status_code == 403
 
 
-# ──────────────────────────── Story 8: model_serialize datetime ───────────────
+# model_serialize datetime
 
 
 class TestStory8ModelSerializeDatetime:
@@ -229,7 +226,7 @@ class TestStory8ModelSerializeDatetime:
         assert result["name"] == "Alice"
 
 
-# ──────────────────────────── Story 9 (partial): shared_lock FOR SHARE ───────
+# partial): shared_lock FOR SHARE
 
 
 class TestStory9SharedLock:
@@ -281,7 +278,7 @@ class TestStory9SharedLock:
         assert "FOR SHARE" in sql
 
 
-# ──────────────────────────── Story 11: first_or_create / update_or_create ───
+# first_or_create / update_or_create
 
 
 class TestStory11UpsertHelpers:
@@ -407,7 +404,7 @@ class TestStory10WhereJsonContains:
         assert hasattr(QueryMixin, "where_json_contains")
 
 
-# ──────────────────────────── Story 12: JsonResource helpers ─────────────────
+# JsonResource helpers
 
 
 class TestStory12JsonResourceHelpers:
@@ -455,7 +452,7 @@ class TestStory12JsonResourceHelpers:
 
         resource_obj = MagicMock(spec=["id"])
         resource_obj.id = 1
-        # 'category' not in __dict__ — not loaded
+        #'category' not in __dict__ — not loaded
         resource_obj.__dict__ = {"id": 1}
         res = MyResource(resource_obj)
         result = res.to_dict(request=None)
@@ -517,7 +514,7 @@ class TestStory12JsonResourceHelpers:
         assert "secret" not in result
 
 
-# ──────────────────────────── Story 14: Throttle fix ────────────────────────
+# Throttle fix
 
 
 class TestStory14ThrottleFix:
@@ -556,7 +553,7 @@ class TestStory14ThrottleFix:
         assert "X-RateLimit-Limit" in response.headers
 
 
-# ──────────────────────────── Story 16: Queued notifications ─────────────────
+# Queued notifications
 
 
 class TestStory16QueuedNotifications:

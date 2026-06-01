@@ -1,7 +1,4 @@
-"""Tests for arvel-permission (Spatie Permission v7 parity).
-
-Maps to FR-025-04 .. FR-025-09 and the related NFRs.
-"""
+"""Core API surface and Spatie Permission v7 parity checks."""
 
 from __future__ import annotations
 
@@ -37,7 +34,7 @@ async def session_factory(
 
 
 def test_role_and_permission_models_have_unique_per_guard_name() -> None:
-    """FR-025-06: Role/Permission unique on (name, guard_name)."""
+    """Role and Permission are unique on (name, guard_name)."""
     from arvel_permission import Permission, Role
     from sqlalchemy import Table, UniqueConstraint
 
@@ -56,7 +53,7 @@ def test_role_and_permission_models_have_unique_per_guard_name() -> None:
 
 
 def test_has_roles_assign_remove_sync() -> None:
-    """FR-025-07: HasRoles exposes the full mixin contract."""
+    """HasRoles exposes assign/remove/sync and has_* helpers."""
     from arvel_permission import HasRoles
 
     for method in (
@@ -72,7 +69,7 @@ def test_has_roles_assign_remove_sync() -> None:
 
 
 def test_has_permissions_lifecycle() -> None:
-    """FR-025-07: HasPermissions methods exist and follow Spatie shape."""
+    """HasPermissions methods exist and follow Spatie shape."""
     from arvel_permission import HasPermissions
 
     for method in (
@@ -92,7 +89,7 @@ def test_has_permissions_lifecycle() -> None:
 async def test_has_role_is_guard_scoped(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """FR-025-07: roles in different guards are not interchangeable."""
+    """Roles in different guards are not interchangeable."""
     from arvel_permission import GuardMismatchError
 
     async with session_factory() as session, use_session(session):
@@ -109,7 +106,7 @@ async def test_has_role_is_guard_scoped(
 
 
 def test_permission_service_provider_registers_with_gate() -> None:
-    """FR-025-08: PermissionServiceProvider.boot wires permissions into Gate."""
+    """PermissionServiceProvider.boot wires permissions into Gate."""
     from arvel_permission import PermissionServiceProvider
 
     assert hasattr(PermissionServiceProvider, "boot")
@@ -117,7 +114,7 @@ def test_permission_service_provider_registers_with_gate() -> None:
 
 
 def test_registrar_caches_lookups_and_invalidates_on_refresh() -> None:
-    """FR-025-09: PermissionRegistrar caches and supports refresh_cache."""
+    """PermissionRegistrar caches lookups and supports refresh_cache."""
     from arvel_permission import PermissionRegistrar
 
     registrar = PermissionRegistrar()
@@ -132,7 +129,7 @@ def test_registrar_caches_lookups_and_invalidates_on_refresh() -> None:
 
 
 def test_public_api_exports() -> None:
-    """FR-025-05: public symbols importable from arvel_permission root."""
+    """Public symbols are importable from the arvel_permission root."""
     import arvel_permission
 
     for name in (

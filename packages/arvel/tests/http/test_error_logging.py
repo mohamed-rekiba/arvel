@@ -1,4 +1,4 @@
-"""Epic 001 Story 6 — unhandled exceptions log through the Log facade with context."""
+"""unhandled exceptions log through the Log facade with context."""
 
 from __future__ import annotations
 

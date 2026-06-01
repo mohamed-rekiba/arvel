@@ -1,5 +1,5 @@
 """
-FR-007-051..055 — guest / verified / can middleware.
+guest / verified / can middleware.
 Tests import from arvel.auth.middleware.* → red state.
 """
 
@@ -36,7 +36,7 @@ def _gate_allow_all(_user: Any) -> bool:
     return True
 
 
-# ─── FR-007-051: GuestMiddleware redirects authenticated users ────────────────
+# GuestMiddleware redirects authenticated users
 
 
 @pytest.mark.asyncio
@@ -64,7 +64,7 @@ async def test_guest_middleware_allows_unauthenticated_through() -> None:
     assert result == "next_called"
 
 
-# ─── FR-007-052: VerifiedMiddleware blocks unverified users ──────────────────
+# VerifiedMiddleware blocks unverified users
 
 
 @pytest.mark.asyncio
@@ -96,7 +96,7 @@ async def test_verified_middleware_blocks_unverified_user() -> None:
         await mw.handle(request, _call_next)
 
 
-# ─── FR-007-053: CanMiddleware enforces gate ability ─────────────────────────
+# CanMiddleware enforces gate ability
 
 
 @pytest.mark.asyncio
@@ -130,7 +130,7 @@ async def test_can_middleware_raises_when_gate_denies() -> None:
         await mw.handle(request, _call_next)
 
 
-# ─── FR-007-054: CanMiddleware raises Unauthenticated if no user ──────────────
+# CanMiddleware raises Unauthenticated if no user
 
 
 @pytest.mark.asyncio
@@ -176,7 +176,7 @@ async def test_can_middleware_resolves_gate_from_request_container() -> None:
     assert result == "next_called"
 
 
-# ─── FR-007-055: Auth middleware attaches user to request.state.user ─────────
+# Auth middleware attaches user to request.state.user
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,4 @@
-"""FR-001-005: env() typed wrapper."""
+"""env() typed wrapper."""
 
 from __future__ import annotations
 

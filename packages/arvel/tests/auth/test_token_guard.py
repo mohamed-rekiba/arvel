@@ -1,5 +1,5 @@
 """
-FR-007-020..027 — TokenGuard (Sanctum-style personal access tokens).
+TokenGuard (Sanctum-style personal access tokens).
 Tests import from arvel.auth.guards.token → red state.
 """
 
@@ -59,7 +59,7 @@ class _FakeRequest:
             self.headers["authorization"] = authorization
 
 
-# ─── FR-007-020: resolves user from valid token ───────────────────────────────
+# resolves user from valid token
 
 
 @pytest.mark.asyncio
@@ -94,7 +94,7 @@ async def test_token_guard_returns_none_when_no_authorization() -> None:
     assert await guard.user(_FakeRequest()) is None
 
 
-# ─── FR-007-021: uses hmac.compare_digest for timing safety ──────────────────
+# uses hmac.compare_digest for timing safety
 
 
 def test_token_guard_uses_timing_safe_comparison(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -110,7 +110,7 @@ def test_token_guard_uses_timing_safe_comparison(monkeypatch: pytest.MonkeyPatch
     assert "compare_digest" in text, "TokenGuard must use hmac.compare_digest"
 
 
-# ─── FR-007-022: expired token returns None ───────────────────────────────────
+# expired token returns None
 
 
 @pytest.mark.asyncio
@@ -136,7 +136,7 @@ async def test_token_guard_rejects_expired_token() -> None:
     assert await guard.user(request) is None
 
 
-# ─── FR-007-023: unknown token returns None ───────────────────────────────────
+# unknown token returns None
 
 
 @pytest.mark.asyncio
@@ -151,7 +151,7 @@ async def test_token_guard_returns_none_for_unknown_token() -> None:
     assert await guard.user(request) is None
 
 
-# ─── FR-007-024: last_used_at updated on successful auth ─────────────────────
+# last_used_at updated on successful auth
 
 
 @pytest.mark.asyncio
@@ -182,7 +182,7 @@ async def test_token_guard_updates_last_used_at_on_success() -> None:
     assert len(updated) == 1
 
 
-# ─── FR-007-025: can() checks abilities ──────────────────────────────────────
+# can() checks abilities
 
 
 @pytest.mark.asyncio
@@ -227,7 +227,7 @@ async def test_token_guard_can_fails_for_unlisted_ability() -> None:
     assert guard.can("write") is False
 
 
-# ─── FR-007-026: token stored as SHA-256 (not plain text) ────────────────────
+# token stored as SHA-256 (not plain text)
 
 
 @pytest.mark.asyncio
@@ -255,7 +255,7 @@ async def test_token_guard_hashes_token_before_lookup() -> None:
     assert seen_hashes[0] == _sha256("plain_text")
 
 
-# ─── FR-007-027: non-bearer scheme returns None ───────────────────────────────
+# non-bearer scheme returns None
 
 
 @pytest.mark.asyncio

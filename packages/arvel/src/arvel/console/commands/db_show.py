@@ -1,4 +1,4 @@
-"""db:show command (WI-arvel-023)."""
+"""db:show command."""
 
 from __future__ import annotations
 

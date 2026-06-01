@@ -1,4 +1,4 @@
-"""FR-013-008 — BroadcastConfig."""
+"""BroadcastConfig."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def test_config_accepts_valid_driver_names() -> None:
 
 
 def test_config_rejects_unknown_driver_name() -> None:
-    """FR-013-008 AC2: unknown default fails validation."""
+    """unknown default fails validation."""
     from arvel.broadcasting.config import BroadcastConfig
 
     with pytest.raises(ValidationError):
@@ -30,7 +30,7 @@ def test_config_rejects_unknown_driver_name() -> None:
 
 
 def test_config_extra_forbid() -> None:
-    """FR-013-008 AC3: extra='forbid' rejects unknown keys."""
+    """extra='forbid' rejects unknown keys."""
     from arvel.broadcasting.config import BroadcastConfig
 
     with pytest.raises(ValidationError):

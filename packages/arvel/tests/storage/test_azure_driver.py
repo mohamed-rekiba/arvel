@@ -1,4 +1,4 @@
-"""Tests for AzureDriver — FR-006-031.
+"""Tests for AzureDriver
 
 The ``TestAzureDriverOps`` suite exercises real put/get/exists/delete against
 an ``mcr.microsoft.com/azure-storage/azurite`` container booted by the
@@ -39,7 +39,7 @@ class AzuriteEndpoint(Protocol):
 
 class TestAzureDriverImportError:
     def test_helpful_import_error_without_extra(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """FR-006-031: helpful ImportError when arvel[azure] not installed.
+        """helpful ImportError when arvel[azure] not installed.
 
         Pinning ``sys.modules["azure.storage.blob.aio"] = None`` is the
         documented way to make Python's import machinery treat a package as
@@ -67,7 +67,7 @@ class TestAzureDriverOps:
         )
 
     async def test_put_and_get(self, driver: AzureDriver) -> None:
-        # Single round-trip covers the four core operations against Azurite:
+        # Single round-trip the four core operations against Azurite:
         # absence → put → exists → get → delete → absence.
         assert await driver.exists("ops/put_and_get.txt") is False
         assert await driver.put("ops/put_and_get.txt", b"hello azurite") is True

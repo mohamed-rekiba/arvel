@@ -1,4 +1,4 @@
-"""Tests for the deserialization allowlist (ADR-035) — NFR-008-009."""
+"""Tests for the deserialization allowlist"""
 
 from __future__ import annotations
 

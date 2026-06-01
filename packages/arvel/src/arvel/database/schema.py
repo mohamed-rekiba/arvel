@@ -1,13 +1,13 @@
 """Laravel-style Schema DSL that compiles to SQLAlchemy / Alembic operations.
 
-The DSL never emits raw SQL (ADR-012). Each Blueprint accumulates a list of
+The DSL never emits raw SQL. Each Blueprint accumulates a list of
 ``Column``-and-``Constraint`` objects, then ``Schema.create / Schema.table``
 hand them to Alembic via ``op.create_table`` / ``op.add_column``.
 
-For the QA-Pre phase we don't yet have a live Alembic ``MigrationContext``,
-so ``Schema.create`` and friends accept an optional ``executor`` callable
-(default: the real ``alembic.op`` module). Tests pass a recording executor
-to assert what would have been emitted without touching a database.
+Tests can pass a recording executor instead of a live Alembic
+``MigrationContext`` to assert what would have been emitted without touching a database.
+So ``Schema.create`` and friends accept an optional ``executor`` callable
+(default: the real ``alembic.op`` module).
 """
 
 from __future__ import annotations

@@ -1,10 +1,10 @@
-"""Annotation resolution helpers (FB-009 — extracted from ``arvel.routing``).
+"""Annotation resolution helpers.
 
 Shared between routing, form-request handling, and the ORM's attribute /
 relation introspection. The same primitive — given a callable or class,
 resolve its type hints honouring PEP 563 (``from __future__ import
 annotations``) and closure-scope captures — appears in three places by
-WI-arvel-003; we own it once, here.
+; we own it once, here.
 """
 
 from __future__ import annotations

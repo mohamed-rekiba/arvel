@@ -9,7 +9,7 @@ from arvel.queue.commands.queue_size import QueueSizeCommand
 
 
 class TestQueueSizeCommand:
-    """queue:size delegates to connection().size() and prints the result."""
+    """queue:size delegates to connection.size and prints the result."""
 
     @pytest.mark.asyncio
     async def test_size_printed(self) -> None:

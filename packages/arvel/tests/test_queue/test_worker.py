@@ -1,4 +1,4 @@
-"""Tests for the worker loop (queue:work) — FR-008-017, FR-011-003..006, ADR-036."""
+"""Tests for the worker loop (queue:work)"""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ class _FailThenSucceedJob(Job):
 
 
 class TestWorkerLoop:
-    """FR-008-017: Worker processes envelopes until stopped."""
+    """Worker processes envelopes until stopped."""
 
     def setup_method(self) -> None:
         _WorkerJob.executed.clear()
@@ -94,7 +94,7 @@ class TestWorkerLoop:
 
 
 class TestWorkerMetrics:
-    """FR-011-006: Worker exposes jobs_processed, jobs_retried, jobs_dead counters."""
+    """Worker exposes jobs_processed, jobs_retried, jobs_dead counters."""
 
     def setup_method(self) -> None:
         _WorkerJob.executed.clear()
@@ -129,7 +129,7 @@ class TestWorkerMetrics:
 
 
 class TestWorkerRetry:
-    """FR-011-003: Failed jobs are re-enqueued until tries are exhausted."""
+    """Failed jobs are re-enqueued until tries are exhausted."""
 
     def setup_method(self) -> None:
         _FailingJob.call_count = 0
@@ -188,7 +188,7 @@ class TestWorkerRetry:
 
     @pytest.mark.asyncio
     async def test_no_dlq_store_exhausted_job_dropped_silently(self) -> None:
-        """FR-011-005: When no FailedJobStore, exhausted jobs are dropped without crash."""
+        """When no FailedJobStore, exhausted jobs are dropped without crash."""
         manager, db_conn = await _make_db_manager()
         job = _FailingJob()
         await db_conn.push(job.to_envelope(), queue="default")
@@ -237,7 +237,7 @@ class TestWorkerRetry:
 
     @pytest.mark.asyncio
     async def test_job_succeeds_on_retry(self) -> None:
-        """FR-011-003: A job that fails once then succeeds counts as processed."""
+        """A job that fails once then succeeds counts as processed."""
         manager, db_conn = await _make_db_manager()
         job = _FailThenSucceedJob()
         await db_conn.push(job.to_envelope(), queue="default")
@@ -274,7 +274,7 @@ class _RetryPriorityProbe(Job):
 
 
 class TestWorkerRetryPreservesPriorityResetsDelay:
-    """FR-018-17: retry MUST preserve priority and reset delay to 0."""
+    """retry MUST preserve priority and reset delay to 0."""
 
     def setup_method(self) -> None:
         _RetryPriorityProbe.seen_priority.clear()

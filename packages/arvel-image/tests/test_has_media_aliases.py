@@ -1,9 +1,6 @@
-"""WI-arvel-036 / FR-036-04 + FR-036-05 — HasMedia aliases + HasMediaMixin QA-Pre tests.
+"""HasMedia aliases and HasMediaMixin.
 
-All tests in this file should FAIL until Stage 3b adds:
-- ``HasMedia.attach_media()`` alias for ``add_media().to_media_collection()``
-- ``HasMedia.delete_media()`` alias for ``clear_media_collection()``
-- ``HasMediaMixin = HasMedia`` re-export in ``arvel_image/__init__.py``
+Covers attach_media/delete_media aliases and the HasMediaMixin re-export.
 """
 
 from __future__ import annotations
@@ -17,11 +14,11 @@ import pytest
 pytest.importorskip("arvel_image", reason="arvel_image required for WI-arvel-036 tests")
 
 
-# ── FR-036-05: HasMediaMixin export ──────────────────────────────────────────
+# ── HasMediaMixin export ──────────────────────────────────────────
 
 
 def test_has_media_mixin_is_exported() -> None:
-    """FR-036-05a: from arvel_image import HasMediaMixin resolves without error."""
+    """from arvel_image import HasMediaMixin resolves without error."""
     # This import must succeed — if HasMediaMixin is not exported it raises ImportError
     import arvel_image
 
@@ -30,7 +27,7 @@ def test_has_media_mixin_is_exported() -> None:
 
 
 def test_has_media_mixin_is_has_media() -> None:
-    """FR-036-05a: HasMediaMixin resolves to the same class as HasMedia."""
+    """HasMediaMixin resolves to the same class as HasMedia."""
     from arvel_image import (
         HasMedia,
         HasMediaMixin,
@@ -39,11 +36,11 @@ def test_has_media_mixin_is_has_media() -> None:
     assert HasMediaMixin is HasMedia
 
 
-# ── FR-036-04a: attach_media() exists ────────────────────────────────────────
+# ── attach_media() exists ────────────────────────────────────────
 
 
 def test_attach_media_method_exists() -> None:
-    """FR-036-04a: HasMedia exposes attach_media()."""
+    """HasMedia exposes attach_media()."""
     from arvel_image import HasMedia
 
     assert hasattr(HasMedia, "attach_media"), "HasMedia.attach_media not found"
@@ -51,7 +48,7 @@ def test_attach_media_method_exists() -> None:
 
 
 def test_attach_media_accepts_collection_param() -> None:
-    """FR-036-04a: attach_media signature includes collection kwarg."""
+    """attach_media signature includes collection kwarg."""
     from arvel_image import HasMedia
 
     sig = inspect.signature(HasMedia.attach_media)
@@ -62,7 +59,7 @@ def test_attach_media_accepts_collection_param() -> None:
 
 
 def test_attach_media_is_a_coroutine() -> None:
-    """FR-036-04a: attach_media must be awaitable (returns a coroutine)."""
+    """attach_media must be awaitable (returns a coroutine)."""
     from arvel_image import HasMedia
 
     assert inspect.iscoroutinefunction(HasMedia.attach_media), (
@@ -70,11 +67,11 @@ def test_attach_media_is_a_coroutine() -> None:
     )
 
 
-# ── FR-036-04b: delete_media() exists ────────────────────────────────────────
+# ── delete_media() exists ────────────────────────────────────────
 
 
 def test_delete_media_method_exists() -> None:
-    """FR-036-04b: HasMedia exposes delete_media()."""
+    """HasMedia exposes delete_media()."""
     from arvel_image import HasMedia
 
     assert hasattr(HasMedia, "delete_media"), "HasMedia.delete_media not found"
@@ -82,7 +79,7 @@ def test_delete_media_method_exists() -> None:
 
 
 def test_delete_media_is_a_coroutine() -> None:
-    """FR-036-04b: delete_media must be awaitable."""
+    """delete_media must be awaitable."""
     from arvel_image import HasMedia
 
     assert inspect.iscoroutinefunction(HasMedia.delete_media), (
@@ -91,7 +88,7 @@ def test_delete_media_is_a_coroutine() -> None:
 
 
 def test_delete_media_signature_has_collection_param() -> None:
-    """FR-036-04b: delete_media(collection='default') mirrors clear_media_collection."""
+    """delete_media(collection='default') mirrors clear_media_collection."""
     from arvel_image import HasMedia
 
     sig = inspect.signature(HasMedia.delete_media)
@@ -102,12 +99,12 @@ def test_delete_media_signature_has_collection_param() -> None:
     assert default == "default"
 
 
-# ── FR-036-04c: aliases delegate, no new logic ───────────────────────────────
+# ── aliases delegate, no new logic ───────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_delete_media_delegates_to_clear_media_collection() -> None:
-    """FR-036-04c: delete_media delegates to clear_media_collection."""
+    """delete_media delegates to clear_media_collection."""
     from arvel_image import HasMedia
 
     class FakeHost(HasMedia):
@@ -127,7 +124,7 @@ async def test_delete_media_delegates_to_clear_media_collection() -> None:
 
 @pytest.mark.asyncio
 async def test_attach_media_delegates_to_add_media_chain() -> None:
-    """FR-036-04c: attach_media delegates to add_media().to_media_collection()."""
+    """attach_media delegates to add_media().to_media_collection()."""
     from arvel_image import HasMedia
     from arvel_image.media.model import Media
 
@@ -154,11 +151,11 @@ async def test_attach_media_delegates_to_add_media_chain() -> None:
     assert host.captured_file_name == "x.jpg"
 
 
-# ── FR-036-05b: no deprecation warnings ──────────────────────────────────────
+# ── no deprecation warnings ──────────────────────────────────────
 
 
 def test_has_media_mixin_import_no_warnings() -> None:
-    """FR-036-05b: importing HasMediaMixin emits no DeprecationWarning."""
+    """importing HasMediaMixin emits no DeprecationWarning."""
     import warnings
 
     with warnings.catch_warnings():

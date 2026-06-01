@@ -1,6 +1,6 @@
 """Gate — ability-based authorization with before/after hooks.
 
-Fail-closed: unregistered abilities raise AuthorizationException (ADR-032).
+Fail-closed: unregistered abilities raise AuthorizationException.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ class Gate:
                 return bool(result)
 
         if ability not in self._abilities:
-            # Fail-closed per ADR-032
+            # Fail-closed
             raise AuthorizationException(f"Ability '{ability}' is not registered.")
 
         result = await self._invoke(self._abilities[ability], user, *args)

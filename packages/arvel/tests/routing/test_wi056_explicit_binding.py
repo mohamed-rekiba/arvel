@@ -1,12 +1,12 @@
-"""Failing tests for WI-arvel-056: Explicit Route Model Binding.
+"""Failing tests for Explicit Route Model Binding.
 
-Epic 048 Story 2 — ``Route.bind(name, resolver)`` registers a custom resolver
+— ``Route.bind(name, resolver)`` registers a custom resolver
 keyed by URL parameter name. The resolver wins over implicit ``Model`` binding
 and runs at request time with the raw URL string. A return of ``None`` produces
 a 404; any other value is injected into the handler under the parameter name.
 
 Run BEFORE implementation — every integration test in this file MUST fail
-(Red state).
+(RED state).
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ async def bind_db() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
         await engine.dispose()
 
 
-# ─────────────────────────── Unit tests: registry ───────────────────────────
+# Unit tests: registry
 
 
 class TestBindingRegistry:
@@ -89,7 +89,7 @@ class TestBindingRegistry:
         assert "foo" not in Router.singleton().bindings()
 
 
-# ─────────────────────────── Integration tests ──────────────────────────────
+# Integration tests
 
 
 @pytest.mark.usefixtures("bind_db")
@@ -182,7 +182,7 @@ class TestExplicitBindingResolves:
         assert resp.json() == {"raw": "abc", "uppercased": "ABC"}
 
 
-# ─────────────────────────── Group-scoped bindings ──────────────────────────
+# Group-scoped bindings
 
 
 @pytest.mark.usefixtures("bind_db")
@@ -215,7 +215,7 @@ def test_group_scoped_binding_applies_only_inside_group(
 
         del _scoped_show
 
-    # Outside the group: same param name `widget`, but no resolver should fire —
+    # Outside the group: same param name `widget`, but no resolver should fire
     # implicit binding (via slug, since _Widget.route_key_name == "slug") takes over.
     @Route.get("/outside/widgets/{widget}", middleware=[tx])
     async def _outside_show(widget: _Widget) -> dict[str, Any]:

@@ -1,4 +1,4 @@
-"""Laravel-pipe pluralisation + bracket-range syntax (FR-015-027, FR-015-028)."""
+"""Laravel-pipe pluralisation + bracket-range syntax."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def select_plural_variant(
 
 
 def _substitute(text: str, *, count: int, replace: Mapping[str, object]) -> str:
-    """Replace :placeholder and {placeholder}. SEC-015-003: pure str replacement, no eval."""
+    """Replace :placeholder and {placeholder}. Pure str replacement, no eval."""
     result = text
     # Auto-bind :count and {count} from `count` (Laravel convention).
     bindings: dict[str, object] = dict(replace)

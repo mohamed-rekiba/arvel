@@ -1,7 +1,4 @@
-"""Rate-limit store abstraction + drivers.
-
-See ``docs/adr/ADR-009-ratelimit-store-abc.md``.
-"""
+"""Rate-limit store abstraction + drivers."""
 
 from __future__ import annotations
 

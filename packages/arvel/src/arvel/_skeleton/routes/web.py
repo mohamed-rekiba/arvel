@@ -2,7 +2,7 @@
 
 Routes registered here become reachable on the FastAPI app via the root
 ``Router``. Add controllers via ``arvel make:controller`` (lands with
-WI-arvel-005).
+).
 """
 
 from __future__ import annotations

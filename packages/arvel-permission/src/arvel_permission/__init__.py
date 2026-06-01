@@ -4,9 +4,6 @@ Provides ``Role``, ``Permission`` SQLAlchemy models, ``HasRoles`` and
 ``HasPermissions`` mixins, an async ``PermissionRegistrar``, and a
 ``PermissionServiceProvider`` that wires permission-aware ability checks into
 the Arvel ``Gate``.
-
-See ``docs/architecture/SAD-025-auth-refresh-spatie-packages.md`` and
-``docs/adr/ADR-079-arvel-permission-spatie-parity.md``.
 """
 
 from __future__ import annotations

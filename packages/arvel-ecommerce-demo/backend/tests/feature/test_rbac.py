@@ -1,13 +1,11 @@
-"""RBAC tests — US-005 (role enforcement) + US-024-025 (user management).
+"""RBAC enforcement and admin user/role management.
 
-RED: all tests fail at import until Stage 3b.
-
-Acceptance criteria:
-- US-005: permission check fires at dependency level before handler
-- US-005: support can read products but cannot create them
-- US-005: catalog_manager can publish but cannot manage users
-- US-024: users.manage permission required to list/soft-delete users
-- US-025: roles.manage permission required to assign/revoke roles
+Coverage:
+- permission check fires at dependency level before handler
+- support can read products but cannot create them
+- catalog_manager can publish but cannot manage users
+- users.manage permission required to list/soft-delete users
+- roles.manage permission required to assign/revoke roles
 """
 
 from __future__ import annotations
@@ -48,7 +46,7 @@ async def app(
     monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.setenv("APP_KEY", "rbac-test-key-must-be-32-bytes-or-more!")
 
-    from app.bootstrap import create_app  # RED until Stage 3b
+    from app.bootstrap import create_app
 
     application = await create_app()
     await application.seed("catalog")
@@ -88,19 +86,19 @@ async def customer_token(client: Any) -> str:
     return await _login(client, "customer@example.com", "password")
 
 
-# ─── US-005: permission enforcement ─────────────────────────────────────────────
+# ─── permission enforcement ─────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_unauthenticated_request_to_admin_returns_401(client: Any) -> None:
-    """US-005: admin endpoints reject unauthenticated requests with 401."""
+    """admin endpoints reject unauthenticated requests with 401."""
     response = await client.get("/api/admin/products")
     assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_customer_cannot_access_admin_products(client: Any, customer_token: str) -> None:
-    """US-005: customer role has no products.view permission → 403."""
+    """customer role has no products.view permission → 403."""
     response = await client.get(
         "/api/admin/products",
         headers={"Authorization": f"Bearer {customer_token}"},
@@ -110,7 +108,7 @@ async def test_customer_cannot_access_admin_products(client: Any, customer_token
 
 @pytest.mark.asyncio
 async def test_support_can_view_but_not_create_products(client: Any, support_token: str) -> None:
-    """US-005: support (level 40) has products.view but not products.create."""
+    """support (level 40) has products.view but not products.create."""
     view = await client.get(
         "/api/admin/products", headers={"Authorization": f"Bearer {support_token}"}
     )
@@ -130,7 +128,7 @@ async def test_support_can_view_but_not_create_products(client: Any, support_tok
 
 @pytest.mark.asyncio
 async def test_catalog_manager_cannot_manage_users(client: Any, catalog_token: str) -> None:
-    """US-005: catalog_manager lacks users.manage → 403 on /api/admin/users."""
+    """catalog_manager lacks users.manage → 403 on /api/admin/users."""
     response = await client.get(
         "/api/admin/users", headers={"Authorization": f"Bearer {catalog_token}"}
     )
@@ -141,7 +139,7 @@ async def test_catalog_manager_cannot_manage_users(client: Any, catalog_token: s
 async def test_catalog_manager_cannot_force_delete(
     client: Any, catalog_token: str, super_admin_token: str
 ) -> None:
-    """US-005: force-delete requires super_admin level (100); catalog (60) gets 403."""
+    """force-delete requires super_admin level (100); catalog (60) gets 403."""
     products = await client.get(
         "/api/admin/products",
         headers={"Authorization": f"Bearer {super_admin_token}"},
@@ -159,12 +157,12 @@ async def test_catalog_manager_cannot_force_delete(
     assert response.status_code == 403
 
 
-# ─── US-024: user management ─────────────────────────────────────────────────────
+# ─── user management ─────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_super_admin_can_list_users(client: Any, super_admin_token: str) -> None:
-    """US-024: users.manage permission required to list users."""
+    """users.manage permission required to list users."""
     response = await client.get(
         "/api/admin/users",
         headers={"Authorization": f"Bearer {super_admin_token}"},
@@ -175,7 +173,7 @@ async def test_super_admin_can_list_users(client: Any, super_admin_token: str) -
 
 @pytest.mark.asyncio
 async def test_super_admin_can_soft_delete_user(client: Any, super_admin_token: str) -> None:
-    """US-024: soft-deleting a user sets their deleted_at."""
+    """soft-deleting a user sets their deleted_at."""
     users = await client.get(
         "/api/admin/users?trashed=without",
         headers={"Authorization": f"Bearer {super_admin_token}"},
@@ -192,12 +190,12 @@ async def test_super_admin_can_soft_delete_user(client: Any, super_admin_token: 
     assert delete.status_code == 204
 
 
-# ─── US-025: role assignment ─────────────────────────────────────────────────────
+# ─── role assignment ─────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_super_admin_can_assign_role_to_user(client: Any, super_admin_token: str) -> None:
-    """US-025: POST /api/admin/users/{id}/roles assigns a role."""
+    """POST /api/admin/users/{id}/roles assigns a role."""
     users = await client.get(
         "/api/admin/users",
         headers={"Authorization": f"Bearer {super_admin_token}"},
@@ -217,7 +215,7 @@ async def test_super_admin_can_assign_role_to_user(client: Any, super_admin_toke
 
 @pytest.mark.asyncio
 async def test_super_admin_can_grant_direct_permission(client: Any, super_admin_token: str) -> None:
-    """US-025: POST /api/admin/users/{id}/permissions grants a direct permission."""
+    """POST /api/admin/users/{id}/permissions grants a direct permission."""
     users = await client.get(
         "/api/admin/users",
         headers={"Authorization": f"Bearer {super_admin_token}"},

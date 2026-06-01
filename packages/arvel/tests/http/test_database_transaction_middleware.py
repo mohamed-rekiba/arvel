@@ -1,4 +1,4 @@
-"""ADR-016 — DatabaseTransaction middleware (sanctioned http↔db bridge)."""
+"""DatabaseTransaction middleware (sanctioned http↔db bridge)."""
 
 from __future__ import annotations
 

@@ -1,16 +1,16 @@
 """Polymorphic morph map — stable string aliases for model classes.
 
-ADR-022 stored the *unqualified class name* in ``{name}_type`` (e.g. ``"Post"``).
+We stored the *unqualified class name* in ``{name}_type`` (e.g. ``"Post"``).
 That token breaks the day someone renames or moves the class. A morph map pins
 an explicit alias per model so the stored value survives refactors and
-cross-package moves. ADR-145 supersedes the unqualified-name default here.
+cross-package moves. The morph map supersedes the unqualified-name default here.
 
-The map is process-global, mirroring Laravel's ``Relation::morphMap()``. Register
+The map is process-global, mirroring Laravel's ``Relation::morphMap``. Register
 it once at boot::
 
-    from arvel.database import morph_map
+ from arvel.database import morph_map
 
-    morph_map({"post": Post, "video": Video})
+ morph_map({"post": Post, "video": Video})
 
 With no argument, :func:`morph_map` returns the current registrations.
 """
@@ -95,7 +95,7 @@ def resolve_morph_class(alias: str) -> type[Model]:
     """Resolve a stored type token back to a model class.
 
     Checks the morph map first, then falls back to scanning the model registry by
-    short class name (the ADR-022 default token). Raises :class:`MorphMapError`
+    short class name (the short-class-name default). Raises :class:`MorphMapError`
     when nothing matches.
     """
     mapped = _state.aliases.get(alias)

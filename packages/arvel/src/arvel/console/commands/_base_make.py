@@ -80,7 +80,7 @@ class BaseMakeCommand(Command):
         """Render the stub content.
 
         Default fallback — every subclass should override this with a real,
-        framework-aware template (see :doc:`/adr/ADR-074-make-stub-templates`).
+        framework-aware template (see project docs).
         """
         return (
             f'"""{name}."""\n'

@@ -1,4 +1,4 @@
-"""WI-arvel-017 — Epic 006 Story 6: enum + extended built-in casts.
+"""Enum + extended built-in casts.
 
 Laravel's ``$casts`` supports backed enums, ``object``, ``collection``, and
 ``datetime:FORMAT``. This covers the Arvel equivalents:
@@ -12,8 +12,7 @@ Laravel's ``$casts`` supports backed enums, ``object``, ``collection``, and
   ``strftime(FORMAT)``.
 
 Reads bypass ``Model.__getattribute__`` via ``object.__getattribute__`` to
-assert the stored (write-path) value where it matters.
-"""
+assert the stored (write-path) value where it matters."""
 
 from __future__ import annotations
 

@@ -141,8 +141,8 @@ class RouteListCommand(Command):
     def get_routes(self) -> list[RouteSpec]:
         """All routes currently buffered by the application's ``Router``.
 
-        Prefers the router bound in the framework container (WI-021 contract).
-        Falls back to ``Router.singleton()`` when no application is attached or
+        Prefers the router bound in the framework container (contract).
+        Falls back to ``Router.singleton`` when no application is attached or
         the container has no Router binding — covers bare test contexts where
         no provider has booted but routes were declared directly against the
         singleton.

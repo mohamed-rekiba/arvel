@@ -1,5 +1,5 @@
 """
-FR-007-001..006 — AuthManager + Auth facade.
+AuthManager + Auth facade.
 All tests import from arvel.auth.*, which doesn't exist yet → red state.
 """
 
@@ -34,7 +34,7 @@ class _FakeRequest:
     pass
 
 
-# ─── FR-007-001: Auth facade static API ───────────────────────────────────────
+# Auth facade static API
 
 
 @pytest.mark.asyncio
@@ -97,7 +97,7 @@ def test_auth_facade_guard_returns_named_guard() -> None:
     assert Auth.guard("api") is guard
 
 
-# ─── FR-007-002: AuthManager routing ──────────────────────────────────────────
+# AuthManager routing
 
 
 def test_auth_manager_raises_on_unknown_guard() -> None:
@@ -121,7 +121,7 @@ async def test_auth_manager_routes_to_correct_guard() -> None:
     assert user == {"id": "api-user"}
 
 
-# ─── FR-007-003: attempt ───────────────────────────────────────────────────────
+# attempt
 
 
 @pytest.mark.asyncio
@@ -143,7 +143,7 @@ async def test_auth_facade_attempt_delegates_to_default_guard() -> None:
     assert fail is False
 
 
-# ─── FR-007-004: login / logout ───────────────────────────────────────────────
+# login / logout
 
 
 @pytest.mark.asyncio
@@ -182,7 +182,7 @@ async def test_auth_facade_logout_delegates_to_default_guard() -> None:
     assert logged_out == [True]
 
 
-# ─── FR-007-005: default guard config ─────────────────────────────────────────
+# default guard config
 
 
 def test_auth_manager_default_guard_is_accessible_via_guard_method() -> None:
@@ -193,7 +193,7 @@ def test_auth_manager_default_guard_is_accessible_via_guard_method() -> None:
     assert manager.guard("web") is guard
 
 
-# ─── FR-007-006: Auth facade id() helper ──────────────────────────────────────
+# Auth facade id() helper
 
 
 @pytest.mark.asyncio

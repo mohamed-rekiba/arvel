@@ -1,4 +1,4 @@
-"""Tests for Event base class — FR-009-001."""
+"""Tests for Event base class."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ class SimpleEvent(Event):
 
 
 class TestEvent:
-    """FR-009-001: Event is a Pydantic BaseModel."""
+    """Event is a Pydantic BaseModel."""
 
     def test_event_is_pydantic_model(self) -> None:
         from pydantic import BaseModel

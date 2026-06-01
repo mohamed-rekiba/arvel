@@ -1,7 +1,6 @@
-"""Unit tests for TaskiqConnection broker selection by URL scheme — WI-018.
+"""Unit tests for TaskiqConnection broker selection by URL scheme.
 
-Covers FR-018-09, FR-018-10, FR-018-12. These tests do NOT touch a real
-broker — they exercise the URL-parsing + ImportError path only.
+No real broker — only URL parsing and ImportError paths.
 """
 
 from __future__ import annotations
@@ -16,12 +15,12 @@ from arvel.queue.envelope import JobEnvelope
 from pydantic import ValidationError
 
 # ---------------------------------------------------------------------------
-# FR-018-12 — TaskiqQueueConfig drops result_backend_url
+# — TaskiqQueueConfig drops result_backend_url
 # ---------------------------------------------------------------------------
 
 
 class TestTaskiqQueueConfigForbidsResultBackend:
-    """FR-018-12: result_backend_url field is removed entirely."""
+    """result_backend_url field is removed entirely."""
 
     def test_default_broker_url_present(self) -> None:
         cfg = TaskiqQueueConfig()
@@ -37,12 +36,12 @@ class TestTaskiqQueueConfigForbidsResultBackend:
 
 
 # ---------------------------------------------------------------------------
-# FR-018-09 — URL-scheme autodetection
+# — URL-scheme autodetection
 # ---------------------------------------------------------------------------
 
 
 class TestSelectBrokerModule:
-    """FR-018-09: broker_url scheme picks the right Taskiq broker module."""
+    """broker_url scheme picks the right Taskiq broker module."""
 
     def test_redis_scheme_picks_taskiq_redis(self) -> None:
         module, extra = select_broker_module("redis://localhost:6379/0")
@@ -76,7 +75,7 @@ class TestSelectBrokerModule:
 
 
 # ---------------------------------------------------------------------------
-# FR-018-10 — Per-scheme ImportError with install command
+# — Per-scheme ImportError with install command
 # ---------------------------------------------------------------------------
 
 
@@ -109,7 +108,7 @@ def hide_taskiq_aio_pika() -> Iterator[None]:
 
 
 class TestImportErrorMessages:
-    """FR-018-10 + NFR-018-05: ImportError mentions the missing extra by exact name."""
+    """+ : ImportError mentions the missing extra by exact name."""
 
     @pytest.mark.usefixtures("hide_taskiq_redis")
     @pytest.mark.asyncio
@@ -119,7 +118,7 @@ class TestImportErrorMessages:
         envelope = JobEnvelope(job_class="tests.dummy.Job", payload={})
         with pytest.raises(ImportError, match=r"arvel\[queue-redis\]") as exc_info:
             await driver.push(envelope)
-        # NFR-018-05: message must not leak Python internals (no "/site-packages/")
+        # : message must not leak Python internals (no "/site-packages/")
         assert "/site-packages/" not in str(exc_info.value)
         assert "Traceback" not in str(exc_info.value)
 
@@ -136,7 +135,7 @@ class TestImportErrorMessages:
 
 
 # ---------------------------------------------------------------------------
-# WI-019 FB-018-003: AMQP delay-plugin actionable error
+# : AMQP delay-plugin actionable error
 # ---------------------------------------------------------------------------
 
 

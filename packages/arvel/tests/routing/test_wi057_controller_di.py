@@ -1,6 +1,6 @@
-"""WI-arvel-057 — Method-based controller routing with DI.
+"""Method-based controller routing with DI.
 
-Covers Epic 048 Story 5 (controller DI). The invokable case lives in
+(controller DI). The invokable case lives in
 ``test_043_critical_fixes.py``; here we cover the multi-action shape:
 
     Route.get("/users/{id}", controller=UserController, action="show")
@@ -11,7 +11,7 @@ The framework must:
      path/query/body params normally.
   3. Coexist with implicit route model binding and ``FormRequest``.
 
-Run BEFORE implementation — every test in this file MUST fail (Red state).
+Run BEFORE implementation — every test in this file MUST fail (RED state).
 """
 
 from __future__ import annotations
@@ -37,9 +37,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 
-# ─────────────────────────── Fixtures: model ────────────────────────────
-
-
 class _WidgetCtrlModel(Model):
     """Tiny Model so route model binding has something to chew on."""
 
@@ -51,7 +48,7 @@ class _WidgetCtrlModel(Model):
 
 @pytest_asyncio.fixture
 async def bind_db() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    """Per-test engine with the WI-057 table created and rows seeded."""
+    """Per-test engine with the table created and rows seeded."""
     engine: AsyncEngine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -72,7 +69,7 @@ def reset_router() -> None:
     Router.reset_singleton()
 
 
-# ──────────────────────────── Unit tests: action= ───────────────────────
+# Unit tests: action=
 
 
 class TestActionParameter:
@@ -119,7 +116,7 @@ class TestActionParameter:
             Route.get("/broken", controller=BrokenCtrl)
 
 
-# ──────────────────────────── DI through container ──────────────────────
+# DI through container
 
 
 class TestMethodControllerDI:
@@ -198,7 +195,7 @@ class TestMethodControllerDI:
         assert resp.json() == {"pong": "ok"}
 
 
-# ──────────────────────── Signature flows through ────────────────────────
+# Signature flows through
 
 
 class TestMethodControllerSignature:
@@ -233,7 +230,7 @@ class TestMethodControllerSignature:
         assert resp.json() == {"sync": "yes"}
 
 
-# ──────────────────────────── Integrations ─────────────────────────────
+# Integrations
 
 
 @pytest.mark.usefixtures("bind_db")
@@ -284,7 +281,7 @@ class TestMethodControllerIntegrations:
         assert resp.json() == {"name": "gamma"}
 
 
-# ──────────────────────── Public adapter API ─────────────────────────
+# Public adapter API
 
 
 class TestAdapterPublicAPI:

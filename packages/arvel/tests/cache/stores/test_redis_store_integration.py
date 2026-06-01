@@ -1,4 +1,4 @@
-"""Real-Redis integration tests for ``RedisStore`` — FR-006-004.
+"""Real-Redis integration tests for ``RedisStore``
 
 The fast inner-loop suite in ``test_redis_store.py`` still runs against
 ``fakeredis``. This file boots the real ``redis:8`` container and asserts

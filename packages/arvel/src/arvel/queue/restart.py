@@ -1,4 +1,4 @@
-"""Queue restart signal (WI-arvel-023, ADR-073).
+"""Queue restart signal.
 
 Writes a UTC timestamp to a cache key the worker polls once per loop. Workers
 compare the timestamp against their own ``started_at`` and exit gracefully

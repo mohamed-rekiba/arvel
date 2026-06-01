@@ -9,15 +9,15 @@ in code and accessible via ``lookup("filesystems.disks.s3.bucket")``.
 
 Wire path:
 
-- ``STORAGE_DEFAULT``                 → :attr:`default`
-- ``STORAGE_S3_ENDPOINT``            → boto3 endpoint (in-network)
-- ``STORAGE_S3_PUBLIC_URL``          → URL emitted in API responses; the
+- ``STORAGE_DEFAULT`` → :attr:`default`
+- ``STORAGE_S3_ENDPOINT`` → boto3 endpoint (in-network)
+- ``STORAGE_S3_PUBLIC_URL`` → URL emitted in API responses; the
                                           dev stack proxies ``/storage/*``
                                           through Caddy to MinIO so the
                                           browser stays on a single origin.
-- ``STORAGE_S3_BUCKET``              → bucket name
+- ``STORAGE_S3_BUCKET`` → bucket name
 - ``STORAGE_S3_KEY`` / ``STORAGE_S3_SECRET`` → MinIO credentials
-- ``STORAGE_S3_ADDRESSING_STYLE``    → ``path`` for MinIO
+- ``STORAGE_S3_ADDRESSING_STYLE`` → ``path`` for MinIO
 """
 
 from __future__ import annotations

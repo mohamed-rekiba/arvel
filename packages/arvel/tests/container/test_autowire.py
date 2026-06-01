@@ -1,4 +1,4 @@
-"""FR-001-010: Auto-wiring from constructor type hints, including chains and cycles."""
+"""Auto-wiring from constructor type hints, including chains and cycles."""
 
 from __future__ import annotations
 

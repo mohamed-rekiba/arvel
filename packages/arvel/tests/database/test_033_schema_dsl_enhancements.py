@@ -1,20 +1,4 @@
-"""WI-arvel-033 — Schema DSL enhancements: partial index where=, unique=, NULLS NOT DISTINCT.
-
-Covers PRD-033 ACs:
-  AC-033-01 … where= predicate forwarded to create_index as postgresql_where
-  AC-033-02 … where=None (default) → no postgresql_where kwarg
-  AC-033-03 … unique=True on index() → create_index called with unique=True
-  AC-033-04 … unique=True + where= → both forwarded correctly
-  AC-033-05 … nulls_not_distinct=True → UniqueConstraint gets postgresql_nulls_not_distinct=True
-  AC-033-06 … nulls_not_distinct=False → UniqueConstraint gets postgresql_nulls_not_distinct=False
-  AC-033-07 … nulls_not_distinct=None (default) → no postgresql_nulls_not_distinct kwarg
-  AC-033-08 … existing callers with no new params behave identically to before (no regression)
-  AC-033-09 … existing test suite still passes (ensured by running make test)
-  AC-033-10 … mypy + pyright zero errors (ensured by make typecheck)
-  AC-033-11 … soft_deletes() auto-emits a partial index by default (index=True)
-  AC-033-12 … soft_deletes(index=False) emits no index
-  AC-033-13 … auto index name follows ix_{table}_{col}_active convention
-"""
+"""Schema DSL: partial indexes, unique=, NULLS NOT DISTINCT, soft_deletes index."""
 
 from __future__ import annotations
 
@@ -73,11 +57,11 @@ class _Rec:
         return result
 
 
-# ─── AC-033-01: where= forwarded as postgresql_where ──────────────────────────
+# ─── where= forwarded as postgresql_where ──────────────────────────
 
 
 def test_index_where_forwarded_as_postgresql_where() -> None:
-    """AC-033-01: where= predicate forwarded to create_index."""
+    """where= predicate forwarded to create_index."""
     ex = _Rec()
     predicate = text("deleted_at IS NULL")
 
@@ -93,11 +77,11 @@ def test_index_where_forwarded_as_postgresql_where() -> None:
     assert idx["postgresql_where"] is predicate
 
 
-# ─── AC-033-02: where=None → no postgresql_where kwarg ───────────────────────
+# ─── where=None → no postgresql_where kwarg ───────────────────────
 
 
 def test_index_no_where_emits_no_postgresql_where() -> None:
-    """AC-033-02: Default where=None produces no postgresql_where kwarg."""
+    """Default where=None produces no postgresql_where kwarg."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -110,11 +94,11 @@ def test_index_no_where_emits_no_postgresql_where() -> None:
     assert "postgresql_where" not in idx
 
 
-# ─── AC-033-03: unique=True on index() ────────────────────────────────────────
+# ─── unique=True on index ────────────────────────────────────────
 
 
 def test_index_unique_true_forwarded() -> None:
-    """AC-033-03: unique=True on Blueprint.index() → create_index unique=True."""
+    """unique=True on Blueprint.index → create_index unique=True."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -127,11 +111,11 @@ def test_index_unique_true_forwarded() -> None:
     assert idx.get("unique") is True
 
 
-# ─── AC-033-04: unique=True + where= combined ─────────────────────────────────
+# ─── unique=True + where= combined ─────────────────────────────────
 
 
 def test_index_unique_with_where_combined() -> None:
-    """AC-033-04: unique=True and where= can be combined in one call."""
+    """unique=True and where= can be combined in one call."""
     ex = _Rec()
     predicate = text("status = 'pending'")
 
@@ -146,11 +130,11 @@ def test_index_unique_with_where_combined() -> None:
     assert idx.get("postgresql_where") is predicate
 
 
-# ─── AC-033-05: nulls_not_distinct=True ──────────────────────────────────────
+# ─── nulls_not_distinct=True ──────────────────────────────────────
 
 
 def test_unique_nulls_not_distinct_true() -> None:
-    """AC-033-05: nulls_not_distinct=True → postgresql_nulls_not_distinct=True on constraint."""
+    """nulls_not_distinct=True → postgresql_nulls_not_distinct=True on constraint."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -165,11 +149,11 @@ def test_unique_nulls_not_distinct_true() -> None:
     assert uc.dialect_kwargs.get("postgresql_nulls_not_distinct") is True
 
 
-# ─── AC-033-06: nulls_not_distinct=False ─────────────────────────────────────
+# ─── nulls_not_distinct=False ─────────────────────────────────────
 
 
 def test_unique_nulls_not_distinct_false() -> None:
-    """AC-033-06: nulls_not_distinct=False → postgresql_nulls_not_distinct=False."""
+    """nulls_not_distinct=False → postgresql_nulls_not_distinct=False."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -184,15 +168,14 @@ def test_unique_nulls_not_distinct_false() -> None:
     assert uc.dialect_kwargs.get("postgresql_nulls_not_distinct") is False
 
 
-# ─── AC-033-07: nulls_not_distinct=None (default) → no kwarg ─────────────────
+# ─── nulls_not_distinct=None (default) → no kwarg ─────────────────
 
 
 def test_unique_nulls_not_distinct_none_emits_no_kwarg() -> None:
-    """AC-033-07: Default nulls_not_distinct=None → postgresql_nulls_not_distinct stays None.
+    """Default nulls_not_distinct=None → postgresql_nulls_not_distinct stays None.
 
     SQLAlchemy's _DialectArgView always exposes all dialect kwargs; a key that was not
-    explicitly set has value None. We assert None, not key absence.
-    """
+    explicitly set has value None. We assert None, not key absence."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -207,11 +190,11 @@ def test_unique_nulls_not_distinct_none_emits_no_kwarg() -> None:
     assert uc.dialect_kwargs.get("postgresql_nulls_not_distinct") is None
 
 
-# ─── AC-033-08: regression — existing callers unaffected ─────────────────────
+# ─── regression — existing callers unaffected ─────────────────────
 
 
 def test_existing_index_call_no_regression() -> None:
-    """AC-033-08: Blueprint.index() with no new params behaves identically to before."""
+    """Blueprint.index with no new params behaves identically to before."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -228,7 +211,7 @@ def test_existing_index_call_no_regression() -> None:
 
 
 def test_existing_unique_call_no_regression() -> None:
-    """AC-033-08 (unique): Blueprint.unique() with no new params behaves identically to before."""
+    """(unique): Blueprint.unique with no new params behaves identically to before."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -248,7 +231,7 @@ def test_existing_unique_call_no_regression() -> None:
 
 
 def test_items_migration_deleted_at_index_is_partial() -> None:
-    """AC-033-08 (migration): soft_deletes() auto-emits the partial index; composite is manual."""
+    """(migration): soft_deletes auto-emits the partial index; composite is manual."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -270,7 +253,7 @@ def test_items_migration_deleted_at_index_is_partial() -> None:
     Schema.create("items", build, executor=ex)
 
     idx_calls = {c["name"]: c for c in ex.index_calls()}
-    # auto-emitted by soft_deletes()
+    # auto-emitted by soft_deletes
     assert "postgresql_where" in idx_calls["ix_items_deleted_at_active"]
     # manual composite partial index
     assert "postgresql_where" in idx_calls["items_category_deleted_at_idx"]
@@ -307,11 +290,11 @@ def test_index_where_parametrized(
     assert ("postgresql_where" in idx) is expect_key
 
 
-# ─── AC-033-11/12/13: soft_deletes() partial index ────────────────────────────
+# ─── soft_deletes partial index ────────────────────────────
 
 
 def test_soft_deletes_auto_emits_partial_index() -> None:
-    """AC-033-11: soft_deletes() creates a partial index by default."""
+    """soft_deletes creates a partial index by default."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -328,7 +311,7 @@ def test_soft_deletes_auto_emits_partial_index() -> None:
 
 
 def test_soft_deletes_index_false_emits_no_index() -> None:
-    """AC-033-12: soft_deletes(index=False) skips the partial index."""
+    """soft_deletes(index=False) skips the partial index."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -342,7 +325,7 @@ def test_soft_deletes_index_false_emits_no_index() -> None:
 
 
 def test_soft_deletes_custom_column_name_index() -> None:
-    """AC-033-13: Custom column name is reflected in the auto-generated index name."""
+    """Custom column name is reflected in the auto-generated index name."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:

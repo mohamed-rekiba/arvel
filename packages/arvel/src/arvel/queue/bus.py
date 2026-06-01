@@ -1,7 +1,7 @@
 """Bus — dispatch, batch, and chain operations for queued jobs.
 
-WI-018 added per-dispatch ``delay`` and ``priority`` keyword overrides per
-ADR-066. ``None`` means "use the value already on the ``Job`` instance".
+Per-dispatch ``delay`` and ``priority`` keyword overrides. ``None`` means
+"use the value already on the ``Job`` instance".
 """
 
 from __future__ import annotations

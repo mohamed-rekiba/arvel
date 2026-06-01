@@ -1,4 +1,4 @@
-"""Tests for ScheduledTask Pydantic model — FR-015-003, FR-015-004."""
+"""Tests for ScheduledTask Pydantic model."""
 
 from __future__ import annotations
 

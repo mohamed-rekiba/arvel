@@ -169,7 +169,7 @@ class Image:
         return self
 
     def optimize(self) -> Self:
-        """Strip EXIF metadata and re-encode at current quality settings (FR-046-16).
+        """Strip EXIF metadata and re-encode at current quality settings
 
         Privacy default: EXIF is removed from JPEG output. Non-JPEG images are
         left structurally unchanged (PNG has no EXIF standard slot).

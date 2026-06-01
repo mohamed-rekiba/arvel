@@ -1,11 +1,10 @@
-"""WI-arvel-028 — Epic 007 Story 3: MorphOne/MorphMany query + eager integration.
+"""MorphOne/MorphMany query + eager integration.
 
 MorphOne/MorphMany now resolve as relations, so they work with:
-- `with_()` — batched eager load (one query for all parents).
+- `with_` — batched eager load (one query for all parents).
 - `where_has` / `has` / `doesnt_have` — EXISTS subquery with the morph type predicate.
 - `with_count` — per-parent count column.
-- `Model.load()` — lazy batched load onto an existing instance.
-"""
+- `Model.load` — lazy batched load onto an existing instance."""
 
 from __future__ import annotations
 
@@ -157,5 +156,5 @@ class TestModelLoad:
         fresh = await Wi028Post.find(p1.id)
         assert fresh is not None
         await fresh.load("comments")
-        # Accessor now reads from the cache load() populated.
+        # Accessor now reads from the cache load populated.
         assert len(await fresh.comments.all()) == 1

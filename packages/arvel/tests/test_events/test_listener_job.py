@@ -1,4 +1,4 @@
-"""Tests for ListenerJob — FR-009-006, FR-009-007."""
+"""Tests for ListenerJob."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class _PayListener(Listener[_PayEvent]):
 
 
 class TestListenerJob:
-    """FR-009-006/007: ListenerJob serializes and re-runs a listener."""
+    """/007: ListenerJob serializes and re-runs a listener."""
 
     def setup_method(self) -> None:
         _PayListener.results.clear()

@@ -1,15 +1,15 @@
-"""Sanctioned HTTP↔database bridge (ADR-016).
+"""Sanctioned HTTP↔database bridge.
 
 This is the ONLY HTTP module allowed to import ``arvel.database``. It opens an
 ``AsyncSession`` per request, binds it as the active session for ActiveRecord
-helpers, runs the handler inside a transaction (``session.begin()``), commits
+helpers, runs the handler inside a transaction (``session.begin``), commits
 on a successful 2xx/3xx response, and rolls back on exception or 4xx/5xx.
 
-After a successful commit, any callbacks registered via ``DB.after_commit()``
+After a successful commit, any callbacks registered via ``DB.after_commit``
 during request handling are awaited before the response is returned.
 
 The exemption is enforced by ``tests/architecture/test_layering.py``
-(``ALLOWED_HTTP_TO_DATABASE_IMPORTS``) and documented in ADR-016.
+(``ALLOWED_HTTP_TO_DATABASE_IMPORTS``).
 """
 
 from __future__ import annotations

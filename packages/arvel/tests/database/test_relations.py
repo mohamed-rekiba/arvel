@@ -1,4 +1,4 @@
-"""AC-010-09..10 — HasMany / HasOne / BelongsTo relation helpers (FR-010-07)."""
+"""HasMany, HasOne, and BelongsTo relation helpers."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ async def _create_tables(engine: Any) -> None:
 
 
 async def test_has_many_returns_query_builder(engine: Any, session: AsyncSession) -> None:
-    """AC-010-09: has_many(T) returns QueryBuilder[T] with FK WHERE."""
+    """has_many(T) returns QueryBuilder[T] with FK WHERE."""
     await _create_tables(engine)
     user = await RelUser.create(name="alice")
     builder = user.posts()
@@ -72,7 +72,7 @@ async def test_has_many_fetches_related_records(engine: Any, session: AsyncSessi
 
 
 async def test_has_many_chains_where(engine: Any, session: AsyncSession) -> None:
-    """has_many result supports further .where() chaining."""
+    """has_many result supports further .where chaining."""
     await _create_tables(engine)
     user = await RelUser.create(name="alice")
     await RelPost.create(title="first", rel_user_id=user.id)
@@ -104,7 +104,7 @@ async def test_has_many_empty_when_no_related(engine: Any, session: AsyncSession
 
 
 async def test_has_one_returns_single_record(engine: Any, session: AsyncSession) -> None:
-    """AC-010-10: has_one(T) returns the first matching record."""
+    """has_one(T) returns the first matching record."""
     await _create_tables(engine)
     user = await RelUser.create(name="alice")
     await RelProfile.create(bio="hello", rel_user_id=user.id)
@@ -126,7 +126,7 @@ async def test_has_one_returns_none_when_no_related(engine: Any, session: AsyncS
 
 
 async def test_belongs_to_fetches_owner(engine: Any, session: AsyncSession) -> None:
-    """AC-010-10: belongs_to(T) fetches the owning record."""
+    """belongs_to(T) fetches the owning record."""
     await _create_tables(engine)
     user = await RelUser.create(name="alice")
     post = await RelPost.create(title="hello", rel_user_id=user.id)

@@ -1,13 +1,13 @@
-"""QA-Pre tests for WI-arvel-002 — Framework Cleanup & Demo Hardening.
+"""Framework cleanup and demo hardening.
 
 All tests must FAIL before implementation and PASS after.
 
-FR-001: FK defaults removed from CartItem / OrderItem
-FR-002: uuid_id() in arvel.database.columns
-FR-003: TranslatableMixin in arvel.database.mixins
-FR-004: Auth guards in arvel.auth.guards
-FR-005: Demo auth controller uses framework AuthController
-FR-006: CartItem.id and OrderItem.id are integer (BIGSERIAL)
+FK defaults removed from CartItem / OrderItem
+uuid_id() in arvel.database.columns
+TranslatableMixin in arvel.database.mixins
+Auth guards in arvel.auth.guards
+Demo auth controller uses framework AuthController
+CartItem.id and OrderItem.id are integer (BIGSERIAL)
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ def _src(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-# ── FR-001: FK defaults removed ──────────────────────────────────────────────
+# ── FK defaults removed ──────────────────────────────────────────────
 
 
 def test_cart_item_cart_id_has_no_default_factory() -> None:
@@ -63,7 +63,7 @@ def test_order_item_order_id_has_no_default_factory() -> None:
     assert "default_factory" not in src
 
 
-# ── FR-002: uuid_id() in framework ───────────────────────────────────────────
+# ── uuid_id() in framework ───────────────────────────────────────────
 
 
 def test_uuid_id_exists_in_arvel_columns() -> None:
@@ -98,7 +98,7 @@ def test_demo_models_use_uuid_id() -> None:
         assert "uuid_id()" in src, f"{f.name} does not use uuid_id()"
 
 
-# ── FR-003: TranslatableMixin in arvel.database.mixins ───────────────────────
+# ── TranslatableMixin in arvel.database.mixins ───────────────────────
 
 
 def test_arvel_database_mixins_exists() -> None:
@@ -120,7 +120,7 @@ def test_demo_base_re_exports_translatable_mixin() -> None:
     assert "arvel.database.mixins" in src or "arvel.database" in src
 
 
-# ── FR-004: Auth guards in arvel.auth.guards ─────────────────────────────────
+# ── Auth guards in arvel.auth.guards ─────────────────────────────────
 
 
 def test_arvel_auth_guards_exists() -> None:
@@ -158,7 +158,7 @@ def test_demo_deps_imports_guards_from_arvel() -> None:
     assert "arvel.auth.guards" in src
 
 
-# ── FR-005: Demo auth controller extends framework AuthController ─────────────
+# ── Demo auth controller extends framework AuthController ─────────────
 
 
 def test_demo_auth_controller_extends_framework_controller() -> None:
@@ -181,12 +181,12 @@ def test_routes_api_wires_auth_controller() -> None:
     assert "AuthController" in src or "EcommerceAuthController" in src
 
 
-# ── FR-006: CartItem and OrderItem use integer PK ────────────────────────────
+# ── CartItem and OrderItem use integer PK ────────────────────────────
 
 
 def test_cart_item_id_is_integer() -> None:
     src = _src(CART_ITEM_MODEL)
-    # After WI-arvel-010, plain annotations are used — 'id: int = id_()'
+    # After plain annotations are used — 'id: int = id_()'
     assert "    id: int" in src
     assert "id_(" in src
 

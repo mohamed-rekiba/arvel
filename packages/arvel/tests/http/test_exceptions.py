@@ -1,4 +1,4 @@
-"""FR-002-021, FR-002-022 — HttpException hierarchy + HttpExceptionHandler."""
+"""HttpException hierarchy + HttpExceptionHandler."""
 
 from __future__ import annotations
 

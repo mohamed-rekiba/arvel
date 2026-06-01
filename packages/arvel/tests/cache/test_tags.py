@@ -1,4 +1,4 @@
-"""Tests for TaggedCache — FR-006-008."""
+"""Tests for TaggedCache."""
 
 from __future__ import annotations
 

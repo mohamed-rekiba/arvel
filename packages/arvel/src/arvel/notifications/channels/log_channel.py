@@ -1,4 +1,4 @@
-"""LogChannel — logs notification to structlog (FR-009-027)."""
+"""LogChannel — logs notification to structlog."""
 
 from __future__ import annotations
 

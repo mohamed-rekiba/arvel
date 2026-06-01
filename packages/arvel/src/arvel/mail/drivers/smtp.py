@@ -1,4 +1,4 @@
-"""SmtpMailDriver — sends via aiosmtplib (FR-009-019, NFR-009-005, NFR-009-006)."""
+"""SmtpMailDriver — sends via aiosmtplib."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ class SmtpMailDriver:
     """Driver that sends real email via aiosmtplib.
 
     Raises MailException on delivery failure.
-    Warns when TLS is not configured outside test environments (NFR-009-006).
+    Warns when TLS is not configured outside test environments.
     """
 
     def __init__(self, smtp_config: SmtpConfig) -> None:

@@ -1,4 +1,4 @@
-"""Story 6: Database query tracing and metrics — FR-030-019..021."""
+"""Database query tracing and metrics."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ class TestDbTracingConfig:
 
 class TestQueryLoggingProviderDeleted:
     def test_query_logging_service_provider_no_longer_exists(self) -> None:
-        """QueryLoggingServiceProvider must be removed after WI-030."""
+        """QueryLoggingServiceProvider must be removed after ."""
         import importlib
 
         try:

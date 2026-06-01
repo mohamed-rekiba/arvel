@@ -1,15 +1,14 @@
-"""WI-023 — make:* scaffolding commands.
+"""make:* scaffolding commands.
 
-AC covered:
-  AC-002.1  Running arvel <command> Foo writes file at canonical path
-  AC-002.2  Generated file imports right base class
-  AC-002.3  Generated file is syntactically valid Python
-  AC-002.4  Running the command twice fails with exit 1
-  AC-002.5  --force overwrites existing file
-  AC-002.6  Path-traversal-like name exits 2
-  FR-023-009 every make:* command provides a real per-command template
+ Running arvel <command> Foo writes file at canonical path
+ Generated file imports right base class
+ Generated file is syntactically valid Python
+ Running the command twice fails with exit 1
+ --force overwrites existing file
+ Path-traversal-like name exits 2
+ every make:* command provides a real per-command template
 
-The old per-table generators (FR-023-003 / AC-003.x) are now handled by
+The old per-table generators ( / x) are now handled by
 ``arvel vendor:publish``; coverage lives in ``test_vendor_publish.py``.
 """
 
@@ -129,7 +128,7 @@ def test_new_make_creates_file_at_canonical_path(
     expected_import_substring: str,
     tmp_path: Path,
 ) -> None:
-    """AC-002.1 / AC-002.2 / FR-023-009: file at expected path with framework-aware content."""
+    """/ / : file at expected path with framework-aware content."""
     app = _app(command_cls())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, [cli_name, arg])
@@ -151,7 +150,7 @@ def test_new_make_generated_file_is_valid_python(
     expected_path: str,
     tmp_path: Path,
 ) -> None:
-    """AC-002.3: every generated stub parses as Python (or as Jinja for views)."""
+    """every generated stub parses as Python (or as Jinja for views)."""
     app = _app(command_cls())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         runner.invoke(app.typer_app, [cli_name, arg])
@@ -161,7 +160,7 @@ def test_new_make_generated_file_is_valid_python(
 
 
 def test_make_view_emits_jinja_file(tmp_path: Path) -> None:
-    """AC-002.1 / FR-023-002: make:view writes a .html.jinja file."""
+    """/ : make:view writes a .html.jinja file."""
     app = _app(MakeViewCommand())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["make:view", "welcome"])
@@ -180,7 +179,7 @@ def test_new_make_no_overwrite_without_force(
     expected_path: str,
     tmp_path: Path,
 ) -> None:
-    """AC-002.4: second invocation without --force fails."""
+    """second invocation without --force fails."""
     app = _app(command_cls())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         first = runner.invoke(app.typer_app, [cli_name, arg])
@@ -197,7 +196,7 @@ def test_new_make_rejects_unsafe_name(
     command_cls: type[Command],
     tmp_path: Path,
 ) -> None:
-    """AC-002.6 / SR-023-003: path-traversal-like name rejected with exit 2."""
+    """/ SR-023-003: path-traversal-like name rejected with exit 2."""
     app = _app(command_cls())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, [command_cls.name, "../EvilName"])

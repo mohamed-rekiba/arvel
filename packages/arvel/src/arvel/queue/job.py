@@ -1,6 +1,6 @@
-"""Job base class — Pydantic BaseModel with handle() and auto-registration (ADR-033).
+"""Job base class — Pydantic BaseModel with handle() and auto-registration.
 
-WI-018 added ``delay`` and ``priority`` as first-class fields (ADR-066). Both
+``delay`` and ``priority`` are first-class envelope fields. Both
 are envelope metadata, not job state, so they're excluded from the JSON
 payload that travels through the broker.
 """
@@ -28,9 +28,9 @@ class Job(BaseModel):
     queue: str = "default"
     tries: int = 3
     timeout: int = 60
-    # ADR-066: delay accepts int (seconds) or timedelta; normalised to int at envelope time.
+    # delay accepts int (seconds) or timedelta; normalised to int at envelope time.
     delay: int | timedelta = 0
-    # ADR-066: priority is 0..9; out-of-range rejected at instantiation.
+    # priority is 0..9; out-of-range rejected at instantiation.
     priority: int = Field(default=0, ge=0, le=9)
     # Seconds to wait before retry; list means per-attempt delays (e.g. [30, 60, 120]).
     backoff: int | list[int] = 0

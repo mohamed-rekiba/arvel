@@ -31,7 +31,7 @@ def _make_provider(config: AuthConfig | None = None) -> tuple[Application, AuthS
 
 
 def test_register_binds_default_broker() -> None:
-    """FR-028-36 — container resolves AuthBroker to default broker instance."""
+    """container resolves AuthBroker to default broker instance."""
     app, provider = _make_provider()
     provider.register()
 
@@ -40,7 +40,7 @@ def test_register_binds_default_broker() -> None:
 
 
 def test_register_binds_user_overridden_broker() -> None:
-    """FR-028-36 — config-supplied class wins over default."""
+    """config-supplied class wins over default."""
     config = AuthConfig(
         default="web",
         jwt=JwtConfig(secret="test-secret-at-least-32-chars-ok"),
@@ -54,7 +54,7 @@ def test_register_binds_user_overridden_broker() -> None:
 
 
 def test_broker_uses_refresh_token_model_by_default() -> None:
-    """FR-028-40 — the default ``AuthBroker`` persists rotation via ``RefreshToken``."""
+    """the default ``AuthBroker`` persists rotation via ``RefreshToken``."""
     from arvel.auth.models.refresh_token import RefreshToken
 
     app, provider = _make_provider()
@@ -66,7 +66,7 @@ def test_broker_uses_refresh_token_model_by_default() -> None:
 
 
 def test_boot_registers_routes_when_enabled() -> None:
-    """FR-028-34 — config.auth.routes.enabled=True → routes registered in Router."""
+    """config.auth.routes.enabled=True → routes registered in Router."""
     from arvel.routing import Router
 
     config = AuthConfig(
@@ -85,7 +85,7 @@ def test_boot_registers_routes_when_enabled() -> None:
 
 
 def test_boot_skips_routes_when_disabled() -> None:
-    """FR-028-34 — config.auth.routes.enabled=False → no routes added."""
+    """config.auth.routes.enabled=False → no routes added."""
     from arvel.routing import Router
 
     config = AuthConfig(
@@ -104,7 +104,7 @@ def test_boot_skips_routes_when_disabled() -> None:
 
 @pytest.mark.asyncio
 async def test_boot_publishes_4_tags(tmp_path: Path) -> None:
-    """FR-028-42 — arvel-auth-{config,views,routes,migrations} all registered."""
+    """arvel-auth-{config,views,routes,migrations} all registered."""
     app, provider = _make_provider()
     provider.register()
 
@@ -122,7 +122,7 @@ async def test_boot_publishes_4_tags(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_default_listeners_attached(tmp_path: Path) -> None:
-    """FR-028-39 — default listeners wire Registered and PasswordResetRequested to mailables."""
+    """default listeners wire Registered and PasswordResetRequested to mailables."""
     app, provider = _make_provider()
     dispatcher = EventDispatcher()
     app.container.instance(EventDispatcher, dispatcher)

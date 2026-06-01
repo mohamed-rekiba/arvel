@@ -1,5 +1,5 @@
 """
-FR-007-046..050 — HashFacade (bcrypt default, argon2id opt-in).
+HashFacade (bcrypt default, argon2id opt-in).
 Tests import from arvel.facades.hash and arvel.auth.hashing → red state.
 """
 
@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-# ─── FR-007-046: Hash.make() produces a bcrypt hash ──────────────────────────
+# Hash.make() produces a bcrypt hash
 
 
 def test_hash_make_returns_bcrypt_hash_by_default() -> None:
@@ -25,7 +25,7 @@ def test_hash_make_is_not_plaintext() -> None:
     assert hashed != "mypassword"
 
 
-# ─── FR-007-047: Hash.check() verifies passwords ─────────────────────────────
+# Hash.check() verifies passwords
 
 
 def test_hash_check_returns_true_for_correct_password() -> None:
@@ -42,9 +42,6 @@ def test_hash_check_returns_false_for_wrong_password() -> None:
     assert Hash.check("wrong", hashed) is False
 
 
-# ─── FR-007-048: Hash.needs_rehash() ─────────────────────────────────────────
-
-
 def test_hash_needs_rehash_returns_false_for_fresh_hash() -> None:
     from arvel.facades.hash import Hash
 
@@ -52,7 +49,7 @@ def test_hash_needs_rehash_returns_false_for_fresh_hash() -> None:
     assert Hash.needs_rehash(hashed) is False
 
 
-# ─── FR-007-049: bcrypt cost is configurable ─────────────────────────────────
+# bcrypt cost is configurable
 
 
 def test_hash_make_accepts_rounds_parameter() -> None:
@@ -63,7 +60,7 @@ def test_hash_make_accepts_rounds_parameter() -> None:
     assert "$argon2" in hashed
 
 
-# ─── FR-007-050: Hash.make_argon2() available when argon2-cffi installed ─────
+# Hash.make_argon2() available when argon2-cffi installed
 
 
 def test_hash_make_argon2_delegates_to_argon2_hasher() -> None:
@@ -73,18 +70,12 @@ def test_hash_make_argon2_delegates_to_argon2_hasher() -> None:
     assert hashed.startswith(("$argon2id$", "$argon2"))
 
 
-# ─── Hash returns different values for same input (salt) ─────────────────────
-
-
 def test_hash_make_produces_different_hashes_for_same_input() -> None:
     from arvel.facades.hash import Hash
 
     h1 = Hash.make("password")
     h2 = Hash.make("password")
     assert h1 != h2  # each call uses a fresh random salt
-
-
-# ─── Hash.check() is timing-safe ─────────────────────────────────────────────
 
 
 def test_hash_module_uses_bcrypt_checkpw_not_eq() -> None:

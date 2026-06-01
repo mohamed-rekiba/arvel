@@ -1,9 +1,8 @@
-"""Migration round-trip tests — US-002.
+"""Migration round-trip on a clean database.
 
-RED: passes once Docker is available; will turn GREEN once the migrations
-directory is correct. Tests the schema structure, not application code.
+Tests schema structure, not application code.
 
-Acceptance criteria (US-002):
+Coverage:
 - All 9 demo migrations apply without error
 - products_catalog materialized view exists after migrations
 - GIN indexes exist on products.name, categories.name, products.search_vector
@@ -20,7 +19,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.mark.asyncio
 async def test_all_migrations_apply_without_error(fresh_db: str) -> None:
-    """US-002: migrations run on a clean database without raising."""
+    """migrations run on a clean database without raising."""
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -37,7 +36,7 @@ async def test_all_migrations_apply_without_error(fresh_db: str) -> None:
 
 @pytest.mark.asyncio
 async def test_products_catalog_materialized_view_exists(fresh_db: str) -> None:
-    """US-002: products_catalog materialized view exists after migrations."""
+    """products_catalog materialized view exists after migrations."""
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -55,7 +54,7 @@ async def test_products_catalog_materialized_view_exists(fresh_db: str) -> None:
 
 @pytest.mark.asyncio
 async def test_products_catalog_has_unique_index(fresh_db: str) -> None:
-    """US-002: unique index on products_catalog.id exists (REFRESH CONCURRENTLY requirement)."""
+    """unique index on products_catalog.id exists (REFRESH CONCURRENTLY requirement)."""
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -78,7 +77,7 @@ async def test_products_catalog_has_unique_index(fresh_db: str) -> None:
 
 @pytest.mark.asyncio
 async def test_gin_index_on_products_search_vector(fresh_db: str) -> None:
-    """US-002: GIN index exists on products.search_vector for FTS."""
+    """GIN index exists on products.search_vector for FTS."""
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -101,7 +100,7 @@ async def test_gin_index_on_products_search_vector(fresh_db: str) -> None:
 
 @pytest.mark.asyncio
 async def test_products_table_has_correct_columns(fresh_db: str) -> None:
-    """US-002: products table has all required columns with correct types."""
+    """products table has all required columns with correct types."""
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -139,7 +138,7 @@ async def test_products_table_has_correct_columns(fresh_db: str) -> None:
 
 @pytest.mark.asyncio
 async def test_roles_table_has_level_column(fresh_db: str) -> None:
-    """US-005: roles table stores the prompt's numeric hierarchy."""
+    """roles table stores the prompt's numeric hierarchy."""
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -161,7 +160,7 @@ async def test_roles_table_has_level_column(fresh_db: str) -> None:
 
 @pytest.mark.asyncio
 async def test_search_vector_trigger_fires_on_product_insert(fresh_db: str) -> None:
-    """US-002: inserting a product populates search_vector via the trigger."""
+    """inserting a product populates search_vector via the trigger."""
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 

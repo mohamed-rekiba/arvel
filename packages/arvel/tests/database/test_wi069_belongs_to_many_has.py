@@ -1,4 +1,4 @@
-"""WI-arvel-069 — Epic 049 Story 6: has/where_has/doesnt_have for BelongsToMany."""
+"""Has/where_has/doesnt_have for BelongsToMany."""
 
 from __future__ import annotations
 

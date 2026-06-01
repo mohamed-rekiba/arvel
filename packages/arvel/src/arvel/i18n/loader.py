@@ -1,15 +1,15 @@
-"""TranslationLoader Protocol + PythonFileLoader / JsonFileLoader (ADR-063, FB-027-001).
+"""TranslationLoader Protocol + PythonFileLoader / JsonFileLoader.
 
 Two ready-to-use loaders ship out of the box:
 
 - :class:`PythonFileLoader` — reads ``resources/lang/{locale}/{namespace}.py``,
-  the original WI-015 driver. Each file exports a module-level
-  ``translations: dict[str, str | dict]``.
+ the original driver. Each file exports a module-level
+ ``translations: dict[str, str | dict]``.
 - :class:`JsonFileLoader` — reads ``resources/lang/{locale}/{namespace}.json``
-  **or** ``resources/lang/{locale}.json`` (single-file mode). Same
-  string-or-nested-dict shape as the Python driver but in JSON, so a
-  single catalog can serve both backend (Python) and frontend
-  (Vue I18n / i18next) consumers (FR-027-102 and FB-027-001).
+ **or** ``resources/lang/{locale}.json`` (single-file mode). Same
+ string-or-nested-dict shape as the Python driver but in JSON, so a
+ single catalog can serve both backend (Python) and frontend
+ (Vue I18n / i18next) consumers.
 
 Both implement :class:`TranslationLoader` and are interchangeable —
 applications wire whichever fits via :class:`arvel.providers.LangServiceProvider`
@@ -73,7 +73,7 @@ class JsonFileLoader:
     The single-file layout is the recommended shape when the same catalog
     must be consumed by Vue I18n on the frontend and the backend
     Translator on the same code path — only one file to keep in sync per
-    locale (FR-027-102 / FB-027-001).
+    locale.
 
     File contents must decode to ``dict[str, str | dict]`` recursively;
     anything else raises :class:`TranslationFileMalformedError`.

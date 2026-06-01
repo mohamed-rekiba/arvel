@@ -1,6 +1,6 @@
-"""WI-021 quality gate #34 — CLI exit-code honesty.
+"""quality gate #34 — CLI exit-code honesty.
 
-NFR-021-04: no command in the WI-021 surface produces a "success" exit code (0)
+: no command in the surface produces a "success" exit code (0)
 without doing real work. Bucket-A real-wire-up commands (migrate, cache:*) exit 0
 only after their backing call returns success; bucket-C honest-deferral commands
 (key:rotate) exit 2 with a tracking-issue pointer.
@@ -19,7 +19,7 @@ import pytest
 
 
 class TestCacheClearHonesty:
-    """FR-021-06 + NFR-021-04: cache:clear fails when subsystem unbound."""
+    """+ : cache:clear fails when subsystem unbound."""
 
     def test_clear_does_not_print_success_on_failure(
         self, capsys: pytest.CaptureFixture[str]
@@ -40,7 +40,7 @@ class TestCacheClearHonesty:
 
 
 class TestCacheForgetHonesty:
-    """FR-021-07 + NFR-021-04: cache:forget fails when subsystem unbound."""
+    """+ : cache:forget fails when subsystem unbound."""
 
     def test_forget_does_not_print_success_on_failure(
         self, capsys: pytest.CaptureFixture[str]
@@ -58,7 +58,7 @@ class TestCacheForgetHonesty:
 
 
 class TestKeyRotateHonesty:
-    """FR-021-08 + NFR-021-04: key:rotate exits 2 with NotImplementedError messaging."""
+    """+ : key:rotate exits 2 with NotImplementedError messaging."""
 
     def test_key_rotate_does_not_exit_zero_for_unimplemented_path(
         self, capsys: pytest.CaptureFixture[str]

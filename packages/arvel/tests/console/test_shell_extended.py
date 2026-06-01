@@ -1,8 +1,8 @@
 """Shell REPL — extended namespace, model auto-import, and DB facade wiring.
 
-These tests cover the post-WI-021 enhancements: the expanded facade set, user
+These tests cover the post- enhancements: the expanded facade set, user
 model auto-import from ``app/models/*.py``, banner output, and the DB facade
-fallback wiring done in ``DatabaseServiceProvider.boot()``.
+fallback wiring done in ``DatabaseServiceProvider.boot``.
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ class TestExpandedFacades:
 
 class TestAutoImportUserModels:
     """The REPL should pre-import user ORM models so newcomers can type
-    ``User.query()`` without first writing ``from app.models.user import User``."""
+    ``User.query`` without first writing ``from app.models.user import User``."""
 
     def test_imports_model_subclasses_into_namespace(self, db_env: Path) -> None:
         models_dir = db_env / "app" / "models"
@@ -282,9 +282,9 @@ def _reset_db_facade(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 class TestDatabaseProviderConfiguresDBFacade:
-    """``DB.transaction()`` and ``DB.select(...)`` from CLI commands (outside
+    """``DB.transaction`` and ``DB.select(...)`` from CLI commands (outside
     HTTP middleware scope) need a session maker on the DB facade. After
-    ``DatabaseServiceProvider.boot()``, that maker MUST be configured.
+    ``DatabaseServiceProvider.boot``, that maker MUST be configured.
 
     Verified by behaviour: ``DB.select(...)`` must succeed outside any HTTP
     request scope. Pre-fix, the call raised
@@ -309,8 +309,8 @@ class TestDatabaseProviderConfiguresDBFacade:
 
 
 class TestIPythonNamespaceWiring:
-    """The namespace built by ``build_namespace()`` must be reachable from
-    code typed at the REPL prompt. IPython's ``embed()`` is fussy about
+    """The namespace built by ``build_namespace`` must be reachable from
+    code typed at the REPL prompt. IPython's ``embed`` is fussy about
     which kwarg name it accepts (``user_ns``, not ``local_ns``) — and the
     wrong name is silently dropped without error. This test instantiates a
     real ``InteractiveShellEmbed`` with the same kwargs the command uses and

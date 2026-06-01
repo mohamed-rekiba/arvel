@@ -1,4 +1,4 @@
-"""HTTP-layer security regressions — NFR-002-004, NFR-002-005, NFR-002-008."""
+"""HTTP-layer security regressions — ."""
 
 from __future__ import annotations
 
@@ -10,9 +10,7 @@ from typing import Any
 import pytest
 from arvel.auth.config import JwtConfig
 
-# ─────────────────────────────────────────────────────────────────────────────
-# NFR-002-004 — Safe defaults
-# ─────────────────────────────────────────────────────────────────────────────
+#  Safe defaults
 
 
 def test_cors_rejects_wildcard_with_credentials() -> None:
@@ -61,9 +59,7 @@ def test_jwt_guard_rejects_short_hmac_secret() -> None:
         JwtGuard(resolver=_R(), jwt=JwtConfig(secret="too-short"))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# NFR-002-004 — HttpExceptionHandler never leaks stack traces
-# ─────────────────────────────────────────────────────────────────────────────
+#  HttpExceptionHandler never leaks stack traces
 
 
 def test_500_response_does_not_contain_stack_trace() -> None:
@@ -84,9 +80,7 @@ def test_500_response_does_not_contain_stack_trace() -> None:
         assert forbidden not in body
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# NFR-002-008 — Log redaction
-# ─────────────────────────────────────────────────────────────────────────────
+#  Log redaction
 
 
 def test_exception_handler_logs_redact_authorization_header(
@@ -118,9 +112,7 @@ def test_exception_handler_logs_redact_authorization_header(
     assert "secret-cookie-value" not in full_log
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# NFR-002-005 — OWASP A07 / A09 patterns
-# ─────────────────────────────────────────────────────────────────────────────
+#  OWASP A07 / A09 patterns
 
 
 def test_throttle_uses_constant_time_key_hashing_for_redis() -> None:

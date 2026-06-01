@@ -1,4 +1,4 @@
-"""FR-013-025, NFR-013-006 — ChannelManager (in-process pub/sub)."""
+"""ChannelManager (in-process pub/sub)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_subscribe_adds_connection_to_channel() -> None:
-    """FR-013-025 AC1: subscribe(channel, connection) registers the connection."""
+    """subscribe(channel, connection) registers the connection."""
     from arvel.reverb.channel_manager import ChannelManager
 
     mgr = ChannelManager()
@@ -20,7 +20,7 @@ async def test_subscribe_adds_connection_to_channel() -> None:
 
 @pytest.mark.asyncio
 async def test_unsubscribe_removes_connection() -> None:
-    """FR-013-025 AC2: unsubscribe removes the connection."""
+    """unsubscribe removes the connection."""
     from arvel.reverb.channel_manager import ChannelManager
 
     mgr = ChannelManager()
@@ -32,7 +32,7 @@ async def test_unsubscribe_removes_connection() -> None:
 
 @pytest.mark.asyncio
 async def test_publish_fans_out_to_all_subscribers() -> None:
-    """FR-013-025 AC3: publish dispatches the event frame to every subscriber on the channel."""
+    """publish dispatches the event frame to every subscriber on the channel."""
     from arvel.reverb.channel_manager import ChannelManager
 
     mgr = ChannelManager()
@@ -57,7 +57,7 @@ async def test_publish_fans_out_to_all_subscribers() -> None:
 
 @pytest.mark.asyncio
 async def test_publish_skips_except_socket_id() -> None:
-    """FR-013-025 AC4: except_socket_id excludes the originating connection."""
+    """except_socket_id excludes the originating connection."""
     from arvel.reverb.channel_manager import ChannelManager
 
     mgr = ChannelManager()
@@ -83,7 +83,7 @@ async def test_publish_skips_except_socket_id() -> None:
 
 @pytest.mark.asyncio
 async def test_send_failure_disconnects_connection() -> None:
-    """NFR-013-006: slow / failing connection is removed; fan-out continues for others."""
+    """slow / failing connection is removed; fan-out continues for others."""
     from arvel.reverb.channel_manager import ChannelManager
 
     mgr = ChannelManager()

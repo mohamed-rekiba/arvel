@@ -100,7 +100,8 @@ def test_catalog_serializers_use_service_layer() -> None:
 
 def test_category_vendor_indexes_honor_trashed_filter() -> None:
     """Trashed filtering is a typed query param on the controller index, surfaced in
-    the OpenAPI spec, and passed straight to the service's list()."""
+    the OpenAPI spec, and passed straight to the service's list().
+    """
     cat_ctrl = _src(CATEGORIES_CTRL)
     ven_ctrl = _src(VENDORS_CTRL)
     cat_svc = _src(CATEGORY_SERVICE)

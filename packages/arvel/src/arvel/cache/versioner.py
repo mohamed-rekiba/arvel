@@ -1,22 +1,22 @@
-"""CacheVersioner — version-stamped cache key invalidation (FR-032-07).
+"""CacheVersioner — version-stamped cache key invalidation.
 
-Pattern extracted from the demo's ``ItemService``.  Instead of deleting
+Pattern extracted from the demo's ``ItemService``. Instead of deleting
 individual cache entries on write, we bump a version counter stored under a
-dedicated key.  Any subsequent call to :meth:`versioned_key` generates a new
+dedicated key. Any subsequent call to :meth:`versioned_key` generates a new
 composite key that differs from all pre-invalidation keys, effectively making
 the old entries unreachable (they expire naturally via TTL).
 
 Usage::
 
-    versioner = CacheVersioner("items:list", store=cache_store)
+ versioner = CacheVersioner("items:list", store=cache_store)
 
-    # Build a key for a specific filter set
-    key = await versioner.versioned_key("user:1", "page:2")
-    cached = await store.get(key)
+ # Build a key for a specific filter set
+ key = await versioner.versioned_key("user:1", "page:2")
+ cached = await store.get(key)
 
-    # Invalidate all list caches for this prefix
-    await versioner.invalidate()
-    # versioner.versioned_key(...) now returns a different key.
+ # Invalidate all list caches for this prefix
+ await versioner.invalidate
+ # versioner.versioned_key(...) now returns a different key.
 
 Each ``CacheVersioner`` instance is scoped to a prefix so two versioners
 with different prefixes don't interfere (AC-18).

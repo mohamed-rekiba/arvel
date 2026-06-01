@@ -1,4 +1,4 @@
-"""Tests for FailedJobStore — FR-008-010..012."""
+"""Tests for FailedJobStore"""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ async def failed_store() -> AsyncIterator[FailedJobStore]:
 
 
 class TestFailedJobStore:
-    """FR-008-010: Failed jobs are persisted in failed_jobs table."""
+    """Failed jobs are persisted in failed_jobs table."""
 
     @pytest.mark.asyncio
     async def test_create_failed_job(self, failed_store: FailedJobStore) -> None:
@@ -56,7 +56,7 @@ class TestFailedJobStore:
 
     @pytest.mark.asyncio
     async def test_delete_by_uuid(self, failed_store: FailedJobStore) -> None:
-        """FR-008-011: queue:forget deletes a failed job."""
+        """queue:forget deletes a failed job."""
         env = JobEnvelope(job_class="myapp.jobs.MyJob", payload={"value": 3})
         created = await failed_store.create(envelope=env, queue="default", error="err")
         deleted = await failed_store.delete(created.uuid)
@@ -70,7 +70,7 @@ class TestFailedJobStore:
 
     @pytest.mark.asyncio
     async def test_flush_all(self, failed_store: FailedJobStore) -> None:
-        """FR-008-012: queue:flush clears all failed jobs."""
+        """queue:flush clears all failed jobs."""
         for i in range(5):
             env = JobEnvelope(job_class="myapp.jobs.MyJob", payload={"value": i})
             await failed_store.create(envelope=env, queue="default", error="err")
@@ -79,7 +79,7 @@ class TestFailedJobStore:
 
     @pytest.mark.asyncio
     async def test_error_truncated_to_65535_chars(self, failed_store: FailedJobStore) -> None:
-        """Error column is capped at 65 535 chars (see ADR-035 / schema doc)."""
+        """Error column is capped at 65 535 chars (see / schema doc)."""
         long_error = "x" * 100_000
         env = JobEnvelope(job_class="myapp.jobs.MyJob", payload={})
         created = await failed_store.create(envelope=env, queue="default", error=long_error)

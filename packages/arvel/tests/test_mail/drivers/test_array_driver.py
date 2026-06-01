@@ -1,4 +1,4 @@
-"""Tests for ArrayMailDriver — FR-009-018."""
+"""Tests for ArrayMailDriver."""
 
 from __future__ import annotations
 

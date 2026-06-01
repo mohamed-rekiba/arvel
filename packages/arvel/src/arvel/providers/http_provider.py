@@ -30,7 +30,7 @@ def default_translators() -> Mapping[type[Exception], ExceptionTranslator]:
 
     Lives in the providers layer because it imports `arvel.http` plus the
     optional `arvel.database` / `arvel.auth` packages — the HTTP package itself
-    stays ORM- and auth-agnostic (ADR-016). Each upstream import is optional;
+    stays ORM- and auth-agnostic. Each upstream import is optional;
     when a package isn't importable its translators are simply absent and apps
     fall back to the generic 500 envelope for those errors.
     """

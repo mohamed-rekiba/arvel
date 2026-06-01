@@ -1,4 +1,4 @@
-"""Unit tests for queue console commands — FR-008-018..022, updated for WI-021.
+"""Unit tests for queue console commands.
 
 These exercise the private async work methods (``_run`` / ``_list`` / ``_retry`` /
 ``_flush`` / ``_forget``) directly. The Typer-callback path is covered separately
@@ -14,7 +14,7 @@ from arvel.queue.config import QueueDriver
 
 
 class TestQueueWorkCommand:
-    """FR-008-018: queue:work starts the worker loop."""
+    """queue:work starts the worker loop."""
 
     def test_command_name(self) -> None:
         from arvel.queue.commands.queue_work import QueueWorkCommand
@@ -37,7 +37,7 @@ class TestQueueWorkCommand:
 
 
 class TestQueueFailedCommand:
-    """FR-008-019: queue:failed lists failed jobs."""
+    """queue:failed lists failed jobs."""
 
     def test_command_name(self) -> None:
         from arvel.queue.commands.queue_failed import QueueFailedCommand
@@ -105,7 +105,7 @@ class TestQueueFailedCommand:
 
 
 class TestQueueRetryCommand:
-    """FR-008-020: queue:retry re-dispatches a failed job."""
+    """queue:retry re-dispatches a failed job."""
 
     def test_command_name(self) -> None:
         from arvel.queue.commands.queue_retry import QueueRetryCommand
@@ -176,7 +176,7 @@ class TestQueueRetryCommand:
 
 
 class TestQueueFlushCommand:
-    """FR-008-021: queue:flush clears all failed jobs."""
+    """queue:flush clears all failed jobs."""
 
     def test_command_name(self) -> None:
         from arvel.queue.commands.queue_flush import QueueFlushCommand
@@ -195,7 +195,7 @@ class TestQueueFlushCommand:
 
 
 class TestQueueForgetCommand:
-    """FR-008-022: queue:forget deletes one failed job by UUID."""
+    """queue:forget deletes one failed job by UUID."""
 
     def test_command_name(self) -> None:
         from arvel.queue.commands.queue_forget import QueueForgetCommand

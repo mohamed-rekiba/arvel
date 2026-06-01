@@ -1,13 +1,13 @@
-"""Content dataclass — email body definition (FR-009-013).
+"""Content dataclass — email body definition.
 
 A ``Content`` describes what goes inside the email envelope. Bodies come
 in two flavours and two delivery modes:
 
 - **Inline**: ``text=`` and ``html=`` carry the body as a literal string.
-  No template rendering is performed; the string is used verbatim.
+ No template rendering is performed; the string is used verbatim.
 - **Template**: ``text_view=`` and ``html_view=`` are Jinja2 template
-  names resolved via :mod:`arvel.support.view`. ``data=`` carries the
-  template context shared between both views.
+ names resolved via :mod:`arvel.support.view`. ``data=`` carries the
+ template context shared between both views.
 
 Validation:
 
@@ -17,10 +17,10 @@ Validation:
 
 Typical shapes::
 
-    Content(text="Hi! Thanks for signing up.")                       # text only
-    Content(html="<p>Hi! Thanks.</p>")                               # html only — text auto-derived
-    Content(html_view="welcome.html.j2", text_view="welcome.txt.j2", # both via templates
-            data={"name": user.name})
+ Content(text="Hi! Thanks for signing up.") # text only
+ Content(html="<p>Hi! Thanks.</p>") # html only — text auto-derived
+ Content(html_view="welcome.html.j2", text_view="welcome.txt.j2", # both via templates
+ data={"name": user.name})
 
 When only an HTML body is supplied, the mailer auto-derives a plain-text
 alternative (see :mod:`arvel.support.html_to_text`). For accessibility

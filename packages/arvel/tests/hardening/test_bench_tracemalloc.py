@@ -1,4 +1,4 @@
-"""WI-017 / FR-017-010: byte-granular memory bench via tracemalloc."""
+"""Byte-granular memory bench via tracemalloc."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import inspect
 
 
 def test_tracemalloc_function_exists() -> None:
-    """FR-017-010: bench_reverb must expose bench_resident_memory_tracemalloc."""
+    """bench_reverb must expose bench_resident_memory_tracemalloc."""
     module = importlib.import_module("benchmarks.bench_reverb")
     fn = getattr(module, "bench_resident_memory_tracemalloc", None)
     assert callable(fn), (
@@ -16,7 +16,7 @@ def test_tracemalloc_function_exists() -> None:
 
 
 def test_legacy_resident_memory_bench_still_exists() -> None:
-    """FB-014-002 explicitly says keep bench_resident_memory() for back-compat."""
+    """Keep bench_resident_memory() alongside tracemalloc for back-compat."""
     module = importlib.import_module("benchmarks.bench_reverb")
     assert callable(getattr(module, "bench_resident_memory", None)), (
         "bench_resident_memory() must remain alongside the tracemalloc version"

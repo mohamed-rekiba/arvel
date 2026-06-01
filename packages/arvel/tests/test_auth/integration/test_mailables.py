@@ -1,4 +1,4 @@
-"""Default mailables render correctly (FR-028-05, FR-028-24, FR-028-38)."""
+"""Default mailables render correctly."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_verify_email_mailable_renders_html_and_text() -> None:
-    """FR-028-05, NFR-028-21 — both template names present, signed URL embedded."""
+    """both template names present, signed URL embedded."""
     from arvel.auth.mail import VerifyEmailMailable
 
     m = VerifyEmailMailable(
@@ -27,7 +27,7 @@ async def test_verify_email_mailable_renders_html_and_text() -> None:
 
 @pytest.mark.asyncio
 async def test_password_reset_mailable_renders_html_and_text() -> None:
-    """FR-028-24 — reset URL embedded; ttl_minutes in context."""
+    """reset URL embedded; ttl_minutes in context."""
     from arvel.auth.mail import PasswordResetMailable
 
     m = PasswordResetMailable(
@@ -48,7 +48,7 @@ async def test_password_reset_mailable_renders_html_and_text() -> None:
 
 @pytest.mark.asyncio
 async def test_user_template_overrides_framework_default() -> None:
-    """FR-028-38 — VerifyEmailMailable uses configurable template names."""
+    """VerifyEmailMailable uses configurable template names."""
     from arvel.auth.mail import VerifyEmailMailable
 
     m = VerifyEmailMailable(user_email="u@test.com", verify_url="https://example.com/v/x")

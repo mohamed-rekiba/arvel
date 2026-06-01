@@ -1,4 +1,4 @@
-"""FR-004-010: ``ApplicationBuilder.with_config_dir(path)``.
+"""``ApplicationBuilder.with_config_dir(path)``.
 
 Discovers every ``.py`` file in ``path`` (non-recursive, no ``_`` prefix),
 loads each via the namespaced loader, and exposes its top-level attributes

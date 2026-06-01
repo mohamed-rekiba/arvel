@@ -1,4 +1,4 @@
-"""Tests for Session Database Store — FR-006-020."""
+"""Tests for Session Database Store."""
 
 from __future__ import annotations
 

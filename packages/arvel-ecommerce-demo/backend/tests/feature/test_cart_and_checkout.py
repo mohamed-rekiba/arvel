@@ -1,15 +1,13 @@
-"""Cart and checkout tests — US-020 (cart) + US-021 (checkout) + US-022 (orders).
+"""Cart, checkout, and order history.
 
-RED: all tests fail at import until Stage 3b.
-
-Acceptance criteria:
-- US-020: authenticated customer can add, update, remove cart items
-- US-020: duplicate add increments quantity (no duplicate rows)
-- US-021: checkout reads price from DB at checkout time, not from cart snapshot
-- US-021: checkout reduces stock_qty atomically; fails if insufficient stock
-- US-021: successful checkout creates order with line item price snapshots
-- US-022: customer can list their orders and view order detail
-- US-022: customer cannot access another customer's order (403)
+Coverage:
+- authenticated customer can add, update, remove cart items
+- duplicate add increments quantity (no duplicate rows)
+- checkout reads price from DB at checkout time, not from cart snapshot
+- checkout reduces stock_qty atomically; fails if insufficient stock
+- successful checkout creates order with line item price snapshots
+- customer can list their orders and view order detail
+- customer cannot access another customer's order (403)
 """
 
 from __future__ import annotations
@@ -50,7 +48,7 @@ async def app(
     monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.setenv("APP_KEY", "cart-checkout-test-key-32-bytes-or-more!")
 
-    from app.bootstrap import create_app  # RED until Stage 3b
+    from app.bootstrap import create_app
 
     application = await create_app()
     await application.seed("catalog")
@@ -88,12 +86,12 @@ async def headphones_id(client: Any) -> str:
     return str(response.json()["data"]["id"])
 
 
-# ─── US-020: cart ────────────────────────────────────────────────────────────────
+# ─── cart ────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_empty_cart_returns_no_items(client: Any, customer_token: str) -> None:
-    """US-020: new customer has an empty cart."""
+    """new customer has an empty cart."""
     response = await client.get("/api/cart", headers={"Authorization": f"Bearer {customer_token}"})
     assert response.status_code == 200
     assert response.json()["data"]["items"] == []
@@ -101,7 +99,7 @@ async def test_empty_cart_returns_no_items(client: Any, customer_token: str) -> 
 
 @pytest.mark.asyncio
 async def test_add_item_to_cart(client: Any, customer_token: str, headphones_id: str) -> None:
-    """US-020: adding a product creates a cart item."""
+    """adding a product creates a cart item."""
     response = await client.post(
         "/api/cart/items",
         headers={"Authorization": f"Bearer {customer_token}"},
@@ -118,7 +116,7 @@ async def test_add_item_to_cart(client: Any, customer_token: str, headphones_id:
 async def test_adding_same_product_twice_increments_quantity(
     client: Any, customer_token: str, headphones_id: str
 ) -> None:
-    """US-020: duplicate add-to-cart merges into one cart item row."""
+    """duplicate add-to-cart merges into one cart item row."""
     await client.post(
         "/api/cart/items",
         headers={"Authorization": f"Bearer {customer_token}"},
@@ -139,7 +137,7 @@ async def test_adding_same_product_twice_increments_quantity(
 async def test_update_cart_item_quantity(
     client: Any, customer_token: str, headphones_id: str
 ) -> None:
-    """US-020: PATCH /api/cart/items/{id} updates quantity."""
+    """PATCH /api/cart/items/{id} updates quantity."""
     cart = await client.post(
         "/api/cart/items",
         headers={"Authorization": f"Bearer {customer_token}"},
@@ -158,7 +156,7 @@ async def test_update_cart_item_quantity(
 
 @pytest.mark.asyncio
 async def test_remove_cart_item(client: Any, customer_token: str, headphones_id: str) -> None:
-    """US-020: DELETE /api/cart/items/{id} removes the item."""
+    """DELETE /api/cart/items/{id} removes the item."""
     cart = await client.post(
         "/api/cart/items",
         headers={"Authorization": f"Bearer {customer_token}"},
@@ -174,14 +172,14 @@ async def test_remove_cart_item(client: Any, customer_token: str, headphones_id:
     assert removed.json()["data"]["items"] == []
 
 
-# ─── US-021: checkout ────────────────────────────────────────────────────────────
+# ─── checkout ────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_checkout_creates_order_with_price_snapshot(
     client: Any, customer_token: str, headphones_id: str
 ) -> None:
-    """US-021: checkout reads price from DB, stores snapshot in order_items."""
+    """checkout reads price from DB, stores snapshot in order_items."""
     await client.post(
         "/api/cart/items",
         headers={"Authorization": f"Bearer {customer_token}"},
@@ -212,11 +210,12 @@ async def test_checkout_creates_order_with_price_snapshot(
 async def test_checkout_fails_on_insufficient_stock(
     client: Any, customer_token: str, headphones_id: str
 ) -> None:
-    """US-021: checkout is the atomic stock gate.
+    """checkout is the atomic stock gate.
 
     Adding is optimistic; the authoritative check happens at checkout under a row
     lock. This reproduces the oversell race: the item is in stock when added, then
     sells out before this customer checks out, so checkout must 409.
+
     """
     await client.post(
         "/api/cart/items",
@@ -241,14 +240,14 @@ async def test_checkout_fails_on_insufficient_stock(
     assert checkout.status_code == 409
 
 
-# ─── US-022: order history ────────────────────────────────────────────────────────
+# ─── order history ────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_customer_can_list_their_orders(
     client: Any, customer_token: str, headphones_id: str
 ) -> None:
-    """US-022: GET /api/account/orders returns customer's own orders."""
+    """GET /api/account/orders returns customer's own orders."""
     await client.post(
         "/api/cart/items",
         headers={"Authorization": f"Bearer {customer_token}"},
@@ -274,7 +273,7 @@ async def test_customer_cannot_access_another_customers_order(
     customer2_token: str,
     headphones_id: str,
 ) -> None:
-    """US-022: customer cannot read another customer's order detail."""
+    """customer cannot read another customer's order detail."""
     # Customer 1 places an order
     await client.post(
         "/api/cart/items",

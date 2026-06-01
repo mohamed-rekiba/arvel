@@ -1,4 +1,4 @@
-"""ShouldQueue marker mixin — auto-dispatch listener via Bus (ADR-040)."""
+"""ShouldQueue marker mixin — auto-dispatch listener via Bus."""
 
 from __future__ import annotations
 

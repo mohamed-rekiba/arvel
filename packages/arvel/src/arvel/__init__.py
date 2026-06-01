@@ -1,6 +1,6 @@
 """Arvel — the Laravel of Python.
 
-Public API surface for WI-arvel-001 (Foundations) + WI-arvel-002 (HTTP layer).
+Public API surface for foundations and the HTTP layer.
 See ``docs/api/foundations-api.md`` and ``docs/api/http-api.md`` for the contract.
 Symbols not in ``__all__`` are internal and may change without notice.
 """

@@ -1,4 +1,4 @@
-"""Worker loop — polls the queue and executes jobs with retry + DLQ (ADR-036, ADR-045)."""
+"""Worker loop — polls the queue and executes jobs with retry + DLQ."""
 
 from __future__ import annotations
 

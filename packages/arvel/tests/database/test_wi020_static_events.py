@@ -1,12 +1,11 @@
-"""WI-arvel-020 — Epic 006 Story 9: static event registration + custom event objects.
+"""Static event registration + custom event objects.
 
 Three additions:
 - ``Model.on("created", cb)`` — register a single callback, no observer class.
 - ``__dispatches_events__`` — map a lifecycle name to a ``ModelEvent`` dispatched on the bus.
 - ``__observed_by__`` — auto-register observer classes at class-definition time.
 
-Each concern uses its own model so ``clear_observers`` in one test can't disturb another.
-"""
+Each concern uses its own model so ``clear_observers`` in one test can't disturb another."""
 
 from __future__ import annotations
 

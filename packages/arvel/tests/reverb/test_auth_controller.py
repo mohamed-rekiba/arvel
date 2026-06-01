@@ -1,4 +1,4 @@
-"""FR-013-023, NFR-013-008 — BroadcastAuthController (HTTP endpoint)."""
+"""BroadcastAuthController (HTTP endpoint)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_auth_controller_signs_for_authorized_user() -> None:
-    """FR-013-023 AC1: returns signed auth payload for authorized channel."""
+    """returns signed auth payload for authorized channel."""
     from arvel.broadcasting.channels import ChannelRegistry
     from arvel.broadcasting.config import BroadcastConfig, ReverbConfig
     from arvel.reverb.auth_controller import BroadcastAuthController
@@ -36,7 +36,7 @@ async def test_auth_controller_signs_for_authorized_user() -> None:
 
 @pytest.mark.asyncio
 async def test_auth_controller_rejects_unauthorized() -> None:
-    """FR-013-023 AC2: unauthorized user → 403-equivalent (returns None / raises)."""
+    """unauthorized user → 403-equivalent (returns None / raises)."""
     from arvel.broadcasting.channels import ChannelRegistry
     from arvel.broadcasting.config import BroadcastConfig, ReverbConfig
     from arvel.broadcasting.exceptions import BroadcastAuthError
@@ -60,7 +60,7 @@ async def test_auth_controller_rejects_unauthorized() -> None:
 
 @pytest.mark.asyncio
 async def test_auth_controller_handles_presence_channel() -> None:
-    """FR-013-023 AC3: presence channel returns channel_data + auth."""
+    """presence channel returns channel_data + auth."""
     from arvel.broadcasting.channels import ChannelRegistry
     from arvel.broadcasting.config import BroadcastConfig, ReverbConfig
     from arvel.reverb.auth_controller import BroadcastAuthController
@@ -89,7 +89,7 @@ async def test_auth_controller_handles_presence_channel() -> None:
 
 @pytest.mark.asyncio
 async def test_auth_controller_logs_failures(caplog: pytest.LogCaptureFixture) -> None:
-    """NFR-013-008 AC2: every rejection emits a structured log event."""
+    """every rejection emits a structured log event."""
     from arvel.broadcasting.channels import ChannelRegistry
     from arvel.broadcasting.config import BroadcastConfig, ReverbConfig
     from arvel.broadcasting.exceptions import BroadcastAuthError

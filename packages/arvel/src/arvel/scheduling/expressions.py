@@ -1,4 +1,4 @@
-"""Cron-expression parsing and due-time evaluation, croniter-backed (ADR-062)."""
+"""Cron-expression parsing and due-time evaluation, croniter-backed."""
 
 from __future__ import annotations
 

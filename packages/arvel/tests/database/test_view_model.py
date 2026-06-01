@@ -1,4 +1,4 @@
-"""Tests for ViewModel — read-only guards, refresh() routing, and make:model flags."""
+"""Tests for ViewModel — read-only guards, refresh routing, and make:model flags."""
 
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ async def test_qb_upsert_raises(session: Any) -> None:
         await qb.upsert([{"id": 1}], unique_by=["id"], update=["id"])
 
 
-# ── refresh() routing ─────────────────────────────────────────────────────────
+# ── refresh routing ─────────────────────────────────────────────────────────
 
 
 async def test_refresh_view_raises_for_regular_view(session: Any) -> None:

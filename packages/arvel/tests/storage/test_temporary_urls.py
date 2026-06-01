@@ -1,4 +1,4 @@
-"""Tests for temporary URL signing — FR-006-032, NFR-006-007..008."""
+"""Tests for temporary URL signing."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ class TestTemporaryUrlSigner:
         )
 
     def test_uses_hmac_sha256_not_md5(self, signer: TemporaryUrlSigner) -> None:
-        """NFR-006-008: HMAC-SHA256 only; no MD5/SHA-1."""
+        """: HMAC-SHA256 only; no MD5/SHA-1."""
         import inspect
 
         import arvel.storage.url_signer as mod
@@ -76,7 +76,7 @@ class TestTemporaryUrlSigner:
         assert "sha1" not in source.lower() or "sha1" not in source
 
     def test_constant_time_compare_used(self, signer: TemporaryUrlSigner) -> None:
-        """NFR-006-007: constant-time comparison to prevent timing attacks."""
+        """: constant-time comparison to prevent timing attacks."""
         import inspect
 
         import arvel.storage.url_signer as mod

@@ -1,4 +1,4 @@
-"""Regression tests for WI-arvel-051 advanced permission parity."""
+"""Advanced permission parity regressions — cache, config, and registrar edge cases."""
 
 from __future__ import annotations
 

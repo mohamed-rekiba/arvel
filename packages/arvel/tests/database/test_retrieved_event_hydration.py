@@ -1,8 +1,7 @@
-"""The retrieved event fires on every hydration path, not just find().
+"""The retrieved event fires on every hydration path, not just find.
 
 Eloquent fires `retrieved` whenever a model is pulled from the DB — first, get,
-all, sole, and paginate included.
-"""
+all, sole, and paginate included."""
 
 from __future__ import annotations
 

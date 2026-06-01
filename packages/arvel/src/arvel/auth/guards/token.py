@@ -1,7 +1,7 @@
 """TokenGuard — Sanctum-style personal access token authentication.
 
 Security:
-- Hashes the incoming plain-text token with SHA-256 before DB lookup (ADR-030).
+- Hashes the incoming plain-text token with SHA-256 before DB lookup.
 - Uses hmac.compare_digest for timing-safe comparison.
 - Rejects tokens where expires_at is in the past.
 """

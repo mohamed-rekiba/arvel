@@ -1,4 +1,4 @@
-"""Tests for Job base class — FR-008-001..003, FR-008-013."""
+"""Tests for Job base class"""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class UnregisteredJob(Job):
 
 
 class TestJobModel:
-    """FR-008-001: Job is a Pydantic BaseModel."""
+    """Job is a Pydantic BaseModel."""
 
     def test_job_has_queue_attribute(self) -> None:
         job = MyJob(value=1)
@@ -52,7 +52,7 @@ class TestJobModel:
 
 
 class TestJobSerialization:
-    """FR-008-002: Jobs serialize to/from JSON envelope."""
+    """Jobs serialize to/from JSON envelope."""
 
     def test_to_envelope_contains_job_class(self) -> None:
         job = MyJob(value=7)
@@ -73,7 +73,7 @@ class TestJobSerialization:
         assert restored.job_class == envelope.job_class
 
     def test_to_envelope_preserves_tries(self) -> None:
-        """FR-011-002: tries must survive envelope serialization."""
+        """tries must survive envelope serialization."""
         job = MyJob(value=1, tries=5)
         envelope = job.to_envelope()
         assert envelope.payload["tries"] == 5
@@ -85,7 +85,7 @@ class TestJobSerialization:
 
 
 class TestJobRegistry:
-    """FR-008-013: Job classes auto-register via __init_subclass__."""
+    """Job classes auto-register via __init_subclass__."""
 
     def test_my_job_in_registry(self) -> None:
         assert any("MyJob" in key for key in JobRegistry)

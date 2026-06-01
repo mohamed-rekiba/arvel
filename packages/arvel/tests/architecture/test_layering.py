@@ -1,7 +1,7 @@
-"""FR-003-039 — Forbidden-import architecture test.
+"""Forbidden-import architecture test.
 
 `arvel.http.*` MUST NOT import `arvel.database.*` (and vice versa), except the
-single sanctioned exemption documented in ADR-016.
+single sanctioned exemption documented in writing.
 `arvel.container.*` MUST NOT import either.
 
 This test walks every Python source file under each package and inspects its
@@ -18,7 +18,7 @@ import arvel
 
 PACKAGE_ROOT = Path(arvel.__file__).resolve().parent
 
-# ADR-016: exactly one HTTP module is allowed to reach into arvel.database.
+# exactly one HTTP module is allowed to reach into arvel.database.
 ALLOWED_HTTP_TO_DATABASE_IMPORTS: dict[str, set[str]] = {
     "arvel.http.middleware.database_transaction": {
         "arvel.database",
@@ -102,7 +102,7 @@ def test_container_does_not_import_either() -> None:
 
 
 def test_sanctioned_exemption_documented() -> None:
-    """ADR-016 must exist (the exemption is non-trivial and requires a written record)."""
+    """Exemption ADR must exist (the exemption is non-trivial and requires a written record)."""
     adr = (
         PACKAGE_ROOT.parent.parent.parent.parent
         / "docs"

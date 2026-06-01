@@ -1,4 +1,4 @@
-"""Tests for LogChannel — FR-009-027."""
+"""Tests for LogChannel."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ class TestLogChannel:
 
     @pytest.mark.asyncio
     async def test_broadcast_channel_stub_logs_warning(self) -> None:
-        """FR-009-028: broadcast channel is a stub that logs a warning."""
+        """broadcast channel is a stub that logs a warning."""
         from arvel.notifications.channels.broadcast_channel import BroadcastChannel
 
         channel = BroadcastChannel()

@@ -1,4 +1,4 @@
-"""Tests for Translator — FR-015-022, FR-015-023, FR-015-025, NFR-015-006, SEC-015-003."""
+"""Tests for Translator — ."""
 
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ def translator(lang_dir: Path) -> Translator:
 
 
 class TestBasicTranslation:
-    """FR-015-022 — Translator.get returns the translation."""
+    """Translator.get returns the translation."""
 
     def test_get_returns_english(self, translator: Translator) -> None:
         # Note: AC1 expects literal string when no replacement happens
@@ -84,7 +84,7 @@ class TestBasicTranslation:
 
 
 class TestMissingKey:
-    """FR-015-022 — missing key returns the key verbatim."""
+    """missing key returns the key verbatim."""
 
     def test_missing_key_returns_key(self, translator: Translator) -> None:
         out = translator.get("messages.nonexistent")
@@ -92,14 +92,14 @@ class TestMissingKey:
 
 
 class TestDotNotation:
-    """FR-015-025 — dot notation traverses nested dicts."""
+    """dot notation traverses nested dicts."""
 
     def test_dot_traversal(self, translator: Translator) -> None:
         assert translator.get("messages.nested.greeting") == "Hello"
 
 
 class TestSubstitutionStyles:
-    """FR-015-026 — Both :placeholder and {placeholder} work."""
+    """Both :placeholder and {placeholder} work."""
 
     def test_laravel_style_colon(self, translator: Translator) -> None:
         assert translator.get("messages.welcome", replace={"name": "Bob"}) == "Welcome, Bob!"
@@ -109,7 +109,7 @@ class TestSubstitutionStyles:
 
 
 class TestNamespaceCache:
-    """NFR-015-006 — second lookup of same key incurs no file I/O."""
+    """second lookup of same key incurs no file I/O."""
 
     def test_namespace_cached_after_first_lookup(self, translator: Translator) -> None:
         translator.get("messages.welcome")
@@ -117,7 +117,7 @@ class TestNamespaceCache:
 
 
 class TestHelpers:
-    """FR-015-023 — module-level __() helper proxies to current Translator."""
+    """module-level __() helper proxies to current Translator."""
 
     def test_helper_uses_bound_translator(self, translator: Translator) -> None:
         from arvel.i18n.helpers import __ as t
@@ -131,7 +131,7 @@ class TestHelpers:
 
 
 class TestNoCodeEval:
-    """SEC-015-003 — translation parameters never evaluated as code."""
+    """translation parameters never evaluated as code."""
 
     def test_parameter_with_python_expr_is_rendered_literally(self, translator: Translator) -> None:
         malicious = "{__import__('os').system('echo PWNED')}"

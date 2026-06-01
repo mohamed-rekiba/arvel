@@ -1,4 +1,4 @@
-"""FR-002-004 — RouteServiceProvider ABC."""
+"""RouteServiceProvider ABC."""
 
 from __future__ import annotations
 

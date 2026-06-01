@@ -3,8 +3,8 @@
 The demo generates three conversions on every image upload:
 
 - ``thumbnail``: 150x150 square crop, used in admin lists.
-- ``card``     : 400x300 cover crop, used on storefront cards.
-- ``full``     : 1200x900 contain fit, used on item show pages.
+- ``card`` : 400x300 cover crop, used on storefront cards.
+- ``full`` : 1200x900 contain fit, used on item show pages.
 
 `arvel-image` runs conversions synchronously with thread-pool offload, so the
 local demo does not need a queue worker for uploads.

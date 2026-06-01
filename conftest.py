@@ -110,7 +110,7 @@ def pytest_terminal_summary(
         return
 
     failures: list[str] = []
-    terminalreporter.section("Per-module coverage gates (FB-010 / ADR-017)")
+    terminalreporter.section("Per-module coverage gates (FB-010 / ADR-011)")
     for module_dotted, floor in sorted(floors.items()):
         actual = _module_coverage_percent(cov, module_dotted)
         if actual is None:

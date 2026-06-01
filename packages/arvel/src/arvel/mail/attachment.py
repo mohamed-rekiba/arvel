@@ -1,4 +1,4 @@
-"""Attachment dataclass — email file attachment (FR-009-014)."""
+"""Attachment dataclass — email file attachment."""
 
 from __future__ import annotations
 

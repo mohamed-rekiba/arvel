@@ -1,6 +1,6 @@
-"""Sanity tests for the WI-018 three-way pyproject extras split.
+"""Sanity tests for the three-way pyproject extras split.
 
-Covers FR-018-13: `queue` → taskiq core; `queue-redis` → taskiq-redis;
+`queue` → taskiq core; `queue-redis` → taskiq-redis;
 `queue-amqp` → taskiq-aio-pika; `all` includes all three.
 """
 
@@ -26,7 +26,7 @@ def _has_any(deps: list[str], needle: str) -> bool:
 
 
 class TestQueueExtrasSplit:
-    """FR-018-13: 'queue' is taskiq core only; broker drivers live in their own extras."""
+    """'queue' is taskiq core only; broker drivers live in their own extras."""
 
     def test_queue_extra_has_taskiq_core(self, extras: dict[str, list[str]]) -> None:
         assert "queue" in extras

@@ -1,4 +1,4 @@
-"""Tests for __choice() pluralisation — FR-015-027, FR-015-028."""
+"""Tests for __choice() pluralisation."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def parse_choice() -> _ParseChoice:
 
 
 class TestLaravelPipeSimple:
-    """FR-015-027 — `'a|b|c'` positional ordering."""
+    """`'a|b|c'` positional ordering."""
 
     @pytest.mark.parametrize(
         ("count", "expected"),
@@ -43,7 +43,7 @@ class TestPlaceholder:
 
 
 class TestBracketRanges:
-    """FR-015-028 — `{0}` exact, `[1,4]` range."""
+    """`{0}` exact, `[1,4]` range."""
 
     @pytest.mark.parametrize(
         ("count", "expected"),

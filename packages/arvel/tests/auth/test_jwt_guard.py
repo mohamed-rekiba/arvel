@@ -1,5 +1,5 @@
 """
-FR-007-013..019 — JwtGuard moved to arvel.auth, Python-2 except bug fixed.
+JwtGuard moved to arvel.auth, Python-2 except bug fixed.
 Tests import from arvel.auth.guards.jwt → red state.
 """
 
@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 from arvel.auth.config import JwtConfig
 
-# FR-017-003: JWT support is via the [jwt] extra. SKIP cleanly when missing.
+# JWT support is via the [jwt] extra. SKIP cleanly when missing.
 pytest.importorskip("jwt", reason="install arvel[jwt] to run JWT guard tests")
 
 _SECRET = "a" * 32  # 32-byte HMAC secret (minimum valid)
@@ -59,7 +59,7 @@ class _FakeRequest:
         self.headers = headers
 
 
-# ─── FR-007-013: guard resolves user from valid JWT ───────────────────────────
+# guard resolves user from valid JWT
 
 
 @pytest.mark.asyncio
@@ -83,7 +83,7 @@ async def test_jwt_guard_returns_none_when_no_authorization_header() -> None:
     assert await guard.user(_FakeRequest()) is None
 
 
-# ─── FR-007-014: alg=none refused at construction ─────────────────────────────
+# alg=none refused at construction
 
 
 def test_jwt_guard_refuses_alg_none() -> None:
@@ -100,7 +100,7 @@ def test_jwt_guard_refuses_alg_none_case_insensitive() -> None:
         JwtGuard(resolver=_FakeResolver(), jwt=_jwt_config(algorithm="None"))
 
 
-# ─── FR-007-015: HMAC secret length enforcement ───────────────────────────────
+# HMAC secret length enforcement
 
 
 def test_jwt_guard_refuses_short_hmac_secret() -> None:
@@ -117,7 +117,7 @@ def test_jwt_guard_accepts_32_byte_hmac_secret() -> None:
     assert guard is not None
 
 
-# ─── FR-007-016: expired token returns None ───────────────────────────────────
+# expired token returns None
 
 
 @pytest.mark.asyncio
@@ -131,7 +131,7 @@ async def test_jwt_guard_rejects_expired_token() -> None:
     assert await guard.user(request) is None
 
 
-# ─── FR-007-017: invalid signature returns None ───────────────────────────────
+# invalid signature returns None
 
 
 @pytest.mark.asyncio
@@ -145,7 +145,7 @@ async def test_jwt_guard_rejects_tampered_signature() -> None:
     assert await guard.user(request) is None
 
 
-# ─── FR-007-018: wrong secret returns None ────────────────────────────────────
+# wrong secret returns None
 
 
 @pytest.mark.asyncio
@@ -160,7 +160,7 @@ async def test_jwt_guard_rejects_token_signed_with_different_secret() -> None:
     assert await guard.user(request) is None
 
 
-# ─── FR-007-019: Python-2 except syntax is gone ───────────────────────────────
+# Python-2 except syntax is gone
 
 
 def test_jwt_guard_module_compiles_with_python3_except_syntax() -> None:
@@ -176,7 +176,7 @@ def test_jwt_guard_module_compiles_with_python3_except_syntax() -> None:
     ast.parse(source)
 
 
-# ─── FR-007-019: malformed authorization header returns None ──────────────────
+# malformed authorization header returns None
 
 
 @pytest.mark.asyncio
@@ -204,7 +204,7 @@ async def test_jwt_guard_handles_malformed_headers_object_without_crashing() -> 
     assert await guard.user(_BadRequest()) is None
 
 
-# ─── issue_token / _encode round-trip ─────────────────────────────────────────
+# issue_token / _encode round-trip
 
 
 @pytest.mark.asyncio

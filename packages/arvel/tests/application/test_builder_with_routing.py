@@ -1,9 +1,9 @@
-"""FR-004-009: ``ApplicationBuilder.with_routing(web=, api=, console=)``.
+"""``ApplicationBuilder.with_routing(web=, api=, console=)``.
 
 The builder accepts up to three optional route file paths. ``web`` and
 ``api`` are loaded by ``HttpServiceProvider.register()`` at create-time;
-``console`` is stored on the application but NOT loaded in WI-004 (no
-Console provider exists yet — wired here so WI-005 can pick it up
+``console`` is stored on the application but NOT loaded in (no
+Console provider exists yet — wired here so can pick it up
 without a builder API change).
 """
 
@@ -112,7 +112,7 @@ def test_with_routing_last_write_wins_per_key(tmp_path: Path) -> None:
 
 
 def test_with_routing_console_only_does_not_raise(tmp_path: Path) -> None:
-    """Console paths are stored but not loaded in WI-004 — must not error at builder call."""
+    """Console paths are stored but not loaded in — must not error at builder call."""
     routes = _make_routes_dir(tmp_path)
     builder = (
         Application.configure(tmp_path)

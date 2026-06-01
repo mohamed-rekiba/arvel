@@ -1,4 +1,4 @@
-"""BroadcastManager — driver factory (FR-013-006)."""
+"""BroadcastManager — driver factory."""
 
 from __future__ import annotations
 

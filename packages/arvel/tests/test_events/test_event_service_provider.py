@@ -1,4 +1,4 @@
-"""Tests for EventServiceProvider — FR-009-009."""
+"""Tests for EventServiceProvider."""
 
 from __future__ import annotations
 

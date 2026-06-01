@@ -1,4 +1,4 @@
-"""Real-SQL integration tests for ``DatabaseSessionStore`` — FR-006-020.
+"""Real-SQL integration tests for ``DatabaseSessionStore``
 
 The fast inner-loop suite in ``test_database_store.py`` runs against
 in-memory SQLite. This file parametrizes the same coverage over Postgres

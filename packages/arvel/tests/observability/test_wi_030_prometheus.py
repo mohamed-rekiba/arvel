@@ -1,4 +1,4 @@
-"""Story 5: Prometheus metrics endpoint — FR-030-022..023."""
+"""Prometheus metrics endpoint."""
 
 from __future__ import annotations
 

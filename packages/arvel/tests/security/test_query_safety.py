@@ -1,4 +1,4 @@
-"""NFR-003-003 + FR-003-010 — SQL injection resistance for kwarg-shorthand."""
+"""+ SQL injection resistance for kwarg-shorthand."""
 
 from __future__ import annotations
 

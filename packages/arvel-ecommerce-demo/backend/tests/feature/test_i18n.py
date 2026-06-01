@@ -1,14 +1,12 @@
-"""i18n tests — US-026 (locale resolution + i18n catalogue).
+"""Locale resolution and i18n catalogue endpoints.
 
-RED: all tests fail at import until Stage 3b.
-
-Acceptance criteria:
-- US-026: GET /api/i18n/{locale} returns flat key/value catalogue
-- US-026: storefront product names resolve to the requested locale
-- US-026: admin endpoints return raw i18n dicts, not resolved strings
-- US-026: locale negotiation: Accept-Language → ?locale= override → default en
-- US-026: missing locale value falls back to en, not null
-- US-026: GET /api/i18n/{locale} returns 304 on ETag hit
+Coverage:
+- GET /api/i18n/{locale} returns flat key/value catalogue
+- storefront product names resolve to the requested locale
+- admin endpoints return raw i18n dicts, not resolved strings
+- locale negotiation: Accept-Language → ?locale= override → default en
+- missing locale value falls back to en, not null
+- GET /api/i18n/{locale} returns 304 on ETag hit
 """
 
 from __future__ import annotations
@@ -49,7 +47,7 @@ async def app(
     monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.setenv("APP_KEY", "i18n-test-key-must-be-32-bytes-or-more!")
 
-    from app.bootstrap import create_app  # RED until Stage 3b
+    from app.bootstrap import create_app
 
     application = await create_app()
     await application.seed("catalog")
@@ -71,7 +69,7 @@ async def client(app: Any) -> Any:
 
 @pytest.mark.asyncio
 async def test_locale_catalogue_returns_flat_key_value_map(client: Any) -> None:
-    """US-026: GET /api/i18n/en returns a flat dict of string keys to string values."""
+    """GET /api/i18n/en returns a flat dict of string keys to string values."""
     response = await client.get("/api/i18n/en")
     assert response.status_code == 200
     body = response.json()
@@ -81,7 +79,7 @@ async def test_locale_catalogue_returns_flat_key_value_map(client: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_locale_catalogue_includes_etag_header(client: Any) -> None:
-    """US-026: /api/i18n/{locale} includes an ETag header for caching."""
+    """/api/i18n/{locale} includes an ETag header for caching."""
     response = await client.get("/api/i18n/ar")
     assert response.status_code == 200
     assert "etag" in response.headers, "ETag header missing on locale catalogue"
@@ -89,7 +87,7 @@ async def test_locale_catalogue_includes_etag_header(client: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_locale_catalogue_returns_304_on_etag_match(client: Any) -> None:
-    """US-026: subsequent request with If-None-Match returns 304."""
+    """subsequent request with If-None-Match returns 304."""
     first = await client.get("/api/i18n/tr")
     etag = first.headers.get("etag", "")
     assert etag, "Cannot test 304 without an ETag"
@@ -100,7 +98,7 @@ async def test_locale_catalogue_returns_304_on_etag_match(client: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_storefront_resolves_arabic_product_name(client: Any) -> None:
-    """US-026: storefront product name is resolved to Arabic when locale=ar."""
+    """storefront product name is resolved to Arabic when locale=ar."""
     response = await client.get("/api/products?locale=ar")
     assert response.status_code == 200
     # All products in the seed have AR translations
@@ -110,7 +108,7 @@ async def test_storefront_resolves_arabic_product_name(client: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_storefront_falls_back_to_en_when_locale_missing(client: Any) -> None:
-    """US-026: storefront falls back to English when TR name would be absent."""
+    """storefront falls back to English when TR name would be absent."""
     # Create a product with no Turkish name
     # (This test verifies the fallback — seeded products have TR names,
     # so we use an admin token to create one without TR)
@@ -154,7 +152,7 @@ async def test_storefront_falls_back_to_en_when_locale_missing(client: Any) -> N
 
 @pytest.mark.asyncio
 async def test_admin_returns_raw_i18n_dict_not_resolved_string(client: Any) -> None:
-    """US-026: admin product response includes raw i18n dicts for all fields."""
+    """admin product response includes raw i18n dicts for all fields."""
     admin = await client.post(
         "/api/auth/login",
         json={"email": "superadmin@example.com", "password": "password"},

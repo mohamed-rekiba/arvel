@@ -1,4 +1,4 @@
-"""FR-001-001: monorepo workspace shape.
+"""monorepo workspace shape.
 
 Sanity checks on workspace layout. These should pass as soon as the workspace is set
 up (Step 1 of Stage 3b). Until then, they should fail.

@@ -1,4 +1,4 @@
-"""FR-013-010 — EventDispatcher routes ShouldBroadcast events to Broadcast.send."""
+"""EventDispatcher routes ShouldBroadcast events to Broadcast.send."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_dispatcher_invokes_broadcast_for_should_broadcast_events() -> None:
-    """FR-013-010 AC1: dispatching ShouldBroadcast event calls Broadcast.send exactly once."""
+    """dispatching ShouldBroadcast event calls Broadcast.send exactly once."""
     from arvel.broadcasting import ShouldBroadcast
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.manager import BroadcastManager
@@ -59,7 +59,7 @@ async def test_dispatcher_invokes_broadcast_for_should_broadcast_events() -> Non
 
 @pytest.mark.asyncio
 async def test_dispatcher_does_not_broadcast_plain_events() -> None:
-    """FR-013-010 AC3: regular events don't reach Broadcast.send."""
+    """regular events don't reach Broadcast.send."""
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.manager import BroadcastManager
     from arvel.events.dispatcher import EventDispatcher
@@ -92,7 +92,7 @@ async def test_dispatcher_does_not_broadcast_plain_events() -> None:
 
 @pytest.mark.asyncio
 async def test_dispatcher_swallows_broadcaster_errors() -> None:
-    """FR-013-010 AC4: broadcaster failures don't break sync listeners."""
+    """broadcaster failures don't break sync listeners."""
     from arvel.broadcasting import ShouldBroadcast
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.exceptions import BroadcastDriverError

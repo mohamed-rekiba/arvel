@@ -1,6 +1,6 @@
 """Generic async middleware pipeline.
 
-Behavior is documented in PRD-001 §FR-001-006.
+Onion-style async middleware chain; each layer receives the next callable.
 """
 
 from __future__ import annotations

@@ -1,15 +1,14 @@
-"""WI-023 — Maintenance mode commands + middleware.
+"""Maintenance mode commands + middleware.
 
-AC covered:
-  AC-005.1  down creates marker file
-  AC-005.2  down generates and prints a token when --secret omitted
-  AC-005.3  up deletes marker (idempotent)
-  AC-005.4  HTTP request without marker is served normally
-  AC-005.5  HTTP with marker + no bypass returns 503
-  AC-005.6  HTTP with ?bypass=<secret> sets cookie and passes through
-  AC-005.7  HTTP with bypass cookie passes through
-  SR-023-001 token has ≥ 256 bits entropy
-  SR-023-002 bypass cookie is HttpOnly + SameSite=Lax
+down creates marker file
+down generates and prints a token when --secret omitted
+up deletes marker (idempotent)
+HTTP request without marker is served normally
+HTTP with marker + no bypass returns 503
+HTTP with ?bypass=<secret> sets cookie and passes through
+HTTP with bypass cookie passes through
+SR-023-001 token has ≥ 256 bits entropy
+SR-023-002 bypass cookie is HttpOnly + SameSite=Lax
 """
 
 from __future__ import annotations
@@ -33,11 +32,11 @@ def _app(*cmds: Command) -> Application:
     return Application(commands=list(cmds))
 
 
-# ─── AC-005.1 — down creates marker ──────────────────────────────────────────
+# ─── — down creates marker ──────────────────────────────────────────
 
 
 def test_down_creates_marker_file(tmp_path: Path) -> None:
-    """AC-005.1: down writes JSON marker at storage/framework/down."""
+    """down writes JSON marker at storage/framework/down."""
     app = _app(DownCommand())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["down", "--secret", "test-secret"])
@@ -48,11 +47,11 @@ def test_down_creates_marker_file(tmp_path: Path) -> None:
         assert data["secret"] == "test-secret"
 
 
-# ─── AC-005.2 — down without --secret generates a token ─────────────────────
+# ─── — down without --secret generates a token ─────────────────────
 
 
 def test_down_generates_token_when_secret_omitted(tmp_path: Path) -> None:
-    """AC-005.2 / SR-023-001: token auto-generated with ≥ 256 bits entropy."""
+    """/ SR-023-001: token auto-generated with ≥ 256 bits entropy."""
     app = _app(DownCommand())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["down"])
@@ -77,11 +76,11 @@ def test_down_token_is_unique_per_invocation(tmp_path: Path) -> None:
         assert first != second
 
 
-# ─── AC-005.3 — up removes marker (idempotent) ────────────────────────────────
+# ─── — up removes marker (idempotent) ────────────────────────────────
 
 
 def test_up_removes_marker(tmp_path: Path) -> None:
-    """AC-005.3: up deletes the marker file."""
+    """up deletes the marker file."""
     app = _app(DownCommand(), UpCommand())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         runner.invoke(app.typer_app, ["down"])
@@ -92,7 +91,7 @@ def test_up_removes_marker(tmp_path: Path) -> None:
 
 
 def test_up_is_idempotent_when_no_marker(tmp_path: Path) -> None:
-    """AC-005.3: up when no marker exists exits 0."""
+    """up when no marker exists exits 0."""
     app = _app(UpCommand())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["up"])
@@ -103,14 +102,14 @@ def test_up_is_idempotent_when_no_marker(tmp_path: Path) -> None:
 
 
 def test_manager_is_down_returns_false_when_no_marker(tmp_path: Path) -> None:
-    """MaintenanceModeManager.is_down() returns False when no marker exists."""
+    """MaintenanceModeManager.is_down returns False when no marker exists."""
     marker_path = tmp_path / "down"
     manager = MaintenanceModeManager(marker_path=marker_path)
     assert manager.is_down() is False
 
 
 def test_manager_down_writes_marker_with_fields(tmp_path: Path) -> None:
-    """MaintenanceModeManager.down() writes a marker file with all expected fields."""
+    """MaintenanceModeManager.down writes a marker file with all expected fields."""
     marker_path = tmp_path / "down"
     manager = MaintenanceModeManager(marker_path=marker_path)
     marker = manager.down(secret="abc", retry=60, refresh=10, template=None)
@@ -156,7 +155,7 @@ def make_test_client() -> Any:
 
 
 def test_middleware_passes_through_when_no_marker(tmp_path: Path, make_test_client: Any) -> None:
-    """AC-005.4: request without marker is served normally."""
+    """request without marker is served normally."""
     client = make_test_client(tmp_path / "down")
     response = client.get("/")
     assert response.status_code == 200
@@ -167,7 +166,7 @@ def test_middleware_returns_503_when_marker_and_no_bypass(
     tmp_path: Path,
     make_test_client: Any,
 ) -> None:
-    """AC-005.5: request with marker + no bypass returns 503."""
+    """request with marker + no bypass returns 503."""
     marker_path = tmp_path / "down"
     manager = MaintenanceModeManager(marker_path=marker_path)
     manager.down(secret="test-secret")
@@ -177,7 +176,7 @@ def test_middleware_returns_503_when_marker_and_no_bypass(
 
 
 def test_middleware_sets_retry_after_header(tmp_path: Path, make_test_client: Any) -> None:
-    """AC-005.5: 503 response includes Retry-After when configured."""
+    """503 response includes Retry-After when configured."""
     marker_path = tmp_path / "down"
     manager = MaintenanceModeManager(marker_path=marker_path)
     manager.down(secret="test-secret", retry=120)
@@ -191,7 +190,7 @@ def test_middleware_bypass_via_query_param_sets_cookie(
     tmp_path: Path,
     make_test_client: Any,
 ) -> None:
-    """AC-005.6: ?bypass=<secret> sets cookie and passes through."""
+    """?bypass=<secret> sets cookie and passes through."""
     marker_path = tmp_path / "down"
     manager = MaintenanceModeManager(marker_path=marker_path)
     manager.down(secret="my-secret")
@@ -208,7 +207,7 @@ def test_middleware_bypass_cookie_passes_through(
     tmp_path: Path,
     make_test_client: Any,
 ) -> None:
-    """AC-005.7: existing bypass cookie passes through without query param."""
+    """existing bypass cookie passes through without query param."""
     marker_path = tmp_path / "down"
     manager = MaintenanceModeManager(marker_path=marker_path)
     manager.down(secret="my-secret")

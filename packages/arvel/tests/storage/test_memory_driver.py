@@ -1,4 +1,4 @@
-"""Tests for MemoryDriver — FR-006-028."""
+"""Tests for MemoryDriver."""
 
 from __future__ import annotations
 

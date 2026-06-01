@@ -1,4 +1,4 @@
-"""BroadcastAuthController — HTTP-side channel-auth endpoint (FR-013-023, NFR-013-008)."""
+"""BroadcastAuthController — HTTP-side channel-auth endpoint."""
 
 from __future__ import annotations
 
@@ -17,8 +17,7 @@ class BroadcastAuthController:
     """Resolves a private/presence channel subscription against the registry.
 
     Returns the signed payload Pusher clients expect. On any rejection raises
-    ``BroadcastAuthError`` — the error message MUST NOT include the secret
-    (SEC-013-007).
+    ``BroadcastAuthError`` — the error message MUST NOT include the secret.
     """
 
     def __init__(
