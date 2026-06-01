@@ -1,4 +1,4 @@
-"""HTTP layer public API surface stability (FR-002-* + NFR-002-007).
+"""HTTP layer public API surface stability.
 
 Imports MUST succeed for every name we promise in http-api.md.
 Stage 3b makes these tests pass.
@@ -8,9 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-# ─────────────────────────────────────────────────────────────────────────────
-# NFR-002-007 — Backward compatibility: every WI-001 symbol still works.
-# ─────────────────────────────────────────────────────────────────────────────
+# Backward compatibility: every symbol still works.
 
 
 def test_foundations_top_level_exports_still_present() -> None:
@@ -33,7 +31,7 @@ def test_foundations_top_level_exports_still_present() -> None:
         "dep",
     }
     missing = foundations - set(arvel.__all__)
-    assert not missing, f"WI-001 symbols missing from arvel.__all__: {sorted(missing)}"
+    assert not missing, f"Public API symbols missing from arvel.__all__: {sorted(missing)}"
 
 
 def test_foundations_providers_still_importable() -> None:
@@ -43,9 +41,7 @@ def test_foundations_providers_still_importable() -> None:
     assert issubclass(ConfigServiceProvider, ServiceProvider)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FR-002-* — New WI-002 public symbols
-# ─────────────────────────────────────────────────────────────────────────────
+# New public symbols
 
 
 def test_http_top_level_exports_complete() -> None:

@@ -1,8 +1,7 @@
-"""Eloquent-parity (backlog 005, S8): write-path completeness.
+"""Eloquent-parity: write-path completeness.
 
 insert_or_ignore, single-statement upsert (returns count), truncate, insert_using,
-increment_each / decrement_each.
-"""
+increment_each / decrement_each."""
 
 from __future__ import annotations
 

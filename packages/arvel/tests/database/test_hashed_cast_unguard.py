@@ -1,4 +1,4 @@
-"""Eloquent-parity (backlog 006, S2): hashed cast, force_fill, unguarded()."""
+"""Eloquent-parity: hashed cast, force_fill, unguarded."""
 
 from __future__ import annotations
 

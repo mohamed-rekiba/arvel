@@ -1,8 +1,7 @@
-"""Eloquent-parity (backlog 005, S11/S9): pagination HTTP + JSON parity.
+"""Eloquent-parity: pagination HTTP + JSON parity.
 
 page_name + request page resolution, Laravel flat envelope, bidirectional cursors,
-appends/with_query_string/fragment, on_each_side link window.
-"""
+appends/with_query_string/fragment, on_each_side link window."""
 
 from __future__ import annotations
 

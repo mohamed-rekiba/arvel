@@ -120,7 +120,7 @@ class ObservabilityMiddleware:
             return
         from arvel.logging.facade import Log
 
-        # Opens the request-flow story; domain breadcrumbs share its request_id/trace.
+        # First line of the request; domain logs share its request_id/trace.
         Log.info("request.received", method=method, path=path)
 
     def _log_request(self, method: str, path: str, status: int, started: float) -> None:
