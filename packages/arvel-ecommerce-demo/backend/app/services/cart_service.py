@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 from arvel.http.exceptions import NotFoundException, ValidationException
+from arvel.logging.facade import Log
 
 from app.models.cart import Cart
 from app.models.cart_item import CartItem
@@ -39,6 +40,7 @@ class CartService:
     async def add_item(
         self, user_id: int, product_id: str, quantity: int, *, locale: str = "en"
     ) -> dict[str, Any]:
+        Log.debug("cart.item.adding", product_id=product_id, quantity=quantity)
         cart_id = await self.get_or_create_cart(user_id)
         pid = uuid.UUID(product_id)
 
@@ -63,11 +65,13 @@ class CartService:
                 quantity=quantity,
                 unit_price_snapshot=price,
             )
+        Log.debug("cart.item.added", product_id=product_id)
         return await self.get_cart(user_id, locale=locale)
 
     async def update_item(
         self, user_id: int, item_id: str, quantity: int, *, locale: str = "en"
     ) -> dict[str, Any]:
+        Log.debug("cart.item.updating", item_id=item_id, quantity=quantity)
         cart_id = await self.get_or_create_cart(user_id)
         iid = int(item_id)
         item: CartItem | None = await CartItem.where(
@@ -83,6 +87,7 @@ class CartService:
                 raise ValidationException("Insufficient stock for cart item.")
             item.quantity = quantity
             await item.save()
+            Log.debug("cart.item.updated", item_id=item_id, quantity=quantity)
         return await self.get_cart(user_id, locale=locale)
 
     async def remove_item(
@@ -95,6 +100,7 @@ class CartService:
         ).first()
         if item is not None:
             await item.delete()
+            Log.debug("cart.item.removed", item_id=item_id)
         return await self.get_cart(user_id, locale=locale)
 
     async def get_cart_for_checkout(self, user_id: int) -> dict[str, Any]:
@@ -117,6 +123,7 @@ class CartService:
         items: list[CartItem] = await CartItem.where(cart_id=cart_id).all()
         for item in items:
             await item.delete()
+        Log.debug("cart.cleared", items=len(items))
 
     async def _get_items(self, cart_id: uuid.UUID) -> list[CartItem]:
         return await CartItem.where(cart_id=cart_id).order_by("created_at").all()

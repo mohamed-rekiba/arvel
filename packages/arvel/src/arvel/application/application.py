@@ -392,7 +392,11 @@ class Application:
 
         fa.add_middleware(DeferredTaskMiddleware)
         fa.add_middleware(ContextMiddleware)
-        fa.add_middleware(ObservabilityMiddleware, service=config.service_name)
+        fa.add_middleware(
+            ObservabilityMiddleware,
+            service=config.service_name,
+            log_requests=not config.log_uvicorn_access,
+        )
 
     def _maybe_add_maintenance_middleware(self, fa: FastAPI) -> None:
         """Attach the maintenance middleware if a manager is bound."""

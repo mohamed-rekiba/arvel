@@ -1,10 +1,10 @@
-"""Single-line stdout formatters for the no-collector case.
+"""Single-line stdout log formatters for the no-collector case.
 
-When no OTLP endpoint is set, signals still need to reach the operator's
-terminal. OTel's console exporters dump a multi-line JSON blob per record/span
-(the full resource included), which is unreadable in `docker compose logs`.
-These formatters render one clean line instead: compact JSON for
-`log_format=json`, human-readable for `log_format=console`.
+When no OTLP endpoint is set, logs still need to reach the operator's terminal.
+OTel's ConsoleLogRecordExporter dumps a multi-line JSON blob per record (the
+full resource included), which is unreadable in `docker compose logs`. These
+formatters render one clean line instead: compact JSON for `log_format=json`,
+human-readable for `log_format=console`.
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from collections.abc import Callable
 from typing import Any
 
 from opentelemetry.sdk._logs import ReadableLogRecord
-from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.util import ns_to_iso_str
 from opentelemetry.trace import format_span_id, format_trace_id
 
@@ -64,24 +63,4 @@ def formatter_for(log_format: str) -> Callable[[ReadableLogRecord], str]:
     return format_console if log_format == "console" else format_json
 
 
-def format_span_console(span: ReadableSpan) -> str:
-    """One readable line per span — beats OTel's multi-line JSON dump on stdout."""
-    ctx = span.get_span_context()
-    start = ns_to_iso_str(span.start_time) if span.start_time is not None else ""
-    duration_ms = (
-        (span.end_time - span.start_time) / 1_000_000
-        if span.start_time is not None and span.end_time is not None
-        else 0.0
-    )
-    trace_id = format_trace_id(ctx.trace_id) if ctx is not None else ""
-    span_id = format_span_id(ctx.span_id) if ctx is not None else ""
-    attrs = dict(span.attributes) if span.attributes else {}
-    suffix = "  " + " ".join(f"{k}={v}" for k, v in attrs.items()) if attrs else ""
-    return (
-        f"{start} TRACE    {span.name}  "
-        f"dur={duration_ms:.2f}ms trace_id={trace_id} span_id={span_id}"
-        f"{suffix}\n"
-    )
-
-
-__all__ = ["format_console", "format_json", "format_span_console", "formatter_for"]
+__all__ = ["format_console", "format_json", "formatter_for"]

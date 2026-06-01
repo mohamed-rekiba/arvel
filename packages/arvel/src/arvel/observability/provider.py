@@ -77,18 +77,11 @@ def _bootstrap_otel(config: ObservabilityConfig) -> None:
 
 
 def _attach_trace_exporters(provider: TracerProvider, config: ObservabilityConfig) -> None:
-    from opentelemetry.sdk.trace.export import (
-        BatchSpanProcessor,
-        ConsoleSpanExporter,
-    )
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+    # No collector: don't dump spans to stdout — they're noise next to the logs.
+    # The http.request log already carries duration + trace context for correlation.
     if not config.otlp_endpoint:
-        if config.log_format == "console":
-            from arvel.observability.stdout_log_exporter import format_span_console
-
-            provider.add_span_processor(
-                BatchSpanProcessor(ConsoleSpanExporter(formatter=format_span_console))
-            )
         return
 
     try:

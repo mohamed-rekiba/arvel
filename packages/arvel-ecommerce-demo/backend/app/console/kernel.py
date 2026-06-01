@@ -24,7 +24,7 @@ class Kernel:
             .onOneServer(ttl_seconds=60)
         )
         # Prune abandoned carts (30 days idle, see Cart.prunable_query).
-        schedule.command("model:prune").daily().at("02:00")
+        schedule.command("model:prune").dailyAt("02:00")
 
 
 __all__ = ["Kernel", "refresh_products_catalog_schedule"]

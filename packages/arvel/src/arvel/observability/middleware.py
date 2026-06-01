@@ -6,6 +6,7 @@ buffers streaming responses and causes Content-Length mismatches.
 
 from __future__ import annotations
 
+import time
 from urllib.parse import parse_qsl
 
 from opentelemetry import trace as otel_trace
@@ -36,9 +37,12 @@ class ObservabilityMiddleware:
     Must be registered before any other middleware so it wraps the full lifecycle.
     """
 
-    def __init__(self, app: ASGIApp, service: str = "arvel") -> None:
+    def __init__(self, app: ASGIApp, service: str = "arvel", *, log_requests: bool = False) -> None:
         self._app = app
         self._service = service
+        # When uvicorn's own access log is off, this middleware emits the access
+        # line instead — richer (duration, request_id, trace context) and one line.
+        self._log_requests = log_requests
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -74,12 +78,17 @@ class ObservabilityMiddleware:
         }
         parent_ctx = otel_extract(carrier)
 
+        method = scope.get("method", "GET")
+        path = scope.get("path", "")
+        started = time.perf_counter()
+
         tracer = otel_trace.get_tracer("arvel")
         try:
             with tracer.start_as_current_span("arvel.http.request", context=parent_ctx) as span:
-                span.set_attribute("http.method", scope.get("method", "GET"))
-                span.set_attribute("http.route", scope.get("path", ""))
+                span.set_attribute("http.method", method)
+                span.set_attribute("http.route", path)
                 span.set_attribute("request_id", request_id)
+                self._log_received(method, path)
 
                 response_status: list[int] = []
 
@@ -95,13 +104,38 @@ class ObservabilityMiddleware:
                 except Exception as exc:
                     span.set_status(StatusCode.ERROR, str(exc))
                     self._log_5xx(exc, request_id)
+                    self._log_request(method, path, _SERVER_ERROR_THRESHOLD, started)
                     raise
 
-                if response_status and response_status[0] >= _SERVER_ERROR_THRESHOLD:
-                    span.set_status(StatusCode.ERROR, f"HTTP {response_status[0]}")
+                status = response_status[0] if response_status else 200
+                if status >= _SERVER_ERROR_THRESHOLD:
+                    span.set_status(StatusCode.ERROR, f"HTTP {status}")
+                self._log_request(method, path, status, started)
         finally:
             reset_request_context(token)
             reset_pagination_request(pg_token)
+
+    def _log_received(self, method: str, path: str) -> None:
+        if not self._log_requests:
+            return
+        from arvel.logging.facade import Log
+
+        # Opens the request-flow story; domain breadcrumbs share its request_id/trace.
+        Log.info("request.received", method=method, path=path)
+
+    def _log_request(self, method: str, path: str, status: int, started: float) -> None:
+        if not self._log_requests:
+            return
+        from arvel.logging.facade import Log
+
+        # request_id / trace context are injected by the logger from RequestContext.
+        Log.info(
+            "http.request",
+            method=method,
+            path=path,
+            status=status,
+            duration_ms=round((time.perf_counter() - started) * 1000, 2),
+        )
 
     def _log_5xx(self, exc: BaseException, request_id: str) -> None:
         from arvel.http.exceptions import HttpException

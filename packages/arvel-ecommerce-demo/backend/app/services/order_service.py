@@ -6,6 +6,8 @@ import uuid
 from decimal import Decimal
 from typing import Any, cast
 
+from arvel.logging.facade import Log
+
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.product import Product
@@ -39,12 +41,21 @@ class OrderService:
     def __init__(self) -> None:
         self._cart_service = CartService()
 
+    @staticmethod
+    def _parse_id(order_id: str) -> uuid.UUID | None:
+        # Malformed path params should 404, not 500.
+        try:
+            return uuid.UUID(order_id)
+        except ValueError:
+            return None
+
     async def checkout(self, user_id: int, shipping_address: dict[str, Any]) -> dict[str, Any]:
         cart = await self._cart_service.get_cart_for_checkout(user_id)
         items = cart["items"]
         if not items:
             raise EmptyCartError("Cannot checkout with an empty cart.")
 
+        Log.debug("order.placing", user_id=user_id, items=len(items))
         locked_products: dict[uuid.UUID, Product] = {}
         published_products: dict[uuid.UUID, ProductCatalog] = {}
         for item in items:
@@ -93,6 +104,7 @@ class OrderService:
             await product.save()
 
         await self._cart_service.clear_cart(user_id)
+        Log.debug("order.placed", order_id=str(order.id), total=float(total))
 
         result = await self.get_order(str(order.id), user_id)
         if result is None:
@@ -113,7 +125,9 @@ class OrderService:
         return results
 
     async def get_order(self, order_id: str, user_id: int) -> dict[str, Any] | None:
-        oid = uuid.UUID(order_id)
+        oid = self._parse_id(order_id)
+        if oid is None:
+            return None
         order: Order | None = (
             await Order.where(Order.id == oid, Order.user_id == user_id).with_("items").first()
         )
@@ -163,7 +177,9 @@ class OrderService:
         return {"data": results, "total": total}
 
     async def admin_get_order(self, order_id: str) -> dict[str, Any] | None:
-        oid = uuid.UUID(order_id)
+        oid = self._parse_id(order_id)
+        if oid is None:
+            return None
         order: Order | None = (
             await Order.with_trashed().where(Order.id == oid).with_("items").first()
         )
@@ -222,17 +238,23 @@ class OrderService:
         ]
 
     async def update_status(self, order_id: str, status: str) -> dict[str, Any] | None:
-        oid = uuid.UUID(order_id)
+        oid = self._parse_id(order_id)
+        if oid is None:
+            return None
         order: Order | None = await Order.with_trashed().where(Order.id == oid).first()
         if order is None:
             return None
         current_status = order.status or "pending"
         if not self._can_transition(current_status, status):
             raise InvalidOrderStatusTransitionError(current_status, status)
+        Log.debug(
+            "order.status.changing", order_id=order_id, from_status=current_status, to_status=status
+        )
         if current_status != "cancelled" and status == "cancelled":
             await self._restore_stock_for_order(oid)
         order.status = status
         await order.save()
+        Log.debug("order.status.changed", order_id=order_id, status=status)
         return await self.admin_get_order(order_id)
 
     async def _restore_stock_for_order(self, order_id: uuid.UUID) -> None:
