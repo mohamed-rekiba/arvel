@@ -84,7 +84,11 @@ def _attach_trace_exporters(provider: TracerProvider, config: ObservabilityConfi
 
     if not config.otlp_endpoint:
         if config.log_format == "console":
-            provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+            from arvel.observability.stdout_log_exporter import format_span_console
+
+            provider.add_span_processor(
+                BatchSpanProcessor(ConsoleSpanExporter(formatter=format_span_console))
+            )
         return
 
     try:
@@ -105,11 +109,23 @@ def _attach_log_processors(provider: LoggerProvider, config: ObservabilityConfig
     from opentelemetry.sdk._logs.export import (
         BatchLogRecordProcessor,
         ConsoleLogRecordExporter,
+        SimpleLogRecordProcessor,
     )
 
     if not config.otlp_endpoint:
-        if config.log_format == "console":
-            provider.add_log_record_processor(BatchLogRecordProcessor(ConsoleLogRecordExporter()))
+        # No collector: render one clean line per record to stdout. Simple (not
+        # batch) so logs show up immediately in dev. Without this, json format
+        # would attach no exporter at all and every log line would vanish.
+        # Bind out=sys.stdout at attach time — the exporter's default captures
+        # stdout once at import, which breaks under reassignment (e.g. tests).
+        import sys
+
+        from arvel.observability.stdout_log_exporter import formatter_for
+
+        stdout_exporter = ConsoleLogRecordExporter(
+            out=sys.stdout, formatter=formatter_for(config.log_format)
+        )
+        provider.add_log_record_processor(SimpleLogRecordProcessor(stdout_exporter))
         return
 
     try:
