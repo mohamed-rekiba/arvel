@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
+import httpx
 import pytest
 
 
@@ -193,7 +194,7 @@ class TestStory7MethodSpoof:
         app.add_middleware(MethodSpoofMiddleware)
         Router.singleton().register_with_app(app)
 
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
         resp = client.post("/items/5", data={"_method": "PUT", "name": "x"})
         assert resp.status_code == 200
         assert resp.json() == {"method": "PUT", "id": 5}
@@ -216,7 +217,7 @@ class TestStory7MethodSpoof:
         app.add_middleware(MethodSpoofMiddleware)
         Router.singleton().register_with_app(app)
 
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
         resp = client.post("/items/7", data={"_method": "DELETE"})
         assert resp.status_code == 200
         assert resp.json() == {"deleted": 7}
@@ -239,7 +240,7 @@ class TestStory7MethodSpoof:
         app.add_middleware(MethodSpoofMiddleware)
         Router.singleton().register_with_app(app)
 
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
         resp = client.post("/items/9", data={"_method": "PATCH"})
         assert resp.status_code == 200
         assert resp.json() == {"patched": 9}
@@ -262,7 +263,7 @@ class TestStory7MethodSpoof:
         app.add_middleware(MethodSpoofMiddleware)
         Router.singleton().register_with_app(app)
 
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
         # Lowercase _method value should still be honoured.
         resp = client.post("/items", data={"_method": "put"})
         assert resp.status_code == 200
@@ -286,7 +287,7 @@ class TestStory7MethodSpoof:
         app.add_middleware(MethodSpoofMiddleware)
         Router.singleton().register_with_app(app)
 
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
         # `_method` in the query string should be ignored.
         resp = client.get("/items?_method=PUT")
         assert resp.status_code == 200
@@ -311,7 +312,7 @@ class TestStory7MethodSpoof:
         app.add_middleware(MethodSpoofMiddleware)
         Router.singleton().register_with_app(app)
 
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
         # `_method=GET` is not a write verb; ignored.
         resp = client.post("/items", data={"_method": "GET"})
         assert resp.status_code == 200
@@ -336,7 +337,7 @@ class TestStory7MethodSpoof:
         app.add_middleware(MethodSpoofMiddleware)
         Router.singleton().register_with_app(app)
 
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
         resp = client.post("/items", json={"name": "x"})
         assert resp.status_code == 200
         assert resp.json() == {"json": True}
@@ -418,7 +419,7 @@ class TestStory8SignedUrls:
         # Drop scheme + host so TestClient hits the right path.
         path_and_query = signed[len("https://example.com") :]
 
-        client = TestClient(app, base_url="https://example.com")
+        client = cast("httpx.Client", TestClient(app, base_url="https://example.com"))
         resp = client.get(path_and_query)
         assert resp.status_code == 200
         assert resp.json() == {"valid": True}
@@ -447,7 +448,7 @@ class TestStory8SignedUrls:
         # Swap user_id 5 → 6 to simulate tampering.
         path_and_query = signed[len("https://example.com") :].replace("/verify/5", "/verify/6")
 
-        client = TestClient(app, base_url="https://example.com")
+        client = cast("httpx.Client", TestClient(app, base_url="https://example.com"))
         resp = client.get(path_and_query)
         assert resp.status_code == 200
         assert resp.json() == {"valid": False}
@@ -477,7 +478,7 @@ class TestStory8SignedUrls:
         signed = URL.signed_route("verify-email", user_id=5)
         path_and_query = signed[len("https://example.com") :]
 
-        client = TestClient(app, base_url="https://evil.com")
+        client = cast("httpx.Client", TestClient(app, base_url="https://evil.com"))
         resp = client.get(path_and_query)
         assert resp.status_code == 200
         assert resp.json() == {"valid": False}
@@ -507,7 +508,7 @@ class TestStory8SignedUrls:
         signed = URL.signed_route("verify-email", expires_at=exp, user_id=5)
         path_and_query = signed[len("https://example.com") :]
 
-        client = TestClient(app, base_url="https://example.com")
+        client = cast("httpx.Client", TestClient(app, base_url="https://example.com"))
         resp = client.get(path_and_query)
         assert resp.status_code == 200
         assert resp.json() == {"valid": False}
@@ -539,7 +540,7 @@ class TestStory8SignedUrls:
 
         HttpExceptionHandler().register(app)
 
-        client = TestClient(app, base_url="https://example.com")
+        client = cast("httpx.Client", TestClient(app, base_url="https://example.com"))
         # Missing signature entirely.
         resp = client.get("/verify/5")
         assert resp.status_code == 403
@@ -574,7 +575,7 @@ class TestStory8SignedUrls:
         signed = URL.signed_route("verify-email", user_id=5)
         path_and_query = signed[len("https://example.com") :]
 
-        client = TestClient(app, base_url="https://example.com")
+        client = cast("httpx.Client", TestClient(app, base_url="https://example.com"))
         resp = client.get(path_and_query)
         assert resp.status_code == 200
         assert resp.json() == {"user_id": 5}

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
+import httpx
 import pytest
 
 
@@ -86,7 +88,7 @@ async def test_into_asgi_returns_wired_app_when_pre_booted(tmp_path: Path) -> No
     await app.boot()
     fa = app.into_asgi()
     assert isinstance(fa, ASGIApp)
-    assert TestClient(fa).get("/healthz").json() == {"status": "ok"}
+    assert cast("httpx.Client", TestClient(fa)).get("/healthz").json() == {"status": "ok"}
 
 
 def test_into_asgi_default_lifespan_boots_and_shuts_down(tmp_path: Path) -> None:
@@ -114,7 +116,7 @@ def test_into_asgi_default_lifespan_boots_and_shuts_down(tmp_path: Path) -> None
     booted_at_factory_time = app._booted  # pyright: ignore[reportPrivateUsage]
     assert booted_at_factory_time is False
 
-    with TestClient(fa) as client:
+    with cast("httpx.Client", TestClient(fa)) as client:
         # Entering the TestClient context drives lifespan startup, which the
         # default lifespan uses to await self.boot().
         assert app._booted is True  # pyright: ignore[reportPrivateUsage]
@@ -142,6 +144,6 @@ def test_into_asgi_skips_double_boot_when_pre_booted(tmp_path: Path) -> None:
     asyncio.run(app.boot())
     fa = app.into_asgi()
     # If the lifespan tried to re-boot a booted app, this would raise.
-    with TestClient(fa) as client:
+    with cast("httpx.Client", TestClient(fa)) as client:
         assert client.get("/__nonexistent__").status_code == 404
     assert app._booted is False  # pyright: ignore[reportPrivateUsage]

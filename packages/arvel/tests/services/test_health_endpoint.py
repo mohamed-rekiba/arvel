@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import cast
 
+import httpx
 import pytest
 from arvel.application import Application
 from arvel.services import BaseService, HealthResult, HealthStatus
@@ -31,7 +33,7 @@ def test_all_healthy_returns_200(tmp_path: Path) -> None:
     app.register_service(_Static("db", HealthResult(HealthStatus.healthy)))
     app.register_service(_Static("cache", HealthResult(HealthStatus.healthy)))
 
-    with TestClient(app.into_asgi()) as client:
+    with cast("httpx.Client", TestClient(app.into_asgi())) as client:
         response = client.get("/_health")
 
     assert response.status_code == 200
@@ -46,7 +48,7 @@ def test_any_unhealthy_returns_503(tmp_path: Path) -> None:
     app.register_service(_Static("db", HealthResult(HealthStatus.healthy)))
     app.register_service(_Static("queue", HealthResult(HealthStatus.unhealthy, "no connection")))
 
-    with TestClient(app.into_asgi()) as client:
+    with cast("httpx.Client", TestClient(app.into_asgi())) as client:
         response = client.get("/_health")
 
     assert response.status_code == 503
@@ -59,7 +61,7 @@ def test_degraded_returns_200(tmp_path: Path) -> None:
     app = _app(tmp_path)
     app.register_service(_Static("cache", HealthResult(HealthStatus.degraded, "slow")))
 
-    with TestClient(app.into_asgi()) as client:
+    with cast("httpx.Client", TestClient(app.into_asgi())) as client:
         response = client.get("/_health")
 
     assert response.status_code == 200
@@ -76,7 +78,7 @@ def test_raising_check_reported_unhealthy(tmp_path: Path) -> None:
     app = _app(tmp_path)
     app.register_service(_Boom())
 
-    with TestClient(app.into_asgi()) as client:
+    with cast("httpx.Client", TestClient(app.into_asgi())) as client:
         response = client.get("/_health")
 
     assert response.status_code == 503
@@ -108,7 +110,7 @@ def test_checks_run_concurrently(tmp_path: Path) -> None:
     app.register_service(_A())
     app.register_service(_B())
 
-    with TestClient(app.into_asgi()) as client:
+    with cast("httpx.Client", TestClient(app.into_asgi())) as client:
         response = client.get("/_health")
 
     assert response.status_code == 200
@@ -130,7 +132,7 @@ def test_timeout_reported_as_unhealthy(tmp_path: Path, monkeypatch: pytest.Monke
     app = _app(tmp_path)
     app.register_service(_Slow())
 
-    with TestClient(app.into_asgi()) as client:
+    with cast("httpx.Client", TestClient(app.into_asgi())) as client:
         response = client.get("/_health")
 
     assert response.status_code == 503
@@ -142,7 +144,7 @@ def test_cidr_restriction_returns_403(tmp_path: Path, monkeypatch: pytest.Monkey
     app = _app(tmp_path)
     app.register_service(_Static("db", HealthResult(HealthStatus.healthy)))
 
-    with TestClient(app.into_asgi()) as client:
+    with cast("httpx.Client", TestClient(app.into_asgi())) as client:
         response = client.get("/_health", headers={"X-Forwarded-For": "8.8.8.8"})
 
     assert response.status_code == 403

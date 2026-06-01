@@ -5,8 +5,9 @@ from __future__ import annotations
 import inspect
 import logging
 import time
-from typing import Any
+from typing import Any, cast
 
+import httpx
 import pytest
 from arvel.auth.config import JwtConfig
 
@@ -75,7 +76,11 @@ def test_500_response_does_not_contain_stack_trace() -> None:
         raise ServerErrorException("kaboom")
 
     del boom  # registered via @fa.get; drop local binding
-    body = TestClient(fa).get("/explode", headers={"Accept": "application/json"}).text
+    body = (
+        cast("httpx.Client", TestClient(fa))
+        .get("/explode", headers={"Accept": "application/json"})
+        .text
+    )
     for forbidden in ("Traceback", 'File "', "raise ServerErrorException"):
         assert forbidden not in body
 
@@ -99,7 +104,7 @@ def test_exception_handler_logs_redact_authorization_header(
 
     del me  # registered via @fa.get; drop local binding
     caplog.set_level(logging.WARNING)
-    TestClient(fa).get(
+    cast("httpx.Client", TestClient(fa)).get(
         "/me",
         headers={
             "Authorization": "Bearer sk-very-secret-token-do-not-log",

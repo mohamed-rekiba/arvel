@@ -9,9 +9,11 @@ target handling, and the `--no-install` / `--python` flags.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pytest
 from arvel.console.entrypoint import build_app
+from click.testing import CliRunner as ClickCliRunner
 from typer.testing import CliRunner
 
 
@@ -47,7 +49,7 @@ def test_new_rejects_invalid_names_with_exit_2(
 ) -> None:
     """Invalid names → exit 2 with stderr mention of the violation."""
     app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app, ["new", bad_name])
         # Empty name is rejected by Typer itself as a missing arg → exit 2.
         # Other invalid names are rejected by validate_project_name → exit 2.
@@ -57,7 +59,7 @@ def test_new_rejects_invalid_names_with_exit_2(
 def test_new_happy_path_creates_target_directory(runner: CliRunner, tmp_path: Path) -> None:
     """Valid name + clean cwd → exit 0, target populated."""
     app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
         result = runner.invoke(app, ["new", "my-app", "--no-install"])
         assert result.exit_code == 0, result.stderr
         assert (Path(iso_cwd) / "my-app").is_dir()
@@ -66,7 +68,7 @@ def test_new_happy_path_creates_target_directory(runner: CliRunner, tmp_path: Pa
 def test_new_no_install_skips_uv_sync(runner: CliRunner, tmp_path: Path) -> None:
     """``--no-install`` means no .venv/ in the generated target."""
     app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
         result = runner.invoke(app, ["new", "my-app", "--no-install"])
         assert result.exit_code == 0, result.stderr
         target = Path(iso_cwd) / "my-app"
@@ -78,7 +80,7 @@ def test_new_no_install_skips_uv_sync(runner: CliRunner, tmp_path: Path) -> None
 def test_new_python_flag_pins_requires_python(runner: CliRunner, tmp_path: Path) -> None:
     """``--python`` writes through to the generated ``pyproject.toml``."""
     app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
         result = runner.invoke(app, ["new", "my-app", "--no-install", "--python", "3.14"])
         assert result.exit_code == 0, result.stderr
         pyproject = (Path(iso_cwd) / "my-app" / "pyproject.toml").read_text()
@@ -88,7 +90,7 @@ def test_new_python_flag_pins_requires_python(runner: CliRunner, tmp_path: Path)
 def test_new_next_steps_output_includes_run_commands(runner: CliRunner, tmp_path: Path) -> None:
     """stdout includes the cd + uv run arvel serve instructions."""
     app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app, ["new", "my-app", "--no-install"])
         assert result.exit_code == 0, result.stderr
         assert "cd my-app" in result.stdout
@@ -98,7 +100,7 @@ def test_new_next_steps_output_includes_run_commands(runner: CliRunner, tmp_path
 def test_new_refuses_to_overwrite_non_empty_dir(runner: CliRunner, tmp_path: Path) -> None:
     """Pre-existing non-empty target → exit 1."""
     app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
         target = Path(iso_cwd) / "my-app"
         target.mkdir()
         (target / "do-not-clobber.txt").write_text("important")
@@ -112,7 +114,7 @@ def test_new_refuses_to_overwrite_non_empty_dir(runner: CliRunner, tmp_path: Pat
 def test_new_accepts_pre_existing_empty_dir(runner: CliRunner, tmp_path: Path) -> None:
     """Pre-existing empty target → exit 0, used into."""
     app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
         (Path(iso_cwd) / "my-app").mkdir()
 
         result = runner.invoke(app, ["new", "my-app", "--no-install"])

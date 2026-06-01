@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import cast
+
+import httpx
 from arvel.context import Context, ContextRepository, bind_repository, reset_repository
 from arvel.http.exceptions import HttpExceptionHandler, NotFoundException
 from arvel.testing.observability import FakeObservability
@@ -26,7 +29,7 @@ def _app() -> FastAPI:
 
 
 def test_unhandled_exception_logged_via_facade() -> None:
-    client = TestClient(_app(), raise_server_exceptions=False)
+    client = cast("httpx.Client", TestClient(_app(), raise_server_exceptions=False))
 
     with FakeObservability() as obs:
         response = client.get("/boom")
@@ -39,7 +42,7 @@ def test_unhandled_exception_logged_via_facade() -> None:
 
 
 def test_500_response_hides_internal_details() -> None:
-    client = TestClient(_app(), raise_server_exceptions=False)
+    client = cast("httpx.Client", TestClient(_app(), raise_server_exceptions=False))
 
     response = client.get("/boom")
 
@@ -64,7 +67,7 @@ def test_unhandled_exception_carries_request_context() -> None:
             raise RuntimeError("nope")
 
         del _kaboom  # registered via decorator; drop local binding
-        client = TestClient(app, raise_server_exceptions=False)
+        client = cast("httpx.Client", TestClient(app, raise_server_exceptions=False))
         with FakeObservability() as obs:
             client.get("/kaboom")
 
@@ -76,7 +79,7 @@ def test_unhandled_exception_carries_request_context() -> None:
 
 
 def test_typed_exception_message_preserved() -> None:
-    client = TestClient(_app(), raise_server_exceptions=False)
+    client = cast("httpx.Client", TestClient(_app(), raise_server_exceptions=False))
 
     response = client.get("/missing")
 

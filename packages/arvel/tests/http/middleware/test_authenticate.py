@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
+
+import httpx
 
 
 class _FakeUser:
@@ -45,7 +47,7 @@ def test_authenticate_populates_request_state_user() -> None:
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
     app.state.arvel_container = container
-    resp = TestClient(app).get("/me")
+    resp = cast("httpx.Client", TestClient(app)).get("/me")
     assert resp.status_code == 200
     assert resp.json() == {"id": "u-1"}
 
@@ -84,6 +86,6 @@ def test_authenticate_raises_401_when_guard_returns_none() -> None:
     Router.singleton().register_with_app(app)
     app.state.arvel_container = container
 
-    resp = TestClient(app).get("/protected")
+    resp = cast("httpx.Client", TestClient(app)).get("/protected")
     assert resp.status_code == 401
     assert resp.json()["error"]["code"] == "UNAUTHENTICATED"

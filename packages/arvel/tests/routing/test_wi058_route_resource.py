@@ -13,8 +13,9 @@ Run BEFORE implementation — every test in this file MUST fail (RED state).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
+import httpx
 import pytest
 from arvel.http.controller import Controller
 from arvel.routing import Route, Router, RouteSpec
@@ -112,7 +113,7 @@ class TestDefaultRegistration:
         app = FastAPI()
         Router.singleton().register_with_app(app)
 
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
         assert client.get("/posts").json() == {"hit": "index"}
         assert client.get("/posts/create").json() == {"hit": "create"}
         assert client.post("/posts").json() == {"hit": "store"}

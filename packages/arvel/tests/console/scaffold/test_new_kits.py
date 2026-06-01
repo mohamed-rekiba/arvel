@@ -7,6 +7,7 @@ these tests focus on the multi-kit registry surface.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pytest
 from arvel.console._scaffold import (
@@ -20,6 +21,7 @@ from arvel.console._scaffold import (
     resolve_kit,
 )
 from arvel.console.entrypoint import build_app
+from click.testing import CliRunner as ClickCliRunner
 from typer.testing import CliRunner
 
 
@@ -74,7 +76,7 @@ def test_resolve_kit_raises_unknown_kit_for_missing_name() -> None:
 def test_unknown_kit_exits_with_listing(runner: CliRunner, tmp_path: Path) -> None:
     """``--kit unknown`` → exit 2 + the available-kits listing in stderr."""
     app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app, ["new", "my-app", "--kit", "not-a-kit", "--no-install"])
         assert result.exit_code == 2
         assert "unknown kit" in result.stderr
@@ -105,7 +107,7 @@ def test_new_kit_flag_appears_in_help(runner: CliRunner) -> None:
 def test_new_kit_defaults_to_api_when_omitted(runner: CliRunner, tmp_path: Path) -> None:
     """``arvel new <name>`` without ``--kit`` produces the api skeleton."""
     app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
         result = runner.invoke(app, ["new", "my-app", "--no-install"])
         assert result.exit_code == 0, result.stderr
         target = Path(iso_cwd) / "my-app"
@@ -116,7 +118,7 @@ def test_new_kit_defaults_to_api_when_omitted(runner: CliRunner, tmp_path: Path)
 def test_new_explicit_api_kit_matches_default_output(runner: CliRunner, tmp_path: Path) -> None:
     """``--kit api`` and the default produce the same project layout."""
     app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
         runner.invoke(app, ["new", "default-app", "--no-install"])
         runner.invoke(app, ["new", "explicit-app", "--kit", "api", "--no-install"])
 
@@ -159,7 +161,7 @@ def test_kit_not_installed_surfaces_install_hint(
     monkeypatch.setitem(kits_module.KITS, "ecommerce", fake_spec)
 
     app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app, ["new", "my-app", "--kit", "ecommerce", "--no-install"])
         assert result.exit_code == 1
         assert "arvel-ecommerce-demo" in result.stderr

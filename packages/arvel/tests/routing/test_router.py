@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
+
+import httpx
 
 
 def test_router_registers_routes_with_fastapi_app() -> None:
@@ -40,7 +42,7 @@ def test_router_preserves_route_name_for_url_lookup() -> None:
     fastapi_app = FastAPI()
     Router.singleton().register_with_app(fastapi_app)
 
-    client = TestClient(fastapi_app)
+    client = cast("httpx.Client", TestClient(fastapi_app))
     resp = client.get("/echo/42")
     assert resp.status_code == 200
     assert resp.json() == {"n": 42}
@@ -72,7 +74,7 @@ def test_router_executes_route_level_middleware() -> None:
     assert any(r.handler is tracked for r in Router.singleton().routes())
     fastapi_app = FastAPI()
     Router.singleton().register_with_app(fastapi_app)
-    client = TestClient(fastapi_app)
+    client = cast("httpx.Client", TestClient(fastapi_app))
     client.get("/tracked")
 
     assert calls == ["before", "handler", "after"]

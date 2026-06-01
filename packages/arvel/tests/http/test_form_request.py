@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
+import httpx
 import pytest
 from pydantic import BaseModel, EmailStr
 
@@ -75,7 +76,7 @@ def test_form_request_bad_body_returns_422_via_fastapi() -> None:
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
 
-    resp = TestClient(app).post("/users", json={"email": "not-an-email"})
+    resp = cast("httpx.Client", TestClient(app)).post("/users", json={"email": "not-an-email"})
     assert resp.status_code == 422
     body = resp.json()
     assert "error" in body
@@ -104,7 +105,9 @@ def test_form_request_authorize_false_returns_403() -> None:
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
 
-    resp = TestClient(app).post("/users", json={"email": "x@example.com", "password": "hunter2"})
+    resp = cast("httpx.Client", TestClient(app)).post(
+        "/users", json={"email": "x@example.com", "password": "hunter2"}
+    )
     assert resp.status_code == 403
     assert resp.json()["error"]["code"] == "FORBIDDEN"
 
@@ -132,7 +135,7 @@ def test_form_request_authorize_runs_after_validation() -> None:
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
 
-    resp = TestClient(app).post("/users", json={"email": "bad"})
+    resp = cast("httpx.Client", TestClient(app)).post("/users", json={"email": "bad"})
     assert resp.status_code == 422
 
 

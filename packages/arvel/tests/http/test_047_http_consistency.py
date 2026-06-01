@@ -11,7 +11,9 @@ Tests are FAILING before the fix and PASSING after.
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -51,7 +53,7 @@ class TestStory10DefaultExceptionHandler:
             raise NotFoundException("not here")
 
         del _endpoint  # registered via @fastapp.*; drop local binding
-        client = TestClient(fastapp, raise_server_exceptions=False)
+        client = cast("httpx.Client", TestClient(fastapp, raise_server_exceptions=False))
         response = client.get("/test")
 
         assert response.status_code == 404
@@ -77,7 +79,7 @@ class TestStory10DefaultExceptionHandler:
             return {"ok": "yes"}
 
         del _endpoint  # registered via @fastapp.*; drop local binding
-        client = TestClient(fastapp, raise_server_exceptions=False)
+        client = cast("httpx.Client", TestClient(fastapp, raise_server_exceptions=False))
         response = client.post("/validate", json={"email": "bad", "age": "not-an-int"})
 
         assert response.status_code == 422
@@ -149,7 +151,7 @@ class TestStory11AbortTypedCodes:
             return {}  # unreachable
 
         del _endpoint  # registered via @fastapp.*; drop local binding
-        client = TestClient(fastapp, raise_server_exceptions=False)
+        client = cast("httpx.Client", TestClient(fastapp, raise_server_exceptions=False))
         response = client.get("/item/missing")
 
         assert response.status_code == 404
@@ -184,7 +186,7 @@ class TestStory12ScopeMiddleware:
             return {"has_scope": scope is not None}
 
         del _endpoint  # registered via @fastapp.*; drop local binding
-        client = TestClient(fastapp, raise_server_exceptions=False)
+        client = cast("httpx.Client", TestClient(fastapp, raise_server_exceptions=False))
         response = client.get("/scope-test")
 
         assert response.status_code == 200
@@ -218,7 +220,7 @@ class TestStory12ScopeMiddleware:
             return {"msg": svc.hello()}
 
         del _endpoint  # registered via @fastapp.*; drop local binding
-        client = TestClient(fastapp, raise_server_exceptions=False)
+        client = cast("httpx.Client", TestClient(fastapp, raise_server_exceptions=False))
         response = client.get("/dep-test")
 
         assert response.status_code == 200
@@ -247,7 +249,7 @@ class TestStory13CatchAllHandler:
             raise RuntimeError("unexpected failure")
 
         del _endpoint  # registered via @fastapp.*; drop local binding
-        client = TestClient(fastapp, raise_server_exceptions=False)
+        client = cast("httpx.Client", TestClient(fastapp, raise_server_exceptions=False))
         response = client.get("/boom")
 
         assert response.status_code == 500
@@ -272,7 +274,7 @@ class TestStory13CatchAllHandler:
             raise RuntimeError("SELECT * FROM users WHERE id = 1; DROP TABLE users;--")
 
         del _endpoint  # registered via @fastapp.*; drop local binding
-        client = TestClient(fastapp, raise_server_exceptions=False)
+        client = cast("httpx.Client", TestClient(fastapp, raise_server_exceptions=False))
         response = client.get("/sql-boom")
 
         assert response.status_code == 500
@@ -292,7 +294,7 @@ class TestStory13CatchAllHandler:
             raise NotFoundException("the thing")
 
         del _endpoint  # registered via @fastapp.*; drop local binding
-        client = TestClient(fastapp, raise_server_exceptions=False)
+        client = cast("httpx.Client", TestClient(fastapp, raise_server_exceptions=False))
         response = client.get("/not-found")
 
         assert response.status_code == 404

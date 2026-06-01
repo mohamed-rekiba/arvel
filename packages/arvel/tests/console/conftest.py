@@ -8,7 +8,7 @@ import io
 import os
 import shutil
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,7 +28,7 @@ if not hasattr(CliRunner, "isolated_filesystem"):
     def _isolated_filesystem(
         self: CliRunner,
         temp_dir: str | os.PathLike[str] | None = None,
-    ) -> Iterator[str]:
+    ) -> Generator[str]:
         cwd = Path.cwd()
         target = tempfile.mkdtemp(dir=temp_dir)
         os.chdir(target)
@@ -101,7 +101,7 @@ def invoke_async(
         # subclasses of the external click.exceptions.* — catch both.
         except (typer.Exit, click.exceptions.Exit) as exc:
             async_exit_code = exc.exit_code
-        except (typer.Abort, click.exceptions.Abort):
+        except typer.Abort, click.exceptions.Abort:
             async_exit_code = 1
         except SystemExit as exc:
             code = exc.code

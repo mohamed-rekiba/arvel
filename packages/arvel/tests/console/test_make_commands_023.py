@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import cast
 
 import pytest
 from arvel.console import Application, Command
@@ -30,6 +31,7 @@ from arvel.console.commands.make_observer import MakeObserverCommand
 from arvel.console.commands.make_resource import MakeResourceCommand
 from arvel.console.commands.make_test import MakeTestCommand
 from arvel.console.commands.make_view import MakeViewCommand
+from click.testing import CliRunner as ClickCliRunner
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -130,7 +132,7 @@ def test_new_make_creates_file_at_canonical_path(
 ) -> None:
     """/ / : file at expected path with framework-aware content."""
     app = _app(command_cls())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, [cli_name, arg])
         assert result.exit_code == 0, result.output
         path = Path(expected_path)
@@ -152,7 +154,7 @@ def test_new_make_generated_file_is_valid_python(
 ) -> None:
     """every generated stub parses as Python (or as Jinja for views)."""
     app = _app(command_cls())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         runner.invoke(app.typer_app, [cli_name, arg])
         source = Path(expected_path).read_text()
         if expected_path.endswith(".py"):
@@ -162,7 +164,7 @@ def test_new_make_generated_file_is_valid_python(
 def test_make_view_emits_jinja_file(tmp_path: Path) -> None:
     """/ : make:view writes a .html.jinja file."""
     app = _app(MakeViewCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["make:view", "welcome"])
         assert result.exit_code == 0, result.output
         assert Path("resources/views/welcome.html.jinja").exists()
@@ -181,7 +183,7 @@ def test_new_make_no_overwrite_without_force(
 ) -> None:
     """second invocation without --force fails."""
     app = _app(command_cls())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         first = runner.invoke(app.typer_app, [cli_name, arg])
         assert first.exit_code == 0, first.output
         second = runner.invoke(app.typer_app, [cli_name, arg])
@@ -198,7 +200,7 @@ def test_new_make_rejects_unsafe_name(
 ) -> None:
     """/ SR-023-003: path-traversal-like name rejected with exit 2."""
     app = _app(command_cls())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, [command_cls.name, "../EvilName"])
         assert result.exit_code == 2
 
