@@ -576,7 +576,7 @@ dev = [
 
 [[package]]
 name = "arvel-image"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "packages/arvel-image" }
 dependencies = [
     { name = "arvel" },
