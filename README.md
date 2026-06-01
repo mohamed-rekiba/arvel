@@ -31,7 +31,7 @@
 
 ---
 
-> **Status**: Pre-alpha — `v0.3.0`. Core subsystems ship and work today, but the public API can still change before `1.0`.
+> **Status**: Pre-alpha. Core subsystems ship and work today, but the public API can still change before `1.0`.
 
 Arvel brings Laravel's developer experience to async Python. You get a service container, typed
 configuration, an Eloquent-style ORM, form requests, API resources, queues, events, broadcasting,

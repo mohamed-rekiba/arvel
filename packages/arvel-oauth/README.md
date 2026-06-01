@@ -10,7 +10,7 @@
 OAuth2 / OIDC social login for [Arvel](https://arvel.dev) — Google, GitHub, Microsoft, Apple, and any
 generic OIDC issuer.
 
-> **Status**: Pre-alpha — `v0.3.0`.
+> **Status**: Pre-alpha.
 
 ---
 

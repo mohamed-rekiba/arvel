@@ -14,7 +14,7 @@ Spatie packages in one wheel:
 - [spatie/laravel-medialibrary v11](https://spatie.be/docs/laravel-medialibrary/v11/introduction) — a
   polymorphic `media` table that attaches files to any model.
 
-> **Status**: Pre-alpha — `v0.3.0`.
+> **Status**: Pre-alpha.
 
 ---
 

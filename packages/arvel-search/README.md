@@ -14,7 +14,7 @@ backend automatically on create / update / delete. Query with a fluent `Model.se
 builder. Swap backends — Meilisearch, Elasticsearch, database (`ILIKE`), in-memory collection, or
 null — entirely through config.
 
-> **Status**: Pre-alpha — `v0.3.0`.
+> **Status**: Pre-alpha.
 
 ---
 
