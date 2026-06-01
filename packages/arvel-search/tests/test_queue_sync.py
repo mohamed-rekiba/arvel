@@ -9,8 +9,8 @@ from arvel.facades.bus import Bus
 from arvel.queue.job import Job
 from arvel_search import Search, SearchManager
 from arvel_search.jobs import SearchIndexJob, SearchRemoveJob
-from sqlalchemy.ext.asyncio import AsyncSession
 from search_support import Article, make_config
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture

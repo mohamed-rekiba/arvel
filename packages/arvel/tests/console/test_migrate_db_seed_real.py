@@ -18,10 +18,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import typer
 
 # These imports are stable already
 from arvel.console import Application
-from arvel.console.commands.db_seed import DbSeedCommand
+from arvel.console.commands.db_seed import DbSeedCommand, run_seeder_for_app
 from arvel.console.commands.migrate import (
     MigrateCommand,
     MigrateRollbackCommand,
@@ -404,6 +405,42 @@ async def down(schema: Schema) -> None:
         return await Schema.has_table(engine, "posts")
 
     assert asyncio.run(_check()) is True
+
+
+# ============================================================
+# run_seeder_for_app — shared helper used by migrate:fresh/refresh --seed
+# ============================================================
+
+
+def test_run_seeder_for_app_runs_and_commits(project: Path, engine: AsyncEngine) -> None:
+    """Happy path: loads the seeder, binds a session, commits."""
+    (project / "database" / "seeders" / "database_seeder.py").write_text(_BASIC_SEEDER)
+    cmd = DbSeedCommand()
+    _make_app_with_engine(project, engine, cmd)
+    asyncio.run(run_seeder_for_app(cmd.app))
+
+
+def test_run_seeder_for_app_rejects_invalid_name(project: Path, engine: AsyncEngine) -> None:
+    cmd = DbSeedCommand()
+    _make_app_with_engine(project, engine, cmd)
+    with pytest.raises(ValueError, match="invalid seeder name"):
+        asyncio.run(run_seeder_for_app(cmd.app, "../bad"))
+
+
+def test_run_seeder_for_app_missing_file_raises(project: Path, engine: AsyncEngine) -> None:
+    cmd = DbSeedCommand()
+    _make_app_with_engine(project, engine, cmd)
+    with pytest.raises(FileNotFoundError, match="seeder file not found"):
+        asyncio.run(run_seeder_for_app(cmd.app, "Nonexistent"))
+
+
+def test_run_seeder_for_app_body_failure_exits_1(project: Path, engine: AsyncEngine) -> None:
+    (project / "database" / "seeders" / "bad_seeder.py").write_text(_RAISING_SEEDER)
+    cmd = DbSeedCommand()
+    _make_app_with_engine(project, engine, cmd)
+    with pytest.raises(typer.Exit) as exc_info:
+        asyncio.run(run_seeder_for_app(cmd.app, "BadSeeder"))
+    assert exc_info.value.exit_code == 1
 
 
 __all__: list[str] = []
