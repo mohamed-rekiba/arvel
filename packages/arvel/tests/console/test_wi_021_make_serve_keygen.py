@@ -572,9 +572,9 @@ class TestServeBypassesEventLoop:
         with (
             patch("arvel.console.commands.serve.uvicorn.run") as mock_run,
             patch.object(entrypoint.asyncio, "run") as mock_asyncio_run,
+            pytest.raises(SystemExit) as exc,
         ):
-            with pytest.raises(SystemExit) as exc:
-                entrypoint.main()
+            entrypoint.main()
 
         assert exc.value.code == 0
         mock_run.assert_called_once()
