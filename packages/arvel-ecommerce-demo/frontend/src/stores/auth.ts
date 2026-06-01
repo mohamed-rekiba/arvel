@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import {
-  apiAuthLoginApiAuthLoginPost,
-  apiAuthMeApiAuthMeGet,
-  apiAuthRegisterApiAuthRegisterPost,
+  authLoginApiAuthLoginPost,
+  authMeApiAuthMeGet,
+  authRegisterApiAuthRegisterPost,
 } from '@/api/auth/auth'
 import type { MeOut } from '@/api/schemas'
 import { ADMIN_PERMISSIONS } from '@/types'
@@ -59,9 +59,9 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
     try {
-      const { access_token } = await apiAuthLoginApiAuthLoginPost({ email, password })
+      const { access_token } = await authLoginApiAuthLoginPost({ email, password })
       persistToken(access_token)
-      const me = await apiAuthMeApiAuthMeGet()
+      const me = await authMeApiAuthMeGet()
       persistUser(me)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Login failed'
@@ -75,7 +75,12 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
     try {
-      await apiAuthRegisterApiAuthRegisterPost({ name, email, password })
+      await authRegisterApiAuthRegisterPost({
+        name,
+        email,
+        password,
+        password_confirmation: password,
+      })
       await login(email, password)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Registration failed'
@@ -92,7 +97,7 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
     try {
-      const me = await apiAuthMeApiAuthMeGet()
+      const me = await authMeApiAuthMeGet()
       persistUser(me)
     } catch {
       logout()

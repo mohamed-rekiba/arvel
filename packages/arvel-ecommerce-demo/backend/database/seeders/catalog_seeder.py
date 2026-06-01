@@ -7,7 +7,7 @@ Creates enough data to populate the marketplace-style storefront:
     Level 2: Mobiles, Laptops, Speakers, TV Sets, Watches, Headsets
     Level 3: Smartphones  (child of Mobiles — exercises the recursive CTE)
 - 12 published products (Mobiles/Smartphones share their 2 products)
-- 1 media row per product using picsum for demo images
+- 1 media row per product using a curated real product photo
   (stored via custom_properties.image_url — no file downloads required)
 
 All translatable fields include en/ar/tr values so i18n tests pass.
@@ -19,6 +19,27 @@ import uuid
 from typing import Any
 
 from app.support.seeder import EcommerceSeeder
+
+# Curated Unsplash photos (free under the Unsplash License) per product slug, so
+# the storefront shows category-correct images instead of random placeholders.
+# Cropped square at the source; the browser loads these URLs directly.
+_IMG = "https://images.unsplash.com/photo-{photo}?w=800&h=800&fit=crop&q=80"
+_PRODUCT_IMAGES: dict[str, str] = {
+    "iphone-15-pro": _IMG.format(photo="1592750475338-74b7b21085ab"),
+    "samsung-galaxy-s25": _IMG.format(photo="1610945415295-d9bbf067e59c"),
+    "macbook-air-m4": _IMG.format(photo="1517336714731-489689fd1ca8"),
+    "dell-xps-15": _IMG.format(photo="1496181133206-80ce9b88a853"),
+    "sony-srs-xb100": _IMG.format(photo="1608043152269-423dbba4e7e1"),
+    "bose-soundlink-flex": _IMG.format(photo="1545454675-3531b543be5d"),
+    "samsung-55-qled-4k": _IMG.format(photo="1593359677879-a4bb92f829d1"),
+    "lg-65-oled-evo-c4": _IMG.format(photo="1593784991095-a205069470b6"),
+    "apple-watch-series-10": _IMG.format(photo="1434493789847-2f02dc6ca35d"),
+    "garmin-forerunner-965": _IMG.format(photo="1691921673576-07c6032e6306"),
+    "sony-wh-1000xm6": _IMG.format(photo="1505740420928-5e560c06d30e"),
+    "airpods-pro-3": _IMG.format(photo="1606220588913-b3aacb4d2f46"),
+    "wireless-headphones-pro": _IMG.format(photo="1583394838336-acd977736f90"),
+    "prototype-gadget-x": _IMG.format(photo="1518770660439-4636190af475"),
+}
 
 
 def _english_slug(slug: dict[str, str]) -> str:
@@ -529,10 +550,9 @@ class CatalogSeeder(EcommerceSeeder):
                 await self._seed_media(str(record["id"]), slug_en)
 
     async def _seed_media(self, product_id: str, slug: str) -> None:
-        """Insert a media row with a picsum URL — skips if one already exists."""
-        existing = await self.db.table("media").where("model_id", product_id).first()
-        if existing:
-            return
+        """Upsert the product's demo image. Re-seeding refreshes the URL in place;
+        user-uploaded media (different uuid) is left untouched."""
+        image_url = _PRODUCT_IMAGES.get(slug, f"https://picsum.photos/seed/{slug}/800/800")
 
         # Deterministic UUID so re-seeding is idempotent via ON CONFLICT(uuid).
         media_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, f"product-image:{product_id}"))
@@ -547,10 +567,10 @@ class CatalogSeeder(EcommerceSeeder):
                 "name": slug,
                 "file_name": f"{slug}.jpg",
                 "mime_type": "image/jpeg",
-                "disk": "public",
+                "disk": "local",
                 "size": 0,
                 "manipulations": {},
-                "custom_properties": {"image_url": f"https://picsum.photos/seed/{slug}/400/400"},
+                "custom_properties": {"image_url": image_url},
                 "generated_conversions": {},
                 "responsive_images": {},
                 "metadata": {},

@@ -23,8 +23,10 @@ import type { MaybeRef } from 'vue'
 import type {
   AdminOrderListOut,
   AdminOrderWrapperOut,
-  ApiAdminOrdersIndexApiAdminOrdersGetParams,
-  ApiErrorOut,
+  AdminOrdersBestSellersApiAdminOrdersBestSellersGetParams,
+  AdminOrdersIndexApiAdminOrdersGetParams,
+  BestSellersListOut,
+  HTTPValidationError,
   UpdateOrderStatusPayload,
 } from '.././schemas'
 
@@ -33,10 +35,10 @@ import { request } from '../../lib/api'
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.Admin.Orders.Index
+ * @summary Admin.Orders.Index
  */
-export const apiAdminOrdersIndexApiAdminOrdersGet = (
-  params?: MaybeRef<ApiAdminOrdersIndexApiAdminOrdersGetParams>,
+export const adminOrdersIndexApiAdminOrdersGet = (
+  params?: MaybeRef<AdminOrdersIndexApiAdminOrdersGetParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
@@ -48,91 +50,62 @@ export const apiAdminOrdersIndexApiAdminOrdersGet = (
   )
 }
 
-export const getApiAdminOrdersIndexApiAdminOrdersGetQueryKey = (
-  params?: MaybeRef<ApiAdminOrdersIndexApiAdminOrdersGetParams>,
+export const getAdminOrdersIndexApiAdminOrdersGetQueryKey = (
+  params?: MaybeRef<AdminOrdersIndexApiAdminOrdersGetParams>,
 ) => {
   return ['api', 'admin', 'orders', ...(params ? [params] : [])] as const
 }
 
-export const getApiAdminOrdersIndexApiAdminOrdersGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminOrdersIndexApiAdminOrdersGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminOrdersIndexApiAdminOrdersGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminOrdersIndexApiAdminOrdersGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiAdminOrdersIndexApiAdminOrdersGetParams>,
+  params?: MaybeRef<AdminOrdersIndexApiAdminOrdersGetParams>,
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminOrdersIndexApiAdminOrdersGet>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof adminOrdersIndexApiAdminOrdersGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminOrdersIndexApiAdminOrdersGetQueryKey(params)
+  const queryKey = getAdminOrdersIndexApiAdminOrdersGetQueryKey(params)
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminOrdersIndexApiAdminOrdersGet>>
-  > = ({ signal }) => apiAdminOrdersIndexApiAdminOrdersGet(params, requestOptions, signal)
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof adminOrdersIndexApiAdminOrdersGet>>> = ({
+    signal,
+  }) => adminOrdersIndexApiAdminOrdersGet(params, requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminOrdersIndexApiAdminOrdersGet>>,
+    Awaited<ReturnType<typeof adminOrdersIndexApiAdminOrdersGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminOrdersIndexApiAdminOrdersGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminOrdersIndexApiAdminOrdersGet>>
+export type AdminOrdersIndexApiAdminOrdersGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminOrdersIndexApiAdminOrdersGet>>
 >
-export type ApiAdminOrdersIndexApiAdminOrdersGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminOrdersIndexApiAdminOrdersGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Orders.Index
+ * @summary Admin.Orders.Index
  */
 
-export function useApiAdminOrdersIndexApiAdminOrdersGet<
-  TData = Awaited<ReturnType<typeof apiAdminOrdersIndexApiAdminOrdersGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminOrdersIndexApiAdminOrdersGet<
+  TData = Awaited<ReturnType<typeof adminOrdersIndexApiAdminOrdersGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiAdminOrdersIndexApiAdminOrdersGetParams>,
+  params?: MaybeRef<AdminOrdersIndexApiAdminOrdersGetParams>,
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminOrdersIndexApiAdminOrdersGet>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof adminOrdersIndexApiAdminOrdersGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminOrdersIndexApiAdminOrdersGetQueryOptions(params, options)
+  const queryOptions = getAdminOrdersIndexApiAdminOrdersGetQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -144,9 +117,103 @@ export function useApiAdminOrdersIndexApiAdminOrdersGet<
 }
 
 /**
- * @summary Api.Admin.Orders.Show
+ * @summary Admin.Orders.Best Sellers
  */
-export const apiAdminOrdersShowApiAdminOrdersOrderIdGet = (
+export const adminOrdersBestSellersApiAdminOrdersBestSellersGet = (
+  params?: MaybeRef<AdminOrdersBestSellersApiAdminOrdersBestSellersGetParams>,
+  options?: SecondParameter<typeof request>,
+  signal?: AbortSignal,
+) => {
+  params = unref(params)
+
+  return request<BestSellersListOut>(
+    { url: `/api/admin/orders/best-sellers`, method: 'GET', params: unref(params), signal },
+    options,
+  )
+}
+
+export const getAdminOrdersBestSellersApiAdminOrdersBestSellersGetQueryKey = (
+  params?: MaybeRef<AdminOrdersBestSellersApiAdminOrdersBestSellersGetParams>,
+) => {
+  return ['api', 'admin', 'orders', 'best-sellers', ...(params ? [params] : [])] as const
+}
+
+export const getAdminOrdersBestSellersApiAdminOrdersBestSellersGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminOrdersBestSellersApiAdminOrdersBestSellersGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: MaybeRef<AdminOrdersBestSellersApiAdminOrdersBestSellersGetParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminOrdersBestSellersApiAdminOrdersBestSellersGet>>,
+        TError,
+        TData
+      >
+    >
+    request?: SecondParameter<typeof request>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getAdminOrdersBestSellersApiAdminOrdersBestSellersGetQueryKey(params)
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminOrdersBestSellersApiAdminOrdersBestSellersGet>>
+  > = ({ signal }) =>
+    adminOrdersBestSellersApiAdminOrdersBestSellersGet(params, requestOptions, signal)
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminOrdersBestSellersApiAdminOrdersBestSellersGet>>,
+    TError,
+    TData
+  >
+}
+
+export type AdminOrdersBestSellersApiAdminOrdersBestSellersGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminOrdersBestSellersApiAdminOrdersBestSellersGet>>
+>
+export type AdminOrdersBestSellersApiAdminOrdersBestSellersGetQueryError = HTTPValidationError
+
+/**
+ * @summary Admin.Orders.Best Sellers
+ */
+
+export function useAdminOrdersBestSellersApiAdminOrdersBestSellersGet<
+  TData = Awaited<ReturnType<typeof adminOrdersBestSellersApiAdminOrdersBestSellersGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: MaybeRef<AdminOrdersBestSellersApiAdminOrdersBestSellersGetParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminOrdersBestSellersApiAdminOrdersBestSellersGet>>,
+        TError,
+        TData
+      >
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getAdminOrdersBestSellersApiAdminOrdersBestSellersGetQueryOptions(
+    params,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+/**
+ * @summary Admin.Orders.Show
+ */
+export const adminOrdersShowApiAdminOrdersOrderIdGet = (
   orderId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -159,28 +226,19 @@ export const apiAdminOrdersShowApiAdminOrdersOrderIdGet = (
   )
 }
 
-export const getApiAdminOrdersShowApiAdminOrdersOrderIdGetQueryKey = (
-  orderId?: MaybeRef<string>,
-) => {
+export const getAdminOrdersShowApiAdminOrdersOrderIdGetQueryKey = (orderId?: MaybeRef<string>) => {
   return ['api', 'admin', 'orders', orderId] as const
 }
 
-export const getApiAdminOrdersShowApiAdminOrdersOrderIdGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminOrdersShowApiAdminOrdersOrderIdGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminOrdersShowApiAdminOrdersOrderIdGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminOrdersShowApiAdminOrdersOrderIdGet>>,
+  TError = HTTPValidationError,
 >(
   orderId: MaybeRef<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminOrdersShowApiAdminOrdersOrderIdGet>>,
+        Awaited<ReturnType<typeof adminOrdersShowApiAdminOrdersOrderIdGet>>,
         TError,
         TData
       >
@@ -190,11 +248,11 @@ export const getApiAdminOrdersShowApiAdminOrdersOrderIdGetQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminOrdersShowApiAdminOrdersOrderIdGetQueryKey(orderId)
+  const queryKey = getAdminOrdersShowApiAdminOrdersOrderIdGetQueryKey(orderId)
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminOrdersShowApiAdminOrdersOrderIdGet>>
-  > = ({ signal }) => apiAdminOrdersShowApiAdminOrdersOrderIdGet(orderId, requestOptions, signal)
+    Awaited<ReturnType<typeof adminOrdersShowApiAdminOrdersOrderIdGet>>
+  > = ({ signal }) => adminOrdersShowApiAdminOrdersOrderIdGet(orderId, requestOptions, signal)
 
   return {
     queryKey,
@@ -202,44 +260,30 @@ export const getApiAdminOrdersShowApiAdminOrdersOrderIdGetQueryOptions = <
     enabled: computed(() => !!unref(orderId)),
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminOrdersShowApiAdminOrdersOrderIdGet>>,
+    Awaited<ReturnType<typeof adminOrdersShowApiAdminOrdersOrderIdGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminOrdersShowApiAdminOrdersOrderIdGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminOrdersShowApiAdminOrdersOrderIdGet>>
+export type AdminOrdersShowApiAdminOrdersOrderIdGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminOrdersShowApiAdminOrdersOrderIdGet>>
 >
-export type ApiAdminOrdersShowApiAdminOrdersOrderIdGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminOrdersShowApiAdminOrdersOrderIdGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Orders.Show
+ * @summary Admin.Orders.Show
  */
 
-export function useApiAdminOrdersShowApiAdminOrdersOrderIdGet<
-  TData = Awaited<ReturnType<typeof apiAdminOrdersShowApiAdminOrdersOrderIdGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminOrdersShowApiAdminOrdersOrderIdGet<
+  TData = Awaited<ReturnType<typeof adminOrdersShowApiAdminOrdersOrderIdGet>>,
+  TError = HTTPValidationError,
 >(
   orderId: MaybeRef<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminOrdersShowApiAdminOrdersOrderIdGet>>,
+        Awaited<ReturnType<typeof adminOrdersShowApiAdminOrdersOrderIdGet>>,
         TError,
         TData
       >
@@ -248,7 +292,7 @@ export function useApiAdminOrdersShowApiAdminOrdersOrderIdGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminOrdersShowApiAdminOrdersOrderIdGetQueryOptions(orderId, options)
+  const queryOptions = getAdminOrdersShowApiAdminOrdersOrderIdGetQueryOptions(orderId, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -260,9 +304,9 @@ export function useApiAdminOrdersShowApiAdminOrdersOrderIdGet<
 }
 
 /**
- * @summary Api.Admin.Orders.Status
+ * @summary Admin.Orders.Update Status
  */
-export const apiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch = (
+export const adminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch = (
   orderId: MaybeRef<string>,
   updateOrderStatusPayload: MaybeRef<UpdateOrderStatusPayload>,
   options?: SecondParameter<typeof request>,
@@ -281,31 +325,24 @@ export const apiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch = (
   )
 }
 
-export const getApiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatchMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch>>,
+    Awaited<ReturnType<typeof adminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch>>,
     TError,
     { orderId: string; data: UpdateOrderStatusPayload },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch>>,
+  Awaited<ReturnType<typeof adminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch>>,
   TError,
   { orderId: string; data: UpdateOrderStatusPayload },
   TContext
 > => {
-  const mutationKey = ['apiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch']
+  const mutationKey = ['adminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -313,48 +350,35 @@ export const getApiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatchMutationOpti
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch>>,
+    Awaited<ReturnType<typeof adminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch>>,
     { orderId: string; data: UpdateOrderStatusPayload }
   > = (props) => {
     const { orderId, data } = props ?? {}
 
-    return apiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch(orderId, data, requestOptions)
+    return adminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch(orderId, data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatchMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch>>
+export type AdminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch>>
 >
-export type ApiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatchMutationBody =
+export type AdminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatchMutationBody =
   UpdateOrderStatusPayload
-export type ApiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatchMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Orders.Status
+ * @summary Admin.Orders.Update Status
  */
-export const useApiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch>>,
+      Awaited<ReturnType<typeof adminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch>>,
       TError,
       { orderId: string; data: UpdateOrderStatusPayload },
       TContext
@@ -363,13 +387,13 @@ export const useApiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch>>,
+  Awaited<ReturnType<typeof adminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch>>,
   TError,
   { orderId: string; data: UpdateOrderStatusPayload },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatchMutationOptions(options)
+    getAdminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatchMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }

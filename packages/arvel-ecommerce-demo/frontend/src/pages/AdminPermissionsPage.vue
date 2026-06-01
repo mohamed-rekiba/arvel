@@ -2,16 +2,16 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  useApiAdminPermissionsIndexApiAdminPermissionsGet,
-  useApiAdminRolesIndexApiAdminRolesGet,
+  useAdminRolesPermissionsIndexApiAdminRolesPermissionsGet,
+  useAdminRolesIndexApiAdminRolesGet,
 } from '@/api/admin-roles-permissions/admin-roles-permissions'
 import type { PermissionOut } from '@/api/schemas'
 
 const { t } = useI18n({ useScope: 'global' })
 
 const { data: permsData, isPending: permsPending } =
-  useApiAdminPermissionsIndexApiAdminPermissionsGet()
-const { data: rolesData, isPending: rolesPending } = useApiAdminRolesIndexApiAdminRolesGet()
+  useAdminRolesPermissionsIndexApiAdminRolesPermissionsGet()
+const { data: rolesData, isPending: rolesPending } = useAdminRolesIndexApiAdminRolesGet()
 
 const isPending = computed(() => permsPending.value || rolesPending.value)
 const permissions = computed(() => permsData.value?.data ?? [])

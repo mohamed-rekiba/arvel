@@ -55,6 +55,8 @@ class UpdateProductPayload(BaseModel):
     description: dict[str, str] | None = None
     price: float | None = None
     stock_qty: int | None = None
+    category_id: str | None = None
+    vendor_id: str | None = None
 
 
 class CreateCategoryPayload(BaseModel):

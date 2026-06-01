@@ -3,14 +3,12 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
-  getApiAdminOrdersShowApiAdminOrdersOrderIdGetQueryKey,
-  useApiAdminOrdersShowApiAdminOrdersOrderIdGet,
-  useApiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch,
+  useAdminOrdersShowApiAdminOrdersOrderIdGet,
+  useAdminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch,
 } from '@/api/admin-orders/admin-orders'
 import { useQueryClient } from '@tanstack/vue-query'
 import { formatCurrency, formatDate, pickLocalized, routeParam } from '@/lib/i18n'
 import { useToastStore } from '@/stores/toast'
-import { getAdminOrder, updateAdminOrderStatus, requireStoredAccessToken } from '@/lib/api'
 import PermissionGate from '@/components/admin/PermissionGate.vue'
 import { getShippingField, isOrderStatus } from '@/types'
 import type { OrderStatus } from '@/types'
@@ -22,21 +20,9 @@ const queryClient = useQueryClient()
 
 const orderId = computed(() => routeParam(route.params.id ?? route.params.orderId))
 
-async function fetchOrder(id: string): Promise<unknown> {
-  const token = requireStoredAccessToken()
-  return getAdminOrder(token, id)
-}
-
-async function patchOrderStatus(id: string, status: string): Promise<unknown> {
-  const token = requireStoredAccessToken()
-  return updateAdminOrderStatus(token, id, status)
-}
-
-void fetchOrder
-void patchOrderStatus
 const selectedStatus = ref<OrderStatus>('pending')
 
-const { data: orderWrapper, isPending } = useApiAdminOrdersShowApiAdminOrdersOrderIdGet(orderId)
+const { data: orderWrapper, isPending } = useAdminOrdersShowApiAdminOrdersOrderIdGet(orderId)
 const order = computed(() => orderWrapper.value?.data ?? null)
 
 watch(order, (o) => {
@@ -44,12 +30,11 @@ watch(order, (o) => {
 })
 
 const { mutate: updateStatus, isPending: saving } =
-  useApiAdminOrdersStatusApiAdminOrdersOrderIdStatusPatch({
+  useAdminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch({
     mutation: {
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: getApiAdminOrdersShowApiAdminOrdersOrderIdGetQueryKey(orderId.value),
-        })
+        // Prefix covers both the detail (show) and the orders list queries.
+        void queryClient.invalidateQueries({ queryKey: ['api', 'admin', 'orders'] })
         toast.success(t('admin.order.status_updated', { status: selectedStatus.value }))
       },
       onError: (err: unknown) =>

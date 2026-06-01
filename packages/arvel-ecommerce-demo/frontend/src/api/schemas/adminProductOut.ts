@@ -7,9 +7,12 @@
 import type { AdminProductOutName } from './adminProductOutName'
 import type { AdminProductOutSlug } from './adminProductOutSlug'
 import type { AdminProductOutDescription } from './adminProductOutDescription'
+import type { AdminProductOutRealStatus } from './adminProductOutRealStatus'
 import type { AdminProductOutPublishedAt } from './adminProductOutPublishedAt'
 import type { AdminProductOutCategoryId } from './adminProductOutCategoryId'
 import type { AdminProductOutVendorId } from './adminProductOutVendorId'
+import type { AdminProductOutCreatedAt } from './adminProductOutCreatedAt'
+import type { AdminProductOutUpdatedAt } from './adminProductOutUpdatedAt'
 import type { AdminProductOutDeletedAt } from './adminProductOutDeletedAt'
 
 export interface AdminProductOut {
@@ -20,10 +23,11 @@ export interface AdminProductOut {
   price: number
   stock_qty: number
   status: string
+  real_status: AdminProductOutRealStatus
   published_at: AdminProductOutPublishedAt
   category_id: AdminProductOutCategoryId
   vendor_id: AdminProductOutVendorId
-  created_at: string
-  updated_at: string
+  created_at: AdminProductOutCreatedAt
+  updated_at: AdminProductOutUpdatedAt
   deleted_at: AdminProductOutDeletedAt
 }

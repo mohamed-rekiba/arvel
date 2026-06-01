@@ -10,10 +10,10 @@ import type { CreateProductPayloadDescription } from './createProductPayloadDesc
 
 export interface CreateProductPayload {
   name: CreateProductPayloadName
-  slug: CreateProductPayloadSlug
-  description: CreateProductPayloadDescription
+  slug?: CreateProductPayloadSlug
+  description?: CreateProductPayloadDescription
   price: number
-  stock_qty: number
+  stock_qty?: number
   category_id: string
-  vendor_id: string
+  vendor_id?: string
 }

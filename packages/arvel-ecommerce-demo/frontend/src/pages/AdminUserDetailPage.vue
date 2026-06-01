@@ -2,12 +2,12 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useApiAdminRolesIndexApiAdminRolesGet } from '@/api/admin-roles-permissions/admin-roles-permissions'
+import { useAdminRolesIndexApiAdminRolesGet } from '@/api/admin-roles-permissions/admin-roles-permissions'
 import {
-  getApiAdminUsersShowApiAdminUsersUserIdGetQueryKey,
-  useApiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost,
-  useApiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete,
-  useApiAdminUsersShowApiAdminUsersUserIdGet,
+  getAdminUsersShowApiAdminUsersUserIdGetQueryKey,
+  useAdminUsersRolesAssignApiAdminUsersUserIdRolesPost,
+  useAdminUsersRolesRevokeApiAdminUsersUserIdRolesDelete,
+  useAdminUsersShowApiAdminUsersUserIdGet,
 } from '@/api/admin-users/admin-users'
 import { useQueryClient } from '@tanstack/vue-query'
 import { routeParam } from '@/lib/i18n'
@@ -81,20 +81,20 @@ void handleUserAction
 void handleDeleteUser
 const selectedRole = ref('')
 
-const { data: userWrapper, isPending } = useApiAdminUsersShowApiAdminUsersUserIdGet(userId)
-const { data: rolesData } = useApiAdminRolesIndexApiAdminRolesGet()
+const { data: userWrapper, isPending } = useAdminUsersShowApiAdminUsersUserIdGet(userId)
+const { data: rolesData } = useAdminRolesIndexApiAdminRolesGet()
 
 const user = computed(() => userWrapper.value?.data ?? null)
 const roles = computed(() => rolesData.value?.data ?? [])
 
 function invalidateUser(): Promise<void> {
   return queryClient.invalidateQueries({
-    queryKey: getApiAdminUsersShowApiAdminUsersUserIdGetQueryKey(userId.value),
+    queryKey: getAdminUsersShowApiAdminUsersUserIdGetQueryKey(userId.value),
   })
 }
 
 const { mutate: assignRole, isPending: assigning } =
-  useApiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost({
+  useAdminUsersRolesAssignApiAdminUsersUserIdRolesPost({
     mutation: {
       onSuccess: () => {
         void invalidateUser()
@@ -107,11 +107,11 @@ const { mutate: assignRole, isPending: assigning } =
   })
 
 const { mutate: revokeRole, isPending: revoking } =
-  useApiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete({
+  useAdminUsersRolesRevokeApiAdminUsersUserIdRolesDelete({
     mutation: {
       onSuccess: (_data, vars) => {
         void invalidateUser()
-        toast.success(t('admin.user.toast_removed', { role: vars.roleName }))
+        toast.success(t('admin.user.toast_removed', { role: vars.params.role_name }))
       },
       onError: (err: unknown) =>
         toast.error(err instanceof Error ? err.message : t('admin.user.remove_failed')),
@@ -160,7 +160,7 @@ const saving = computed(() => assigning.value || revoking.value)
                 type="button"
                 class="text-brand-hover hover:text-red-500"
                 :disabled="saving"
-                @click="user && revokeRole({ userId: user.id, roleName: role })"
+                @click="user && revokeRole({ userId: user.id, params: { role_name: role } })"
               >
                 ×
               </button>

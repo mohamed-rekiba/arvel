@@ -18,14 +18,16 @@ import { computed, unref } from 'vue'
 import type { MaybeRef } from 'vue'
 
 import type {
-  ApiCategoriesShowApiCategoriesSlugGetParams,
-  ApiErrorOut,
-  ApiProductsIndexApiProductsGetParams,
-  ApiProductsShowApiProductsSlugGetParams,
-  ApiSearchApiSearchGetParams,
+  HTTPValidationError,
   ProductDetailOut,
   ProductListOut,
   SearchOut,
+  StorefrontCategoryListOut,
+  StorefrontIndexApiProductsGetParams,
+  StorefrontProductsCatalogAltApiCategoriesSlugProductsGetParams,
+  StorefrontProductsCatalogApiCategoriesSlugGetParams,
+  StorefrontSearchApiSearchGetParams,
+  StorefrontShowApiProductsSlugGetParams,
 } from '.././schemas'
 
 import { request } from '../../lib/api'
@@ -33,10 +35,10 @@ import { request } from '../../lib/api'
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.Products.Index
+ * @summary Storefront.Index
  */
-export const apiProductsIndexApiProductsGet = (
-  params?: MaybeRef<ApiProductsIndexApiProductsGetParams>,
+export const storefrontIndexApiProductsGet = (
+  params?: MaybeRef<StorefrontIndexApiProductsGetParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
@@ -48,83 +50,62 @@ export const apiProductsIndexApiProductsGet = (
   )
 }
 
-export const getApiProductsIndexApiProductsGetQueryKey = (
-  params?: MaybeRef<ApiProductsIndexApiProductsGetParams>,
+export const getStorefrontIndexApiProductsGetQueryKey = (
+  params?: MaybeRef<StorefrontIndexApiProductsGetParams>,
 ) => {
   return ['api', 'products', ...(params ? [params] : [])] as const
 }
 
-export const getApiProductsIndexApiProductsGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiProductsIndexApiProductsGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getStorefrontIndexApiProductsGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof storefrontIndexApiProductsGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiProductsIndexApiProductsGetParams>,
+  params?: MaybeRef<StorefrontIndexApiProductsGetParams>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiProductsIndexApiProductsGet>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof storefrontIndexApiProductsGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiProductsIndexApiProductsGetQueryKey(params)
+  const queryKey = getStorefrontIndexApiProductsGetQueryKey(params)
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof apiProductsIndexApiProductsGet>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof storefrontIndexApiProductsGet>>> = ({
     signal,
-  }) => apiProductsIndexApiProductsGet(params, requestOptions, signal)
+  }) => storefrontIndexApiProductsGet(params, requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiProductsIndexApiProductsGet>>,
+    Awaited<ReturnType<typeof storefrontIndexApiProductsGet>>,
     TError,
     TData
   >
 }
 
-export type ApiProductsIndexApiProductsGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiProductsIndexApiProductsGet>>
+export type StorefrontIndexApiProductsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storefrontIndexApiProductsGet>>
 >
-export type ApiProductsIndexApiProductsGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type StorefrontIndexApiProductsGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Products.Index
+ * @summary Storefront.Index
  */
 
-export function useApiProductsIndexApiProductsGet<
-  TData = Awaited<ReturnType<typeof apiProductsIndexApiProductsGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useStorefrontIndexApiProductsGet<
+  TData = Awaited<ReturnType<typeof storefrontIndexApiProductsGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiProductsIndexApiProductsGetParams>,
+  params?: MaybeRef<StorefrontIndexApiProductsGetParams>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiProductsIndexApiProductsGet>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof storefrontIndexApiProductsGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiProductsIndexApiProductsGetQueryOptions(params, options)
+  const queryOptions = getStorefrontIndexApiProductsGetQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -136,11 +117,11 @@ export function useApiProductsIndexApiProductsGet<
 }
 
 /**
- * @summary Api.Products.Show
+ * @summary Storefront.Show
  */
-export const apiProductsShowApiProductsSlugGet = (
+export const storefrontShowApiProductsSlugGet = (
   slug: MaybeRef<string>,
-  params?: MaybeRef<ApiProductsShowApiProductsSlugGetParams>,
+  params?: MaybeRef<StorefrontShowApiProductsSlugGetParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
@@ -153,87 +134,66 @@ export const apiProductsShowApiProductsSlugGet = (
   )
 }
 
-export const getApiProductsShowApiProductsSlugGetQueryKey = (
+export const getStorefrontShowApiProductsSlugGetQueryKey = (
   slug?: MaybeRef<string>,
-  params?: MaybeRef<ApiProductsShowApiProductsSlugGetParams>,
+  params?: MaybeRef<StorefrontShowApiProductsSlugGetParams>,
 ) => {
   return ['api', 'products', slug, ...(params ? [params] : [])] as const
 }
 
-export const getApiProductsShowApiProductsSlugGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiProductsShowApiProductsSlugGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getStorefrontShowApiProductsSlugGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof storefrontShowApiProductsSlugGet>>,
+  TError = HTTPValidationError,
 >(
   slug: MaybeRef<string>,
-  params?: MaybeRef<ApiProductsShowApiProductsSlugGetParams>,
+  params?: MaybeRef<StorefrontShowApiProductsSlugGetParams>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiProductsShowApiProductsSlugGet>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof storefrontShowApiProductsSlugGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiProductsShowApiProductsSlugGetQueryKey(slug, params)
+  const queryKey = getStorefrontShowApiProductsSlugGetQueryKey(slug, params)
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof apiProductsShowApiProductsSlugGet>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof storefrontShowApiProductsSlugGet>>> = ({
     signal,
-  }) => apiProductsShowApiProductsSlugGet(slug, params, requestOptions, signal)
+  }) => storefrontShowApiProductsSlugGet(slug, params, requestOptions, signal)
 
   return {
     queryKey,
     queryFn,
     enabled: computed(() => !!unref(slug)),
     ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof apiProductsShowApiProductsSlugGet>>, TError, TData>
+  } as UseQueryOptions<Awaited<ReturnType<typeof storefrontShowApiProductsSlugGet>>, TError, TData>
 }
 
-export type ApiProductsShowApiProductsSlugGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiProductsShowApiProductsSlugGet>>
+export type StorefrontShowApiProductsSlugGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storefrontShowApiProductsSlugGet>>
 >
-export type ApiProductsShowApiProductsSlugGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type StorefrontShowApiProductsSlugGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Products.Show
+ * @summary Storefront.Show
  */
 
-export function useApiProductsShowApiProductsSlugGet<
-  TData = Awaited<ReturnType<typeof apiProductsShowApiProductsSlugGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useStorefrontShowApiProductsSlugGet<
+  TData = Awaited<ReturnType<typeof storefrontShowApiProductsSlugGet>>,
+  TError = HTTPValidationError,
 >(
   slug: MaybeRef<string>,
-  params?: MaybeRef<ApiProductsShowApiProductsSlugGetParams>,
+  params?: MaybeRef<StorefrontShowApiProductsSlugGetParams>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiProductsShowApiProductsSlugGet>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof storefrontShowApiProductsSlugGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiProductsShowApiProductsSlugGetQueryOptions(slug, params, options)
+  const queryOptions = getStorefrontShowApiProductsSlugGetQueryOptions(slug, params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -245,11 +205,92 @@ export function useApiProductsShowApiProductsSlugGet<
 }
 
 /**
- * @summary Api.Categories.Show
+ * @summary Storefront.Categories.Index
  */
-export const apiCategoriesShowApiCategoriesSlugGet = (
+export const storefrontCategoriesIndexApiCategoriesGet = (
+  options?: SecondParameter<typeof request>,
+  signal?: AbortSignal,
+) => {
+  return request<StorefrontCategoryListOut>(
+    { url: `/api/categories`, method: 'GET', signal },
+    options,
+  )
+}
+
+export const getStorefrontCategoriesIndexApiCategoriesGetQueryKey = () => {
+  return ['api', 'categories'] as const
+}
+
+export const getStorefrontCategoriesIndexApiCategoriesGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof storefrontCategoriesIndexApiCategoriesGet>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof storefrontCategoriesIndexApiCategoriesGet>>,
+      TError,
+      TData
+    >
+  >
+  request?: SecondParameter<typeof request>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getStorefrontCategoriesIndexApiCategoriesGetQueryKey()
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storefrontCategoriesIndexApiCategoriesGet>>
+  > = ({ signal }) => storefrontCategoriesIndexApiCategoriesGet(requestOptions, signal)
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof storefrontCategoriesIndexApiCategoriesGet>>,
+    TError,
+    TData
+  >
+}
+
+export type StorefrontCategoriesIndexApiCategoriesGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storefrontCategoriesIndexApiCategoriesGet>>
+>
+export type StorefrontCategoriesIndexApiCategoriesGetQueryError = unknown
+
+/**
+ * @summary Storefront.Categories.Index
+ */
+
+export function useStorefrontCategoriesIndexApiCategoriesGet<
+  TData = Awaited<ReturnType<typeof storefrontCategoriesIndexApiCategoriesGet>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storefrontCategoriesIndexApiCategoriesGet>>,
+        TError,
+        TData
+      >
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getStorefrontCategoriesIndexApiCategoriesGetQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+/**
+ * @summary Storefront.Products Catalog
+ */
+export const storefrontProductsCatalogApiCategoriesSlugGet = (
   slug: MaybeRef<string>,
-  params?: MaybeRef<ApiCategoriesShowApiCategoriesSlugGetParams>,
+  params?: MaybeRef<StorefrontProductsCatalogApiCategoriesSlugGetParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
@@ -262,30 +303,23 @@ export const apiCategoriesShowApiCategoriesSlugGet = (
   )
 }
 
-export const getApiCategoriesShowApiCategoriesSlugGetQueryKey = (
+export const getStorefrontProductsCatalogApiCategoriesSlugGetQueryKey = (
   slug?: MaybeRef<string>,
-  params?: MaybeRef<ApiCategoriesShowApiCategoriesSlugGetParams>,
+  params?: MaybeRef<StorefrontProductsCatalogApiCategoriesSlugGetParams>,
 ) => {
   return ['api', 'categories', slug, ...(params ? [params] : [])] as const
 }
 
-export const getApiCategoriesShowApiCategoriesSlugGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiCategoriesShowApiCategoriesSlugGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getStorefrontProductsCatalogApiCategoriesSlugGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof storefrontProductsCatalogApiCategoriesSlugGet>>,
+  TError = HTTPValidationError,
 >(
   slug: MaybeRef<string>,
-  params?: MaybeRef<ApiCategoriesShowApiCategoriesSlugGetParams>,
+  params?: MaybeRef<StorefrontProductsCatalogApiCategoriesSlugGetParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiCategoriesShowApiCategoriesSlugGet>>,
+        Awaited<ReturnType<typeof storefrontProductsCatalogApiCategoriesSlugGet>>,
         TError,
         TData
       >
@@ -295,11 +329,12 @@ export const getApiCategoriesShowApiCategoriesSlugGetQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiCategoriesShowApiCategoriesSlugGetQueryKey(slug, params)
+  const queryKey = getStorefrontProductsCatalogApiCategoriesSlugGetQueryKey(slug, params)
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiCategoriesShowApiCategoriesSlugGet>>
-  > = ({ signal }) => apiCategoriesShowApiCategoriesSlugGet(slug, params, requestOptions, signal)
+    Awaited<ReturnType<typeof storefrontProductsCatalogApiCategoriesSlugGet>>
+  > = ({ signal }) =>
+    storefrontProductsCatalogApiCategoriesSlugGet(slug, params, requestOptions, signal)
 
   return {
     queryKey,
@@ -307,45 +342,31 @@ export const getApiCategoriesShowApiCategoriesSlugGetQueryOptions = <
     enabled: computed(() => !!unref(slug)),
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiCategoriesShowApiCategoriesSlugGet>>,
+    Awaited<ReturnType<typeof storefrontProductsCatalogApiCategoriesSlugGet>>,
     TError,
     TData
   >
 }
 
-export type ApiCategoriesShowApiCategoriesSlugGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiCategoriesShowApiCategoriesSlugGet>>
+export type StorefrontProductsCatalogApiCategoriesSlugGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storefrontProductsCatalogApiCategoriesSlugGet>>
 >
-export type ApiCategoriesShowApiCategoriesSlugGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type StorefrontProductsCatalogApiCategoriesSlugGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Categories.Show
+ * @summary Storefront.Products Catalog
  */
 
-export function useApiCategoriesShowApiCategoriesSlugGet<
-  TData = Awaited<ReturnType<typeof apiCategoriesShowApiCategoriesSlugGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useStorefrontProductsCatalogApiCategoriesSlugGet<
+  TData = Awaited<ReturnType<typeof storefrontProductsCatalogApiCategoriesSlugGet>>,
+  TError = HTTPValidationError,
 >(
   slug: MaybeRef<string>,
-  params?: MaybeRef<ApiCategoriesShowApiCategoriesSlugGetParams>,
+  params?: MaybeRef<StorefrontProductsCatalogApiCategoriesSlugGetParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiCategoriesShowApiCategoriesSlugGet>>,
+        Awaited<ReturnType<typeof storefrontProductsCatalogApiCategoriesSlugGet>>,
         TError,
         TData
       >
@@ -354,7 +375,11 @@ export function useApiCategoriesShowApiCategoriesSlugGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiCategoriesShowApiCategoriesSlugGetQueryOptions(slug, params, options)
+  const queryOptions = getStorefrontProductsCatalogApiCategoriesSlugGetQueryOptions(
+    slug,
+    params,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -366,10 +391,115 @@ export function useApiCategoriesShowApiCategoriesSlugGet<
 }
 
 /**
- * @summary Api.Search
+ * @summary Storefront.Products Catalog Alt
  */
-export const apiSearchApiSearchGet = (
-  params: MaybeRef<ApiSearchApiSearchGetParams>,
+export const storefrontProductsCatalogAltApiCategoriesSlugProductsGet = (
+  slug: MaybeRef<string>,
+  params?: MaybeRef<StorefrontProductsCatalogAltApiCategoriesSlugProductsGetParams>,
+  options?: SecondParameter<typeof request>,
+  signal?: AbortSignal,
+) => {
+  slug = unref(slug)
+  params = unref(params)
+
+  return request<ProductListOut>(
+    { url: `/api/categories/${slug}/products`, method: 'GET', params: unref(params), signal },
+    options,
+  )
+}
+
+export const getStorefrontProductsCatalogAltApiCategoriesSlugProductsGetQueryKey = (
+  slug?: MaybeRef<string>,
+  params?: MaybeRef<StorefrontProductsCatalogAltApiCategoriesSlugProductsGetParams>,
+) => {
+  return ['api', 'categories', slug, 'products', ...(params ? [params] : [])] as const
+}
+
+export const getStorefrontProductsCatalogAltApiCategoriesSlugProductsGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof storefrontProductsCatalogAltApiCategoriesSlugProductsGet>>,
+  TError = HTTPValidationError,
+>(
+  slug: MaybeRef<string>,
+  params?: MaybeRef<StorefrontProductsCatalogAltApiCategoriesSlugProductsGetParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storefrontProductsCatalogAltApiCategoriesSlugProductsGet>>,
+        TError,
+        TData
+      >
+    >
+    request?: SecondParameter<typeof request>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getStorefrontProductsCatalogAltApiCategoriesSlugProductsGetQueryKey(slug, params)
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storefrontProductsCatalogAltApiCategoriesSlugProductsGet>>
+  > = ({ signal }) =>
+    storefrontProductsCatalogAltApiCategoriesSlugProductsGet(slug, params, requestOptions, signal)
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => !!unref(slug)),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof storefrontProductsCatalogAltApiCategoriesSlugProductsGet>>,
+    TError,
+    TData
+  >
+}
+
+export type StorefrontProductsCatalogAltApiCategoriesSlugProductsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storefrontProductsCatalogAltApiCategoriesSlugProductsGet>>
+>
+export type StorefrontProductsCatalogAltApiCategoriesSlugProductsGetQueryError = HTTPValidationError
+
+/**
+ * @summary Storefront.Products Catalog Alt
+ */
+
+export function useStorefrontProductsCatalogAltApiCategoriesSlugProductsGet<
+  TData = Awaited<ReturnType<typeof storefrontProductsCatalogAltApiCategoriesSlugProductsGet>>,
+  TError = HTTPValidationError,
+>(
+  slug: MaybeRef<string>,
+  params?: MaybeRef<StorefrontProductsCatalogAltApiCategoriesSlugProductsGetParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storefrontProductsCatalogAltApiCategoriesSlugProductsGet>>,
+        TError,
+        TData
+      >
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getStorefrontProductsCatalogAltApiCategoriesSlugProductsGetQueryOptions(
+    slug,
+    params,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+/**
+ * @summary Storefront.Search
+ */
+export const storefrontSearchApiSearchGet = (
+  params: MaybeRef<StorefrontSearchApiSearchGetParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
@@ -381,82 +511,62 @@ export const apiSearchApiSearchGet = (
   )
 }
 
-export const getApiSearchApiSearchGetQueryKey = (
-  params?: MaybeRef<ApiSearchApiSearchGetParams>,
+export const getStorefrontSearchApiSearchGetQueryKey = (
+  params?: MaybeRef<StorefrontSearchApiSearchGetParams>,
 ) => {
   return ['api', 'search', ...(params ? [params] : [])] as const
 }
 
-export const getApiSearchApiSearchGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiSearchApiSearchGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getStorefrontSearchApiSearchGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof storefrontSearchApiSearchGet>>,
+  TError = HTTPValidationError,
 >(
-  params: MaybeRef<ApiSearchApiSearchGetParams>,
+  params: MaybeRef<StorefrontSearchApiSearchGetParams>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiSearchApiSearchGet>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof storefrontSearchApiSearchGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiSearchApiSearchGetQueryKey(params)
+  const queryKey = getStorefrontSearchApiSearchGetQueryKey(params)
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof apiSearchApiSearchGet>>> = ({ signal }) =>
-    apiSearchApiSearchGet(params, requestOptions, signal)
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof storefrontSearchApiSearchGet>>> = ({
+    signal,
+  }) => storefrontSearchApiSearchGet(params, requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiSearchApiSearchGet>>,
+    Awaited<ReturnType<typeof storefrontSearchApiSearchGet>>,
     TError,
     TData
   >
 }
 
-export type ApiSearchApiSearchGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiSearchApiSearchGet>>
+export type StorefrontSearchApiSearchGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storefrontSearchApiSearchGet>>
 >
-export type ApiSearchApiSearchGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type StorefrontSearchApiSearchGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Search
+ * @summary Storefront.Search
  */
 
-export function useApiSearchApiSearchGet<
-  TData = Awaited<ReturnType<typeof apiSearchApiSearchGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useStorefrontSearchApiSearchGet<
+  TData = Awaited<ReturnType<typeof storefrontSearchApiSearchGet>>,
+  TError = HTTPValidationError,
 >(
-  params: MaybeRef<ApiSearchApiSearchGetParams>,
+  params: MaybeRef<StorefrontSearchApiSearchGetParams>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiSearchApiSearchGet>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof storefrontSearchApiSearchGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiSearchApiSearchGetQueryOptions(params, options)
+  const queryOptions = getStorefrontSearchApiSearchGetQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import {
-  apiCartItemsAddApiCartItemsPost,
-  apiCartItemsRemoveApiCartItemsItemIdDelete,
-  apiCartItemsUpdateApiCartItemsItemIdPatch,
-  apiCartShowApiCartGet,
+  cartItemsStoreApiCartItemsPost,
+  cartItemsDestroyApiCartItemsItemIdDelete,
+  cartItemsUpdateApiCartItemsItemIdPatch,
+  cartShowApiCartGet,
 } from '@/api/cart/cart'
 import type { CartOut } from '@/api/schemas'
 import { useAuthStore } from '@/stores/auth'
@@ -31,7 +31,7 @@ export const useCartStore = defineStore('cart', () => {
     loading.value = true
     error.value = null
     try {
-      cart.value = (await apiCartShowApiCartGet()).data
+      cart.value = (await cartShowApiCartGet()).data
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load cart'
     } finally {
@@ -43,7 +43,7 @@ export const useCartStore = defineStore('cart', () => {
     loading.value = true
     error.value = null
     try {
-      cart.value = (await apiCartItemsAddApiCartItemsPost({ product_id: productId, quantity })).data
+      cart.value = (await cartItemsStoreApiCartItemsPost({ product_id: productId, quantity })).data
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to add item'
       throw err
@@ -57,9 +57,9 @@ export const useCartStore = defineStore('cart', () => {
     error.value = null
     try {
       if (quantity <= 0) {
-        cart.value = (await apiCartItemsRemoveApiCartItemsItemIdDelete(itemId)).data
+        cart.value = (await cartItemsDestroyApiCartItemsItemIdDelete(itemId)).data
       } else {
-        cart.value = (await apiCartItemsUpdateApiCartItemsItemIdPatch(itemId, { quantity })).data
+        cart.value = (await cartItemsUpdateApiCartItemsItemIdPatch(itemId, { quantity })).data
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to update item'
@@ -73,7 +73,7 @@ export const useCartStore = defineStore('cart', () => {
     loading.value = true
     error.value = null
     try {
-      cart.value = (await apiCartItemsRemoveApiCartItemsItemIdDelete(itemId)).data
+      cart.value = (await cartItemsDestroyApiCartItemsItemIdDelete(itemId)).data
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to remove item'
       throw err

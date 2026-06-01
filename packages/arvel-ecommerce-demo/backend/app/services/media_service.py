@@ -43,7 +43,16 @@ async def delete_product_image(product: Product, media_id: str) -> bool:
 
 
 async def serialize_media(media: Media) -> dict[str, Any]:
-    conversions = await _conversion_urls(media)
+    custom = media.custom_properties or {}
+    generated = media.generated_conversions or {}
+    seeded_url = custom.get("image_url")
+    if seeded_url and not any(generated.values()):
+        # Seeded demo media has no file on disk; the image lives at this URL.
+        url = str(seeded_url)
+        conversions = {"thumbnail": url, "card": url, "full": url}
+    else:
+        url = await media.get_url()
+        conversions = await _conversion_urls(media)
     return {
         "id": str(media.id),
         "uuid": media.uuid,
@@ -51,7 +60,7 @@ async def serialize_media(media: Media) -> dict[str, Any]:
         "filename": media.file_name,
         "mime_type": media.mime_type,
         "size": media.size,
-        "url": await media.get_url(),
+        "url": url,
         "conversions": conversions,
         "metadata": {
             "custom_properties": media.custom_properties or {},

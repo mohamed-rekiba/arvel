@@ -8,9 +8,8 @@ AuthController cannot do generically.
 
 from __future__ import annotations
 
-from typing import Any
-
 from app.http.controllers._deps import require_auth
+from app.http.controllers._responses import MeOut
 from app.models.user import User
 from arvel.auth.http.controller import AuthController
 from arvel.http import Request
@@ -18,19 +17,21 @@ from arvel.http.exceptions import UnauthenticatedException
 
 
 class EcommerceAuthController(AuthController):
-    async def me(self, request: Request) -> dict[str, Any]:
+    async def me(self, request: Request) -> MeOut:
         raw_user = await require_auth(request)
         user: User | None = await User.where(User.id == raw_user.id).first()
         if user is None:
             raise UnauthenticatedException("User not found.")
         role_names = [r.name for r in await user.roles.all() if r.name]
         all_permissions = [p.name for p in await user.get_all_permissions() if p.name]
-        return {
-            "id": int(user.id),
-            "name": str(user.name),
-            "email": str(user.email),
-            "locale": str(getattr(user, "locale", "en") or "en"),
-            "theme": str(getattr(user, "theme", "system") or "system"),
-            "roles": sorted(set(role_names)),
-            "permissions": sorted(set(all_permissions)),
-        }
+        return MeOut.model_validate(
+            {
+                "id": int(user.id),
+                "name": str(user.name),
+                "email": str(user.email),
+                "locale": str(getattr(user, "locale", "en") or "en"),
+                "theme": str(getattr(user, "theme", "system") or "system"),
+                "roles": sorted(set(role_names)),
+                "permissions": sorted(set(all_permissions)),
+            }
+        )

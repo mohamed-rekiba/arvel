@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from app.http.controllers._deps import require_permission, require_role_level, role_level, users
+from app.http.controllers._responses import AdminUserListOut, AdminUserWrapperOut
 from app.http.controllers._schemas import AssignRolePayload, GrantPermissionPayload
 from app.models.user import User
 from arvel.http import Request
@@ -22,16 +21,18 @@ class AdminUsersController(Controller):
         search: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> dict[str, Any]:
+    ) -> AdminUserListOut:
         await require_permission(request, "users.manage")
-        return await users.list_users(trashed=trashed, search=search, limit=limit, offset=offset)
+        return AdminUserListOut.model_validate(
+            await users.list_users(trashed=trashed, search=search, limit=limit, offset=offset)
+        )
 
-    async def show(self, user_id: int, request: Request) -> dict[str, Any]:
+    async def show(self, user_id: int, request: Request) -> AdminUserWrapperOut:
         await require_permission(request, "users.manage")
         user = await users.get_user(user_id)
         if user is None:
             raise NotFoundException("User not found.")
-        return {"data": user}
+        return AdminUserWrapperOut.model_validate({"data": user})
 
     async def destroy(self, user_id: int, request: Request) -> Response:
         await require_permission(request, "users.manage")
@@ -43,32 +44,32 @@ class AdminUsersController(Controller):
         await users.force_delete(user_id)
         return Response(status_code=204)
 
-    async def suspend(self, user_id: int, request: Request) -> dict[str, Any]:
+    async def suspend(self, user_id: int, request: Request) -> AdminUserWrapperOut:
         actor = await require_permission(request, "users.manage")
         if int(actor.id) == user_id:
             raise AuthorizationException("Cannot suspend your own account.")
         result = await users.suspend(user_id)
         if result is None:
             raise NotFoundException("User not found.")
-        return {"data": result}
+        return AdminUserWrapperOut.model_validate({"data": result})
 
-    async def unsuspend(self, user_id: int, request: Request) -> dict[str, Any]:
+    async def unsuspend(self, user_id: int, request: Request) -> AdminUserWrapperOut:
         await require_permission(request, "users.manage")
         result = await users.unsuspend(user_id)
         if result is None:
             raise NotFoundException("User not found.")
-        return {"data": result}
+        return AdminUserWrapperOut.model_validate({"data": result})
 
-    async def restore(self, user_id: int, request: Request) -> dict[str, Any]:
+    async def restore(self, user_id: int, request: Request) -> AdminUserWrapperOut:
         await require_permission(request, "users.manage")
         result = await users.restore(user_id)
         if result is None:
             raise NotFoundException("User not found.")
-        return {"data": result}
+        return AdminUserWrapperOut.model_validate({"data": result})
 
     async def assign_role(
         self, user_id: int, payload: AssignRolePayload, request: Request
-    ) -> dict[str, Any]:
+    ) -> AdminUserWrapperOut:
         actor = await require_permission(request, "roles.manage")
         level = await role_level(payload.role)
         if not await actor.has_level(level):
@@ -80,19 +81,21 @@ class AdminUsersController(Controller):
         if role_obj is None:
             raise NotFoundException(f"Role '{payload.role}' not found.")
         await target.assign_role(role_obj)
-        return {"data": await users.get_user(user_id)}
+        return AdminUserWrapperOut.model_validate({"data": await users.get_user(user_id)})
 
-    async def revoke_role(self, user_id: int, role_name: str, request: Request) -> dict[str, Any]:
+    async def revoke_role(
+        self, user_id: int, role_name: str, request: Request
+    ) -> AdminUserWrapperOut:
         await require_permission(request, "roles.manage")
         target: User | None = await User.where(User.id == user_id).first()
         if target is None:
             raise NotFoundException("User not found.")
         await target.remove_role(role_name)
-        return {"data": await users.get_user(user_id)}
+        return AdminUserWrapperOut.model_validate({"data": await users.get_user(user_id)})
 
     async def grant_permission(
         self, user_id: int, payload: GrantPermissionPayload, request: Request
-    ) -> dict[str, Any]:
+    ) -> AdminUserWrapperOut:
         await require_permission(request, "roles.manage")
         perm_obj: Permission | None = await Permission.where(name=payload.permission).first()
         if perm_obj is None:
@@ -101,11 +104,11 @@ class AdminUsersController(Controller):
         if target is None:
             raise NotFoundException("User not found.")
         await target.give_permission_to(perm_obj)
-        return {"data": await users.get_user(user_id)}
+        return AdminUserWrapperOut.model_validate({"data": await users.get_user(user_id)})
 
     async def revoke_permission(
         self, user_id: int, permission_name: str, request: Request
-    ) -> dict[str, Any]:
+    ) -> AdminUserWrapperOut:
         await require_permission(request, "roles.manage")
         perm_obj: Permission | None = await Permission.where(name=permission_name).first()
         if perm_obj is None:
@@ -114,4 +117,4 @@ class AdminUsersController(Controller):
         if target is None:
             raise NotFoundException("User not found.")
         await target.revoke_permission_to(perm_obj)
-        return {"data": await users.get_user(user_id)}
+        return AdminUserWrapperOut.model_validate({"data": await users.get_user(user_id)})

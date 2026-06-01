@@ -16,93 +16,72 @@ import type {
 
 import { unref } from 'vue'
 
-import type { ApiErrorOut, PermissionsListOut, RolesListOut } from '.././schemas'
+import type { PermissionsListOut, RolesListOut } from '.././schemas'
 
 import { request } from '../../lib/api'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.Admin.Roles.Index
+ * @summary Admin.Roles.Index
  */
-export const apiAdminRolesIndexApiAdminRolesGet = (
+export const adminRolesIndexApiAdminRolesGet = (
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
   return request<RolesListOut>({ url: `/api/admin/roles`, method: 'GET', signal }, options)
 }
 
-export const getApiAdminRolesIndexApiAdminRolesGetQueryKey = () => {
+export const getAdminRolesIndexApiAdminRolesGetQueryKey = () => {
   return ['api', 'admin', 'roles'] as const
 }
 
-export const getApiAdminRolesIndexApiAdminRolesGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminRolesIndexApiAdminRolesGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminRolesIndexApiAdminRolesGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminRolesIndexApiAdminRolesGet>>,
+  TError = unknown,
 >(options?: {
   query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof apiAdminRolesIndexApiAdminRolesGet>>, TError, TData>
+    UseQueryOptions<Awaited<ReturnType<typeof adminRolesIndexApiAdminRolesGet>>, TError, TData>
   >
   request?: SecondParameter<typeof request>
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminRolesIndexApiAdminRolesGetQueryKey()
+  const queryKey = getAdminRolesIndexApiAdminRolesGetQueryKey()
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof apiAdminRolesIndexApiAdminRolesGet>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof adminRolesIndexApiAdminRolesGet>>> = ({
     signal,
-  }) => apiAdminRolesIndexApiAdminRolesGet(requestOptions, signal)
+  }) => adminRolesIndexApiAdminRolesGet(requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminRolesIndexApiAdminRolesGet>>,
+    Awaited<ReturnType<typeof adminRolesIndexApiAdminRolesGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminRolesIndexApiAdminRolesGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminRolesIndexApiAdminRolesGet>>
+export type AdminRolesIndexApiAdminRolesGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminRolesIndexApiAdminRolesGet>>
 >
-export type ApiAdminRolesIndexApiAdminRolesGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminRolesIndexApiAdminRolesGetQueryError = unknown
 
 /**
- * @summary Api.Admin.Roles.Index
+ * @summary Admin.Roles.Index
  */
 
-export function useApiAdminRolesIndexApiAdminRolesGet<
-  TData = Awaited<ReturnType<typeof apiAdminRolesIndexApiAdminRolesGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminRolesIndexApiAdminRolesGet<
+  TData = Awaited<ReturnType<typeof adminRolesIndexApiAdminRolesGet>>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiAdminRolesIndexApiAdminRolesGet>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof adminRolesIndexApiAdminRolesGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminRolesIndexApiAdminRolesGetQueryOptions(options)
+  const queryOptions = getAdminRolesIndexApiAdminRolesGetQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -114,36 +93,29 @@ export function useApiAdminRolesIndexApiAdminRolesGet<
 }
 
 /**
- * @summary Api.Admin.Permissions.Index
+ * @summary Admin.Roles.Permissions.Index
  */
-export const apiAdminPermissionsIndexApiAdminPermissionsGet = (
+export const adminRolesPermissionsIndexApiAdminRolesPermissionsGet = (
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
   return request<PermissionsListOut>(
-    { url: `/api/admin/permissions`, method: 'GET', signal },
+    { url: `/api/admin/roles/permissions`, method: 'GET', signal },
     options,
   )
 }
 
-export const getApiAdminPermissionsIndexApiAdminPermissionsGetQueryKey = () => {
-  return ['api', 'admin', 'permissions'] as const
+export const getAdminRolesPermissionsIndexApiAdminRolesPermissionsGetQueryKey = () => {
+  return ['api', 'admin', 'roles', 'permissions'] as const
 }
 
-export const getApiAdminPermissionsIndexApiAdminPermissionsGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminPermissionsIndexApiAdminPermissionsGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminRolesPermissionsIndexApiAdminRolesPermissionsGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminRolesPermissionsIndexApiAdminRolesPermissionsGet>>,
+  TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
-      Awaited<ReturnType<typeof apiAdminPermissionsIndexApiAdminPermissionsGet>>,
+      Awaited<ReturnType<typeof adminRolesPermissionsIndexApiAdminRolesPermissionsGet>>,
       TError,
       TData
     >
@@ -152,50 +124,36 @@ export const getApiAdminPermissionsIndexApiAdminPermissionsGetQueryOptions = <
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminPermissionsIndexApiAdminPermissionsGetQueryKey()
+  const queryKey = getAdminRolesPermissionsIndexApiAdminRolesPermissionsGetQueryKey()
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminPermissionsIndexApiAdminPermissionsGet>>
-  > = ({ signal }) => apiAdminPermissionsIndexApiAdminPermissionsGet(requestOptions, signal)
+    Awaited<ReturnType<typeof adminRolesPermissionsIndexApiAdminRolesPermissionsGet>>
+  > = ({ signal }) => adminRolesPermissionsIndexApiAdminRolesPermissionsGet(requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminPermissionsIndexApiAdminPermissionsGet>>,
+    Awaited<ReturnType<typeof adminRolesPermissionsIndexApiAdminRolesPermissionsGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminPermissionsIndexApiAdminPermissionsGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminPermissionsIndexApiAdminPermissionsGet>>
+export type AdminRolesPermissionsIndexApiAdminRolesPermissionsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminRolesPermissionsIndexApiAdminRolesPermissionsGet>>
 >
-export type ApiAdminPermissionsIndexApiAdminPermissionsGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminRolesPermissionsIndexApiAdminRolesPermissionsGetQueryError = unknown
 
 /**
- * @summary Api.Admin.Permissions.Index
+ * @summary Admin.Roles.Permissions.Index
  */
 
-export function useApiAdminPermissionsIndexApiAdminPermissionsGet<
-  TData = Awaited<ReturnType<typeof apiAdminPermissionsIndexApiAdminPermissionsGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminRolesPermissionsIndexApiAdminRolesPermissionsGet<
+  TData = Awaited<ReturnType<typeof adminRolesPermissionsIndexApiAdminRolesPermissionsGet>>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminPermissionsIndexApiAdminPermissionsGet>>,
+        Awaited<ReturnType<typeof adminRolesPermissionsIndexApiAdminRolesPermissionsGet>>,
         TError,
         TData
       >
@@ -204,7 +162,7 @@ export function useApiAdminPermissionsIndexApiAdminPermissionsGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminPermissionsIndexApiAdminPermissionsGetQueryOptions(options)
+  const queryOptions = getAdminRolesPermissionsIndexApiAdminRolesPermissionsGetQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

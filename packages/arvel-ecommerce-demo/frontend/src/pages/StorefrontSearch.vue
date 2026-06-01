@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import ProductCard from '@/components/storefront/ProductCard.vue'
-import { useApiSearchApiSearchGet } from '@/api/storefront/storefront'
+import { useStorefrontSearchApiSearchGet } from '@/api/storefront/storefront'
 import { routeQuery, toSupportedLocale } from '@/lib/i18n'
 
 const route = useRoute()
@@ -12,7 +12,7 @@ const { locale, t } = useI18n({ useScope: 'global' })
 const currentLocale = computed(() => toSupportedLocale(locale.value))
 const query = computed(() => routeQuery(route.query.q))
 
-const { data, isPending } = useApiSearchApiSearchGet(
+const { data, isPending } = useStorefrontSearchApiSearchGet(
   computed(() => ({ q: query.value, locale: currentLocale.value })),
   { query: { enabled: computed(() => !!query.value.trim()) } },
 )

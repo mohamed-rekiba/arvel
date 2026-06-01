@@ -90,7 +90,16 @@ export async function request<T>(config: RequestConfig, _options?: RequestOption
 }
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init })
+  // Merge headers — spreading ...init last would drop Content-Type whenever a
+  // caller passes its own headers (e.g. Authorization), which makes the backend
+  // skip JSON parsing and reject the body.
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers as Record<string, string> | undefined),
+    },
+  })
   if (!res.ok) {
     const body = await res.json().catch(() => null)
     throw new ApiError(
@@ -371,18 +380,6 @@ export async function forceDeleteAdminCatalog(
 ): Promise<void> {
   return json<void>(`/api/admin/${resource}/${encodeURIComponent(id)}/force`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
-
-export async function runAdminCatalogAction(
-  token: string,
-  resource: AdminCatalogResource,
-  id: string | number,
-  action: string,
-): Promise<unknown> {
-  return json<unknown>(`/api/admin/${resource}/${encodeURIComponent(String(id))}/${action}`, {
-    method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   })
 }
