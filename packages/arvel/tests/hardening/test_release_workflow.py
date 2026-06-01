@@ -7,7 +7,7 @@ from typing import cast
 
 import yaml
 
-RELEASE_YML = Path(__file__).resolve().parents[4] / ".github" / "workflows" / "release.yml"
+RELEASE_YML = Path(__file__).resolve().parents[4] / ".github" / "workflows" / "release-please.yml"
 
 
 def _load_workflow() -> dict[object, object]:
@@ -76,5 +76,5 @@ def test_release_workflow_fails_closed() -> None:
                 )
 
     assert "twine check" in raw, (
-        "FR-017-021: release.yml must run 'twine check' as a dry-run validation"
+        "FR-017-021: release-please.yml must run 'twine check' as a dry-run validation"
     )
