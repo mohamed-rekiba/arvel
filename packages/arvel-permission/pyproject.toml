@@ -21,6 +21,7 @@ dependencies = ["arvel", "pydantic>=2.13.4", "sqlalchemy[asyncio]>=2.0.50"]
 Homepage = "https://arvel.dev"
 Documentation = "https://arvel.dev/packages/permission/"
 Repository = "https://github.com/mohamed-rekiba/arvel"
+Issues = "https://github.com/mohamed-rekiba/arvel/issues"
 
 [build-system]
 requires = ["hatchling>=1.25"]

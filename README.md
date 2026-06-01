@@ -12,7 +12,7 @@
     <img src="https://github.com/mohamed-rekiba/arvel/actions/workflows/security.yml/badge.svg" alt="Security">
 </a>
 <a href="https://pypi.org/project/arvel/" target="_blank">
-    <img src="https://img.shields.io/pypi/v/arvel?color=%2334D058&label=pypi%20package" alt="Package version">
+    <img src="https://img.shields.io/pypi/v/arvel?color=%2334D058" alt="Package version">
 </a>
 <a href="https://pypi.org/project/arvel/" target="_blank">
     <img src="https://img.shields.io/pypi/pyversions/arvel.svg?color=%2334D058" alt="Supported Python versions">

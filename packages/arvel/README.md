@@ -1,5 +1,12 @@
 # arvel
 
+<p>
+<a href="https://pypi.org/project/arvel/">
+    <img src="https://img.shields.io/pypi/v/arvel?color=%2334D058" alt="PyPI">
+</a>
+<img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License">
+</p>
+
 The Laravel of Python — built natively on FastAPI + Pydantic + SQLAlchemy, end-to-end type-safe.
 
 > **Status:** Pre-alpha. The public API can still change before `1.0`.

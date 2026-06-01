@@ -2,7 +2,7 @@
 
 <p>
 <a href="https://pypi.org/project/arvel-audit/">
-    <img src="https://img.shields.io/pypi/v/arvel-audit?color=%2334D058&label=pypi" alt="PyPI">
+    <img src="https://img.shields.io/pypi/v/arvel-audit?color=%2334D058" alt="PyPI">
 </a>
 <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License">
 </p>

@@ -176,8 +176,8 @@ arvel = "arvel.console.entrypoint:main"
 "reverb:start" = "arvel.console.commands.reverb_commands:ReverbStartCommand"
 
 [project.urls]
-Homepage = "https://github.com/mohamed-rekiba/arvel"
-Documentation = "https://github.com/mohamed-rekiba/arvel/tree/main/docs"
+Homepage = "https://arvel.dev"
+Documentation = "https://arvel.dev"
 Repository = "https://github.com/mohamed-rekiba/arvel"
 Issues = "https://github.com/mohamed-rekiba/arvel/issues"
 
