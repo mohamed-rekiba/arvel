@@ -1,6 +1,6 @@
 [project]
 name = "arvel-workspace"
-version = "0.0.0"        # x-release-please-version
+version = "0.4.0"        # x-release-please-version
 
 description = "Arvel monorepo — framework + cli + skeleton + docs + benchmarks."
 readme = "README.md"
@@ -127,7 +127,7 @@ ignore = [
     "ARG002", # TypeDecorator.process_*_param must keep SQLAlchemy's `dialect` name
 ]
 "packages/arvel-oauth/src/arvel_oauth/exceptions.py" = [
-    "N818",    # ProviderNotFound / InvalidOAuthState / DuplicateOAuthAccount are public API names
+    "N818", # ProviderNotFound / InvalidOAuthState / DuplicateOAuthAccount are public API names
 ]
 "packages/arvel-oauth/src/arvel_oauth/models.py" = [
     "ARG002", # TypeDecorator.process_*_param must keep SQLAlchemy's `dialect` name
@@ -312,15 +312,15 @@ ignore = [
     "E501",    # CLI signature lines exceed 100 due to typer Annotated decorators
 ]
 "packages/arvel/src/arvel/testing/**" = [
-    "PLC0415", # lazy imports across testing.fakes break circular deps with facades
-    "S108",    # /tmp default is for testing only (file_path is unused by ARRAY store)
-    "SLF001",  # OTel private provider variables must be patched to enable test swapping
-    "TRY004",  # AssertionError is the documented contract for fake-not-active failures
-    "PLR2004", # 200..300 boundary is documented in Python — not a magic number
-    "PLR1714", # the chained-equality form is explicit on purpose in key matching
-    "SIM109",  # status code 2xx range check is more readable as written
-    "E501",    # docstring lines hold copy-paste-ready user examples; do not wrap
-    "ARG002",  # LockFake mirrors CacheLock's signature for drop-in substitutability
+    "PLC0415",  # lazy imports across testing.fakes break circular deps with facades
+    "S108",     # /tmp default is for testing only (file_path is unused by ARRAY store)
+    "SLF001",   # OTel private provider variables must be patched to enable test swapping
+    "TRY004",   # AssertionError is the documented contract for fake-not-active failures
+    "PLR2004",  # 200..300 boundary is documented in Python — not a magic number
+    "PLR1714",  # the chained-equality form is explicit on purpose in key matching
+    "SIM109",   # status code 2xx range check is more readable as written
+    "E501",     # docstring lines hold copy-paste-ready user examples; do not wrap
+    "ARG002",   # LockFake mirrors CacheLock's signature for drop-in substitutability
     "ASYNC109", # LockFake.block(timeout=...) mirrors CacheLock — asyncio.timeout adds no value
 ]
 "packages/arvel/src/arvel/observability/**" = [
@@ -507,7 +507,10 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["packages/arvel/src/arvel", "packages/arvel-permission/src/arvel_permission"]
+source = [
+    "packages/arvel/src/arvel",
+    "packages/arvel-permission/src/arvel_permission",
+]
 branch = true
 parallel = true
 

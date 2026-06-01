@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.3.0...arvel-v1.0.0) (2026-06-01)
+## [0.4.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.3.0...arvel-v0.4.0) (2026-06-01)
 
 
 ### ⚠ BREAKING CHANGES

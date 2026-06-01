@@ -1,12 +1,19 @@
 [project]
 name = "arvel-search"
-version = "0.1.0" # x-release-please-version
+version = "0.4.0" # x-release-please-version
 description = "Scout-style full-text search for Arvel — Meilisearch, Elasticsearch, database, collection, and null drivers."
 readme = "README.md"
 requires-python = ">=3.14"
 license = { text = "MIT" }
 authors = [{ name = "Arvel contributors" }]
-keywords = ["arvel", "search", "full-text", "meilisearch", "elasticsearch", "scout"]
+keywords = [
+    "arvel",
+    "search",
+    "full-text",
+    "meilisearch",
+    "elasticsearch",
+    "scout",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: FastAPI",
