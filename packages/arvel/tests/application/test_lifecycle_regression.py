@@ -8,7 +8,9 @@ guard against silent breakage when the provider chain or ASGI stack changes.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
+import httpx
 import pytest
 from arvel.application import Application
 from arvel.services import BaseService, HealthResult, HealthStatus
@@ -63,7 +65,7 @@ def test_request_id_in_headers_and_logs(tmp_path: Path, monkeypatch: pytest.Monk
         return {"ok": "yes"}
 
     del _ping  # registered via decorator; drop local binding
-    with FakeObservability() as obs, TestClient(fa) as client:
+    with FakeObservability() as obs, cast("httpx.Client", TestClient(fa)) as client:
         response = client.get("/ping")
 
     assert "x-request-id" in {k.lower() for k in response.headers}
@@ -106,7 +108,7 @@ def test_unhandled_exception_logs_and_hides_trace() -> None:
         raise RuntimeError("secret internals")
 
     del _explode  # registered via decorator; drop local binding
-    client = TestClient(fa, raise_server_exceptions=False)
+    client = cast("httpx.Client", TestClient(fa, raise_server_exceptions=False))
     with FakeObservability() as obs:
         response = client.get("/explode")
 

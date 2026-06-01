@@ -5,8 +5,9 @@ from __future__ import annotations
 import struct
 import zlib
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
+import httpx
 from arvel.database import Model, id_, string
 from arvel.http.exceptions import HttpExceptionHandler
 from arvel.http.requests import FormRequest
@@ -223,7 +224,9 @@ class TestFormRequestRulesIntegration:
         HttpExceptionHandler().register(app)
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).post("/emails", json={"email": "taken@example.com"})
+        resp = cast("httpx.Client", TestClient(app)).post(
+            "/emails", json={"email": "taken@example.com"}
+        )
         assert resp.status_code == 422
         body = resp.json()
         assert body["error"]["code"] == "VALIDATION_FAILED"
@@ -254,5 +257,7 @@ class TestFormRequestRulesIntegration:
         HttpExceptionHandler().register(app)
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).post("/emails", json={"email": "taken@example.com"})
+        resp = cast("httpx.Client", TestClient(app)).post(
+            "/emails", json={"email": "taken@example.com"}
+        )
         assert resp.status_code == 422

@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
+import httpx
 import pytest
 import pytest_asyncio
 from arvel.database import Model, id_, string
@@ -148,7 +149,7 @@ class TestImplicitBindingIntegration:
         app = FastAPI()
         HttpExceptionHandler().register(app)
         Router.singleton().register_with_app(app)
-        return TestClient(app)
+        return cast("httpx.Client", TestClient(app))
 
     def test_pk_resolution_returns_loaded_model(
         self, bind_db: async_sessionmaker[AsyncSession]
@@ -252,7 +253,7 @@ def test_implicit_binding_coexists_with_form_request(
 
     app = FastAPI()
     Router.singleton().register_with_app(app)
-    client = TestClient(app)
+    client = cast("httpx.Client", TestClient(app))
 
     resp = client.put("/posts/1", json={"title": "fresh"})
     assert resp.status_code == 200
@@ -297,7 +298,7 @@ def test_implicit_binding_runs_inside_route_middleware(
 
     app = FastAPI()
     Router.singleton().register_with_app(app)
-    client = TestClient(app)
+    client = cast("httpx.Client", TestClient(app))
 
     resp = client.get("/posts/1")
     assert resp.status_code == 200

@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from typing import cast
+
+import httpx
 from arvel.http.exceptions import ThrottleException, ValidationException
 from arvel.http.problem_details import ProblemDetailsHandler
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
 
-def _client(app: FastAPI) -> TestClient:
+def _client(app: FastAPI) -> httpx.Client:
     ProblemDetailsHandler().register(app)
-    return TestClient(app)
+    return cast("httpx.Client", TestClient(app))
 
 
 def test_problem_details_uses_exception_details() -> None:

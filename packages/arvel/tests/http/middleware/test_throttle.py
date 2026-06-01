@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any, cast
 
+import httpx
 import pytest
 
 
@@ -59,7 +60,7 @@ def test_throttle_middleware_blocks_after_max_attempts() -> None:
     app = FastAPI()
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
-    client = TestClient(app)
+    client = cast("httpx.Client", TestClient(app))
 
     # First 3 succeed
     for _ in range(3):
@@ -123,7 +124,7 @@ def test_throttle_response_carries_rate_limit_headers() -> None:
     app = FastAPI()
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
-    resp = TestClient(app).get("/ping")
+    resp = cast("httpx.Client", TestClient(app)).get("/ping")
     assert resp.status_code == 200
     assert "x-ratelimit-limit" in {k.lower() for k in resp.headers}
     assert "x-ratelimit-remaining" in {k.lower() for k in resp.headers}
@@ -150,7 +151,7 @@ def test_throttle_429_sends_retry_after() -> None:
     app = FastAPI()
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
-    client = TestClient(app)
+    client = cast("httpx.Client", TestClient(app))
     client.get("/ping")  # consume the only attempt
     resp = client.get("/ping")
     assert resp.status_code == 429
@@ -182,7 +183,7 @@ def test_throttle_custom_key_callable() -> None:
     app = FastAPI()
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
-    client = TestClient(app)
+    client = cast("httpx.Client", TestClient(app))
 
     # Two different users share the limiter but with different keys
     for _ in range(2):

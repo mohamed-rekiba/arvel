@@ -10,7 +10,9 @@ provider does, keeping the HTTP layer ORM-agnostic.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import cast
 
+import httpx
 from arvel.database.exceptions import ModelNotFoundError, ORMError
 from arvel.http.exceptions import (
     ExceptionTranslator,
@@ -39,7 +41,7 @@ def test_model_not_found_error_returns_404_with_envelope() -> None:
         raise ModelNotFoundError("User", user_id)
 
     del handler
-    resp = TestClient(app).get("/users/99")
+    resp = cast("httpx.Client", TestClient(app)).get("/users/99")
     assert resp.status_code == 404
     body = resp.json()
     assert body["error"]["code"] == "NOT_FOUND"
@@ -56,7 +58,7 @@ def test_model_not_found_error_does_not_leak_traceback() -> None:
         raise ModelNotFoundError("Post", slug)
 
     del handler
-    resp = TestClient(app).get("/posts/unknown")
+    resp = cast("httpx.Client", TestClient(app)).get("/posts/unknown")
     assert resp.status_code == 404
     body = resp.text
     forbidden = ["Traceback", 'File "', "raise ModelNotFoundError", "arvel/database"]
@@ -76,7 +78,7 @@ def test_other_orm_errors_still_propagate_to_500() -> None:
     # raise_server_exceptions=False mirrors production ASGI behaviour where
     # the framework's catch-all handler returns the 500 envelope instead of
     # the test client re-raising.
-    resp = TestClient(app, raise_server_exceptions=False).get("/db-error")
+    resp = cast("httpx.Client", TestClient(app, raise_server_exceptions=False)).get("/db-error")
     assert resp.status_code == 500
     assert resp.json()["error"]["code"] == "INTERNAL_ERROR"
 
@@ -92,7 +94,7 @@ def test_add_translator_registers_handler_after_construction() -> None:
         raise ModelNotFoundError("Article", article_id)
 
     del view
-    resp = TestClient(app).get("/articles/42")
+    resp = cast("httpx.Client", TestClient(app)).get("/articles/42")
     assert resp.status_code == 404
     assert set(resp.json()["error"].keys()) >= {"code", "message"}
 
@@ -106,7 +108,7 @@ def test_problem_details_handler_maps_model_not_found_to_rfc7807() -> None:
         raise ModelNotFoundError("Order", order_id)
 
     del handler
-    resp = TestClient(app).get("/orders/7")
+    resp = cast("httpx.Client", TestClient(app)).get("/orders/7")
     assert resp.status_code == 404
     assert resp.headers["content-type"].startswith("application/problem+json")
     body = resp.json()
@@ -158,7 +160,7 @@ def test_auth_unauthenticated_exception_returns_401_envelope() -> None:
         raise AuthUnauth("token expired")
 
     del handler
-    resp = TestClient(app, raise_server_exceptions=False).get("/me")
+    resp = cast("httpx.Client", TestClient(app, raise_server_exceptions=False)).get("/me")
     assert resp.status_code == 401
     assert resp.json()["error"]["code"] == "UNAUTHENTICATED"
 
@@ -175,6 +177,6 @@ def test_auth_authorization_exception_returns_403_envelope() -> None:
         raise AuthForbidden
 
     del handler
-    resp = TestClient(app, raise_server_exceptions=False).get("/admin")
+    resp = cast("httpx.Client", TestClient(app, raise_server_exceptions=False)).get("/admin")
     assert resp.status_code == 403
     assert resp.json()["error"]["code"] == "FORBIDDEN"

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -24,6 +25,7 @@ from arvel.console.commands.db_table import DbTableCommand
 from arvel.console.commands.event_list import EventListCommand
 from arvel.console.commands.model_show import ModelShowCommand
 from arvel.console.commands.view_commands import ViewClearCommand
+from click.testing import CliRunner as ClickCliRunner
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -56,7 +58,7 @@ def test_config_show_prints_registered_config_value(tmp_path: Path) -> None:
 
     register("app", SimpleNamespace(NAME="arvel"))
     app = _app(ConfigShowCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["config:show", "app.NAME"])
 
     assert result.exit_code == 0
@@ -65,7 +67,7 @@ def test_config_show_prints_registered_config_value(tmp_path: Path) -> None:
 
 def test_config_show_missing_key_exits_two(tmp_path: Path) -> None:
     app = _app(ConfigShowCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["config:show", "missing.KEY"])
 
     assert result.exit_code == 2
@@ -103,7 +105,7 @@ def test_db_table_nonexistent_table_exits_two(
         cmd = DbTableCommand()
         cmd.app = _FakeApp()  # type: ignore[assignment]
         app = _app(cmd)
-        with runner.isolated_filesystem(temp_dir=tmp_path):
+        with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
             result = runner.invoke(app.typer_app, ["db:table", "nonexistent_table_xyz"])
             assert result.exit_code == 2, result.stdout + result.stderr
     finally:
@@ -123,7 +125,7 @@ def test_model_show_command_registered() -> None:
 def test_model_show_with_missing_import_exits_two(tmp_path: Path) -> None:
     """model:show on bogus dotted path exits 2."""
     app = _app(ModelShowCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["model:show", "no.such.module.NoClass"])
         assert result.exit_code == 2
 

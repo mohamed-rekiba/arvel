@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import cast
+
+import httpx
 import pytest
 
 
@@ -62,7 +65,7 @@ def test_exception_handler_returns_json_for_api_path() -> None:
         raise NotFoundException("missing")
 
     del handler  # registered via @app.get; drop local binding
-    resp = TestClient(app).get("/api/missing")
+    resp = cast("httpx.Client", TestClient(app)).get("/api/missing")
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "NOT_FOUND"
     assert resp.json()["error"]["message"] == "missing"
@@ -81,7 +84,9 @@ def test_exception_handler_never_leaks_traceback_in_response() -> None:
         raise ServerErrorException("kaboom")
 
     del handler  # registered via @app.get; drop local binding
-    resp = TestClient(app).get("/boom", headers={"Accept": "application/json"})
+    resp = cast("httpx.Client", TestClient(app)).get(
+        "/boom", headers={"Accept": "application/json"}
+    )
     assert resp.status_code == 500
     body = resp.text
     forbidden = ["Traceback", 'File "', "line ", "raise ServerErrorException"]

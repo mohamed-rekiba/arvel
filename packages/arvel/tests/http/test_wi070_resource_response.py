@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
+import httpx
 from arvel.database import Paginator
 from arvel.http import JsonResource, ResourceResponse
 from starlette.requests import Request
@@ -97,7 +98,7 @@ class TestFastAPIHandlerReturn:
             return UserResource.collection(users).response(request)
 
         del handler
-        resp = TestClient(app).get("/users")
+        resp = cast("httpx.Client", TestClient(app)).get("/users")
         assert resp.status_code == 200
         assert resp.json() == {
             "data": [
@@ -117,6 +118,6 @@ class TestFastAPIHandlerReturn:
             return UserResource(_User(user_id, "x@y.io")).response(request, status_code=200)
 
         del handler
-        resp = TestClient(app).get("/users/7")
+        resp = cast("httpx.Client", TestClient(app)).get("/users/7")
         assert resp.status_code == 200
         assert resp.json() == {"id": 7, "email": "x@y.io"}

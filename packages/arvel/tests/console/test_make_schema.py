@@ -16,9 +16,11 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from typing import cast
 
 from arvel.console import Application
 from arvel.console.commands.make_schema import MakeSchemaCommand
+from click.testing import CliRunner as ClickCliRunner
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -62,7 +64,7 @@ _USER_MODEL = textwrap.dedent(
 def test_make_schema_creates_file_at_canonical_path(tmp_path: Path) -> None:
     """make:schema User writes app/schemas/user_schema.py."""
     app = _app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         _write_model(Path("app/models"), "user", _USER_MODEL)
         # Need the empty app/__init__.py so app.models.user is importable.
         Path("app/__init__.py").write_text("")
@@ -73,7 +75,7 @@ def test_make_schema_creates_file_at_canonical_path(tmp_path: Path) -> None:
 
 def test_generated_file_emits_three_classes(tmp_path: Path) -> None:
     app = _app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         _write_model(Path("app/models"), "user", _USER_MODEL)
         Path("app/__init__.py").write_text("")
         runner.invoke(app.typer_app, ["make:schema", "User"])
@@ -86,7 +88,7 @@ def test_generated_file_emits_three_classes(tmp_path: Path) -> None:
 def test_create_excludes_server_managed_fields(tmp_path: Path) -> None:
     """UserCreate drops ``id`` (autoincrement PK), ``created_at``, ``updated_at``."""
     app = _app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         _write_model(Path("app/models"), "user", _USER_MODEL)
         Path("app/__init__.py").write_text("")
         runner.invoke(app.typer_app, ["make:schema", "User"])
@@ -110,7 +112,7 @@ def test_create_excludes_server_managed_fields(tmp_path: Path) -> None:
 
 def test_update_makes_every_field_optional(tmp_path: Path) -> None:
     app = _app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         _write_model(Path("app/models"), "user", _USER_MODEL)
         Path("app/__init__.py").write_text("")
         runner.invoke(app.typer_app, ["make:schema", "User"])
@@ -125,7 +127,7 @@ def test_update_makes_every_field_optional(tmp_path: Path) -> None:
 
 def test_read_includes_timestamps_excludes_hidden(tmp_path: Path) -> None:
     app = _app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         _write_model(Path("app/models"), "user", _USER_MODEL)
         Path("app/__init__.py").write_text("")
         runner.invoke(app.typer_app, ["make:schema", "User"])
@@ -143,7 +145,7 @@ def test_read_includes_timestamps_excludes_hidden(tmp_path: Path) -> None:
 def test_generated_file_passes_ruff_check(tmp_path: Path) -> None:
     """Generated schemas must be ruff-clean — no follow-up clean-up needed."""
     app = _app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         _write_model(Path("app/models"), "user", _USER_MODEL)
         Path("app/__init__.py").write_text("")
         runner.invoke(app.typer_app, ["make:schema", "User"])
@@ -160,7 +162,7 @@ def test_generated_file_passes_ruff_check(tmp_path: Path) -> None:
 
 def test_no_force_blocks_overwrite(tmp_path: Path) -> None:
     app = _app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         _write_model(Path("app/models"), "user", _USER_MODEL)
         Path("app/__init__.py").write_text("")
         Path("app/schemas").mkdir(parents=True)
@@ -172,7 +174,7 @@ def test_no_force_blocks_overwrite(tmp_path: Path) -> None:
 
 def test_force_overwrites(tmp_path: Path) -> None:
     app = _app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         _write_model(Path("app/models"), "user", _USER_MODEL)
         Path("app/__init__.py").write_text("")
         Path("app/schemas").mkdir(parents=True)
@@ -185,7 +187,7 @@ def test_force_overwrites(tmp_path: Path) -> None:
 def test_missing_model_returns_actionable_error(tmp_path: Path) -> None:
     """Diagnostic must tell the user what they need to do next."""
     app = _app()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         Path("app").mkdir()
         Path("app/__init__.py").write_text("")
         result = runner.invoke(app.typer_app, ["make:schema", "Nonexistent"])

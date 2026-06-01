@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import cast
+
+import httpx
 import pytest
 
 
@@ -36,7 +39,7 @@ def test_csrf_skips_safe_methods(method: str) -> None:
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
 
-    client = TestClient(app)
+    client = cast("httpx.Client", TestClient(app))
     resp = client.request(method, "/x")
     assert resp.status_code == 200
 
@@ -63,7 +66,7 @@ def test_csrf_post_without_token_returns_419() -> None:
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
 
-    resp = TestClient(app).post("/x", json={})
+    resp = cast("httpx.Client", TestClient(app)).post("/x", json={})
     assert resp.status_code == 419  # Laravel CSRF parity
 
 
@@ -128,7 +131,7 @@ def test_csrf_except_paths_bypasses_check() -> None:
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
 
-    resp = TestClient(app).post("/webhooks/stripe", json={})
+    resp = cast("httpx.Client", TestClient(app)).post("/webhooks/stripe", json={})
     assert resp.status_code == 200
 
 

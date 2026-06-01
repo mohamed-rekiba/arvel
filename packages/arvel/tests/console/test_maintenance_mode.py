@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -23,6 +23,7 @@ import pytest
 from arvel.console import Application, Command
 from arvel.console.commands.maintenance import DownCommand, UpCommand
 from arvel.maintenance import MaintenanceModeManager, MaintenanceModeMiddleware
+from click.testing import CliRunner as ClickCliRunner
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -38,7 +39,7 @@ def _app(*cmds: Command) -> Application:
 def test_down_creates_marker_file(tmp_path: Path) -> None:
     """down writes JSON marker at storage/framework/down."""
     app = _app(DownCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["down", "--secret", "test-secret"])
         assert result.exit_code == 0, result.output
         marker = Path("storage/framework/down")
@@ -53,7 +54,7 @@ def test_down_creates_marker_file(tmp_path: Path) -> None:
 def test_down_generates_token_when_secret_omitted(tmp_path: Path) -> None:
     """/ SR-023-001: token auto-generated with ≥ 256 bits entropy."""
     app = _app(DownCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["down"])
         assert result.exit_code == 0
         marker = Path("storage/framework/down")
@@ -67,7 +68,7 @@ def test_down_generates_token_when_secret_omitted(tmp_path: Path) -> None:
 def test_down_token_is_unique_per_invocation(tmp_path: Path) -> None:
     """SR-023-001: each invocation generates a fresh token."""
     app = _app(DownCommand(), UpCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         runner.invoke(app.typer_app, ["down"])
         first = json.loads(Path("storage/framework/down").read_text())["secret"]
         runner.invoke(app.typer_app, ["up"])
@@ -82,7 +83,7 @@ def test_down_token_is_unique_per_invocation(tmp_path: Path) -> None:
 def test_up_removes_marker(tmp_path: Path) -> None:
     """up deletes the marker file."""
     app = _app(DownCommand(), UpCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         runner.invoke(app.typer_app, ["down"])
         assert Path("storage/framework/down").exists()
         result = runner.invoke(app.typer_app, ["up"])
@@ -93,7 +94,7 @@ def test_up_removes_marker(tmp_path: Path) -> None:
 def test_up_is_idempotent_when_no_marker(tmp_path: Path) -> None:
     """up when no marker exists exits 0."""
     app = _app(UpCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["up"])
         assert result.exit_code == 0
 

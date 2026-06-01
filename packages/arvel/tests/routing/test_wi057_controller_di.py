@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
+import httpx
 import pytest
 import pytest_asyncio
 from arvel.container import Container
@@ -101,7 +102,7 @@ class TestActionParameter:
         app = FastAPI()
         Router.singleton().register_with_app(app)
 
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
         assert client.get("/multi/idx").json() == {"hit": "index"}
         assert client.get("/multi/show").json() == {"hit": "show"}
 
@@ -142,7 +143,7 @@ class TestMethodControllerDI:
         app.state.arvel_container = container
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).get("/greet")
+        resp = cast("httpx.Client", TestClient(app)).get("/greet")
         assert resp.status_code == 200
         assert resp.json() == {"msg": "hello"}
 
@@ -174,7 +175,7 @@ class TestMethodControllerDI:
         app.state.arvel_container = container
         Router.singleton().register_with_app(app)
 
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
         assert client.get("/a").json() == {"src": "A", "tok": "shared"}
         assert client.get("/b").json() == {"src": "B", "tok": "shared"}
 
@@ -190,7 +191,7 @@ class TestMethodControllerDI:
         app = FastAPI()
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).get("/ping")
+        resp = cast("httpx.Client", TestClient(app)).get("/ping")
         assert resp.status_code == 200
         assert resp.json() == {"pong": "ok"}
 
@@ -211,7 +212,7 @@ class TestMethodControllerSignature:
         app = FastAPI()
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).get("/widgets/42")
+        resp = cast("httpx.Client", TestClient(app)).get("/widgets/42")
         assert resp.status_code == 200
         assert resp.json() == {"id": 42}
 
@@ -225,7 +226,7 @@ class TestMethodControllerSignature:
         app = FastAPI()
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).get("/info")
+        resp = cast("httpx.Client", TestClient(app)).get("/info")
         assert resp.status_code == 200
         assert resp.json() == {"sync": "yes"}
 
@@ -253,7 +254,7 @@ class TestMethodControllerIntegrations:
         HttpExceptionHandler().register(app)
         Router.singleton().register_with_app(app)
 
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
         assert client.get("/widgets/1").json() == {"id": 1, "name": "alpha"}
         assert client.get("/widgets/2").json() == {"id": 2, "name": "beta"}
         assert client.get("/widgets/999").status_code == 404
@@ -276,7 +277,7 @@ class TestMethodControllerIntegrations:
         app = FastAPI()
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).post("/widgets", json={"name": "gamma"})
+        resp = cast("httpx.Client", TestClient(app)).post("/widgets", json={"name": "gamma"})
         assert resp.status_code == 200
         assert resp.json() == {"name": "gamma"}
 

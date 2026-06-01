@@ -8,8 +8,9 @@ Tests are FAILING before the fix and PASSING after.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
+import httpx
 import pytest
 from starlette.requests import Request as _StarletteRequest
 
@@ -120,7 +121,7 @@ class TestStory18SingleAuthenticateMiddleware:
 
         del _endpoint  # registered via @fastapp.get; drop local binding
 
-        client = TestClient(fastapp, raise_server_exceptions=False)
+        client = cast("httpx.Client", TestClient(fastapp, raise_server_exceptions=False))
         response = client.get("/protected")
         # Must be 401 because no user is authenticated
         assert response.status_code in (401, 503)  # 503 acceptable if container unavailable

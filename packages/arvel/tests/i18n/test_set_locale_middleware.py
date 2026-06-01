@@ -4,6 +4,9 @@ Tests are written RED — the module arvel.i18n.middleware does not exist yet.
 
 from __future__ import annotations
 
+from typing import cast
+
+import httpx
 import pytest
 from starlette.requests import Request
 from starlette.responses import Response
@@ -46,19 +49,19 @@ def test_import() -> None:
 
 def test_accept_language_negotiation() -> None:
     """es wins when es is in supported and has higher q than en."""
-    client = TestClient(_make_app(supported=["en", "es"]))
+    client = cast("httpx.Client", TestClient(_make_app(supported=["en", "es"])))
     response = client.get("/", headers={"Accept-Language": "es, en;q=0.9"})
     assert response.text == "es"
 
 
 def test_accept_language_exact_match() -> None:
-    client = TestClient(_make_app(supported=["en", "fr", "ar"]))
+    client = cast("httpx.Client", TestClient(_make_app(supported=["en", "fr", "ar"])))
     response = client.get("/", headers={"Accept-Language": "fr"})
     assert response.text == "fr"
 
 
 def test_accept_language_unsupported_falls_back() -> None:
-    client = TestClient(_make_app(supported=["en"], default="en"))
+    client = cast("httpx.Client", TestClient(_make_app(supported=["en"], default="en")))
     response = client.get("/", headers={"Accept-Language": "zh"})
     assert response.text == "en"
 
@@ -93,7 +96,7 @@ def test_user_locale_wins_over_header() -> None:
         scope["state"]["user"] = FakeUser()
         await locale_middleware(scope, receive, send)
 
-    client = TestClient(outer)
+    client = cast("httpx.Client", TestClient(outer))
     response = client.get("/", headers={"Accept-Language": "en"})
     assert response.text == "ar"
 
@@ -102,7 +105,7 @@ def test_user_locale_wins_over_header() -> None:
 
 
 def test_no_user_header_wins() -> None:
-    client = TestClient(_make_app(supported=["en", "es"], default="en"))
+    client = cast("httpx.Client", TestClient(_make_app(supported=["en", "es"], default="en")))
     response = client.get("/", headers={"Accept-Language": "es"})
     assert response.text == "es"
 
@@ -111,7 +114,7 @@ def test_no_user_header_wins() -> None:
 
 
 def test_default_locale_when_no_header() -> None:
-    client = TestClient(_make_app(supported=["en", "fr"], default="en"))
+    client = cast("httpx.Client", TestClient(_make_app(supported=["en", "fr"], default="en")))
     response = client.get("/")
     assert response.text == "en"
 
@@ -131,7 +134,7 @@ def test_default_locale_when_no_header() -> None:
     ],
 )
 def test_malformed_accept_language_does_not_raise(header: str) -> None:
-    client = TestClient(_make_app(supported=["en"], default="en"))
+    client = cast("httpx.Client", TestClient(_make_app(supported=["en"], default="en")))
     response = client.get("/", headers={"Accept-Language": header})
     assert response.status_code == 200
     assert response.text == "en"
@@ -141,7 +144,7 @@ def test_malformed_accept_language_does_not_raise(header: str) -> None:
 
 
 def test_content_language_header_set_on_response() -> None:
-    client = TestClient(_make_app(supported=["en", "es"], default="en"))
+    client = cast("httpx.Client", TestClient(_make_app(supported=["en", "es"], default="en")))
     response = client.get("/", headers={"Accept-Language": "es"})
     assert response.headers.get("content-language") == "es"
 
@@ -155,7 +158,7 @@ def test_content_language_not_overwritten_if_already_set() -> None:
         await response(scope, receive, send)
 
     app = SetLocaleMiddleware(handler, supported=["en", "es"], default="en")
-    client = TestClient(app)
+    client = cast("httpx.Client", TestClient(app))
     response = client.get("/", headers={"Accept-Language": "es"})
     assert response.headers["content-language"] == "fr"
 

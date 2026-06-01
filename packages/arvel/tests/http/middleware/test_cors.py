@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import cast
+
+import httpx
 import pytest
 
 
@@ -33,7 +36,7 @@ def test_cors_preflight_returns_allow_headers_for_known_origin() -> None:
         return {"ok": True}
 
     del options_handler, get_handler  # registered via @fa.*; drop local bindings
-    client = TestClient(fa)
+    client = cast("httpx.Client", TestClient(fa))
     resp = client.options(
         "/api/test",
         headers={
@@ -57,7 +60,7 @@ def test_cors_disallowed_origin_does_not_get_allow_origin_header() -> None:
         return {"ok": True}
 
     del handler  # registered via @fa.get; drop local binding
-    client = TestClient(fa)
+    client = cast("httpx.Client", TestClient(fa))
     resp = client.get(
         "/api/test",
         headers={"Origin": "https://evil.example.com"},
