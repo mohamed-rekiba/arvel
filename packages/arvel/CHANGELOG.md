@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.5.1...arvel-v0.6.0) (2026-06-01)
+
+
+### Features
+
+* update package URLs and badge formatting across multiple packages ([f5794fd](https://github.com/mohamed-rekiba/arvel/commit/f5794fd0d2d21f46a93d84b4db1d1ea483fb4b83))
+
 ## [0.5.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.5.0...arvel-v0.5.1) (2026-06-01)
 
 
