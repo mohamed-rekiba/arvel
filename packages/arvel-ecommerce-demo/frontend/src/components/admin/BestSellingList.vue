@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useAdminOrdersBestSellersApiAdminOrdersBestSellersGet } from '@/api/default/default'
+import { useAdminOrdersBestSellersApiAdminOrdersBestSellersGet } from '@/api/admin-orders/admin-orders'
 import { formatCurrency } from '@/lib/i18n'
 import type { SupportedLocale } from '@/types'
 

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Literal
 
 from app.http.controllers._deps import categories, require_permission, require_role_level
+from app.http.controllers._responses import AdminCategoryListOut, AdminCategoryWrapperOut
 from app.http.controllers._schemas import CreateCategoryPayload, UpdateCategoryPayload
-from arvel.database import parse_trashed_mode
 from arvel.http import Request
 from arvel.http.controller import Controller
 from arvel.http.exceptions import NotFoundException
@@ -17,49 +17,54 @@ class AdminCategoriesController(Controller):
     async def index(
         self,
         request: Request,
+        trashed: Literal["without", "with", "only"] = "without",
         limit: int = 50,
         offset: int = 0,
-    ) -> dict[str, Any]:
+    ) -> AdminCategoryListOut:
         await require_permission(request, "categories.view")
-        return await categories.list(parse_trashed_mode(request), limit=limit, offset=offset)
+        return AdminCategoryListOut.model_validate(
+            await categories.list(trashed, limit=limit, offset=offset)
+        )
 
-    async def show(self, category_id: str, request: Request) -> dict[str, Any]:
+    async def show(self, category_id: str, request: Request) -> AdminCategoryWrapperOut:
         await require_permission(request, "categories.view")
         category = await categories.find(category_id, include_trashed=True)
         if category is None:
             raise NotFoundException("Category not found.")
-        return {"data": categories.to_dict(category)}
+        return AdminCategoryWrapperOut.model_validate({"data": categories.to_dict(category)})
 
-    async def store(self, payload: CreateCategoryPayload, request: Request) -> dict[str, Any]:
+    async def store(
+        self, payload: CreateCategoryPayload, request: Request
+    ) -> AdminCategoryWrapperOut:
         await require_permission(request, "categories.create")
         category = await categories.create(payload)
-        return {"data": categories.to_dict(category)}
+        return AdminCategoryWrapperOut.model_validate({"data": categories.to_dict(category)})
 
     async def update(
         self, category_id: str, payload: UpdateCategoryPayload, request: Request
-    ) -> dict[str, Any]:
+    ) -> AdminCategoryWrapperOut:
         await require_permission(request, "categories.update")
         category = await categories.find(category_id, include_trashed=True)
         if category is None:
             raise NotFoundException("Category not found.")
         category = await categories.update(category, payload)
-        return {"data": categories.to_dict(category)}
+        return AdminCategoryWrapperOut.model_validate({"data": categories.to_dict(category)})
 
-    async def publish(self, category_id: str, request: Request) -> dict[str, Any]:
+    async def publish(self, category_id: str, request: Request) -> AdminCategoryWrapperOut:
         await require_permission(request, "categories.update")
         category = await categories.find(category_id, include_trashed=True)
         if category is None:
             raise NotFoundException("Category not found.")
         category = await categories.publish(category)
-        return {"data": categories.to_dict(category)}
+        return AdminCategoryWrapperOut.model_validate({"data": categories.to_dict(category)})
 
-    async def unpublish(self, category_id: str, request: Request) -> dict[str, Any]:
+    async def unpublish(self, category_id: str, request: Request) -> AdminCategoryWrapperOut:
         await require_permission(request, "categories.update")
         category = await categories.find(category_id, include_trashed=True)
         if category is None:
             raise NotFoundException("Category not found.")
         category = await categories.unpublish(category)
-        return {"data": categories.to_dict(category)}
+        return AdminCategoryWrapperOut.model_validate({"data": categories.to_dict(category)})
 
     async def destroy(self, category_id: str, request: Request) -> Response:
         await require_permission(request, "categories.delete")
@@ -75,10 +80,10 @@ class AdminCategoriesController(Controller):
             await categories.force_delete(category)
         return Response(status_code=204)
 
-    async def restore(self, category_id: str, request: Request) -> dict[str, Any]:
+    async def restore(self, category_id: str, request: Request) -> AdminCategoryWrapperOut:
         await require_permission(request, "categories.update")
         category = await categories.find(category_id, include_trashed=True)
         if category is None:
             raise NotFoundException("Category not found.")
         category = await categories.restore(category)
-        return {"data": categories.to_dict(category)}
+        return AdminCategoryWrapperOut.model_validate({"data": categories.to_dict(category)})

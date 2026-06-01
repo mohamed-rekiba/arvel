@@ -205,7 +205,6 @@ def test_admin_dashboard_uses_backend_rows() -> None:
 
 def test_admin_catalog_pages_use_backend_crud_apis() -> None:
     router = _src(FRONTEND_DIR / "src" / "router.ts")
-    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
     page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogPage.vue")
 
     for route in (
@@ -214,32 +213,27 @@ def test_admin_catalog_pages_use_backend_crud_apis() -> None:
         "path: '/admin/vendors'",
     ):
         assert route in router
+    # List page reads via the generated orval index hooks (one per resource).
     for snippet in (
-        "listAdminCatalog(",
-        "createAdminCatalog(",
-        "updateAdminCatalog(",
-        "deleteAdminCatalog(",
-        "forceDeleteAdminCatalog(",
-        "runAdminCatalogAction(",
-        "`/api/admin/${resource}`",
-        "`/api/admin/${resource}?${params}`",
-        "`/api/admin/${resource}/${encodeURIComponent(id)}/force`",
+        "useAdminProductsIndexApiAdminProductsGet",
+        "useAdminCategoriesIndexApiAdminCategoriesGet",
+        "useAdminVendorsIndexApiAdminVendorsGet",
     ):
-        assert snippet in api
+        assert snippet in page
+    # Add/Edit navigate to the dedicated create/edit pages instead of an inline modal.
+    assert "/admin/${props.catalog}/new" in page
+    assert "/admin/${props.catalog}/${id}/edit" in page
     assert "AdminLayout" in page
-    assert "Catalog CRUD" in page
     assert "Bearer token" not in page
-    assert "requireStoredAccessToken(" in page
 
 
 def test_admin_catalog_uses_translatable_inputs() -> None:
-    page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogPage.vue")
+    page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogEditPage.vue")
     translatable = _src(FRONTEND_DIR / "src" / "components" / "admin" / "TranslatableInput.vue")
 
     assert "TranslatableInput" in page
-    assert "Name translations" in page
-    assert "Description translations" in page
-    assert "updateTranslation('name'" in page
+    assert 'v-model="productForm.name"' in page
+    assert 'v-model="productForm.description"' in page
     assert "'ar', label: 'Arabic', dir: 'rtl'" in translatable
     assert "'update:modelValue'" in translatable
 
@@ -278,23 +272,24 @@ def test_admin_list_pages_use_backend_read_apis() -> None:
 
 def test_admin_edit_and_order_detail_routes_use_show_apis() -> None:
     router = _src(FRONTEND_DIR / "src" / "router.ts")
-    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
-    catalog_page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogPage.vue")
+    edit_page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogEditPage.vue")
     order_page = _src(FRONTEND_DIR / "src" / "pages" / "AdminOrderDetailPage.vue")
 
     for route in (
+        "path: '/admin/products/new'",
+        "path: '/admin/categories/new'",
+        "path: '/admin/vendors/new'",
         "path: '/admin/products/:editId/edit'",
         "path: '/admin/categories/:editId/edit'",
         "path: '/admin/vendors/:editId/edit'",
         "path: '/admin/orders/:orderId'",
     ):
         assert route in router
-    assert "getAdminCatalogRecord(" in api
-    assert "getAdminOrder(" in api
-    assert "updateAdminOrderStatus(" in api
-    assert "getAdminCatalogRecord(" in catalog_page
-    assert "getAdminOrder(" in order_page
-    assert "updateAdminOrderStatus(" in order_page
+    # Edit page hydrates from the generated show hooks; create mode skips them.
+    assert "useAdminProductsShowApiAdminProductsProductIdGet" in edit_page
+    assert "useAdminCategoriesShowApiAdminCategoriesCategoryIdGet" in edit_page
+    assert "useAdminVendorsShowApiAdminVendorsVendorIdGet" in edit_page
+    assert "useAdminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch" in order_page
     assert 'PermissionGate permission="orders.update"' in order_page
 
 
@@ -334,7 +329,7 @@ def test_admin_user_detail_manages_roles_and_permissions() -> None:
 
 def test_admin_product_edit_page_manages_media() -> None:
     api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
-    page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogPage.vue")
+    page = _src(FRONTEND_DIR / "src" / "pages" / "AdminCatalogEditPage.vue")
 
     for snippet in (
         "listProductMedia(",
@@ -344,7 +339,7 @@ def test_admin_product_edit_page_manages_media() -> None:
     ):
         assert snippet in api
     for snippet in (
-        "Product media",
+        "product_media",
         'type="file"',
         '@change="uploadMedia"',
         "removeMedia(item.id)",
@@ -360,8 +355,8 @@ def test_admin_catalog_actions_use_permission_gate() -> None:
     assert "PermissionGate" in page
     assert ':permission="publishPermission"' in page
     assert ':permission="deletePermission"' in page
-    assert ':permission="savePermission"' in page
+    assert ':permission="createPermission"' in page
     assert 'id="trashed-mode"' in page
-    assert "forceDeleteRecord(record)" in page
+    assert "handleForceDelete(record.id)" in page
     assert "hasPermission(props.permission)" in gate
     assert "hasAdminAccess(" in auth

@@ -9,7 +9,7 @@ import HeroBanner from '@/components/storefront/HeroBanner.vue'
 import ProductCard from '@/components/storefront/ProductCard.vue'
 import PromoBanners from '@/components/storefront/PromoBanners.vue'
 import { fetchProductList } from '../lib/api'
-import { useApiProductsIndexApiProductsGet } from '@/api/storefront/storefront'
+import { useStorefrontIndexApiProductsGet } from '@/api/storefront/storefront'
 import { toSupportedLocale } from '@/lib/i18n'
 import { useCategoriesStore } from '@/stores/categories'
 
@@ -18,7 +18,7 @@ const { locale, t } = useI18n({ useScope: 'global' })
 const currentLocale = computed(() => toSupportedLocale(locale.value))
 const categoriesStore = useCategoriesStore()
 
-const { data, isPending } = useApiProductsIndexApiProductsGet(
+const { data, isPending } = useStorefrontIndexApiProductsGet(
   computed(() => ({ locale: currentLocale.value, limit: 16 })),
 )
 

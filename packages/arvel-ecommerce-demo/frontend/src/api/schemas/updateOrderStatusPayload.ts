@@ -4,7 +4,8 @@
  * FastAPI
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateOrderStatusPayloadStatus } from './updateOrderStatusPayloadStatus'
 
 export interface UpdateOrderStatusPayload {
-  status: string
+  status: UpdateOrderStatusPayloadStatus
 }

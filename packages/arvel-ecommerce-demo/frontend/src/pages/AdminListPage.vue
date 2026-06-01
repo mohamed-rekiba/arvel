@@ -2,8 +2,8 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useApiAdminOrdersIndexApiAdminOrdersGet } from '@/api/admin-orders/admin-orders'
-import { useApiAdminUsersIndexApiAdminUsersGet } from '@/api/admin-users/admin-users'
+import { useAdminOrdersIndexApiAdminOrdersGet } from '@/api/admin-orders/admin-orders'
+import { useAdminUsersIndexApiAdminUsersGet } from '@/api/admin-users/admin-users'
 import { listAdminRows, requireStoredAccessToken, type AdminListResource } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/i18n'
 
@@ -55,11 +55,11 @@ const usersParams = computed(() => ({
   search: search.value || undefined,
 }))
 
-const { data: ordersData, isPending: loadingOrders } = useApiAdminOrdersIndexApiAdminOrdersGet(
+const { data: ordersData, isPending: loadingOrders } = useAdminOrdersIndexApiAdminOrdersGet(
   ordersParams,
   { query: { enabled: isOrders } },
 )
-const { data: usersData, isPending: loadingUsers } = useApiAdminUsersIndexApiAdminUsersGet(
+const { data: usersData, isPending: loadingUsers } = useAdminUsersIndexApiAdminUsersGet(
   usersParams,
   { query: { enabled: computed(() => !isOrders.value) } },
 )

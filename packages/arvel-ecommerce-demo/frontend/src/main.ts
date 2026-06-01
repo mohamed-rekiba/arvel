@@ -5,7 +5,7 @@ import { createI18n } from 'vue-i18n'
 import App from './App.vue'
 import router from './router'
 import './assets/main.css'
-import { apiI18nCatalogueApiI18nLocaleGet } from './api/i18n/i18n'
+import { i18nCatalogueApiI18nLocaleGet } from './api/i18n/i18n'
 import { setUnauthorizedHandler } from './lib/api'
 import {
   applyDocumentLocale,
@@ -20,7 +20,7 @@ async function loadMessages(locale: SupportedLocale): Promise<Record<string, str
   const cached = getCachedTranslations(locale)
   if (cached) return cached
   try {
-    const messages = (await apiI18nCatalogueApiI18nLocaleGet(locale)) as Record<string, string>
+    const messages = (await i18nCatalogueApiI18nLocaleGet(locale)) as Record<string, string>
     cacheTranslations(locale, messages)
     return messages
   } catch {
@@ -224,7 +224,9 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.catalog.action_unpublish': 'Unpublish',
     'admin.catalog.action_restore': 'Restore',
     'admin.catalog.action_delete': 'Delete',
+    'admin.catalog.action_force_delete': 'Force delete',
     'admin.catalog.delete_confirm': 'Delete this item?',
+    'admin.catalog.force_delete_confirm': 'Permanently delete this item? This cannot be undone.',
     'admin.catalog.saving': 'Saving…',
     'admin.catalog.save': 'Save',
     'admin.catalog.cancel': 'Cancel',
@@ -247,6 +249,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.catalog.toast_published': '{item} published',
     'admin.catalog.toast_unpublished': '{item} unpublished',
     'admin.catalog.toast_restored': '{item} restored',
+    'admin.catalog.force_deleted': 'Item permanently deleted',
     'admin.catalog.op_failed': 'Operation failed',
     'admin.catalog.show_trashed': 'Show deleted',
     // admin — real_status labels
@@ -270,6 +273,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // admin — edit page
     'admin.edit.back': 'Back',
     'admin.edit.title': 'Edit {item}',
+    'admin.edit.create_title': 'New {item}',
     'admin.edit.field_name': 'Name',
     'admin.edit.field_slug': 'Slug',
     'admin.edit.field_description': 'Description',
@@ -285,14 +289,19 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.edit.visible_storefront': 'Visible in the storefront',
     'admin.edit.hidden_storefront': 'Hidden from the storefront',
     'admin.edit.save_changes': 'Save changes',
+    'admin.edit.create_button': 'Create',
     'admin.edit.saving': 'Saving…',
     'admin.edit.cancel': 'Cancel',
     'admin.edit.save_failed': 'Save failed',
     'admin.edit.toast_saved': 'Changes saved',
+    'admin.edit.toast_created': 'Created',
     'admin.edit.toast_published': 'Category published',
     'admin.edit.toast_unpublished': 'Category unpublished',
     'admin.edit.publish_failed': 'Publish failed',
     'admin.edit.unpublish_failed': 'Unpublish failed',
+    'admin.edit.product_media': 'Product media',
+    'admin.edit.upload_image': 'Upload image',
+    'admin.edit.media_failed': 'Media operation failed',
     // admin — order detail
     'admin.order.back': 'Back to orders',
     'admin.order.customer': 'Customer',
@@ -582,7 +591,9 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.catalog.action_unpublish': 'إلغاء النشر',
     'admin.catalog.action_restore': 'استعادة',
     'admin.catalog.action_delete': 'حذف',
+    'admin.catalog.action_force_delete': 'حذف نهائي',
     'admin.catalog.delete_confirm': 'هل تريد حذف هذا العنصر؟',
+    'admin.catalog.force_delete_confirm': 'حذف هذا العنصر نهائيًا؟ لا يمكن التراجع عن ذلك.',
     'admin.catalog.saving': 'جارٍ الحفظ…',
     'admin.catalog.save': 'حفظ',
     'admin.catalog.cancel': 'إلغاء',
@@ -605,6 +616,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.catalog.toast_published': 'تم نشر {item}',
     'admin.catalog.toast_unpublished': 'تم إلغاء نشر {item}',
     'admin.catalog.toast_restored': 'تم استعادة {item}',
+    'admin.catalog.force_deleted': 'تم حذف العنصر نهائيًا',
     'admin.catalog.op_failed': 'فشلت العملية',
     'admin.catalog.show_trashed': 'عرض المحذوفات',
     // admin — real_status labels
@@ -628,6 +640,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // admin — edit page
     'admin.edit.back': 'رجوع',
     'admin.edit.title': 'تعديل {item}',
+    'admin.edit.create_title': '{item} جديد',
     'admin.edit.field_name': 'الاسم',
     'admin.edit.field_slug': 'الاختصار',
     'admin.edit.field_description': 'الوصف',
@@ -643,14 +656,19 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.edit.visible_storefront': 'مرئي في المتجر',
     'admin.edit.hidden_storefront': 'مخفي من المتجر',
     'admin.edit.save_changes': 'حفظ التغييرات',
+    'admin.edit.create_button': 'إنشاء',
     'admin.edit.saving': 'جارٍ الحفظ…',
     'admin.edit.cancel': 'إلغاء',
     'admin.edit.save_failed': 'فشل الحفظ',
     'admin.edit.toast_saved': 'تم حفظ التغييرات',
+    'admin.edit.toast_created': 'تم الإنشاء',
     'admin.edit.toast_published': 'تم نشر الفئة',
     'admin.edit.toast_unpublished': 'تم إلغاء نشر الفئة',
     'admin.edit.publish_failed': 'فشل النشر',
     'admin.edit.unpublish_failed': 'فشل إلغاء النشر',
+    'admin.edit.product_media': 'وسائط المنتج',
+    'admin.edit.upload_image': 'رفع صورة',
+    'admin.edit.media_failed': 'فشلت عملية الوسائط',
     // admin — order detail
     'admin.order.back': 'العودة إلى الطلبات',
     'admin.order.customer': 'العميل',
@@ -940,7 +958,9 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.catalog.action_unpublish': 'Yayından Kaldır',
     'admin.catalog.action_restore': 'Geri Yükle',
     'admin.catalog.action_delete': 'Sil',
+    'admin.catalog.action_force_delete': 'Kalıcı sil',
     'admin.catalog.delete_confirm': 'Bu öğeyi silmek istiyor musunuz?',
+    'admin.catalog.force_delete_confirm': 'Bu öğe kalıcı olarak silinsin mi? Bu işlem geri alınamaz.',
     'admin.catalog.saving': 'Kaydediliyor…',
     'admin.catalog.save': 'Kaydet',
     'admin.catalog.cancel': 'İptal',
@@ -963,6 +983,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.catalog.toast_published': '{item} yayınlandı',
     'admin.catalog.toast_unpublished': '{item} yayından kaldırıldı',
     'admin.catalog.toast_restored': '{item} geri yüklendi',
+    'admin.catalog.force_deleted': 'Öğe kalıcı olarak silindi',
     'admin.catalog.op_failed': 'İşlem başarısız',
     'admin.catalog.show_trashed': 'Silinenleri Göster',
     // admin — real_status labels
@@ -986,6 +1007,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // admin — edit page
     'admin.edit.back': 'Geri',
     'admin.edit.title': '{item} Düzenle',
+    'admin.edit.create_title': 'Yeni {item}',
     'admin.edit.field_name': 'Ad',
     'admin.edit.field_slug': 'Kısa Ad',
     'admin.edit.field_description': 'Açıklama',
@@ -1001,14 +1023,19 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.edit.visible_storefront': 'Mağazada görünür',
     'admin.edit.hidden_storefront': 'Mağazada gizli',
     'admin.edit.save_changes': 'Değişiklikleri Kaydet',
+    'admin.edit.create_button': 'Oluştur',
     'admin.edit.saving': 'Kaydediliyor…',
     'admin.edit.cancel': 'İptal',
     'admin.edit.save_failed': 'Kaydetme başarısız',
     'admin.edit.toast_saved': 'Değişiklikler kaydedildi',
+    'admin.edit.toast_created': 'Oluşturuldu',
     'admin.edit.toast_published': 'Kategori yayınlandı',
     'admin.edit.toast_unpublished': 'Kategori yayından kaldırıldı',
     'admin.edit.publish_failed': 'Yayınlama başarısız',
     'admin.edit.unpublish_failed': 'Yayından kaldırma başarısız',
+    'admin.edit.product_media': 'Ürün medyası',
+    'admin.edit.upload_image': 'Görsel yükle',
+    'admin.edit.media_failed': 'Medya işlemi başarısız',
     // admin — order detail
     'admin.order.back': 'Siparişlere dön',
     'admin.order.customer': 'Müşteri',

@@ -3,7 +3,7 @@ import { computed, reactive, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import { requireStoredAccessToken } from '@/lib/api'
-import { apiCheckoutApiCheckoutPost } from '@/api/checkout/checkout'
+import { checkoutApiCheckoutPost } from '@/api/checkout/checkout'
 import type { OrderOut } from '@/api/schemas'
 import { formatCurrency, toSupportedLocale } from '@/lib/i18n'
 import { useCartStore } from '@/stores/cart'
@@ -49,7 +49,7 @@ async function placeOrder(): Promise<void> {
   submitting.value = true
   error.value = null
   try {
-    const wrapper = await apiCheckoutApiCheckoutPost({
+    const wrapper = await checkoutApiCheckoutPost({
       shipping_address: {
         name: form.name,
         street: form.street,

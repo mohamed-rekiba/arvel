@@ -3,35 +3,49 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
-  useApiAdminCategoriesIndexApiAdminCategoriesGet,
-  useApiAdminCategoriesShowApiAdminCategoriesCategoryIdGet,
-  useApiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch,
-  useApiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch,
-  useApiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch,
+  useAdminCategoriesIndexApiAdminCategoriesGet,
+  useAdminCategoriesShowApiAdminCategoriesCategoryIdGet,
+  useAdminCategoriesStoreApiAdminCategoriesPost,
+  useAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch,
+  useAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch,
+  useAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch,
 } from '@/api/admin-categories/admin-categories'
 import {
-  useApiAdminProductsShowApiAdminProductsProductIdGet,
-  useApiAdminProductsUpdateApiAdminProductsProductIdPatch,
+  useAdminProductsShowApiAdminProductsProductIdGet,
+  useAdminProductsStoreApiAdminProductsPost,
+  useAdminProductsUpdateApiAdminProductsProductIdPatch,
 } from '@/api/admin-products/admin-products'
 import {
-  useApiAdminVendorsIndexApiAdminVendorsGet,
-  useApiAdminVendorsShowApiAdminVendorsVendorIdGet,
-  useApiAdminVendorsUpdateApiAdminVendorsVendorIdPatch,
+  useAdminVendorsIndexApiAdminVendorsGet,
+  useAdminVendorsShowApiAdminVendorsVendorIdGet,
+  useAdminVendorsStoreApiAdminVendorsPost,
+  useAdminVendorsUpdateApiAdminVendorsVendorIdPatch,
 } from '@/api/admin-vendors/admin-vendors'
 import TranslatableInput from '@/components/admin/TranslatableInput.vue'
 import { useToastStore } from '@/stores/toast'
 import { pickLocalized } from '@/lib/i18n'
+import {
+  deleteProductMedia,
+  listProductMedia,
+  requireStoredAccessToken,
+  uploadProductMedia,
+} from '@/lib/api'
 import type { LocalizedText } from '@/types'
 
 const { t } = useI18n({ useScope: 'global' })
 const toast = useToastStore()
 const router = useRouter()
 
-const props = defineProps<{
-  catalog: 'products' | 'categories' | 'vendors'
-  id: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    catalog: 'products' | 'categories' | 'vendors'
+    id?: string
+    mode?: 'create' | 'edit'
+  }>(),
+  { mode: 'edit', id: undefined },
+)
 
+const isCreate = computed(() => props.mode === 'create')
 const isProducts = computed(() => props.catalog === 'products')
 const isCategories = computed(() => props.catalog === 'categories')
 const isVendors = computed(() => props.catalog === 'vendors')
@@ -71,31 +85,27 @@ const vendorForm = reactive({
   description: '',
 })
 
-// Fetch current item
+// Fetch current item (edit mode only)
+const idRef = computed(() => props.id ?? '')
+const fetchProduct = computed(() => isProducts.value && !isCreate.value)
+const fetchCategory = computed(() => isCategories.value && !isCreate.value)
+const fetchVendor = computed(() => isVendors.value && !isCreate.value)
+
 const { data: productWrapper, isPending: loadingProduct } =
-  useApiAdminProductsShowApiAdminProductsProductIdGet(
-    computed(() => props.id),
-    { query: { enabled: isProducts } },
-  )
+  useAdminProductsShowApiAdminProductsProductIdGet(idRef, { query: { enabled: fetchProduct } })
 
 const { data: categoryWrapper, isPending: loadingCategory } =
-  useApiAdminCategoriesShowApiAdminCategoriesCategoryIdGet(
-    computed(() => props.id),
-    { query: { enabled: isCategories } },
-  )
+  useAdminCategoriesShowApiAdminCategoriesCategoryIdGet(idRef, { query: { enabled: fetchCategory } })
 
 const { data: vendorWrapper, isPending: loadingVendor } =
-  useApiAdminVendorsShowApiAdminVendorsVendorIdGet(
-    computed(() => props.id),
-    { query: { enabled: isVendors } },
-  )
+  useAdminVendorsShowApiAdminVendorsVendorIdGet(idRef, { query: { enabled: fetchVendor } })
 
 // Load category list for: product category selector + category parent selector
 const needsCategories = computed(() => isProducts.value || isCategories.value)
-const { data: allCategoriesData } = useApiAdminCategoriesIndexApiAdminCategoriesGet(undefined, {
+const { data: allCategoriesData } = useAdminCategoriesIndexApiAdminCategoriesGet(undefined, {
   query: { enabled: needsCategories },
 })
-const { data: allVendorsData } = useApiAdminVendorsIndexApiAdminVendorsGet(undefined, {
+const { data: allVendorsData } = useAdminVendorsIndexApiAdminVendorsGet(undefined, {
   query: { enabled: isProducts },
 })
 
@@ -106,13 +116,46 @@ const allVendors = computed(() => allVendorsData.value?.data ?? [])
 const parentCandidates = computed(() => allCategories.value.filter((c) => c.id !== props.id))
 
 // Only check the active query — disabled queries stay isPending:true forever in TanStack Query v5.
-const loading = computed(() =>
-  isProducts.value
+const loading = computed(() => {
+  if (isCreate.value) return false
+  return isProducts.value
     ? loadingProduct.value
     : isCategories.value
       ? loadingCategory.value
-      : loadingVendor.value,
-)
+      : loadingVendor.value
+})
+
+// Product media lives here (not orval) because the multipart upload needs raw FormData.
+const productMedia = ref<{ id: string; url: string }[]>([])
+
+async function loadMedia(productId: string): Promise<void> {
+  const token = requireStoredAccessToken()
+  const res = await listProductMedia(token, productId)
+  productMedia.value = res.data.map((m) => ({ id: m.id, url: m.url }))
+}
+
+async function uploadMedia(event: Event): Promise<void> {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file || !props.id) return
+  try {
+    const token = requireStoredAccessToken()
+    await uploadProductMedia(token, props.id, file)
+    await loadMedia(props.id)
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : t('admin.edit.media_failed'))
+  }
+}
+
+async function removeMedia(mediaId: string): Promise<void> {
+  if (!props.id) return
+  try {
+    const token = requireStoredAccessToken()
+    await deleteProductMedia(token, props.id, mediaId)
+    await loadMedia(props.id)
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : t('admin.edit.media_failed'))
+  }
+}
 
 // immediate: true handles cached responses delivered synchronously before the watcher is registered.
 watch(
@@ -129,6 +172,7 @@ watch(
       category_id: product.category_id ?? '',
       vendor_id: product.vendor_id ?? '',
     })
+    if (props.id) void loadMedia(props.id)
   },
   { immediate: true },
 )
@@ -164,7 +208,7 @@ watch(
 
 // Mutations
 const { mutate: updateProduct, isPending: savingProduct } =
-  useApiAdminProductsUpdateApiAdminProductsProductIdPatch({
+  useAdminProductsUpdateApiAdminProductsProductIdPatch({
     mutation: {
       onSuccess: async () => {
         toast.success(t('admin.edit.toast_saved'))
@@ -179,7 +223,7 @@ const { mutate: updateProduct, isPending: savingProduct } =
   })
 
 const { mutate: updateCategory, isPending: savingCategory } =
-  useApiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch({
+  useAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch({
     mutation: {
       onSuccess: async () => {
         toast.success(t('admin.edit.toast_saved'))
@@ -194,7 +238,7 @@ const { mutate: updateCategory, isPending: savingCategory } =
   })
 
 const { mutate: publishCategory, isPending: publishing } =
-  useApiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch({
+  useAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch({
     mutation: {
       onSuccess: () => {
         categoryIsPublished.value = true
@@ -207,7 +251,7 @@ const { mutate: publishCategory, isPending: publishing } =
   })
 
 const { mutate: unpublishCategory, isPending: unpublishing } =
-  useApiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch({
+  useAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch({
     mutation: {
       onSuccess: () => {
         categoryIsPublished.value = false
@@ -220,7 +264,7 @@ const { mutate: unpublishCategory, isPending: unpublishing } =
   })
 
 const { mutate: updateVendor, isPending: savingVendor } =
-  useApiAdminVendorsUpdateApiAdminVendorsVendorIdPatch({
+  useAdminVendorsUpdateApiAdminVendorsVendorIdPatch({
     mutation: {
       onSuccess: async () => {
         toast.success(t('admin.edit.toast_saved'))
@@ -234,42 +278,83 @@ const { mutate: updateVendor, isPending: savingVendor } =
     },
   })
 
-const saving = computed(() => savingProduct.value || savingCategory.value || savingVendor.value)
+function onCreated(): void {
+  toast.success(t('admin.edit.toast_created'))
+  void router.push(`/admin/${props.catalog}`)
+}
+
+function onSaveError(err: unknown): void {
+  const msg = err instanceof Error ? err.message : t('admin.edit.save_failed')
+  error.value = msg
+  toast.error(msg)
+}
+
+const { mutate: createProduct, isPending: creatingProduct } = useAdminProductsStoreApiAdminProductsPost(
+  { mutation: { onSuccess: onCreated, onError: onSaveError } },
+)
+
+const { mutate: createCategory, isPending: creatingCategory } =
+  useAdminCategoriesStoreApiAdminCategoriesPost({
+    mutation: { onSuccess: onCreated, onError: onSaveError },
+  })
+
+const { mutate: createVendor, isPending: creatingVendor } = useAdminVendorsStoreApiAdminVendorsPost({
+  mutation: { onSuccess: onCreated, onError: onSaveError },
+})
+
+const saving = computed(
+  () =>
+    savingProduct.value ||
+    savingCategory.value ||
+    savingVendor.value ||
+    creatingProduct.value ||
+    creatingCategory.value ||
+    creatingVendor.value,
+)
 
 const togglingPublish = computed(() => publishing.value || unpublishing.value)
 
+const pageTitle = computed(() =>
+  isCreate.value
+    ? t('admin.edit.create_title', { item: catalogSingular.value })
+    : t('admin.edit.title', { item: catalogSingular.value }),
+)
+
 function handlePublishToggle(): void {
+  const categoryId = props.id ?? ''
   if (categoryIsPublished.value) {
-    unpublishCategory({ categoryId: props.id })
+    unpublishCategory({ categoryId })
   } else {
-    publishCategory({ categoryId: props.id })
+    publishCategory({ categoryId })
   }
 }
 
 function handleSave(): void {
   error.value = null
   if (props.catalog === 'products') {
-    updateProduct({
-      productId: props.id,
-      data: {
-        name: productForm.name,
-        slug: productForm.slug,
-        description: productForm.description,
-        price: productForm.price,
-        stock_qty: productForm.stock_qty,
-      },
-    })
+    const data = {
+      name: productForm.name,
+      slug: productForm.slug,
+      description: productForm.description,
+      price: productForm.price,
+      stock_qty: productForm.stock_qty,
+      category_id: productForm.category_id,
+      vendor_id: productForm.vendor_id,
+    }
+    if (isCreate.value) createProduct({ data })
+    else updateProduct({ productId: props.id ?? '', data })
   } else if (props.catalog === 'categories') {
-    updateCategory({
-      categoryId: props.id,
-      data: {
-        name: categoryForm.name,
-        slug: categoryForm.slug,
-        parent_id: categoryForm.parent_id,
-      },
-    })
+    const data = {
+      name: categoryForm.name,
+      slug: categoryForm.slug,
+      parent_id: categoryForm.parent_id,
+    }
+    if (isCreate.value) createCategory({ data })
+    else updateCategory({ categoryId: props.id ?? '', data })
   } else {
-    updateVendor({ vendorId: props.id, data: { ...vendorForm } })
+    const data = { ...vendorForm }
+    if (isCreate.value) createVendor({ data })
+    else updateVendor({ vendorId: props.id ?? '', data })
   }
 }
 </script>
@@ -290,7 +375,7 @@ function handleSave(): void {
         {{ t('admin.edit.back') }}
       </button>
       <h1 class="text-2xl font-bold capitalize text-fg">
-        {{ t('admin.edit.title', { item: catalogSingular }) }}
+        {{ pageTitle }}
       </h1>
     </div>
 
@@ -359,6 +444,27 @@ function handleSave(): void {
             </select>
           </label>
         </div>
+
+        <!-- Product media: only once the product exists (need its id to attach images) -->
+        <div v-if="!isCreate" class="space-y-2">
+          <p class="text-sm font-medium text-fg">{{ t('admin.edit.product_media') }}</p>
+          <label class="flex w-fit cursor-pointer items-center gap-2 text-sm text-brand">
+            <input type="file" accept="image/*" class="sr-only" @change="uploadMedia" />
+            {{ t('admin.edit.upload_image') }}
+          </label>
+          <div v-if="productMedia.length" class="flex flex-wrap gap-2">
+            <div v-for="item in productMedia" :key="item.id" class="relative">
+              <img :src="item.url" class="h-16 w-16 rounded object-cover" alt="" />
+              <button
+                type="button"
+                class="absolute end-0 top-0 rounded-full bg-app-bg px-1 text-xs text-danger"
+                @click="removeMedia(item.id)"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
       </template>
 
       <!-- ── Categories form ── -->
@@ -380,8 +486,11 @@ function handleSave(): void {
           </select>
         </label>
 
-        <!-- Publish toggle -->
-        <div class="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+        <!-- Publish toggle (edit only; can't publish before it exists) -->
+        <div
+          v-if="!isCreate"
+          class="flex items-center justify-between rounded-lg border border-border px-4 py-3"
+        >
           <div>
             <p class="text-sm font-medium text-fg">{{ t('admin.edit.published_label') }}</p>
             <p class="text-xs text-fg-muted">
@@ -445,7 +554,13 @@ function handleSave(): void {
           :disabled="saving"
           class="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:opacity-50"
         >
-          {{ saving ? t('admin.edit.saving') : t('admin.edit.save_changes') }}
+          {{
+            saving
+              ? t('admin.edit.saving')
+              : isCreate
+                ? t('admin.edit.create_button')
+                : t('admin.edit.save_changes')
+          }}
         </button>
         <button
           type="button"

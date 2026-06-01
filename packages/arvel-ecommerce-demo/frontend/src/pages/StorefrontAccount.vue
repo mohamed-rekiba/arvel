@@ -4,8 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { requireStoredAccessToken } from '@/lib/api'
 import {
-  useApiAccountOrdersListApiAccountOrdersGet,
-  useApiAccountOrdersShowApiAccountOrdersOrderIdGet,
+  useAccountOrdersIndexApiAccountOrdersGet,
+  useAccountOrdersShowApiAccountOrdersOrderIdGet,
 } from '@/api/account/account'
 import type { OrderOut } from '@/api/schemas'
 import { formatCurrency, formatDate, toSupportedLocale } from '@/lib/i18n'
@@ -19,7 +19,7 @@ onMounted(() => {
 
 const route = useRoute()
 
-const { data, isPending } = useApiAccountOrdersListApiAccountOrdersGet()
+const { data, isPending } = useAccountOrdersIndexApiAccountOrdersGet()
 const orders = computed(() => data.value?.data ?? [])
 
 const selectedOrderId = ref<string | null>(null)
@@ -27,7 +27,7 @@ const selectedOrderId = ref<string | null>(null)
 const orderIdForQuery = computed<string>(() => selectedOrderId.value ?? '')
 
 const { data: orderDetailData, isPending: loadingDetail } =
-  useApiAccountOrdersShowApiAccountOrdersOrderIdGet(orderIdForQuery, {
+  useAccountOrdersShowApiAccountOrdersOrderIdGet(orderIdForQuery, {
     query: { enabled: computed(() => Boolean(selectedOrderId.value)) },
   })
 

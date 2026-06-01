@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useApiAdminRolesIndexApiAdminRolesGet } from '@/api/admin-roles-permissions/admin-roles-permissions'
+import { useAdminRolesIndexApiAdminRolesGet } from '@/api/admin-roles-permissions/admin-roles-permissions'
 
 const { t } = useI18n({ useScope: 'global' })
 
-const { data, isPending } = useApiAdminRolesIndexApiAdminRolesGet()
+const { data, isPending } = useAdminRolesIndexApiAdminRolesGet()
 const roles = computed(() => data.value?.data ?? [])
 
 const levelLabel = computed<Record<number, { label: string; classes: string }>>(() => ({

@@ -23,11 +23,11 @@ import type { MaybeRef } from 'vue'
 import type {
   AdminProductListOut,
   AdminProductWrapperOut,
-  ApiAdminProductsIndexApiAdminProductsGetParams,
-  ApiErrorOut,
-  BodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost,
+  AdminProductsIndexApiAdminProductsGetParams,
+  BodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost,
   CatalogRefreshOut,
   CreateProductPayload,
+  HTTPValidationError,
   MediaListOut,
   MediaWrapperOut,
   UpdateProductPayload,
@@ -38,10 +38,10 @@ import { request } from '../../lib/api'
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.Admin.Products.Index
+ * @summary Admin.Products.Index
  */
-export const apiAdminProductsIndexApiAdminProductsGet = (
-  params?: MaybeRef<ApiAdminProductsIndexApiAdminProductsGetParams>,
+export const adminProductsIndexApiAdminProductsGet = (
+  params?: MaybeRef<AdminProductsIndexApiAdminProductsGetParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
@@ -53,28 +53,21 @@ export const apiAdminProductsIndexApiAdminProductsGet = (
   )
 }
 
-export const getApiAdminProductsIndexApiAdminProductsGetQueryKey = (
-  params?: MaybeRef<ApiAdminProductsIndexApiAdminProductsGetParams>,
+export const getAdminProductsIndexApiAdminProductsGetQueryKey = (
+  params?: MaybeRef<AdminProductsIndexApiAdminProductsGetParams>,
 ) => {
   return ['api', 'admin', 'products', ...(params ? [params] : [])] as const
 }
 
-export const getApiAdminProductsIndexApiAdminProductsGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminProductsIndexApiAdminProductsGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminProductsIndexApiAdminProductsGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminProductsIndexApiAdminProductsGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiAdminProductsIndexApiAdminProductsGetParams>,
+  params?: MaybeRef<AdminProductsIndexApiAdminProductsGetParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminProductsIndexApiAdminProductsGet>>,
+        Awaited<ReturnType<typeof adminProductsIndexApiAdminProductsGet>>,
         TError,
         TData
       >
@@ -84,51 +77,37 @@ export const getApiAdminProductsIndexApiAdminProductsGetQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminProductsIndexApiAdminProductsGetQueryKey(params)
+  const queryKey = getAdminProductsIndexApiAdminProductsGetQueryKey(params)
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminProductsIndexApiAdminProductsGet>>
-  > = ({ signal }) => apiAdminProductsIndexApiAdminProductsGet(params, requestOptions, signal)
+    Awaited<ReturnType<typeof adminProductsIndexApiAdminProductsGet>>
+  > = ({ signal }) => adminProductsIndexApiAdminProductsGet(params, requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminProductsIndexApiAdminProductsGet>>,
+    Awaited<ReturnType<typeof adminProductsIndexApiAdminProductsGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminProductsIndexApiAdminProductsGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminProductsIndexApiAdminProductsGet>>
+export type AdminProductsIndexApiAdminProductsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminProductsIndexApiAdminProductsGet>>
 >
-export type ApiAdminProductsIndexApiAdminProductsGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsIndexApiAdminProductsGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Products.Index
+ * @summary Admin.Products.Index
  */
 
-export function useApiAdminProductsIndexApiAdminProductsGet<
-  TData = Awaited<ReturnType<typeof apiAdminProductsIndexApiAdminProductsGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminProductsIndexApiAdminProductsGet<
+  TData = Awaited<ReturnType<typeof adminProductsIndexApiAdminProductsGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiAdminProductsIndexApiAdminProductsGetParams>,
+  params?: MaybeRef<AdminProductsIndexApiAdminProductsGetParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminProductsIndexApiAdminProductsGet>>,
+        Awaited<ReturnType<typeof adminProductsIndexApiAdminProductsGet>>,
         TError,
         TData
       >
@@ -137,7 +116,7 @@ export function useApiAdminProductsIndexApiAdminProductsGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminProductsIndexApiAdminProductsGetQueryOptions(params, options)
+  const queryOptions = getAdminProductsIndexApiAdminProductsGetQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -149,9 +128,9 @@ export function useApiAdminProductsIndexApiAdminProductsGet<
 }
 
 /**
- * @summary Api.Admin.Products.Store
+ * @summary Admin.Products.Store
  */
-export const apiAdminProductsStoreApiAdminProductsPost = (
+export const adminProductsStoreApiAdminProductsPost = (
   createProductPayload: MaybeRef<CreateProductPayload>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -170,31 +149,24 @@ export const apiAdminProductsStoreApiAdminProductsPost = (
   )
 }
 
-export const getApiAdminProductsStoreApiAdminProductsPostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminProductsStoreApiAdminProductsPostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminProductsStoreApiAdminProductsPost>>,
+    Awaited<ReturnType<typeof adminProductsStoreApiAdminProductsPost>>,
     TError,
     { data: CreateProductPayload },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminProductsStoreApiAdminProductsPost>>,
+  Awaited<ReturnType<typeof adminProductsStoreApiAdminProductsPost>>,
   TError,
   { data: CreateProductPayload },
   TContext
 > => {
-  const mutationKey = ['apiAdminProductsStoreApiAdminProductsPost']
+  const mutationKey = ['adminProductsStoreApiAdminProductsPost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -202,47 +174,33 @@ export const getApiAdminProductsStoreApiAdminProductsPostMutationOptions = <
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminProductsStoreApiAdminProductsPost>>,
+    Awaited<ReturnType<typeof adminProductsStoreApiAdminProductsPost>>,
     { data: CreateProductPayload }
   > = (props) => {
     const { data } = props ?? {}
 
-    return apiAdminProductsStoreApiAdminProductsPost(data, requestOptions)
+    return adminProductsStoreApiAdminProductsPost(data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminProductsStoreApiAdminProductsPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminProductsStoreApiAdminProductsPost>>
+export type AdminProductsStoreApiAdminProductsPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminProductsStoreApiAdminProductsPost>>
 >
-export type ApiAdminProductsStoreApiAdminProductsPostMutationBody = CreateProductPayload
-export type ApiAdminProductsStoreApiAdminProductsPostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsStoreApiAdminProductsPostMutationBody = CreateProductPayload
+export type AdminProductsStoreApiAdminProductsPostMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Products.Store
+ * @summary Admin.Products.Store
  */
-export const useApiAdminProductsStoreApiAdminProductsPost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminProductsStoreApiAdminProductsPost = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminProductsStoreApiAdminProductsPost>>,
+      Awaited<ReturnType<typeof adminProductsStoreApiAdminProductsPost>>,
       TError,
       { data: CreateProductPayload },
       TContext
@@ -251,19 +209,19 @@ export const useApiAdminProductsStoreApiAdminProductsPost = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminProductsStoreApiAdminProductsPost>>,
+  Awaited<ReturnType<typeof adminProductsStoreApiAdminProductsPost>>,
   TError,
   { data: CreateProductPayload },
   TContext
 > => {
-  const mutationOptions = getApiAdminProductsStoreApiAdminProductsPostMutationOptions(options)
+  const mutationOptions = getAdminProductsStoreApiAdminProductsPostMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Products.Catalog.Refresh
+ * @summary Admin.Products.Catalog.Refresh
  */
-export const apiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost = (
+export const adminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost = (
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
@@ -273,24 +231,24 @@ export const apiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost = 
   )
 }
 
-export const getApiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPostMutationOptions = <
-  TError = ApiErrorOut | ApiErrorOut | ApiErrorOut | ApiErrorOut,
+export const getAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPostMutationOptions = <
+  TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>,
+    Awaited<ReturnType<typeof adminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>,
     TError,
     void,
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>,
+  Awaited<ReturnType<typeof adminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>,
   TError,
   void,
   TContext
 > => {
-  const mutationKey = ['apiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost']
+  const mutationKey = ['adminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -298,36 +256,32 @@ export const getApiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>,
+    Awaited<ReturnType<typeof adminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>,
     void
   > = () => {
-    return apiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost(requestOptions)
+    return adminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost(requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPostMutationResult =
+export type AdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPostMutationResult =
   NonNullable<
-    Awaited<ReturnType<typeof apiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>
+    Awaited<ReturnType<typeof adminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>
   >
 
-export type ApiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPostMutationError = unknown
 
 /**
- * @summary Api.Admin.Products.Catalog.Refresh
+ * @summary Admin.Products.Catalog.Refresh
  */
-export const useApiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost = <
-  TError = ApiErrorOut | ApiErrorOut | ApiErrorOut | ApiErrorOut,
+export const useAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost = <
+  TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>,
+      Awaited<ReturnType<typeof adminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>,
       TError,
       void,
       TContext
@@ -336,20 +290,20 @@ export const useApiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>,
+  Awaited<ReturnType<typeof adminProductsCatalogRefreshApiAdminProductsCatalogRefreshPost>>,
   TError,
   void,
   TContext
 > => {
   const mutationOptions =
-    getApiAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPostMutationOptions(options)
+    getAdminProductsCatalogRefreshApiAdminProductsCatalogRefreshPostMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Products.Show
+ * @summary Admin.Products.Show
  */
-export const apiAdminProductsShowApiAdminProductsProductIdGet = (
+export const adminProductsShowApiAdminProductsProductIdGet = (
   productId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -362,28 +316,21 @@ export const apiAdminProductsShowApiAdminProductsProductIdGet = (
   )
 }
 
-export const getApiAdminProductsShowApiAdminProductsProductIdGetQueryKey = (
+export const getAdminProductsShowApiAdminProductsProductIdGetQueryKey = (
   productId?: MaybeRef<string>,
 ) => {
   return ['api', 'admin', 'products', productId] as const
 }
 
-export const getApiAdminProductsShowApiAdminProductsProductIdGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminProductsShowApiAdminProductsProductIdGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminProductsShowApiAdminProductsProductIdGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminProductsShowApiAdminProductsProductIdGet>>,
+  TError = HTTPValidationError,
 >(
   productId: MaybeRef<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminProductsShowApiAdminProductsProductIdGet>>,
+        Awaited<ReturnType<typeof adminProductsShowApiAdminProductsProductIdGet>>,
         TError,
         TData
       >
@@ -393,12 +340,12 @@ export const getApiAdminProductsShowApiAdminProductsProductIdGetQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminProductsShowApiAdminProductsProductIdGetQueryKey(productId)
+  const queryKey = getAdminProductsShowApiAdminProductsProductIdGetQueryKey(productId)
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminProductsShowApiAdminProductsProductIdGet>>
+    Awaited<ReturnType<typeof adminProductsShowApiAdminProductsProductIdGet>>
   > = ({ signal }) =>
-    apiAdminProductsShowApiAdminProductsProductIdGet(productId, requestOptions, signal)
+    adminProductsShowApiAdminProductsProductIdGet(productId, requestOptions, signal)
 
   return {
     queryKey,
@@ -406,44 +353,30 @@ export const getApiAdminProductsShowApiAdminProductsProductIdGetQueryOptions = <
     enabled: computed(() => !!unref(productId)),
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminProductsShowApiAdminProductsProductIdGet>>,
+    Awaited<ReturnType<typeof adminProductsShowApiAdminProductsProductIdGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminProductsShowApiAdminProductsProductIdGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminProductsShowApiAdminProductsProductIdGet>>
+export type AdminProductsShowApiAdminProductsProductIdGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminProductsShowApiAdminProductsProductIdGet>>
 >
-export type ApiAdminProductsShowApiAdminProductsProductIdGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsShowApiAdminProductsProductIdGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Products.Show
+ * @summary Admin.Products.Show
  */
 
-export function useApiAdminProductsShowApiAdminProductsProductIdGet<
-  TData = Awaited<ReturnType<typeof apiAdminProductsShowApiAdminProductsProductIdGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminProductsShowApiAdminProductsProductIdGet<
+  TData = Awaited<ReturnType<typeof adminProductsShowApiAdminProductsProductIdGet>>,
+  TError = HTTPValidationError,
 >(
   productId: MaybeRef<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminProductsShowApiAdminProductsProductIdGet>>,
+        Awaited<ReturnType<typeof adminProductsShowApiAdminProductsProductIdGet>>,
         TError,
         TData
       >
@@ -452,7 +385,7 @@ export function useApiAdminProductsShowApiAdminProductsProductIdGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminProductsShowApiAdminProductsProductIdGetQueryOptions(
+  const queryOptions = getAdminProductsShowApiAdminProductsProductIdGetQueryOptions(
     productId,
     options,
   )
@@ -467,9 +400,9 @@ export function useApiAdminProductsShowApiAdminProductsProductIdGet<
 }
 
 /**
- * @summary Api.Admin.Products.Update
+ * @summary Admin.Products.Update
  */
-export const apiAdminProductsUpdateApiAdminProductsProductIdPatch = (
+export const adminProductsUpdateApiAdminProductsProductIdPatch = (
   productId: MaybeRef<string>,
   updateProductPayload: MaybeRef<UpdateProductPayload>,
   options?: SecondParameter<typeof request>,
@@ -488,31 +421,24 @@ export const apiAdminProductsUpdateApiAdminProductsProductIdPatch = (
   )
 }
 
-export const getApiAdminProductsUpdateApiAdminProductsProductIdPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminProductsUpdateApiAdminProductsProductIdPatchMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminProductsUpdateApiAdminProductsProductIdPatch>>,
+    Awaited<ReturnType<typeof adminProductsUpdateApiAdminProductsProductIdPatch>>,
     TError,
     { productId: string; data: UpdateProductPayload },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminProductsUpdateApiAdminProductsProductIdPatch>>,
+  Awaited<ReturnType<typeof adminProductsUpdateApiAdminProductsProductIdPatch>>,
   TError,
   { productId: string; data: UpdateProductPayload },
   TContext
 > => {
-  const mutationKey = ['apiAdminProductsUpdateApiAdminProductsProductIdPatch']
+  const mutationKey = ['adminProductsUpdateApiAdminProductsProductIdPatch']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -520,47 +446,33 @@ export const getApiAdminProductsUpdateApiAdminProductsProductIdPatchMutationOpti
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminProductsUpdateApiAdminProductsProductIdPatch>>,
+    Awaited<ReturnType<typeof adminProductsUpdateApiAdminProductsProductIdPatch>>,
     { productId: string; data: UpdateProductPayload }
   > = (props) => {
     const { productId, data } = props ?? {}
 
-    return apiAdminProductsUpdateApiAdminProductsProductIdPatch(productId, data, requestOptions)
+    return adminProductsUpdateApiAdminProductsProductIdPatch(productId, data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminProductsUpdateApiAdminProductsProductIdPatchMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminProductsUpdateApiAdminProductsProductIdPatch>>
+export type AdminProductsUpdateApiAdminProductsProductIdPatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminProductsUpdateApiAdminProductsProductIdPatch>>
 >
-export type ApiAdminProductsUpdateApiAdminProductsProductIdPatchMutationBody = UpdateProductPayload
-export type ApiAdminProductsUpdateApiAdminProductsProductIdPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsUpdateApiAdminProductsProductIdPatchMutationBody = UpdateProductPayload
+export type AdminProductsUpdateApiAdminProductsProductIdPatchMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Products.Update
+ * @summary Admin.Products.Update
  */
-export const useApiAdminProductsUpdateApiAdminProductsProductIdPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminProductsUpdateApiAdminProductsProductIdPatch = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminProductsUpdateApiAdminProductsProductIdPatch>>,
+      Awaited<ReturnType<typeof adminProductsUpdateApiAdminProductsProductIdPatch>>,
       TError,
       { productId: string; data: UpdateProductPayload },
       TContext
@@ -569,53 +481,46 @@ export const useApiAdminProductsUpdateApiAdminProductsProductIdPatch = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminProductsUpdateApiAdminProductsProductIdPatch>>,
+  Awaited<ReturnType<typeof adminProductsUpdateApiAdminProductsProductIdPatch>>,
   TError,
   { productId: string; data: UpdateProductPayload },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminProductsUpdateApiAdminProductsProductIdPatchMutationOptions(options)
+    getAdminProductsUpdateApiAdminProductsProductIdPatchMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Products.Destroy
+ * @summary Admin.Products.Destroy
  */
-export const apiAdminProductsDestroyApiAdminProductsProductIdDelete = (
+export const adminProductsDestroyApiAdminProductsProductIdDelete = (
   productId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
 ) => {
   productId = unref(productId)
 
-  return request<void>({ url: `/api/admin/products/${productId}`, method: 'DELETE' }, options)
+  return request<unknown>({ url: `/api/admin/products/${productId}`, method: 'DELETE' }, options)
 }
 
-export const getApiAdminProductsDestroyApiAdminProductsProductIdDeleteMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminProductsDestroyApiAdminProductsProductIdDeleteMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminProductsDestroyApiAdminProductsProductIdDelete>>,
+    Awaited<ReturnType<typeof adminProductsDestroyApiAdminProductsProductIdDelete>>,
     TError,
     { productId: string },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminProductsDestroyApiAdminProductsProductIdDelete>>,
+  Awaited<ReturnType<typeof adminProductsDestroyApiAdminProductsProductIdDelete>>,
   TError,
   { productId: string },
   TContext
 > => {
-  const mutationKey = ['apiAdminProductsDestroyApiAdminProductsProductIdDelete']
+  const mutationKey = ['adminProductsDestroyApiAdminProductsProductIdDelete']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -623,47 +528,33 @@ export const getApiAdminProductsDestroyApiAdminProductsProductIdDeleteMutationOp
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminProductsDestroyApiAdminProductsProductIdDelete>>,
+    Awaited<ReturnType<typeof adminProductsDestroyApiAdminProductsProductIdDelete>>,
     { productId: string }
   > = (props) => {
     const { productId } = props ?? {}
 
-    return apiAdminProductsDestroyApiAdminProductsProductIdDelete(productId, requestOptions)
+    return adminProductsDestroyApiAdminProductsProductIdDelete(productId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminProductsDestroyApiAdminProductsProductIdDeleteMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminProductsDestroyApiAdminProductsProductIdDelete>>
+export type AdminProductsDestroyApiAdminProductsProductIdDeleteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminProductsDestroyApiAdminProductsProductIdDelete>>
 >
 
-export type ApiAdminProductsDestroyApiAdminProductsProductIdDeleteMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsDestroyApiAdminProductsProductIdDeleteMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Products.Destroy
+ * @summary Admin.Products.Destroy
  */
-export const useApiAdminProductsDestroyApiAdminProductsProductIdDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminProductsDestroyApiAdminProductsProductIdDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminProductsDestroyApiAdminProductsProductIdDelete>>,
+      Awaited<ReturnType<typeof adminProductsDestroyApiAdminProductsProductIdDelete>>,
       TError,
       { productId: string },
       TContext
@@ -672,53 +563,49 @@ export const useApiAdminProductsDestroyApiAdminProductsProductIdDelete = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminProductsDestroyApiAdminProductsProductIdDelete>>,
+  Awaited<ReturnType<typeof adminProductsDestroyApiAdminProductsProductIdDelete>>,
   TError,
   { productId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminProductsDestroyApiAdminProductsProductIdDeleteMutationOptions(options)
+    getAdminProductsDestroyApiAdminProductsProductIdDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Products.Force-Destroy
+ * @summary Admin.Products.Force Destroy
  */
-export const apiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete = (
+export const adminProductsForceDestroyApiAdminProductsProductIdForceDelete = (
   productId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
 ) => {
   productId = unref(productId)
 
-  return request<void>({ url: `/api/admin/products/${productId}/force`, method: 'DELETE' }, options)
+  return request<unknown>(
+    { url: `/api/admin/products/${productId}/force`, method: 'DELETE' },
+    options,
+  )
 }
 
-export const getApiAdminProductsForceDestroyApiAdminProductsProductIdForceDeleteMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminProductsForceDestroyApiAdminProductsProductIdForceDeleteMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete>>,
+    Awaited<ReturnType<typeof adminProductsForceDestroyApiAdminProductsProductIdForceDelete>>,
     TError,
     { productId: string },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete>>,
+  Awaited<ReturnType<typeof adminProductsForceDestroyApiAdminProductsProductIdForceDelete>>,
   TError,
   { productId: string },
   TContext
 > => {
-  const mutationKey = ['apiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete']
+  const mutationKey = ['adminProductsForceDestroyApiAdminProductsProductIdForceDelete']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -726,51 +613,35 @@ export const getApiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete>>,
+    Awaited<ReturnType<typeof adminProductsForceDestroyApiAdminProductsProductIdForceDelete>>,
     { productId: string }
   > = (props) => {
     const { productId } = props ?? {}
 
-    return apiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete(
-      productId,
-      requestOptions,
-    )
+    return adminProductsForceDestroyApiAdminProductsProductIdForceDelete(productId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminProductsForceDestroyApiAdminProductsProductIdForceDeleteMutationResult =
+export type AdminProductsForceDestroyApiAdminProductsProductIdForceDeleteMutationResult =
   NonNullable<
-    Awaited<ReturnType<typeof apiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete>>
+    Awaited<ReturnType<typeof adminProductsForceDestroyApiAdminProductsProductIdForceDelete>>
   >
 
-export type ApiAdminProductsForceDestroyApiAdminProductsProductIdForceDeleteMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsForceDestroyApiAdminProductsProductIdForceDeleteMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Products.Force-Destroy
+ * @summary Admin.Products.Force Destroy
  */
-export const useApiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminProductsForceDestroyApiAdminProductsProductIdForceDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete>>,
+      Awaited<ReturnType<typeof adminProductsForceDestroyApiAdminProductsProductIdForceDelete>>,
       TError,
       { productId: string },
       TContext
@@ -779,20 +650,20 @@ export const useApiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminProductsForceDestroyApiAdminProductsProductIdForceDelete>>,
+  Awaited<ReturnType<typeof adminProductsForceDestroyApiAdminProductsProductIdForceDelete>>,
   TError,
   { productId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminProductsForceDestroyApiAdminProductsProductIdForceDeleteMutationOptions(options)
+    getAdminProductsForceDestroyApiAdminProductsProductIdForceDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Products.Restore
+ * @summary Admin.Products.Restore
  */
-export const apiAdminProductsRestoreApiAdminProductsProductIdRestorePost = (
+export const adminProductsRestoreApiAdminProductsProductIdRestorePost = (
   productId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -805,31 +676,24 @@ export const apiAdminProductsRestoreApiAdminProductsProductIdRestorePost = (
   )
 }
 
-export const getApiAdminProductsRestoreApiAdminProductsProductIdRestorePostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminProductsRestoreApiAdminProductsProductIdRestorePostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminProductsRestoreApiAdminProductsProductIdRestorePost>>,
+    Awaited<ReturnType<typeof adminProductsRestoreApiAdminProductsProductIdRestorePost>>,
     TError,
     { productId: string },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminProductsRestoreApiAdminProductsProductIdRestorePost>>,
+  Awaited<ReturnType<typeof adminProductsRestoreApiAdminProductsProductIdRestorePost>>,
   TError,
   { productId: string },
   TContext
 > => {
-  const mutationKey = ['apiAdminProductsRestoreApiAdminProductsProductIdRestorePost']
+  const mutationKey = ['adminProductsRestoreApiAdminProductsProductIdRestorePost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -837,47 +701,34 @@ export const getApiAdminProductsRestoreApiAdminProductsProductIdRestorePostMutat
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminProductsRestoreApiAdminProductsProductIdRestorePost>>,
+    Awaited<ReturnType<typeof adminProductsRestoreApiAdminProductsProductIdRestorePost>>,
     { productId: string }
   > = (props) => {
     const { productId } = props ?? {}
 
-    return apiAdminProductsRestoreApiAdminProductsProductIdRestorePost(productId, requestOptions)
+    return adminProductsRestoreApiAdminProductsProductIdRestorePost(productId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminProductsRestoreApiAdminProductsProductIdRestorePostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminProductsRestoreApiAdminProductsProductIdRestorePost>>
+export type AdminProductsRestoreApiAdminProductsProductIdRestorePostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminProductsRestoreApiAdminProductsProductIdRestorePost>>
 >
 
-export type ApiAdminProductsRestoreApiAdminProductsProductIdRestorePostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsRestoreApiAdminProductsProductIdRestorePostMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Products.Restore
+ * @summary Admin.Products.Restore
  */
-export const useApiAdminProductsRestoreApiAdminProductsProductIdRestorePost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminProductsRestoreApiAdminProductsProductIdRestorePost = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminProductsRestoreApiAdminProductsProductIdRestorePost>>,
+      Awaited<ReturnType<typeof adminProductsRestoreApiAdminProductsProductIdRestorePost>>,
       TError,
       { productId: string },
       TContext
@@ -886,56 +737,49 @@ export const useApiAdminProductsRestoreApiAdminProductsProductIdRestorePost = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminProductsRestoreApiAdminProductsProductIdRestorePost>>,
+  Awaited<ReturnType<typeof adminProductsRestoreApiAdminProductsProductIdRestorePost>>,
   TError,
   { productId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminProductsRestoreApiAdminProductsProductIdRestorePostMutationOptions(options)
+    getAdminProductsRestoreApiAdminProductsProductIdRestorePostMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Products.Publish
+ * @summary Admin.Products.Publish
  */
-export const apiAdminProductsPublishApiAdminProductsProductIdPublishPatch = (
+export const adminProductsPublishApiAdminProductsProductIdPublishPatch = (
   productId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
 ) => {
   productId = unref(productId)
 
   return request<AdminProductWrapperOut>(
-    { url: `/api/admin/products/${productId}/publish`, method: 'POST' },
+    { url: `/api/admin/products/${productId}/publish`, method: 'PATCH' },
     options,
   )
 }
 
-export const getApiAdminProductsPublishApiAdminProductsProductIdPublishPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminProductsPublishApiAdminProductsProductIdPublishPatchMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminProductsPublishApiAdminProductsProductIdPublishPatch>>,
+    Awaited<ReturnType<typeof adminProductsPublishApiAdminProductsProductIdPublishPatch>>,
     TError,
     { productId: string },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminProductsPublishApiAdminProductsProductIdPublishPatch>>,
+  Awaited<ReturnType<typeof adminProductsPublishApiAdminProductsProductIdPublishPatch>>,
   TError,
   { productId: string },
   TContext
 > => {
-  const mutationKey = ['apiAdminProductsPublishApiAdminProductsProductIdPublishPatch']
+  const mutationKey = ['adminProductsPublishApiAdminProductsProductIdPublishPatch']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -943,48 +787,34 @@ export const getApiAdminProductsPublishApiAdminProductsProductIdPublishPatchMuta
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminProductsPublishApiAdminProductsProductIdPublishPatch>>,
+    Awaited<ReturnType<typeof adminProductsPublishApiAdminProductsProductIdPublishPatch>>,
     { productId: string }
   > = (props) => {
     const { productId } = props ?? {}
 
-    return apiAdminProductsPublishApiAdminProductsProductIdPublishPatch(productId, requestOptions)
+    return adminProductsPublishApiAdminProductsProductIdPublishPatch(productId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminProductsPublishApiAdminProductsProductIdPublishPatchMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof apiAdminProductsPublishApiAdminProductsProductIdPublishPatch>>
-  >
+export type AdminProductsPublishApiAdminProductsProductIdPublishPatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminProductsPublishApiAdminProductsProductIdPublishPatch>>
+>
 
-export type ApiAdminProductsPublishApiAdminProductsProductIdPublishPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsPublishApiAdminProductsProductIdPublishPatchMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Products.Publish
+ * @summary Admin.Products.Publish
  */
-export const useApiAdminProductsPublishApiAdminProductsProductIdPublishPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminProductsPublishApiAdminProductsProductIdPublishPatch = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminProductsPublishApiAdminProductsProductIdPublishPatch>>,
+      Awaited<ReturnType<typeof adminProductsPublishApiAdminProductsProductIdPublishPatch>>,
       TError,
       { productId: string },
       TContext
@@ -993,56 +823,49 @@ export const useApiAdminProductsPublishApiAdminProductsProductIdPublishPatch = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminProductsPublishApiAdminProductsProductIdPublishPatch>>,
+  Awaited<ReturnType<typeof adminProductsPublishApiAdminProductsProductIdPublishPatch>>,
   TError,
   { productId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminProductsPublishApiAdminProductsProductIdPublishPatchMutationOptions(options)
+    getAdminProductsPublishApiAdminProductsProductIdPublishPatchMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Products.Unpublish
+ * @summary Admin.Products.Unpublish
  */
-export const apiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch = (
+export const adminProductsUnpublishApiAdminProductsProductIdUnpublishPatch = (
   productId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
 ) => {
   productId = unref(productId)
 
   return request<AdminProductWrapperOut>(
-    { url: `/api/admin/products/${productId}/unpublish`, method: 'POST' },
+    { url: `/api/admin/products/${productId}/unpublish`, method: 'PATCH' },
     options,
   )
 }
 
-export const getApiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatchMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>,
+    Awaited<ReturnType<typeof adminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>,
     TError,
     { productId: string },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>,
+  Awaited<ReturnType<typeof adminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>,
   TError,
   { productId: string },
   TContext
 > => {
-  const mutationKey = ['apiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch']
+  const mutationKey = ['adminProductsUnpublishApiAdminProductsProductIdUnpublishPatch']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -1050,51 +873,35 @@ export const getApiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>,
+    Awaited<ReturnType<typeof adminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>,
     { productId: string }
   > = (props) => {
     const { productId } = props ?? {}
 
-    return apiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch(
-      productId,
-      requestOptions,
-    )
+    return adminProductsUnpublishApiAdminProductsProductIdUnpublishPatch(productId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatchMutationResult =
+export type AdminProductsUnpublishApiAdminProductsProductIdUnpublishPatchMutationResult =
   NonNullable<
-    Awaited<ReturnType<typeof apiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>
+    Awaited<ReturnType<typeof adminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>
   >
 
-export type ApiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsUnpublishApiAdminProductsProductIdUnpublishPatchMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Products.Unpublish
+ * @summary Admin.Products.Unpublish
  */
-export const useApiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>,
+      Awaited<ReturnType<typeof adminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>,
       TError,
       { productId: string },
       TContext
@@ -1103,145 +910,20 @@ export const useApiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>,
+  Awaited<ReturnType<typeof adminProductsUnpublishApiAdminProductsProductIdUnpublishPatch>>,
   TError,
   { productId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatchMutationOptions(options)
+    getAdminProductsUnpublishApiAdminProductsProductIdUnpublishPatchMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Products.Media.Store
+ * @summary Admin.Products.Media.Index
  */
-export const apiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost = (
-  productId: MaybeRef<string>,
-  bodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost: MaybeRef<BodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost>,
-  options?: SecondParameter<typeof request>,
-  signal?: AbortSignal,
-) => {
-  productId = unref(productId)
-  bodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost = unref(
-    bodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost,
-  )
-  const formData = new FormData()
-  formData.append(`file`, bodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost.file)
-
-  return request<MediaWrapperOut>(
-    {
-      url: `/api/admin/products/${productId}/media`,
-      method: 'POST',
-      headers: { 'Content-Type': 'multipart/form-data' },
-      data: formData,
-      signal,
-    },
-    options,
-  )
-}
-
-export const getApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost>>,
-    TError,
-    { productId: string; data: BodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost },
-    TContext
-  >
-  request?: SecondParameter<typeof request>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost>>,
-  TError,
-  { productId: string; data: BodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost },
-  TContext
-> => {
-  const mutationKey = ['apiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost']
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost>>,
-    { productId: string; data: BodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost }
-  > = (props) => {
-    const { productId, data } = props ?? {}
-
-    return apiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost(
-      productId,
-      data,
-      requestOptions,
-    )
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type ApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPostMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof apiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost>>
-  >
-export type ApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPostMutationBody =
-  BodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost
-export type ApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-
-/**
- * @summary Api.Admin.Products.Media.Store
- */
-export const useApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost>>,
-      TError,
-      { productId: string; data: BodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost },
-      TContext
-    >
-    request?: SecondParameter<typeof request>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost>>,
-  TError,
-  { productId: string; data: BodyApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPost },
-  TContext
-> => {
-  const mutationOptions =
-    getApiAdminProductsMediaStoreApiAdminProductsProductIdMediaPostMutationOptions(options)
-
-  return useMutation(mutationOptions, queryClient)
-}
-/**
- * @summary Api.Admin.Products.Media.Index
- */
-export const apiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet = (
+export const adminProductsMediaIndexApiAdminProductsProductIdMediaGet = (
   productId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -1254,28 +936,21 @@ export const apiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet = (
   )
 }
 
-export const getApiAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryKey = (
+export const getAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryKey = (
   productId?: MaybeRef<string>,
 ) => {
   return ['api', 'admin', 'products', productId, 'media'] as const
 }
 
-export const getApiAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminProductsMediaIndexApiAdminProductsProductIdMediaGet>>,
+  TError = HTTPValidationError,
 >(
   productId: MaybeRef<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet>>,
+        Awaited<ReturnType<typeof adminProductsMediaIndexApiAdminProductsProductIdMediaGet>>,
         TError,
         TData
       >
@@ -1285,12 +960,12 @@ export const getApiAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQuery
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryKey(productId)
+  const queryKey = getAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryKey(productId)
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet>>
+    Awaited<ReturnType<typeof adminProductsMediaIndexApiAdminProductsProductIdMediaGet>>
   > = ({ signal }) =>
-    apiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet(productId, requestOptions, signal)
+    adminProductsMediaIndexApiAdminProductsProductIdMediaGet(productId, requestOptions, signal)
 
   return {
     queryKey,
@@ -1298,44 +973,30 @@ export const getApiAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQuery
     enabled: computed(() => !!unref(productId)),
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet>>,
+    Awaited<ReturnType<typeof adminProductsMediaIndexApiAdminProductsProductIdMediaGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet>>
+export type AdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminProductsMediaIndexApiAdminProductsProductIdMediaGet>>
 >
-export type ApiAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Products.Media.Index
+ * @summary Admin.Products.Media.Index
  */
 
-export function useApiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet<
-  TData = Awaited<ReturnType<typeof apiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminProductsMediaIndexApiAdminProductsProductIdMediaGet<
+  TData = Awaited<ReturnType<typeof adminProductsMediaIndexApiAdminProductsProductIdMediaGet>>,
+  TError = HTTPValidationError,
 >(
   productId: MaybeRef<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet>>,
+        Awaited<ReturnType<typeof adminProductsMediaIndexApiAdminProductsProductIdMediaGet>>,
         TError,
         TData
       >
@@ -1344,7 +1005,7 @@ export function useApiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryOptions(
+  const queryOptions = getAdminProductsMediaIndexApiAdminProductsProductIdMediaGetQueryOptions(
     productId,
     options,
   )
@@ -1359,9 +1020,113 @@ export function useApiAdminProductsMediaIndexApiAdminProductsProductIdMediaGet<
 }
 
 /**
- * @summary Api.Admin.Products.Media.Destroy
+ * @summary Admin.Products.Media.Store
  */
-export const apiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete = (
+export const adminProductsMediaStoreApiAdminProductsProductIdMediaPost = (
+  productId: MaybeRef<string>,
+  bodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost: MaybeRef<BodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost>,
+  options?: SecondParameter<typeof request>,
+  signal?: AbortSignal,
+) => {
+  productId = unref(productId)
+  bodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost = unref(
+    bodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost,
+  )
+  const formData = new FormData()
+  formData.append(`file`, bodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost.file)
+
+  return request<MediaWrapperOut>(
+    {
+      url: `/api/admin/products/${productId}/media`,
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/form-data' },
+      data: formData,
+      signal,
+    },
+    options,
+  )
+}
+
+export const getAdminProductsMediaStoreApiAdminProductsProductIdMediaPostMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminProductsMediaStoreApiAdminProductsProductIdMediaPost>>,
+    TError,
+    { productId: string; data: BodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost },
+    TContext
+  >
+  request?: SecondParameter<typeof request>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminProductsMediaStoreApiAdminProductsProductIdMediaPost>>,
+  TError,
+  { productId: string; data: BodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost },
+  TContext
+> => {
+  const mutationKey = ['adminProductsMediaStoreApiAdminProductsProductIdMediaPost']
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminProductsMediaStoreApiAdminProductsProductIdMediaPost>>,
+    { productId: string; data: BodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost }
+  > = (props) => {
+    const { productId, data } = props ?? {}
+
+    return adminProductsMediaStoreApiAdminProductsProductIdMediaPost(
+      productId,
+      data,
+      requestOptions,
+    )
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AdminProductsMediaStoreApiAdminProductsProductIdMediaPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminProductsMediaStoreApiAdminProductsProductIdMediaPost>>
+>
+export type AdminProductsMediaStoreApiAdminProductsProductIdMediaPostMutationBody =
+  BodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost
+export type AdminProductsMediaStoreApiAdminProductsProductIdMediaPostMutationError =
+  HTTPValidationError
+
+/**
+ * @summary Admin.Products.Media.Store
+ */
+export const useAdminProductsMediaStoreApiAdminProductsProductIdMediaPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminProductsMediaStoreApiAdminProductsProductIdMediaPost>>,
+      TError,
+      { productId: string; data: BodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost },
+      TContext
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof adminProductsMediaStoreApiAdminProductsProductIdMediaPost>>,
+  TError,
+  { productId: string; data: BodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost },
+  TContext
+> => {
+  const mutationOptions =
+    getAdminProductsMediaStoreApiAdminProductsProductIdMediaPostMutationOptions(options)
+
+  return useMutation(mutationOptions, queryClient)
+}
+/**
+ * @summary Admin.Products.Media.Destroy
+ */
+export const adminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete = (
   productId: MaybeRef<string>,
   mediaId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
@@ -1369,27 +1134,17 @@ export const apiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDe
   productId = unref(productId)
   mediaId = unref(mediaId)
 
-  return request<void>(
+  return request<unknown>(
     { url: `/api/admin/products/${productId}/media/${mediaId}`, method: 'DELETE' },
     options,
   )
 }
 
-export const getApiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDeleteMutationOptions =
-  <
-    TError =
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut,
-    TContext = unknown,
-  >(options?: {
+export const getAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDeleteMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
     mutation?: UseMutationOptions<
       Awaited<
-        ReturnType<typeof apiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>
+        ReturnType<typeof adminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>
       >,
       TError,
       { productId: string; mediaId: string },
@@ -1398,13 +1153,13 @@ export const getApiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaI
     request?: SecondParameter<typeof request>
   }): UseMutationOptions<
     Awaited<
-      ReturnType<typeof apiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>
+      ReturnType<typeof adminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>
     >,
     TError,
     { productId: string; mediaId: string },
     TContext
   > => {
-    const mutationKey = ['apiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete']
+    const mutationKey = ['adminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete']
     const { mutation: mutationOptions, request: requestOptions } = options
       ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
         ? options
@@ -1413,13 +1168,13 @@ export const getApiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaI
 
     const mutationFn: MutationFunction<
       Awaited<
-        ReturnType<typeof apiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>
+        ReturnType<typeof adminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>
       >,
       { productId: string; mediaId: string }
     > = (props) => {
       const { productId, mediaId } = props ?? {}
 
-      return apiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete(
+      return adminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete(
         productId,
         mediaId,
         requestOptions,
@@ -1429,40 +1184,25 @@ export const getApiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaI
     return { mutationFn, ...mutationOptions }
   }
 
-export type ApiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDeleteMutationResult =
+export type AdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDeleteMutationResult =
   NonNullable<
-    Awaited<
-      ReturnType<typeof apiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>
-    >
+    Awaited<ReturnType<typeof adminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>>
   >
 
-export type ApiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDeleteMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDeleteMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Products.Media.Destroy
+ * @summary Admin.Products.Media.Destroy
  */
-export const useApiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<
-        ReturnType<typeof apiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>
+        ReturnType<typeof adminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>
       >,
       TError,
       { productId: string; mediaId: string },
@@ -1472,17 +1212,13 @@ export const useApiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaI
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<
-    ReturnType<typeof apiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>
-  >,
+  Awaited<ReturnType<typeof adminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDelete>>,
   TError,
   { productId: string; mediaId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDeleteMutationOptions(
-      options,
-    )
+    getAdminProductsMediaDestroyApiAdminProductsProductIdMediaMediaIdDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }

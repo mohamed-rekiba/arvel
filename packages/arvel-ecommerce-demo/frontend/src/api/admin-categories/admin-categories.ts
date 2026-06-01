@@ -21,11 +21,11 @@ import { computed, unref } from 'vue'
 import type { MaybeRef } from 'vue'
 
 import type {
+  AdminCategoriesIndexApiAdminCategoriesGetParams,
   AdminCategoryListOut,
   AdminCategoryWrapperOut,
-  ApiAdminCategoriesIndexApiAdminCategoriesGetParams,
-  ApiErrorOut,
   CreateCategoryPayload,
+  HTTPValidationError,
   UpdateCategoryPayload,
 } from '.././schemas'
 
@@ -34,43 +34,36 @@ import { request } from '../../lib/api'
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.Admin.Categories.Index
+ * @summary Admin.Categories.Index
  */
-export const apiAdminCategoriesIndexApiAdminCategoriesGet = (
-  params?: MaybeRef<ApiAdminCategoriesIndexApiAdminCategoriesGetParams>,
+export const adminCategoriesIndexApiAdminCategoriesGet = (
+  params?: MaybeRef<AdminCategoriesIndexApiAdminCategoriesGetParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
   params = unref(params)
 
   return request<AdminCategoryListOut>(
-    { url: `/api/admin/categories`, method: 'GET', params, signal },
+    { url: `/api/admin/categories`, method: 'GET', params: unref(params), signal },
     options,
   )
 }
 
-export const getApiAdminCategoriesIndexApiAdminCategoriesGetQueryKey = (
-  params?: MaybeRef<ApiAdminCategoriesIndexApiAdminCategoriesGetParams>,
+export const getAdminCategoriesIndexApiAdminCategoriesGetQueryKey = (
+  params?: MaybeRef<AdminCategoriesIndexApiAdminCategoriesGetParams>,
 ) => {
-  return ['api', 'admin', 'categories', params] as const
+  return ['api', 'admin', 'categories', ...(params ? [params] : [])] as const
 }
 
-export const getApiAdminCategoriesIndexApiAdminCategoriesGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminCategoriesIndexApiAdminCategoriesGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminCategoriesIndexApiAdminCategoriesGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminCategoriesIndexApiAdminCategoriesGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiAdminCategoriesIndexApiAdminCategoriesGetParams>,
+  params?: MaybeRef<AdminCategoriesIndexApiAdminCategoriesGetParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminCategoriesIndexApiAdminCategoriesGet>>,
+        Awaited<ReturnType<typeof adminCategoriesIndexApiAdminCategoriesGet>>,
         TError,
         TData
       >
@@ -80,51 +73,37 @@ export const getApiAdminCategoriesIndexApiAdminCategoriesGetQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminCategoriesIndexApiAdminCategoriesGetQueryKey(params)
+  const queryKey = getAdminCategoriesIndexApiAdminCategoriesGetQueryKey(params)
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminCategoriesIndexApiAdminCategoriesGet>>
-  > = ({ signal }) => apiAdminCategoriesIndexApiAdminCategoriesGet(params, requestOptions, signal)
+    Awaited<ReturnType<typeof adminCategoriesIndexApiAdminCategoriesGet>>
+  > = ({ signal }) => adminCategoriesIndexApiAdminCategoriesGet(params, requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminCategoriesIndexApiAdminCategoriesGet>>,
+    Awaited<ReturnType<typeof adminCategoriesIndexApiAdminCategoriesGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminCategoriesIndexApiAdminCategoriesGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminCategoriesIndexApiAdminCategoriesGet>>
+export type AdminCategoriesIndexApiAdminCategoriesGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminCategoriesIndexApiAdminCategoriesGet>>
 >
-export type ApiAdminCategoriesIndexApiAdminCategoriesGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminCategoriesIndexApiAdminCategoriesGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Categories.Index
+ * @summary Admin.Categories.Index
  */
 
-export function useApiAdminCategoriesIndexApiAdminCategoriesGet<
-  TData = Awaited<ReturnType<typeof apiAdminCategoriesIndexApiAdminCategoriesGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminCategoriesIndexApiAdminCategoriesGet<
+  TData = Awaited<ReturnType<typeof adminCategoriesIndexApiAdminCategoriesGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiAdminCategoriesIndexApiAdminCategoriesGetParams>,
+  params?: MaybeRef<AdminCategoriesIndexApiAdminCategoriesGetParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminCategoriesIndexApiAdminCategoriesGet>>,
+        Awaited<ReturnType<typeof adminCategoriesIndexApiAdminCategoriesGet>>,
         TError,
         TData
       >
@@ -133,7 +112,7 @@ export function useApiAdminCategoriesIndexApiAdminCategoriesGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminCategoriesIndexApiAdminCategoriesGetQueryOptions(params, options)
+  const queryOptions = getAdminCategoriesIndexApiAdminCategoriesGetQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -145,9 +124,9 @@ export function useApiAdminCategoriesIndexApiAdminCategoriesGet<
 }
 
 /**
- * @summary Api.Admin.Categories.Store
+ * @summary Admin.Categories.Store
  */
-export const apiAdminCategoriesStoreApiAdminCategoriesPost = (
+export const adminCategoriesStoreApiAdminCategoriesPost = (
   createCategoryPayload: MaybeRef<CreateCategoryPayload>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -166,31 +145,24 @@ export const apiAdminCategoriesStoreApiAdminCategoriesPost = (
   )
 }
 
-export const getApiAdminCategoriesStoreApiAdminCategoriesPostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminCategoriesStoreApiAdminCategoriesPostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminCategoriesStoreApiAdminCategoriesPost>>,
+    Awaited<ReturnType<typeof adminCategoriesStoreApiAdminCategoriesPost>>,
     TError,
     { data: CreateCategoryPayload },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminCategoriesStoreApiAdminCategoriesPost>>,
+  Awaited<ReturnType<typeof adminCategoriesStoreApiAdminCategoriesPost>>,
   TError,
   { data: CreateCategoryPayload },
   TContext
 > => {
-  const mutationKey = ['apiAdminCategoriesStoreApiAdminCategoriesPost']
+  const mutationKey = ['adminCategoriesStoreApiAdminCategoriesPost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -198,47 +170,33 @@ export const getApiAdminCategoriesStoreApiAdminCategoriesPostMutationOptions = <
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminCategoriesStoreApiAdminCategoriesPost>>,
+    Awaited<ReturnType<typeof adminCategoriesStoreApiAdminCategoriesPost>>,
     { data: CreateCategoryPayload }
   > = (props) => {
     const { data } = props ?? {}
 
-    return apiAdminCategoriesStoreApiAdminCategoriesPost(data, requestOptions)
+    return adminCategoriesStoreApiAdminCategoriesPost(data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminCategoriesStoreApiAdminCategoriesPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminCategoriesStoreApiAdminCategoriesPost>>
+export type AdminCategoriesStoreApiAdminCategoriesPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminCategoriesStoreApiAdminCategoriesPost>>
 >
-export type ApiAdminCategoriesStoreApiAdminCategoriesPostMutationBody = CreateCategoryPayload
-export type ApiAdminCategoriesStoreApiAdminCategoriesPostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminCategoriesStoreApiAdminCategoriesPostMutationBody = CreateCategoryPayload
+export type AdminCategoriesStoreApiAdminCategoriesPostMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Categories.Store
+ * @summary Admin.Categories.Store
  */
-export const useApiAdminCategoriesStoreApiAdminCategoriesPost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminCategoriesStoreApiAdminCategoriesPost = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminCategoriesStoreApiAdminCategoriesPost>>,
+      Awaited<ReturnType<typeof adminCategoriesStoreApiAdminCategoriesPost>>,
       TError,
       { data: CreateCategoryPayload },
       TContext
@@ -247,19 +205,19 @@ export const useApiAdminCategoriesStoreApiAdminCategoriesPost = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminCategoriesStoreApiAdminCategoriesPost>>,
+  Awaited<ReturnType<typeof adminCategoriesStoreApiAdminCategoriesPost>>,
   TError,
   { data: CreateCategoryPayload },
   TContext
 > => {
-  const mutationOptions = getApiAdminCategoriesStoreApiAdminCategoriesPostMutationOptions(options)
+  const mutationOptions = getAdminCategoriesStoreApiAdminCategoriesPostMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Categories.Show
+ * @summary Admin.Categories.Show
  */
-export const apiAdminCategoriesShowApiAdminCategoriesCategoryIdGet = (
+export const adminCategoriesShowApiAdminCategoriesCategoryIdGet = (
   categoryId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -272,28 +230,21 @@ export const apiAdminCategoriesShowApiAdminCategoriesCategoryIdGet = (
   )
 }
 
-export const getApiAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryKey = (
+export const getAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryKey = (
   categoryId?: MaybeRef<string>,
 ) => {
   return ['api', 'admin', 'categories', categoryId] as const
 }
 
-export const getApiAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminCategoriesShowApiAdminCategoriesCategoryIdGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminCategoriesShowApiAdminCategoriesCategoryIdGet>>,
+  TError = HTTPValidationError,
 >(
   categoryId: MaybeRef<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminCategoriesShowApiAdminCategoriesCategoryIdGet>>,
+        Awaited<ReturnType<typeof adminCategoriesShowApiAdminCategoriesCategoryIdGet>>,
         TError,
         TData
       >
@@ -303,12 +254,12 @@ export const getApiAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryOption
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryKey(categoryId)
+  const queryKey = getAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryKey(categoryId)
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminCategoriesShowApiAdminCategoriesCategoryIdGet>>
+    Awaited<ReturnType<typeof adminCategoriesShowApiAdminCategoriesCategoryIdGet>>
   > = ({ signal }) =>
-    apiAdminCategoriesShowApiAdminCategoriesCategoryIdGet(categoryId, requestOptions, signal)
+    adminCategoriesShowApiAdminCategoriesCategoryIdGet(categoryId, requestOptions, signal)
 
   return {
     queryKey,
@@ -316,44 +267,30 @@ export const getApiAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryOption
     enabled: computed(() => !!unref(categoryId)),
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminCategoriesShowApiAdminCategoriesCategoryIdGet>>,
+    Awaited<ReturnType<typeof adminCategoriesShowApiAdminCategoriesCategoryIdGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminCategoriesShowApiAdminCategoriesCategoryIdGet>>
+export type AdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminCategoriesShowApiAdminCategoriesCategoryIdGet>>
 >
-export type ApiAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Categories.Show
+ * @summary Admin.Categories.Show
  */
 
-export function useApiAdminCategoriesShowApiAdminCategoriesCategoryIdGet<
-  TData = Awaited<ReturnType<typeof apiAdminCategoriesShowApiAdminCategoriesCategoryIdGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminCategoriesShowApiAdminCategoriesCategoryIdGet<
+  TData = Awaited<ReturnType<typeof adminCategoriesShowApiAdminCategoriesCategoryIdGet>>,
+  TError = HTTPValidationError,
 >(
   categoryId: MaybeRef<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminCategoriesShowApiAdminCategoriesCategoryIdGet>>,
+        Awaited<ReturnType<typeof adminCategoriesShowApiAdminCategoriesCategoryIdGet>>,
         TError,
         TData
       >
@@ -362,7 +299,7 @@ export function useApiAdminCategoriesShowApiAdminCategoriesCategoryIdGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryOptions(
+  const queryOptions = getAdminCategoriesShowApiAdminCategoriesCategoryIdGetQueryOptions(
     categoryId,
     options,
   )
@@ -377,9 +314,9 @@ export function useApiAdminCategoriesShowApiAdminCategoriesCategoryIdGet<
 }
 
 /**
- * @summary Api.Admin.Categories.Update
+ * @summary Admin.Categories.Update
  */
-export const apiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch = (
+export const adminCategoriesUpdateApiAdminCategoriesCategoryIdPatch = (
   categoryId: MaybeRef<string>,
   updateCategoryPayload: MaybeRef<UpdateCategoryPayload>,
   options?: SecondParameter<typeof request>,
@@ -398,31 +335,24 @@ export const apiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch = (
   )
 }
 
-export const getApiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatchMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>,
+    Awaited<ReturnType<typeof adminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>,
     TError,
     { categoryId: string; data: UpdateCategoryPayload },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>,
+  Awaited<ReturnType<typeof adminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>,
   TError,
   { categoryId: string; data: UpdateCategoryPayload },
   TContext
 > => {
-  const mutationKey = ['apiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch']
+  const mutationKey = ['adminCategoriesUpdateApiAdminCategoriesCategoryIdPatch']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -430,52 +360,35 @@ export const getApiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatchMutatio
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>,
+    Awaited<ReturnType<typeof adminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>,
     { categoryId: string; data: UpdateCategoryPayload }
   > = (props) => {
     const { categoryId, data } = props ?? {}
 
-    return apiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch(
-      categoryId,
-      data,
-      requestOptions,
-    )
+    return adminCategoriesUpdateApiAdminCategoriesCategoryIdPatch(categoryId, data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatchMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>
+export type AdminCategoriesUpdateApiAdminCategoriesCategoryIdPatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>
 >
-export type ApiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatchMutationBody =
+export type AdminCategoriesUpdateApiAdminCategoriesCategoryIdPatchMutationBody =
   UpdateCategoryPayload
-export type ApiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminCategoriesUpdateApiAdminCategoriesCategoryIdPatchMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Categories.Update
+ * @summary Admin.Categories.Update
  */
-export const useApiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>,
+      Awaited<ReturnType<typeof adminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>,
       TError,
       { categoryId: string; data: UpdateCategoryPayload },
       TContext
@@ -484,53 +397,46 @@ export const useApiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>,
+  Awaited<ReturnType<typeof adminCategoriesUpdateApiAdminCategoriesCategoryIdPatch>>,
   TError,
   { categoryId: string; data: UpdateCategoryPayload },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatchMutationOptions(options)
+    getAdminCategoriesUpdateApiAdminCategoriesCategoryIdPatchMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Categories.Destroy
+ * @summary Admin.Categories.Destroy
  */
-export const apiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete = (
+export const adminCategoriesDestroyApiAdminCategoriesCategoryIdDelete = (
   categoryId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
 ) => {
   categoryId = unref(categoryId)
 
-  return request<void>({ url: `/api/admin/categories/${categoryId}`, method: 'DELETE' }, options)
+  return request<unknown>({ url: `/api/admin/categories/${categoryId}`, method: 'DELETE' }, options)
 }
 
-export const getApiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDeleteMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminCategoriesDestroyApiAdminCategoriesCategoryIdDeleteMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>,
+    Awaited<ReturnType<typeof adminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>,
     TError,
     { categoryId: string },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>,
+  Awaited<ReturnType<typeof adminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>,
   TError,
   { categoryId: string },
   TContext
 > => {
-  const mutationKey = ['apiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete']
+  const mutationKey = ['adminCategoriesDestroyApiAdminCategoriesCategoryIdDelete']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -538,47 +444,34 @@ export const getApiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDeleteMutat
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>,
+    Awaited<ReturnType<typeof adminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>,
     { categoryId: string }
   > = (props) => {
     const { categoryId } = props ?? {}
 
-    return apiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete(categoryId, requestOptions)
+    return adminCategoriesDestroyApiAdminCategoriesCategoryIdDelete(categoryId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDeleteMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>
+export type AdminCategoriesDestroyApiAdminCategoriesCategoryIdDeleteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>
 >
 
-export type ApiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDeleteMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminCategoriesDestroyApiAdminCategoriesCategoryIdDeleteMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Categories.Destroy
+ * @summary Admin.Categories.Destroy
  */
-export const useApiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>,
+      Awaited<ReturnType<typeof adminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>,
       TError,
       { categoryId: string },
       TContext
@@ -587,277 +480,36 @@ export const useApiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>,
+  Awaited<ReturnType<typeof adminCategoriesDestroyApiAdminCategoriesCategoryIdDelete>>,
   TError,
   { categoryId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminCategoriesDestroyApiAdminCategoriesCategoryIdDeleteMutationOptions(options)
+    getAdminCategoriesDestroyApiAdminCategoriesCategoryIdDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Categories.Publish
+ * @summary Admin.Categories.Force Destroy
  */
-export const apiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch = (
+export const adminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete = (
   categoryId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
 ) => {
   categoryId = unref(categoryId)
 
-  return request<AdminCategoryWrapperOut>(
-    { url: `/api/admin/categories/${categoryId}/publish`, method: 'POST' },
-    options,
-  )
-}
-
-export const getApiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>,
-    TError,
-    { categoryId: string },
-    TContext
-  >
-  request?: SecondParameter<typeof request>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>,
-  TError,
-  { categoryId: string },
-  TContext
-> => {
-  const mutationKey = ['apiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch']
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>,
-    { categoryId: string }
-  > = (props) => {
-    const { categoryId } = props ?? {}
-
-    return apiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch(
-      categoryId,
-      requestOptions,
-    )
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type ApiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatchMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof apiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>
-  >
-
-export type ApiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-
-/**
- * @summary Api.Admin.Categories.Publish
- */
-export const useApiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>,
-      TError,
-      { categoryId: string },
-      TContext
-    >
-    request?: SecondParameter<typeof request>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>,
-  TError,
-  { categoryId: string },
-  TContext
-> => {
-  const mutationOptions =
-    getApiAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatchMutationOptions(options)
-
-  return useMutation(mutationOptions, queryClient)
-}
-/**
- * @summary Api.Admin.Categories.Unpublish
- */
-export const apiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch = (
-  categoryId: MaybeRef<string>,
-  options?: SecondParameter<typeof request>,
-) => {
-  categoryId = unref(categoryId)
-
-  return request<AdminCategoryWrapperOut>(
-    { url: `/api/admin/categories/${categoryId}/unpublish`, method: 'POST' },
-    options,
-  )
-}
-
-export const getApiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatchMutationOptions =
-  <
-    TError =
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut,
-    TContext = unknown,
-  >(options?: {
-    mutation?: UseMutationOptions<
-      Awaited<
-        ReturnType<typeof apiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>
-      >,
-      TError,
-      { categoryId: string },
-      TContext
-    >
-    request?: SecondParameter<typeof request>
-  }): UseMutationOptions<
-    Awaited<
-      ReturnType<typeof apiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>
-    >,
-    TError,
-    { categoryId: string },
-    TContext
-  > => {
-    const mutationKey = ['apiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch']
-    const { mutation: mutationOptions, request: requestOptions } = options
-      ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-        ? options
-        : { ...options, mutation: { ...options.mutation, mutationKey } }
-      : { mutation: { mutationKey }, request: undefined }
-
-    const mutationFn: MutationFunction<
-      Awaited<
-        ReturnType<typeof apiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>
-      >,
-      { categoryId: string }
-    > = (props) => {
-      const { categoryId } = props ?? {}
-
-      return apiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch(
-        categoryId,
-        requestOptions,
-      )
-    }
-
-    return { mutationFn, ...mutationOptions }
-  }
-
-export type ApiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatchMutationResult =
-  NonNullable<
-    Awaited<
-      ReturnType<typeof apiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>
-    >
-  >
-
-export type ApiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-
-/**
- * @summary Api.Admin.Categories.Unpublish
- */
-export const useApiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<
-        ReturnType<typeof apiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>
-      >,
-      TError,
-      { categoryId: string },
-      TContext
-    >
-    request?: SecondParameter<typeof request>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>>,
-  TError,
-  { categoryId: string },
-  TContext
-> => {
-  const mutationOptions =
-    getApiAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatchMutationOptions(options)
-
-  return useMutation(mutationOptions, queryClient)
-}
-/**
- * @summary Api.Admin.Categories.Force-Destroy
- */
-export const apiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete = (
-  categoryId: MaybeRef<string>,
-  options?: SecondParameter<typeof request>,
-) => {
-  categoryId = unref(categoryId)
-
-  return request<void>(
+  return request<unknown>(
     { url: `/api/admin/categories/${categoryId}/force`, method: 'DELETE' },
     options,
   )
 }
 
-export const getApiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDeleteMutationOptions =
-  <
-    TError =
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut,
-    TContext = unknown,
-  >(options?: {
+export const getAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDeleteMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
     mutation?: UseMutationOptions<
       Awaited<
-        ReturnType<typeof apiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>
+        ReturnType<typeof adminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>
       >,
       TError,
       { categoryId: string },
@@ -865,14 +517,12 @@ export const getApiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceD
     >
     request?: SecondParameter<typeof request>
   }): UseMutationOptions<
-    Awaited<
-      ReturnType<typeof apiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>
-    >,
+    Awaited<ReturnType<typeof adminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>>,
     TError,
     { categoryId: string },
     TContext
   > => {
-    const mutationKey = ['apiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete']
+    const mutationKey = ['adminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete']
     const { mutation: mutationOptions, request: requestOptions } = options
       ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
         ? options
@@ -881,13 +531,13 @@ export const getApiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceD
 
     const mutationFn: MutationFunction<
       Awaited<
-        ReturnType<typeof apiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>
+        ReturnType<typeof adminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>
       >,
       { categoryId: string }
     > = (props) => {
       const { categoryId } = props ?? {}
 
-      return apiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete(
+      return adminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete(
         categoryId,
         requestOptions,
       )
@@ -896,40 +546,25 @@ export const getApiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceD
     return { mutationFn, ...mutationOptions }
   }
 
-export type ApiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDeleteMutationResult =
+export type AdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDeleteMutationResult =
   NonNullable<
-    Awaited<
-      ReturnType<typeof apiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>
-    >
+    Awaited<ReturnType<typeof adminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>>
   >
 
-export type ApiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDeleteMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDeleteMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Categories.Force-Destroy
+ * @summary Admin.Categories.Force Destroy
  */
-export const useApiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<
-        ReturnType<typeof apiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>
+        ReturnType<typeof adminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>
       >,
       TError,
       { categoryId: string },
@@ -939,20 +574,20 @@ export const useApiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceD
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>>,
+  Awaited<ReturnType<typeof adminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDelete>>,
   TError,
   { categoryId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDeleteMutationOptions(options)
+    getAdminCategoriesForceDestroyApiAdminCategoriesCategoryIdForceDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Categories.Restore
+ * @summary Admin.Categories.Restore
  */
-export const apiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost = (
+export const adminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost = (
   categoryId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -965,31 +600,24 @@ export const apiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost = 
   )
 }
 
-export const getApiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>,
+    Awaited<ReturnType<typeof adminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>,
     TError,
     { categoryId: string },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>,
+  Awaited<ReturnType<typeof adminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>,
   TError,
   { categoryId: string },
   TContext
 > => {
-  const mutationKey = ['apiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost']
+  const mutationKey = ['adminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -997,51 +625,35 @@ export const getApiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>,
+    Awaited<ReturnType<typeof adminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>,
     { categoryId: string }
   > = (props) => {
     const { categoryId } = props ?? {}
 
-    return apiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost(
-      categoryId,
-      requestOptions,
-    )
+    return adminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost(categoryId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePostMutationResult =
+export type AdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePostMutationResult =
   NonNullable<
-    Awaited<ReturnType<typeof apiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>
+    Awaited<ReturnType<typeof adminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>
   >
 
-export type ApiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePostMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Categories.Restore
+ * @summary Admin.Categories.Restore
  */
-export const useApiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>,
+      Awaited<ReturnType<typeof adminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>,
       TError,
       { categoryId: string },
       TContext
@@ -1050,13 +662,197 @@ export const useApiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>,
+  Awaited<ReturnType<typeof adminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePost>>,
   TError,
   { categoryId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePostMutationOptions(options)
+    getAdminCategoriesRestoreApiAdminCategoriesCategoryIdRestorePostMutationOptions(options)
+
+  return useMutation(mutationOptions, queryClient)
+}
+/**
+ * @summary Admin.Categories.Publish
+ */
+export const adminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch = (
+  categoryId: MaybeRef<string>,
+  options?: SecondParameter<typeof request>,
+) => {
+  categoryId = unref(categoryId)
+
+  return request<AdminCategoryWrapperOut>(
+    { url: `/api/admin/categories/${categoryId}/publish`, method: 'PATCH' },
+    options,
+  )
+}
+
+export const getAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatchMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>,
+    TError,
+    { categoryId: string },
+    TContext
+  >
+  request?: SecondParameter<typeof request>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>,
+  TError,
+  { categoryId: string },
+  TContext
+> => {
+  const mutationKey = ['adminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch']
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>,
+    { categoryId: string }
+  > = (props) => {
+    const { categoryId } = props ?? {}
+
+    return adminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch(
+      categoryId,
+      requestOptions,
+    )
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatchMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof adminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>
+  >
+
+export type AdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatchMutationError =
+  HTTPValidationError
+
+/**
+ * @summary Admin.Categories.Publish
+ */
+export const useAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>,
+      TError,
+      { categoryId: string },
+      TContext
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof adminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatch>>,
+  TError,
+  { categoryId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAdminCategoriesPublishApiAdminCategoriesCategoryIdPublishPatchMutationOptions(options)
+
+  return useMutation(mutationOptions, queryClient)
+}
+/**
+ * @summary Admin.Categories.Unpublish
+ */
+export const adminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch = (
+  categoryId: MaybeRef<string>,
+  options?: SecondParameter<typeof request>,
+) => {
+  categoryId = unref(categoryId)
+
+  return request<AdminCategoryWrapperOut>(
+    { url: `/api/admin/categories/${categoryId}/unpublish`, method: 'PATCH' },
+    options,
+  )
+}
+
+export const getAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatchMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof adminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>
+      >,
+      TError,
+      { categoryId: string },
+      TContext
+    >
+    request?: SecondParameter<typeof request>
+  }): UseMutationOptions<
+    Awaited<ReturnType<typeof adminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>>,
+    TError,
+    { categoryId: string },
+    TContext
+  > => {
+    const mutationKey = ['adminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch']
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined }
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof adminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>
+      >,
+      { categoryId: string }
+    > = (props) => {
+      const { categoryId } = props ?? {}
+
+      return adminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch(
+        categoryId,
+        requestOptions,
+      )
+    }
+
+    return { mutationFn, ...mutationOptions }
+  }
+
+export type AdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatchMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof adminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>>
+  >
+
+export type AdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatchMutationError =
+  HTTPValidationError
+
+/**
+ * @summary Admin.Categories.Unpublish
+ */
+export const useAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof adminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>
+      >,
+      TError,
+      { categoryId: string },
+      TContext
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof adminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatch>>,
+  TError,
+  { categoryId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAdminCategoriesUnpublishApiAdminCategoriesCategoryIdUnpublishPatchMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }

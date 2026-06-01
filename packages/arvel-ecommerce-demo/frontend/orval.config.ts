@@ -9,6 +9,7 @@ export default defineConfig({
       schemas: './src/api/schemas',
       client: 'vue-query',
       prettier: true,
+      clean: true,
       override: {
         mutator: {
           path: './src/lib/api.ts',

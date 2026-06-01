@@ -15,16 +15,16 @@ import type {
 import { unref } from 'vue'
 import type { MaybeRef } from 'vue'
 
-import type { ApiErrorOut, CheckoutPayload, OrderWrapperOut } from '.././schemas'
+import type { CheckoutPayload, HTTPValidationError, OrderWrapperOut } from '.././schemas'
 
 import { request } from '../../lib/api'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.Checkout
+ * @summary Checkout
  */
-export const apiCheckoutApiCheckoutPost = (
+export const checkoutApiCheckoutPost = (
   checkoutPayload: MaybeRef<CheckoutPayload>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -43,31 +43,24 @@ export const apiCheckoutApiCheckoutPost = (
   )
 }
 
-export const getApiCheckoutApiCheckoutPostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getCheckoutApiCheckoutPostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiCheckoutApiCheckoutPost>>,
+    Awaited<ReturnType<typeof checkoutApiCheckoutPost>>,
     TError,
     { data: CheckoutPayload },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiCheckoutApiCheckoutPost>>,
+  Awaited<ReturnType<typeof checkoutApiCheckoutPost>>,
   TError,
   { data: CheckoutPayload },
   TContext
 > => {
-  const mutationKey = ['apiCheckoutApiCheckoutPost']
+  const mutationKey = ['checkoutApiCheckoutPost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -75,47 +68,30 @@ export const getApiCheckoutApiCheckoutPostMutationOptions = <
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiCheckoutApiCheckoutPost>>,
+    Awaited<ReturnType<typeof checkoutApiCheckoutPost>>,
     { data: CheckoutPayload }
   > = (props) => {
     const { data } = props ?? {}
 
-    return apiCheckoutApiCheckoutPost(data, requestOptions)
+    return checkoutApiCheckoutPost(data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiCheckoutApiCheckoutPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiCheckoutApiCheckoutPost>>
+export type CheckoutApiCheckoutPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof checkoutApiCheckoutPost>>
 >
-export type ApiCheckoutApiCheckoutPostMutationBody = CheckoutPayload
-export type ApiCheckoutApiCheckoutPostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type CheckoutApiCheckoutPostMutationBody = CheckoutPayload
+export type CheckoutApiCheckoutPostMutationError = HTTPValidationError
 
 /**
- * @summary Api.Checkout
+ * @summary Checkout
  */
-export const useApiCheckoutApiCheckoutPost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(
+export const useCheckoutApiCheckoutPost = <TError = HTTPValidationError, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiCheckoutApiCheckoutPost>>,
+      Awaited<ReturnType<typeof checkoutApiCheckoutPost>>,
       TError,
       { data: CheckoutPayload },
       TContext
@@ -124,12 +100,12 @@ export const useApiCheckoutApiCheckoutPost = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiCheckoutApiCheckoutPost>>,
+  Awaited<ReturnType<typeof checkoutApiCheckoutPost>>,
   TError,
   { data: CheckoutPayload },
   TContext
 > => {
-  const mutationOptions = getApiCheckoutApiCheckoutPostMutationOptions(options)
+  const mutationOptions = getCheckoutApiCheckoutPostMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
