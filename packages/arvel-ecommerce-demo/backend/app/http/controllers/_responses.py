@@ -316,6 +316,7 @@ class AdminUserOut(_Out):
     email: str
     roles: list[str]
     permissions: list[str]
+    direct_permissions: list[str]
     suspended_at: str | None
     deleted_at: str | None
 

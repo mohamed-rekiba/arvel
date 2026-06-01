@@ -120,10 +120,11 @@ async def test_admin_can_list_products(client: Any, catalog_token: str) -> None:
 @pytest.mark.asyncio
 async def test_support_cannot_create_product(client: Any, support_token: str) -> None:
     """US-008: support role (level 40) cannot create products."""
+    # Send a schema-valid body so the 403 reflects authorization, not validation.
     response = await client.post(
         "/api/admin/products",
         headers={"Authorization": f"Bearer {support_token}"},
-        json={},
+        json={"name": {"en": "Forbidden"}, "price": 9.99, "category_id": "missing"},
     )
     assert response.status_code == 403
 
