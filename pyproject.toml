@@ -31,6 +31,7 @@ dev = [
     "bandit>=1.9.4",
     "coverage[toml]>=7.14.0",
     "cyclonedx-bom>=7.3.0",
+    "mkdocs-github-admonitions-plugin>=0.1.1",
     "mkdocs-material>=9.7.6",
     "mkdocs-minify-plugin>=0.8.0",
     "mkdocstrings[python]>=1.0.4",

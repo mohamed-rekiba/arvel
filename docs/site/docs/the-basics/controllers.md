@@ -1,0 +1,210 @@
+# Controllers
+
+<a name="introduction"></a>
+## Introduction
+
+Instead of defining all request-handling logic as standalone functions in your route files, you may group related handling into "controller" classes. A controller can group related request handling logic into a single class — for example, a `UserController` class might handle all incoming requests related to users: showing, creating, updating, and deleting users.
+
+Controllers are entirely optional. A plain `async def` route handler is perfectly fine for simple endpoints. Reach for a controller when a route file grows unwieldy, or when several handlers share dependencies you'd rather inject once.
+
+Every controller in Arvel is resolved through the [service container](../core-concepts/service-container.md), so its constructor dependencies are wired automatically.
+
+<a name="writing-controllers"></a>
+## Writing Controllers
+
+<a name="basic-controllers"></a>
+### Basic Controllers
+
+A controller extends the base `Controller` class and defines one `async def` method per action. Bind each method to a route with the `controller` and `action` keywords:
+
+```python
+from arvel.http.controller import Controller
+from arvel.routing import Route
+from app.models.user import User
+
+
+class UserController(Controller):
+    async def show(self, user: User) -> dict:
+        return user.to_dict()
+
+
+Route.get("/api/users/{user}", controller=UserController, action="show", name="users.show")
+```
+
+A controller method behaves exactly like a route handler function. Its parameters are resolved the same way: path and query parameters from the URL, request bodies from Pydantic models, the `Request` object on demand, [route model binding](routing.md#route-model-binding) for model-typed parameters, and [container services](#method-injection) via `dep(...)`.
+
+```python
+class UserController(Controller):
+    async def index(self) -> list[dict]:
+        users = await User.all()
+        return [u.to_dict() for u in users]
+
+    async def show(self, user: User) -> dict:   # model binding resolves `user`
+        return user.to_dict()
+
+
+Route.get("/api/users", controller=UserController, action="index", name="users.index")
+Route.get("/api/users/{user}", controller=UserController, action="show", name="users.show")
+```
+
+> [!NOTE]
+> The base `Controller` class is a lightweight marker — it has no middleware property or authorization helpers. Attach [middleware](middleware.md) on the route or [route group](routing.md#route-groups), and perform authorization with a [form request](validation.md#form-request-validation) or a [gate](../features/authorization.md).
+
+<a name="single-action-controllers"></a>
+### Single Action Controllers
+
+If a controller action is particularly complex, you might find it convenient to dedicate an entire controller class to that single action. Define a `__call__` method and bind the route with only `controller` (no `action`):
+
+```python
+from arvel import Controller, Route
+from starlette.requests import Request
+
+
+class ProvisionServer(Controller):
+    async def __call__(self, request: Request) -> dict:
+        # ... provision a server ...
+        return {"status": "provisioning"}
+
+
+Route.post("/api/servers", controller=ProvisionServer)
+```
+
+> [!WARNING]
+> Binding `controller=` without `action=` requires the class to define `__call__`. If it doesn't, route registration raises a `TypeError` immediately, at decoration time — not at request time.
+
+<a name="controller-dependency-injection"></a>
+## Controller Dependency Injection
+
+<a name="constructor-injection"></a>
+### Constructor Injection
+
+The [service container](../core-concepts/service-container.md) resolves all controllers, so you may type-hint any dependencies your controller needs in its constructor. The declared dependencies are resolved and injected automatically:
+
+```python
+class UserController(Controller):
+    def __init__(self, users: UserService) -> None:
+        self.users = users
+
+    async def index(self) -> list[dict]:
+        return await self.users.all()
+```
+
+> [!NOTE]
+> A controller instance is created when its route is mounted (at boot), not on every request. If you need a fresh instance per route on a class that backs several routes, that's the default for container `bind()` registrations; register the controller as a `singleton()` to share one instance across its routes.
+
+<a name="method-injection"></a>
+### Method Injection
+
+In addition to constructor injection, you may resolve container services directly in an action's signature with `dep(...)`. This pulls the service from the per-request [scope](../core-concepts/service-container.md):
+
+```python
+from arvel import Controller, dep
+from fastapi import Depends
+
+
+class ReportController(Controller):
+    async def export(self, reports: ReportService = Depends(dep(ReportService))) -> dict:
+        return await reports.export()
+```
+
+`dep(...)` returns a resolver; wrap it in FastAPI's `Depends(...)` so the service is resolved per request rather than the function object being used as the default.
+
+The `Request` instance is injected by type-hinting a parameter with it, exactly as in a function handler:
+
+```python
+class SessionController(Controller):
+    async def store(self, request: Request) -> dict:
+        ...
+```
+
+<a name="resource-controllers"></a>
+## Resource Controllers
+
+Think of each ORM model in your application as a "resource", and the typical set of actions you perform against it — list, create, show, update, delete — as repetitive. Resource routing assigns those conventional routes to a controller with a single line of code. See [Resource Routes](routing.md#resource-routes) for the routing side:
+
+```python
+from app.http.controllers.post_controller import PostController
+
+Route.resource("/api/posts", PostController)
+```
+
+<a name="actions-handled-by-a-resource-controller"></a>
+### Actions Handled by a Resource Controller
+
+`Route.resource` expects your controller to implement methods named after the seven resource actions:
+
+| Verb | Path | Method | Purpose |
+|---|---|---|---|
+| GET | `/api/posts` | `index` | List the resource |
+| GET | `/api/posts/create` | `create` | Show the create form |
+| POST | `/api/posts` | `store` | Persist a new resource |
+| GET | `/api/posts/{post}` | `show` | Show one resource |
+| GET | `/api/posts/{post}/edit` | `edit` | Show the edit form |
+| PUT | `/api/posts/{post}` | `update` | Persist changes |
+| DELETE | `/api/posts/{post}` | `destroy` | Delete the resource |
+
+The member routes (`show`, `edit`, `update`, `destroy`) receive the resource via [model binding](routing.md#route-model-binding) when you type-hint the parameter:
+
+```python
+from arvel import Controller
+from app.http.requests import StorePostRequest, UpdatePostRequest
+from app.models.post import Post
+
+
+class PostController(Controller):
+    async def index(self) -> list[dict]:
+        return [p.to_dict() for p in await Post.all()]
+
+    async def store(self, form: StorePostRequest) -> dict:
+        post = await Post.create(**form.validated().model_dump())
+        return post.to_dict()
+
+    async def show(self, post: Post) -> dict:
+        return post.to_dict()
+
+    async def update(self, post: Post, form: UpdatePostRequest) -> dict:
+        post.fill(**form.validated().model_dump())
+        await post.save()
+        return post.to_dict()
+
+    async def destroy(self, post: Post) -> dict:
+        await post.delete()
+        return {"deleted": True}
+```
+
+<a name="api-resource-controllers"></a>
+### API Resource Controllers
+
+When building a JSON API, the `create` and `edit` actions — which exist to render HTML forms — are dead weight. Use `Route.api_resource` to register the resource routes **without** them:
+
+```python
+Route.api_resource("/api/posts", PostController)
+# index, store, show, update, destroy
+```
+
+You can further narrow, rename, or scope a resource registration — see [Partial Resource Routes](routing.md#partial-resource-routes).
+
+<a name="generating-controllers"></a>
+## Generating Controllers
+
+The `make:controller` command scaffolds a controller in `app/http/controllers/`:
+
+```bash
+arvel make:controller UserController
+```
+
+| Flag | Effect |
+|---|---|
+| `--force` | Overwrite an existing file. |
+| `--resource` | Generate stubs for all seven REST actions. |
+| `--api` | With `--resource`, omit the `create` and `edit` actions. |
+| `--model Post` | With `--resource`, import `app.models.post` and type member parameters as the model. |
+
+```bash
+arvel make:controller PostController --resource
+arvel make:controller PostController --resource --api
+arvel make:controller PostController --resource --model Post
+```
+
+> [!NOTE]
+> The generated resource actions raise `NotImplementedError` until you fill them in — they're stubs, not working endpoints.
