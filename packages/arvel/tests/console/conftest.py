@@ -3,13 +3,43 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import io
+import os
+import shutil
+import tempfile
+from collections.abc import Iterator
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import click
+import typer
 from typer.testing import CliRunner
+
+# typer 0.26 swapped its Click-derived CliRunner for a vendored standalone class
+# that dropped `isolated_filesystem`. The console suite (and scaffold tests) still
+# rely on it, so restore a faithful equivalent here when it's missing. Attaching
+# at import time means every console test sees the method via the class.
+if not hasattr(CliRunner, "isolated_filesystem"):
+
+    @contextlib.contextmanager
+    def _isolated_filesystem(
+        self: CliRunner,
+        temp_dir: str | os.PathLike[str] | None = None,
+    ) -> Iterator[str]:
+        cwd = Path.cwd()
+        target = tempfile.mkdtemp(dir=temp_dir)
+        os.chdir(target)
+        try:
+            yield target
+        finally:
+            os.chdir(cwd)
+            with contextlib.suppress(OSError):
+                shutil.rmtree(target)
+
+    CliRunner.isolated_filesystem = _isolated_filesystem  # type: ignore[attr-defined]
 
 
 @dataclass
@@ -67,9 +97,11 @@ def invoke_async(
     with redirect_stdout(async_buf), redirect_stderr(async_buf):
         try:
             asyncio.run(coro)
-        except click.exceptions.Exit as exc:
+        # typer 0.26 vendors its own click, so typer.Exit/Abort are no longer
+        # subclasses of the external click.exceptions.* — catch both.
+        except (typer.Exit, click.exceptions.Exit) as exc:
             async_exit_code = exc.exit_code
-        except click.exceptions.Abort:
+        except (typer.Abort, click.exceptions.Abort):
             async_exit_code = 1
         except SystemExit as exc:
             code = exc.code
