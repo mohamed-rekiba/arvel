@@ -274,6 +274,16 @@ class ShellCommand(Command):
 
     @staticmethod
     def _import_user_model(file_path: Path) -> ModuleType | None:
+        # Reuse a module already loaded from this file (e.g. app.models.user
+        # imported during boot via routes/controllers). Re-executing the file
+        # under a synthetic name would re-run the `class User(Model)` definition
+        # and register its table on the shared MetaData a second time, which
+        # SQLAlchemy rejects ("Table 'users' is already defined") — the model
+        # would then be silently skipped and missing from the REPL namespace.
+        already_loaded = _find_loaded_module(file_path)
+        if already_loaded is not None:
+            return already_loaded
+
         module_name = f"arvel_user_models_{file_path.stem}"
         try:
             spec = importlib.util.spec_from_file_location(module_name, file_path)
@@ -289,15 +299,18 @@ class ShellCommand(Command):
 
     def print_banner(self, namespace: dict[str, Any]) -> None:
         """Print the welcome banner. Public so tests can drive it standalone."""
-        typer.echo("Arvel shell — Ctrl-D to exit.")
+        typer.secho()
+        typer.secho("Arvel shell — Ctrl-D to exit.", fg=typer.colors.YELLOW)
         if "session" in namespace:
-            typer.echo(
+            typer.secho(
                 "DB session active. Wrap writes in `async with DB.transaction():` "
                 "or call `await session.commit()` to persist.",
+                fg=typer.colors.GREEN,
             )
         aliased = namespace.get("__arvel_aliased_models__")
         if aliased:
-            typer.echo(f"Aliased models: {', '.join(aliased)}.")
+            typer.secho(f"Aliased models: {', '.join(aliased)}.", fg=typer.colors.CYAN)
+        typer.secho()
 
     def _launch_repl(self, namespace: dict[str, Any]) -> None:
         try:
@@ -312,6 +325,28 @@ class ShellCommand(Command):
             import code  # noqa: PLC0415
 
             code.interact(local=namespace)
+
+
+def _find_loaded_module(file_path: Path) -> ModuleType | None:
+    """Return an already-imported module sourced from ``file_path``, if any.
+
+    Matches by resolved ``__file__`` so a model imported during boot under its
+    canonical dotted name (``app.models.user``) is reused instead of re-executed.
+    """
+    try:
+        target = file_path.resolve()
+    except OSError:
+        return None
+    for module in list(sys.modules.values()):
+        mod_file = getattr(module, "__file__", None)
+        if mod_file is None:
+            continue
+        try:
+            if Path(mod_file).resolve() == target:
+                return module
+        except (OSError, ValueError):
+            continue
+    return None
 
 
 def _collect_models(module: ModuleType, namespace: dict[str, Any], model_base: type) -> list[str]:

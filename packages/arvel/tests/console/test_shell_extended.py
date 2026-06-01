@@ -187,6 +187,59 @@ class TestAutoImportUserModels:
         finally:
             cmd.release_active_session()
 
+    def test_reuses_model_module_already_imported_during_boot(self, db_env: Path) -> None:
+        """A model imported under its real name during boot must still surface.
+
+        In a real project, routes/controllers import ``app.models.user`` during
+        ``boot()``, registering the ``users`` table on the shared MetaData. The
+        shell used to re-execute the same file under a synthetic module name,
+        which re-registered the table and crashed SQLAlchemy — the model was
+        then silently skipped and missing from the REPL namespace. The shell
+        must reuse the already-imported module instead.
+        """
+        import importlib.util
+
+        models_dir = db_env / "app" / "models"
+        models_dir.mkdir(parents=True)
+        model_file = models_dir / "customer.py"
+        model_file.write_text(
+            textwrap.dedent(
+                """
+                from __future__ import annotations
+
+                from arvel.database import Model, id_
+
+
+                class Customer(Model):
+                    __tablename__ = "shell_ext_customers"
+                    id: int = id_()
+                """
+            )
+        )
+
+        # Simulate boot-time import: load the file under its canonical dotted
+        # name, registering the table on the shared MetaData up front.
+        spec = importlib.util.spec_from_file_location("app.models.customer", model_file)
+        assert spec is not None and spec.loader is not None
+        boot_module = importlib.util.module_from_spec(spec)
+        import sys
+
+        sys.modules["app.models.customer"] = boot_module
+        spec.loader.exec_module(boot_module)
+
+        try:
+            cmd = ShellCommand()
+            cmd.app = _build_app(db_env)
+            try:
+                ns = cmd.build_namespace()
+                assert "Customer" in ns
+                assert ns["Customer"] is boot_module.Customer
+                assert ns["__arvel_aliased_models__"] == ("Customer",)
+            finally:
+                cmd.release_active_session()
+        finally:
+            sys.modules.pop("app.models.customer", None)
+
     def test_no_models_dir_is_a_silent_noop(self, db_env: Path) -> None:
         # db_env has no app/ subdir at all.
         cmd = ShellCommand()
