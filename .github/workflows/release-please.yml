@@ -32,6 +32,11 @@ jobs:
       - uses: googleapis/release-please-action@v5.0.0
         id: release
         with:
+          # A PAT or GitHub App token is required so the tags release-please
+          # creates trigger publish.yml. Tags pushed with the default
+          # GITHUB_TOKEN do NOT emit events (GitHub blocks recursive runs), so
+          # auto-publish stays dormant until RELEASE_PLEASE_TOKEN is set.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: .github/release-please-config.json
           manifest-file: .github/release-please-manifest.json
 
@@ -73,9 +78,11 @@ jobs:
             if git diff --quiet uv.lock; then
               echo "uv.lock already up to date on ${branch}"
             else
+              # Fold the lockfile into release-please's own commit instead of
+              # adding a second commit, so the release PR stays one commit.
               git add uv.lock
-              git commit -m "chore: regenerate uv.lock after version bump"
-              git push origin "HEAD:${branch}"
+              git commit --amend --no-edit
+              git push --force-with-lease origin "HEAD:${branch}"
             fi
             git checkout -
             echo "::endgroup::"

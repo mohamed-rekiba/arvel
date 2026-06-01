@@ -1,6 +1,6 @@
 # Release Notes
 
-Arvel is pre-1.0, currently at `v0.3.0`. The core subsystems are complete and working; the public API may still shift before `1.0`. This page covers the versioning scheme, the support policy, and a high-level map of what's in the box. For the full, per-release changelog, see [`CHANGELOG.md`](https://github.com/mohamed-rekiba/arvel/blob/main/CHANGELOG.md).
+Arvel is pre-1.0. The core subsystems are complete and working; the public API may still shift before `1.0`. This page covers the versioning scheme, the support policy, and a high-level map of what's in the box. For the full, per-release changelog, see [`CHANGELOG.md`](https://github.com/mohamed-rekiba/arvel/blob/main/CHANGELOG.md).
 
 <a name="versioning-scheme"></a>
 ## Versioning Scheme
