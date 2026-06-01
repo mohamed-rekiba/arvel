@@ -7,12 +7,17 @@ from typing import cast
 
 import yaml
 
-RELEASE_YML = Path(__file__).resolve().parents[4] / ".github" / "workflows" / "release-please.yml"
+WORKFLOWS = Path(__file__).resolve().parents[4] / ".github" / "workflows"
+RELEASE_YML = WORKFLOWS / "release-please.yml"
+# release-please.yml opens release PRs on push to main; when a release PR
+# merges, release-please pushes a `<package>-v<version>` tag. publish.yml is
+# the workflow that triggers on those tags, runs `twine check`, and publishes.
+PUBLISH_YML = WORKFLOWS / "publish.yml"
 
 
-def _load_workflow() -> dict[object, object]:
-    raw: object = yaml.safe_load(RELEASE_YML.read_text(encoding="utf-8"))
-    assert isinstance(raw, dict), f"{RELEASE_YML} must be a YAML mapping"
+def _load_workflow(path: Path) -> dict[object, object]:
+    raw: object = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(raw, dict), f"{path} must be a YAML mapping"
     return cast("dict[object, object]", raw)
 
 
@@ -30,28 +35,29 @@ def _as_list(value: object) -> list[object]:
 
 def test_release_workflow_exists() -> None:
     assert RELEASE_YML.exists(), f"FR-017-021: {RELEASE_YML} must exist"
+    assert PUBLISH_YML.exists(), f"FR-017-021: {PUBLISH_YML} must exist"
 
 
 def test_release_workflow_triggers_on_version_tag() -> None:
-    workflow = _load_workflow()
+    workflow = _load_workflow(PUBLISH_YML)
     # PyYAML parses a bare ``on:`` key as the Python bool True.
     on = _as_dict(workflow.get(True, workflow.get("on", {})))
     push = _as_dict(on.get("push", {}))
     tags = _as_list(push.get("tags", []))
     assert any("v" in str(t) for t in tags), (
-        "FR-017-021: release workflow must trigger on push to v*.*.* tags"
+        "FR-017-021: publish workflow must trigger on push to <package>-v*.*.* tags"
     )
 
 
 def test_release_workflow_fails_closed() -> None:
-    """workflow must NOT execute twine upload.
+    """publish workflow must NOT execute twine upload.
 
     Scope check: only counts uncommented, executable shell lines (lines that
     start a `run:` block or are inside one). Documentation comments referring
     to 'twine upload' as a manual step are fine.
     """
-    raw = RELEASE_YML.read_text(encoding="utf-8")
-    workflow = _load_workflow()
+    raw = PUBLISH_YML.read_text(encoding="utf-8")
+    workflow = _load_workflow(PUBLISH_YML)
     jobs = _as_dict(workflow.get("jobs", {}))
 
     for job_name, job_value in jobs.items():
@@ -76,5 +82,5 @@ def test_release_workflow_fails_closed() -> None:
                 )
 
     assert "twine check" in raw, (
-        "FR-017-021: release-please.yml must run 'twine check' as a dry-run validation"
+        "FR-017-021: publish.yml must run 'twine check' as a dry-run validation"
     )
