@@ -1,4 +1,4 @@
-"""Eloquent-parity (backlog 006, S1): attribute-level custom cast protocol."""
+"""Eloquent-parity: attribute-level custom cast protocol."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ async def _create_tables(engine: AsyncEngine) -> None:
 
 def test_custom_cast_class_routes_get_and_set() -> None:
     doc = Doc(meta={"a": 1})
-    # set() JSON-encoded it for storage; get() parses back to a dict.
+    # set JSON-encoded it for storage; get parses back to a dict.
     assert doc.meta == {"a": 1}
 
 
@@ -79,7 +79,7 @@ def test_plain_builtin_cast_still_works() -> None:
 def test_to_dict_uses_cast_serialize() -> None:
     doc = Doc(meta={"x": [1, 2]}, code="hi")
     data = doc.to_dict()
-    # serialize() yields the dict, not the stored JSON string.
+    # serialize yields the dict, not the stored JSON string.
     assert data["meta"] == {"x": [1, 2]}
 
 

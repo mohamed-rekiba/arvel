@@ -1,4 +1,4 @@
-"""Eloquent-parity (backlog 005, S13): or_* OR-onto-chain + clause polish bundle."""
+"""Eloquent-parity: or_* OR-onto-chain + clause polish bundle."""
 
 from __future__ import annotations
 

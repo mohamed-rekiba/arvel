@@ -19,8 +19,8 @@ _log = logging.getLogger("arvel.console")
 class Context:
     """I/O surface passed to ``Command.handle()``.
 
-    Method names mirror Laravel Artisan's command I/O so the migration story is
-    obvious to anyone coming from PHP. Output goes to stdout for status/info
+    Method names mirror Laravel Artisan's command I/O so it's familiar to
+    anyone coming from PHP. Output goes to stdout for status/info
     channels and stderr for ``error()`` — the latter mirrors the convention
     that exit codes are paired with stderr messages.
     """
@@ -160,9 +160,9 @@ class Application:
         return name in self._commands
 
     def register_command(self, cmd: Command) -> None:
-        """Register a Command after construction (WI-020 FR-020-02).
+        """Register a Command after construction.
 
-        Used by ``ConsoleServiceProvider.boot()`` to attach provider-owned
+        Used by ``ConsoleServiceProvider.boot`` to attach provider-owned
         commands once their dependencies have been wired. Re-registering a
         name overwrites the previous binding and logs a warning so the
         collision is auditable.
@@ -173,7 +173,7 @@ class Application:
         cmd.register(self.typer_app)
 
     def run(self, name: str, args: list[str] | None = None) -> int:
-        """Invoke a registered command by name and return its exit code (WI-020 FR-020-01).
+        """Invoke a registered command by name and return its exit code.
 
         Bypasses Typer's CLI parsing — this is the in-process programmatic
         entry-point used by the scheduler kernel's ``run_command`` hook. The

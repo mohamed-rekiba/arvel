@@ -1,4 +1,4 @@
-"""Eloquent-parity (backlog 005, Sprint A): nested WHERE groups, unless/tap, efficient exists."""
+"""Eloquent-parity: nested WHERE groups, unless/tap, efficient exists."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ async def _seed(engine: Any) -> None:
     await Gadget.create(name="gamma", qty=9, tag="x")
 
 
-# ── S2: nested WHERE groups ────────────────────────────────────────────────
+# ── nested WHERE groups ────────────────────────────────────────────────
 
 
 async def test_where_callback_groups_or_within_and(engine: Any, session: AsyncSession) -> None:
@@ -69,7 +69,7 @@ async def test_where_group_callback_returning_none_raises(
         Gadget.where(_bad)
 
 
-# ── S4: unless / tap ───────────────────────────────────────────────────────
+# ── unless / tap ───────────────────────────────────────────────────────
 
 
 async def test_unless_runs_callback_when_condition_falsy(
@@ -120,7 +120,7 @@ async def test_tap_ignores_callback_return_value(engine: Any, session: AsyncSess
     assert await tapped.count() == 3
 
 
-# ── S7: efficient exists / doesnt_exist ────────────────────────────────────
+# ── efficient exists / doesnt_exist ────────────────────────────────────
 
 
 async def test_exists_true_and_false(engine: Any, session: AsyncSession) -> None:

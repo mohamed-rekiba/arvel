@@ -1,4 +1,4 @@
-"""Eloquent-parity (backlog 005, S1): date/time WHERE helpers."""
+"""Eloquent-parity: date/time WHERE helpers."""
 
 from __future__ import annotations
 

@@ -1,7 +1,6 @@
-"""Eloquent-parity (backlog 005, S3): subquery FROM / JOIN / SELECT.
+"""Eloquent-parity: subquery FROM / JOIN / SELECT.
 
-from_sub, join_sub / left_join_sub, select_sub, add_select.
-"""
+from_sub, join_sub / left_join_sub, select_sub, add_select."""
 
 from __future__ import annotations
 

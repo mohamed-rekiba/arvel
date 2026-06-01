@@ -1,6 +1,6 @@
-"""WI-arvel-068 — Epic 049 Story 10 write-path follow-up.
+"""Cast write-path follow-up.
 
-Read-path casts shipped in WI-063 — ``m.field`` returns the cast value when
+Read-path casts shipped in ``m.field`` returns the cast value when
 ``__casts__`` lists the column. The follow-up is symmetric: assignment
 (``m.field = raw_value``) and construction (``Model(field=raw_value)``)
 should coerce eagerly so the **stored** value is already the right type
@@ -9,8 +9,7 @@ before SQLAlchemy persists it.
 Tests bypass ``Model.__getattribute__`` via ``object.__getattribute__`` to
 read the raw stored value — proves the coercion happened on write, not on
 read. Invalid values raise ``CastError`` immediately at assignment, not on
-the first read.
-"""
+the first read."""
 
 from __future__ import annotations
 

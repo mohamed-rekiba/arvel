@@ -1,4 +1,4 @@
-"""Eloquent-parity (backlog 005, S12): imperative begin/commit/rollback + savepoints."""
+"""Eloquent-parity: imperative begin/commit/rollback + savepoints."""
 
 from __future__ import annotations
 
