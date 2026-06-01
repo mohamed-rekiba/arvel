@@ -1,10 +1,12 @@
 name: Release Please
 
-# Opens per-package release PRs on every push to `main`. When a release PR is
-# merged, release-please creates a component-prefixed tag (e.g. `arvel-v1.0.1`
-# or `arvel-cli-v0.1.0`) and a GitHub Release. The companion
-# `publish.yml` workflow then uploads the matching distribution to PyPI via
-# Trusted Publishing.
+# Opens per-package release PRs on every push to `main`. Each workspace
+# package versions independently (see release-please-config.json +
+# release-please-manifest.json). When a release PR is merged, release-please
+# creates a component-prefixed tag (e.g. `arvel-v1.0.1`,
+# `arvel-permission-v0.4.0`) plus a GitHub Release. The companion
+# `publish.yml` workflow then builds the matching package and uploads it to
+# PyPI via Trusted Publishing, and attaches the distribution to the Release.
 
 on:
   push:
@@ -26,10 +28,6 @@ jobs:
   release-please:
     name: Open / update release PRs
     runs-on: ubuntu-24.04
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      pr: ${{ steps.release.outputs.pr }}
     steps:
       - uses: googleapis/release-please-action@v5.0.0
         id: release
@@ -38,50 +36,47 @@ jobs:
           manifest-file: .github/release-please-manifest.json
 
   update-lockfile:
-    name: Regenerate uv.lock on release PR
+    name: Regenerate uv.lock on release PRs
     needs: release-please
-    # A version bump in pyproject.toml invalidates uv.lock (it pins the
-    # workspace member version). Every CI job runs --frozen, so without this
-    # the release PR fails. Regenerate and push it back to the PR branch.
-    if: needs.release-please.outputs.pr != '' && !fromJSON(needs.release-please.outputs.pr).merged
+    # A version bump in any package's pyproject.toml invalidates the shared
+    # uv.lock (it pins every workspace member's version). Every CI job runs
+    # --frozen, so without this each release PR would fail. Because packages
+    # release via separate PRs, regenerate the lockfile on every open
+    # release-please PR branch — not just one.
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: read
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
       - uses: astral-sh/setup-uv@v8.1.0
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Regenerate lockfile
-        run: uv lock
-      - name: Commit updated lockfile
+      - name: Regenerate uv.lock on each open release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if git diff --quiet uv.lock; then
-            echo "uv.lock already up to date"
+          branches=$(gh pr list --state open --json headRefName \
+            --jq '.[] | select(.headRefName | startswith("release-please--branches--main")) | .headRefName')
+          if [ -z "${branches}" ]; then
+            echo "No open release-please PRs; nothing to do."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add uv.lock
-          git commit -m "chore: regenerate uv.lock after version bump"
-          git push
-
-  upload-assets:
-    name: Attach distributions to GitHub Release
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.1.0
-        with:
-          version: ${{ env.UV_VERSION }}
-          python-version: ${{ env.PYTHON_VERSION }}
-          enable-cache: true
-      - name: Build wheel + sdist for arvel
-        run: uv build --package arvel --out-dir dist/arvel
-      - name: Upload assets to the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" dist/arvel/* --clobber
+          for branch in ${branches}; do
+            echo "::group::${branch}"
+            git fetch origin "${branch}"
+            git checkout "${branch}"
+            uv lock
+            if git diff --quiet uv.lock; then
+              echo "uv.lock already up to date on ${branch}"
+            else
+              git add uv.lock
+              git commit -m "chore: regenerate uv.lock after version bump"
+              git push origin "HEAD:${branch}"
+            fi
+            git checkout -
+            echo "::endgroup::"
+          done
