@@ -960,7 +960,8 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.catalog.action_delete': 'Sil',
     'admin.catalog.action_force_delete': 'Kalıcı sil',
     'admin.catalog.delete_confirm': 'Bu öğeyi silmek istiyor musunuz?',
-    'admin.catalog.force_delete_confirm': 'Bu öğe kalıcı olarak silinsin mi? Bu işlem geri alınamaz.',
+    'admin.catalog.force_delete_confirm':
+      'Bu öğe kalıcı olarak silinsin mi? Bu işlem geri alınamaz.',
     'admin.catalog.saving': 'Kaydediliyor…',
     'admin.catalog.save': 'Kaydet',
     'admin.catalog.cancel': 'İptal',
