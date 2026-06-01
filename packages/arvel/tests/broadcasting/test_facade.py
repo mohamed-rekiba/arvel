@@ -1,4 +1,4 @@
-"""FR-013-007 — Broadcast facade."""
+"""Broadcast facade."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ def test_facade_has_required_methods() -> None:
 
 
 def test_facade_channel_returns_decorator() -> None:
-    """FR-013-007 AC2: @Broadcast.channel("pattern") returns a decorator."""
+    """@Broadcast.channel("pattern") returns a decorator."""
     from arvel.facades.broadcast import Broadcast
 
     decorator = Broadcast.channel("private-test.{id}")
@@ -31,7 +31,7 @@ def test_facade_channel_returns_decorator() -> None:
 
 @pytest.mark.asyncio
 async def test_facade_driver_delegates_to_manager() -> None:
-    """FR-013-007 AC3: facade.driver() delegates to BroadcastManager."""
+    """facade.driver delegates to BroadcastManager."""
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.drivers.null import NullBroadcaster
     from arvel.broadcasting.manager import BroadcastManager

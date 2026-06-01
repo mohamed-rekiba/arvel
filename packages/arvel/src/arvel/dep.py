@@ -17,7 +17,7 @@ def dep(abstract: type[T]) -> Callable[..., T]:
 
     The resolver expects the request to expose ``request.state.arvel_scope``, an
     instance of ``arvel.container.Container`` (created per-request by the framework's
-    scope middleware, shipped fully in WI-arvel-002).
+    scope middleware, shipped fully).
     """
 
     def _resolve(request: Request) -> T:

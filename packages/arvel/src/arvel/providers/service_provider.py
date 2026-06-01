@@ -45,10 +45,10 @@ class ServiceProvider:
         """Async. Tear down resources. Runs in reverse registration order."""
 
     def commands(self) -> list[type[Command] | Command]:
-        """Console commands shipped by this provider (WI-020 FR-020-05).
+        """Console commands shipped by this provider.
 
         Each item may be either a ``Command`` subclass (instantiated with
-        no args by ``ConsoleServiceProvider.boot()``) or a pre-built
+        no args by ``ConsoleServiceProvider.boot``) or a pre-built
         ``Command`` instance (used when the provider needs to inject
         dependencies that come from the container).
         """

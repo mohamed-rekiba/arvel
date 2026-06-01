@@ -1,11 +1,4 @@
-"""QA-Pre tests for WI-arvel-046 — arvel-image medialibrary v11 parity.
-
-Maps to PRD-046 FRs FR-046-01 .. FR-046-16.
-
-All tests in this file are expected to FAIL until Stage 3b (Execution) implements
-the corresponding features. They compile and the infrastructure runs; the assertions
-fail because the features do not yet exist.
-"""
+"""Tests for medialibrary v11 parity."""
 
 from __future__ import annotations
 
@@ -87,14 +80,14 @@ def _host_046() -> type[Any]:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-01: UUID auto-generation
+# UUID auto-generation
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 async def test_uuid_is_set_after_add_media(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-01: FileAdder.to_media_collection() populates uuid on the row."""
+    """FileAdder.to_media_collection() populates uuid on the row."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -115,7 +108,7 @@ async def test_uuid_is_set_after_add_media(
 async def test_two_media_rows_have_distinct_uuids(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-01: each row gets a unique uuid."""
+    """each row gets a unique uuid."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -132,14 +125,14 @@ async def test_two_media_rows_have_distinct_uuids(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-02: Atomic ingestion rollback
+# Atomic ingestion rollback
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 async def test_rollback_on_conversion_failure_deletes_row_and_file(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-02: on conversion failure, the Media row and original file are removed."""
+    """on conversion failure, the Media row and original file are removed."""
     from arvel.facades import Storage
     from arvel_image import Conversion, MediaCollection
     from arvel_image.media.exceptions import ConversionFailedError
@@ -182,14 +175,14 @@ async def test_rollback_on_conversion_failure_deletes_row_and_file(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-03: conversions_disk honoured
+# conversions_disk honoured
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 async def test_conversions_disk_persisted_on_row(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-03: MediaCollection.use_conversions_disk() sets media.conversions_disk."""
+    """MediaCollection.use_conversions_disk() sets media.conversions_disk."""
     from arvel_image import Conversion, MediaCollection
 
     await _create_tables_046(engine)
@@ -206,7 +199,7 @@ async def test_conversions_disk_persisted_on_row(
 
 
 def test_media_collection_use_conversions_disk_returns_self() -> None:
-    """FR-046-03: use_conversions_disk is a chain method returning Self."""
+    """use_conversions_disk is a chain method returning Self."""
     from arvel_image import MediaCollection
 
     coll = MediaCollection("x")
@@ -216,14 +209,14 @@ def test_media_collection_use_conversions_disk_returns_self() -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-04: Ordered get_media()
+# Ordered get_media()
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 async def test_get_media_returns_in_order_column_asc(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-04: get_media() returns rows sorted by order_column ASC, then id ASC."""
+    """get_media() returns rows sorted by order_column ASC, then id ASC."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -252,12 +245,12 @@ async def test_get_media_returns_in_order_column_asc(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-05: add_media_from_url()
+# -- add_media_from_url --
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 async def test_add_media_from_url_exists_on_has_media() -> None:
-    """FR-046-05: HasMedia must expose add_media_from_url as an async method."""
+    """HasMedia must expose add_media_from_url as an async method."""
     from arvel_image import HasMedia
 
     assert hasattr(HasMedia, "add_media_from_url"), "add_media_from_url not found on HasMedia"
@@ -271,7 +264,7 @@ async def test_add_media_from_url_exists_on_has_media() -> None:
 async def test_add_media_from_url_downloads_and_ingests(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-05: add_media_from_url fetches bytes via httpx and ingests them."""
+    """add_media_from_url fetches bytes via httpx and ingests them."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -299,7 +292,7 @@ async def test_add_media_from_url_downloads_and_ingests(
 
 
 async def test_add_media_from_url_ssrf_guard_blocks_private_ip() -> None:
-    """FR-046-05 / NFR-046-04: SSRF guard rejects private IP addresses."""
+    """SSRF guard rejects private IP addresses."""
     from arvel_image.media.url_fetcher import fetch_url
 
     with pytest.raises(Exception, match="SSRF|private|blocked"):
@@ -307,7 +300,7 @@ async def test_add_media_from_url_ssrf_guard_blocks_private_ip() -> None:
 
 
 async def test_add_media_from_url_ssrf_guard_blocks_loopback() -> None:
-    """FR-046-05 / NFR-046-04: SSRF guard rejects loopback addresses."""
+    """SSRF guard rejects loopback addresses."""
     from arvel_image.media.url_fetcher import fetch_url
 
     with pytest.raises(Exception, match="SSRF|loopback|blocked"):
@@ -315,14 +308,14 @@ async def test_add_media_from_url_ssrf_guard_blocks_loopback() -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-06: with_custom_properties() on FileAdder
+# with_custom_properties() on FileAdder
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 async def test_with_custom_properties_persisted_on_row(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-06: with_custom_properties() stores data on media.custom_properties."""
+    """with_custom_properties() stores data on media.custom_properties."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -342,7 +335,7 @@ async def test_with_custom_properties_persisted_on_row(
 async def test_with_custom_properties_merges_on_second_call(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-06: calling with_custom_properties twice merges results."""
+    """calling with_custom_properties twice merges results."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -361,12 +354,12 @@ async def test_with_custom_properties_merges_on_second_call(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-07: Collection MIME + size validation
+# Collection MIME + size validation
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 def test_media_collection_accept_mime_types_returns_self() -> None:
-    """FR-046-07: accept_mime_types is a chain method on MediaCollection."""
+    """accept_mime_types is a chain method on MediaCollection."""
     from arvel_image import MediaCollection
 
     coll = MediaCollection("docs")
@@ -375,7 +368,7 @@ def test_media_collection_accept_mime_types_returns_self() -> None:
 
 
 def test_media_collection_max_file_size_returns_self() -> None:
-    """FR-046-07: max_file_size is a chain method on MediaCollection."""
+    """max_file_size is a chain method on MediaCollection."""
     from arvel_image import MediaCollection
 
     coll = MediaCollection("docs")
@@ -386,7 +379,7 @@ def test_media_collection_max_file_size_returns_self() -> None:
 async def test_validation_rejects_wrong_mime_before_io(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-07: ingestion fails with wrong MIME before any storage write."""
+    """ingestion fails with wrong MIME before any storage write."""
     from arvel.facades import Storage
     from arvel_image import MediaCollection
 
@@ -409,7 +402,7 @@ async def test_validation_rejects_wrong_mime_before_io(
 async def test_validation_rejects_oversized_file_before_io(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-07: ingestion fails when file exceeds max_file_size."""
+    """ingestion fails when file exceeds max_file_size."""
     from arvel.facades import Storage
     from arvel_image import MediaCollection
 
@@ -429,12 +422,12 @@ async def test_validation_rejects_oversized_file_before_io(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-08: model_id VARCHAR for UUID host PKs
+# model_id VARCHAR for UUID host PKs
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 def test_media_model_id_is_string_type() -> None:
-    """FR-046-08: Media.model_id must be a String column, not Integer."""
+    """Media.model_id must be a String column, not Integer."""
     from arvel_image import Media
     from sqlalchemy import String
     from sqlalchemy.orm import class_mapper
@@ -447,7 +440,7 @@ def test_media_model_id_is_string_type() -> None:
 
 
 async def test_media_model_id_stores_uuid_pk(engine: AsyncEngine, session: AsyncSession) -> None:
-    """FR-046-08: model_id can store a UUID string without truncation."""
+    """model_id can store a UUID string without truncation."""
     from arvel_image import Media
 
     await _create_tables_046(engine)
@@ -468,12 +461,12 @@ async def test_media_model_id_stores_uuid_pk(engine: AsyncEngine, session: Async
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-09: to_disk() override on FileAdder
+# to_disk() override on FileAdder
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 def test_file_adder_to_disk_returns_self(jpeg_bytes: bytes) -> None:
-    """FR-046-09: FileAdder.to_disk() is a chain method."""
+    """FileAdder.to_disk() is a chain method."""
     from arvel_image.media.file_adder import FileAdder
     from arvel_image.media.trait import HasMedia
 
@@ -489,7 +482,7 @@ def test_file_adder_to_disk_returns_self(jpeg_bytes: bytes) -> None:
 async def test_to_disk_overrides_collection_disk(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-09: to_disk() overrides the MediaCollection's disk on ingestion."""
+    """to_disk() overrides the MediaCollection's disk on ingestion."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -507,14 +500,14 @@ async def test_to_disk_overrides_collection_disk(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-10: Fallback URL
+# Fallback URL
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 async def test_get_media_url_returns_fallback_when_empty(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """FR-046-10: get_media_url returns fallback when collection is empty."""
+    """get_media_url returns fallback when collection is empty."""
     await _create_tables_046(engine)
     Host = _host_046()
     host = await Host.create(name="liam")
@@ -524,19 +517,19 @@ async def test_get_media_url_returns_fallback_when_empty(
 
 
 async def test_get_first_media_url_alias_exists() -> None:
-    """FR-046-10: HasMedia.get_first_media_url is present."""
+    """HasMedia.get_first_media_url is present."""
     from arvel_image import HasMedia
 
     assert hasattr(HasMedia, "get_first_media_url"), "get_first_media_url not found"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-11: add_media_from_base64()
+# -- add_media_from_base64 --
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 async def test_add_media_from_base64_exists() -> None:
-    """FR-046-11: HasMedia.add_media_from_base64 is an async method."""
+    """HasMedia.add_media_from_base64 is an async method."""
     import inspect
 
     from arvel_image import HasMedia
@@ -548,7 +541,7 @@ async def test_add_media_from_base64_exists() -> None:
 async def test_add_media_from_base64_decodes_and_ingests(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-11: base64 encoded image is decoded and ingested correctly."""
+    """base64 encoded image is decoded and ingested correctly."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -569,7 +562,7 @@ async def test_add_media_from_base64_decodes_and_ingests(
 async def test_add_media_from_base64_strips_data_uri_prefix(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-11: data:image/jpeg;base64,<data> prefix is stripped before decode."""
+    """data:image/jpeg;base64,<data> prefix is stripped before decode."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -587,7 +580,7 @@ async def test_add_media_from_base64_strips_data_uri_prefix(
 
 
 async def test_add_media_from_base64_rejects_malformed() -> None:
-    """FR-046-11: malformed base64 raises MediaError."""
+    """malformed base64 raises MediaError."""
     from arvel_image import MediaError
     from arvel_image.media.trait import HasMedia
 
@@ -600,12 +593,12 @@ async def test_add_media_from_base64_rejects_malformed() -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-12: only_keep_latest(N)
+# -- only_keep_latest --
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 def test_only_keep_latest_returns_self() -> None:
-    """FR-046-12: only_keep_latest is a chain method on MediaCollection."""
+    """only_keep_latest is a chain method on MediaCollection."""
     from arvel_image import MediaCollection
 
     coll = MediaCollection("photos")
@@ -614,7 +607,7 @@ def test_only_keep_latest_returns_self() -> None:
 
 
 def test_only_keep_latest_exclusive_with_single_file() -> None:
-    """FR-046-12: only_keep_latest and single_file=True are mutually exclusive."""
+    """only_keep_latest and single_file=True are mutually exclusive."""
     from arvel_image import MediaCollection
 
     coll = MediaCollection("x", single_file=True)
@@ -625,7 +618,7 @@ def test_only_keep_latest_exclusive_with_single_file() -> None:
 async def test_only_keep_latest_prunes_oldest(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-12: adding a 4th file to a keep_latest(3) collection prunes the oldest."""
+    """adding a 4th file to a keep_latest(3) collection prunes the oldest."""
     from arvel.facades import Storage
     from arvel_image import MediaCollection
 
@@ -650,12 +643,12 @@ async def test_only_keep_latest_prunes_oldest(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-13: move() and copy() on Media
+# move() and copy() on Media
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 async def test_media_has_move_and_copy_methods() -> None:
-    """FR-046-13: Media exposes async move() and copy()."""
+    """Media exposes async move() and copy()."""
     import inspect
 
     from arvel_image import Media
@@ -669,7 +662,7 @@ async def test_media_has_move_and_copy_methods() -> None:
 async def test_media_copy_creates_new_row(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-13: copy() produces a new Media row without removing the original."""
+    """copy() produces a new Media row without removing the original."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -694,7 +687,7 @@ async def test_media_copy_creates_new_row(
 async def test_media_move_changes_owner_and_removes_from_source(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-13: move() transfers the row to the target host."""
+    """move() transfers the row to the target host."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -715,12 +708,12 @@ async def test_media_move_changes_owner_and_removes_from_source(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-14: Regenerate conversions service + CLI
+# Regenerate conversions service + CLI
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 def test_media_library_service_exists() -> None:
-    """FR-046-14: MediaLibrary service class is importable."""
+    """MediaLibrary service class is importable."""
     from arvel_image.media.media_library import MediaLibrary
 
     assert hasattr(MediaLibrary, "regenerate"), "MediaLibrary.regenerate not found"
@@ -729,7 +722,7 @@ def test_media_library_service_exists() -> None:
 async def test_media_library_regenerate_returns_count(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-046-14: regenerate() returns the count of reprocessed media rows."""
+    """regenerate() returns the count of reprocessed media rows."""
     from arvel.facades import Storage
     from arvel_image.media.media_library import MediaLibrary
 
@@ -749,12 +742,12 @@ async def test_media_library_regenerate_returns_count(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-15: size column unsigned consistency
+# size column unsigned consistency
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 def test_media_size_column_is_big_integer() -> None:
-    """FR-046-15: Media.size uses BigInteger (unsigned for MySQL compat)."""
+    """Media.size uses BigInteger (unsigned for MySQL compat)."""
     from arvel_image import Media
     from sqlalchemy import BigInteger
     from sqlalchemy.orm import class_mapper
@@ -767,19 +760,19 @@ def test_media_size_column_is_big_integer() -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FR-046-16: Image.optimize()
+# -- Image.optimize --
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 def test_image_optimize_exists() -> None:
-    """FR-046-16: Image.optimize() method exists."""
+    """Image.optimize() method exists."""
     from arvel_image import Image
 
     assert hasattr(Image, "optimize"), "Image.optimize not found"
 
 
 def test_image_optimize_returns_self_and_strips_exif(jpeg_bytes: bytes) -> None:
-    """FR-046-16: optimize() strips EXIF and returns the same Image instance."""
+    """optimize() strips EXIF and returns the same Image instance."""
     from arvel_image import Image
 
     img = Image.load(jpeg_bytes)

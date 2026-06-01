@@ -1,15 +1,14 @@
-"""WI-023 — Alias and misc commands.
+"""Alias and misc commands.
 
 Covers: tinker, schedule:run, storage:unlink, auth:clear-resets, test.
 
-AC covered:
-  AC-008.1  arvel tinker behaves like arvel shell
-  AC-008.2  arvel schedule:run behaves like arvel schedule:work --once
-  AC-008.3  arvel storage:unlink removes the symlink (idempotent)
-  AC-008.4  arvel auth:clear-resets deletes expired tokens and prints count
-  AC-008.5  arvel test <args> forwards to pytest, exit code matches
-  SR-023-006 auth:clear-resets uses parameterized DELETE
-  SR-023-007 test command shell-escapes its arguments
+ arvel tinker behaves like arvel shell
+ arvel schedule:run behaves like arvel schedule:work --once
+ arvel storage:unlink removes the symlink (idempotent)
+ arvel auth:clear-resets deletes expired tokens and prints count
+ arvel test <args> forwards to pytest, exit code matches
+ SR-023-006 auth:clear-resets uses parameterized DELETE
+ SR-023-007 test command shell-escapes its arguments
 """
 
 from __future__ import annotations
@@ -33,31 +32,31 @@ def _app(*cmds: Command) -> Application:
     return Application(commands=list(cmds))
 
 
-# ─── AC-008.1 — tinker is registered ─────────────────────────────────────────
+# ─── — tinker is registered ─────────────────────────────────────────
 
 
 def test_tinker_is_registered_as_alias() -> None:
-    """AC-008.1: arvel tinker exists with name 'tinker'."""
+    """arvel tinker exists with name 'tinker'."""
     assert TinkerCommand.name == "tinker"
     app = _app(TinkerCommand())
     assert app.has_command("tinker")
 
 
-# ─── AC-008.2 — schedule:run is registered ───────────────────────────────────
+# ─── — schedule:run is registered ───────────────────────────────────
 
 
 def test_schedule_run_is_registered() -> None:
-    """AC-008.2: arvel schedule:run exists with name 'schedule:run'."""
+    """arvel schedule:run exists with name 'schedule:run'."""
     assert ScheduleRunCommand.name == "schedule:run"
     app = _app(ScheduleRunCommand())
     assert app.has_command("schedule:run")
 
 
-# ─── AC-008.3 — storage:unlink ────────────────────────────────────────────────
+# ─── — storage:unlink ────────────────────────────────────────────────
 
 
 def test_storage_unlink_removes_symlink(tmp_path: Path) -> None:
-    """AC-008.3: storage:unlink deletes the symlink at public/storage."""
+    """storage:unlink deletes the symlink at public/storage."""
     app = _app(StorageUnlinkCommand())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         Path("public").mkdir(parents=True)
@@ -72,7 +71,7 @@ def test_storage_unlink_removes_symlink(tmp_path: Path) -> None:
 
 
 def test_storage_unlink_is_idempotent(tmp_path: Path) -> None:
-    """AC-008.3: storage:unlink when no link exists exits 0."""
+    """storage:unlink when no link exists exits 0."""
     app = _app(StorageUnlinkCommand())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         Path("public").mkdir(parents=True)
@@ -80,28 +79,28 @@ def test_storage_unlink_is_idempotent(tmp_path: Path) -> None:
         assert result.exit_code == 0
 
 
-# ─── AC-008.4 — auth:clear-resets ────────────────────────────────────────────
+# ─── — auth:clear-resets ────────────────────────────────────────────
 
 
 def test_auth_clear_resets_is_registered() -> None:
-    """AC-008.4: auth:clear-resets exists."""
+    """auth:clear-resets exists."""
     assert AuthClearResetsCommand.name == "auth:clear-resets"
     app = _app(AuthClearResetsCommand())
     assert app.has_command("auth:clear-resets")
 
 
-# ─── AC-008.5 — test command ─────────────────────────────────────────────────
+# ─── — test command ─────────────────────────────────────────────────
 
 
 def test_test_command_is_registered() -> None:
-    """AC-008.5: arvel test exists."""
+    """arvel test exists."""
     assert TestCommand.name == "test"
     app = _app(TestCommand())
     assert app.has_command("test")
 
 
 def test_test_command_reports_missing_pytest(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC-008.5: arvel test gives a useful message when dev deps are absent."""
+    """arvel test gives a useful message when dev deps are absent."""
 
     def missing_pytest(module_name: str) -> ModuleType:
         if module_name == "pytest":

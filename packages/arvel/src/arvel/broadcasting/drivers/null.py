@@ -1,4 +1,4 @@
-"""NullBroadcaster — fail-closed no-op driver (FR-013-003)."""
+"""NullBroadcaster — fail-closed no-op driver."""
 
 from __future__ import annotations
 

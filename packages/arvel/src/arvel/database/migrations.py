@@ -1,4 +1,4 @@
-"""Migration runtime + reversibility checker (ADR-015)."""
+"""Migration runtime + reversibility checker."""
 
 from __future__ import annotations
 
@@ -85,8 +85,8 @@ class Migration(ABC):
 
     Subclasses implement ``async def up(self) -> None`` and
     ``async def down(self) -> None``. ``__init_subclass__`` runs a static
-    reversibility check (ADR-015): if ``up()`` calls any destructive op, the
-    ``down()`` body must be non-empty.
+    reversibility check: if ``up`` calls any destructive op, the
+    ``down`` body must be non-empty.
     """
 
     def __init_subclass__(cls, **kw: object) -> None:

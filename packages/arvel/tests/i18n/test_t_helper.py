@@ -1,5 +1,4 @@
-"""Tests for the request-aware t() helper — FR-032-03 / AC-06..07.
-
+"""Tests for the request-aware t() helper.
 Tests are written RED — t() is not yet added to arvel.i18n.helpers.
 """
 
@@ -15,7 +14,7 @@ from starlette.requests import Request
 if TYPE_CHECKING:
     from arvel.i18n import Translator
 
-# ─── fixtures ─────────────────────────────────────────────────────────────────
+# fixtures
 
 
 @pytest.fixture
@@ -61,7 +60,7 @@ def _fake_request(locale: str | None = None) -> Request:
     return Request(scope)
 
 
-# ─── AC-06: t() uses request.state.locale ─────────────────────────────────────
+#: t() uses request.state.locale
 
 
 def test_t_uses_request_locale(bound_translator: Translator) -> None:
@@ -86,7 +85,7 @@ def test_t_performs_replacements(bound_translator: Translator) -> None:
     assert t(request, "messages.greeting", name="Alice") == "Hola Alice"
 
 
-# ─── AC-07: t() falls back gracefully when locale absent ─────────────────────
+#: t() falls back gracefully when locale absent
 
 
 def test_t_falls_back_when_state_has_no_locale(bound_translator: Translator) -> None:
@@ -105,7 +104,7 @@ def test_t_importable_from_arvel_i18n() -> None:
     assert callable(t)
 
 
-# ─── Security: t() must not surface raw exceptions ────────────────────────────
+# Security: t() must not surface raw exceptions
 
 
 def test_t_missing_key_returns_key_not_exception(bound_translator: Translator) -> None:

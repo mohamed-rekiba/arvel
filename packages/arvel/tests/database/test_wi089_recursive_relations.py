@@ -1,9 +1,8 @@
 """Recursive self-referential relations: descendants / ancestors + with_tree.
 
 A node declares ``descendants`` / ``ancestors`` once as zero-arg accessors. The
-same definition powers lazy ``.get()`` / ``.as_tree()`` and one-query eager
-loading via ``with_tree(...)`` — Laravel's adjacency-list DX, batched.
-"""
+same definition powers lazy ``.get`` / ``.as_tree`` and one-query eager
+loading via ``with_tree(...)`` — Laravel's adjacency-list DX, batched."""
 
 from __future__ import annotations
 
@@ -43,13 +42,11 @@ async def _setup(engine: AsyncEngine) -> None:
 
 
 async def _seed() -> dict[str, TreeCat]:
-    """
-    root              root2
+    """root              root2
     ├── a             └── r2c
     │   └── gc
     │       └── ggc
-    └── b
-    """
+    └── b"""
     nodes: dict[str, TreeCat] = {}
     nodes["root"] = await TreeCat.create(name="root", parent_id=None)
     nodes["a"] = await TreeCat.create(name="a", parent_id=nodes["root"].id)
@@ -228,7 +225,7 @@ class TestEagerWithTree:
     async def test_plain_with_routes_to_recursive(
         self, engine: AsyncEngine, session: AsyncSession
     ) -> None:
-        """A recursive relation passed to with_() loads with defaults too."""
+        """A recursive relation passed to with_ loads with defaults too."""
         await _setup(engine)
         await _seed()
 

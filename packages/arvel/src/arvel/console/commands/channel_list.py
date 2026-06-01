@@ -1,4 +1,4 @@
-"""channel:list command (WI-arvel-023)."""
+"""channel:list command."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""migrate:fresh command (WI-arvel-023)."""
+"""migrate:fresh command."""
 
 from __future__ import annotations
 

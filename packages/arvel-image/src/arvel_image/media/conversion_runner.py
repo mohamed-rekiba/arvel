@@ -1,6 +1,6 @@
 """Synchronous conversion runner (with thread-pool offload).
 
-ADR-082 D1: conversions run synchronously in v1, but the Pillow work is
+: conversions run synchronously in v1, but the Pillow work is
 CPU-bound, so we run it in a worker thread via ``anyio.to_thread.run_sync``.
 That keeps the request loop responsive without dragging in a queue
 backend on day one.

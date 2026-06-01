@@ -1,7 +1,7 @@
 """Sync driver — executes jobs inline in the calling coroutine.
 
-WI-018 honours ``envelope.delay`` via ``asyncio.sleep`` before executing
-``handle()``. Priority is a documented no-op (single in-flight job).
+ honours ``envelope.delay`` via ``asyncio.sleep`` before executing
+``handle``. Priority is a documented no-op (single in-flight job).
 """
 
 from __future__ import annotations

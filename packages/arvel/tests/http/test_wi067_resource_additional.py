@@ -1,4 +1,4 @@
-"""WI-arvel-067 — Epic 049 Story 7 follow-up: ``.additional({...})``.
+"""follow-up: ``.additional({...})``.
 
 Resources and resource collections accept extra root-level keys via a
 fluent ``.additional(extra)`` method. Merge happens AFTER the default
@@ -39,9 +39,7 @@ class _DummyRequest:
     query_params: dict[str, str] = {}
 
 
-# ---------------------------------------------------------------------------
 # JsonResource.additional
-# ---------------------------------------------------------------------------
 
 
 class TestJsonResourceAdditional:
@@ -67,9 +65,7 @@ class TestJsonResourceAdditional:
         assert body["b"] == 2
 
 
-# ---------------------------------------------------------------------------
 # ResourceCollection.additional — list path
-# ---------------------------------------------------------------------------
 
 
 class TestResourceCollectionAdditionalList:
@@ -89,9 +85,7 @@ class TestResourceCollectionAdditionalList:
         assert "only_a" not in body_b
 
 
-# ---------------------------------------------------------------------------
 # ResourceCollection.additional — paginator path
-# ---------------------------------------------------------------------------
 
 
 class TestResourceCollectionAdditionalPaginator:

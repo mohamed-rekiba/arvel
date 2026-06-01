@@ -1,5 +1,4 @@
-"""Real-Redis integration tests for ``RedisConnection`` — FR-007-005.
-
+"""Real-Redis integration tests for ``RedisConnection``
 Before this file the ``RedisConnection`` queue driver had zero tests; the
 only coverage was the in-process ``SyncConnection`` and a SQLite-backed
 ``DatabaseConnection``. Booting a real Redis container is the only way
@@ -105,7 +104,7 @@ def _envelope_dp(payload: str, *, priority: int = 0, delay: int = 0) -> JobEnvel
 @pytest.mark.requires_emulator
 @pytest.mark.integration
 class TestRedisConnectionDelayPriority:
-    """FR-018-08 + NFR-018-06: redis-direct delay, priority, no double-dispatch."""
+    """+ : redis-direct delay, priority, no double-dispatch."""
 
     @pytest_asyncio.fixture
     async def driver(self, redis_endpoint: RedisEndpoint) -> AsyncIterator[RedisConnection]:
@@ -125,13 +124,13 @@ class TestRedisConnectionDelayPriority:
             await connection.close()
 
     async def test_delayed_jobs_not_popped_early(self, driver: RedisConnection) -> None:
-        """FR-018-08: delay=3600 envelope is not popped within 1 s timeout."""
+        """delay=3600 envelope is not popped within 1 s timeout."""
         await driver.push(_envelope_dp("delayed", delay=3600))
         popped = await driver.pop_blocking(timeout=1.0)
         assert popped is None
 
     async def test_priority_pop_order(self, driver: RedisConnection) -> None:
-        """FR-018-08: higher priority pops first within the ready set."""
+        """higher priority pops first within the ready set."""
         await driver.push(_envelope_dp("p0"))
         await driver.push(_envelope_dp("p7", priority=7))
         await driver.push(_envelope_dp("p3", priority=3))
@@ -147,7 +146,7 @@ class TestRedisConnectionDelayPriority:
     async def test_no_double_dispatch_under_contention(
         self, driver: RedisConnection, redis_endpoint: RedisEndpoint
     ) -> None:
-        """NFR-018-06: 10 concurrent pops over 100 pushes yields 100 distinct receives."""
+        """10 concurrent pops over 100 pushes yields 100 distinct receives."""
         import asyncio
 
         # Use a SEPARATE driver per worker to mimic real worker processes

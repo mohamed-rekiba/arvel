@@ -30,7 +30,7 @@ async def _booted_app(tmp_path: Path) -> tuple[Application, AuthServiceProvider]
 
 @pytest.mark.asyncio
 async def test_arvel_auth_install_command_publishes_all_tags(tmp_path: Path) -> None:
-    """FR-028-41 — `arvel auth:install` writes config + routes + views + migrations."""
+    """`arvel auth:install` writes config + routes + views + migrations."""
     app, _ = await _booted_app(tmp_path)
 
     cmd = AuthInstallCommand()
@@ -56,7 +56,7 @@ async def test_arvel_auth_install_command_publishes_all_tags(tmp_path: Path) -> 
 
 @pytest.mark.asyncio
 async def test_arvel_auth_install_idempotent_skip_existing(tmp_path: Path) -> None:
-    """FR-028-41 — re-running skips files that already exist (no overwrite without --force)."""
+    """re-running skips files that already exist (no overwrite without --force)."""
     app, _ = await _booted_app(tmp_path)
 
     cmd = AuthInstallCommand()

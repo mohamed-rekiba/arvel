@@ -1,6 +1,6 @@
 """Database driver — persists jobs in the `jobs` ORM table.
 
-WI-018 added the ``priority`` column (ADR-066) and folded ``push_delayed``
+The driver added the ``priority`` column and folded ``push_delayed``
 into ``push`` — delay is sourced from ``envelope.delay``. Pop applies
 ``ORDER BY priority DESC, available_at ASC LIMIT 1``.
 """
@@ -46,7 +46,7 @@ class JobRow(_Base):
     attempts: Any = Column(Integer, nullable=False, default=0)
     available_at: Any = Column(Integer, nullable=False)
     created_at: Any = Column(Integer, nullable=False)
-    # WI-018 (FR-018-07): priority gate for pop ORDER BY.
+    # : priority gate for pop ORDER BY.
     priority: Any = Column(Integer, nullable=False, default=0)
 
 

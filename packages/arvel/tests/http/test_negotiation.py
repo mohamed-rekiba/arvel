@@ -1,4 +1,4 @@
-"""FR-002-023 — wants_json content negotiation."""
+"""wants_json content negotiation."""
 
 from __future__ import annotations
 

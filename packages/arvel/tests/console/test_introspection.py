@@ -1,12 +1,11 @@
-"""WI-023 — Introspection commands (db:show, db:table, model:show, channel:list, event:list).
+"""Introspection commands (db:show, db:table, model:show, channel:list, event:list).
 
-AC covered:
-  AC-007.1  db:show exits 0 and prints connection info
-  AC-007.2  db:table <name> prints columns of an existing table
-  AC-007.3  db:table <nonexistent> exits 2
-  AC-007.4  model:show <model.path> prints table + attributes
-  AC-007.5  channel:list prints channels or "(none registered)"
-  AC-007.6  event:list prints events with listeners
+db:show exits 0 and prints connection info
+db:table <name> prints columns of an existing table
+db:table <nonexistent> exits 2
+model:show <model.path> prints table + attributes
+channel:list prints channels or "(none registered)"
+event:list prints events with listeners
 """
 
 from __future__ import annotations
@@ -34,14 +33,14 @@ def _app(*cmds: Command) -> Application:
     return Application(commands=list(cmds))
 
 
-# ─── AC-007.1 — db:show ──────────────────────────────────────────────────────
+# ─── — db:show ──────────────────────────────────────────────────────
 
 
 def test_db_show_prints_connection_info(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AC-007.1: db:show exits 0 and prints driver + database name."""
+    """db:show exits 0 and prints driver + database name."""
     # The actual test requires a bootstrapped Application; for unit-level we
     # check that the command class exists and registers a 'db:show' name.
     app = _app(DbShowCommand())
@@ -72,11 +71,11 @@ def test_config_show_missing_key_exits_two(tmp_path: Path) -> None:
     assert result.exit_code == 2
 
 
-# ─── AC-007.2 / AC-007.3 — db:table ──────────────────────────────────────────
+# ─── / — db:table ──────────────────────────────────────────
 
 
 def test_db_table_command_registered() -> None:
-    """AC-007.2: db:table is a registered command."""
+    """db:table is a registered command."""
     app = _app(DbTableCommand())
     assert DbTableCommand.name == "db:table"
     assert app.has_command("db:table")
@@ -86,7 +85,7 @@ def test_db_table_nonexistent_table_exits_two(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AC-007.3: db:table on missing table exits 2."""
+    """db:table on missing table exits 2."""
     from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
@@ -111,39 +110,39 @@ def test_db_table_nonexistent_table_exits_two(
         asyncio.run(engine.dispose())
 
 
-# ─── AC-007.4 — model:show ────────────────────────────────────────────────────
+# ─── — model:show ────────────────────────────────────────────────────
 
 
 def test_model_show_command_registered() -> None:
-    """AC-007.4: model:show is a registered command."""
+    """model:show is a registered command."""
     app = _app(ModelShowCommand())
     assert ModelShowCommand.name == "model:show"
     assert app.has_command("model:show")
 
 
 def test_model_show_with_missing_import_exits_two(tmp_path: Path) -> None:
-    """AC-007.4: model:show on bogus dotted path exits 2."""
+    """model:show on bogus dotted path exits 2."""
     app = _app(ModelShowCommand())
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["model:show", "no.such.module.NoClass"])
         assert result.exit_code == 2
 
 
-# ─── AC-007.5 — channel:list ─────────────────────────────────────────────────
+# ─── — channel:list ─────────────────────────────────────────────────
 
 
 def test_channel_list_command_registered() -> None:
-    """AC-007.5: channel:list is a registered command."""
+    """channel:list is a registered command."""
     app = _app(ChannelListCommand())
     assert ChannelListCommand.name == "channel:list"
     assert app.has_command("channel:list")
 
 
-# ─── AC-007.6 — event:list ────────────────────────────────────────────────────
+# ─── — event:list ────────────────────────────────────────────────────
 
 
 def test_event_list_command_registered() -> None:
-    """AC-007.6: event:list is a registered command."""
+    """event:list is a registered command."""
     app = _app(EventListCommand())
     assert EventListCommand.name == "event:list"
     assert app.has_command("event:list")

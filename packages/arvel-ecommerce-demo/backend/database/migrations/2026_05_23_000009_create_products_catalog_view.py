@@ -4,17 +4,17 @@ This view covers ALL non-deleted products and adds a ``real_status`` column
 so both the storefront and the admin can query it with a single scan.
 
 Storefront: WHERE real_status = 'visible'
-Admin:      full table — filter by status / real_status as needed
+Admin: full table — filter by status / real_status as needed
 
 ``real_status`` values (evaluated in priority order):
-  'draft'             — product.status = 'draft'
-  'not_scheduled'     — status='published' but published_at IS NULL
-  'scheduled'         — status='published' but published_at > NOW() (future)
-  'category_deleted'  — any ancestor category is soft-deleted
-  'category_hidden'   — any ancestor is unpublished or not yet scheduled
-  'vendor_deleted'    — linked vendor is soft-deleted
-  'vendor_hidden'     — linked vendor is unpublished or not yet scheduled
-  'visible'           — fully storefront-ready
+  'draft' — product.status = 'draft'
+  'not_scheduled' — status='published' but published_at IS NULL
+  'scheduled' — status='published' but published_at > NOW() (future)
+  'category_deleted' — any ancestor category is soft-deleted
+  'category_hidden' — any ancestor is unpublished or not yet scheduled
+  'vendor_deleted' — linked vendor is soft-deleted
+  'vendor_hidden' — linked vendor is unpublished or not yet scheduled
+  'visible' — fully storefront-ready
 
 Refresh strategy:
 1. On mutation — product/category/vendor writes fire the observer, which

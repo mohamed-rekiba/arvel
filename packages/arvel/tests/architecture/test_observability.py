@@ -30,7 +30,7 @@ def _find_structlog_get_logger_calls(path: Path) -> list[str]:
 
 
 def test_no_direct_structlog_get_logger_in_src() -> None:
-    """After WI-arvel-030, framework internals must use Log, not structlog.get_logger()."""
+    """After , framework internals must use Log, not structlog.get_logger()."""
     spec = importlib.util.find_spec("arvel")
     assert spec is not None, "arvel package not found on sys.path"
     assert spec.submodule_search_locations is not None

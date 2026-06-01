@@ -1,8 +1,7 @@
 """first_where, where_relation, and Eloquent-faithful bulk update/increment.
 
 Bulk update/increment/decrement/soft-delete touch updated_at when the model is
-timestamped; increment/decrement accept extra columns and return rows affected.
-"""
+timestamped; increment/decrement accept extra columns and return rows affected."""
 
 from __future__ import annotations
 

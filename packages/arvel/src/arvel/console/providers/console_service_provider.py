@@ -1,9 +1,9 @@
 """ConsoleServiceProvider — binds console Application + collects provider commands.
 
-Introduced by WI-arvel-020 to close FB-019-001. At ``register()`` it binds an
+At ``register`` it binds an
 empty :class:`arvel.console.Application` into the framework container; at
-``boot()`` it walks every registered ``ServiceProvider``, calls its
-``commands()`` method, and attaches each returned item to the bound
+``boot`` it walks every registered ``ServiceProvider``, calls its
+``commands`` method, and attaches each returned item to the bound
 Application.
 
 Once bound, the scheduler kernel can resolve the Application and wire
@@ -11,10 +11,10 @@ Once bound, the scheduler kernel can resolve the Application and wire
 ``arvel.providers.scheduler_provider.SchedulerServiceProvider``).
 
 User apps should register this provider **last** (or at least after every
-provider whose ``commands()`` depends on container bindings made during
-``register()``). Order matters because provider commands often need DI from
-the container, and only ``register()`` is guaranteed to have run by the
-time ``commands()`` is called.
+provider whose ``commands`` depends on container bindings made during
+``register``). Order matters because provider commands often need DI from
+the container, and only ``register`` is guaranteed to have run by the
+time ``commands`` is called.
 """
 
 from __future__ import annotations

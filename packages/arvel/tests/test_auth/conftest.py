@@ -1,4 +1,4 @@
-"""Shared fixtures for WI-028 auth tests.
+"""Shared fixtures for auth tests.
 
 These tests are RED until the implementation lands in S25.1-S25.4. Model-level
 fixtures (``engine`` / ``session``) come from the workspace-root ``conftest.py``

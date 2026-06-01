@@ -1,5 +1,4 @@
-"""Real-Redis integration tests for ``RedisBroadcaster`` — FR-013-004.
-
+"""Real-Redis integration tests for ``RedisBroadcaster``
 Before this file the broadcaster's Redis path was only covered by an
 ``AsyncMock`` redis client. This boots the real Redis container, opens a
 ``SUBSCRIBE`` listener, runs ``RedisBroadcaster.broadcast(...)``, and

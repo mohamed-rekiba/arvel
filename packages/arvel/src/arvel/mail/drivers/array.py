@@ -1,4 +1,4 @@
-"""ArrayMailDriver — in-memory driver for testing (FR-009-018)."""
+"""ArrayMailDriver — in-memory driver for testing."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ from arvel.mail.rendered_mail import RenderedMail
 
 
 class ArrayMailDriver:
-    """Captures sent mail in-memory. Never raises (NFR-009-004).
+    """Captures sent mail in-memory. Never raises.
 
-    Use ``Mail.fake()`` to swap the active driver in tests.
+    Use ``Mail.fake`` to swap the active driver in tests.
     """
 
     def __init__(self) -> None:

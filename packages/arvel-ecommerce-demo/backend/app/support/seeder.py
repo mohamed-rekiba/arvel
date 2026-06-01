@@ -33,6 +33,7 @@ class _Json:
 def _coerce(value: Any) -> Any:
     """Serialize dicts/lists to JSON strings for JSONB columns.
 
+
     datetime objects are passed through — asyncpg binds them natively to
     TIMESTAMPTZ. Dict/list values are wrapped in _Json so the caller can
     automatically apply a ::jsonb cast without listing every JSONB column.
@@ -93,9 +94,11 @@ class _SeederDB:
     ) -> dict[str, Any] | None:
         """INSERT ... ON CONFLICT (...) DO UPDATE SET ...
 
+
         ``cast_map`` maps column names to PostgreSQL type names for columns
         that require an explicit cast (e.g. custom enum types). asyncpg infers
         plain string params as ``text``, so enum columns need ``::enum_type``.
+
 
         When match_on is empty, performs a plain INSERT (useful for fresh test DBs).
         Returns the inserted/updated row dict including id.

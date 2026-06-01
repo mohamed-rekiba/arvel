@@ -1,4 +1,4 @@
-"""Tests for NullStore — FR-006-006."""
+"""Tests for NullStore."""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
-"""Unit tests for ``S3Driver.url()`` — covers the three URL-resolution modes.
+"""Unit tests for ``S3Driver.url()`` — the three URL-resolution modes.
 
-``url()`` doesn't talk to S3 — it builds a public URL from configuration —
+``url()`` doesn't talk to S3 — it builds a public URL from configuration
 so these tests run without an emulator and without the network. They lock
 in the priority order: ``public_url`` (CDN / custom domain) →
 ``endpoint`` (path-style off the API endpoint) → AWS hostname pattern.

@@ -1,6 +1,6 @@
 """Taskiq driver — delegates to a Taskiq broker chosen by ``broker_url`` scheme.
 
-WI-018 (ADR-067): the broker module is picked by the URL scheme of
+: the broker module is picked by the URL scheme of
 ``TaskiqQueueConfig.broker_url``. ``redis://``/``rediss://``/``unix://`` →
 ``taskiq_redis.ListQueueBroker``; ``amqp://``/``amqps://`` →
 ``taskiq_aio_pika.AioPikaBroker`` (declared with ``max_priority=9`` so
@@ -8,9 +8,8 @@ RabbitMQ honours per-message priority natively).
 
 Per-message priority on the Redis broker is routed via queue-name suffix
 ``<base>:p<N>`` because ``taskiq-redis``'s ``ListQueueBroker`` has no
-native priority. Operators run ``taskiq worker arvel:p9 arvel:p8 ...
-arvel:p0`` to drain in priority order. See ADR-067 for the trade-off.
-"""
+native priority. Operators run ``taskiq worker arvel:p9 arvel:p8...
+arvel:p0`` to drain in priority order."""
 
 from __future__ import annotations
 
@@ -76,7 +75,7 @@ class TaskiqConnection:
             try:
                 module = importlib.import_module(module_name)
             except ImportError as exc:
-                # NFR-018-05: include only the missing package + install command;
+                # 05: include only the missing package + install command;
                 # no stack chaining, no path leak.
                 raise ImportError(
                     f"arvel requires '{module_name.replace('_', '-')}'. "
@@ -95,7 +94,7 @@ class TaskiqConnection:
         if module_name == "taskiq_redis":
             return cast("_TaskiqBroker", module.ListQueueBroker(url=self._config.broker_url))
         # taskiq_aio_pika.AioPikaBroker — declare queue with max_priority=9 so
-        # RabbitMQ honours per-message priority (FR-018-11 amqp branch).
+        # RabbitMQ honours per-message priority.
         return cast(
             "_TaskiqBroker",
             module.AioPikaBroker(url=self._config.broker_url).with_max_priority(9)
@@ -158,7 +157,7 @@ class TaskiqConnection:
         For the AMQP broker we always use the base queue name (priority is
         carried by ``BrokerMessage.labels`` and honoured by the AMQP queue
         declaration). For the Redis broker we route by ``:p<N>`` suffix so
-        operators can drain by priority (ADR-067).
+        operators can drain by priority.
         """
         module_name, _ = select_broker_module(self._config.broker_url)
         if module_name == "taskiq_redis" and envelope.priority > 0:

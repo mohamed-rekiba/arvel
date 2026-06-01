@@ -1,4 +1,4 @@
-"""FR-013-016, 019, 021, 024, 026 — ReverbServer wiring."""
+"""ReverbServer wiring."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_server_assigns_socket_id_on_connect() -> None:
-    """FR-013-019 AC1: server assigns a unique socket_id and sends connection_established."""
+    """server assigns a unique socket_id and sends connection_established."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.reverb.server import ReverbServer
 
@@ -40,7 +40,7 @@ async def test_server_assigns_socket_id_on_connect() -> None:
 
 @pytest.mark.asyncio
 async def test_server_routes_subscribe_to_channel_manager() -> None:
-    """FR-013-019 AC2: pusher:subscribe routes through ChannelManager.subscribe."""
+    """pusher:subscribe routes through ChannelManager.subscribe."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.reverb.server import ReverbServer
 
@@ -85,7 +85,7 @@ async def test_server_routes_subscribe_to_channel_manager() -> None:
 
 @pytest.mark.asyncio
 async def test_server_rejects_private_subscribe_without_valid_auth() -> None:
-    """FR-013-024 AC1: subscribing to private channel with invalid auth sends pusher:error."""
+    """subscribing to private channel with invalid auth sends pusher:error."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.reverb.server import ReverbServer
 
@@ -125,7 +125,7 @@ async def test_server_rejects_private_subscribe_without_valid_auth() -> None:
 
 @pytest.mark.asyncio
 async def test_server_responds_to_ping_with_pong() -> None:
-    """FR-013-022 AC1: pusher:ping triggers pusher:pong."""
+    """pusher:ping triggers pusher:pong."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.reverb.server import ReverbServer
 
@@ -157,7 +157,7 @@ async def test_server_responds_to_ping_with_pong() -> None:
 
 @pytest.mark.asyncio
 async def test_server_idle_timeout_closes_connection() -> None:
-    """FR-013-022 AC3: idle connections past activity_timeout are closed."""
+    """idle connections past activity_timeout are closed."""
     # Reverb spec — for unit test, we verify the timeout is wired through.
     from arvel.broadcasting.config import ReverbConfig
     from arvel.reverb.server import ReverbServer
@@ -169,7 +169,7 @@ async def test_server_idle_timeout_closes_connection() -> None:
 
 @pytest.mark.asyncio
 async def test_server_respects_max_connections_per_ip() -> None:
-    """FR-013-026 AC1: ConnectionLimitExceeded when too many connections from one IP."""
+    """ConnectionLimitExceeded when too many connections from one IP."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.reverb.server import ReverbServer
 
@@ -214,7 +214,7 @@ async def test_server_respects_max_connections_per_ip() -> None:
 
 @pytest.mark.asyncio
 async def test_subscribe_rate_limit_yields_4301_after_100_per_second() -> None:
-    """FR-013-026 / SEC-013-004 AC1: 101st subscribe in <1s gets pusher:error 4301."""
+    """/ : 101st subscribe in <1s gets pusher:error 4301."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.reverb.server import ReverbServer
 
@@ -254,7 +254,7 @@ async def test_subscribe_rate_limit_yields_4301_after_100_per_second() -> None:
 
 @pytest.mark.asyncio
 async def test_idle_connection_is_closed_after_activity_timeout_plus_grace() -> None:
-    """FR-013-022 AC3: a connection with no traffic for activity_timeout + 30s is closed."""
+    """a connection with no traffic for activity_timeout + 30s is closed."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.reverb.server import ReverbServer
 
@@ -324,7 +324,7 @@ async def _subscribe_presence(server: Any, ws: Any, label: str) -> Any:
 
 @pytest.mark.asyncio
 async def test_presence_channel_emits_member_added_to_others() -> None:
-    """FR-013-021 AC2: subscribing to presence sends member_added to other subscribers."""
+    """subscribing to presence sends member_added to other subscribers."""
     import asyncio as _asyncio
 
     from arvel.broadcasting.config import ReverbConfig
@@ -419,7 +419,7 @@ async def test_channel_manager_drops_empty_buckets_after_last_unsubscribe() -> N
 
 @pytest.mark.asyncio
 async def test_serve_passes_origin_allowlist_to_websockets() -> None:
-    """Stage 4b HIGH-1: when allowed_origins is set, serve() must enforce it."""
+    """Stage 4b HIGH-1: when allowed_origins is set, serve must enforce it."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.reverb.server import ReverbServer
 

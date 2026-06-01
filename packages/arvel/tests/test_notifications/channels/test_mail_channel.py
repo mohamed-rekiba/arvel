@@ -1,4 +1,4 @@
-"""Tests for MailChannel — FR-009-025."""
+"""Tests for MailChannel."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ class TestMailChannel:
 
     @pytest.mark.asyncio
     async def test_skips_silently_when_to_mail_returns_none(self) -> None:
-        """FR-009-025: silently skips if to_mail() returns None."""
+        """silently skips if to_mail() returns None."""
         channel, driver = self._channel()
         await channel.send(FakeUser(1), DbOnlyNotification())
         assert len(driver.sent) == 0

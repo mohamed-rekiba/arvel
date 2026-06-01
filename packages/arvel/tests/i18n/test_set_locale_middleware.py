@@ -1,5 +1,4 @@
-"""Tests for SetLocaleMiddleware — FR-032-02 / AC-02..05.
-
+"""Tests for SetLocaleMiddleware.
 Tests are written RED — the module arvel.i18n.middleware does not exist yet.
 """
 
@@ -11,7 +10,7 @@ from starlette.responses import Response
 from starlette.testclient import TestClient
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-# ─── helpers ──────────────────────────────────────────────────────────────────
+# helpers
 
 
 def _make_app(supported: list[str] | None = None, default: str = "en") -> ASGIApp:
@@ -32,7 +31,7 @@ def _make_app(supported: list[str] | None = None, default: str = "en") -> ASGIAp
     return SetLocaleMiddleware(inner, **kwargs)  # type: ignore[arg-type]
 
 
-# ─── AC-02: importable ────────────────────────────────────────────────────────
+#: importable
 
 
 def test_import() -> None:
@@ -42,7 +41,7 @@ def test_import() -> None:
     assert callable(SetLocaleMiddleware)
 
 
-# ─── AC-03: Accept-Language negotiation ──────────────────────────────────────
+#: Accept-Language negotiation
 
 
 def test_accept_language_negotiation() -> None:
@@ -64,7 +63,7 @@ def test_accept_language_unsupported_falls_back() -> None:
     assert response.text == "en"
 
 
-# ─── AC-04: User locale preference wins over header ──────────────────────────
+#: User locale preference wins over header
 
 
 def test_user_locale_wins_over_header() -> None:
@@ -99,7 +98,7 @@ def test_user_locale_wins_over_header() -> None:
     assert response.text == "ar"
 
 
-# ─── AC-04b: No user → header wins ───────────────────────────────────────────
+# AC-04b: No user → header wins
 
 
 def test_no_user_header_wins() -> None:
@@ -108,7 +107,7 @@ def test_no_user_header_wins() -> None:
     assert response.text == "es"
 
 
-# ─── AC-03b: No header, no user → default ────────────────────────────────────
+# AC-03b: No header, no user → default
 
 
 def test_default_locale_when_no_header() -> None:
@@ -117,7 +116,7 @@ def test_default_locale_when_no_header() -> None:
     assert response.text == "en"
 
 
-# ─── AC-05: Malformed Accept-Language does not raise ─────────────────────────
+#: Malformed Accept-Language does not raise
 
 
 @pytest.mark.parametrize(
@@ -138,7 +137,7 @@ def test_malformed_accept_language_does_not_raise(header: str) -> None:
     assert response.text == "en"
 
 
-# ─── Content-Language response header (setdefault) ───────────────────────────
+# Content-Language response header (setdefault)
 
 
 def test_content_language_header_set_on_response() -> None:
@@ -161,7 +160,7 @@ def test_content_language_not_overwritten_if_already_set() -> None:
     assert response.headers["content-language"] == "fr"
 
 
-# ─── Non-HTTP scope passthrough ──────────────────────────────────────────────
+# Non-HTTP scope passthrough
 
 
 def test_websocket_scope_passthrough() -> None:

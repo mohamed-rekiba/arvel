@@ -1,16 +1,15 @@
-"""Redis driver — composite ZSET design with atomic Lua promote-and-pop (ADR-066).
+"""Redis driver — composite ZSET design with atomic Lua promote-and-pop.
 
-WI-018 replaced the original single-list RPUSH/BLPOP design so the driver
+ replaced the original single-list RPUSH/BLPOP design so the driver
 honours both ``envelope.delay`` and ``envelope.priority`` natively:
 
 - ``<queue_key>:<queue>:scheduled`` ZSET (score = ``available_at_ms``) holds
-  envelopes that are not yet due.
+ envelopes that are not yet due.
 - ``<queue_key>:<queue>:ready`` ZSET (score = ``-priority``) holds envelopes
-  that are due now; the lowest-scored entry is the highest-priority one.
+ that are due now; the lowest-scored entry is the highest-priority one.
 - An atomic Lua script (``promote_and_pop.lua``) moves due-now entries
-  from ``:scheduled`` into ``:ready`` and ``ZPOPMIN``s one in a single
-  round trip — guaranteeing no double-dispatch under concurrent workers
-  (NFR-018-06).
+ from ``:scheduled`` into ``:ready`` and ``ZPOPMIN``s one in a single
+ round trip — guaranteeing no double-dispatch under concurrent workers.
 """
 
 from __future__ import annotations
@@ -29,7 +28,7 @@ logger = Log.channel(__name__)
 
 
 class RedisQueueConn(Protocol):
-    """Minimal interface of redis.asyncio.Redis used by RedisConnection (WI-018).
+    """Minimal interface of redis.asyncio.Redis used by RedisConnection.
 
     Public so that test fakes can ``cast`` to it without importing private names
     (per ``enforce-quality-gates.mdc``).
@@ -44,7 +43,7 @@ class RedisQueueConn(Protocol):
 
 
 class RedisConnection:
-    """Composite ZSET driver with Lua promote-and-pop (WI-018, ADR-066)."""
+    """Composite ZSET driver with Lua promote-and-pop."""
 
     def __init__(self, config: RedisQueueConfig) -> None:
         self._config = config

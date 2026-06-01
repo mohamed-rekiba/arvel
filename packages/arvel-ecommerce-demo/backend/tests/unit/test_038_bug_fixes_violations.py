@@ -1,17 +1,15 @@
-"""QA-Pre tests — WI-arvel-038: Demo Bug Fixes and Remaining Violations.
+"""Demo bug fixes and remaining contract violations.
 
-RED until Stage 3b implementation.
-
-Acceptance criteria:
-- FR-001: except syntax uses tuple form (ValueError, KeyError) — Python 3 compliant
-- FR-002: force-delete routes require role level 100
-- FR-003: User exposes has_level() for the prompt's numeric RBAC hierarchy
-- FR-004: seeded roles include the prompt role levels
-- FR-005: admin_get has include_trashed param; admin_get_including_trashed is deleted
-- FR-006: ProductService storefront methods use ORM (no direct DB.select on storefront)
-- FR-007: integration test asserts roles.level column exists
-- FR-008: support_agent and order_manager roles are seeded
-- FR-009: User docstring does not mention stale _max_level internals
+Coverage:
+- except syntax uses tuple form (ValueError, KeyError) — Python 3 compliant
+- force-delete routes require role level 100
+- User exposes has_level() for the prompt's numeric RBAC hierarchy
+- seeded roles include the prompt role levels
+- admin_get has include_trashed param; admin_get_including_trashed is deleted
+- ProductService storefront methods use ORM (no direct DB.select on storefront)
+- integration test asserts roles.level column exists
+- support_agent and order_manager roles are seeded
+- User docstring does not mention stale _max_level internals
 """
 
 from __future__ import annotations
@@ -25,7 +23,7 @@ pytestmark = pytest.mark.unit
 
 
 class TestPython3ExceptSyntax:
-    """FR-001: except clause must use tuple form."""
+    """except clause must use tuple form."""
 
     def test_product_service_has_no_python2_except(self) -> None:
         """No `except A, B:` (Python 2 tuple-in-header form) in product_service.py."""
@@ -57,7 +55,7 @@ class TestPython3ExceptSyntax:
 
 
 class TestForceDestroyUsesRoleLevel:
-    """FR-002: force-delete is gated by role hierarchy, not a bespoke permission."""
+    """force-delete is gated by role hierarchy, not a bespoke permission."""
 
     def test_force_destroy_routes_require_level_100(self) -> None:
         from pathlib import Path
@@ -104,7 +102,7 @@ class TestForceDestroyUsesRoleLevel:
 
 
 class TestUserRoleLevel:
-    """FR-003: User keeps permission traits and adds prompt-level hierarchy checks."""
+    """User keeps permission traits and adds prompt-level hierarchy checks."""
 
     def test_has_roles_mixin_file_deleted(self) -> None:
         """app/mixins/has_roles.py must not exist."""
@@ -140,7 +138,7 @@ class TestUserRoleLevel:
 
 
 class TestSeederRoleLevels:
-    """FR-004: seeded roles must carry the prompt's numeric hierarchy."""
+    """seeded roles must carry the prompt's numeric hierarchy."""
 
     def test_role_levels_in_roles_data(self) -> None:
         from pathlib import Path
@@ -182,7 +180,7 @@ class TestSeederRoleLevels:
 
 
 class TestAdminGetMerged:
-    """FR-005: admin_get_including_trashed must be deleted; admin_get gains include_trashed."""
+    """admin_get_including_trashed must be deleted; admin_get gains include_trashed."""
 
     def test_admin_get_including_trashed_deleted(self) -> None:
         """ProductService must not have admin_get_including_trashed method."""
@@ -203,7 +201,7 @@ class TestAdminGetMerged:
 
 
 class TestStorefrontUsesORM:
-    """FR-006: storefront methods must use ProductCatalog ORM, not raw DB.select."""
+    """storefront methods must use ProductCatalog ORM, not raw DB.select."""
 
     def test_product_catalog_viewmodel_exists(self) -> None:
         """app.models.product_catalog.ProductCatalog must be importable."""
@@ -261,7 +259,7 @@ class TestStorefrontUsesORM:
 
 
 class TestPromptRoleNames:
-    """FR-008/FR-009: role names match the prompt and stale internals stay gone."""
+    """Seeded role names match the prompt; stale internals stay gone."""
 
     def test_user_docstring_no_max_level(self) -> None:
         from app.models.user import User

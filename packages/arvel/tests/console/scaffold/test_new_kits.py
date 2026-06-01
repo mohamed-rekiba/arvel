@@ -29,7 +29,7 @@ def runner() -> CliRunner:
 
 
 # ────────────────────────────────────────────────────────────────────
-#  Kit registry — typed structure
+# Kit registry — typed structure
 # ────────────────────────────────────────────────────────────────────
 
 
@@ -59,7 +59,7 @@ def test_resolve_kit_returns_spec_for_known_name() -> None:
 
 
 # ────────────────────────────────────────────────────────────────────
-#  Unknown kit → exit 2 + listing
+# Unknown kit → exit 2 + listing
 # ────────────────────────────────────────────────────────────────────
 
 
@@ -91,7 +91,7 @@ def test_format_kit_listing_includes_every_kit() -> None:
 
 
 # ────────────────────────────────────────────────────────────────────
-#  --kit flag with default api  +  api preserves behaviour
+# --kit flag with default api + api preserves behaviour
 # ────────────────────────────────────────────────────────────────────
 
 
@@ -134,7 +134,7 @@ def test_new_explicit_api_kit_matches_default_output(runner: CliRunner, tmp_path
 
 
 # ────────────────────────────────────────────────────────────────────
-#  ecommerce kit — scaffolds the full-stack demo layout
+# ecommerce kit — scaffolds the full-stack demo layout
 # ────────────────────────────────────────────────────────────────────
 
 
@@ -167,7 +167,7 @@ def test_new_kit_ecommerce_skips_build_caches(runner: CliRunner, tmp_path: Path)
 
 
 # ────────────────────────────────────────────────────────────────────
-#  Kit-not-installed surface
+# Kit-not-installed surface
 # ────────────────────────────────────────────────────────────────────
 
 

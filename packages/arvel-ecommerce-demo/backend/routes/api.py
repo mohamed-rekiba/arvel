@@ -3,16 +3,16 @@
 All routes declared here; controllers contain only handler logic.
 
 Route hierarchy:
-  Health     — GET /healthz
-  Auth       — POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
-  Public     — GET /api/products, GET /api/products/{slug},
+  Health — GET /healthz
+  Auth — POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
+  Public — GET /api/products, GET /api/products/{slug},
                GET /api/categories/{slug}/products, GET /api/search
-  Cart       — /api/cart/*
-  Checkout   — POST /api/checkout
-  Account    — /api/account/orders/*
-  i18n       — GET /api/i18n/{locale}
-  Admin      — /api/admin/* (products, vendors, categories, users, orders, roles, translations)
-  Test       — /api/test/* (seed endpoints, disabled in production)
+  Cart — /api/cart/*
+  Checkout — POST /api/checkout
+  Account — /api/account/orders/*
+  i18n — GET /api/i18n/{locale}
+  Admin — /api/admin/* (products, vendors, categories, users, orders, roles, translations)
+  Test — /api/test/* (seed endpoints, disabled in production)
 """
 
 from __future__ import annotations

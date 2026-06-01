@@ -1,4 +1,4 @@
-"""Tests for Mailable ABC — FR-009-011..014."""
+"""Tests for Mailable ABC."""
 
 from __future__ import annotations
 

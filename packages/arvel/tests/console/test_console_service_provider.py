@@ -1,15 +1,15 @@
-"""WI-020 Sub-A — ConsoleServiceProvider + Application.run + scheduler auto-wire.
+"""ConsoleServiceProvider + Application.run + scheduler auto-wire.
 
 Tests for:
-  FR-020-01  Application.run(name, args) -> int (programmatic invocation)
-  FR-020-02  Application.register_command(cmd) (post-construction registration)
-  FR-020-03  ConsoleServiceProvider.register() binds Application in container
-  FR-020-04  ConsoleServiceProvider.boot() collects provider commands (both shapes)
-  FR-020-05  ServiceProvider.commands() return type widened to list[type[Command] | Command]
-  FR-020-06  SchedulerServiceProvider auto-wires run_command when console Application bound
-  FR-020-07  Both dispatch_job and run_command auto-wired when both providers registered
-  NFR-020-04 Provider.commands() raising is tolerated (skipped with warning)
-  ARCH-020-B Application.iter_providers() public accessor
+ Application.run(name, args) -> int (programmatic invocation)
+ Application.register_command(cmd) (post-construction registration)
+ ConsoleServiceProvider.register binds Application in container
+ ConsoleServiceProvider.boot collects provider commands (both shapes)
+ ServiceProvider.commands return type widened to list[type[Command] | Command]
+ SchedulerServiceProvider auto-wires run_command when console Application bound
+ Both dispatch_job and run_command auto-wired when both providers registered
+ Provider.commands raising is tolerated (skipped with warning)
+ B Application.iter_providers public accessor
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ class _InstanceBackedProvider(ServiceProvider):
 
 
 class _RaisingProvider(ServiceProvider):
-    """commands() raises — tests NFR-020-04 boot-walk tolerance."""
+    """commands raises — tests boot-walk tolerance."""
 
     def commands(self) -> list[type[Command] | Command]:
         msg = "provider commands() failed"
@@ -80,41 +80,41 @@ class _RaisingProvider(ServiceProvider):
 
 
 class _EmptyProvider(ServiceProvider):
-    """commands() returns []."""
+    """commands returns []."""
 
     def commands(self) -> list[type[Command] | Command]:
         return []
 
 
-# ─── FR-020-01: Application.run(name, args) -> int ────────────────────────────
+# ─── : Application.run(name, args) -> int ────────────────────────────
 
 
 def test_application_run_invokes_command_by_name_returns_exit_code() -> None:
-    """FR-020-01: run() dispatches by name, returns Command.handle() exit code."""
+    """run dispatches by name, returns Command.handle exit code."""
     app = ConsoleApplication(commands=[_HelloCmd()])
     code = app.run("hello")
     assert code == 0
 
 
 def test_application_run_propagates_nonzero_exit_code() -> None:
-    """FR-020-01: failing command's exit code is returned, not raised."""
+    """failing command's exit code is returned, not raised."""
     app = ConsoleApplication(commands=[_FailingCmd()])
     code = app.run("fail")
     assert code == 1
 
 
 def test_application_run_raises_keyerror_on_unknown_command() -> None:
-    """FR-020-01: unknown command name raises KeyError (no silent fallback)."""
+    """unknown command name raises KeyError (no silent fallback)."""
     app = ConsoleApplication(commands=[_HelloCmd()])
     with pytest.raises(KeyError):
         app.run("does-not-exist")
 
 
-# ─── FR-020-02: Application.register_command(cmd) ────────────────────────────
+# ─── : Application.register_command(cmd) ────────────────────────────
 
 
 def test_application_register_command_adds_to_dispatch_table() -> None:
-    """FR-020-02: register_command() adds a Command that run() can dispatch."""
+    """register_command adds a Command that run can dispatch."""
     app = ConsoleApplication(commands=[])
     app.register_command(_HelloCmd())
     assert app.run("hello") == 0
@@ -123,7 +123,7 @@ def test_application_register_command_adds_to_dispatch_table() -> None:
 def test_application_register_command_overrides_with_warning(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """FR-020-02: re-registering the same name emits a warning; last wins."""
+    """re-registering the same name emits a warning; last wins."""
     app = ConsoleApplication(commands=[_HelloCmd()])
     with caplog.at_level(logging.WARNING, logger="arvel.console"):
         app.register_command(_FailingCmd.__new__(_FailingCmd))  # type: ignore[misc]
@@ -142,11 +142,11 @@ def test_application_register_command_overrides_with_warning(
     assert app.run("hello") == 42
 
 
-# ─── ARCH-020-B: Application.iter_providers() ────────────────────────────────
+# ─── B: Application.iter_providers() ────────────────────────────────
 
 
 def test_framework_application_iter_providers_yields_registered_instances() -> None:
-    """ARCH-020-B: public iter_providers() exposes every booted provider instance.
+    """B: public iter_providers exposes every booted provider instance.
 
     User-listed providers always end up in the chain alongside the framework
     auto-baseline (head: Config/Log/Lang/Database/Http/Scheduler; tail:
@@ -164,11 +164,11 @@ def test_framework_application_iter_providers_yields_registered_instances() -> N
     assert any(isinstance(p, _TypeBackedProvider) for p in providers)
 
 
-# ─── FR-020-03 / 04 / 05 / NFR-020-04: ConsoleServiceProvider ────────────────
+# ─── / 04 / 05 / : ConsoleServiceProvider ────────────────
 
 
 def test_console_service_provider_binds_console_application_in_container() -> None:
-    """FR-020-03: ConsoleServiceProvider.register() binds ConsoleApplication."""
+    """ConsoleServiceProvider.register binds ConsoleApplication."""
     from arvel.console.providers.console_service_provider import ConsoleServiceProvider
 
     builder = FrameworkApplication.configure(Path.cwd())
@@ -183,7 +183,7 @@ def test_console_service_provider_binds_console_application_in_container() -> No
 
 @pytest.mark.asyncio
 async def test_console_service_provider_boot_collects_type_backed_commands() -> None:
-    """FR-020-04 / FR-020-05: commands returned as TYPES are instantiated and registered."""
+    """/ : commands returned as TYPES are instantiated and registered."""
     from arvel.console.providers.console_service_provider import ConsoleServiceProvider
 
     builder = FrameworkApplication.configure(Path.cwd())
@@ -200,7 +200,7 @@ async def test_console_service_provider_boot_collects_type_backed_commands() -> 
 
 @pytest.mark.asyncio
 async def test_console_service_provider_boot_collects_instance_backed_commands() -> None:
-    """FR-020-04 / FR-020-05: commands returned as INSTANCES are registered as-is."""
+    """/ : commands returned as INSTANCES are registered as-is."""
     from arvel.console.providers.console_service_provider import ConsoleServiceProvider
 
     builder = FrameworkApplication.configure(Path.cwd())
@@ -219,7 +219,7 @@ async def test_console_service_provider_boot_collects_instance_backed_commands()
 async def test_console_service_provider_boot_tolerates_raising_provider(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """NFR-020-04: a provider whose commands() raises is skipped with a warning."""
+    """a provider whose commands raises is skipped with a warning."""
     from arvel.console.providers.console_service_provider import ConsoleServiceProvider
 
     builder = FrameworkApplication.configure(Path.cwd())
@@ -242,12 +242,12 @@ async def test_console_service_provider_boot_tolerates_raising_provider(
     ), "A warning naming the failing provider must be emitted"
 
 
-# ─── FR-020-06 / 07: SchedulerServiceProvider auto-wires run_command ─────────
+# ─── / 07: SchedulerServiceProvider auto-wires run_command ─────────
 
 
 @pytest.mark.asyncio
 async def test_scheduler_auto_wires_run_command_when_console_application_bound() -> None:
-    """FR-020-06: scheduler kernel's run_command hook resolves the console Application."""
+    """scheduler kernel's run_command hook resolves the console Application."""
     from arvel.console.providers.console_service_provider import ConsoleServiceProvider
     from arvel.providers.cache_provider import CacheServiceProvider
     from arvel.providers.log_provider import LogServiceProvider
@@ -282,7 +282,7 @@ async def test_scheduler_auto_wires_run_command_when_console_application_bound()
 
 @pytest.mark.asyncio
 async def test_scheduler_run_command_raises_on_nonzero_exit_code() -> None:
-    """FR-020-06: non-zero exit code from a scheduled command propagates as RuntimeError."""
+    """non-zero exit code from a scheduled command propagates as RuntimeError."""
     from arvel.console.providers.console_service_provider import ConsoleServiceProvider
     from arvel.providers.cache_provider import CacheServiceProvider
     from arvel.providers.log_provider import LogServiceProvider
@@ -321,11 +321,11 @@ async def test_scheduler_run_command_raises_on_nonzero_exit_code() -> None:
 
 
 def test_scheduler_skips_run_command_when_no_console_application_bound() -> None:
-    """FR-020-06: scheduler defensively returns ``run_command=None`` when nothing
+    """scheduler defensively returns ``run_command=None`` when nothing
     has bound ``ConsoleApplication`` in the container.
 
-    The auto-baseline (ADR-075) always pins ``ConsoleServiceProvider`` last, so
-    in normal usage this branch isn't reachable through ``Application.create()``.
+    The auto-baseline always pins ``ConsoleServiceProvider`` last, so
+    in normal usage this branch isn't reachable through ``Application.create``.
     The defensive code still exists for tests or specialised hosts that build
     a custom ``FrameworkApplication`` — invoke ``SchedulerServiceProvider``
     directly against an Application stub whose container deliberately lacks

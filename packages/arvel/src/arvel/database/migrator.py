@@ -1,15 +1,13 @@
-"""Migration runner (WI-arvel-022, ADR-071).
+"""Migration runner.
 
 The :class:`Migrator` orchestrates user migration files against a
 Laravel-style ``migrations`` tracking table. It honors the existing
-async-function-based file contract that ``arvel make:migration`` generates:
+async-function-based file contract that ``arvel make:migration`` generates:.. code-block:: python
 
-.. code-block:: python
+ from arvel.database import Schema
 
-    from arvel.database import Schema
-
-    async def up(schema: Schema) -> None: ...
-    async def down(schema: Schema) -> None: ...
+ async def up(schema: Schema) -> None:...
+ async def down(schema: Schema) -> None:...
 
 Inside a user ``up``/``down`` body, ``Schema.create(...)`` and friends emit
 DDL via Alembic's ``op`` proxy. The Migrator binds that proxy to a real
@@ -17,8 +15,8 @@ SQLAlchemy connection per migration so each one runs in its own transaction
 — a body failure leaves earlier migrations applied (Laravel semantics).
 
 Implementation note: the orchestration stays on the ``AsyncEngine`` path,
-using ``conn.run_sync()`` to obtain a sync ``Connection`` for Alembic's
-``MigrationContext``. Inside the sync callback the user's ``async def up()``
+using ``conn.run_sync`` to obtain a sync ``Connection`` for Alembic's
+``MigrationContext``. Inside the sync callback the user's ``async def up``
 is driven manually one step at a time — typical migration bodies never
 ``await`` anything (``Schema.create`` and friends are sync), so the coroutine
 runs to ``StopIteration`` on the first ``send(None)``. If a body does

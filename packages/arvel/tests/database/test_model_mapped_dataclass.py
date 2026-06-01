@@ -1,4 +1,4 @@
-"""Tests for MappedAsDataclass integration on the Model base class (ADR-076)."""
+"""MappedAsDataclass integration on the Model base class."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ class Tag(Model):
     article: ArticleDC | None = relationship("ArticleDC", init=False)
 
 
-# ─── FR-076-001: typed keyword-only __init__ ─────────────────────────────────
+# ───  typed keyword-only __init__ ─────────────────────────────────
 
 
 def test_model_is_dataclass() -> None:
@@ -76,7 +76,7 @@ def test_relationship_not_in_init() -> None:
     assert fields["article"].init is False
 
 
-# ─── FR-076-002: missing required field raises TypeError ─────────────────────
+# ───  missing required field raises TypeError ─────────────────────
 
 
 def test_missing_required_field_raises() -> None:
@@ -84,7 +84,7 @@ def test_missing_required_field_raises() -> None:
         ArticleDC()  # type: ignore[call-arg]  # intentional negative test
 
 
-# ─── FR-076-003: dataclass_transform metaclass propagates to subclasses ──────
+# ───  dataclass_transform metaclass propagates to subclasses ──────
 
 
 def test_custom_model_class_is_dataclass() -> None:
@@ -94,7 +94,7 @@ def test_custom_model_class_is_dataclass() -> None:
     assert init_field_names == {"name", "article_id"}
 
 
-# ─── FR-076-004: instance_hidden unaffected ──────────────────────────────────
+# ───  instance_hidden unaffected ──────────────────────────────────
 
 
 def test_instance_hidden_is_class_var_not_dataclass_field() -> None:
@@ -103,7 +103,7 @@ def test_instance_hidden_is_class_var_not_dataclass_field() -> None:
     assert "_instance_hidden" not in field_names
 
 
-# ─── FR-076-005: to_dict / to_schema still work ──────────────────────────────
+# ───  to_dict / to_schema still work ──────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -121,20 +121,19 @@ async def test_to_dict_includes_mapped_columns(engine: Any, session: Any) -> Non
     assert "id" in d
 
 
-# ─── ARCH-001: column helpers produce Mapped[T]-annotated attributes ─────────
+# ─── column helpers produce Mapped[T]-annotated attributes ─────────
 
 
 def test_arvel_model_module_has_no_untyped_mapped_columns() -> None:
-    """Every mapped_column() assignment in model.py must be Mapped[T]-annotated.
+    """Every mapped_column assignment in model.py must be Mapped[T]-annotated.
 
-    Catches regressions where a developer adds a bare `col = mapped_column()`
-    without the required `Mapped[T]` annotation that MappedAsDataclass depends on.
-    """
+    Catches regressions where a developer adds a bare `col = mapped_column`
+    without the required `Mapped[T]` annotation that MappedAsDataclass depends on."""
     spec = importlib.util.find_spec("arvel.database.model")
     assert spec is not None and spec.origin is not None
     source = Path(spec.origin).read_text()
 
-    # Lines that assign mapped_column() but lack a Mapped[...] annotation.
+    # Lines that assign mapped_column but lack a Mapped[...] annotation.
     bad_lines = [
         line
         for line in source.splitlines()
@@ -150,7 +149,7 @@ def test_arvel_model_module_has_no_untyped_mapped_columns() -> None:
 
 
 def test_columns_module_has_no_untyped_mapped_columns() -> None:
-    """Every mapped_column() assignment in columns.py must be Mapped[T]-annotated."""
+    """Every mapped_column assignment in columns.py must be Mapped[T]-annotated."""
     spec = importlib.util.find_spec("arvel.database.columns")
     assert spec is not None and spec.origin is not None
     source = Path(spec.origin).read_text()

@@ -87,16 +87,16 @@ class EnumType(TypeDecorator[EnumT], Generic[EnumT]):
 
 
 class EncryptedType(TypeDecorator[str]):
-    """AES-256-GCM column encryption (ADR-014).
+    """AES-256-GCM column encryption.
 
     Two modes:
 
     - ``deterministic=False`` (default): random 12-byte IV per write; ciphertext
-      shape is ``b64(VERSION || KEY_ID || IV || ciphertext || tag)``. Same
-      plaintext → different ciphertext. **Not searchable** by equality.
+    shape is ``b64(VERSION || KEY_ID || IV || ciphertext || tag)``. Same
+    plaintext → different ciphertext. **Not searchable** by equality.
     - ``deterministic=True``: IV derived from ``HKDF-SHA256(key, plaintext)``,
-      so equal plaintexts produce equal ciphertexts. **Searchable** but leaks
-      equality. Useful for lookup columns (e.g. hashed-email indexes).
+    so equal plaintexts produce equal ciphertexts. **Searchable** but leaks
+    equality. Useful for lookup columns (e.g. hashed-email indexes).
 
     The wire format is versioned and key-identified so future schemes
     (alternative ciphers, key rotation) can coexist on disk during a rolling
@@ -106,7 +106,7 @@ class EncryptedType(TypeDecorator[str]):
     Optional ``associated_data`` is passed to AES-GCM as AAD so ciphertext
     bound to one column won't decrypt against another column even with the
     same key. Recommended pattern is ``EncryptedType(key, associated_data=
-    f"{table}.{column}".encode())``.
+    f"{table}.{column}".encode)``.
 
     Decryption failures (wrong key, tampered ciphertext) raise
     :class:`DecryptionError` — never silent ``None``.

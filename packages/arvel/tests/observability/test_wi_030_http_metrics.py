@@ -1,4 +1,4 @@
-"""Story 4: HTTP auto-instrumentation and metrics — FR-030-018, FR-030-024."""
+"""HTTP auto-instrumentation and metrics."""
 
 from __future__ import annotations
 

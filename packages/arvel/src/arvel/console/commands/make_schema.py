@@ -83,8 +83,7 @@ _TYPE_MAP: tuple[tuple[type, str, frozenset[str]], ...] = (
 def _is_email_column(name: str, col_type: Any) -> bool:
     """``email``-named string columns get ``EmailStr`` at the boundary.
 
-    The storage layer stays VARCHAR (see ADR-077 — emails persist as plain
-    strings, validation lives at the API boundary). This heuristic catches
+    The storage layer stays VARCHAR. This heuristic catches
     the common Laravel-style naming — ``email``, ``contact_email``,
     ``billing_email`` — without forcing users to hand-edit the generated
     schema. To opt out, run ``make:schema --force`` and edit the file.

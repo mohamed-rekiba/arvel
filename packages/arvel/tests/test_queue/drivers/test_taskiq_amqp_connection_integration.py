@@ -1,8 +1,8 @@
 """Integration tests for `TaskiqConnection` against a real RabbitMQ broker.
 
-New file per FR-018-16. Covers FR-018-09 (URL scheme picks amqp broker),
-FR-018-11 amqp branch (native priority via max_priority=9 on queue
-declaration), and FR-018-14 (rabbitmq_endpoint fixture).
+Covers URL-scheme broker selection (amqp broker),
+ amqp branch (native priority via max_priority=9 on queue
+declaration), and (rabbitmq_endpoint fixture).
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ class TestTaskiqAmqpBrokerOps:
             await connection.close()
 
     async def test_url_scheme_picks_amqp_broker(self, driver: TaskiqConnection) -> None:
-        """FR-018-09: amqp:// scheme resolves to a taskiq_aio_pika broker class."""
+        """amqp:// scheme resolves to a taskiq_aio_pika broker class."""
         broker = await driver._get_broker()  # pyright: ignore[reportPrivateUsage]
         assert type(broker).__module__.startswith("taskiq_aio_pika")
 
@@ -84,7 +84,7 @@ class TestTaskiqAmqpBrokerOps:
     async def test_amqp_native_priority(
         self, driver: TaskiqConnection, rabbitmq_endpoint: RabbitmqEndpoint
     ) -> None:
-        """FR-018-11 amqp: max-priority=9 queue; consumers see priority order."""
+        """amqp: max-priority=9 queue; consumers see priority order."""
         aio_pika: Any = importlib.import_module("aio_pika")
         # Push lo before hi so FIFO would deliver lo first; native priority must invert this
         await driver.push(_envelope("lo-prio", priority=2))

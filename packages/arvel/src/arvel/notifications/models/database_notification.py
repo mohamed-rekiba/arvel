@@ -1,4 +1,4 @@
-"""DatabaseNotification ORM model — notifications table (FR-009-026)."""
+"""DatabaseNotification ORM model — notifications table."""
 
 from __future__ import annotations
 

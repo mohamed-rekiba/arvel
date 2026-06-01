@@ -519,7 +519,7 @@ exclude_lines = [
 ]
 fail_under = 90
 
-# FB-010 / ADR-017 — per-module coverage floors. Enforced by the workspace-root
+# Per-module coverage floors. Enforced by the workspace-root
 # conftest.py after pytest-cov finishes. Floors are *minimums*: pinned just
 # below the current measured number so refactors don't get blocked, and raised
 # whenever real coverage climbs durably. Current numbers (2026-05-17):

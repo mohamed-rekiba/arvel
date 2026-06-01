@@ -1,4 +1,4 @@
-"""WI-arvel-063 — Epic 049 Story 10: `datetime` / `date` / `timestamp` casts.
+"""`datetime` / `date` / `timestamp` casts.
 
 `__casts__` already handles bool/int/float/str/dict/list. The Laravel-parity
 gap is the temporal trio:
@@ -16,8 +16,7 @@ it via the exception-translator registry if a caller wants 400 instead of 500.
 
 Tests go through the public surface: define a tiny ``Model`` subclass with
 ``__casts__`` set, construct an instance with the raw value, then read the
-attribute and assert the cast result. No private symbol access.
-"""
+attribute and assert the cast result. No private symbol access."""
 
 from __future__ import annotations
 
@@ -58,8 +57,7 @@ def _build(model_cls: type[Model], value: object) -> Any:
     incomplete and trips ``reportCallIssue`` on ``Model(value=...)`` even
     though the runtime accepts it cleanly. Calling through ``Any`` widens
     the type at the call site so pyright stops complaining while preserving
-    runtime SA instrumentation.
-    """
+    runtime SA instrumentation."""
     factory: Any = model_cls
     return factory(field=value)
 
@@ -110,7 +108,7 @@ class TestDatetimeCast:
         assert m.field == datetime(2026, 5, 25, 1, 30, 0, tzinfo=UTC)
 
     def test_invalid_string_raises_cast_error(self) -> None:
-        # WI-068 made coercion fail-fast at write — bad input never reaches storage.
+        # made coercion fail-fast at write — bad input never reaches storage.
         with pytest.raises(CastError) as ei:
             _build(self.M, "not a date")
         assert "datetime" in str(ei.value)

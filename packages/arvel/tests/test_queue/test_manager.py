@@ -1,4 +1,4 @@
-"""Tests for QueueManager — FR-008-001, FR-008-004..006."""
+"""Tests for QueueManager"""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ class _MgrJob(Job):
 
 
 class TestQueueManagerDriverSelection:
-    """FR-008-004: QueueManager returns configured driver."""
+    """QueueManager returns configured driver."""
 
     def test_default_connection_is_sync(self) -> None:
         manager = QueueManager(QueueConfig(connection=QueueDriver.SYNC))
@@ -48,7 +48,7 @@ class TestQueueManagerDriverSelection:
 
 
 class TestQueueManagerPassThrough:
-    """FR-008-005..006: QueueManager delegates push/pop to active driver."""
+    """QueueManager delegates push/pop to active driver."""
 
     def setup_method(self) -> None:
         _MgrJob.executed.clear()

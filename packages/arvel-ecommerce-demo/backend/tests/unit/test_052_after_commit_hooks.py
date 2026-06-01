@@ -1,4 +1,4 @@
-"""Unit tests for the after-commit lifecycle hooks (Story 2).
+"""Unit tests for the after-commit lifecycle hooks.
 
 Covers:
 - DB.after_commit() enqueues callbacks executed after DB.transaction() commits.
@@ -154,7 +154,7 @@ async def test_callbacks_do_not_execute_on_rollback() -> None:
     @asynccontextmanager
     async def _begin_that_raises() -> None:  # type: ignore[override]
         raise RuntimeError("forced rollback")
-        yield  # type: ignore[misc]  # unreachable but required for @asynccontextmanager protocol
+        yield  # type: ignore[misc] # unreachable but required for @asynccontextmanager protocol
 
     mock_session.begin = _begin_that_raises
     mock_maker = MagicMock()

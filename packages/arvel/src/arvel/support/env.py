@@ -1,6 +1,6 @@
 """Typed wrapper for environment-variable access.
 
-Behavior is documented in PRD-001 §FR-001-005.
+Typed reads with sensible coercion for bool, int, float, and list values.
 """
 
 from __future__ import annotations

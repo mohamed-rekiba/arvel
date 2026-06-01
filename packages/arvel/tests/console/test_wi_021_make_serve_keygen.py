@@ -1,9 +1,7 @@
-"""WI-021 — make:migration, serve, key:generate command generators.
-
-Covers (red until Stage 3b):
-  FR-021-20  make:migration generates timestamp-prefixed Alembic-shaped file
-  FR-021-25  serve runs uvicorn against public.asgi:asgi with sensible defaults
-  FR-021-26  key:generate produces base64 random key; writes to .env or --show
+"""make:migration, serve, key:generate command generators.
+make:migration generates timestamp-prefixed Alembic-shaped file
+ serve runs uvicorn against public.asgi:asgi with sensible defaults
+ key:generate produces base64 random key; writes to .env or --show
 """
 
 from __future__ import annotations
@@ -15,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-20 — make:migration
+# — make:migration
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -114,7 +112,7 @@ class TestMakeMigration:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-25 — serve
+# — serve
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -152,7 +150,7 @@ class TestServe:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-021-26 — key:generate
+# — key:generate
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -304,7 +302,7 @@ class TestMakeMigrationRegister:
         assert "Blueprint" not in content
 
 
-# ─── make:migration --view (FR-021-20 extension) ─────────────────────────────
+# ─── make:migration --view ( extension) ─────────────────────────────
 
 
 class TestMakeMigrationView:

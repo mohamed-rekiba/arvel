@@ -1,4 +1,4 @@
-"""NFR-001-004: Secret* types never leak in error paths."""
+""": Secret* types never leak in error paths."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ def test_env_coercion_error_does_not_leak_raw_value(
     """Stage 4b: env() coercion errors must NOT echo the raw env value.
 
     Apps routinely log exceptions; raw env values are often secrets
-    (API keys, passwords, tokens). See SAD-001 §4 / OWASP A09.
+    (API keys, passwords, tokens). See OWASP A09.
     """
     monkeypatch.setenv("ARVEL_SECRET_FOR_TEST", raw)
     with pytest.raises(EnvCoercionError) as excinfo:

@@ -1,4 +1,4 @@
-"""Tests for Mailer and MailPendingSend — FR-009-015, FR-009-016, FR-009-020."""
+"""Tests for Mailer and MailPendingSend."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ class TestMailer:
 
 
 class TestMailFake:
-    """FR-009-020: Mail.fake() returns array driver and works as context manager."""
+    """Mail.fake() returns array driver and works as context manager."""
 
     def setup_method(self) -> None:
         from arvel.facades.mail import Mail
@@ -101,7 +101,7 @@ class TestMailFake:
 
     @pytest.mark.asyncio
     async def test_fake_context_manager_restores_original_driver(self) -> None:
-        """NFR-009-010: Mail.fake() as context manager."""
+        """: Mail.fake() as context manager."""
         from arvel.facades.mail import Mail
 
         original_driver = Mail.get_mailer().current_driver

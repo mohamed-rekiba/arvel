@@ -1,13 +1,13 @@
-"""WI-020 Sub-B — CLI built-ins via arvel.commands entry-points.
+"""CLI built-ins via arvel.commands entry-points.
 
 Tests for:
-  FR-020-08  pyproject.toml declares [project.entry-points."arvel.commands"]
-  FR-020-09  Entry-points list covers all 24 expected built-ins + reverb:start
-  FR-020-10  console.entrypoint.get_commands() collapses to discover_commands()
-  FR-020-11  arvel --help displays the same 24 commands (regression guard)
-  FR-020-12  Queue commands stay OUT of the entry-points group
-  ARCH-020-D discover_commands() tolerates ImportError from individual entry-points
-  NFR-020-05 Discovery test pins expected names so future removal fails CI
+ pyproject.toml declares [project.entry-points."arvel.commands"]
+ Entry-points list covers all 24 expected built-ins + reverb:start
+ console.entrypoint.get_commands collapses to discover_commands
+ arvel --help displays the same 24 commands (regression guard)
+ Queue commands stay OUT of the entry-points group
+ discover_commands tolerates ImportError from individual entry-points
+ Discovery test pins expected names so future removal fails CI
 """
 
 from __future__ import annotations
@@ -42,11 +42,11 @@ def entry_points_table(pyproject_data: dict[str, Any]) -> dict[str, str]:
     return eps.get("arvel.commands", {})
 
 
-# ─── FR-020-08 / FR-020-09: pyproject declares all expected entry-points ──────
+# ─── / : pyproject declares all expected entry-points ──────
 
 
 EXPECTED_BUILTINS = {
-    # make:* generators (WI-020 core + WI-023 additions)
+    # make:* generators ( core + additions)
     "make:controller",
     "make:model",
     "make:service",
@@ -72,7 +72,7 @@ EXPECTED_BUILTINS = {
     # publishing — replaces the old per-table make:<feature>-table commands
     "vendor:publish",
     "config:publish",
-    # migrate family (WI-022 + WI-023)
+    # migrate family ( + )
     "migrate",
     "migrate:rollback",
     "migrate:status",
@@ -98,7 +98,7 @@ EXPECTED_BUILTINS = {
     "test",
     "down",
     "up",
-    # queue ops (entry-point safe — DI-required ones still live in WI-021)
+    # queue ops (entry-point safe — DI-required ones still live in )
     "queue:restart",
     "queue:clear",
     "queue:prune-failed",
@@ -127,7 +127,7 @@ QUEUE_COMMANDS_THAT_MUST_NOT_BE_IN_ENTRY_POINTS = {
 def test_pyproject_declares_arvel_commands_entry_points_table(
     entry_points_table: dict[str, str],
 ) -> None:
-    """FR-020-08: pyproject.toml has the [project.entry-points."arvel.commands"] table."""
+    """pyproject.toml has the [project.entry-points."arvel.commands"] table."""
     assert entry_points_table, (
         '[project.entry-points."arvel.commands"] section is missing '
         "from packages/arvel/pyproject.toml"
@@ -138,7 +138,7 @@ def test_pyproject_declares_arvel_commands_entry_points_table(
 def test_each_builtin_is_declared_as_entry_point(
     entry_points_table: dict[str, str], command_name: str
 ) -> None:
-    """FR-020-09 / NFR-020-05: every expected built-in is declared as an entry-point."""
+    """/ : every expected built-in is declared as an entry-point."""
     assert command_name in entry_points_table, (
         f"Built-in {command_name!r} is missing from "
         '[project.entry-points."arvel.commands"] in pyproject.toml'
@@ -153,18 +153,18 @@ def test_each_builtin_is_declared_as_entry_point(
 def test_queue_commands_are_not_declared_as_entry_points(
     entry_points_table: dict[str, str], command_name: str
 ) -> None:
-    """FR-020-12: queue commands need DI; they must NOT be declared as entry-points."""
+    """queue commands need DI; they must NOT be declared as entry-points."""
     assert command_name not in entry_points_table, (
         f'Queue command {command_name!r} must NOT be in [project.entry-points."arvel.commands"] '
         "— it needs DI and is intentionally deferred to WI-arvel-021."
     )
 
 
-# ─── FR-020-10: get_commands() collapses to discover_commands() ──────────────
+# ─── : get_commands() collapses to discover_commands() ──────────────
 
 
 def test_entrypoint_get_commands_returns_only_discover_commands_result() -> None:
-    """FR-020-10: get_commands() no longer composes a hardcoded list."""
+    """get_commands no longer composes a hardcoded list."""
     import inspect
 
     import arvel.console.entrypoint as entrypoint_mod
@@ -192,11 +192,11 @@ def test_entrypoint_get_commands_returns_only_discover_commands_result() -> None
         )
 
 
-# ─── FR-020-11: arvel --help discovers all expected built-ins via entry-points
+# ─── : arvel --help discovers all expected built-ins via entry-points
 
 
 def test_discover_commands_finds_all_expected_builtins_against_installed_wheel() -> None:
-    """FR-020-09 + FR-020-11: at runtime, the installed wheel exposes every expected command."""
+    """+ : at runtime, the installed wheel exposes every expected command."""
     eps = importlib.metadata.entry_points(group="arvel.commands")
     discovered_names = {ep.name for ep in eps}
 
@@ -213,7 +213,7 @@ def test_discover_commands_finds_all_expected_builtins_against_installed_wheel()
 
 
 def test_get_commands_returns_at_least_core_builtins_at_runtime() -> None:
-    """FR-020-11: get_commands() resolves the core built-ins via the installed wheel."""
+    """get_commands resolves the core built-ins via the installed wheel."""
     commands = get_commands()
     names = {c.name for c in commands}
     core_required = EXPECTED_BUILTINS - {"reverb:start"}
@@ -224,13 +224,13 @@ def test_get_commands_returns_at_least_core_builtins_at_runtime() -> None:
     )
 
 
-# ─── ARCH-020-D: ImportError-tolerant entry-point loader ─────────────────────
+# ─── D: ImportError-tolerant entry-point loader ─────────────────────
 
 
 def test_discover_commands_skips_entry_point_that_raises_importerror(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """ARCH-020-D: a single ImportError-raising entry-point must NOT abort discovery."""
+    """D: a single ImportError-raising entry-point must NOT abort discovery."""
 
     broken_ep = MagicMock()
     broken_ep.name = "broken:cmd"
@@ -272,7 +272,7 @@ def test_discover_commands_skips_entry_point_that_raises_importerror(
 def test_discover_commands_logs_runtime_errors_and_continues(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """FR-021-17 supersedes the old "RuntimeError propagates" behavior.
+    """supersedes the old "RuntimeError propagates" behavior.
 
     A faulty plugin must never take down the whole CLI bootstrap; the error
     class is captured in the log message so the operator still has a clear

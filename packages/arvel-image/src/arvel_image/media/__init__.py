@@ -1,7 +1,6 @@
 """arvel-image media-library runtime — Spatie ``laravel-medialibrary`` v11 parity.
 
-Public surface organized as a feature-per-file subpackage (Approach B in
-SAD-026 §1):
+Public surface organized as a feature-per-file subpackage:
 
 - :class:`Media` — the polymorphic ORM row (`media` table).
 - :class:`HasMedia` — mixin that gives any host model the
@@ -17,7 +16,7 @@ SAD-026 §1):
   work to a worker thread so it never blocks the event loop.
 - :class:`FileAdder` — builder returned by :meth:`HasMedia.add_media`.
 
-See ADR-082 for the runtime-layer architectural decisions
+See package architecture docs for runtime-layer decisions
 (synchronous conversions, short class-name polymorphic discriminator,
 default path scheme matching Spatie verbatim).
 """

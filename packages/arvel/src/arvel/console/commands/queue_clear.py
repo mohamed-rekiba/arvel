@@ -1,4 +1,4 @@
-"""queue:clear command (WI-arvel-023)."""
+"""queue:clear command."""
 
 from __future__ import annotations
 

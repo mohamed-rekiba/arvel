@@ -1,4 +1,4 @@
-"""Event base class — Pydantic BaseModel with auto-registration (ADR-037)."""
+"""Event base class — Pydantic BaseModel with auto-registration."""
 
 from __future__ import annotations
 

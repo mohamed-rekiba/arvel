@@ -1,4 +1,4 @@
-"""WI-017 / FR-017-015: every # nosec carries a rule code AND a rationale."""
+"""Every # nosec carries a rule code and a rationale."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def _scan_python_files() -> list[Path]:
 
 
 def test_no_bare_nosec_comments() -> None:
-    """FR-017-015: every '# nosec' must carry a rule code AND a rationale."""
+    """every '# nosec' must carry a rule code and a rationale."""
     offenders: list[tuple[Path, int, str]] = []
     for path in _scan_python_files():
         lines = path.read_text(encoding="utf-8").splitlines()

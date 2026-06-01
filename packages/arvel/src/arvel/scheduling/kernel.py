@@ -1,6 +1,6 @@
 """SchedulerKernel — async dispatch loop with cache-lock-based safety.
 
-WI-019 wired the ``job`` and ``command`` callback kinds to actually run.
+ wired the ``job`` and ``command`` callback kinds to actually run.
 The kernel stays decoupled from the queue and console subsystems by
 accepting two optional callbacks (``dispatch_job``, ``run_command``)
 instead of importing ``Bus`` or ``Application`` directly. The default
@@ -94,7 +94,7 @@ class SchedulerKernel:
     async def run_due_tasks(self, now: datetime) -> SchedulerRunResult:
         """Evaluate registered tasks against ``now`` and dispatch the due ones.
 
-        Per ADR-064 uses asyncio.TaskGroup for structured concurrency.
+        Uses asyncio.TaskGroup for structured concurrency.
         Per-task exceptions are caught BEFORE the TaskGroup boundary so a
         single failing task never cancels its siblings.
         """

@@ -1,7 +1,4 @@
-"""Route-level middleware Protocol and built-in middlewares.
-
-See ``docs/adr/ADR-008-two-tier-middleware.md``.
-"""
+"""Route-level middleware Protocol and built-in middlewares."""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """MorphOne and MorphMany — polymorphic relations using short class-name discriminators.
 
-ADR-022: the ``{name}_type`` column stores the owner's unqualified class name
+The ``{name}_type`` column stores the owner's unqualified class name
 (e.g. ``"Post"``, not ``"app.models.Post"``).
 """
 

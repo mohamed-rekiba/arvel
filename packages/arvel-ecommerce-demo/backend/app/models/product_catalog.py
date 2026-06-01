@@ -21,6 +21,7 @@ class ProductCatalog(ProductBase, ViewModel):
 
     ``__media_host_type__`` redirects ``get_media()`` lookups to ``"Product"`` rows in
     the media table so this view model transparently shares Product's media records.
+
     """
 
     __media_host_type__: str = "Product"

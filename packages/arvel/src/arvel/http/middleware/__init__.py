@@ -1,7 +1,7 @@
 """Route-level middleware Protocol and built-in middlewares.
 
 This is a thin re-export shim — historically all middleware lived in a single
-file (``arvel.http.middleware``). WI-arvel-003 converted it to a package so
+file (``arvel.http.middleware``). converted it to a package so
 ``database_transaction`` could live alongside as a sibling module without
 mixing concerns. The public symbols (``Cors``, ``Throttle``, ``Authenticate``,
 ``VerifyCsrf``, ``Middleware``, ``CallNext``) are unchanged.

@@ -1,4 +1,4 @@
-"""FR-001-013: Extending bindings."""
+"""Extending bindings."""
 
 from __future__ import annotations
 

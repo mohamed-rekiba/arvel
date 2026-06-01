@@ -1,11 +1,11 @@
-"""WI-arvel-047: HTTP Consistency cluster — Stories 10, 11, 12, 13.
+"""HTTP Consistency cluster — , 13.
 
 Tests are FAILING before the fix and PASSING after.
 
-Story 10 (FR-047-010): HttpServiceProvider must register HttpExceptionHandler as default.
-Story 11 (FR-047-011): abort() must raise typed subclass with correct code.
-Story 12 (FR-047-012): Application.into_asgi() must wire scope middleware.
-Story 13 (FR-047-013): HttpExceptionHandler must register catch-all Exception handler.
+): HttpServiceProvider must register HttpExceptionHandler as default.
+): abort() must raise typed subclass with correct code.
+): Application.into_asgi() must wire scope middleware.
+): HttpExceptionHandler must register catch-all Exception handler.
 """
 
 from __future__ import annotations
@@ -17,11 +17,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.requests import Request as _Request
 
-# ─── Story 10: HttpServiceProvider default handler ───────────────────────────
+# HttpServiceProvider default handler
 
 
 class TestStory10DefaultExceptionHandler:
-    """FR-047-010: HttpServiceProvider must bind HttpExceptionHandler, not ProblemDetailsHandler."""
+    """HttpServiceProvider must bind HttpExceptionHandler, not ProblemDetailsHandler."""
 
     def test_http_service_provider_binds_http_exception_handler(self) -> None:
         """Currently FAILS: provider binds ProblemDetailsHandler."""
@@ -87,11 +87,11 @@ class TestStory10DefaultExceptionHandler:
         assert "details" in body["error"]
 
 
-# ─── Story 11: abort() typed codes ────────────────────────────────────────────
+# abort() typed codes
 
 
 class TestStory11AbortTypedCodes:
-    """FR-047-011: abort(N) must raise typed exception with correct code."""
+    """abort(N) must raise typed exception with correct code."""
 
     @pytest.mark.parametrize(
         ("status_code", "expected_code"),
@@ -157,11 +157,11 @@ class TestStory11AbortTypedCodes:
         assert body["error"]["code"] == "NOT_FOUND"
 
 
-# ─── Story 12: ArvelScopeMiddleware wired in into_asgi() ─────────────────────
+# ArvelScopeMiddleware wired in into_asgi()
 
 
 class TestStory12ScopeMiddleware:
-    """FR-047-012: into_asgi() must mount scope middleware so dep() works."""
+    """into_asgi() must mount scope middleware so dep() works."""
 
     def test_into_asgi_creates_arvel_scope_per_request(self) -> None:
         """request.state.arvel_scope must be set by the middleware.
@@ -225,11 +225,11 @@ class TestStory12ScopeMiddleware:
         assert response.json()["msg"] == "hello"
 
 
-# ─── Story 13: Catch-all 500 handler ─────────────────────────────────────────
+# Catch-all 500 handler
 
 
 class TestStory13CatchAllHandler:
-    """FR-047-013: HttpExceptionHandler must register a bare Exception handler."""
+    """HttpExceptionHandler must register a bare Exception handler."""
 
     def test_unhandled_exception_returns_500_envelope(self) -> None:
         """Bare RuntimeError must return {error: {code: INTERNAL_ERROR}} not a traceback.

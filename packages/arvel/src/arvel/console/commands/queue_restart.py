@@ -1,4 +1,4 @@
-"""queue:restart command (WI-arvel-023)."""
+"""queue:restart command."""
 
 from __future__ import annotations
 

@@ -7,7 +7,7 @@ Run: ``uv run python benchmarks/bench_reverb.py``
 
 Exits 0 on PASS for all three budgets (publish p99, RSS delta, tracemalloc
 heap delta), 1 on FAIL. The CI ``bench-reverb`` and ``bench-tracemalloc``
-jobs are hard gates per ADR-065.
+jobs are hard gates per ADR-112.
 
 Memory unit notes:
 - ``resource.getrusage(RUSAGE_SELF).ru_maxrss`` returns kilobytes on Linux
@@ -37,7 +37,7 @@ NFR_CHANNELS = 100  # NFR-013-003 scenario
 # WI-017 / FR-017-010: byte-granular Python-heap budget for the same scenario.
 # Initial conservative ceiling — looser than NFR_MEMORY_MIB because tracemalloc
 # captures heap-only allocations not the OS-level RSS picture. Calibrated in
-# ADR-065.
+# ADR-112.
 TRACEMALLOC_BUDGET_MIB = 96
 
 

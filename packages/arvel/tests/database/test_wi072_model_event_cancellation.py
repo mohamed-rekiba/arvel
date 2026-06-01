@@ -1,4 +1,4 @@
-"""WI-arvel-072 — Epic 049 Story 8: cancellable creating/updating/deleting hooks."""
+"""Cancellable creating/updating/deleting hooks."""
 
 from __future__ import annotations
 

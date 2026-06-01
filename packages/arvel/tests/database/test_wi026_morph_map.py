@@ -1,11 +1,10 @@
-"""WI-arvel-026 — Epic 007 Story 1: morph map foundation.
+"""Morph map foundation.
 
-- `get_morph_class()` returns the short class name by default, the alias when mapped.
+- `get_morph_class` returns the short class name by default, the alias when mapped.
 - `morph_map({...})` registers/returns aliases; `merge=False` replaces.
-- `require_morph_map()` makes an unmapped polymorphic model raise.
+- `require_morph_map` makes an unmapped polymorphic model raise.
 - `resolve_morph_class(alias)` goes token -> class (map first, registry fallback).
-- A row written through a morph accessor stores the alias in `{name}_type`.
-"""
+- A row written through a morph accessor stores the alias in `{name}_type`."""
 
 from __future__ import annotations
 

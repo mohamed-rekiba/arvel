@@ -17,7 +17,6 @@ import pytest
 # of subdirectory. Tests opt in by marking themselves @pytest.mark.requires_emulator
 # and requesting the fixture by name; collection stays cheap because the fixtures
 # only run when their tests are actually selected.
-#
 # Stays in this conftest (rather than the workspace root) because the dotted
 # plugin path is resolved against ``packages/arvel/tests/`` on sys.path.
 pytest_plugins = ["integration.emulators.fixtures"]
@@ -31,11 +30,11 @@ def reset_global_state() -> Iterator[None]:
     """Tear down all process-level singletons after every test.
 
     Resets:
-    - _lookup_registry._REGISTRY  — dotted-key config modules
+    - _lookup_registry._REGISTRY — dotted-key config modules
     - config/registry._REGISTERED — ArvelSettings subclasses
-    - Router._instance             — buffered route specs
-    - Config._container            — Pydantic config facade
-    - os.environ                   — prevents .env loads from leaking across tests
+    - Router._instance — buffered route specs
+    - Config._container — Pydantic config facade
+    - os.environ — prevents .env loads from leaking across tests
     """
     env_snapshot = dict(os.environ)
     yield

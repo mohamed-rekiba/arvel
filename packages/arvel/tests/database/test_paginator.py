@@ -1,4 +1,4 @@
-"""FR-003-014 — Paginator math."""
+"""Paginator math."""
 
 from __future__ import annotations
 

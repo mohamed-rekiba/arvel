@@ -1,6 +1,6 @@
-"""FR-001-007: ``Collection[T]`` — the single canonical Eloquent-style collection.
+"""``Collection[T]`` — the single canonical Eloquent-style collection.
 
-Covers every behavioural surface of ``arvel.support.Collection``. The database
+every behavioural surface of ``arvel.support.Collection``. The database
 layer re-exports the same class; integration wiring is asserted in
 ``tests/database/test_012_s5_collections_casts_factories.py``.
 """
@@ -19,7 +19,7 @@ class Item:
     value: int
 
 
-# ── list-subclass contract ────────────────────────────────────────────────────
+# list-subclass contract
 
 
 def test_collection_is_list_subclass() -> None:
@@ -35,7 +35,7 @@ def test_collection_to_array() -> None:
     assert list(coll) == [1, 2, 3]
 
 
-# ── transformation ────────────────────────────────────────────────────────────
+# transformation
 
 
 def test_filter_and_map_chain() -> None:
@@ -119,7 +119,7 @@ def test_zip() -> None:
     assert list(zipped) == [(1, "a"), (2, "b"), (3, "c")]
 
 
-# ── lookup / inspection ───────────────────────────────────────────────────────
+# lookup / inspection
 
 
 def test_first_and_first_where() -> None:
@@ -172,7 +172,7 @@ def test_is_empty_and_is_not_empty() -> None:
     assert not nonempty.is_empty()
 
 
-# ── aggregates ────────────────────────────────────────────────────────────────
+# aggregates
 
 
 def test_sum_and_avg() -> None:
@@ -203,7 +203,7 @@ def test_count_by() -> None:
     assert grouped == {1: 2, 0: 2}
 
 
-# ── grouping ──────────────────────────────────────────────────────────────────
+# grouping
 
 
 def test_group_by_attribute() -> None:
@@ -228,7 +228,7 @@ def test_key_by() -> None:
     assert by_name["b"].value == 2
 
 
-# ── set operations ────────────────────────────────────────────────────────────
+# set operations
 
 
 def test_only_keeps_listed_values() -> None:
@@ -249,7 +249,7 @@ def test_merge() -> None:
     assert list(a.merge(b)) == [1, 2, 3, 4]
 
 
-# ── serialisation ─────────────────────────────────────────────────────────────
+# serialisation
 
 
 def test_to_json_with_to_dict() -> None:

@@ -1,7 +1,7 @@
-"""schedule:work + schedule:list CLI commands (FR-015-009, FR-015-010).
+"""schedule:work + schedule:list CLI commands.
 
 Both commands need the user's :class:`arvel.scheduling.Schedule` — the one
-populated by ``app/console/kernel.py::Kernel.schedule()`` — and a working
+populated by ``app/console/kernel.py::Kernel.schedule`` — and a working
 :class:`arvel.scheduling.SchedulerKernel`. They opt into framework DI
 (``needs_application = True``) so the entrypoint bootstraps the framework
 :class:`arvel.application.Application` before dispatch and binds it to

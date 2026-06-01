@@ -153,7 +153,7 @@ class Application:
     def iter_providers(self) -> Iterator[ServiceProvider]:
         """Yield each registered ServiceProvider instance, in registration order.
 
-        Used by ConsoleServiceProvider.boot() (WI-020) to collect commands from
+        Used by ConsoleServiceProvider.boot to collect commands from
         every provider without reaching into ``_provider_instances`` directly.
         """
         yield from self._provider_instances
@@ -480,13 +480,13 @@ class ApplicationBuilder:
         api: Path | str | None = None,
         console: Path | str | None = None,
     ) -> Self:
-        """Register routing file paths to be loaded at register() time.
+        """Register routing file paths to be loaded at register time.
 
-        ``web`` and ``api`` are loaded by ``HttpServiceProvider.register()``.
-        ``console`` is stored on the application but NOT loaded in WI-004
-        (no Console provider ships until WI-005).
+               ``web`` and ``api`` are loaded by ``HttpServiceProvider.register``.
+               ``console`` is stored on the application but not loaded until the
+               Console provider ships.
 
-        At least one of the three must be non-None. Subsequent calls
+               At least one of the three must be non-None. Subsequent calls
         accumulate (last-write-wins per key).
         """
         if web is None and api is None and console is None:
@@ -587,8 +587,8 @@ class ApplicationBuilder:
     def _load_routing_files(self) -> None:
         """Import each registered routing file so its decorators populate ``Router``.
 
-        Only ``web`` and ``api`` are loaded in WI-004. ``console`` is stored
-        for a future Console provider (WI-005). Files load through the
+               Only ``web`` and ``api`` are loaded initially. ``console`` is stored
+               for a future Console provider. Files load through the
         ``_loader`` so the ``sys.path`` invariant holds and config-style
         module shadowing is avoided.
         """

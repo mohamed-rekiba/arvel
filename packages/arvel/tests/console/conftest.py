@@ -41,7 +41,7 @@ def invoke_async(
 ) -> InvokeResult:
     """Invoke *typer_app* via CliRunner and run any work deferred by schedule_async.
 
-    Commands that use ``schedule_async()`` defer their coroutine to the
+    Commands that use ``schedule_async`` defer their coroutine to the
     entrypoint's event loop. In unit tests that bypass the entrypoint, nothing
     awaits the coroutine. This helper bridges the gap: runs the sync dispatch
     first, then runs the scheduled coroutine (if any) and captures its output.

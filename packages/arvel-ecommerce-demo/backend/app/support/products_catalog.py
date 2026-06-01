@@ -19,6 +19,7 @@ async def refresh_products_catalog() -> int:
 
     Returns the number of rows in the catalog after refresh, or -1 if the lock
     was already held by another process.
+
     """
     async with Cache.lock(_REFRESH_LOCK, ttl=_REFRESH_LOCK_TTL_SECONDS) as acquired:
         if not acquired:

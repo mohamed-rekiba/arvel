@@ -1,4 +1,4 @@
-"""Tests for view:cache / view:clear commands and warm_bytecode_cache()."""
+"""Tests for view:cache / view:clear commands and warm_bytecode_cache."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 
 class TestWarmBytecodeCache:
-    """warm_bytecode_cache() creates bootstrap/views/ and returns template count."""
+    """warm_bytecode_cache creates bootstrap/views/ and returns template count."""
 
     def test_returns_zero_for_empty_template_dir(self, tmp_path: Path) -> None:
         from arvel.support.view import warm_bytecode_cache
@@ -47,7 +47,7 @@ class TestWarmBytecodeCache:
 
 
 class TestClearBytecodeCache:
-    """clear_bytecode_cache() removes .cache files from bootstrap/views/."""
+    """clear_bytecode_cache removes .cache files from bootstrap/views/."""
 
     def test_no_error_when_cache_dir_missing(self) -> None:
         from arvel.support.view import clear_bytecode_cache
@@ -70,7 +70,7 @@ class TestClearBytecodeCache:
 
 
 class TestViewCacheCommand:
-    """view:cache command calls warm_bytecode_cache() and echoes the count."""
+    """view:cache command calls warm_bytecode_cache and echoes the count."""
 
     def test_command_echoes_template_count(self) -> None:
         from arvel.console import Application

@@ -1,4 +1,4 @@
-"""Testcontainers harness for WI-arvel-035 (e-commerce demo).
+"""Testcontainers harness for the e-commerce demo.
 
 Boots Postgres 18, Redis 7, RabbitMQ 3.13, MinIO, and Mailpit once per
 session. Per-test isolation via the template-DB pattern (same as arvel-starter).

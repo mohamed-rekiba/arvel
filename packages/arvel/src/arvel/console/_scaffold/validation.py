@@ -1,9 +1,7 @@
 """Project-name validation + target-directory resolution.
 
-First line of defence against path-traversal attacks (NFR-004-003,
-ADR-018 §Conventions, ADR-020 § Project name validation). Contract surface
-only — bodies raise ``NotImplementedError`` until Stage 3b makes the
-QA-Pre tests green.
+First line of defence against path-traversal attacks. Contract surface
+only — bodies raise ``NotImplementedError`` until the scaffold implementation lands.
 """
 
 from __future__ import annotations

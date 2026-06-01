@@ -1,8 +1,7 @@
-"""Spatie v7 parity for arvel-permission, on the async ``MorphToMany`` core.
+"""Spatie v7 parity on the async ``MorphToMany`` core.
 
-Maps to FR-045-01 .. FR-045-13. The pivots are plain Core ``Table``s; hosts
-grant roles/permissions through async accessors, so the behavioral tests run
-against a real session.
+Pivots are plain Core ``Table``s; hosts grant roles/permissions through async
+accessors, so behavioral tests run against a real session.
 """
 
 from __future__ import annotations
@@ -47,7 +46,7 @@ async def session_factory(
     yield async_sessionmaker(async_engine, expire_on_commit=False)
 
 
-# ── FR-045-01: Composite PK on pivot tables, no surrogate id, no timestamps ───
+# Pivot tables: composite PK, no surrogate id, no timestamps
 
 
 def test_model_has_roles_shape() -> None:
@@ -68,7 +67,7 @@ def test_model_has_permissions_shape() -> None:
     assert pk_cols == {"permission_id", "model_id", "model_type"}
 
 
-# ── FR-045-03: PermissionConfig cache_enabled wired ───────────────────────────
+# PermissionConfig.cache_enabled wired through the registrar
 
 
 def test_cache_enabled_false_bypasses_in_memory_cache() -> None:
@@ -85,7 +84,7 @@ def test_cache_enabled_false_bypasses_in_memory_cache() -> None:
     assert reg.find_role("editor") is None
 
 
-# ── FR-045-04: HasPermissions grafted onto Role ───────────────────────────────
+# HasPermissions grafted onto Role
 
 
 def test_role_has_permission_methods() -> None:
@@ -116,7 +115,7 @@ async def test_role_give_permission_to_db(
         assert await role.has_permission_to("edit articles")
 
 
-# ── FR-045-05: Route middleware ───────────────────────────────────────────────
+# Route middleware
 
 
 def test_middleware_classes_importable() -> None:
@@ -138,7 +137,7 @@ def test_middleware_exported_from_package() -> None:
         assert hasattr(arvel_permission, name), f"arvel_permission missing {name}"
 
 
-# ── FR-045-07: Typed exceptions ───────────────────────────────────────────────
+# Typed exceptions
 
 
 def test_typed_exceptions_importable() -> None:
@@ -155,7 +154,7 @@ def test_typed_exceptions_in_all() -> None:
     assert hasattr(arvel_permission, "PermissionDoesNotExist")
 
 
-# ── FR-045-08: get_direct_permissions / get_permissions_via_roles ─────────────
+# get_direct_permissions / get_permissions_via_roles
 
 
 def test_has_permissions_has_direct_and_via_role_methods() -> None:
@@ -187,7 +186,7 @@ async def test_direct_vs_via_roles(
         assert not any(p.name == "edit articles" for p in via_roles)
 
 
-# ── FR-045-09: find_by_name / find_by_id / find_or_create ─────────────────────
+# find_by_name / find_by_id / find_or_create
 
 
 def test_role_find_helpers_exist() -> None:
@@ -202,7 +201,7 @@ def test_permission_find_helpers_exist() -> None:
     assert hasattr(Permission, "find_or_create")
 
 
-# ── FR-045-10: sync_roles detach parameter + StrEnum support ──────────────────
+# sync_roles detach parameter + StrEnum support
 
 
 @pytest.mark.asyncio
@@ -250,7 +249,7 @@ async def test_assign_role_accepts_str_enum(
         assert await user.has_role("editor")
 
 
-# ── FR-045-11: Wildcard permissions ──────────────────────────────────────────
+# Wildcard permissions
 
 
 @pytest.mark.asyncio
@@ -278,7 +277,7 @@ async def test_wildcard_star_matches_everything(
         assert await user.has_permission_to("anything.at.all")
 
 
-# ── FR-045-12: Behavioral round-trips ─────────────────────────────────────────
+# Behavioral round-trips
 
 
 @pytest.mark.asyncio

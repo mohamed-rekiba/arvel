@@ -1,4 +1,4 @@
-"""FR-013-020, NFR-013-007 — Channel auth signature scheme (HMAC-SHA256)."""
+"""Channel auth signature scheme (HMAC-SHA256)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 
 
 def test_sign_channel_auth_private_channel() -> None:
-    """FR-013-020 AC1: private signature = HMAC-SHA256(secret, "<socket_id>:<channel>")."""
+    """private signature = HMAC-SHA256(secret, "<socket_id>:<channel>")."""
     from arvel.reverb.auth import sign_channel_auth
 
     secret = "the-secret"
@@ -28,7 +28,7 @@ def test_sign_channel_auth_private_channel() -> None:
 
 
 def test_sign_channel_auth_presence_channel_includes_channel_data() -> None:
-    """FR-013-020 AC2: presence signature = HMAC over "<socket>:<channel>:<channel_data>"."""
+    """presence signature = HMAC over "<socket>:<channel>:<channel_data>"."""
     from arvel.reverb.auth import sign_channel_auth
 
     secret = "s"
@@ -51,7 +51,7 @@ def test_sign_channel_auth_presence_channel_includes_channel_data() -> None:
 
 
 def test_verify_channel_auth_accepts_valid_signature() -> None:
-    """NFR-013-007 AC1: verify_channel_auth accepts a correctly signed token."""
+    """verify_channel_auth accepts a correctly signed token."""
     from arvel.reverb.auth import sign_channel_auth, verify_channel_auth
 
     auth = sign_channel_auth(secret="s", key="k", socket_id="1.2", channel="private-x.1")
@@ -65,7 +65,7 @@ def test_verify_channel_auth_accepts_valid_signature() -> None:
 
 
 def test_verify_channel_auth_rejects_tampered_signature() -> None:
-    """NFR-013-007 AC2: tampered signature is rejected."""
+    """tampered signature is rejected."""
     from arvel.reverb.auth import verify_channel_auth
 
     assert not verify_channel_auth(
@@ -78,7 +78,7 @@ def test_verify_channel_auth_rejects_tampered_signature() -> None:
 
 
 def test_verify_channel_auth_uses_compare_digest() -> None:
-    """NFR-013-007 AC3: implementation uses hmac.compare_digest (no early-return on mismatch)."""
+    """implementation uses hmac.compare_digest (no early-return on mismatch)."""
     import inspect
 
     from arvel.reverb import auth as auth_module

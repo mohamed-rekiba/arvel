@@ -1,4 +1,4 @@
-"""Tests for MailServiceProvider — FR-009-021."""
+"""Tests for MailServiceProvider."""
 
 from __future__ import annotations
 

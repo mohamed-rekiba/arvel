@@ -1,5 +1,5 @@
 """
-FR-007-056..060 — AuthServiceProvider, AuthConfig, arvel install:auth CLI.
+AuthServiceProvider, AuthConfig, arvel install:auth CLI.
 Tests import from arvel.auth.provider and arvel.auth.config → red state.
 """
 
@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-# ─── FR-007-056: AuthServiceProvider registers AuthManager in container ───────
+# AuthServiceProvider registers AuthManager in container
 
 
 def test_auth_service_provider_registers_auth_manager(clean_env: Any) -> None:
@@ -30,7 +30,7 @@ def test_auth_service_provider_registers_auth_manager(clean_env: Any) -> None:
     assert isinstance(manager, AuthManager)
 
 
-# ─── FR-007-057: AuthConfig validates guard + provider config ─────────────────
+# AuthConfig validates guard + provider config
 
 
 def test_auth_config_requires_default_guard() -> None:
@@ -52,7 +52,7 @@ def test_auth_config_valid_minimal_config() -> None:
     assert config.default == "web"
 
 
-# ─── FR-007-058: Auth facade is importable from arvel.facades ─────────────────
+# Auth facade is importable from arvel.facades
 
 
 def test_auth_facade_importable_from_arvel_facades() -> None:
@@ -67,7 +67,7 @@ def test_hash_facade_importable_from_arvel_facades() -> None:
     assert Hash is not None
 
 
-# ─── FR-007-059: AuthConfigError is raised for unknown guard driver ───────────
+# AuthConfigError is raised for unknown guard driver
 
 
 def test_auth_service_provider_raises_for_unknown_guard_driver() -> None:
@@ -89,7 +89,7 @@ def test_auth_service_provider_raises_for_unknown_guard_driver() -> None:
         provider.build_manager(config)
 
 
-# ─── FR-007-060: AuthExceptions are HTTP-aware ────────────────────────────────
+# AuthExceptions are HTTP-aware
 
 
 def test_unauthenticated_exception_is_http_401() -> None:

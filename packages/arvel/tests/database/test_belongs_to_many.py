@@ -1,14 +1,4 @@
-"""S-005-10 — BelongsToMany relation.
-
-AC covered:
-  AC-005-016-01  attach() inserts a pivot row and returns True
-  AC-005-016-02  attach() on existing row upserts (returns False) without raising
-  AC-005-016-03  detach() removes the pivot row
-  AC-005-016-04  sync() replaces all pivot rows
-  AC-005-016-05  iterating the accessor yields related model instances
-  AC-005-016-06  pivot() returns dict of pivot column values for a related row
-  AC-005-017-01  toggle() attaches if absent, detaches if present
-"""
+"""BelongsToMany pivot attach/detach/sync/toggle behavior."""
 
 from __future__ import annotations
 
@@ -58,11 +48,11 @@ async def _create_tables(engine: Any) -> None:
         await conn.run_sync(Model.metadata.create_all)
 
 
-# ─── AC-005-016-01: attach returns True for new row ──────────────────────────
+# ───  attach returns True for new row ──────────────────────────
 
 
 async def test_btm_attach_inserts_pivot_row(engine: Any, session: AsyncSession) -> None:
-    """AC-005-016-01: attach() inserts a pivot row and returns True."""
+    """attach inserts a pivot row and returns True."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="python")
     post = await BtmPost.create(title="Hello")
@@ -74,11 +64,11 @@ async def test_btm_attach_inserts_pivot_row(engine: Any, session: AsyncSession) 
     assert any(t.id == tag.id for t in related)
 
 
-# ─── AC-005-016-02: attach on existing row upserts without raising ────────────
+# ───  attach on existing row upserts without raising ────────────
 
 
 async def test_btm_attach_upserts_existing_row(engine: Any, session: AsyncSession) -> None:
-    """AC-005-016-02: attach() on an existing pivot row does not raise; returns False."""
+    """attach on an existing pivot row does not raise; returns False."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="python")
     post = await BtmPost.create(title="Hello")
@@ -90,7 +80,7 @@ async def test_btm_attach_upserts_existing_row(engine: Any, session: AsyncSessio
 
 
 async def test_btm_attach_with_pivot_columns(engine: Any, session: AsyncSession) -> None:
-    """AC-005-016-02: attach() stores extra pivot column values."""
+    """attach stores extra pivot column values."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="orm")
     post = await BtmPost.create(title="ORM Post")
@@ -101,11 +91,11 @@ async def test_btm_attach_with_pivot_columns(engine: Any, session: AsyncSession)
     assert pivot_data["tagged_at"] == "2026-05-17"
 
 
-# ─── AC-005-016-03: detach removes the pivot row ─────────────────────────────
+# ───  detach removes the pivot row ─────────────────────────────
 
 
 async def test_btm_detach_removes_pivot_row(engine: Any, session: AsyncSession) -> None:
-    """AC-005-016-03: detach() removes the pivot row."""
+    """detach removes the pivot row."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="python")
     post = await BtmPost.create(title="Hello")
@@ -118,7 +108,7 @@ async def test_btm_detach_removes_pivot_row(engine: Any, session: AsyncSession) 
 
 
 async def test_btm_detach_nonexistent_is_noop(engine: Any, session: AsyncSession) -> None:
-    """AC-005-016-03: detach() on a non-attached id does not raise."""
+    """detach on a non-attached id does not raise."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="python")
     post = await BtmPost.create(title="Hello")
@@ -126,11 +116,11 @@ async def test_btm_detach_nonexistent_is_noop(engine: Any, session: AsyncSession
     await post.tags.detach(tag.id)  # should not raise
 
 
-# ─── AC-005-016-04: sync replaces all pivot rows ─────────────────────────────
+# ───  sync replaces all pivot rows ─────────────────────────────
 
 
 async def test_btm_sync_replaces_pivot_rows(engine: Any, session: AsyncSession) -> None:
-    """AC-005-016-04: sync() detaches stale rows and attaches new ones."""
+    """sync detaches stale rows and attaches new ones."""
     await _create_tables(engine)
     tag_a = await BtmTag.create(name="a")
     tag_b = await BtmTag.create(name="b")
@@ -148,7 +138,7 @@ async def test_btm_sync_replaces_pivot_rows(engine: Any, session: AsyncSession) 
 
 
 async def test_btm_sync_with_empty_list_detaches_all(engine: Any, session: AsyncSession) -> None:
-    """AC-005-016-04: sync([]) detaches all related rows."""
+    """sync([]) detaches all related rows."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="python")
     post = await BtmPost.create(title="Hello")
@@ -161,7 +151,7 @@ async def test_btm_sync_with_empty_list_detaches_all(engine: Any, session: Async
 
 
 async def test_btm_sync_returns_changes(engine: Any, session: AsyncSession) -> None:
-    """sync() reports which IDs were attached and detached, like Eloquent."""
+    """sync reports which IDs were attached and detached, like Eloquent."""
     await _create_tables(engine)
     tag_a = await BtmTag.create(name="a")
     tag_b = await BtmTag.create(name="b")
@@ -178,7 +168,7 @@ async def test_btm_sync_returns_changes(engine: Any, session: AsyncSession) -> N
 
 
 async def test_btm_sync_with_pivot_attrs(engine: Any, session: AsyncSession) -> None:
-    """sync() accepts {id: pivot_attrs} and writes pivot columns on attach."""
+    """sync accepts {id: pivot_attrs} and writes pivot columns on attach."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="pivoted")
     post = await BtmPost.create(title="Pivot Sync")
@@ -192,7 +182,7 @@ async def test_btm_sync_with_pivot_attrs(engine: Any, session: AsyncSession) -> 
 
 
 async def test_btm_sync_updates_existing_pivot(engine: Any, session: AsyncSession) -> None:
-    """sync() updates pivot columns on already-attached rows and reports them."""
+    """sync updates pivot columns on already-attached rows and reports them."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="reused")
     post = await BtmPost.create(title="Pivot Update")
@@ -207,11 +197,11 @@ async def test_btm_sync_updates_existing_pivot(engine: Any, session: AsyncSessio
     assert pivot_data["tagged_at"] == "new"
 
 
-# ─── AC-005-016-05: iteration yields related model instances ──────────────────
+# ───  iteration yields related model instances ──────────────────
 
 
 async def test_btm_iteration_yields_related_models(engine: Any, session: AsyncSession) -> None:
-    """AC-005-016-05: iterating the accessor yields instances of the related model."""
+    """iterating the accessor yields instances of the related model."""
     await _create_tables(engine)
     tag1 = await BtmTag.create(name="django")
     tag2 = await BtmTag.create(name="flask")
@@ -226,11 +216,11 @@ async def test_btm_iteration_yields_related_models(engine: Any, session: AsyncSe
     assert {t.name for t in related} == {"django", "flask"}
 
 
-# ─── AC-005-016-06: pivot() returns dict of pivot column values ───────────────
+# ───  pivot returns dict of pivot column values ───────────────
 
 
 async def test_btm_pivot_returns_pivot_columns(engine: Any, session: AsyncSession) -> None:
-    """AC-005-016-06: pivot() returns a dict containing pivot column values."""
+    """pivot returns a dict containing pivot column values."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="fastapi")
     post = await BtmPost.create(title="FastAPI Post")
@@ -244,7 +234,7 @@ async def test_btm_pivot_returns_pivot_columns(engine: Any, session: AsyncSessio
 
 
 async def test_btm_pivot_returns_none_for_unattached(engine: Any, session: AsyncSession) -> None:
-    """AC-005-016-06: pivot() returns None when the row is not attached."""
+    """pivot returns None when the row is not attached."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="starlette")
     post = await BtmPost.create(title="Starlette Post")
@@ -254,11 +244,11 @@ async def test_btm_pivot_returns_none_for_unattached(engine: Any, session: Async
     assert pivot_data is None
 
 
-# ─── AC-005-017-01: toggle ───────────────────────────────────────────────────
+# ───  toggle ───────────────────────────────────────────────────
 
 
 async def test_btm_toggle_attaches_when_absent(engine: Any, session: AsyncSession) -> None:
-    """AC-005-017-01: toggle() attaches the row when it is not yet attached."""
+    """toggle attaches the row when it is not yet attached."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="asyncio")
     post = await BtmPost.create(title="Async Post")
@@ -271,7 +261,7 @@ async def test_btm_toggle_attaches_when_absent(engine: Any, session: AsyncSessio
 
 
 async def test_btm_toggle_detaches_when_present(engine: Any, session: AsyncSession) -> None:
-    """AC-005-017-01: toggle() detaches the row when it is already attached."""
+    """toggle detaches the row when it is already attached."""
     await _create_tables(engine)
     tag = await BtmTag.create(name="asyncio")
     post = await BtmPost.create(title="Async Post")

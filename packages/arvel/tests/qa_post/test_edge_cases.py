@@ -25,7 +25,7 @@ def clean_env() -> Iterator[None]:
         os.environ.update(snapshot)
 
 
-# ───────────────────────── application ─────────────────────────
+# application
 
 
 def test_environment_not_set_error_when_accessed_before_create() -> None:
@@ -96,9 +96,9 @@ def test_shutdown_error_wraps_provider_failure(tmp_path: Path) -> None:
 
 
 def test_with_providers_from_path_defers_load_until_create(tmp_path: Path) -> None:
-    """WI-004: ``with_providers(Path)`` defers loading to ``.create()`` time.
+    """``with_providers(Path)`` defers loading to ``.create()`` time.
 
-    Previously this branch raised at the builder call. With WI-004's Laravel-
+    Previously this branch raised at the builder call. With 's Laravel-
     shaped layout, ``bootstrap/app.py`` builds the application fluently and
     the call site cannot be aware that the loader isn't ready yet — the
     failure now surfaces at create() where the loader actually runs.
@@ -117,7 +117,7 @@ def test_with_providers_from_path_defers_load_until_create(tmp_path: Path) -> No
         builder.create()
 
 
-# ───────────────────────── container ─────────────────────────
+# container
 
 
 def test_bind_rejects_non_callable_concrete() -> None:
@@ -259,7 +259,7 @@ def test_aresolve_treats_pre_bound_instance_as_highest_priority() -> None:
     assert out is pre_built
 
 
-# ───────────────────────── env ─────────────────────────
+# env
 
 
 def test_env_required_missing_raises(clean_env: None) -> None:
@@ -293,7 +293,7 @@ def test_env_returns_empty_string_when_set_without_default(clean_env: None) -> N
     assert env("ARVEL_BLANK") == ""
 
 
-# ───────────────────────── support.collections ─────────────────────────
+# support.collections
 
 
 def test_first_on_empty_collection_returns_none() -> None:
@@ -313,7 +313,7 @@ def test_chunk_with_invalid_size_raises() -> None:
         c.chunk(0)
 
 
-# ───────────────────────── support.pipeline ─────────────────────────
+# support.pipeline
 
 
 def test_pipeline_then_without_send_raises() -> None:
@@ -328,7 +328,7 @@ def test_pipeline_then_without_send_raises() -> None:
         asyncio.run(p.then(final))
 
 
-# ───────────────────────── config.registry ─────────────────────────
+# config.registry
 
 
 def test_registry_clear_empties_registered_configs() -> None:
@@ -344,13 +344,13 @@ def test_registry_clear_empties_registered_configs() -> None:
     assert SnapshotCfg not in registered_configs()
 
 
-# ───────────────────────── providers.config_provider ─────────────────────────
+# providers.config_provider
 
 
 def test_config_provider_re_raises_unwrapped_config_error(tmp_path: Path) -> None:
     """If make() itself raises ConfigError directly, the provider must re-raise as-is.
 
-    FB-016-001 fix: HostileCfg is unregistered in a finally block so the global
+    fix: HostileCfg is unregistered in a finally block so the global
     config registry does not leak across tests.
     """
     from arvel import Application

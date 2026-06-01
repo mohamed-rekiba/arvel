@@ -1,4 +1,4 @@
-"""MailChannel — sends notification via Mailer (FR-009-025)."""
+"""MailChannel — sends notification via Mailer."""
 
 from __future__ import annotations
 

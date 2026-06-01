@@ -1,4 +1,4 @@
-"""FR-003-015..019 — Scopes, accessors, mutators."""
+"""Scopes, accessors, and mutators."""
 
 from __future__ import annotations
 

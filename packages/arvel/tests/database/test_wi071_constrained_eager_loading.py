@@ -1,4 +1,4 @@
-"""WI-arvel-071 — Epic 049 Story 3: constrained eager loading + query counts."""
+"""Constrained eager loading + query counts."""
 
 from __future__ import annotations
 

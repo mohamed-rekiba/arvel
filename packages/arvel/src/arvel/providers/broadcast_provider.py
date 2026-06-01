@@ -1,4 +1,4 @@
-"""BroadcastServiceProvider — registers manager + facade + console commands (FR-013-015)."""
+"""BroadcastServiceProvider — registers manager + facade + console commands."""
 
 from __future__ import annotations
 

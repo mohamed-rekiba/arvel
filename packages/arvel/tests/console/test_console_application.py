@@ -1,10 +1,9 @@
 """S-005-01 / S-005-02 — CLI binary + plugin discovery.
 
-AC covered:
-  AC-005-001-01  arvel --help exits 0
-  AC-005-001-02  command names listed in help output
-  AC-005-002-01  plugin commands discovered via arvel.commands entry-point group
-  AC-005-002-02  name collision logs warning and last-registered wins
+-001-01 arvel --help exits 0
+-001-02 command names listed in help output
+-002-01 plugin commands discovered via arvel.commands entry-point group
+-002-02 name collision logs warning and last-registered wins
 """
 
 from __future__ import annotations
@@ -48,22 +47,22 @@ class _CollisionCommand(Command):
         return 0
 
 
-# ─── AC-005-001-01: arvel --help exits 0 ─────────────────────────────────────
+# ─── -001-01: arvel --help exits 0 ─────────────────────────────────────
 
 
 def test_application_help_exits_zero() -> None:
-    """AC-005-001-01: --help must exit with code 0."""
+    """-001-01: --help must exit with code 0."""
     runner = CliRunner()
     app = Application(commands=[_HelloCommand()])
     result = runner.invoke(app.typer_app, ["--help"])
     assert result.exit_code == 0
 
 
-# ─── AC-005-001-02: registered command names appear in --help ────────────────
+# ─── -001-02: registered command names appear in --help ────────────────
 
 
 def test_application_help_lists_command_names() -> None:
-    """AC-005-001-02: every registered command name appears in --help output."""
+    """-001-02: every registered command name appears in --help output."""
     runner = CliRunner()
     app = Application(commands=[_HelloCommand(), _WorldCommand()])
     result = runner.invoke(app.typer_app, ["--help"])
@@ -72,7 +71,7 @@ def test_application_help_lists_command_names() -> None:
 
 
 def test_application_help_groups_make_commands() -> None:
-    """AC-005-001-02: make:* commands listed under 'make' section."""
+    """-001-02: make:* commands listed under 'make' section."""
 
     class _MakeCtrl(Command):
         name = "make:controller"
@@ -87,11 +86,11 @@ def test_application_help_groups_make_commands() -> None:
     assert "make:controller" in result.output
 
 
-# ─── AC-005-002-01: entry-point discovery ────────────────────────────────────
+# ─── -002-01: entry-point discovery ────────────────────────────────────
 
 
 def test_discover_commands_returns_registered_commands(monkeypatch: Any) -> None:
-    """AC-005-002-01: discover_commands() finds commands from arvel.commands group."""
+    """-002-01: discover_commands finds commands from arvel.commands group."""
     fake_ep = MagicMock()
     fake_ep.load.return_value = _HelloCommand
 
@@ -105,7 +104,7 @@ def test_discover_commands_returns_registered_commands(monkeypatch: Any) -> None
 
 
 def test_discover_commands_instantiates_each_class(monkeypatch: Any) -> None:
-    """AC-005-002-01: each discovered class is instantiated exactly once."""
+    """-002-01: each discovered class is instantiated exactly once."""
     instantiation_count = 0
 
     class _CountedCommand(Command):
@@ -131,11 +130,11 @@ def test_discover_commands_instantiates_each_class(monkeypatch: Any) -> None:
     assert instantiation_count == 1
 
 
-# ─── AC-005-002-02: name collision → warning + last wins ─────────────────────
+# ─── -002-02: name collision → warning + last wins ─────────────────────
 
 
 def test_application_warns_on_name_collision(caplog: Any) -> None:
-    """AC-005-002-02: duplicate command names log a warning."""
+    """-002-02: duplicate command names log a warning."""
     with caplog.at_level(logging.WARNING, logger="arvel.console"):
         Application(commands=[_HelloCommand(), _CollisionCommand()])
 
@@ -143,7 +142,7 @@ def test_application_warns_on_name_collision(caplog: Any) -> None:
 
 
 def test_application_last_registered_wins_on_collision() -> None:
-    """AC-005-002-02: last-registered command wins when names collide."""
+    """-002-02: last-registered command wins when names collide."""
     runner = CliRunner()
     app = Application(commands=[_HelloCommand(), _CollisionCommand()])
     result = runner.invoke(app.typer_app, ["hello"])
@@ -154,7 +153,7 @@ def test_application_last_registered_wins_on_collision() -> None:
 
 
 def test_application_run_dispatches_to_command() -> None:
-    """Application.run() invokes the matched command's handle()."""
+    """Application.run invokes the matched command's handle."""
     runner = CliRunner()
     app = Application(commands=[_HelloCommand()])
     result = runner.invoke(app.typer_app, ["hello"])
@@ -163,7 +162,7 @@ def test_application_run_dispatches_to_command() -> None:
 
 
 def test_application_run_returns_nonzero_on_handle_failure() -> None:
-    """Application propagates non-zero return value from handle()."""
+    """Application propagates non-zero return value from handle."""
 
     class _FailCmd(Command):
         name = "fail"

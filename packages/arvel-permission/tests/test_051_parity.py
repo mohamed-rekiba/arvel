@@ -1,7 +1,7 @@
-"""Post-045 parity for arvel-permission, on the async ``MorphToMany`` core.
+"""Follow-on Spatie parity on the async ``MorphToMany`` core.
 
-Maps to FR-051-01 .. FR-051-10. Behavioral tests run against a real session;
-middleware tests use async user stubs since the middleware awaits the checks.
+Behavioral tests run against a real session; middleware tests use async user
+stubs because the middleware awaits the checks.
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ async def session_factory(
     yield async_sessionmaker(async_engine, expire_on_commit=False)
 
 
-# ── FR-051-01: Wire PermissionConfig.wildcard_enabled to has_permission_to ────
+# PermissionConfig.wildcard_enabled gates has_permission_to
 
 
 @pytest.mark.asyncio
@@ -100,7 +100,7 @@ async def test_wildcard_model_level_override_wins(
         HasPermissions.wildcard_permission = original
 
 
-# ── FR-051-02: role_has_permissions composite PK ──────────────────────────────
+# role_has_permissions composite PK
 
 
 def test_role_has_permissions_migration_uses_composite_pk() -> None:
@@ -120,7 +120,7 @@ def test_role_has_permissions_table_declares_composite_pk() -> None:
     assert pk_cols == {"permission_id", "role_id"}
 
 
-# ── FR-051-03: Middleware guard forwarding ────────────────────────────────────
+# Middleware guard forwarding
 
 
 @pytest.mark.asyncio
@@ -165,7 +165,7 @@ async def test_permission_middleware_forwards_guard() -> None:
     assert captured["guard"] == "api"
 
 
-# ── FR-051-04: Middleware pipe-separated OR syntax ────────────────────────────
+# Middleware pipe-separated OR syntax
 
 
 @pytest.mark.asyncio
@@ -230,7 +230,7 @@ async def test_role_middleware_pipe_or_denies_when_none_match() -> None:
     assert exc_info.value.status_code == 403
 
 
-# ── FR-051-05: Async registrar cache_enabled consistency ─────────────────────
+# Async registrar cache_enabled consistency
 
 
 @pytest.mark.asyncio
@@ -259,7 +259,7 @@ async def test_async_registrar_cache_enabled_does_cache(
     assert reg.find_role("editor") is not None
 
 
-# ── FR-051-06: Bidirectional Permission ↔ Role API ───────────────────────────
+# Bidirectional Permission ↔ Role API
 
 
 def test_permission_roles_is_belongs_to_many() -> None:
@@ -305,7 +305,7 @@ async def test_permission_sync_roles_db(
         assert names == {"editor", "admin"}
 
 
-# ── FR-051-07: UnauthorizedException ─────────────────────────────────────────
+# UnauthorizedException
 
 
 def test_unauthorized_exception_importable() -> None:
@@ -369,7 +369,7 @@ async def test_no_user_raises_unauthorized_with_401() -> None:
     assert exc_info.value.status_code == 401
 
 
-# ── FR-051-08: Wildcard subpart syntax (comma-separated segments) ─────────────
+# Wildcard subpart syntax (comma-separated segments)
 
 
 def test_wildcard_subpart_resource_action() -> None:
@@ -406,7 +406,7 @@ def test_wildcard_subpart_existing_patterns_unchanged() -> None:
     assert not matches_wildcard("edit.*", "edit.articles.section")
 
 
-# ── FR-051-09: Model query scopes ─────────────────────────────────────────────
+# Model query scopes
 
 
 def test_has_roles_has_query_with_role_classmethod() -> None:
@@ -436,7 +436,7 @@ async def test_query_with_role_returns_matching_models(
         assert u2.id not in ids
 
 
-# ── FR-051-10: Events system ──────────────────────────────────────────────────
+# Events system
 
 
 def test_events_module_importable() -> None:

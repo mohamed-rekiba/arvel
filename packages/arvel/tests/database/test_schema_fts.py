@@ -1,4 +1,4 @@
-"""Story 1 & 2 — Blueprint.tsvector() and Blueprint.gin_index() (AC from WI-arvel-034)."""
+"""Blueprint.tsvector() and Blueprint.gin_index()."""
 
 from __future__ import annotations
 
@@ -39,11 +39,11 @@ class _Rec:
         self._rec("execute", (clause,), kw)
 
 
-# ── Story 1: Blueprint.tsvector() ─────────────────────────────────────────────
+# ── Blueprint.tsvector ─────────────────────────────────────────────
 
 
 def test_tsvector_column_added_to_blueprint() -> None:
-    """Given tsvector() is called, the Blueprint records a column named correctly."""
+    """Given tsvector is called, the Blueprint records a column named correctly."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -58,7 +58,7 @@ def test_tsvector_column_added_to_blueprint() -> None:
 
 
 def test_tsvector_column_is_nullable_by_default() -> None:
-    """tsvector() without chaining behaves like other column helpers — nullable by default."""
+    """tsvector without chaining behaves like other column helpers — nullable by default."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -72,7 +72,7 @@ def test_tsvector_column_is_nullable_by_default() -> None:
 
 
 def test_tsvector_column_nullable_chain() -> None:
-    """Given .nullable() is chained, the column becomes nullable."""
+    """Given .nullable is chained, the column becomes nullable."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -86,7 +86,7 @@ def test_tsvector_column_nullable_chain() -> None:
 
 
 def test_tsvector_column_type_is_postgresql_tsvector_on_pg_dialect() -> None:
-    """tsvector() emits TSVECTOR DDL when compiled with the postgresql dialect."""
+    """tsvector emits TSVECTOR DDL when compiled with the postgresql dialect."""
     from arvel.database.schema import Blueprint
     from sqlalchemy import create_mock_engine, make_url
 
@@ -101,7 +101,7 @@ def test_tsvector_column_type_is_postgresql_tsvector_on_pg_dialect() -> None:
 
 
 def test_tsvector_column_type_degrades_to_text_on_sqlite() -> None:
-    """tsvector() falls back to TEXT on non-PostgreSQL dialects (SQLite CI path)."""
+    """tsvector falls back to TEXT on non-PostgreSQL dialects (SQLite CI path)."""
     from arvel.database.schema import Blueprint
     from sqlalchemy.dialects import sqlite as sq
 
@@ -110,11 +110,11 @@ def test_tsvector_column_type_degrades_to_text_on_sqlite() -> None:
     assert sqla_col.type.compile(dialect=sq.dialect()).upper() == "TEXT"
 
 
-# ── Story 2: Blueprint.gin_index() ────────────────────────────────────────────
+# ── Blueprint.gin_index ────────────────────────────────────────────
 
 
 def test_gin_index_emits_create_index_with_postgresql_using_gin() -> None:
-    """gin_index() calls create_index with postgresql_using='gin' in kwargs."""
+    """gin_index calls create_index with postgresql_using='gin' in kwargs."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:
@@ -163,7 +163,7 @@ def test_gin_index_multi_column() -> None:
 
 
 def test_gin_index_does_not_affect_regular_indexes() -> None:
-    """A regular index() and a gin_index() coexist without conflict."""
+    """A regular index and a gin_index coexist without conflict."""
     ex = _Rec()
 
     def build(t: Blueprint) -> None:

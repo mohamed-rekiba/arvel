@@ -1,4 +1,4 @@
-"""Story 10: FakeObservability testing utilities — FR-030-031..032."""
+"""FakeObservability testing utilities."""
 
 from __future__ import annotations
 

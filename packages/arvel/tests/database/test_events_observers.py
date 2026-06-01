@@ -1,4 +1,4 @@
-"""FR-003-025..027 — Lifecycle events and observers."""
+"""Lifecycle events and observers."""
 
 from __future__ import annotations
 

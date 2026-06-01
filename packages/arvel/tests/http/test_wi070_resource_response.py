@@ -1,4 +1,4 @@
-"""WI-arvel-070 — Epic 049 Story 7: FastAPI Response-compat for resources."""
+"""FastAPI Response-compat for resources."""
 
 from __future__ import annotations
 

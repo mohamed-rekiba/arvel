@@ -1,4 +1,4 @@
-"""CacheFakeContext + Cache.fake()/.assert_*() — FR-016-005, FR-016-006."""
+"""CacheFakeContext + Cache.fake/.assert_* —"""
 
 from __future__ import annotations
 

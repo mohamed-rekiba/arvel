@@ -1,10 +1,9 @@
-"""WI-arvel-047: Auth Security cluster — Stories 1, 2, 3.
-
+"""Auth Security cluster.
 Tests are FAILING before the fix and PASSING after.
 
-Story 1 (FR-047-001): SessionGuard.attempt() must verify password hash.
-Story 2 (FR-047-002): AuthService and JwtGuard must use the same jwt.secret.
-Story 3 (FR-047-003): JwtConfig.secret must enforce min_length=32.
+): SessionGuard.attempt() must verify password hash.
+): AuthService and JwtGuard must use the same jwt.secret.
+): JwtConfig.secret must enforce min_length=32.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from typing import Any
 
 import pytest
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# Helpers
 
 
 class _FakeSessionData:
@@ -64,11 +63,11 @@ class _PasswordAwareResolver:
         return self._users.get(str(credentials.get("email")))
 
 
-# ─── Story 1: Session guard must verify password before login ──────────────────
+# Session guard must verify password before login
 
 
 class TestStory1SessionGuardPasswordVerification:
-    """FR-047-001: attempt() must call Hash.check() before login()."""
+    """attempt() must call Hash.check() before login()."""
 
     @pytest.mark.asyncio
     async def test_attempt_returns_false_for_wrong_password(self) -> None:
@@ -140,11 +139,11 @@ class TestStory1SessionGuardPasswordVerification:
         assert session.get("_auth_id") is None
 
 
-# ─── Story 2: JWT key alignment ────────────────────────────────────────────────
+# JWT key alignment
 
 
 class TestStory2JwtKeyAlignment:
-    """FR-047-002: AuthService and JwtGuard must share the same jwt.secret."""
+    """AuthService and JwtGuard must share the same jwt.secret."""
 
     def test_jwt_guard_construction_uses_jwt_secret(self) -> None:
         """JwtGuard must be constructable with a 32-char secret from config.jwt.secret.
@@ -253,11 +252,11 @@ class TestStory2JwtKeyAlignment:
         assert claims["aud"] == "arvel-api"
 
 
-# ─── Story 3: JWT secret minimum length ────────────────────────────────────────
+# JWT secret minimum length
 
 
 class TestStory3JwtSecretMinLength:
-    """FR-047-003: JwtConfig must reject secrets shorter than 32 chars."""
+    """JwtConfig must reject secrets shorter than 32 chars."""
 
     def test_jwt_config_rejects_empty_secret(self) -> None:
         """JwtConfig(secret='') must raise ValidationError. Currently FAILS (accepts it)."""

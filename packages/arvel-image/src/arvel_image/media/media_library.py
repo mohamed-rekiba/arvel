@@ -1,4 +1,4 @@
-"""MediaLibrary service for bulk operations (FR-046-14, FR-050-01-03)."""
+"""MediaLibrary service for bulk operations"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 def resolve_path_generator() -> PathGenerator:
-    """Return the active path generator (custom or default) (FR-050-28)."""
+    """Return the active path generator (custom or default)"""
     from arvel_image.media.path_generator import get_path_generator  # noqa: PLC0415
 
     return get_path_generator()
@@ -35,11 +35,11 @@ class MediaLibrary:
     ) -> int:
         """Re-run conversions for matching :class:`Media` rows.
 
-        When ``host`` is ``None``, all rows in the media table are processed
-        (FR-050-01). Reads source files from ``media.disk`` (FR-050-02) and
-        writes conversions to ``media.conversions_disk`` when set (FR-050-03).
+         When ``host`` is ``None``, all rows in the media table are processed
+        . Reads source files from ``media.disk`` and
+         writes conversions to ``media.conversions_disk`` when set
 
-        Returns the count of rows processed.
+         Returns the count of rows processed.
         """
         from arvel_image.media.conversion_runner import ConversionRunner  # noqa: PLC0415
         from arvel_image.media.model import Media  # noqa: PLC0415
@@ -74,7 +74,7 @@ async def process_one(
     if not media.mime_type:
         return
 
-    # FR-050-02: read from media.disk regardless of whether host is supplied.
+    # read from media.disk regardless of whether host is supplied.
     read_disk_label = media.disk
     read_disk_target: str | None = None if read_disk_label == "default" else read_disk_label
     read_disk = Storage.disk(read_disk_target)
@@ -96,7 +96,7 @@ async def process_one(
     if not coll.conversions:
         return
 
-    # FR-050-03: write conversions to media.conversions_disk when set.
+    # write conversions to media.conversions_disk when set.
     if media.conversions_disk:
         write_disk_target: str | None = (
             None if media.conversions_disk == "default" else media.conversions_disk

@@ -1,4 +1,4 @@
-"""FR-001-006: Pipeline[InT, OutT]."""
+"""Pipeline[InT, OutT]."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Mail facade — classmethod API proxying to the bound Mailer (FR-009-020)."""
+"""Mail facade — classmethod API proxying to the bound Mailer."""
 
 from __future__ import annotations
 

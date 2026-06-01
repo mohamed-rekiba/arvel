@@ -1,9 +1,8 @@
-"""WI-arvel-027 — Epic 007 Story 2: MorphTo inverse relation.
+"""MorphTo inverse relation.
 
 - `comment.commentable` resolves the parent from `{name}_type` + `{name}_id`.
-- `associate(model)` / `dissociate()` set/clear both discriminator columns together.
-- Eager loading over a list batches parents grouped by type — one query per distinct type.
-"""
+- `associate(model)` / `dissociate` set/clear both discriminator columns together.
+- Eager loading over a list batches parents grouped by type — one query per distinct type."""
 
 from __future__ import annotations
 

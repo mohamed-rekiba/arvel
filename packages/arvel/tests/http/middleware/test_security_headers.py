@@ -1,5 +1,4 @@
-"""Tests for SecurityHeadersMiddleware — FR-032-04 / AC-08..10.
-
+"""Tests for SecurityHeadersMiddleware.
 Tests are written RED — arvel.http.middleware.SecurityHeadersMiddleware does not exist yet.
 """
 
@@ -26,7 +25,7 @@ def _app_with_custom_csp(csp_value: str) -> ASGIApp:
     return app
 
 
-# ─── AC-08: All 4 security headers present ────────────────────────────────────
+#: All 4 security headers present
 
 
 def test_all_four_headers_present() -> None:
@@ -60,7 +59,7 @@ def test_csp_includes_frame_ancestors_none() -> None:
     assert "frame-ancestors 'none'" in csp
 
 
-# ─── AC-09: setdefault semantics — no overwrite ────────────────────────────────
+#: setdefault semantics — no overwrite
 
 
 def test_csp_not_overwritten_when_handler_sets_it() -> None:
@@ -72,7 +71,7 @@ def test_csp_not_overwritten_when_handler_sets_it() -> None:
     assert response.headers["content-security-policy"] == custom_csp
 
 
-# ─── AC-09b: Custom csp constructor param used ────────────────────────────────
+# AC-09b: Custom csp constructor param used
 
 
 def test_custom_csp_via_constructor() -> None:
@@ -93,7 +92,7 @@ def test_custom_hsts_max_age() -> None:
     assert "max-age=86400" in hsts
 
 
-# ─── AC-10: WebSocket scope is no-op ─────────────────────────────────────────
+#: WebSocket scope is no-op
 
 
 def test_websocket_scope_passthrough() -> None:
@@ -123,9 +122,6 @@ def test_websocket_scope_passthrough() -> None:
 
     asyncio.run(run())
     assert called == ["websocket"]
-
-
-# ─── import path ─────────────────────────────────────────────────────────────
 
 
 def test_importable_from_http_middleware() -> None:

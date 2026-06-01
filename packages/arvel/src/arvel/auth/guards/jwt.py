@@ -7,7 +7,7 @@ The guard's only responsibilities are:
 - Reject refresh-typed tokens used as access tokens.
 - Resolve the ``sub`` claim through the configured ``UserResolver``.
 
-Issuance and rotation moved to :class:`arvel.auth.AuthBroker` per ADR-086 —
+Issuance and rotation moved to :class:`arvel.auth.AuthBroker` —
 the guard is no longer a token mint.
 
 Security:

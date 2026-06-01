@@ -1,4 +1,4 @@
-"""FR-002-027 — Annotated[str, NoPrefix] env opt-out (FB-005)."""
+"""Annotated[str, NoPrefix] env opt-out."""
 
 from __future__ import annotations
 

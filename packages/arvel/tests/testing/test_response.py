@@ -1,4 +1,4 @@
-"""Tests for arvel.testing.TestResponse — FR-016-002."""
+"""Tests for arvel.testing.TestResponse."""
 
 from __future__ import annotations
 

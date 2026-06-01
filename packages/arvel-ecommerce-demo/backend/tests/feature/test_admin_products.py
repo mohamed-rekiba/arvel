@@ -1,16 +1,14 @@
-"""Admin product management tests — US-008 through US-014.
+"""Admin product management — list, CRUD, publish, media.
 
-RED: all tests fail at import time until Stage 3b implements app.bootstrap.
-
-Acceptance criteria:
-- US-008: authenticated admin can list products (with trashed filter)
-- US-009: catalog_manager can create a product with i18n fields
-- US-010: catalog_manager can update product fields
-- US-011: catalog_manager can soft-delete; product disappears from storefront
-- US-011: super_admin can force-delete (permanent)
-- US-012: catalog_manager can restore a soft-deleted product
-- US-013: catalog_manager can publish/unpublish; materialized view refreshed
-- US-014: catalog_manager can list, upload, delete product media
+Coverage:
+- authenticated admin can list products (with trashed filter)
+- catalog_manager can create a product with i18n fields
+- catalog_manager can update product fields
+- catalog_manager can soft-delete; product disappears from storefront
+- super_admin can force-delete (permanent)
+- catalog_manager can restore a soft-deleted product
+- catalog_manager can publish/unpublish; materialized view refreshed
+- catalog_manager can list, upload, delete product media
 """
 
 from __future__ import annotations
@@ -52,7 +50,7 @@ async def app(
     monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.setenv("APP_KEY", "admin-products-test-key-32-bytes-or-more!")
 
-    from app.bootstrap import create_app  # RED until Stage 3b
+    from app.bootstrap import create_app
 
     application = await create_app()
     await application.seed("catalog")
@@ -101,12 +99,12 @@ async def category_id(client: Any, catalog_token: str) -> str:
     return str(r.json()["data"][0]["id"])
 
 
-# ─── US-008: product listing ────────────────────────────────────────────────────
+# ─── product listing ────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_admin_can_list_products(client: Any, catalog_token: str) -> None:
-    """US-008: catalog_manager can list all products including drafts."""
+    """catalog_manager can list all products including drafts."""
     response = await client.get(
         "/api/admin/products", headers={"Authorization": f"Bearer {catalog_token}"}
     )
@@ -119,7 +117,7 @@ async def test_admin_can_list_products(client: Any, catalog_token: str) -> None:
 
 @pytest.mark.asyncio
 async def test_support_cannot_create_product(client: Any, support_token: str) -> None:
-    """US-008: support role (level 40) cannot create products."""
+    """support role (level 40) cannot create products."""
     # Send a schema-valid body so the 403 reflects authorization, not validation.
     response = await client.post(
         "/api/admin/products",
@@ -131,7 +129,7 @@ async def test_support_cannot_create_product(client: Any, support_token: str) ->
 
 @pytest.mark.asyncio
 async def test_admin_list_includes_trashed_when_requested(client: Any, catalog_token: str) -> None:
-    """US-008: ?trashed=with includes soft-deleted products."""
+    """?trashed=with includes soft-deleted products."""
     # Soft-delete a product first
     products = await client.get(
         "/api/admin/products", headers={"Authorization": f"Bearer {catalog_token}"}
@@ -150,14 +148,14 @@ async def test_admin_list_includes_trashed_when_requested(client: Any, catalog_t
     assert first_id in ids, "?trashed=with must include soft-deleted products"
 
 
-# ─── US-009: create product ─────────────────────────────────────────────────────
+# ─── create product ─────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_catalog_manager_can_create_product(
     client: Any, catalog_token: str, vendor_id: str, category_id: str
 ) -> None:
-    """US-009: POST /api/admin/products creates a product with i18n fields."""
+    """POST /api/admin/products creates a product with i18n fields."""
     payload = {
         "name": {"en": "Test Widget", "ar": "أداة تجريبية", "tr": "Test Widget"},
         "slug": {"en": "test-widget", "ar": "test-widget", "tr": "test-widget"},
@@ -183,7 +181,7 @@ async def test_catalog_manager_can_create_product(
 async def test_create_product_rejects_missing_required_fields(
     client: Any, catalog_token: str
 ) -> None:
-    """US-009: creating a product without price or category_id returns 422."""
+    """creating a product without price or category_id returns 422."""
     response = await client.post(
         "/api/admin/products",
         headers={"Authorization": f"Bearer {catalog_token}"},
@@ -192,14 +190,14 @@ async def test_create_product_rejects_missing_required_fields(
     assert response.status_code == 422
 
 
-# ─── US-010: update product ─────────────────────────────────────────────────────
+# ─── update product ─────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_catalog_manager_can_update_product_price(
     client: Any, catalog_token: str, vendor_id: str, category_id: str
 ) -> None:
-    """US-010: PATCH /api/admin/products/{id} updates price."""
+    """PATCH /api/admin/products/{id} updates price."""
     created = await client.post(
         "/api/admin/products",
         headers={"Authorization": f"Bearer {catalog_token}"},
@@ -224,14 +222,14 @@ async def test_catalog_manager_can_update_product_price(
     assert updated.json()["data"]["price"] == 14.99
 
 
-# ─── US-011: soft-delete + force-delete ──────────────────────────────────────────
+# ─── soft-delete + force-delete ──────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_soft_delete_product_disappears_from_storefront(
     client: Any, catalog_token: str
 ) -> None:
-    """US-011: soft-deleted product is removed from storefront after materialized view refresh."""
+    """soft-deleted product is removed from storefront after materialized view refresh."""
     products = await client.get(
         "/api/admin/products?status=published",
         headers={"Authorization": f"Bearer {catalog_token}"},
@@ -255,7 +253,7 @@ async def test_soft_delete_product_disappears_from_storefront(
 async def test_force_delete_requires_super_admin(
     client: Any, catalog_token: str, super_admin_token: str, vendor_id: str, category_id: str
 ) -> None:
-    """US-011: force-delete returns 403 for catalog_manager, 204 for super_admin."""
+    """force-delete returns 403 for catalog_manager, 204 for super_admin."""
     created = await client.post(
         "/api/admin/products",
         headers={"Authorization": f"Bearer {super_admin_token}"},
@@ -292,14 +290,14 @@ async def test_force_delete_requires_super_admin(
     assert sa_response.status_code == 204
 
 
-# ─── US-012: restore ────────────────────────────────────────────────────────────
+# ─── restore ────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_restore_soft_deleted_product_reappears_in_storefront(
     client: Any, catalog_token: str
 ) -> None:
-    """US-012: restoring a soft-deleted published product brings it back to storefront."""
+    """restoring a soft-deleted published product brings it back to storefront."""
     products = await client.get(
         "/api/admin/products?status=published",
         headers={"Authorization": f"Bearer {catalog_token}"},
@@ -318,14 +316,14 @@ async def test_restore_soft_deleted_product_reappears_in_storefront(
     assert restore.json()["data"]["deleted_at"] is None
 
 
-# ─── US-013: publish / unpublish ─────────────────────────────────────────────────
+# ─── publish / unpublish ─────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_publish_product_appears_in_storefront(
     client: Any, catalog_token: str, vendor_id: str, category_id: str
 ) -> None:
-    """US-013: publishing a draft product makes it visible in the storefront."""
+    """publishing a draft product makes it visible in the storefront."""
     created = await client.post(
         "/api/admin/products",
         headers={"Authorization": f"Bearer {catalog_token}"},
@@ -354,14 +352,14 @@ async def test_publish_product_appears_in_storefront(
     assert product_id in storefront_ids
 
 
-# ─── US-014: media ──────────────────────────────────────────────────────────────
+# ─── media ──────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_upload_product_image_creates_conversions(
     client: Any, catalog_token: str, vendor_id: str, category_id: str
 ) -> None:
-    """US-014: uploading an image creates thumbnail, card, and full conversions."""
+    """uploading an image creates thumbnail, card, and full conversions."""
     created = await client.post(
         "/api/admin/products",
         headers={"Authorization": f"Bearer {catalog_token}"},
@@ -405,7 +403,7 @@ async def test_upload_product_image_creates_conversions(
 async def test_upload_rejects_non_image_file(
     client: Any, catalog_token: str, vendor_id: str, category_id: str
 ) -> None:
-    """US-014: uploading a non-image (e.g. PDF) returns 400."""
+    """uploading a non-image (e.g. PDF) returns 400."""
     created = await client.post(
         "/api/admin/products",
         headers={"Authorization": f"Bearer {catalog_token}"},

@@ -1,4 +1,4 @@
-"""Epic 001 Story 4 — BaseService lifecycle contract."""
+"""BaseService lifecycle contract."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Tests for PythonFileLoader — FR-015-024."""
+"""Tests for PythonFileLoader."""
 
 from __future__ import annotations
 

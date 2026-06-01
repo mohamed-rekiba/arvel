@@ -1,6 +1,4 @@
-"""WI-arvel-059 — `route:list` console command with full Laravel-parity columns.
-
-Epic 048 Story 9.
+"""`route:list` console command with full Laravel-parity columns.
 
 Covers the five canonical columns (Method, URI, Name, Action, Middleware),
 the ``--filter`` substring switch, the ``--json`` raw-output switch, and the
@@ -78,7 +76,7 @@ def _seed(specs: list[RouteSpec]) -> None:
 
 
 class TestColumnShape:
-    """AC-9.2 — Method, URI, Name, Action, Middleware columns."""
+    """Method, URI, Name, Action, Middleware columns."""
 
     def test_table_header_lists_all_five_columns(self) -> None:
         _seed(
@@ -222,7 +220,7 @@ class TestMiddlewareColumn:
 
 
 class TestFilter:
-    """AC-9.3 — --filter=foo includes only routes whose path contains 'foo'."""
+    """--filter=foo includes only routes whose path contains 'foo'."""
 
     def test_filter_keeps_matching_paths(self) -> None:
         _seed(
@@ -271,7 +269,7 @@ class TestFilter:
 
 
 class TestJsonOutput:
-    """AC-9.4 — --json emits a JSON array with one object per route."""
+    """--json emits a JSON array with one object per route."""
 
     def test_empty_router_emits_empty_json_array(self) -> None:
         app = _app(RouteListCommand())
@@ -342,7 +340,7 @@ class TestJsonOutput:
 
 
 class TestRouteSource:
-    """The command queries Router.singleton() — no container binding required."""
+    """The command queries Router.singleton — no container binding required."""
 
     def test_routes_come_from_router_singleton(self) -> None:
         _seed(
@@ -363,7 +361,7 @@ class TestRouteSource:
 
 
 class TestBackwardCompat:
-    """The existing AC-005-009-* tests in test_ops_commands.py still hold."""
+    """The existing -009-* tests in test_ops_commands.py still hold."""
 
     def test_command_name_and_help_unchanged(self) -> None:
         cmd = RouteListCommand()

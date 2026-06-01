@@ -1,10 +1,9 @@
-"""WI-arvel-047: Cache Correctness cluster — Stories 14, 15, 16.
-
+"""Cache Correctness cluster.
 Tests are FAILING before the fix and PASSING after.
 
-Story 14 (FR-047-014): Cache locks must be atomic using Redis SET NX EX.
-Story 15 (FR-047-015): RedisStore.flush() must use SCAN, not blocking KEYS.
-Story 16 (FR-047-016): CacheStore.has() must return True for falsy cached values.
+): Cache locks must be atomic using Redis SET NX EX.
+): RedisStore.flush() must use SCAN, not blocking KEYS.
+): CacheStore.has() must return True for falsy cached values.
 """
 
 from __future__ import annotations
@@ -16,13 +15,13 @@ import pytest
 from arvel.cache import CacheManager
 from arvel.config.cache_config import CacheConfig, CacheDriver
 
-# ─── Story 16: has() must return True for falsy values ───────────────────────
+# has() must return True for falsy values
 
 
 class TestStory16HasFalsyValues:
-    """FR-047-016: has(key) must return True for None, False, 0, '' cached values."""
+    """has(key) must return True for None, False, 0, '' cached values."""
 
-    # ── ArrayStore (in-memory) ───────────────────────────────────────────────
+    # ArrayStore (in-memory)
 
     @pytest.mark.asyncio
     async def test_array_store_has_returns_true_for_cached_none(self) -> None:
@@ -55,7 +54,7 @@ class TestStory16HasFalsyValues:
         manager = CacheManager(CacheConfig(connection=CacheDriver.ARRAY))
         assert await manager.has("key_absent_xyz_123") is False
 
-    # ── FileStore ────────────────────────────────────────────────────────────
+    # FileStore
 
     @pytest.mark.asyncio
     async def test_file_store_has_returns_true_for_cached_none(self, tmp_path: Path) -> None:
@@ -74,7 +73,7 @@ class TestStory16HasFalsyValues:
         await store.put("key_false", False)
         assert await store.has("key_false") is True
 
-    # ── DatabaseStore ────────────────────────────────────────────────────────
+    # DatabaseStore
 
     @pytest.mark.asyncio
     async def test_database_store_has_returns_true_for_cached_none(self) -> None:
@@ -132,11 +131,11 @@ class TestStory16HasFalsyValues:
         assert await store.has("key_false") is True
 
 
-# ─── Story 14: Atomic cache locks ─────────────────────────────────────────────
+# Atomic cache locks
 
 
 class TestStory14AtomicLocks:
-    """FR-047-014: CacheLock.acquire() must be atomic — two concurrent callers cannot both win."""
+    """CacheLock.acquire() must be atomic — two concurrent callers cannot both win."""
 
     class _AtomicRedis:
         def __init__(self) -> None:
@@ -285,11 +284,11 @@ class TestStory14AtomicLocks:
         assert 'redis.call("GET", KEYS[1])' in redis.eval_calls[0][0]
 
 
-# ─── Story 15: Redis flush must use SCAN ──────────────────────────────────────
+# Redis flush must use SCAN
 
 
 class TestStory15RedisScanFlush:
-    """FR-047-015: RedisStore.flush() must use SCAN instead of blocking KEYS."""
+    """RedisStore.flush() must use SCAN instead of blocking KEYS."""
 
     @pytest.mark.asyncio
     async def test_redis_flush_does_not_use_keys_command(self) -> None:

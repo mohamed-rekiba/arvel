@@ -1,14 +1,13 @@
-"""WI-023 — Queue operations additions.
+"""Queue operations additions.
 
-AC covered:
-  AC-006.1  queue:restart writes UTC timestamp to arvel:queue:restart cache key
-  AC-006.2  Worker started before restart exits on next loop iteration
-  AC-006.3  Worker started after restart is not affected
-  AC-006.4  queue:retry --all retries every failed job
-  AC-006.5  queue:retry --all <id> exits 2 (mutually exclusive)
-  AC-006.6  queue:clear --queue removes pending jobs
-  AC-006.7  queue:prune-failed --hours deletes old failed jobs and prints count
-  SR-023-004 queue restart marker scoped by cache prefix
+queue:restart writes UTC timestamp to arvel:queue:restart cache key
+Worker started before restart exits on next loop iteration
+Worker started after restart is not affected
+queue:retry --all retries every failed job
+queue:retry --all <id> exits 2 (mutually exclusive)
+queue:clear --queue removes pending jobs
+queue:prune-failed --hours deletes old failed jobs and prints count
+SR-023-004 queue restart marker scoped by cache prefix
 """
 
 from __future__ import annotations
@@ -35,11 +34,11 @@ def _app(*cmds: Command) -> Application:
     return Application(commands=list(cmds))
 
 
-# ─── AC-006.1 — queue:restart writes marker ──────────────────────────────────
+# ─── — queue:restart writes marker ──────────────────────────────────
 
 
 def test_queue_restart_writes_marker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC-006.1: queue:restart writes current UTC timestamp to cache key."""
+    """queue:restart writes current UTC timestamp to cache key."""
     written: dict[str, str] = {}
 
     async def fake_signal(self: Any) -> datetime:
@@ -55,13 +54,13 @@ def test_queue_restart_writes_marker(tmp_path: Path, monkeypatch: pytest.MonkeyP
         assert "timestamp" in written
 
 
-# ─── AC-006.2 / AC-006.3 — Worker honors restart marker ──────────────────────
+# ─── / — Worker honors restart marker ──────────────────────
 
 
 def test_worker_with_older_started_at_exits_on_restart_signal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AC-006.2: worker that started before the signal exits gracefully."""
+    """worker that started before the signal exits gracefully."""
     worker_started_at = datetime.now(UTC) - timedelta(seconds=10)
     restart_at = datetime.now(UTC)
 
@@ -81,7 +80,7 @@ def test_worker_with_older_started_at_exits_on_restart_signal(
 def test_worker_with_newer_started_at_ignores_restart_signal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AC-006.3: worker started after the signal is unaffected."""
+    """worker started after the signal is unaffected."""
     restart_at = datetime.now(UTC) - timedelta(seconds=10)
     worker_started_at = datetime.now(UTC)
 
@@ -98,11 +97,11 @@ def test_worker_with_newer_started_at_ignores_restart_signal(
     assert asyncio.run(check()) is False
 
 
-# ─── AC-006.6 — queue:clear ──────────────────────────────────────────────────
+# ─── — queue:clear ──────────────────────────────────────────────────
 
 
 def test_queue_clear_invokes_driver_clear(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC-006.6: queue:clear --queue=default calls connection.clear('default')."""
+    """queue:clear --queue=default calls connection.clear('default')."""
     cleared: list[str] = []
 
     async def fake_clear(self: Any, queue: str) -> int:
@@ -125,14 +124,14 @@ def test_queue_clear_invokes_driver_clear(tmp_path: Path, monkeypatch: pytest.Mo
         assert result.exit_code in (0, 2)
 
 
-# ─── AC-006.7 — queue:prune-failed ───────────────────────────────────────────
+# ─── — queue:prune-failed ───────────────────────────────────────────
 
 
 def test_queue_prune_failed_default_24h_threshold(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AC-006.7: queue:prune-failed --hours=24 deletes only entries older than 24h."""
+    """queue:prune-failed --hours=24 deletes only entries older than 24h."""
     called_with: dict[str, Any] = {}
 
     async def fake_prune(self: Any, hours: int) -> int:

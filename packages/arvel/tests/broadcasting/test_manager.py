@@ -1,4 +1,4 @@
-"""FR-013-006 — BroadcastManager driver resolution."""
+"""BroadcastManager driver resolution."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import pytest
 
 
 def test_manager_default_driver_resolves_from_config() -> None:
-    """FR-013-006 AC1: default name comes from BroadcastConfig.default."""
+    """default name comes from BroadcastConfig.default."""
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.drivers.log import LogBroadcaster
     from arvel.broadcasting.manager import BroadcastManager
@@ -18,7 +18,7 @@ def test_manager_default_driver_resolves_from_config() -> None:
 
 
 def test_manager_same_name_returns_same_instance() -> None:
-    """FR-013-006 AC2: per-manager singleton — same name returns same instance."""
+    """per-manager singleton — same name returns same instance."""
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.manager import BroadcastManager
 
@@ -29,7 +29,7 @@ def test_manager_same_name_returns_same_instance() -> None:
 
 
 def test_manager_unknown_driver_raises() -> None:
-    """FR-013-006 AC3: unknown driver name raises BroadcastDriverError."""
+    """unknown driver name raises BroadcastDriverError."""
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.exceptions import BroadcastDriverError
     from arvel.broadcasting.manager import BroadcastManager

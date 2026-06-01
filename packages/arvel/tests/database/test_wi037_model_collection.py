@@ -1,8 +1,7 @@
-"""WI-arvel-037 — Epic 006 Story 8: Eloquent-style ModelCollection.
+"""Eloquent-style ModelCollection.
 
-all()/get() return a ModelCollection with batch load, model_keys, PK-aware
-find/contains/only/except_/diff/intersect, to_query, fresh, make_hidden/make_visible.
-"""
+all/get return a ModelCollection with batch load, model_keys, PK-aware
+find/contains/only/except_/diff/intersect, to_query, fresh, make_hidden/make_visible."""
 
 from __future__ import annotations
 

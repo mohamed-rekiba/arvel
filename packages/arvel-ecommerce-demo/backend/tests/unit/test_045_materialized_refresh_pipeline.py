@@ -1,4 +1,4 @@
-"""WI-arvel-045 — materialized-view refresh pipeline hardening."""
+"""Materialized-view refresh pipeline hardening."""
 
 from __future__ import annotations
 

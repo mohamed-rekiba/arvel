@@ -1,5 +1,4 @@
-"""End-to-end HTTP roundtrip tests for AuthController (FR-028-01..31).
-
+"""End-to-end HTTP roundtrip tests for AuthController.
 Each test maps to a PRD-028 acceptance criterion and exercises the full
 HTTP path — request schema → controller → service → repo → response.
 The app uses an in-memory SQLite database via ``engine``/``session`` from
@@ -40,7 +39,7 @@ _JWT_SECRET = "x" * 32
 _REDIRECT = "https://app.example.com/auth/verified"
 
 
-# ── fixtures ──────────────────────────────────────────────────────────────────
+# fixtures
 
 
 @pytest.fixture
@@ -102,7 +101,7 @@ def test_app(
     return app
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+# helpers
 
 
 async def _register_verified(
@@ -129,7 +128,7 @@ async def _register_verified(
     await user_obj.save()
 
 
-# ── tests ─────────────────────────────────────────────────────────────────────
+# tests
 
 
 @pytest.mark.asyncio
@@ -138,7 +137,7 @@ async def test_register_201_with_user_envelope(
     test_app: FastAPI,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-01 — POST /api/auth/register returns 201 + UserResource."""
+    """POST /api/auth/register returns 201 + UserResource."""
     async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as c:
         r = await c.post(
             "/api/auth/register",
@@ -161,7 +160,7 @@ async def test_register_409_on_duplicate_email(
     test_app: FastAPI,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-02 — duplicate email → 409 + code=EMAIL_ALREADY_REGISTERED."""
+    """duplicate email → 409 + code=EMAIL_ALREADY_REGISTERED."""
     async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as c:
         payload = {
             "name": "Alice",
@@ -180,7 +179,7 @@ async def test_login_200_with_bearer_and_cookies(
     test_app: FastAPI,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-06 — login sets __Host-refresh + _csrf, returns access_token."""
+    """login sets __Host-refresh + _csrf, returns access_token."""
     async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as c:
         await _register_verified(c)
         r = await c.post(
@@ -199,7 +198,7 @@ async def test_login_429_after_5_failed_attempts(
     test_app: FastAPI,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-31 / FB-027-012 — throttle returns 429 + Retry-After after threshold."""
+    """/ — throttle returns 429 + Retry-After after threshold."""
     from arvel.auth.middleware.throttle_login import ThrottleLoginMiddleware
 
     # Build app with ThrottleLoginMiddleware (and proper exception handler).
@@ -251,7 +250,7 @@ async def test_refresh_200_rotates_cookie(
     test_app: FastAPI,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-13 — old cookie value gone; new cookie value present."""
+    """old cookie value gone; new cookie value present."""
     async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as c:
         await _register_verified(c)
         login = await c.post(
@@ -276,7 +275,7 @@ async def test_refresh_403_on_csrf_mismatch(
     test_app: FastAPI,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-16 — CSRF double-submit check blocks mismatched token."""
+    """CSRF double-submit check blocks mismatched token."""
     from arvel.auth.middleware.csrf_double_submit import CsrfDoubleSubmitMiddleware
 
     # Wrap the test_app with CSRF middleware (non-exempt refresh path).
@@ -329,7 +328,7 @@ async def test_forgot_password_returns_uniform_202(
     test_app: FastAPI,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-23 — known and unknown emails get the same 202 body."""
+    """known and unknown emails get the same 202 body."""
     async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as c:
         r1 = await c.post(
             "/api/auth/forgot-password",
@@ -350,7 +349,7 @@ async def test_reset_password_revokes_all_refresh_tokens(
     test_app: FastAPI,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-26 — every active refresh-token row is gone after a successful reset."""
+    """every active refresh-token row is gone after a successful reset."""
     async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as c:
         await _register_verified(c)
         await c.post("/api/auth/login", json={"email": _EMAIL, "password": _PASSWORD})
@@ -387,7 +386,7 @@ async def test_verify_email_302_to_success_page(
     event_fake: EventFake,
     services: tuple[AuthService, PasswordService, EmailVerificationService],
 ) -> None:
-    """FR-028-19 — successful verify redirects to configurable success URL."""
+    """successful verify redirects to configurable success URL."""
     _, _, ev = services
     from arvel.auth import User
 
@@ -421,7 +420,7 @@ async def test_verify_email_resend_throttled_returns_429(
     test_app: FastAPI,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-21 — second resend within window → 429."""
+    """second resend within window → 429."""
     async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as c:
         await _register_verified(c)
         login = await c.post(

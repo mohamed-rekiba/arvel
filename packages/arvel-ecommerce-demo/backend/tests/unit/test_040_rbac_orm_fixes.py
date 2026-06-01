@@ -1,15 +1,12 @@
-"""WI-arvel-040 — RED tests for V-011 through V-016.
-
-All tests must FAIL before fixes (RED state).
-They turn GREEN after Stage 3b execution.
+"""RBAC ORM and serialization fixes.
 
 Coverage:
-  V-011 — User.default_guard_name must be "api"
-  V-012 — bootstrap.py must use the shared refresh helper
-  V-013 — created_at serialised with .isoformat() in UserService and OrderService
-  V-014 — where_raw JSONB calls annotated with framework gap comment
-  V-015 — storefront_list composite cursor references G-002
-  V-016 — CartService uses delete() not force_delete()
+  User.default_guard_name must be "api"
+  bootstrap.py must use the shared refresh helper
+  created_at serialised with .isoformat() in UserService and OrderService
+  where_raw JSONB calls annotated with framework gap comment
+  storefront_list composite cursor documents malformed-cursor handling
+  CartService uses delete() not force_delete()
 """
 
 from __future__ import annotations
@@ -33,11 +30,11 @@ def _src(path: Path) -> str:
     return path.read_text()
 
 
-# ─── V-011: User.default_guard_name must be "api" ─────────────────────────────
+# ─── User.default_guard_name must be "api" ─────────────────────────────
 
 
 class TestV011GuardName:
-    """AC-001a-c: User.default_guard_name must equal 'api'."""
+    """User.default_guard_name must equal 'api'."""
 
     def test_user_model_has_api_default_guard(self) -> None:
         src = _src(USER_MODEL_FILE)
@@ -52,11 +49,11 @@ class TestV011GuardName:
         assert not has_web, "V-011 not fixed: default_guard_name='web' still present in user.py"
 
 
-# ─── V-012: bootstrap.py must use the shared refresh helper ───────────────────
+# ─── bootstrap.py must use the shared refresh helper ───────────────────
 
 
 class TestV012BootstrapRefresh:
-    """AC-002a-b: bootstrap.py must not use raw DB.statement REFRESH."""
+    """bootstrap.py must not use raw DB.statement REFRESH."""
 
     def test_bootstrap_no_raw_refresh_statement(self) -> None:
         src = _src(BOOTSTRAP_FILE)
@@ -77,11 +74,11 @@ class TestV012BootstrapRefresh:
         )
 
 
-# ─── V-013: created_at serialized with .isoformat() ───────────────────────────
+# ─── created_at serialized with .isoformat() ───────────────────────────
 
 
 class TestV013DatetimeSerialization:
-    """AC-003a-b: created_at must be serialized via .isoformat() on the same line."""
+    """created_at must be serialized via .isoformat() on the same line."""
 
     def test_user_service_created_at_isoformat(self) -> None:
         src = _src(USER_SVC_FILE)
@@ -109,11 +106,11 @@ class TestV013DatetimeSerialization:
         pytest.fail("V-013: '\"created_at\": order.created_at' not found in order_service.py")
 
 
-# ─── V-014: where_raw JSONB calls documented as framework gap ─────────────────
+# ─── where_raw JSONB calls documented as framework gap ─────────────────
 
 
 class TestV014JsonbGapDocumented:
-    """AC-004a: JSONB where_raw calls must have a gap comment nearby."""
+    """JSONB where_raw calls must have a gap comment nearby."""
 
     def test_product_service_jsonb_where_raw_has_gap_comment(self) -> None:
         src = _src(PRODUCT_SVC_FILE)
@@ -128,24 +125,25 @@ class TestV014JsonbGapDocumented:
                 )
 
 
-# ─── V-015: composite cursor references G-002 ─────────────────────────────────
+# ─── composite cursor gap note ─────────────────────────────────
 
 
 class TestV015CursorGapDocumented:
-    """AC-005a: storefront_list must reference G-002."""
+    """storefront_list documents malformed-cursor handling."""
 
-    def test_storefront_list_references_g002(self) -> None:
+    def test_storefront_list_documents_malformed_cursor(self) -> None:
         src = _src(PRODUCT_SVC_FILE)
-        assert "G-002" in src, (
-            "V-015 not fixed: G-002 framework gap reference not found in product_service.py"
+        assert "malformed cursor" in src.lower() and "InvalidCursorError" in src, (
+            "storefront_list must document how a malformed cursor is handled "
+            "(fall back to page one) in product_service.py"
         )
 
 
-# ─── V-016: CartService uses delete() not force_delete() ──────────────────────
+# ─── CartService uses delete() not force_delete() ──────────────────────
 
 
 class TestV016CartItemDelete:
-    """AC-006a-b: CartService must use delete() not force_delete()."""
+    """CartService must use delete() not force_delete()."""
 
     def test_cart_service_no_force_delete(self) -> None:
         src = _src(CART_SVC_FILE)

@@ -1,10 +1,10 @@
-"""WI-arvel-061 — Epic 049 Story 4: ORM `ModelNotFoundError` → HTTP 404 envelope.
+"""ORM `ModelNotFoundError` → HTTP 404 envelope.
 
 Without an explicit translator, the ORM error falls through to the catch-all
 and becomes a 500. The `HttpServiceProvider` wires `ModelNotFoundError` to a
 `NotFoundException` translator so route handlers surface missing records as
 the standard 404 envelope. Tests build the translator map the same way the
-provider does, keeping the HTTP layer ORM-agnostic per ADR-016.
+provider does, keeping the HTTP layer ORM-agnostic.
 """
 
 from __future__ import annotations

@@ -1,7 +1,4 @@
-"""Tests for first-class delay/priority on Job, JobEnvelope, Bus, Worker — WI-018.
-
-Covers FR-018-01, FR-018-02, FR-018-03, FR-018-04, FR-018-17.
-"""
+"""Tests for first-class delay/priority on Job, JobEnvelope, Bus, and Worker."""
 
 from __future__ import annotations
 
@@ -29,12 +26,12 @@ class _DPJob(Job):
 
 
 # ---------------------------------------------------------------------------
-# FR-018-01 — Job.delay
+# — Job.delay
 # ---------------------------------------------------------------------------
 
 
 class TestJobDelayField:
-    """FR-018-01: Job.delay accepts int (seconds) or timedelta; default 0."""
+    """Job.delay accepts int (seconds) or timedelta; default 0."""
 
     def test_default_delay_is_zero(self) -> None:
         job = _DPJob(value=1)
@@ -67,12 +64,12 @@ class TestJobDelayField:
 
 
 # ---------------------------------------------------------------------------
-# FR-018-02 — Job.priority
+# — Job.priority
 # ---------------------------------------------------------------------------
 
 
 class TestJobPriorityField:
-    """FR-018-02: Job.priority is int 0..9; default 0."""
+    """Job.priority is int 0..9; default 0."""
 
     def test_default_priority_is_zero(self) -> None:
         job = _DPJob(value=1)
@@ -107,12 +104,12 @@ class TestJobPriorityField:
 
 
 # ---------------------------------------------------------------------------
-# FR-018-03 — JobEnvelope wire format
+# — JobEnvelope wire format
 # ---------------------------------------------------------------------------
 
 
 class TestJobEnvelopeDelayPriority:
-    """FR-018-03: JobEnvelope carries delay (int seconds) and priority (int)."""
+    """JobEnvelope carries delay (int seconds) and priority (int)."""
 
     def test_default_delay_priority_zero(self) -> None:
         env = JobEnvelope(job_class="x.Y", payload={})
@@ -144,12 +141,12 @@ class TestJobEnvelopeDelayPriority:
 
 
 # ---------------------------------------------------------------------------
-# FR-018-04 — Bus.dispatch kwarg overrides
+# — Bus.dispatch kwarg overrides
 # ---------------------------------------------------------------------------
 
 
 class TestBusDispatchOverrides:
-    """FR-018-04: Bus.dispatch(job, *, delay=None, priority=None) overrides Job fields."""
+    """Bus.dispatch(job, *, delay=None, priority=None) overrides Job fields."""
 
     def setup_method(self) -> None:
         _DPJob.seen.clear()

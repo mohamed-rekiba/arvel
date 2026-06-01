@@ -80,7 +80,7 @@ class ProductService:
         if category_slug is not None:
             query = query.where_json_path("category_slug", locale, category_slug)
 
-        # G-002: a malformed cursor must not 500 the storefront — cursor_paginate
+        # Malformed cursor must not 500 the storefront — cursor_paginate
         # raises InvalidCursorError, so fall back to page one.
         try:
             page = await query.cursor_paginate(

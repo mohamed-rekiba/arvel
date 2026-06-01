@@ -1,4 +1,4 @@
-"""WI-arvel-066 — Epic 049 Story 2: programmatic global-scope API.
+"""Programmatic global-scope API.
 
 Three things land here:
 
@@ -6,12 +6,11 @@ Three things land here:
   (callable or :class:`GlobalScope` instance), without editing
   ``__arvel_global_scopes__`` by hand.
 * ``SoftDeleteScope`` — the soft-delete default scope as a real
-  :class:`GlobalScope` subclass, exposed publicly. The :class:`SoftDeletes`
+class:`GlobalScope` subclass, exposed publicly. The :class:`SoftDeletes`
   mixin registers an instance of it.
 * Subclass inheritance — a global scope registered on a parent must apply
   to subclass queries, and registering on the subclass must not mutate the
-  parent's scope dict.
-"""
+  parent's scope dict."""
 
 from __future__ import annotations
 

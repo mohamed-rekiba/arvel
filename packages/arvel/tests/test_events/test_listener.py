@@ -1,4 +1,4 @@
-"""Tests for Listener[E] generic abstract class — FR-009-002."""
+"""Tests for Listener[E] generic abstract class."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ class _Ev(Event):
 
 
 class TestListener:
-    """FR-009-002: Listener[E] is generic with abstract handle()."""
+    """Listener[E] is generic with abstract handle()."""
 
     def test_listener_is_generic(self) -> None:
         from typing import get_args

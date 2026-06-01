@@ -1,14 +1,4 @@
-"""WI-arvel-047: Queue Reliability cluster — Stories 4, 5, 6, 7, 8, 9.
-
-Tests are FAILING before the fix and PASSING after.
-
-Story 4 (FR-047-004): NotificationJob must exist and serialize/deliver.
-Story 5 (FR-047-005): QueueWorkCommand must wire FailedJobStore to Worker.
-Story 6 (FR-047-006): queue:retry must reset attempts=0 explicitly.
-Story 7 (FR-047-007): Job timeout must be enforced with asyncio.wait_for.
-Story 8 (FR-047-008): Job must support backoff and retry_until.
-Story 9 (FR-047-009): Database queue driver must use the configured app database.
-"""
+"""Queue reliability: notifications, DLQ wiring, retry, timeout, backoff, app DB."""
 
 from __future__ import annotations
 
@@ -95,11 +85,11 @@ class _CaptureChannel:
         self.sent.append(notifiable)
 
 
-# ─── Story 4: NotificationJob module must exist ───────────────────────────────
+# ─── NotificationJob module must exist ───────────────────────────────────────
 
 
 class TestStory4NotificationJob:
-    """FR-047-004: arvel.notifications.notification_job.NotificationJob must exist."""
+    """arvel.notifications.notification_job.NotificationJob must exist."""
 
     def test_notification_job_module_importable(self) -> None:
         """Currently FAILS with ImportError (module does not exist)."""
@@ -151,11 +141,11 @@ class TestStory4NotificationJob:
         assert channel.sent == [_QueuedNotifiable.rows[7]]
 
 
-# ─── Story 5: QueueWorkCommand must wire FailedJobStore ───────────────────────
+# ─── QueueWorkCommand must wire FailedJobStore ────────────────────────────────
 
 
 class TestStory5FailedJobStoreWiring:
-    """FR-047-005: queue:work must pass FailedJobStore to Worker."""
+    """queue:work must pass FailedJobStore to Worker."""
 
     @pytest.mark.asyncio
     async def test_exhausted_jobs_land_in_dlq(self) -> None:
@@ -186,7 +176,7 @@ class TestStory5FailedJobStoreWiring:
 
     @pytest.mark.asyncio
     async def test_queue_work_command_injects_failed_job_store(self) -> None:
-        """QueueWorkCommand.run_worker() must create Worker with failed_job_store.
+        """QueueWorkCommand.run_worker must create Worker with failed_job_store.
 
         Currently FAILS: Worker is constructed without failed_job_store=...
         """
@@ -202,11 +192,11 @@ class TestStory5FailedJobStoreWiring:
         assert cmd is not None
 
 
-# ─── Story 6: queue:retry must reset attempts=0 ───────────────────────────────
+# ─── queue:retry must reset attempts=0 ──────────────────────────────────────
 
 
 class TestStory6RetryResetsAttempts:
-    """FR-047-006: retry must explicitly set envelope.attempts = 0."""
+    """retry must explicitly set envelope.attempts = 0."""
 
     @pytest.mark.asyncio
     async def test_retry_dispatches_with_zero_attempts(self) -> None:
@@ -263,11 +253,11 @@ class TestStory6RetryResetsAttempts:
         assert [first.attempts, second.attempts] == [0, 0]
 
 
-# ─── Story 7: Job timeout enforcement ─────────────────────────────────────────
+# ─── Job timeout enforcement ────────────────────────────────────────────────
 
 
 class TestStory7JobTimeout:
-    """FR-047-007: Worker must cancel jobs that exceed Job.timeout."""
+    """Worker must cancel jobs that exceed Job.timeout."""
 
     @pytest.mark.asyncio
     async def test_timeout_causes_job_to_fail(self) -> None:
@@ -354,11 +344,11 @@ class TestStory7JobTimeout:
         assert captured["timeout_seconds"] == 1
 
 
-# ─── Story 8: Job backoff ──────────────────────────────────────────────────────
+# ─── Job backoff ──────────────────────────────────────────────────────────────
 
 
 class TestStory8JobBackoff:
-    """FR-047-008: Job must support backoff: int | list[int] and retry_until."""
+    """Job must support backoff: int | list[int] and retry_until."""
 
     def test_job_has_backoff_attribute(self) -> None:
         """Job base class must have backoff: int | list[int] = 0.
@@ -466,7 +456,7 @@ class TestStory8JobBackoff:
         assert _ExpiredJob.call_count <= 1
 
 
-# ─── Story 9: Database queue uses configured app DB ───────────────────────────
+# ─── Database queue uses configured app DB ──────────────────────────────────
 
 
 class TestStory9DatabaseQueueConfiguredDatabase:

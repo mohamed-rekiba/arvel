@@ -1,4 +1,4 @@
-"""RedisBroadcaster — fan-out via Redis Pub/Sub (FR-013-004)."""
+"""RedisBroadcaster — fan-out via Redis Pub/Sub."""
 
 from __future__ import annotations
 

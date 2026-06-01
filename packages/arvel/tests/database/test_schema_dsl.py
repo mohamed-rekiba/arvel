@@ -1,4 +1,4 @@
-"""FR-003-028..031 — Schema DSL compiles to Alembic-shaped operations."""
+"""Schema DSL compiles to Alembic-shaped operations."""
 
 from __future__ import annotations
 
@@ -16,14 +16,13 @@ _AnyColumn = Column[Any]
 def _find_column(emitted_args: tuple[Any, ...], name: str) -> _AnyColumn:
     """Locate the emitted ``Column[Any]`` with ``name`` inside Schema args.
 
-    The cast matches the documented ADR-052 pattern at line 113-114 below:
+    The cast matches the dual-checker cast pattern used below:
     mypy narrows ``isinstance(c, Column)`` to ``Column[Any]`` (cast looks
     redundant to mypy) while pyright leaves the generic parameter unbound
-    (cast is required). Both suppressions are specific codes.
-    """
+    (cast is required). Both suppressions are specific codes."""
     for c in emitted_args:
         if isinstance(c, Column) and c.name == name:
-            return cast("_AnyColumn", c)  # type: ignore[redundant-cast]  # ADR-052
+            return cast("_AnyColumn", c)  # type: ignore[redundant-cast]  # dual-checker cast
     raise AssertionError(f"no column named {name!r} in emitted args")
 
 
@@ -32,8 +31,7 @@ class RecordingExecutor:
 
     Implements the `_Executor` protocol surface explicitly (not via
     ``__getattr__``) so pyright sees a real protocol match instead of
-    dynamic attribute access.
-    """
+    dynamic attribute access."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = []
@@ -142,11 +140,11 @@ def test_drop_table_emits_drop_table() -> None:
     assert ex.calls == [("drop_table", ("users",), {})]
 
 
-# ─── use_current (FR-010-05, AC-010-06..07) ──────────────────────────────────
+# ─── use_current  ──────────────────────────────────
 
 
 def test_use_current_sets_server_default() -> None:
-    """AC-010-06: use_current() sets server_default=func.now() on the Column."""
+    """use_current sets server_default=func.now on the Column."""
     from arvel.database.schema import Blueprint
 
     col = Blueprint.__new__(Blueprint).make_pending_column_for_test("created_at", "datetime")
@@ -156,7 +154,7 @@ def test_use_current_sets_server_default() -> None:
 
 
 def test_use_current_on_update_sets_server_onupdate() -> None:
-    """AC-010-07: use_current(on_update=True) also sets server_onupdate=FetchedValue()."""
+    """use_current(on_update=True) also sets server_onupdate=FetchedValue."""
     from arvel.database.schema import Blueprint
 
     col = Blueprint.__new__(Blueprint).make_pending_column_for_test("updated_at", "datetime")
@@ -167,7 +165,7 @@ def test_use_current_on_update_sets_server_onupdate() -> None:
 
 
 def test_use_current_without_on_update_has_no_server_onupdate() -> None:
-    """.use_current() without on_update does NOT set server_onupdate."""
+    """.use_current without on_update does NOT set server_onupdate."""
     from arvel.database.schema import Blueprint
 
     col = Blueprint.__new__(Blueprint).make_pending_column_for_test("ts", "datetime")
@@ -177,7 +175,7 @@ def test_use_current_without_on_update_has_no_server_onupdate() -> None:
 
 
 def test_use_current_is_fluent() -> None:
-    """use_current() returns PendingColumn for chaining."""
+    """use_current returns PendingColumn for chaining."""
     from arvel.database.schema import Blueprint
 
     col = Blueprint.__new__(Blueprint).make_pending_column_for_test("ts", "datetime")
@@ -186,7 +184,7 @@ def test_use_current_is_fluent() -> None:
 
 
 def test_use_current_in_blueprint_ddl() -> None:
-    """Blueprint.datetime().use_current() appears in the DDL via schema create."""
+    """Blueprint.datetime.use_current appears in the DDL via schema create."""
     ex = RecordingExecutor()
 
     def build(t: Blueprint) -> None:
@@ -198,11 +196,11 @@ def test_use_current_in_blueprint_ddl() -> None:
     assert ex.calls[0][0] == "create_table"
 
 
-# ─── long_text (FR-010-06, AC-010-08) ────────────────────────────────────────
+# ─── long_text  ────────────────────────────────────────
 
 
 def test_long_text_adds_text_column() -> None:
-    """AC-010-08: Blueprint.long_text(name) → Text(length=4294967295)."""
+    """Blueprint.long_text(name) → Text(length=4294967295)."""
     from sqlalchemy import Text
 
     ex = RecordingExecutor()
@@ -222,12 +220,12 @@ def test_long_text_adds_text_column() -> None:
 
 
 def test_long_text_is_fluent() -> None:
-    """Blueprint.long_text() returns PendingColumn for chaining."""
+    """Blueprint.long_text returns PendingColumn for chaining."""
     from arvel.database.schema import Blueprint
 
     bp = Blueprint("fluent_test")
     result = bp.long_text("content")
-    # It returns a PendingColumn — can call .nullable() etc.
+    # It returns a PendingColumn — can call .nullable etc.
     assert result is not None
 
 
@@ -238,8 +236,7 @@ def test_raw_column_emits_column_verbatim() -> None:
     """Blueprint.raw_column(Column(...)) passes the column through unchanged.
 
     Use case: a SQLA Column type (e.g. Postgres JSONB) or kwarg (e.g. computed
-    defaults) the fluent helpers don't expose.
-    """
+    defaults) the fluent helpers don't expose."""
     from sqlalchemy import JSON
 
     ex = RecordingExecutor()

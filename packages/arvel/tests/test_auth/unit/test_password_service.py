@@ -1,8 +1,8 @@
-"""FR-028-23..28 — PasswordService unit tests.
+"""PasswordService unit tests.
 
 The service uses the real ``User``, ``PasswordReset``, and ``RefreshToken``
 models on in-memory async SQLite.  The plaintext reset token is obtained
-from the ``PasswordResetRequested`` event dispatched by ``forgot()`` —
+from the ``PasswordResetRequested`` event dispatched by ``forgot()``
 mirroring how the mail listener gets it in production.
 """
 
@@ -64,7 +64,7 @@ async def alice(setup_db: AsyncSession) -> User:
     )
 
 
-# ─── forgot ────────────────────────────────────────────────────────────────
+# forgot
 
 
 @pytest.mark.asyncio
@@ -73,7 +73,7 @@ async def test_forgot_known_email_creates_row_and_dispatches_event(
     alice: User,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-23 — known email → PasswordReset row + PasswordResetRequested event."""
+    """known email → PasswordReset row + PasswordResetRequested event."""
     await password_service.forgot("alice@example.com")
 
     row = await PasswordReset.where(email="alice@example.com").first()
@@ -91,7 +91,7 @@ async def test_forgot_unknown_email_silent(
     alice: User,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-23 — unknown email → no row, no event, returns silently."""
+    """unknown email → no row, no event, returns silently."""
     await password_service.forgot("nobody@example.com")
 
     assert await PasswordReset.where(email="nobody@example.com").first() is None
@@ -104,7 +104,7 @@ async def test_forgot_throttled_skips_second_token(
     alice: User,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-25 — second forgot within throttle window → no new row, no new event."""
+    """second forgot within throttle window → no new row, no new event."""
     await password_service.forgot("alice@example.com")
     EventFacade.assert_dispatched(PasswordResetRequested, times=1)
 
@@ -113,7 +113,7 @@ async def test_forgot_throttled_skips_second_token(
     EventFacade.assert_dispatched(PasswordResetRequested, times=1)
 
 
-# ─── reset ─────────────────────────────────────────────────────────────────
+# reset
 
 
 async def _get_plain_token(
@@ -135,7 +135,7 @@ async def test_reset_with_valid_token_updates_password_and_burns_row(
     alice: User,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-26, FR-028-28 — successful reset updates user, deletes row."""
+    """successful reset updates user, deletes row."""
     plain = await _get_plain_token(password_service, "alice@example.com", event_fake)
 
     await password_service.reset(token=plain, password="Brand-New-pw99!")
@@ -154,7 +154,7 @@ async def test_reset_invalid_token_raises(
     alice: User,
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-27 — bad token → PasswordResetTokenInvalidError."""
+    """bad token → PasswordResetTokenInvalidError."""
     with pytest.raises(PasswordResetTokenInvalidError):
         await password_service.reset(token="never-minted", password="x" * 12)
 
@@ -165,7 +165,7 @@ async def test_reset_revokes_all_refresh_tokens(
     alice: User,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-26 — successful reset deletes every active refresh row for the user."""
+    """successful reset deletes every active refresh row for the user."""
     for token_hash in ("a" * 64, "b" * 64):
         await RefreshToken.create(
             user_id=str(alice.id),
@@ -184,7 +184,7 @@ async def test_reset_token_one_shot(
     alice: User,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-28 — reusing a successful reset token raises."""
+    """reusing a successful reset token raises."""
     plain = await _get_plain_token(password_service, "alice@example.com", event_fake)
 
     await password_service.reset(token=plain, password="First-pw99!")

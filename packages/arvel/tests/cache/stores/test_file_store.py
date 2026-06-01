@@ -1,4 +1,4 @@
-"""Tests for FileStore — FR-006-003."""
+"""Tests for FileStore."""
 
 from __future__ import annotations
 

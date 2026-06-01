@@ -1,8 +1,7 @@
-"""WI-arvel-025 — Epic 006 Story 14: attribute API polish bundle.
+"""Attribute API polish bundle.
 
 Covers append/set_appends, make_hidden_if/make_visible_if, only/except_, get_key/get_key_name,
-qualify_column, is_same/is_not, discard_changes, and the HasUuids/HasUlids traits.
-"""
+qualify_column, is_same/is_not, discard_changes, and the HasUuids/HasUlids traits."""
 
 from __future__ import annotations
 

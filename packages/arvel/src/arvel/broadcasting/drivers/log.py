@@ -1,4 +1,4 @@
-"""LogBroadcaster — emit a structured log; never send anything over the wire (FR-013-002)."""
+"""LogBroadcaster — emit a structured log; never send anything over the wire."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class LogBroadcaster:
     """Dev driver. Logs ``broadcast_emitted`` with channel + event + payload keys.
 
-    Per NFR-013-009 / SEC-013-003, payload **values** are NOT logged — only keys.
+    Per payload **values** are NOT logged — only keys.
     """
 
     async def broadcast(

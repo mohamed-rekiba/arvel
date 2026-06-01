@@ -1,4 +1,4 @@
-"""NFR-004-003: path-traversal protection.
+"""path-traversal protection.
 
 Adversarial test suite — verifies the cli cannot write outside the
 intended target directory under any input. Targeted by Stage 4b security

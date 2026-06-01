@@ -1,4 +1,4 @@
-"""Epic 001 Story 7 — graceful shutdown and OS signal handling."""
+"""graceful shutdown and OS signal handling."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""FR-002-003 — Router.register_with_app(fastapi) mounts buffered routes."""
+"""Router.register_with_app(fastapi) mounts buffered routes."""
 
 from __future__ import annotations
 

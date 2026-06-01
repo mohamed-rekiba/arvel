@@ -1,4 +1,4 @@
-"""FR-013-002..005 — Driver behaviour tests (log, null, redis, pusher)."""
+"""Driver behaviour tests (log, null, redis, pusher)."""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-# ─── FR-013-002 — LogBroadcaster ──────────────────────────────────────────────
+# ─── — LogBroadcaster ──────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_log_broadcaster_emits_structured_event(caplog: pytest.LogCaptureFixture) -> None:
-    """FR-013-002 AC1: emits exactly one structured log event named broadcast_emitted."""
+    """emits exactly one structured log event named broadcast_emitted."""
     from arvel.broadcasting.drivers.log import LogBroadcaster
 
     log = LogBroadcaster()
@@ -24,7 +24,7 @@ async def test_log_broadcaster_emits_structured_event(caplog: pytest.LogCaptureF
 
 @pytest.mark.asyncio
 async def test_log_broadcaster_omits_payload_values() -> None:
-    """FR-013-002 AC2 / NFR-013-009: payload values are NOT included in the log; only keys."""
+    """/ : payload values are NOT included in the log; only keys."""
     import logging as _logging
 
     from arvel.broadcasting.drivers.log import LogBroadcaster
@@ -56,18 +56,18 @@ async def test_log_broadcaster_omits_payload_values() -> None:
 
 @pytest.mark.asyncio
 async def test_log_broadcaster_no_args_constructor() -> None:
-    """FR-013-002 AC3: constructor takes no arguments."""
+    """constructor takes no arguments."""
     from arvel.broadcasting.drivers.log import LogBroadcaster
 
     LogBroadcaster()  # MUST NOT raise
 
 
-# ─── FR-013-003 — NullBroadcaster ─────────────────────────────────────────────
+# ─── — NullBroadcaster ─────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_null_broadcaster_is_noop() -> None:
-    """FR-013-003 AC1: broadcast is a no-op that returns None."""
+    """broadcast is a no-op that returns None."""
     from arvel.broadcasting.drivers.null import NullBroadcaster
 
     # broadcast() is typed -> None; calling it must not raise.
@@ -76,18 +76,18 @@ async def test_null_broadcaster_is_noop() -> None:
 
 @pytest.mark.asyncio
 async def test_null_broadcaster_accepts_empty_channels() -> None:
-    """FR-013-003 AC2: never raises under any input including channels=[]."""
+    """never raises under any input including channels=[]."""
     from arvel.broadcasting.drivers.null import NullBroadcaster
 
     await NullBroadcaster().broadcast([], "Any", {})
 
 
-# ─── FR-013-004 — RedisBroadcaster ────────────────────────────────────────────
+# ─── — RedisBroadcaster ────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_redis_broadcaster_publishes_per_channel() -> None:
-    """FR-013-004 AC1: one Redis PUBLISH per channel in the list."""
+    """one Redis PUBLISH per channel in the list."""
     from arvel.broadcasting.drivers.redis import RedisBroadcaster
 
     fake_client = AsyncMock()
@@ -103,7 +103,7 @@ async def test_redis_broadcaster_publishes_per_channel() -> None:
 
 @pytest.mark.asyncio
 async def test_redis_broadcaster_uses_prefixed_channel_key() -> None:
-    """FR-013-004 AC2: channel key is `arvel.broadcasting.{channel}`."""
+    """channel key is `arvel.broadcasting.{channel}`."""
     from arvel.broadcasting.drivers.redis import RedisBroadcaster
 
     fake_client = AsyncMock()
@@ -116,7 +116,7 @@ async def test_redis_broadcaster_uses_prefixed_channel_key() -> None:
 
 @pytest.mark.asyncio
 async def test_redis_broadcaster_payload_is_valid_json() -> None:
-    """FR-013-004 AC3: payload encoded with json.dumps."""
+    """payload encoded with json.dumps."""
     from arvel.broadcasting.drivers.redis import RedisBroadcaster
 
     fake_client = AsyncMock()
@@ -131,7 +131,7 @@ async def test_redis_broadcaster_payload_is_valid_json() -> None:
 
 @pytest.mark.asyncio
 async def test_redis_broadcaster_rejects_non_serializable_payload() -> None:
-    """FR-013-004 AC3: raise BroadcastDriverError on non-JSON payload."""
+    """raise BroadcastDriverError on non-JSON payload."""
     from arvel.broadcasting.drivers.redis import RedisBroadcaster
     from arvel.broadcasting.exceptions import BroadcastDriverError
 
@@ -142,7 +142,7 @@ async def test_redis_broadcaster_rejects_non_serializable_payload() -> None:
 
 
 def test_redis_broadcaster_raises_when_redis_extra_missing() -> None:
-    """FR-013-004 AC4: missing dep raises BroadcastDriverError on resolve."""
+    """missing dep raises BroadcastDriverError on resolve."""
     import sys
 
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
@@ -156,12 +156,12 @@ def test_redis_broadcaster_raises_when_redis_extra_missing() -> None:
             manager.driver()
 
 
-# ─── FR-013-005 — PusherBroadcaster ───────────────────────────────────────────
+# ─── — PusherBroadcaster ───────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_pusher_broadcaster_posts_to_events_endpoint() -> None:
-    """FR-013-005 AC1+AC2: posts to /apps/{app_id}/events with signed params."""
+    """+: posts to /apps/{app_id}/events with signed params."""
     from arvel.broadcasting.drivers.pusher import PusherBroadcaster
 
     sent_requests: list[Any] = []
@@ -201,7 +201,7 @@ async def test_pusher_broadcaster_posts_to_events_endpoint() -> None:
 
 @pytest.mark.asyncio
 async def test_pusher_broadcaster_raises_on_failed_request() -> None:
-    """FR-013-005 AC4: failed HTTP request raises BroadcastDriverError."""
+    """failed HTTP request raises BroadcastDriverError."""
     from arvel.broadcasting.drivers.pusher import PusherBroadcaster
     from arvel.broadcasting.exceptions import BroadcastDriverError
 

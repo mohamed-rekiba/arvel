@@ -1,9 +1,7 @@
-"""Unit tests for framework mixins — US-001.
-
-RED: imports from app.models.* and app.mixins.* fail until Stage 3b
+"""Framework mixin behavior on demo models.
 implements those modules. Every test here fails at import time.
 
-Acceptance criteria (US-001):
+Coverage:
 - BaseModelMixin: UUID v7 id, created_at, updated_at, deleted_at, scope_active()
 - TranslatableMixin: get_translation(), set_translation(), locale fallback to 'en'
 - User RBAC: HasRoles/HasPermissions plus has_level()
@@ -23,7 +21,7 @@ pytestmark = pytest.mark.unit
 class TestBaseModelMixin:
     def test_id_is_uuid_v7(self) -> None:
         """BaseModelMixin assigns UUID v7 (timestamp-prefixed) primary keys."""
-        from app.models.product import Product  # RED until Stage 3b
+        from app.models.product import Product
 
         p = Product()
         assert p.id is not None
@@ -32,7 +30,7 @@ class TestBaseModelMixin:
 
     def test_created_at_attribute_exists(self) -> None:
         """Timestamps mixin adds created_at; it's set by the ORM on flush, not on __init__."""
-        from app.models.vendor import Vendor  # RED until Stage 3b
+        from app.models.vendor import Vendor
 
         v = Vendor(name="Test", slug="test", status="published")
         # In unit tests (no session), created_at starts None; the framework sets it on save.
@@ -42,7 +40,7 @@ class TestBaseModelMixin:
         """SoftDeletes mixin adds deleted_at; it starts as None."""
         from datetime import UTC, datetime
 
-        from app.models.product import Product  # RED until Stage 3b
+        from app.models.product import Product
 
         p = Product()
         assert p.deleted_at is None
@@ -54,7 +52,7 @@ class TestBaseModelMixin:
         """Setting deleted_at=None restores the record (async restore() does the same)."""
         from datetime import UTC, datetime
 
-        from app.models.product import Product  # RED until Stage 3b
+        from app.models.product import Product
 
         p = Product()
         p.deleted_at = datetime.now(UTC)
@@ -63,7 +61,7 @@ class TestBaseModelMixin:
 
     def test_soft_deletes_global_scope_class_attribute(self) -> None:
         """SoftDeletes registers __arvel_soft_delete_column__ on models that use it."""
-        from app.models.product import Product  # RED until Stage 3b
+        from app.models.product import Product
 
         assert getattr(Product, "__arvel_soft_delete_column__", None) == "deleted_at"
 
@@ -100,7 +98,7 @@ class TestBaseModelMixin:
 class TestTranslatableMixin:
     def test_get_translation_returns_locale_value(self) -> None:
         """get_translation returns the value for the requested locale."""
-        from app.models.product import Product  # RED until Stage 3b
+        from app.models.product import Product
 
         p = Product()
         p.name = {"en": "Headphones", "ar": "سماعات", "tr": "Kulakl\u0131k"}
@@ -108,7 +106,7 @@ class TestTranslatableMixin:
 
     def test_get_translation_falls_back_to_en(self) -> None:
         """get_translation falls back to 'en' when the requested locale is absent."""
-        from app.models.product import Product  # RED until Stage 3b
+        from app.models.product import Product
 
         p = Product()
         p.name = {"en": "Headphones"}
@@ -116,7 +114,7 @@ class TestTranslatableMixin:
 
     def test_get_translation_returns_empty_when_all_absent(self) -> None:
         """Returns '' when both the locale and 'en' fallback are absent."""
-        from app.models.product import Product  # RED until Stage 3b
+        from app.models.product import Product
 
         p = Product()
         p.name = {}
@@ -124,7 +122,7 @@ class TestTranslatableMixin:
 
     def test_set_translation_updates_only_the_target_locale(self) -> None:
         """set_translation patches one locale key, leaving others intact."""
-        from app.models.product import Product  # RED until Stage 3b
+        from app.models.product import Product
 
         p = Product()
         p.name = {"en": "Headphones", "ar": "سماعات"}

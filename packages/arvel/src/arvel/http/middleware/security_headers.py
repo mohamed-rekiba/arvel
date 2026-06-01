@@ -1,4 +1,4 @@
-"""SecurityHeadersMiddleware — pure-ASGI HTTP security headers (FR-032-04).
+"""SecurityHeadersMiddleware — pure-ASGI HTTP security headers.
 
 Injects four headers on every HTTP response:
 
@@ -6,7 +6,7 @@ Injects four headers on every HTTP response:
 - ``X-Content-Type-Options: nosniff`` — prevents MIME-type sniffing.
 - ``Referrer-Policy: strict-origin-when-cross-origin`` — limits referrer leakage.
 - ``Content-Security-Policy`` — defaults to a tight policy with
-  ``frame-ancestors 'none'`` (no clickjacking); override via constructor.
+ ``frame-ancestors 'none'`` (no clickjacking); override via constructor.
 
 All headers use ``setdefault`` semantics: if the handler already sent a header
 (e.g. a route that returns a custom CSP), the middleware does not overwrite it.

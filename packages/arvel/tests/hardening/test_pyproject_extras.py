@@ -1,4 +1,4 @@
-"""WI-017 / FR-017-004: arvel[all] extra is the union of all current extras."""
+"""arvel[all] extra is the union of all current extras."""
 
 from __future__ import annotations
 

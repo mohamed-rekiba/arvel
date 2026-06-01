@@ -1,17 +1,17 @@
-"""SetLocaleMiddleware — per-request locale negotiation (ADR-092).
+"""SetLocaleMiddleware — per-request locale negotiation.
 
 Resolution order on every HTTP request:
 
 1. ``request.state.user.locale`` — authenticated user's stored preference wins,
-   so a user who set Spanish in profile settings keeps Spanish even when their
-   browser sends ``Accept-Language: en``.
-2. ``Accept-Language`` header, RFC 9110 §12.5.4 quality-value sorted.  We pick
-   the highest-q tag whose primary subtag matches a supported locale.
+ so a user who set Spanish in profile settings keeps Spanish even when their
+ browser sends ``Accept-Language: en``.
+2. ``Accept-Language`` header, RFC 9110 §12.5.4 quality-value sorted. We pick
+ the highest-q tag whose primary subtag matches a supported locale.
 3. ``default`` locale (constructor arg, default ``"en"``).
 
 The negotiated locale is stamped on ``request.state.locale`` and mirrored to
 the response via ``Content-Language`` (setdefault — never overwrites a
-handler-set value).  The shared ``Translator`` is *never* mutated, so
+handler-set value). The shared ``Translator`` is *never* mutated, so
 concurrent requests are safe; callers pass ``locale`` to
 ``Translator.get(..., locale=...)`` or use the :func:`arvel.i18n.t` helper.
 

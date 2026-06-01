@@ -1,5 +1,5 @@
 """
-FR-007-038..045 — Gate + Policy[T] authorization.
+Gate + Policy[T] authorization.
 Tests import from arvel.auth.gate and arvel.auth.policy → red state.
 """
 
@@ -36,9 +36,6 @@ def _before_super_admin(user: Any, _ability: Any) -> bool | None:
     return True if user.role == "super_admin" else None
 
 
-# ─── FR-007-038: Gate.define() + Gate.allows() ───────────────────────────────
-
-
 @pytest.mark.asyncio
 async def test_gate_allows_registered_ability() -> None:
     from arvel.auth.gate import Gate
@@ -49,9 +46,6 @@ async def test_gate_allows_registered_ability() -> None:
     user = _FakeUser("u1")
     assert await gate.allows("edit-post", user, {"owner_id": "u1"}) is True
     assert await gate.allows("edit-post", user, {"owner_id": "u2"}) is False
-
-
-# ─── FR-007-039: Gate.denies() ────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -68,7 +62,7 @@ async def test_gate_denies_is_inverse_of_allows() -> None:
     assert await gate.denies("delete-post", admin) is False
 
 
-# ─── FR-007-040: Gate fail-closed — unregistered ability raises ───────────────
+# Gate fail-closed — unregistered ability raises
 
 
 @pytest.mark.asyncio
@@ -83,7 +77,7 @@ async def test_gate_fail_closed_raises_for_unregistered_ability() -> None:
         await gate.allows("nonexistent-ability", user)
 
 
-# ─── FR-007-041: Gate.authorize() raises 403 on denial ───────────────────────
+# Gate.authorize() raises 403 on denial
 
 
 @pytest.mark.asyncio
@@ -108,7 +102,7 @@ async def test_gate_authorize_does_not_raise_when_allowed() -> None:
     await gate.authorize("admin-only", _FakeUser("a1", role="admin"))
 
 
-# ─── FR-007-042: Gate.before() override ──────────────────────────────────────
+# Gate.before() override
 
 
 @pytest.mark.asyncio
@@ -124,7 +118,7 @@ async def test_gate_before_override_grants_all_for_super_admin() -> None:
     assert await gate.allows("edit-post", admin, {"owner_id": "other"}) is True
 
 
-# ─── FR-007-043: Gate.after() hook ───────────────────────────────────────────
+# Gate.after() hook
 
 
 @pytest.mark.asyncio
@@ -144,9 +138,6 @@ async def test_gate_after_hook_called_with_result() -> None:
     await gate.allows("read", user)
     assert len(after_calls) == 1
     assert after_calls[0] == (user, "read", True)
-
-
-# ─── FR-007-044: Policy[T] ────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -181,7 +172,7 @@ async def test_policy_update_method_returns_false_for_non_admin() -> None:
     assert await policy.check("update", user, {"id": "p1"}) is False
 
 
-# ─── FR-007-045: Gate.policy() registers a policy ─────────────────────────────
+# Gate.policy() registers a policy
 
 
 @pytest.mark.asyncio

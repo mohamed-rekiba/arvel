@@ -1,4 +1,4 @@
-"""ChannelManager — in-process pub/sub for the Reverb WS server (FR-013-025, NFR-013-006)."""
+"""ChannelManager — in-process pub/sub for the Reverb WS server."""
 
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ class ChannelManager:
 
     @staticmethod
     def _as_sendable(connection: object) -> _Sendable:
-        # Trust the duck-type: every caller in this package implements send().
+        # Trust the duck-type: every caller in this package implements send.
         return connection  # type: ignore[return-value]
 
     def channels_for(self, connection: object) -> Iterable[str]:

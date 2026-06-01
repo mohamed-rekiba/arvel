@@ -55,7 +55,7 @@ def create_asgi(app: Application) -> FastAPI:
     )
     # Swagger UI and ReDoc load scripts/styles from cdn.jsdelivr.net and an
     # image from fastapi.tiangolo.com, plus an inline init script — all of
-    # which the strict default-src 'self' policy blocks.  We apply a relaxed
+    # which the strict default-src 'self' policy blocks. We apply a relaxed
     # policy only to those two paths; everything else keeps the tight default.
     _docs_csp = (
         "default-src 'self'; "
@@ -134,6 +134,7 @@ def _patch_error_responses(app: FastAPI) -> None:
     - Common error codes (400/401/403/404/409/422/500) on every operation
     - BearerAuth security scheme and per-operation security requirement
     - Tag groups so Swagger UI organises endpoints into logical sections
+
     """
     _err_ref = {"$ref": "#/components/schemas/ApiErrorOut"}
     _err_content = {"application/json": {"schema": _err_ref}}

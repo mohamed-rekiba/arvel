@@ -1,8 +1,7 @@
 """Eloquent-style dirty tracking and $appends on the model.
 
 is_dirty / get_dirty / get_original / was_changed / get_changes mirror Laravel's
-attribute change tracking. __appends__ adds @accessor values to to_dict() output.
-"""
+attribute change tracking. __appends__ adds @accessor values to to_dict output."""
 
 from __future__ import annotations
 

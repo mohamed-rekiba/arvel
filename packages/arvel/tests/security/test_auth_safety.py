@@ -1,5 +1,5 @@
 """
-Security sweep for WI-arvel-007 (Auth subsystem).
+Security sweep for (Auth subsystem).
 Quality gates 50-55. All tests red until arvel.auth is implemented.
 """
 
@@ -14,7 +14,7 @@ from arvel.auth.guard import UserResolver
 _SECRET = "a" * 32
 
 
-# ─── Gate 50: JWT alg-confusion attack prevention ─────────────────────────────
+# Gate 50: JWT alg-confusion attack prevention
 
 
 def test_jwt_guard_refuses_alg_none_in_new_module() -> None:
@@ -38,7 +38,7 @@ def test_jwt_guard_refuses_short_hmac_secret() -> None:
         JwtGuard(resolver=_make_resolver(), jwt=JwtConfig(secret="too-short", algorithm="HS256"))
 
 
-# ─── Gate 51: timing-safe token comparison ────────────────────────────────────
+# Gate 51: timing-safe token comparison
 
 
 def test_token_guard_source_uses_compare_digest() -> None:
@@ -61,7 +61,7 @@ def test_hash_facade_uses_bcrypt_checkpw_not_equality_operator() -> None:
     assert "verify" in source or "checkpw" in source or "compare_digest" in source
 
 
-# ─── Gate 52: session fixation prevention ─────────────────────────────────────
+# Gate 52: session fixation prevention
 
 
 @pytest.mark.asyncio
@@ -97,7 +97,7 @@ async def test_session_guard_login_regenerates_session_id() -> None:
     assert session.regenerated, "login() must call session.regenerate() to prevent session fixation"
 
 
-# ─── Gate 53: Gate fail-closed ────────────────────────────────────────────────
+# Gate 53: Gate fail-closed
 
 
 @pytest.mark.asyncio
@@ -114,7 +114,7 @@ async def test_gate_raises_for_unregistered_ability() -> None:
         await gate.allows("not-registered", _User())
 
 
-# ─── Gate 54: backward compat re-exports ──────────────────────────────────────
+# Gate 54: backward compat re-exports
 
 
 def test_arvel_http_auth_still_exports_all_symbols() -> None:
@@ -124,7 +124,7 @@ def test_arvel_http_auth_still_exports_all_symbols() -> None:
         assert hasattr(http_auth, name), f"arvel.http.auth missing re-export: {name}"
 
 
-# ─── Gate 55: auth module coverage (100% import — no syntax errors) ──────────
+# Gate 55: auth module coverage (100% import — no syntax errors)
 
 
 def test_all_auth_modules_importable() -> None:
@@ -159,7 +159,7 @@ def test_all_auth_modules_importable() -> None:
     assert not failed, f"Auth modules not importable: {failed}"
 
 
-# ─── helpers ──────────────────────────────────────────────────────────────────
+# helpers
 
 
 def _make_resolver() -> UserResolver:

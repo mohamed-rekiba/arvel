@@ -3,8 +3,7 @@
 Loads Python files by absolute path under namespaced module names so the
 user's files never shadow stdlib or each other across multiple Arvel apps
 in the same process. Asserts ``sys.path`` is unchanged before and after
-each load. See ADR-019 for the design.
-"""
+each load."""
 
 from __future__ import annotations
 
@@ -18,7 +17,7 @@ NAMESPACE_PREFIX = "_arvel_user_app"
 
 A leading underscore signals "framework-private namespace, do not import
 from user code". The full module name is ``<NAMESPACE_PREFIX>.<subpkg>.<stem>``
-(see ADR-019 § Module name conventions).
+(see module name conventions).
 """
 
 # Process-level cache: (resolved_path_str, mtime) -> loaded ModuleType.
@@ -33,7 +32,7 @@ class LoaderError(RuntimeError):
 
 
 class SysPathMutationError(RuntimeError):
-    """Raised when loaded code mutates ``sys.path`` (NFR-004-004 violation)."""
+    """Raised when loaded code mutates ``sys.path``."""
 
 
 def clear_module_cache() -> None:

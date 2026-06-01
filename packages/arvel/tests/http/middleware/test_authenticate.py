@@ -1,4 +1,4 @@
-"""FR-002-017 — Authenticate middleware."""
+"""Authenticate middleware."""
 
 from __future__ import annotations
 

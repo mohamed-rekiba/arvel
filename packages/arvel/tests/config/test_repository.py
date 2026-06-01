@@ -1,4 +1,4 @@
-"""FR-001-009: Config typed accessor."""
+"""Config typed accessor."""
 
 from __future__ import annotations
 

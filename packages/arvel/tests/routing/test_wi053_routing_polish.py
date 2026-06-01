@@ -1,13 +1,7 @@
-"""Failing tests for WI-arvel-053: Routing Security & UX Polish.
+"""Routing security and UX polish — RED state.
 
-Covers Epic 048 stories:
-
-- Story 4 polish: `url()` helper, `RoutingError` for missing params, `absolute=True` on `route()`.
-- Story 6 polish: `name_prefix` parameter in `Route.group()`.
-- Story 7: `MethodSpoofMiddleware` for HTML form `_method=PUT/PATCH/DELETE`.
-- Story 8: `URL.signed_route()`, `Request.has_valid_signature()`, `SignedMiddleware`.
-
-Run BEFORE implementation — every test in this file MUST fail (Red state).
+Covers url() helper, RoutingError, name_prefix in Route.group(),
+MethodSpoofMiddleware, and signed URL middleware.
 """
 
 from __future__ import annotations
@@ -18,8 +12,6 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-
-# ─────────────────────────── Story 6 polish: name_prefix in Route.group ──────
 
 
 class TestStory6NamePrefix:
@@ -93,9 +85,6 @@ class TestStory6NamePrefix:
 
         routes = Router.singleton().routes()
         assert any(r.path == "/api/v1/users" and r.name == "api.users.index" for r in routes)
-
-
-# ───────────────── Story 4 polish: RoutingError + url() + absolute=True ──────
 
 
 class TestStory4RoutingErrorAndUrlHelper:
@@ -179,7 +168,7 @@ class TestStory4RoutingErrorAndUrlHelper:
             url("/posts")
 
 
-# ───────────────── Story 7: MethodSpoofMiddleware ────────────────────────────
+# MethodSpoofMiddleware
 
 
 class TestStory7MethodSpoof:
@@ -353,7 +342,7 @@ class TestStory7MethodSpoof:
         assert resp.json() == {"json": True}
 
 
-# ───────────────── Story 8: Signed URLs ──────────────────────────────────────
+# Signed URLs
 
 
 class TestStory8SignedUrls:
@@ -659,7 +648,7 @@ class TestStory8SignedUrls:
             URL.signed_route("x")
 
 
-# ─────────────────────────── Misc cross-cutting ──────────────────────────────
+# Misc cross-cutting
 
 
 def test_routing_module_reexports_url_and_routing_error() -> None:

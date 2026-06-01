@@ -1,10 +1,9 @@
-"""Clean model syntax — type-inferred columns + the generic ``field()``.
+"""Clean model syntax — type-inferred columns + the generic ``field``.
 
 Bare annotations (``name: str``), plain Python defaults (``age: int | None = None``),
 and ``field(...)`` produce real SQLAlchemy columns without ``Mapped`` /
 ``mapped_column``, while explicit helpers keep working. These models double as
-the mypy/pyright sample — the suite is type-checked under --strict.
-"""
+the mypy/pyright sample — the suite is type-checked under --strict."""
 
 from __future__ import annotations
 
@@ -109,7 +108,7 @@ class TestInferredTypes:
         assert col.index is True
 
     def test_explicit_helper_still_works(self) -> None:
-        # json() keeps its mutation-tracking type; inference doesn't touch it.
+        # json keeps its mutation-tracking type; inference doesn't touch it.
         assert _cols(Widget)["blob"] is not None
 
 

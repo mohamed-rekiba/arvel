@@ -1,4 +1,4 @@
-"""Story 2: Log facade → OTel Logs — FR-030-005..014, FR-030-028."""
+"""Log facade → OTel Logs."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def obs() -> FakeObservability:
-    """FakeObservability context (story 10 helper — tested separately)."""
+    """FakeObservability context (helper — tested separately)."""
     from arvel.testing.observability import FakeObservability
 
     return FakeObservability()

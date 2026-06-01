@@ -1,4 +1,4 @@
-"""Story 3 & 4 — QueryBuilder.where_full_text() and order_by_relevance() (WI-arvel-034)."""
+"""QueryBuilder.where_full_text() and order_by_relevance()."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _sql(qb: QueryBuilder[FtsPost]) -> str:
     return qb.to_sql(dialect="postgresql")
 
 
-# ── Story 3: where_full_text ───────────────────────────────────────────────────
+# ── where_full_text ───────────────────────────────────────────────────
 
 
 def test_where_full_text_emits_at_at_operator() -> None:
@@ -79,7 +79,7 @@ def test_where_full_text_query_is_bind_param() -> None:
 
 
 def test_where_full_text_chains_with_where() -> None:
-    """where_full_text() can be chained with .where() — both predicates appear."""
+    """where_full_text can be chained with .where — both predicates appear."""
     sql = _sql(FtsPost.where_full_text(_SV, "python").where(FtsPost.__table__.c.id > 10))
     assert "@@" in sql
     assert "fts_posts.id > 10" in sql
@@ -98,7 +98,7 @@ def test_where_full_text_returns_self_for_chaining() -> None:
     assert isinstance(qb, QueryBuilder)
 
 
-# ── Story 4: order_by_relevance ───────────────────────────────────────────────
+# ── order_by_relevance ───────────────────────────────────────────────
 
 
 def test_order_by_relevance_emits_ts_rank() -> None:

@@ -1,4 +1,4 @@
-"""ChannelRegistry + channel-name validation (FR-013-011, FR-013-012, SEC-013-004/008, ADR-054)."""
+"""ChannelRegistry + channel-name validation."""
 
 from __future__ import annotations
 
@@ -25,13 +25,13 @@ _PLACEHOLDER_SEGMENT = r"([^./]+)"
 
 
 def validate_channel_name(name: str) -> None:
-    """Reject malformed channel names (SEC-013-004 / SEC-013-008)."""
+    """Reject malformed channel names."""
     if not _CHANNEL_NAME_RE.fullmatch(name):
         raise BroadcastChannelError(f"Invalid channel name: {name!r}")
 
 
 def compile_pattern(pattern: str) -> re.Pattern[str]:
-    """Turn ``private-user.{id}`` into a fully anchored regex (ADR-054).
+    """Turn ``private-user.{id}`` into a fully anchored regex.
 
     Literal segments are ``re.escape``d to avoid regex-meta interpretation;
     placeholders become named capture groups so callers can pull them back as kwargs.
@@ -62,7 +62,7 @@ class _Entry:
 
 @dataclass
 class ChannelRegistry:
-    """Holds the channel pattern → authorization callback mapping (FR-013-011).
+    """Holds the channel pattern → authorization callback mapping.
 
     Patterns are matched in registration order. First match wins.
     """

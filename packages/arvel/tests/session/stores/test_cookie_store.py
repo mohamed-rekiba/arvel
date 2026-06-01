@@ -1,4 +1,4 @@
-"""Tests for CookieStore — FR-006-018, FR-006-005 (NFR: cookie security)."""
+"""Tests for CookieStore — (cookie security)."""
 
 from __future__ import annotations
 

@@ -2,7 +2,7 @@
 
 Wires providers (``bootstrap/providers.py``), config (``config/``), and
 routing (``routes/web.py``, ``routes/api.py``, ``routes/console.py``).
-The console path is stored for the future ``arvel`` CLI (WI-arvel-005).
+The console path is stored for the future ``arvel`` CLI.
 """
 
 from __future__ import annotations

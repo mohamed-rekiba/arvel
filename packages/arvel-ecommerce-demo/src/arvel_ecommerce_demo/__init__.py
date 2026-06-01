@@ -15,6 +15,7 @@ __all__ = ["kit_root"]
 def kit_root() -> Path:
     """Return the root of the e-commerce demo kit tree.
 
+
     The kit root is the directory that contains ``backend/``, ``frontend/``,
     ``Makefile``, ``docker-compose.yml``, and ``README.md``.
     """

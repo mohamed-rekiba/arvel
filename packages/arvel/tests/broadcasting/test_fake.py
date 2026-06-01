@@ -1,4 +1,4 @@
-"""FR-013-013, FR-013-014 — Exceptions and BroadcasterFake (under arvel.testing)."""
+"""Exceptions and BroadcasterFake (under arvel.testing)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 
 
 def test_exception_hierarchy() -> None:
-    """FR-013-013: every broadcast-side exception inherits BroadcastException."""
+    """every broadcast-side exception inherits BroadcastException."""
     from arvel.broadcasting.exceptions import (
         BroadcastAuthError,
         BroadcastChannelError,
@@ -21,12 +21,12 @@ def test_exception_hierarchy() -> None:
     assert issubclass(BroadcastAuthError, BroadcastException)
 
 
-# ─── FR-013-014 — BroadcasterFake ────────────────────────────────────────────
+# ─── — BroadcasterFake ────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_fake_records_calls() -> None:
-    """FR-013-014 AC1: every broadcast() call recorded with channels/event/payload."""
+    """every broadcast call recorded with channels/event/payload."""
     from arvel.testing.broadcasting import BroadcasterFake
 
     fake = BroadcasterFake()
@@ -39,7 +39,7 @@ async def test_fake_records_calls() -> None:
 
 
 def test_fake_assert_broadcasted_passes() -> None:
-    """FR-013-014 AC2: assert_broadcasted(event_name) passes if at least one call matches."""
+    """assert_broadcasted(event_name) passes if at least one call matches."""
     import asyncio
 
     from arvel.testing.broadcasting import BroadcasterFake
@@ -50,7 +50,7 @@ def test_fake_assert_broadcasted_passes() -> None:
 
 
 def test_fake_assert_broadcasted_fails_with_message() -> None:
-    """FR-013-014 AC2: assertion failure carries diagnostic context."""
+    """assertion failure carries diagnostic context."""
     from arvel.testing.broadcasting import BroadcasterFake
 
     fake = BroadcasterFake()
@@ -59,7 +59,7 @@ def test_fake_assert_broadcasted_fails_with_message() -> None:
 
 
 def test_fake_assert_broadcasted_on() -> None:
-    """FR-013-014 AC3: assert_broadcasted_on(channel) filters by channel."""
+    """assert_broadcasted_on(channel) filters by channel."""
     import asyncio
 
     from arvel.testing.broadcasting import BroadcasterFake
@@ -72,7 +72,7 @@ def test_fake_assert_broadcasted_on() -> None:
 
 
 def test_fake_assert_nothing_broadcasted() -> None:
-    """FR-013-014 AC4: assert_nothing_broadcasted passes when no calls made."""
+    """assert_nothing_broadcasted passes when no calls made."""
     from arvel.testing.broadcasting import BroadcasterFake
 
     fake = BroadcasterFake()
@@ -80,14 +80,14 @@ def test_fake_assert_nothing_broadcasted() -> None:
 
 
 def test_fake_lives_under_arvel_testing() -> None:
-    """ADR-059: BroadcasterFake exposed from arvel.testing.broadcasting."""
+    """BroadcasterFake exposed from arvel.testing.broadcasting."""
     import arvel.testing.broadcasting as t
 
     assert hasattr(t, "BroadcasterFake")
 
 
 def test_fake_implements_broadcaster_protocol() -> None:
-    """ADR-059: BroadcasterFake satisfies the Broadcaster Protocol."""
+    """BroadcasterFake satisfies the Broadcaster Protocol."""
     from arvel.broadcasting import Broadcaster
     from arvel.testing.broadcasting import BroadcasterFake
 
@@ -96,7 +96,7 @@ def test_fake_implements_broadcaster_protocol() -> None:
 
 @pytest.mark.asyncio
 async def test_fake_respects_except_socket_id() -> None:
-    """FR-013-014: except_socket_id is recorded so tests can assert on it."""
+    """except_socket_id is recorded so tests can assert on it."""
     from arvel.testing.broadcasting import BroadcasterFake
 
     fake = BroadcasterFake()

@@ -1,15 +1,12 @@
-"""QA-Post extension tests for the arvel-image media-library runtime.
+"""Post-ingestion extension tests for the arvel-image media-library runtime.
 
-These cover edge cases beyond the QA-Pre AC-mapped suite:
+Edge cases beyond the basic ingestion suite:
 
-- non-string ``file_name`` is rejected (boundary case for SEC-026-01),
+- non-string ``file_name`` is rejected,
 - ``Media.delete()`` removes derived conversion files in addition to the
-  original (FR-026-39 / AC-026-20 — finer-grained than the QA-Pre check),
-- ``register_media_collections`` runs at most once per host class
-  (FR-026-26 / AC-026-12),
+  original (finer-grained than the pre-ingestion check),
+- ``register_media_collections`` runs at most once per host class,
 - two unrelated ``HasMedia`` subclasses do not share collections.
-
-See `docs/qa/RTM-026.md` for the full traceability matrix.
 """
 
 from __future__ import annotations
@@ -41,7 +38,7 @@ def jpeg_bytes_8x8() -> bytes:
 
 
 def test_file_adder_rejects_non_string_file_name() -> None:
-    """SEC-026-01: ``sanitize_file_name`` rejects non-string input."""
+    """``sanitize_file_name`` rejects non-string input."""
     from arvel_image import MediaError
     from arvel_image.media.file_adder import FileAdder
 
@@ -59,8 +56,8 @@ def test_file_adder_rejects_non_string_file_name() -> None:
 async def _create_tables(engine: AsyncEngine, host_factory: Any) -> None:
     """Register the host class onto ``Model.metadata`` then run ``create_all``.
 
-    QA-Post mirrors the QA-Pre helper so every test owns its host class and
-    we don't accidentally share registry state across tests.
+    Same pattern as the main media test helper — each test owns its host class
+    so we don't accidentally share registry state across tests.
     """
     from arvel.database import Model
     from arvel_image import Media
@@ -128,7 +125,7 @@ def _isolation_host_b() -> type[Any]:
 async def test_media_delete_cascades_to_conversion_files(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """FR-026-39 / AC-026-20: ``Media.delete()`` removes the original AND
+    """``Media.delete()`` removes the original AND
     every recorded conversion derivative (best-effort, missing files OK).
     """
     from arvel.database import Model, Timestamps
@@ -177,7 +174,7 @@ async def test_media_delete_cascades_to_conversion_files(
 async def test_register_media_collections_runs_once_per_class(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """FR-026-26 / AC-026-12: ``register_media_collections`` runs at most
+    """``register_media_collections`` runs at most
     once per host class — subsequent instances reuse the registry.
     """
     HostA = _isolation_host_a()
@@ -196,9 +193,9 @@ async def test_register_media_collections_runs_once_per_class(
 
 
 async def test_collection_per_class_isolation(engine: AsyncEngine, session: AsyncSession) -> None:
-    """FR-026-26: two unrelated HasMedia subclasses keep their own registries.
+    """two unrelated HasMedia subclasses keep their own registries.
 
-    Under strict-collection semantics (FR-026-26 / AC-026-12), a host
+    Under strict-collection semantics, a host
     that has declared at least one collection raises
     :class:`UnknownCollectionError` for any name it didn't register —
     proof that the registries are per-class, not shared.
@@ -236,7 +233,7 @@ async def test_collection_per_class_isolation(engine: AsyncEngine, session: Asyn
 async def test_media_get_path_and_temporary_url(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """FR-026-4 / FR-026-5: ``Media.get_path`` and ``Media.get_temporary_url``
+    """``Media.get_path`` and ``Media.get_temporary_url``
     return the disk-relative path and a time-limited URL respectively.
     """
     from arvel.database import Model, Timestamps
@@ -262,11 +259,11 @@ async def test_media_get_path_and_temporary_url(
             "avatar"
         )
 
-        # FR-026-4
+        # get_path
         assert media.get_path() == f"{media.id}/avatar.jpg"
         assert media.get_path("thumb") == f"{media.id}/conversions/thumb-avatar.jpg"
 
-        # FR-026-5
+        # get_temporary_url
         tmp = await media.get_temporary_url(60)
         assert tmp.startswith("memory:///")
         assert "expiry=60" in tmp
@@ -275,7 +272,7 @@ async def test_media_get_path_and_temporary_url(
 async def test_get_first_media_returns_first_or_none(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """FR-026-14: ``get_first_media`` returns the lowest-id row or ``None``."""
+    """``get_first_media`` returns the lowest-id row or ``None``."""
     from arvel.database import Model, Timestamps
     from arvel.database.columns import id_, string
     from arvel.facades.storage import Storage
@@ -311,7 +308,7 @@ async def test_get_first_media_returns_first_or_none(
 async def test_unknown_collection_raises_when_registry_is_strict(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """FR-026-26 / AC-026-12: hosts that declare collections explicitly
+    """hosts that declare collections explicitly
     raise :class:`UnknownCollectionError` for any name they didn't register.
     """
     from arvel.database import Model, Timestamps
@@ -342,7 +339,7 @@ async def test_add_media_accepts_filesystem_path(
     jpeg_bytes_8x8: bytes,
     tmp_path: Any,
 ) -> None:
-    """FR-026-11: ``add_media`` accepts a path on disk; the basename
+    """``add_media`` accepts a path on disk; the basename
     becomes ``Media.file_name`` when no explicit ``file_name`` is given.
     """
     from arvel.database import Model, Timestamps
@@ -378,7 +375,7 @@ async def test_add_media_accepts_file_like_object(
     session: AsyncSession,
     jpeg_bytes_8x8: bytes,
 ) -> None:
-    """FR-026-11: ``add_media`` accepts a file-like ``.read()`` object."""
+    """``add_media`` accepts a file-like ``.read()`` object."""
     import io as _io
 
     from arvel.database import Model, Timestamps

@@ -1,7 +1,7 @@
 """Builder returned by :meth:`HasMedia.add_media` — terminate with
 ``await fa.to_media_collection(name)``.
 
-Handles input sanitization (SEC-026-01), single-file collection semantics,
+Handles input sanitization , single-file collection semantics,
 MIME/size validation, UUID auto-assignment, atomic rollback, custom
 properties, per-ingestion disk override, and conversion fan-out.
 """
@@ -42,7 +42,7 @@ _CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f]")
 
 
 def resolve_path_generator() -> PathGenerator:
-    """Return the active path generator (custom or default) (FR-050-28)."""
+    """Return the active path generator (custom or default)"""
     from arvel_image.media.path_generator import get_path_generator  # noqa: PLC0415
 
     return get_path_generator()
@@ -89,7 +89,7 @@ class FileAdder:
         return self
 
     def with_custom_properties(self, props: dict[str, Any]) -> Self:
-        """Merge ``props`` into the custom_properties stored on the row (FR-046-06)."""
+        """Merge ``props`` into the custom_properties stored on the row"""
         self._custom_props = {**self._custom_props, **props}
         return self
 
@@ -98,21 +98,21 @@ class FileAdder:
         return self.with_custom_properties(props)
 
     def to_disk(self, name: str) -> Self:
-        """Override the collection's disk for this specific ingestion (FR-046-09)."""
+        """Override the collection's disk for this specific ingestion"""
         self._disk_override = name
         return self
 
     def using_file_name(self, name: str) -> Self:
-        """Override the stored file name (FR-050-21)."""
+        """Override the stored file name"""
         self._file_name_override = name
         return self
 
     def set_file_name(self, name: str) -> Self:
-        """Alias for :meth:`using_file_name` (FR-050-21)."""
+        """Alias for :meth:`using_file_name`"""
         return self.using_file_name(name)
 
     def sanitizing_file_name(self, callback: Callable[[str], str]) -> Self:
-        """Register a custom sanitization callback applied after the built-in strip (FR-050-24)."""
+        """Register a custom sanitization callback applied after the built-in strip"""
         self._sanitize_callback = callback
         return self
 
@@ -121,18 +121,18 @@ class FileAdder:
     ) -> Media:
         """Persist the original, register the row, run conversions.
 
-        Validates MIME and size before any I/O (FR-046-07).
-        Assigns a UUID4 to the row (FR-046-01).
-        Rolls back row + file on any post-creation exception (FR-046-02).
-        Honours conversions_disk when set on the collection (FR-046-03).
-        Prunes only_keep_latest after successful add (FR-046-12).
-        Auto-assigns order_column (FR-050-04).
-        ``disk`` arg overrides both .to_disk() and collection.disk (FR-050-10).
+        Validates MIME and size before any I/O
+        Assigns a UUID4 to the row
+        Rolls back row + file on any post-creation exception
+        Honours conversions_disk when set on the collection
+        Prunes only_keep_latest after successful add
+        Auto-assigns order_column
+        ``disk`` arg overrides both .to_disk() and collection.disk
         """
         host = self._host
         coll = host.collection_for(collection)
 
-        # Apply file_name override and custom sanitize callback (FR-050-21/24).
+        # Apply file_name override and custom sanitize callback.
         effective_file_name = self._apply_file_name_overrides(
             self._file_name_override or self._file_name
         )
@@ -147,11 +147,11 @@ class FileAdder:
             await host.clear_media_collection(collection)
 
         # ── disk resolution ────────────────────────────────────────────────
-        # FR-050-10: to_media_collection(disk) > .to_disk() > collection.disk
+        # to_media_collection(disk) > .to_disk() > collection.disk
         disk_label = disk or self._disk_override or coll.disk or "default"
         disk_target: str | None = None if disk_label == "default" else disk_label
 
-        # ── order_column (FR-050-04) ───────────────────────────────────────
+        # ── order_column ───────────────────────────────────────
         existing = await get_media_ordered(host, collection)
         if existing and existing[-1].order_column is not None:
             next_order: int = existing[-1].order_column + 1
@@ -163,7 +163,7 @@ class FileAdder:
             "Media",
             await Media.create(
                 model_type=type(host).__name__,
-                model_id=str(host.host_pk()),  # always string (FR-046-08)
+                model_id=str(host.host_pk()),  # always string
                 collection_name=collection,
                 name=self._name,
                 file_name=self._file_name,
@@ -172,7 +172,7 @@ class FileAdder:
                 custom_properties=self._custom_props,
             ),
         )
-        # Assign UUID4 after row creation so we have the id (FR-046-01).
+        # Assign UUID4 after row creation so we have the id
         media.uuid = str(_uuid_module.uuid4())
         media.mime_type = self._mime
         media.order_column = next_order
@@ -206,7 +206,7 @@ class FileAdder:
         return media
 
     def _validate(self, coll: MediaCollection, collection: str) -> None:
-        """Raise if MIME, size, or accepts_file checks fail (FR-046-07, FR-050-25)."""
+        """Raise if MIME, size, or accepts_file checks fail"""
         if (
             coll.accept_mime_types_list is not None
             and self._mime.lower() not in coll.accept_mime_types_list
@@ -233,7 +233,7 @@ class FileAdder:
             raise InvalidMimeTypeError(msg)
 
     def _apply_file_name_overrides(self, name: str) -> str:
-        """Apply using_file_name override then sanitize_callback (FR-050-21/24)."""
+        """Apply using_file_name override then sanitize_callback."""
         cleaned = self.sanitize_file_name(name)
         if self._sanitize_callback is not None:
             cleaned = self._sanitize_callback(cleaned)
@@ -265,7 +265,7 @@ class FileAdder:
         runner = ConversionRunner()
         generated: dict[str, Any] = dict(media.generated_conversions or {})
 
-        # Conversion derivatives go to conversions_disk when set (FR-046-03).
+        # Conversion derivatives go to conversions_disk when set
         cdisk_label = coll.conversions_disk or coll.disk or "default"
         cdisk_target: str | None = None if cdisk_label == "default" else cdisk_label
         if coll.conversions_disk:
@@ -296,7 +296,7 @@ class FileAdder:
 
     @classmethod
     def sanitize_file_name(cls, name: object) -> str:
-        """Reduce caller-provided filename to a safe basename (SEC-026-01)."""
+        """Reduce caller-provided filename to a safe basename"""
         if not isinstance(name, str):
             msg = "file_name must be a string"
             raise MediaError(msg)

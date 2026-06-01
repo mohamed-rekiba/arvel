@@ -1,5 +1,4 @@
-"""Tests for create_test_app() async context manager — FR-032-06 / AC-15..16.
-
+"""Tests for create_test_app() async context manager.
 Tests are written RED — arvel.testing.create_test_app does not exist yet.
 """
 
@@ -12,7 +11,7 @@ import pytest
 if TYPE_CHECKING:
     from starlette.types import ASGIApp
 
-# ─── AC-16: importable, not from arvel root ───────────────────────────────────
+#: importable, not from arvel root
 
 
 def test_importable_from_arvel_testing() -> None:
@@ -30,7 +29,7 @@ def test_not_importable_from_arvel_root() -> None:
     )
 
 
-# ─── AC-15: boots and shuts down ────────────────────────────────────────────
+#: boots and shuts down
 
 
 @pytest.mark.asyncio
@@ -68,7 +67,7 @@ async def test_create_test_app_boots_and_shuts_down() -> None:
     assert shutdown_count == 1, "shutdown() must be called exactly once on exit"
 
 
-# ─── AC-16: no Any types ──────────────────────────────────────────────────────
+#: no Any types
 
 
 def test_no_any_in_asgi_types() -> None:
@@ -85,7 +84,7 @@ def test_no_any_in_asgi_types() -> None:
     )
 
 
-# ─── default base_url ────────────────────────────────────────────────────────
+# default base_url
 
 
 @pytest.mark.asyncio

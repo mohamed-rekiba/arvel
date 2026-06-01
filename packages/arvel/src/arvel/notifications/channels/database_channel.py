@@ -1,4 +1,4 @@
-"""DatabaseChannel — persists notification to the notifications table (FR-009-026)."""
+"""DatabaseChannel — persists notification to the notifications table."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from arvel.notifications.notification import Notification
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-_MAX_DATA_LEN = 65_535  # NFR-009-007
+_MAX_DATA_LEN = 65_535  # cap stored JSON payload size
 
 logger = Log.channel(__name__)
 

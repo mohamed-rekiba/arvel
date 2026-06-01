@@ -99,7 +99,7 @@ async def get_media_ordered(host: HasMedia, collection: str) -> list[Media]:
     """Return Media rows for ``host`` in ``collection`` ordered by order_column, id.
 
     Public helper — used by :class:`FileAdder` and :meth:`HasMedia.get_media`
-    (FR-046-04, FR-050-29).
+
     """
     query = (
         Media.query()
@@ -139,7 +139,7 @@ class HasMedia:
     # ─── public surface ────────────────────────────────────────────────────
 
     def add_media(self, source: MediaSource, *, file_name: str | None = None) -> FileAdder:
-        """Begin ingestion of ``source`` (FR-026-11)."""
+        """Begin ingestion of ``source``"""
         from arvel_image.media.file_adder import FileAdder  # noqa: PLC0415
 
         contents, resolved_name = _coerce_source(source, file_name)
@@ -152,11 +152,11 @@ class HasMedia:
         file_name: str | None = None,
         max_bytes: int = _DEFAULT_MAX_BYTES,
     ) -> FileAdder:
-        """Download ``url`` and return a :class:`FileAdder` (FR-046-05).
+        """Download ``url`` and return a :class:`FileAdder`
 
         The SSRF guard rejects RFC-1918, loopback, and link-local addresses.
-        Only http/https schemes are permitted (FR-050-11).
-        DNS rebinding is a known limitation (ADR-109).
+        Only http/https schemes are permitted
+        DNS rebinding is a known limitation .
         """
         from arvel_image.media.file_adder import FileAdder  # noqa: PLC0415
         from arvel_image.media.url_fetcher import fetch_url  # noqa: PLC0415
@@ -172,7 +172,7 @@ class HasMedia:
         *,
         max_bytes: int = _DEFAULT_MAX_BYTES,
     ) -> FileAdder:
-        """Decode a base64 string and return a :class:`FileAdder` (FR-046-11).
+        """Decode a base64 string and return a :class:`FileAdder`
 
         Strips ``data:<mime>;base64,`` prefix before decoding.
         """
@@ -198,7 +198,7 @@ class HasMedia:
         *,
         disk: str = "default",
     ) -> FileAdder:
-        """Read a file from a storage disk and return a :class:`FileAdder` (FR-050-22).
+        """Read a file from a storage disk and return a :class:`FileAdder`
 
         Reads via the Storage facade so disk-level access controls apply.
         """
@@ -218,7 +218,7 @@ class HasMedia:
         *,
         file_name: str = "text.txt",
     ) -> FileAdder:
-        """Wrap a string/bytes payload and return a :class:`FileAdder` (FR-050-23).
+        """Wrap a string/bytes payload and return a :class:`FileAdder`
 
         Default ``file_name`` is ``"text.txt"``; override via ``.using_file_name()``.
         """
@@ -235,8 +235,8 @@ class HasMedia:
     ) -> list[Media]:
         """Return every :class:`Media` row in ``collection`` ordered by order_column, id.
 
-        ``"*"`` returns all rows across all collections (FR-050-27).
-        ``filters`` applies Python-side filtering (FR-050-17).
+        ``"*"`` returns all rows across all collections
+        ``filters`` applies Python-side filtering
         """
         if collection == "*":
             rows = await self._get_all_media()
@@ -253,7 +253,7 @@ class HasMedia:
         return rows  # unreachable — filters is never None here (handled above)
 
     async def _get_all_media(self) -> list[Media]:
-        """Fetch all Media rows for this host across all collections (FR-050-27)."""
+        """Fetch all Media rows for this host across all collections"""
         query = (
             Media.query()
             .where(Media.model_type == _model_type_for(self))
@@ -268,7 +268,7 @@ class HasMedia:
         return rows[0] if rows else None
 
     async def get_last_media(self, collection: str = "default") -> Media | None:
-        """Return the :class:`Media` with the highest order_column in ``collection`` (FR-050-12)."""
+        """Return the :class:`Media` with the highest order_column in ``collection``"""
         rows = await get_media_ordered(self, collection)
         return rows[-1] if rows else None
 
@@ -280,9 +280,9 @@ class HasMedia:
     ) -> str | None:
         """Return the URL of the first media in ``collection``.
 
-        Returns ``fallback`` when the collection is empty (FR-046-10).
+        Returns ``fallback`` when the collection is empty
         Falls back to collection-level fallback URL when no call-site fallback
-        supplied and collection is configured with one (FR-050-15).
+        supplied and collection is configured with one
         """
         first = await self.get_first_media(collection)
         if first is not None:
@@ -292,7 +292,7 @@ class HasMedia:
         if fallback is not None:
             return fallback
 
-        # FR-050-15: collection-level fallback.
+        # collection-level fallback.
         try:
             coll = self.collection_for(collection)
             return coll.get_fallback_url(conversion)
@@ -305,7 +305,7 @@ class HasMedia:
         conversion: str | None = None,
         fallback: str | None = None,
     ) -> str | None:
-        """Alias for :meth:`get_media_url` (FR-046-10)."""
+        """Alias for :meth:`get_media_url`"""
         return await self.get_media_url(collection, conversion=conversion, fallback=fallback)
 
     async def get_last_media_url(
@@ -313,7 +313,7 @@ class HasMedia:
         collection: str = "default",
         conversion: str | None = None,
     ) -> str | None:
-        """Return the URL of the last media in ``collection`` (FR-050-12)."""
+        """Return the URL of the last media in ``collection``"""
         last = await self.get_last_media(collection)
         if last is None:
             return None
@@ -331,7 +331,7 @@ class HasMedia:
         collection: str,
         kept: Media | list[Media],
     ) -> int:
-        """Delete every media in ``collection`` except ``kept`` (FR-050-13)."""
+        """Delete every media in ``collection`` except ``kept``"""
         kept_list = [kept] if isinstance(kept, Media) else list(kept)
         kept_ids = {m.id for m in kept_list}
         rows = await get_media_ordered(self, collection)
@@ -357,11 +357,11 @@ class HasMedia:
         return await self.clear_media_collection(collection)
 
     async def delete_preserving_media(self) -> Any:
-        """Delete the host row without cascading to Media rows or files (FR-050-26)."""
+        """Delete the host row without cascading to Media rows or files"""
         return await super().delete()  # type: ignore[misc]
 
     def get_registered_media_collections(self) -> list[MediaCollection]:
-        """Return all declared MediaCollection objects (FR-050-14)."""
+        """Return all declared MediaCollection objects"""
         self.ensure_collections()
         cls = type(self)
         registry: dict[str, MediaCollection] = cls.__dict__.get("__arvel_media_collections__") or {}
@@ -397,7 +397,7 @@ class HasMedia:
         cls.__arvel_collections_registered__ = True
 
     def host_pk(self) -> Any:
-        """Return this host's primary key as a string (FR-046-08)."""
+        """Return this host's primary key as a string"""
         return str(self.id)  # type: ignore[attr-defined]
 
 

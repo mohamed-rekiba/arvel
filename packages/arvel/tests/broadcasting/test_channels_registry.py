@@ -1,4 +1,4 @@
-"""FR-013-011 + FR-013-012 — ChannelRegistry pattern matching and authorization."""
+"""+ — ChannelRegistry pattern matching and authorization."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def test_register_returns_self_for_chaining(registry: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_match_resolves_placeholders(registry: Any) -> None:
-    """FR-013-011 AC2: {id} placeholders are extracted and passed as kwargs."""
+    """{id} placeholders are extracted and passed as kwargs."""
     captured: dict[str, Any] = {}
 
     async def _cb(user: Any, id: str) -> bool:
@@ -41,7 +41,7 @@ async def test_match_resolves_placeholders(registry: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_first_match_wins(registry: Any) -> None:
-    """FR-013-011 AC4: registration order is preserved; first match wins."""
+    """registration order is preserved; first match wins."""
     calls: list[str] = []
 
     async def _cb1(user: Any, id: str) -> bool:
@@ -60,14 +60,14 @@ async def test_first_match_wins(registry: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_no_match_returns_false(registry: Any) -> None:
-    """FR-013-012 AC1: no callback registered → reject (return False)."""
+    """no callback registered → reject (return False)."""
     result = await registry.authorize("private-orphan.5", user="x")
     assert result is False
 
 
 @pytest.mark.asyncio
 async def test_callback_returning_falsy_rejects(registry: Any) -> None:
-    """FR-013-012 AC2: callback returning False/None rejects."""
+    """callback returning False/None rejects."""
 
     async def _cb_false(user: Any, id: str) -> bool:
         return False
@@ -78,7 +78,7 @@ async def test_callback_returning_falsy_rejects(registry: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_presence_channel_returns_presence_payload(registry: Any) -> None:
-    """FR-013-012 AC4: presence channel callbacks may return a dict (presence payload)."""
+    """presence channel callbacks may return a dict (presence payload)."""
 
     async def _cb(user: Any, id: str) -> dict[str, Any]:
         return {"id": "u-42", "info": {"name": "Alice"}}
@@ -90,7 +90,7 @@ async def test_presence_channel_returns_presence_payload(registry: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_callback_raising_returns_false_and_logs(registry: Any) -> None:
-    """FR-013-012 AC3: raising callback authorize returns False (rejected)."""
+    """raising callback authorize returns False (rejected)."""
 
     async def _cb_boom(user: Any, id: str) -> bool:
         raise ValueError("db down")
@@ -101,7 +101,7 @@ async def test_callback_raising_returns_false_and_logs(registry: Any) -> None:
 
 
 def test_placeholder_does_not_match_dots(registry: Any) -> None:
-    """ADR-054: {id} matches [^./]+ — does not span path separators."""
+    """{id} matches [^./]+ — does not span path separators."""
     from arvel.broadcasting.channels import compile_pattern
 
     pattern = compile_pattern("private-user.{id}")
@@ -112,7 +112,7 @@ def test_placeholder_does_not_match_dots(registry: Any) -> None:
 
 
 def test_literal_dots_are_escaped(registry: Any) -> None:
-    """ADR-054: literal dots in patterns are re-escaped to avoid regex meta-match."""
+    """literal dots in patterns are re-escaped to avoid regex meta-match."""
     from arvel.broadcasting.channels import compile_pattern
 
     pattern = compile_pattern("private-user.{id}")

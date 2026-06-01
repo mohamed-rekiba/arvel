@@ -1,12 +1,11 @@
-"""WI-023 — Migration reset family (migrate:fresh, migrate:reset, migrate:refresh).
+"""Migration reset family (migrate:fresh, migrate:reset, migrate:refresh).
 
-AC covered:
-  AC-001.1  migrate:reset with no applied migrations exits 0
-  AC-001.2  migrate:reset rolls back applied migrations in reverse order
-  AC-001.3  migrate:fresh drops all tables and re-runs migrations
-  AC-001.4  migrate:fresh --seed invokes db:seed after migrating
-  AC-001.5  migrate:refresh is equivalent to reset && migrate
-  AC-001.6  migrate:fresh refuses in production without ARVEL_ALLOW_DESTRUCTIVE=1
+ migrate:reset with no applied migrations exits 0
+ migrate:reset rolls back applied migrations in reverse order
+ migrate:fresh drops all tables and re-runs migrations
+ migrate:fresh --seed invokes db:seed after migrating
+ migrate:refresh is equivalent to reset && migrate
+ migrate:fresh refuses in production without ARVEL_ALLOW_DESTRUCTIVE=1
 
 Uses a real in-memory SQLite engine wired through a hand-rolled framework
 Application — mirroring the test_migrate_db_seed_real.py pattern.
@@ -70,7 +69,7 @@ def _make_app_with_engine(tmp_path: Path, engine: AsyncEngine, *cmds: Command) -
 
     fake_app = _FakeFrameworkApp(engine, tmp_path)
     for cmd in cmds:
-        cmd.app = fake_app  # type: ignore[assignment] — Command.app is the seam from WI-021
+        cmd.app = fake_app  # type: ignore[assignment] — Command.app is the seam from
 
     return Application(commands=list(cmds))
 
@@ -91,7 +90,7 @@ def engine() -> Iterator[AsyncEngine]:
         asyncio.run(eng.dispose())
 
 
-# ─── AC-001.1 — reset with nothing applied ────────────────────────────────────
+# ─── — reset with nothing applied ────────────────────────────────────
 
 
 def test_migrate_reset_with_nothing_applied_exits_zero(
@@ -104,7 +103,7 @@ def test_migrate_reset_with_nothing_applied_exits_zero(
     assert "nothing" in result.stdout.lower()
 
 
-# ─── AC-001.2 — reset rolls back applied migrations in reverse order ─────────
+# ─── — reset rolls back applied migrations in reverse order ─────────
 
 
 def test_migrate_reset_rolls_back_in_reverse_order(
@@ -134,7 +133,7 @@ async def _apply_all(migrator: Any) -> None:
     await migrator.upgrade()
 
 
-# ─── AC-001.3 — fresh drops all tables and re-runs migrations ─────────────────
+# ─── — fresh drops all tables and re-runs migrations ─────────────────
 
 
 def test_migrate_fresh_drops_all_then_migrates(
@@ -148,7 +147,7 @@ def test_migrate_fresh_drops_all_then_migrates(
     assert "2026_01_01_a" in result.stdout
 
 
-# ─── AC-001.4 — fresh --seed invokes db:seed ──────────────────────────────────
+# ─── — fresh --seed invokes db:seed ──────────────────────────────────
 
 
 def test_migrate_fresh_with_seed_invokes_db_seed(
@@ -172,7 +171,7 @@ def test_migrate_fresh_with_seed_invokes_db_seed(
     assert seed_invoked
 
 
-# ─── AC-001.5 — refresh is reset && migrate ───────────────────────────────────
+# ─── — refresh is reset && migrate ───────────────────────────────────
 
 
 def test_migrate_refresh_resets_then_reapplies(
@@ -194,7 +193,7 @@ def test_migrate_refresh_resets_then_reapplies(
     assert "2026_01_01_a" in result.stdout
 
 
-# ─── AC-001.6 — production guard ──────────────────────────────────────────────
+# ─── — production guard ──────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(

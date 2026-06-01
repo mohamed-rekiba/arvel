@@ -1,4 +1,4 @@
-"""Real-SMTP integration tests for ``SmtpMailDriver`` — FR-009-019.
+"""Real-SMTP integration tests for ``SmtpMailDriver``
 
 The fast inner-loop suite in ``test_smtp_driver.py`` mocks the underlying
 ``aiosmtplib.send``. This file boots a Mailpit container, sends a real

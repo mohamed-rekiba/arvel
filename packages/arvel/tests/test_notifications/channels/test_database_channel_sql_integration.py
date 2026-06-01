@@ -1,4 +1,4 @@
-"""Real-SQL integration tests for ``DatabaseChannel`` — FR-009-026.
+"""Real-SQL integration tests for ``DatabaseChannel``
 
 Parametrizes the notification database channel over Postgres and MySQL
 containers. The channel writes through a ``Notification``-derived row using

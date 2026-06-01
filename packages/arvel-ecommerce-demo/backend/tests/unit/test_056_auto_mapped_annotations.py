@@ -1,4 +1,4 @@
-"""WI-arvel-010 — Auto-Mapped Column Annotations.
+"""Auto-Mapped Column Annotations.
 
 Verifies that:
 1. _ModelMeta.__new__ auto-wraps plain type annotations with Mapped[T]
@@ -36,6 +36,7 @@ ARVEL_COLUMNS = (
 def _annotation_is_mapped(ann: Any) -> bool:
     """Return True if ann is Mapped[T] — handles both actual types and strings.
 
+
     With 'from __future__ import annotations' in model files, __annotations__
     may contain strings until our metaclass resolves them. After __new__ runs,
     they should be actual Mapped[T] types (not strings).
@@ -59,13 +60,13 @@ def _get_hints(cls: type) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# AC-001: Metaclass wraps plain annotations with Mapped[T]
+# Metaclass wraps plain annotations with Mapped[T]
 # ---------------------------------------------------------------------------
 
 
 class TestMetaclassAnnotationWrapping:
     def test_plain_int_annotation_wrapped(self) -> None:
-        """id: int = id_()  →  __annotations__['id'] is Mapped[int] at class creation."""
+        """id: int = id_() → __annotations__['id'] is Mapped[int] at class creation."""
         from arvel.database.columns import id_, string
         from arvel.database.model import Model, Timestamps
 
@@ -140,7 +141,7 @@ class TestMetaclassAnnotationWrapping:
 
 
 # ---------------------------------------------------------------------------
-# AC-002: Nullable overloads — type annotation carries nullability
+# Nullable overloads — type annotation carries nullability
 # ---------------------------------------------------------------------------
 
 
@@ -175,7 +176,7 @@ class TestNullableAnnotations:
 
 
 # ---------------------------------------------------------------------------
-# AC-003: Relationship annotations wrapped
+# Relationship annotations wrapped
 # ---------------------------------------------------------------------------
 
 
@@ -195,7 +196,7 @@ class TestRelationshipAnnotationWrapping:
 
 
 # ---------------------------------------------------------------------------
-# AC-004: Mixins use framework column helpers (not raw mapped_column)
+# Mixins use framework column helpers (not raw mapped_column)
 # Note: Timestamps/SoftDeletes use ModelMeta, so their plain annotations get
 # auto-wrapped in Mapped[T] just like user models. The goal here is they use
 # the datetime() helper with clean annotations.
@@ -217,7 +218,7 @@ class TestMixinHelperUsage:
 
 
 # ---------------------------------------------------------------------------
-# AC-005: Demo models have no 'from sqlalchemy.orm import Mapped'
+# Demo models have no 'from sqlalchemy.orm import Mapped'
 # ---------------------------------------------------------------------------
 
 
@@ -276,7 +277,7 @@ class TestDemoModelsNoMappedImport:
 
 
 # ---------------------------------------------------------------------------
-# AC-006: Columns module does not re-export Mapped (clean public surface)
+# Columns module does not re-export Mapped (clean public surface)
 # ---------------------------------------------------------------------------
 
 

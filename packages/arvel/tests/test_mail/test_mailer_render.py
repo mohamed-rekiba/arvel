@@ -1,4 +1,4 @@
-"""Tests for ``Mailer`` rendering — covers the four ``Content`` shapes and the
+"""Tests for ``Mailer`` rendering — the four ``Content`` shapes and the
 HTML-to-text auto-derivation when only HTML is provided.
 
 Renders are observed through ``ArrayMailDriver.sent`` rather than calling
@@ -129,7 +129,7 @@ class TestMailerRender:
         assert rendered.body_html is not None
         assert "&lt;script&gt;" in rendered.body_html
         # Auto-derived plain text strips tags but keeps the (escaped) entity
-        # — i.e. the user's literal "<script>" appears in the text fallback.
+        #  i.e. the user's literal "<script>" appears in the text fallback.
         assert "<script>" in rendered.body_text
 
     @pytest.mark.asyncio

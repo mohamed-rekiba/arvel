@@ -1,4 +1,4 @@
-"""FR-001-008: ArvelSettings base class."""
+"""ArvelSettings base class."""
 
 from __future__ import annotations
 
@@ -153,6 +153,6 @@ def test_base_settings_do_not_filter_dotenv_by_prefix(
     # the dotenv even though no key matches the prefix.
     _Probe()  # No exception → base accepts mixed dotenv rows.
 
-    # And the base's model_config must not declare ``dotenv_filtering`` —
+    # And the base's model_config must not declare ``dotenv_filtering``
     # this is a hard contract for subclasses with aliased flat env vars.
     assert "dotenv_filtering" not in ArvelSettings.model_config

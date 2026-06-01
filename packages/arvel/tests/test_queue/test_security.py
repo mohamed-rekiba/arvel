@@ -1,4 +1,4 @@
-"""Security tests for queue subsystem — NFR-008-007..010, OWASP A05."""
+"""Security tests for queue subsystem (OWASP A05 injection)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from arvel.queue.registry import deserialize_job
 
 
 class TestDeserializationSecurity:
-    """NFR-008-009: Job class allowlist prevents code injection via queue."""
+    """Job class allowlist prevents code injection via queue."""
 
     INJECTION_PAYLOADS = [
         "os.system",
@@ -30,7 +30,7 @@ class TestDeserializationSecurity:
 
 
 class TestPayloadValidation:
-    """NFR-008-007: Payloads are validated on deserialization (OWASP A05)."""
+    """Payloads are validated on deserialization (OWASP A05)."""
 
     def test_oversized_payload_key_rejected(self) -> None:
         from arvel.queue.job import Job
@@ -74,7 +74,7 @@ class TestPayloadValidation:
 
 
 class TestFailedJobStoreSecurity:
-    """NFR-008-010: Failed job payloads don't log PII."""
+    """Failed job payloads don't log PII."""
 
     @pytest.mark.asyncio
     async def test_error_truncation_prevents_disk_exhaustion(self) -> None:

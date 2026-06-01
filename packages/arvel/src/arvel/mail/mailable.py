@@ -1,4 +1,4 @@
-"""Mailable abstract base class (ADR-038, FR-009-011)."""
+"""Mailable abstract base class."""
 
 from __future__ import annotations
 

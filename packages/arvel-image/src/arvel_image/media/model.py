@@ -2,13 +2,13 @@
 
 Mirrors the schema in
 ``packages/arvel-image/src/arvel_image/migrations/create_media_table.py``.
-Discriminator columns use the host's short class name (ADR-022 +
-ADR-082 D2): ``model_type`` is ``"User"``, not ``"app.models.User"``.
+Discriminator columns use the host's short class name: ``model_type`` is
+``"User"``, not ``"app.models.User"``.
 
 JSON columns default to ``{}`` so callers never have to special-case
 ``None`` when reading metadata. ``Media.delete()`` cleans the original
 plus every successfully-generated conversion best-effort: missing files
-do not raise (FR-026-39).
+do not raise.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from arvel_image.media.path_generator import PathGenerator
     from arvel_image.media.trait import HasMedia
 
-# Mass-assignment guard (FR-026-9 / SEC-026-04): system-managed columns
+# Mass-assignment guard : system-managed columns
 # (``id``, ``uuid``, timestamps) and best-effort metadata are NOT fillable
 # from user input. Internal callers set those fields via attribute assignment.
 _FILLABLE: tuple[str, ...] = (
@@ -45,7 +45,7 @@ _GB = _KB * _MB
 
 
 def resolve_path_generator() -> PathGenerator:
-    """Return the active path generator (custom or default) (FR-050-28)."""
+    """Return the active path generator (custom or default)"""
     from arvel_image.media.path_generator import get_path_generator  # noqa: PLC0415
 
     return get_path_generator()
@@ -66,12 +66,12 @@ class Media(Model, Timestamps):
 
     id: int = field(default=None, primary_key=True, init=False)
     model_type: str
-    # VARCHAR(36) to support UUID-PK host models (ADR-108, FR-046-08).
+    # VARCHAR(36) to support UUID-PK host models .
     model_id: str = field(length=36)
     name: str
     file_name: str
     disk: str
-    # BigInteger unsigned — matches migration stub (FR-046-15).
+    # BigInteger unsigned — matches migration stub
     size: int = big_integer()
 
     collection_name: str = "default"
@@ -106,12 +106,12 @@ class Media(Model, Timestamps):
         return None if cdisk == "default" else cdisk
 
     def get_path(self, conversion: str | None = None) -> str:
-        """Disk-relative path of the original or a conversion (FR-026-4)."""
+        """Disk-relative path of the original or a conversion"""
         gen: PathGenerator = resolve_path_generator()
         return gen.path_for_conversion(self, conversion) if conversion else gen.path_for(self)
 
     async def get_url(self, conversion: str | None = None) -> str:
-        """Return the storage-disk URL for the original or a conversion (FR-026-3)."""
+        """Return the storage-disk URL for the original or a conversion"""
         from arvel.facades.storage import Storage  # noqa: PLC0415
 
         path = self.get_path(conversion)
@@ -120,7 +120,7 @@ class Media(Model, Timestamps):
         return disk.url(path)
 
     async def get_full_url(self, conversion: str | None = None) -> str:
-        """Return an absolute URL for the original or a conversion (FR-050-19).
+        """Return an absolute URL for the original or a conversion
 
         If ``get_url()`` already returns an absolute URL this is a transparent alias.
         If it returns a path-only URL, prepends the configured app URL.
@@ -140,7 +140,7 @@ class Media(Model, Timestamps):
         return url
 
     async def get_temporary_url(self, expiry: int, conversion: str | None = None) -> str:
-        """Time-limited URL of the original or a conversion (FR-026-5)."""
+        """Time-limited URL of the original or a conversion"""
         from arvel.facades.storage import Storage  # noqa: PLC0415
 
         path = self.get_path(conversion)
@@ -153,7 +153,7 @@ class Media(Model, Timestamps):
 
         Cleans the original AND every conversion marked as generated in
         ``generated_conversions``. Missing files do not raise — the row
-        is the source of truth, files are advisory (FR-026-39).
+        is the source of truth, files are advisory
         """
         from arvel.facades.storage import Storage  # noqa: PLC0415
 
@@ -177,10 +177,10 @@ class Media(Model, Timestamps):
         return await super().delete()
 
     async def copy(self, target: HasMedia, collection: str = "default") -> Media:
-        """Copy this media to ``target`` host in ``collection`` (FR-046-13, FR-050-07/08).
+        """Copy this media to ``target`` host in ``collection``
 
-        Uses ``target.host_pk()`` for model_id (FR-050-07).
-        Copies generated conversion files and carries generated_conversions (FR-050-08).
+        Uses ``target.host_pk()`` for model_id
+        Copies generated conversion files and carries generated_conversions
         """
         from arvel.facades.storage import Storage  # noqa: PLC0415
 
@@ -190,7 +190,7 @@ class Media(Model, Timestamps):
 
         new_media: Media = await Media.create(
             model_type=type(target).__name__,
-            model_id=str(target.host_pk()),  # FR-050-07: use host_pk()
+            model_id=str(target.host_pk()),  # use host_pk()
             collection_name=collection,
             name=self.name,
             file_name=self.file_name,
@@ -205,7 +205,7 @@ class Media(Model, Timestamps):
         dst_disk = Storage.disk(new_media.disk_target())
         await dst_disk.put(gen.path_for(new_media), contents)
 
-        # FR-050-08: carry generated_conversions and copy conversion files.
+        # carry generated_conversions and copy conversion files.
         src_generated: dict[str, Any] = dict(self.generated_conversions or {})
         if src_generated:
             new_media.generated_conversions = src_generated
@@ -225,18 +225,18 @@ class Media(Model, Timestamps):
         return new_media
 
     async def move(self, target: HasMedia, collection: str = "default") -> Media:
-        """Move this media to ``target`` host in ``collection`` (FR-046-13, FR-050-07).
+        """Move this media to ``target`` host in ``collection``
 
         Updates the row in place — no new file copy on disk (same path).
-        Uses ``target.host_pk()`` for model_id (FR-050-07).
+        Uses ``target.host_pk()`` for model_id
         """
         self.model_type = type(target).__name__
-        self.model_id = str(target.host_pk())  # FR-050-07: use host_pk()
+        self.model_id = str(target.host_pk())  # use host_pk()
         self.collection_name = collection
         await self.save()
         return self
 
-    # ─── custom property helpers (FR-050-16) ───────────────────────────────
+    # ─── custom property helpers ───────────────────────────────────────────
 
     def has_custom_property(self, key: str) -> bool:
         """Return ``True`` if ``key`` exists in ``custom_properties``."""
@@ -274,7 +274,7 @@ class Media(Model, Timestamps):
         props.pop(key, None)
         self.custom_properties = props
 
-    # ─── QoL helpers (FR-050-18/20) ────────────────────────────────────────
+    # ─── QoL helpers ───────────────────────────────────────────────────────
 
     def has_generated_conversion(self, name: str) -> bool:
         """Return ``True`` if conversion ``name`` was generated successfully."""
@@ -282,7 +282,7 @@ class Media(Model, Timestamps):
 
     @property
     def human_readable_size(self) -> str:
-        """Return file size as a human-readable string (FR-050-20)."""
+        """Return file size as a human-readable string"""
         size = self.size or 0
         if size < _KB:
             return f"{size} B"
@@ -292,7 +292,7 @@ class Media(Model, Timestamps):
             return f"{size / _MB:.1f} MB"
         return f"{size / _GB:.1f} GB"
 
-    # ─── class method: set_new_order (FR-050-06) ───────────────────────────
+    # ─── set_new_order ─────────────────────────────────────────────────────
 
     @classmethod
     async def set_new_order(
@@ -301,7 +301,7 @@ class Media(Model, Timestamps):
         *,
         start_order: int = 1,
     ) -> None:
-        """Bulk-update ``order_column`` for the given IDs (FR-050-06).
+        """Bulk-update ``order_column`` for the given IDs
 
         Unknown IDs are silently skipped. ``start_order`` defaults to 1.
         """

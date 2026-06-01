@@ -1,7 +1,7 @@
 """UserService — admin user management and suspension.
 
-Role / permission assignment is handled directly in routes/api.py via
-arvel-permission traits (HasRoles, HasPermissions) after WI-arvel-037.
+Role / permission assignment is handled in routes/api.py via
+arvel-permission traits (HasRoles, HasPermissions).
 """
 
 from __future__ import annotations
