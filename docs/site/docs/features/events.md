@@ -1,0 +1,109 @@
+# Events
+
+<a name="introduction"></a>
+## Introduction
+
+Arvel's events provide a simple observer pattern, letting you subscribe and listen for events in your application. **Events** are immutable Pydantic models (`Event` subclasses `BaseModel` with `frozen=True`); **listeners** react to them. A single event can have multiple listeners that don't depend on each other, which is a great way to decouple side effects from the code that triggers them.
+
+<a name="registering-the-provider"></a>
+## Registering the Provider
+
+Events are **opt-in**. Add `EventServiceProvider` to `bootstrap/providers.py`. It binds the `Event` facade and wires the dispatcher to the container (so listeners can be resolved with dependency injection).
+
+<a name="defining-events"></a>
+## Defining Events
+
+An event is a Pydantic model. Declare its payload as typed fields. Events are frozen (immutable) and auto-register themselves, so a queued listener can deserialize them later:
+
+```python
+from arvel.events.event import Event
+
+
+class OrderShipped(Event):
+    order_id: int
+    tracking_number: str
+```
+
+<a name="defining-listeners"></a>
+## Defining Listeners
+
+A listener subclasses `Listener[E]` for its event type and implements an async `handle`:
+
+```python
+from arvel.events.listener import Listener
+from app.events.order_shipped import OrderShipped
+
+
+class SendShipmentNotification(Listener[OrderShipped]):
+    async def handle(self, event: OrderShipped) -> None:
+        # notify the customer
+        ...
+```
+
+Because the dispatcher resolves listeners through the container, you can declare constructor dependencies and they'll be injected.
+
+<a name="registering-listeners"></a>
+## Registering Listeners
+
+Map events to listeners on the dispatcher with `listen`. Registration is idempotent and order-preserving — listeners fire in the order they were registered. Do this in a service provider's boot phase:
+
+```python
+from arvel.events.dispatcher import EventDispatcher
+
+
+def boot(self) -> None:
+    dispatcher = self.app.make(EventDispatcher)
+    dispatcher.listen(OrderShipped, SendShipmentNotification)
+```
+
+> [!NOTE]
+> There is no convention-based listener auto-discovery — register each event-to-listener mapping explicitly.
+
+<a name="dispatching-events"></a>
+## Dispatching Events
+
+Dispatch an event instance through the `Event` facade. `dispatch` is a coroutine:
+
+```python
+from arvel.facades.event import Event
+
+await Event.dispatch(OrderShipped(order_id=1, tracking_number="1Z999"))
+```
+
+Every registered listener runs. If one listener raises, the error is logged and the remaining listeners still run — one bad listener won't break the rest.
+
+<a name="queued-listeners"></a>
+## Queued Listeners
+
+For slow work (sending mail, calling external APIs), push the listener onto the queue by mixing in `ShouldQueue`. Instead of running inline, the dispatcher enqueues it through the [`Bus`](queues.md):
+
+```python
+from arvel.events.listener import Listener
+from arvel.events.should_queue import ShouldQueue
+
+
+class SendShipmentNotification(Listener[OrderShipped], ShouldQueue):
+    async def handle(self, event: OrderShipped) -> None:
+        ...
+```
+
+> [!NOTE]
+> If the queue (`Bus`) isn't bound, queued listeners fall back to running inline so events still fire in development.
+
+<a name="events-and-broadcasting"></a>
+## Events & Broadcasting
+
+An event that also implements the `ShouldBroadcast` contract is pushed to your broadcast driver after the synchronous listeners finish. See [Broadcasting](broadcasting.md).
+
+<a name="testing"></a>
+## Testing
+
+`Event.fake()` records dispatched events instead of running listeners, so you can assert they fired:
+
+```python
+with Event.fake():
+    await ship_order(order)
+    Event.assert_dispatched(OrderShipped)
+    Event.assert_dispatched(OrderShipped, times=1)
+    Event.assert_not_dispatched(OrderCancelled)
+```

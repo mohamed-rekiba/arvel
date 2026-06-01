@@ -14,7 +14,7 @@ Roles and permissions for [Arvel](https://arvel.dev) — a Python port of
 
 ---
 
-**Documentation**: <a href="https://arvel.dev/permission" target="_blank">https://arvel.dev/permission</a>
+**Documentation**: <a href="https://arvel.dev/packages/permission" target="_blank">https://arvel.dev/packages/permission</a>
 
 ---
 
@@ -30,158 +30,107 @@ Register the provider in `bootstrap/providers.py`:
 ```python
 from arvel_permission import PermissionServiceProvider
 
-PROVIDERS = [
+providers = [
     # ...other providers...
     PermissionServiceProvider,
 ]
 ```
 
-Run the migration (adds `roles`, `permissions`, `model_has_roles`, `model_has_permissions`,
+Run the migration (adds `roles`, `permissions`, `model_has_roles`, `model_has_permissions`, and
 `role_has_permissions`):
 
 ```bash
 arvel migrate
 ```
 
-## Quick start
+## Make a model role-aware
 
-Mix `HasRoles` and `HasPermissions` into any model:
+Mix in `HasRoles` and `HasPermissions`, and wire the polymorphic relations:
 
 ```python
-from arvel.database import Model, Timestamps, id_, string
-from arvel_permission import HasRoles, HasPermissions
+from typing import ClassVar
+
+from arvel.database import Model, id_
+from arvel.database.orm import MorphToMany
+from arvel_permission import (
+    HasRoles, HasPermissions, Role, Permission,
+    model_has_roles, model_has_permissions,
+)
 
 
-class User(Model, Timestamps, HasRoles, HasPermissions):
+class User(Model, HasRoles, HasPermissions):
     __tablename__ = "users"
+    id: int = id_(init=False)
+    default_guard_name: ClassVar[str] = "web"
 
-    id: int = id_()
-    email: str = string(254, unique=True)
+    roles: ClassVar[MorphToMany[Role]] = MorphToMany(
+        Role, table=model_has_roles, name="model", related_key="role_id"
+    )
+    permissions: ClassVar[MorphToMany[Permission]] = MorphToMany(
+        Permission, table=model_has_permissions, name="model", related_key="permission_id"
+    )
 ```
 
-Manage roles and permissions:
+> All trait methods are **async** and need an active DB session in scope. In a request that's set up
+> for you; in scripts and tests, run them inside the framework's session context.
+
+## Assign and check
 
 ```python
-user = await User.find(user_id)
+await user.assign_role("editor")
+await user.give_permission_to("posts.publish")
 
-# assign_role / give_permission_to mutate in-memory; await save() flushes to the DB
-user.assign_role("editor")
-user.assign_role("writer")
-user.give_permission_to("edit articles")
-user.give_permission_to("delete articles")
-await user.save()
-
-# Check
-assert user.has_role("editor")
-assert user.has_any_role(["editor", "admin"])
-assert user.has_permission_to("edit articles")
+await user.has_role("editor")              # -> bool
+await user.has_any_role("editor", "admin")
+await user.has_permission_to("posts.publish")
+names = await user.get_role_names()
 ```
 
-## Roles
+Other methods: `remove_role`, `sync_roles`, `has_all_roles`, `has_level`, `revoke_permission_to`,
+`sync_permissions`, `get_all_permissions`, `get_direct_permissions`, `get_permissions_via_roles`.
 
-```python
-from arvel_permission.models import Role, Permission
-from arvel.facades import DB
-
-# Create a role with permissions
-editor = Role(name="editor", guard_name="api")
-await DB.session().add(editor)
-
-publish = Permission(name="publish articles", guard_name="api")
-await DB.session().add(publish)
-
-editor.sync_permissions([publish])
-await DB.session().commit()
-
-# Assign to user
-user.assign_role(editor)
-
-# Get role names
-print(user.get_role_names())          # ["editor"]
-print(user.get_permission_names())    # ["publish articles"]
-print(user.get_all_permissions())     # includes inherited permissions
-```
+Permissions resolve through roles automatically — `has_permission_to` is true when the user holds the
+permission directly **or** via any assigned role. With `wildcard_enabled` (the default), a held
+`posts.*` satisfies a check for `posts.edit`.
 
 ## Route middleware
 
-Protect routes by role or permission using the registered middleware:
+The package ships three middleware classes. Register them yourself — the provider does not wire them:
 
 ```python
-@Route.get("/admin", middleware=["role:admin"])
-async def admin_panel() -> dict[str, str]:
-    return {"panel": "admin"}
+from arvel_permission import RoleMiddleware, PermissionMiddleware, RoleOrPermissionMiddleware
 
-@Route.post("/articles", middleware=["permission:publish articles"])
-async def publish_article() -> dict[str, str]:
-    return {"published": True}
-
-# Pipe-separated → OR semantics
-@Route.get("/dashboard", middleware=["role:admin|manager"])
-async def dashboard() -> dict[str, str]:
-    return {"ok": True}
+RoleMiddleware("admin")
+PermissionMiddleware("posts.publish")
+RoleOrPermissionMiddleware("admin|posts.publish")   # pipe = OR
 ```
 
-Middleware raises `UnauthorizedException` (401 when unauthenticated, 403 when unauthorized).
-The framework's default exception handler converts it to the correct HTTP response.
+A failed check raises `UnauthorizedException`, which the framework's default handler turns into a 401
+(unauthenticated) or 403 (unauthorized) response.
 
 ## Gate integration
 
-Wire permissions into Arvel's `Gate` so `gate.allows("edit articles", user)` works without
-manually registering each ability:
-
-```python
-from arvel_permission.gate_integration import register_permissions_with_gate
-from arvel.facades import Gate as ArvelGate
-
-register_permissions_with_gate(ArvelGate, guard="api")
-
-# Now these work
-allowed = await ArvelGate.allows("edit articles", user)
-```
-
-## Events (opt-in)
-
-Enable role/permission mutation events for audit logs or cache invalidation:
-
-```python
-from arvel_permission import PermissionConfig
-
-config = PermissionConfig(events_enabled=True)
-```
-
-Subscribe to events:
-
-```python
-from arvel_permission.events import RoleAttachedEvent, PermissionGrantedEvent, on
-
-@on(RoleAttachedEvent)
-def audit_role(event: RoleAttachedEvent) -> None:
-    print(f"Role '{event.role.name}' attached to {event.model}")
-
-@on(PermissionGrantedEvent)
-def audit_permission(event: PermissionGrantedEvent) -> None:
-    print(f"Permission '{event.permission.name}' granted to {event.model}")
-```
-
-Events are in-process only — not dispatched through Arvel's async queue.
+When `PermissionServiceProvider` boots and a `Gate` is bound, it registers a `before` hook so
+`await gate.allows("posts.edit", user)` resolves through the user's permissions. If no `Gate` is
+bound, this is skipped silently — no manual wiring needed.
 
 ## Configuration
 
-All knobs are a Pydantic model:
+`PermissionConfig` is a frozen model — there are **no environment variables**. Override defaults by
+setting the provider's `config` before boot:
 
 ```python
 from arvel_permission import PermissionConfig, PermissionServiceProvider
 
-class MyPermissionProvider(PermissionServiceProvider):
-    def register(self) -> None:
-        self.config = PermissionConfig(
-            default_guard_name="api",   # default: "web"
-            cache_enabled=True,         # set False in tests
-            wildcard_enabled=True,      # "posts.*" matches "posts.edit"
-        )
+
+class AppPermissionProvider(PermissionServiceProvider):
+    config = PermissionConfig(default_guard_name="api", wildcard_enabled=True)
 ```
 
-## Spatie ↔ arvel-permission API
+Notable fields: `default_guard_name` (`web`), `cache_enabled` (`true`), `wildcard_enabled` (`true`),
+`events_enabled` (`false`), `cache_ttl` (`86400`).
+
+## Spatie ↔ arvel-permission
 
 | Spatie (PHP) | arvel-permission (Python) |
 |---|---|
@@ -197,7 +146,6 @@ class MyPermissionProvider(PermissionServiceProvider):
 | `hasPermissionTo` | `has_permission_to` |
 | `getAllPermissions` | `get_all_permissions` |
 | `getRoleNames` | `get_role_names` |
-| `getPermissionNames` | `get_permission_names` |
 
 ## License
 

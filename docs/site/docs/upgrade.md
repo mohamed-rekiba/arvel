@@ -1,67 +1,58 @@
 # Upgrade Guide
 
-This page documents breaking changes and migration steps for each Arvel release. We try hard to keep breaking changes minimal — if a change requires updating your code, you'll find it here with before/after examples.
+This page documents breaking changes and migration steps between Arvel releases. When a change requires updating your code, you'll find it here with before/after examples.
 
-## Versioning policy
+<a name="versioning-policy"></a>
+## Versioning Policy
 
-Arvel follows [Semantic Versioning](https://semver.org) from `1.0.0` onward. Until then, `0.x` minor releases may include breaking changes, always documented below.
+Arvel follows [Semantic Versioning](https://semver.org) from `1.0.0` onward. Until then, `0.x` minor releases may include breaking changes — always documented below.
 
+<a name="upgrading-to-0-3-0"></a>
 ## Upgrading to 0.3.0
 
-**Estimated upgrade time: under 30 minutes for most apps.**
+**Estimated upgrade time: a few minutes.**
 
-### Python 3.14 required
-
-Arvel `0.3.0` requires Python 3.14+. If you're on 3.12 or 3.13, upgrade first:
-
-```bash
-uv python install 3.14
-```
-
-Then update your `.python-version` file and your `pyproject.toml`:
-
-```toml
-[project]
-requires-python = ">=3.14"
-```
-
-### Dependency update
+`0.3.0` is a drop-in upgrade from `0.1.0` — it's purely additive, with no breaking changes. Update the dependency and re-sync:
 
 ```bash
 uv lock --upgrade-package arvel
 uv sync
 ```
 
-### Config class changes
+To pull every optional feature in one go (the recommended install), use the `all` extra:
 
-`ArvelSettings` now reads `env_prefix` automatically from the class name (snake-cased, with a trailing `_`). If you previously set `model_config = SettingsConfigDict(env_prefix="DB_")` explicitly, that still works — the auto-derive is only a fallback.
+```bash
+uv add "arvel[all]"
+```
 
-### Auth: `AuthServiceProvider` now required
+Python 3.14+ has been required since `0.1.0` — no change there.
 
-The auth subsystem is no longer auto-loaded. You must register `AuthServiceProvider` explicitly in `bootstrap/providers.py`:
+<a name="upgrading-to-0-1-0"></a>
+## Upgrading to 0.1.0
+
+`0.1.0` was the first public release. There's no documented upgrade path from pre-release versions.
+
+<a name="how-to-read-this-guide"></a>
+## How to Read This Guide
+
+Each future release adds a section here. Breaking changes come with the exact code to change. A couple of conventions worth knowing now, so later migrations read clearly:
+
+- **Service providers.** App-level providers are declared in `bootstrap/providers.py` as a `providers` list. Some subsystems are opt-in — for example, `AuthServiceProvider` powers [authentication](features/authentication.md#registering-the-provider) and the [`Gate`](features/authorization.md):
 
 ```python
-from arvel.auth import AuthServiceProvider
+# bootstrap/providers.py
+from arvel.auth.provider import AuthServiceProvider
 
-PROVIDERS = [
+providers = [
     AuthServiceProvider,
-    # ... your other providers ...
+    # ...your other providers...
 ]
 ```
 
-If you used `arvel auth:install` to scaffold auth, the generated `bootstrap/providers.py` already includes this.
+- **Config classes.** `ArvelSettings` subclasses auto-derive their `env_prefix` from the class name (`DbConfig` → `DB_`). Set `model_config["env_prefix"]` explicitly to override.
 
-### Queue: retry semantics
+<a name="next-steps"></a>
+## Next Steps
 
-`Job.tries` previously counted the initial attempt. It now counts retries only — so `tries = 3` means up to 3 retries after the first failure (4 total attempts). If you relied on the old semantics, subtract 1 from your `tries` value.
-
----
-
-## Upgrading to 0.1.0
-
-`0.1.0` was the first public release. No upgrade path from pre-release versions is documented.
-
-## Next steps
-
-- Read [Release Notes](releases.md) for a full list of what shipped in each version.
-- Check [Configuration](configuration.md) if any environment variables changed.
+- Read the [Release Notes](releases.md) for what shipped in each version, or [`CHANGELOG.md`](https://github.com/mohamed-rekiba/arvel/blob/main/CHANGELOG.md) for the full log.
+- Check [Configuration](core-concepts/configuration.md) if any environment variables changed.
