@@ -92,3 +92,12 @@ def test_env_required_present_returns_str(clean_env: None) -> None:
 
     os.environ["ARVEL_TEST_KEY"] = "x"
     assert env("ARVEL_TEST_KEY", required=True) == "x"
+
+
+def test_env_unsupported_default_type_raises(clean_env: None) -> None:
+    from arvel.support.env import EnvCoercionError, env
+
+    os.environ["ARVEL_TEST_KEY"] = "value"
+    with pytest.raises(EnvCoercionError, match="Unsupported default type"):
+        # dict has no matching env() overload by design — this asserts the runtime guard.
+        env("ARVEL_TEST_KEY", {"a": 1})  # type: ignore[call-overload]

@@ -202,3 +202,57 @@ async def test_jwt_guard_handles_malformed_headers_object_without_crashing() -> 
 
     guard = JwtGuard(resolver=_FakeResolver(), jwt=_jwt_config())
     assert await guard.user(_BadRequest()) is None
+
+
+# ─── issue_token / _encode round-trip ─────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_jwt_guard_issued_token_round_trips() -> None:
+    from datetime import timedelta
+
+    from arvel.auth.guards.jwt import JwtGuard
+
+    config = JwtConfig(
+        secret=_SECRET, algorithm="HS256", audience="arvel-api", issuer="https://issuer.test"
+    )
+    resolver = _FakeResolver({"u1": {"id": "u1"}})
+    guard = JwtGuard(resolver=resolver, jwt=config)
+
+    token = await guard.issue_token(subject="u1", expires_in=timedelta(minutes=5))
+    request = _FakeRequest(authorization=f"Bearer {token}")
+    assert await guard.user(request) == {"id": "u1"}
+
+
+@pytest.mark.asyncio
+async def test_jwt_guard_rejects_refresh_typed_token() -> None:
+    import importlib
+    import time
+
+    from arvel.auth.guards.jwt import JwtGuard
+
+    _jwt = importlib.import_module("jwt")
+    token = str(
+        _jwt.encode(
+            {"sub": "u1", "exp": int(time.time()) + 3600, "typ": "refresh"},
+            _SECRET,
+            algorithm="HS256",
+        )
+    )
+    guard = JwtGuard(resolver=_FakeResolver({"u1": {"id": "u1"}}), jwt=_jwt_config())
+    request = _FakeRequest(authorization=f"Bearer {token}")
+    assert await guard.user(request) is None
+
+
+@pytest.mark.asyncio
+async def test_jwt_guard_rejects_token_without_sub() -> None:
+    import importlib
+    import time
+
+    from arvel.auth.guards.jwt import JwtGuard
+
+    _jwt = importlib.import_module("jwt")
+    token = str(_jwt.encode({"exp": int(time.time()) + 3600}, _SECRET, algorithm="HS256"))
+    guard = JwtGuard(resolver=_FakeResolver(), jwt=_jwt_config())
+    request = _FakeRequest(authorization=f"Bearer {token}")
+    assert await guard.user(request) is None

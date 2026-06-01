@@ -9,8 +9,8 @@ from arvel.database import Model, id_, string
 from arvel_search import Search, SearchManager
 from arvel_search.dtos import SearchQuery
 from arvel_search.searchable import Searchable
-from sqlalchemy.ext.asyncio import AsyncSession
 from search_support import Article, make_config
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class TestMixinDefaults:
