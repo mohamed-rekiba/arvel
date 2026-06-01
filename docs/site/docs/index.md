@@ -8,13 +8,15 @@ description: A typed, async-first Python web framework with Laravel-grade develo
 
 <div class="arvel-hero" markdown>
 
+<p class="arvel-hero__eyebrow">Built on FastAPI · Pydantic · SQLAlchemy</p>
+
 <h1 class="arvel-hero__title">
-The clean stack for
+The web framework for
 <span class="arvel-hero__accent">Python developers and agents</span>.
 </h1>
 
 <p class="arvel-hero__lede">
-A Python web framework that feels good to write and impossible to misuse &mdash; expressive routing, a typed ORM, and first-class async from the request loop to the database.
+Arvel gives Python the Laravel developer experience &mdash; expressive routing, a typed active-record ORM, queues, a scheduler, and a generator CLI &mdash; while staying async to the core and passing <code>mypy --strict</code> end to end.
 </p>
 
 <div class="arvel-hero__actions" markdown>
@@ -31,7 +33,7 @@ A Python web framework that feels good to write and impossible to misuse &mdash;
 
 ### Easy
 
-One command to scaffold. One import to wire a route, send a mail, or dispatch a job. Arvel ships with `Route`, `Cache`, `Mail`, `Bus`, and `DB` already wired together &mdash; so you write the feature, not the plumbing.
+Scaffold a project in one command. Wire a feature in one import. `Route`, `DB`, `Cache`, `Mail`, and `Bus` come pre-wired through the container, so you write the feature, not the plumbing.
 
 </div>
 
@@ -40,7 +42,7 @@ One command to scaffold. One import to wire a route, send a mail, or dispatch a 
 
 ### Typed
 
-Your editor knows the shape of every model, every route parameter, every config value. Mistakes show up as red squiggles &mdash; not as 500 errors at midnight. Pass a wrong argument anywhere and the IDE tells you before you even save the file.
+The whole framework passes `mypy --strict` and `pyright --strict`. Your editor knows every column, route parameter, and config key — so mistakes show up as red squiggles, not 500s at midnight.
 
 </div>
 
@@ -49,125 +51,181 @@ Your editor knows the shape of every model, every route parameter, every config 
 
 ### Fast
 
-Concurrent by default &mdash; handle thousands of requests without threads or callbacks. Database queries, cache reads, queue dispatch, and mail sends all run without blocking. Your app stays responsive even under load.
+Async by default. Requests, database queries, cache reads, queue dispatch, and mail all run without blocking the event loop — thousands of concurrent connections, no threads or callbacks.
 
 </div>
 
 </div>
+
+## Getting Started
+
+Install the CLI, scaffold a typed project, and you're serving in under a minute.
+
+```console
+$ uv tool install arvel       # the CLI, installed globally
+$ arvel new blog && cd blog   # a typed project, ready to run
+$ arvel serve                 # → http://127.0.0.1:8000
+```
+
+> [!NOTE]
+> Arvel needs **Python 3.14+**, and works best with [uv](https://docs.astral.sh/uv/). Adding it to an existing project instead? `uv add arvel`.
+
+New to Arvel? Walk the [Quickstart](getting-started/quickstart.md), or read [Installation](getting-started/installation.md) for Docker, optional extras, and CI setup.
+
+## See it in code
+
+No magic strings, no untyped dicts. A route is an `async def`, a model is a typed class, validation is a class the framework runs for you, and slow work goes on a queue with one call.
+
+=== "Route"
+
+    ```python
+    from arvel import Route
+
+
+    @Route.get("/api/health")
+    async def health() -> dict[str, str]:
+        return {"status": "ok"}
+    ```
+
+    Handlers are real FastAPI routes, so path params, Pydantic bodies, and dependency injection all work as you'd expect.
+
+=== "Model"
+
+    ```python
+    from arvel.database import Model, Timestamps, id_, string
+
+
+    class Flight(Model, Timestamps):
+        __tablename__ = "flights"
+
+        id: int = id_()
+        name: str = string(255)
+
+
+    flight = await Flight.find(1)     # every terminal call is async
+    flights = await Flight.all()
+    ```
+
+    Arvent is an Eloquent-shaped active-record ORM on top of SQLAlchemy's async engine — relationships, casts, scopes, and a fluent query builder included.
+
+=== "Validate"
+
+    ```python
+    from typing import Any
+
+    from pydantic import BaseModel, Field
+    from arvel import Route
+    from arvel.http.requests import FormRequest
+
+
+    class StoreUserPayload(BaseModel):
+        email: str = Field(min_length=3, max_length=254)
+        name: str
+
+
+    class StoreUserRequest(FormRequest[StoreUserPayload]):
+        async def authorize(self, request: Any) -> bool:
+            return True                  # deny-by-default; opt in here
+
+        def rules(self) -> dict[str, str | list[str]]:
+            return {"email": "required|unique:users,email"}
+
+
+    @Route.post("/api/users")
+    async def store(form: StoreUserRequest) -> dict:
+        # runs only after parsing, rules, and authorize all pass
+        return form.validated().model_dump()
+    ```
+
+    Invalid input becomes a structured `422` before your handler runs. Unauthorized requests get a `403`. Your code only sees data it can trust.
+
+=== "Queue"
+
+    ```python
+    from arvel.facades.bus import Bus
+    from arvel.queue.job import Job
+
+
+    class ProcessPodcast(Job):
+        podcast_id: int
+
+        async def handle(self) -> None:
+            ...                          # the slow work, off the request path
+
+
+    await Bus.dispatch(ProcessPodcast(podcast_id=1))
+    ```
+
+    Jobs are typed Pydantic models. Dispatch returns immediately; a worker picks them up. Batches, chains, delays, retries, and backoff are all one field away.
 
 ## The `arvel` CLI
 
-One command line for the work you do every day: start an app, generate files, run migrations, inspect routes, and keep workers moving.
+One command line for the work you do every day — scaffold a project, generate typed stubs, run migrations, inspect what's registered, and keep workers moving.
 
 === "First app"
 
     ```bash
-    # Create it
     uv tool install arvel
     arvel new my-app
-
-    # Run it
     cd my-app
-    arvel serve
 
-    # Check it
-    arvel route:list
-    arvel openapi:export
+    arvel serve              # run under uvicorn
+    arvel route:list         # see what registered
+    arvel openapi:export     # dump the OpenAPI spec
     ```
-
-    Start a real app, run it locally, then check what Arvel registered for you. No Uvicorn flags to memorize before you see your first route.
 
 === "Scaffolding"
 
     ```bash
-    # Generate typed stubs — no boilerplate to hand-write
     arvel make:model Post
     arvel make:migration CreatePostsTable
     arvel make:controller PostController --resource --model=Post
-    arvel make:factory PostFactory
-    arvel make:policy PostPolicy
-    arvel make:job PublishPost
-    arvel make:mail PostPublished
     arvel make:request StorePostRequest
+    arvel make:job PublishPost
+    arvel make:policy PostPolicy
     ```
 
-    Every generator normalises the name — `post`, `Post`, and `post_model` all produce `class Post`. Generated files pass `ruff` and `mypy --strict` immediately.
+    Generated files pass `ruff` and `mypy --strict` straight away. There are 25+ generators — see the [CLI reference](cli/commands.md).
 
 === "Database"
 
     ```bash
-    arvel migrate               # run pending migrations
-    arvel migrate:status        # see which migrations have run
-    arvel migrate:rollback      # undo the last batch
-    arvel migrate:fresh         # drop everything and re-run from scratch
-
-    arvel db:seed               # run your seeders
-    arvel db:show               # list tables, row counts, and sizes
-    arvel db:table posts        # inspect a table's columns and indexes
+    arvel migrate            # run pending migrations
+    arvel migrate:status     # what's run, what's pending
+    arvel migrate:rollback   # undo the last batch
+    arvel migrate:fresh      # drop everything, re-run from scratch
+    arvel db:seed            # run your seeders
     ```
 
-=== "Inspect"
+=== "Workers"
 
     ```bash
-    arvel route:list                       # every registered route
-    arvel route:list --filter posts        # filter by path substring
-    arvel route:list --json | jq '.'       # machine-readable output
+    # Queue
+    arvel queue:work                    # process jobs continuously
+    arvel queue:work --stop-when-empty  # drain once and exit (CI/cron)
+    arvel queue:failed                  # inspect failures
+    arvel queue:retry --all             # requeue them
 
-    arvel event:list                       # all listeners per event class
-    arvel schedule:list                    # scheduled tasks and their cron
-    arvel channel:list                     # WebSocket channels (Reverb)
-
-    arvel about                            # framework + runtime versions
-    arvel openapi:export                   # dump OpenAPI spec to YAML/JSON
+    # Scheduler
+    arvel schedule:work                 # ticks every minute, runs due tasks
+    arvel schedule:list                 # show tasks and their next run
     ```
 
-=== "Queue"
+## Batteries included
 
-    ```bash
-    # Workers
-    arvel queue:work                       # process jobs continuously
-    arvel queue:work --stop-when-empty     # drain once and exit (CI/cron)
-    arvel queue:work --queue high,default  # multiple queues, in priority order
+Arvel ships the parts a real app needs, behind one consistent, typed surface:
 
-    # Failed job management
-    arvel queue:failed                     # list failed jobs with details
-    arvel queue:retry all                  # requeue every failed job
-    arvel queue:retry 5                    # requeue a single job by ID
-    arvel queue:forget 5                   # delete one failed job
-    arvel queue:flush                      # delete all failed jobs
-    arvel queue:prune-failed --hours=48    # prune failures older than N hours
-    arvel queue:clear                      # clear all pending jobs from a queue
-    arvel queue:restart                    # signal workers to reload gracefully
-    ```
+- **Persistence** — PostgreSQL, MySQL, and SQLite, with Alembic-backed migrations, seeders, and factories.
+- **Background work** — queues (`sync`, database, Redis, TaskIQ), a cron-style scheduler, and a dead-letter queue.
+- **Messaging** — typed events and listeners, `Mailable` emails, multi-channel notifications, and Reverb broadcasting over WebSockets.
+- **Edges** — Redis cache and sessions, S3/GCS/Azure/local storage with signed URLs, JWT auth with refresh rotation, a `Gate` and policies, and field-level encryption.
+- **Developer experience** — a generated OpenAPI contract, structured logging, locale-negotiated i18n, and a test kit with `.fake()` doubles.
 
-    Generate a new job class with `arvel make:job PublishPost`.
+And the work that doesn't belong in core lives in companion packages: [OAuth login](packages/oauth.md), [roles & permissions](packages/permission.md), [image processing](packages/image.md), [full-text search](packages/search.md), and [audit trails](packages/audit.md). Want a full reference app? Read the [e-commerce demo](packages/ecommerce-demo.md).
 
-=== "Scheduler"
+## Ready to build?
 
-    ```bash
-    # Run the scheduler
-    arvel schedule:work                    # daemon — ticks every minute forever
-    arvel schedule:run                     # run due tasks once, then exit (cron mode)
+Install Arvel, scaffold your first app, and ship a typed route in minutes.
 
-    # Inspect the schedule
-    arvel schedule:list                    # show all tasks, cron expression, next run
-    ```
-
-    Run `schedule:work` as a long-lived process alongside your queue worker. Use `schedule:run` when you already have an external cron (`* * * * *`) and just want Arvel to handle the task dispatch.
-
-    Generate a scheduled command with `arvel make:command DailyReport` then register it in your `App\Console\Kernel`.
-
-For Docker, CI setup, and source builds see [Installation](getting-started/installation.md). For the full command reference see [CLI commands](cli/commands.md).
-
-## Why Arvel?
-
-Arvel brings Laravel's everyday developer experience to async Python.
-
-The key ideas are:
-
-- **Laravel-like**: Routes, controllers, facades, providers, queues, scheduler, resources, and a CLI that feels familiar.
-- **Python-native**: Built on FastAPI, Starlette, Pydantic, SQLAlchemy, and Uvicorn, so it stays close to the tools Python teams already use.
-- **Typed**: Editor feedback, strict models, typed config, and fewer runtime surprises.
-- **Async-first**: Requests, database work, queues, cache, mail, and storage are designed for async apps.
-- **App-ready**: PostgreSQL, MySQL, SQLite, MongoDB, Redis, AMQP, S3, and local storage are part of the normal path.
-- **Less glue code**: Generate the boring files and spend your time on the feature.
+[Install Arvel](getting-started/installation.md){ .md-button .md-button--primary }
+[Follow the Quickstart](getting-started/quickstart.md){ .md-button }

@@ -1,0 +1,46 @@
+# Scheduling
+
+A fluent `Schedule` builder defines cron-like tasks; `SchedulerKernel` evaluates which are due and runs them, with optional overlap and single-server locks via the cache.
+
+**Source**: `packages/arvel/src/arvel/scheduling/` — `schedule.py`, `scheduled_task.py`, `expressions.py`, `kernel.py`, `providers/scheduler_provider.py`.
+
+## Defining tasks
+
+```python
+class Schedule:
+    def call(self, callback) -> ScheduledTaskBuilder: ...
+    def command(self, name) -> ScheduledTaskBuilder: ...
+    def job(self, job_class) -> ScheduledTaskBuilder: ...
+    def tasks(self) -> tuple[ScheduledTask, ...]: ...
+```
+
+`ScheduledTaskBuilder` exposes frequency helpers (`everyMinute`, `everyFiveMinutes`, … `daily`, `yearly`) that all compile to a `cron(expression)`, plus `withoutOverlapping`, `onOneServer`, `inMaintenanceMode`, `outputTo`. `tasks()` snapshots pending builders into frozen `ScheduledTask` Pydantic models.
+
+## Running
+
+```mermaid
+flowchart TD
+    Tick["run_due_tasks(now)"] --> Filter["filter tasks where is_due(now)"]
+    Filter --> TG["asyncio.TaskGroup (semaphore-limited)"]
+    TG --> One["_run_one"]
+    One --> OS{onOneServer?}
+    OS -->|yes| Lock1["cache lock"]
+    One --> NO{withoutOverlapping?}
+    NO -->|yes| Lock2["cache lock"]
+    One --> Inv["_invoke by kind"]
+    Inv --> Call["call → await callback"]
+    Inv --> Job["job → hooks.dispatch_job (needs Bus)"]
+    Inv --> Cmd["command → hooks.run_command (needs console)"]
+```
+
+`is_due` uses `croniter` with a one-minute Laravel-style tolerance window. `serve_forever` loops on a sleep interval, honoring interrupt/pause markers (via `SchedulerSignal` in the cache). The CLI `schedule:work` runs `serve_forever` (or `--once`).
+
+> **Warning**: `inMaintenanceMode()` and `outputTo()` are stored on `ScheduledTask` but the kernel never reads them. `TODO/QUESTION:` Are these intended to be honored, or builder placeholders?
+
+## Provider
+
+`SchedulerServiceProvider.register()` binds a singleton `Schedule` and a factory-built `SchedulerKernel` (wired with the `CacheManager`, a `Bus.dispatch` hook, and a console-run hook). `boot()` auto-imports `app/console/kernel.py` and calls its `Kernel.schedule(schedule)`. It's a **baseline** provider. Commands: `schedule:work`, `schedule:list`, plus interrupt/pause/continue.
+
+## See also
+
+- [Cache](cache.md) — overlap/one-server locks. [Queues](queues.md) — scheduled jobs. [CLI architecture](../console/cli-architecture.md)

@@ -1,7 +1,8 @@
-# ADR-003 — Monorepo with `uv` workspaces, skeleton auto-split
+# ADR-003 — Monorepo with `uv` workspaces
 
+**Status**: Accepted (skeleton-distribution mechanism superseded — see Notes)
 **Date**: 2026-05-17
-**Status**: Accepted
+**Last reconciled**: 2026-06-01
 **Deciders**: Solution Architect (autonomous), Product Engineer (proposer)
 **Scope**: Whole repository layout
 
@@ -9,53 +10,49 @@
 
 ## Context
 
-
-1. **Polyrepo** (Laravel's approach in PHP/Composer): each thing in its own repo, framework internally monorepo'd then auto-split.
-2. **Monorepo** with workspace tooling: one repo, multiple packages, one lockfile, atomic cross-package changes.
-
-In Python 2026, the `uv` ecosystem has first-class workspace support; in 2013 PHP, it didn't.
+Two repository shapes were available: polyrepo (Laravel's PHP/Composer approach — each thing in its own repo, auto-split from an internal monorepo) versus a monorepo with workspace tooling (one repo, multiple packages, one lockfile, atomic cross-package changes). In Python 2026 `uv` has first-class workspace support, which 2013-era PHP lacked.
 
 ## Options considered
 
 ### Option A — Polyrepo like Laravel
 
-**Pros**: Smaller per-repo surface; community fork-friendly per package; mature pattern.
-**Cons**:
-- Adding a feature that needs framework + skeleton changes = two coordinated PRs.
-- CI duplicated 3+ times.
-- Issue tracking fragmented.
-- Refactor pain for breaking changes.
-- During 0.x (rapid iteration), this is significant friction.
+**Pros**: smaller per-repo surface, fork-friendly per package. **Cons**: cross-cutting features need coordinated PRs; CI duplicated; fragmented issues; painful refactors during 0.x rapid iteration.
 
-### Option B — Pure monorepo, no auto-split (chosen for dev, augmented for users)
+### Option B — Pure monorepo
 
-**Pros**: Atomic cross-package PRs; one CI; one lock file; one issue tracker; refactor-friendly.
-**Cons**: External users want to clone "just the skeleton" without the framework dev clutter.
+**Pros**: atomic cross-package PRs, one CI, one lockfile, one issue tracker, refactor-friendly. **Cons**: external users want "just the skeleton" without dev clutter.
 
-### Option C — Monorepo + auto-split (chosen)
+### Option C — Monorepo (+ generated skeleton) — chosen
 
-**Pros**: Combine the best of both — monorepo DX for us, polyrepo UX for users. Skeleton lives in `skeleton/` and is auto-pushed to `github.com/arvel/skeleton` on every tag via `git subtree split`. Installer downloads from there.
-
-**Cons**: One extra CI step (~10 seconds); one external repo to monitor.
+**Pros**: monorepo DX for maintainers, clean project-generation UX for users. **Cons**: one extra generation/packaging step.
 
 ## Decision
 
-**Option C.** Per `REPO-STRUCTURE.md`:
+**Monorepo with `uv` workspaces.** `tool.uv.workspace.members = ["packages/*"]`. One `uv.lock` at the repo root; shared dev tooling (ruff, mypy, pyright, pytest, pre-commit) configured at root. Per-package `pyproject.toml` declares each package's own dependencies; cross-package dev refs use `tool.uv.sources.<pkg> = { workspace = true }`.
 
-- Single GitHub repo `github.com/arvel/arvel`.
-- `tool.uv.workspace.members = ["packages/*"]` with `packages/arvel/` + `packages/arvel-cli/`.
-- `skeleton/` lives in this repo and is auto-split to a public template repo via `tools/split-skeleton.sh` in `.github/workflows/release.yml`.
-- One `uv.lock` at repo root; shared dev tooling (ruff, mypy, pyright, pytest, pre-commit) at root.
-- Per-package `pyproject.toml` declares the package's own deps; dev-time cross-package refs use `tool.uv.sources.<pkg> = { workspace = true }`.
+Current workspace members under `packages/`:
+
+| Package | Role |
+|---|---|
+| `arvel` | The framework (ships the `arvel` CLI binary) |
+| `arvel-audit` | Audit-log companion |
+| `arvel-image` | Image manipulation companion |
+| `arvel-oauth` | OAuth/social-login companion |
+| `arvel-permission` | Roles & permissions companion |
+| `arvel-search` | Full-text / engine-backed search companion |
+| `arvel-ecommerce-demo` | Reference application (not published) |
 
 ## Consequences
 
-- CI complexity goes up slightly (one matrix per workspace member) but `uv` handles caching natively.
-- Versioning rule: during 0.x, the three artifacts (framework, cli, skeleton) cut as one release train. Post-1.0 they can diverge.
-- Future first-party companions (Sanctum-eq, Horizon-eq, …) start as modules inside `packages/arvel/`. Only graduate to their own workspace member when surface or release cadence diverges.
+- CI runs across workspace members; `uv` handles caching natively.
+- During 0.x the framework and companions iterate together; post-1.0 they can diverge on cadence.
+- New first-party companions start as their own `packages/*` member when surface or release cadence justifies it.
 
-## References
+## Current implementation
 
-- `docs/REPO-STRUCTURE.md` (full layout, release flow, CI matrix).
-- Laravel's auto-split via `splitsh/lite`: https://github.com/splitsh/lite.
-- uv workspaces: https://docs.astral.sh/uv/concepts/workspaces/
+- Layout: `packages/*`, root `pyproject.toml` (`[tool.uv]`), `uv.lock`.
+- Docs: `docs-fresh/contributing/repo-and-build.md`, `docs-fresh/packages/overview.md`.
+
+## Notes
+
+- **Superseded mechanism**: the original ADR specified a separate `arvel-cli` workspace member and an external `skeleton/` repo auto-split via `git subtree`. Neither exists today. The CLI was consolidated into the single `arvel` binary (ADR-126, ADR-126), and the project skeleton is packaged inside `arvel` (`packages/arvel/src/arvel/_skeleton/`) and rendered by `arvel new`. The monorepo + `uv` workspace decision itself still holds.
