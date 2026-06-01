@@ -6,7 +6,14 @@ readme = "README.md"
 requires-python = ">=3.14"
 license = { text = "MIT" }
 authors = [{ name = "Arvel contributors" }]
-keywords = ["arvel", "search", "full-text", "meilisearch", "elasticsearch", "scout"]
+keywords = [
+    "arvel",
+    "search",
+    "full-text",
+    "meilisearch",
+    "elasticsearch",
+    "scout",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: FastAPI",
@@ -24,8 +31,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/mohamed-rekiba/arvel"
-Documentation = "https://github.com/mohamed-rekiba/arvel/tree/main/packages/arvel-search"
+Homepage = "https://arvel.dev"
+Documentation = "https://arvel.dev/packages/search/"
 Repository = "https://github.com/mohamed-rekiba/arvel"
 
 [build-system]

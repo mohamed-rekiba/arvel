@@ -23,8 +23,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/mohamed-rekiba/arvel"
-Documentation = "https://github.com/mohamed-rekiba/arvel/tree/main/packages/arvel-audit"
+Homepage = "https://arvel.dev"
+Documentation = "https://arvel.dev/packages/audit/"
 Repository = "https://github.com/mohamed-rekiba/arvel"
 
 [build-system]
