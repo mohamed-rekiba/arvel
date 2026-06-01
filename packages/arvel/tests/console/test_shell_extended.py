@@ -388,10 +388,15 @@ class TestReplLoopLifecycle:
         from sqlalchemy import text
 
         framework_app = _build_app(db_env)
-        monkeypatch.setattr(shell_mod, "find_project_root", lambda *_a, **_k: db_env)
-        monkeypatch.setattr(
-            shell_mod, "bootstrap_framework_application", lambda *_a, **_k: framework_app
-        )
+
+        def fake_find_root(*_a: object, **_k: object) -> Path:
+            return db_env
+
+        def fake_bootstrap(*_a: object, **_k: object) -> Application:
+            return framework_app
+
+        monkeypatch.setattr(shell_mod, "find_project_root", fake_find_root)
+        monkeypatch.setattr(shell_mod, "bootstrap_framework_application", fake_bootstrap)
 
         cmd = ShellCommand()
         observed: dict[str, Any] = {}

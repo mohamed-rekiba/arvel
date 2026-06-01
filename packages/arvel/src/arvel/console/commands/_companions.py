@@ -18,7 +18,7 @@ from arvel.support.str import Str
 def model(root: str, *, force: bool = False) -> int:
     from arvel.console.commands.make_model import MakeModelCommand
 
-    return MakeModelCommand()._generate(root, force=force, exist_ok=True)
+    return MakeModelCommand().generate(root, force=force, exist_ok=True)
 
 
 def migration(root: str) -> int:
@@ -84,7 +84,7 @@ def controller(
 ) -> int:
     from arvel.console.commands.make_controller import MakeControllerCommand
 
-    return MakeControllerCommand()._generate(
+    return MakeControllerCommand().generate(
         f"{Str.pascal(root)}Controller",
         force=force,
         exist_ok=True,
