@@ -54,6 +54,7 @@ class MakePolicyCommand(BaseMakeCommand):
     name: ClassVar[str] = "make:policy"
     help: ClassVar[str] = "Generate an authorization Policy (async ability methods)"
     _target_subdir: ClassVar[str] = "app/policies"
+    _suffix: ClassVar[str] = "Policy"
 
     def _render(self, name: str) -> str:
         return _TEMPLATE.format(title=Str.pascal(name))

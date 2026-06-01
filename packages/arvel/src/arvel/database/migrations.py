@@ -34,11 +34,7 @@ def extract_table_name(name: str) -> str:
         if snake.startswith(prefix):
             snake = snake[len(prefix) :]
             break
-    if snake.endswith("s"):
-        return snake
-    if snake.endswith("y"):
-        return snake[:-1] + "ies"
-    return snake + "s"
+    return Str.plural(snake)
 
 
 def extract_view_name(name: str) -> str:

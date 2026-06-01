@@ -46,6 +46,7 @@ class MakeSeederCommand(BaseMakeCommand):
     name: ClassVar[str] = "make:seeder"
     help: ClassVar[str] = "Generate a database seeder (arvel.database.Seeder)"
     _target_subdir: ClassVar[str] = "database/seeders"
+    _suffix: ClassVar[str] = "Seeder"
 
     def _render(self, name: str) -> str:
         return _TEMPLATE.format(title=Str.pascal(name))

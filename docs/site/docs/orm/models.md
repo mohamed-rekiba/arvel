@@ -32,7 +32,27 @@ class Flight(Model, Timestamps):
     name: str = string(255)
 ```
 
-`make:model` only creates the model class — it does not generate a migration. Create the table separately with `arvel make:migration` (see [Migrations](migrations.md)).
+On its own, `make:model` only creates the model class. To scaffold the related artifacts in one command, pass companion flags — each is named from the model:
+
+| Flag | Companion |
+|---|---|
+| `-m`, `--migration` | A `create_<table>_table` migration (the table name is pluralized). |
+| `-f`, `--factory` | A model factory. |
+| `-s`, `--seed` | A database seeder. |
+| `-c`, `--controller` | A controller (add `--resource` / `--api` to shape it). |
+| `--requests` | The `Store…Request` / `Update…Request` pair. |
+| `-p`, `--policy` | An authorization policy. |
+| `-o`, `--observer` | A lifecycle observer. |
+| `-R`, `--json-resource` | A `JsonResource` transformer. |
+| `--test` | A feature test. |
+| `-a`, `--all` | The model plus every companion above (resource controller). |
+
+```bash
+arvel make:model Flight -mfsc        # model + migration + factory + seeder + controller
+arvel make:model Flight --all        # the full set
+```
+
+Companions that already exist are skipped, never overwritten. Short flags combine (`-mf`, `-mfsc`).
 
 <a name="table-names"></a>
 ### Table Names

@@ -97,6 +97,22 @@ class Str:
     def pascal(text: str) -> str:
         return _pascal(text)
 
+    @staticmethod
+    def plural(value: str) -> str:
+        """Naive English pluralization used by the code generators.
+
+        ``post`` → ``posts``, ``category`` → ``categories``. Already-plural
+        words (trailing ``s``) are left alone. Irregulars (``person``,
+        ``child``) aren't handled — override the table name when it matters.
+        """
+        if not value:
+            return value
+        if value.endswith("s"):
+            return value
+        if value.endswith("y"):
+            return value[:-1] + "ies"
+        return value + "s"
+
     # ── slug / headline ─────────────────────────────────────────────────
 
     @staticmethod

@@ -128,24 +128,45 @@ class TestApiFlag:
 
 
 class TestModelFlag:
-    """--model imports the model and types the member parameter."""
+    """--model generates the model, imports it, and types the member parameter."""
 
     def test_model_imports_named_class(self, tmp_path: Path) -> None:
         app = _app(MakeControllerCommand())
         with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
             runner.invoke(
                 app.typer_app,
-                ["make:controller", "PostController", "--resource", "--model", "Post"],
+                ["make:controller", "PostController", "--resource", "--model"],
             )
             content = Path("app/http/controllers/post_controller.py").read_text()
             assert "from app.models.post import Post" in content
+
+    def test_model_generates_the_model_file(self, tmp_path: Path) -> None:
+        app = _app(MakeControllerCommand())
+        with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                app.typer_app,
+                ["make:controller", "PostController", "--resource", "--model"],
+            )
+            assert result.exit_code == 0, result.output
+            assert Path("app/models/post.py").exists()
+
+    def test_model_name_overrides_derived_name(self, tmp_path: Path) -> None:
+        app = _app(MakeControllerCommand())
+        with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
+            runner.invoke(
+                app.typer_app,
+                ["make:controller", "BlogController", "--resource", "--model-name", "Article"],
+            )
+            content = Path("app/http/controllers/blog_controller.py").read_text()
+            assert "from app.models.article import Article" in content
+            assert Path("app/models/article.py").exists()
 
     def test_model_types_member_method_param(self, tmp_path: Path) -> None:
         app = _app(MakeControllerCommand())
         with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
             runner.invoke(
                 app.typer_app,
-                ["make:controller", "PostController", "--resource", "--model", "Post"],
+                ["make:controller", "PostController", "--resource", "--model"],
             )
             content = Path("app/http/controllers/post_controller.py").read_text()
             assert "async def show(self, post: Post)" in content
@@ -153,28 +174,25 @@ class TestModelFlag:
             assert "async def update(self, post: Post)" in content
             assert "async def destroy(self, post: Post)" in content
 
-    def test_model_without_resource_is_rejected(self, tmp_path: Path) -> None:
+    def test_model_without_resource_generates_basic_controller_and_model(
+        self, tmp_path: Path
+    ) -> None:
+        # --model no longer requires --resource: it generates the model and a
+        # basic controller (which has no member methods to bind the model to).
         app = _app(MakeControllerCommand())
         with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
-            result = runner.invoke(
-                app.typer_app, ["make:controller", "PostController", "--model", "Post"]
-            )
-            assert result.exit_code != 0
-            assert "--model" in result.output and "--resource" in result.output
+            result = runner.invoke(app.typer_app, ["make:controller", "PostController", "--model"])
+            assert result.exit_code == 0, result.output
+            assert Path("app/models/post.py").exists()
+            content = Path("app/http/controllers/post_controller.py").read_text()
+            assert "from app.models" not in content
 
     def test_model_works_with_api(self, tmp_path: Path) -> None:
         app = _app(MakeControllerCommand())
         with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
             runner.invoke(
                 app.typer_app,
-                [
-                    "make:controller",
-                    "PostController",
-                    "--resource",
-                    "--api",
-                    "--model",
-                    "Post",
-                ],
+                ["make:controller", "PostController", "--resource", "--api", "--model"],
             )
             content = Path("app/http/controllers/post_controller.py").read_text()
             assert "from app.models.post import Post" in content
@@ -188,13 +206,7 @@ class TestModelFlag:
         with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
             runner.invoke(
                 app.typer_app,
-                [
-                    "make:controller",
-                    "BlogPostController",
-                    "--resource",
-                    "--model",
-                    "BlogPost",
-                ],
+                ["make:controller", "BlogPostController", "--resource", "--model"],
             )
             content = Path("app/http/controllers/blog_post_controller.py").read_text()
             assert "from app.models.blog_post import BlogPost" in content
@@ -235,7 +247,7 @@ class TestGeneratedFileQuality:
         with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
             runner.invoke(
                 app.typer_app,
-                ["make:controller", "PostController", "--resource", "--model", "Post"],
+                ["make:controller", "PostController", "--resource", "--model"],
             )
             path = Path("app/http/controllers/post_controller.py")
             assert _ruff_format_check(path)

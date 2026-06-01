@@ -7,6 +7,7 @@ fallback wiring done in ``DatabaseServiceProvider.boot``.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import textwrap
 from collections.abc import Iterator
@@ -301,6 +302,62 @@ class TestDatabaseProviderConfiguresDBFacade:
         await framework_app.boot()
         rows = await DB.select("SELECT 1 AS one")
         assert rows == [{"one": 1}]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REPL event-loop lifecycle (regression for the asyncio.run nesting crash)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestReplLoopLifecycle:
+    """``shell`` must run outside the entrypoint's ``asyncio.run`` wrapper and
+    boot on the same loop IPython uses for ``%autoawait``.
+
+    Before the fix, ``shell`` ran *inside* ``asyncio.run(async_main())``; IPython
+    embed → prompt_toolkit then called ``asyncio.run`` again and crashed with
+    "asyncio.run() cannot be called from a running event loop". Booting on a
+    different loop than the one user ``await``s run on would also break the
+    async engine ("attached to a different loop").
+    """
+
+    def test_shell_owns_process_and_self_bootstraps(self) -> None:
+        # owns_process routes the command outside the entrypoint's asyncio.run;
+        # needs_application is False because the command boots itself.
+        assert ShellCommand.owns_process is True
+        assert ShellCommand.needs_application is False
+
+    def test_run_repl_runs_query_on_repl_loop_without_nested_run(
+        self, db_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pytest.importorskip("IPython")
+        import arvel.console.commands.shell as shell_mod
+        from IPython.core.async_helpers import get_asyncio_loop
+        from sqlalchemy import text
+
+        framework_app = _build_app(db_env)
+        monkeypatch.setattr(shell_mod, "find_project_root", lambda *_a, **_k: db_env)
+        monkeypatch.setattr(
+            shell_mod, "bootstrap_framework_application", lambda *_a, **_k: framework_app
+        )
+
+        cmd = ShellCommand()
+        observed: dict[str, Any] = {}
+
+        def fake_launch(namespace: dict[str, Any]) -> None:
+            # The original crash happened because a loop was already running
+            # here. After the fix, none is.
+            with pytest.raises(RuntimeError):
+                asyncio.get_running_loop()
+            # Mimic `await session.execute(...)` typed at the prompt: IPython
+            # autoawait runs it on get_asyncio_loop() — the loop boot ran on.
+            session = namespace["session"]
+            result = get_asyncio_loop().run_until_complete(session.execute(text("SELECT 1")))
+            observed["value"] = result.scalar_one()
+
+        monkeypatch.setattr(cmd, "_launch_repl", fake_launch)
+        cmd.run_repl()
+
+        assert observed["value"] == 1
 
 
 # ─────────────────────────────────────────────────────────────────────────────

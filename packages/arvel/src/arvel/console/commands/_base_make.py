@@ -40,10 +40,31 @@ class BaseMakeCommand(Command):
     Subclasses configure ``_target_subdir`` (directory) and ``_extension``
     (defaults to ``.py``). Subclasses MUST override :meth:`_render` to produce
     a framework-aware stub.
+
+    Generators whose artifact carries a conventional class suffix set
+    ``_suffix`` (e.g. ``"Controller"``). The user can then type the bare
+    root name — ``make:controller Post`` produces ``PostController`` — while
+    a fully-qualified name stays untouched (idempotent). Generators without
+    a strong suffix convention leave ``_suffix`` empty, and name
+    normalization is a no-op.
     """
 
     _target_subdir: ClassVar[str]
     _extension: ClassVar[str] = ".py"
+    _suffix: ClassVar[str] = ""
+
+    def class_name(self, name: str) -> str:
+        """Apply the suffix convention. Idempotent; no-op when ``_suffix`` is empty."""
+        if not self._suffix:
+            return name
+        pascal = Str.pascal(name)
+        if pascal.endswith(self._suffix):
+            return pascal
+        return pascal + self._suffix
+
+    def root_name(self, name: str) -> str:
+        """Strip the suffix to recover the bare root (``PostController`` → ``Post``)."""
+        return self.class_name(name).removesuffix(self._suffix) if self._suffix else name
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self
@@ -62,17 +83,30 @@ class BaseMakeCommand(Command):
     def handle(self, ctx: Context) -> int:
         raise NotImplementedError
 
-    def _generate(self, name: str, *, force: bool = False) -> int:
+    def generate(self, name: str, *, force: bool = False, exist_ok: bool = False) -> int:
+        """Public entry point used by companion orchestration (make:model/-controller).
+
+        ``exist_ok`` turns an existing-file collision into a skip (exit 0,
+        printed as ``Exists``) instead of a hard failure, so a companion that's
+        already present doesn't abort the whole command.
+        """
+        return self._generate(name, force=force, exist_ok=exist_ok)
+
+    def _generate(self, name: str, *, force: bool = False, exist_ok: bool = False) -> int:
         error = validate_name(name)
         if error is not None:
             typer.echo(f"arvel: {error}", err=True)
             return 2
-        target = Path(self._target_subdir) / f"{Str.snake(name)}{self._extension}"
+        class_name = self.class_name(name)
+        target = Path(self._target_subdir) / f"{Str.snake(class_name)}{self._extension}"
         if target.exists() and not force:
+            if exist_ok:
+                typer.echo(f"Exists: {target}")
+                return 0
             typer.echo(f"arvel: {target} already exists. Pass --force to overwrite.", err=True)
             return 1
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(self._render(name))
+        target.write_text(self._render(class_name))
         typer.echo(f"Created: {target}")
         return 0
 

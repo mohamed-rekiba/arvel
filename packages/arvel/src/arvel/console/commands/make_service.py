@@ -36,6 +36,7 @@ class MakeServiceCommand(BaseMakeCommand):
     name: ClassVar[str] = "make:service"
     help: ClassVar[str] = "Generate an application service class"
     _target_subdir: ClassVar[str] = "app/services"
+    _suffix: ClassVar[str] = "Service"
 
     def _render(self, name: str) -> str:
         return _TEMPLATE.format(title=Str.pascal(name))

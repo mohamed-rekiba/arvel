@@ -790,10 +790,15 @@ class TestSchedulerHonoursUserApp:
 
 
 class TestShellNamespace:
-    def test_shell_command_opts_into_application(self) -> None:
+    def test_shell_command_owns_process_and_self_bootstraps(self) -> None:
         from arvel.console.commands.shell import ShellCommand
 
-        assert ShellCommand.needs_application is True
+        # shell drives its own event loop (IPython autoawait + prompt_toolkit
+        # both call asyncio.run), so it must run outside the entrypoint's
+        # asyncio.run wrapper and bootstrap the framework itself rather than
+        # relying on the entrypoint's needs_application DI.
+        assert ShellCommand.owns_process is True
+        assert ShellCommand.needs_application is False
 
     def test_bootstrap_app_includes_app_and_container(self) -> None:
         from arvel.console.commands.shell import ShellCommand

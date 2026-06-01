@@ -46,6 +46,7 @@ class MakeFactoryCommand(BaseMakeCommand):
     name: ClassVar[str] = "make:factory"
     help: ClassVar[str] = "Generate a model factory (arvel.database.Factory)"
     _target_subdir: ClassVar[str] = "database/factories"
+    _suffix: ClassVar[str] = "Factory"
 
     def _render(self, name: str) -> str:
         title = Str.pascal(name)
