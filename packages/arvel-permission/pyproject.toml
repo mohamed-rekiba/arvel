@@ -18,8 +18,8 @@ classifiers = [
 dependencies = ["arvel", "pydantic>=2.13.4", "sqlalchemy[asyncio]>=2.0.50"]
 
 [project.urls]
-Homepage = "https://github.com/mohamed-rekiba/arvel"
-Documentation = "https://github.com/mohamed-rekiba/arvel/tree/main/packages/arvel-permission"
+Homepage = "https://arvel.dev"
+Documentation = "https://arvel.dev/packages/permission/"
 Repository = "https://github.com/mohamed-rekiba/arvel"
 
 [build-system]
