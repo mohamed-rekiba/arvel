@@ -118,6 +118,41 @@ def test_image_to_bytes_returns_non_empty(png_4x4_bytes: bytes) -> None:
     assert len(out) > 0
 
 
+@pytest.mark.asyncio
+async def test_image_to_bytes_async_matches_sync(png_4x4_bytes: bytes) -> None:
+    """to_bytes_async offloads to a thread and returns the same bytes as the sync path."""
+    from arvel_image import Image
+
+    sync_out = Image.load(png_4x4_bytes).fit("cover", 8, 8).format("png").to_bytes()
+    async_out = await Image.load(png_4x4_bytes).fit("cover", 8, 8).format("png").to_bytes_async()
+    assert async_out == sync_out
+
+
+@pytest.mark.asyncio
+async def test_image_save_async_writes_file(png_4x4_bytes: bytes, tmp_path: Path) -> None:
+    """save_async writes the file off the event loop and returns the Image for chaining."""
+    from arvel_image import Image
+    from PIL import Image as PILImage
+
+    target = tmp_path / "async.webp"
+    img = Image.load(png_4x4_bytes).fit("cover", 8, 8)
+    result = await img.save_async(target, image_format="webp")
+
+    assert result is img
+    assert target.exists()
+    assert PILImage.open(target).format == "WEBP"
+
+
+def test_image_chain_is_reusable(png_4x4_bytes: bytes) -> None:
+    """Building is side-effect free: terminals can run more than once."""
+    from arvel_image import Image
+
+    img = Image.load(png_4x4_bytes).resize(width=8, height=8).format("png")
+    first = img.to_bytes()
+    second = img.to_bytes()
+    assert first == second
+
+
 def test_image_does_not_shell_out() -> None:
     """NFR-025-07: arvel_image MUST NOT import subprocess or os.system."""
     import arvel_image
