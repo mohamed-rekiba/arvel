@@ -10,7 +10,7 @@
 Roles and permissions for [Arvel](https://arvel.dev) — a Python port of
 [spatie/laravel-permission](https://spatie.be/docs/laravel-permission/v7/introduction) v7.
 
-> **Status**: Pre-alpha — `v0.3.0`.
+> **Status**: Pre-alpha.
 
 ---
 

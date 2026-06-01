@@ -17,7 +17,7 @@ Two logging layers in one package:
 - **Activity log** — record business events ("user exported report") with the fluent `activity()`
   API, modeled after Spatie's Laravel ActivityLog.
 
-> **Status**: Pre-alpha — `v0.3.0`.
+> **Status**: Pre-alpha.
 
 ---
 
