@@ -187,6 +187,24 @@ class MakeModelCommand(Command):
 
         app.command(name=self.name, help=self.help)(_callback)
 
+    def generate(
+        self,
+        name: str,
+        *,
+        force: bool = False,
+        exist_ok: bool = False,
+        view: bool = False,
+        materialized_view: bool = False,
+    ) -> int:
+        """Public entry point used by companion orchestration (make:model --controller)."""
+        return self._generate(
+            name,
+            force=force,
+            exist_ok=exist_ok,
+            view=view,
+            materialized_view=materialized_view,
+        )
+
     def _generate(
         self,
         name: str,

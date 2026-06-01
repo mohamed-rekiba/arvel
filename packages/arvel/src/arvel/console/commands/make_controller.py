@@ -236,6 +236,26 @@ class MakeControllerCommand(BaseMakeCommand):
 
         app.command(name=self.name, help=self.help)(_callback)
 
+    def generate(
+        self,
+        name: str,
+        *,
+        force: bool = False,
+        exist_ok: bool = False,
+        resource: bool = False,
+        api: bool = False,
+        model_root: str | None = None,
+    ) -> int:
+        """Public entry point used by companion orchestration (make:model --controller)."""
+        return self._generate(
+            name,
+            force=force,
+            exist_ok=exist_ok,
+            resource=resource,
+            api=api,
+            model_root=model_root,
+        )
+
     def _generate(
         self,
         name: str,
