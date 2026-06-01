@@ -7,13 +7,21 @@ Public surface:
   unsupported format. The allowed set is intentionally narrow (jpeg/jpg/png/
   webp/gif) — if you need TIFF or BMP, drop down to Pillow directly.
 
-The whole class is synchronous. Pillow is CPU-bound; image manipulation in
-request handlers should be wrapped in ``run_in_threadpool`` (Starlette/FastAPI)
-or ``asyncio.to_thread``.
+The chain is lazy: ``load`` and the pixel operations (``resize``, ``fit``,
+``crop``, ``optimize``) record what to do; nothing decodes or transforms until
+a terminal (:meth:`to_bytes` / :meth:`save`) runs. Argument validation
+(``quality`` range, ``format`` support, positive dimensions) still happens
+eagerly at call time so mistakes fail fast.
+
+Pillow is CPU-bound. The sync terminals run inline; the ``*_async`` terminals
+offload the *whole* pipeline — decode, transforms, encode — to a worker thread
+so they don't block the event loop in an async handler.
 """
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Callable
 from io import BytesIO
 from pathlib import Path
 from typing import IO, Protocol, Self, cast
@@ -27,6 +35,9 @@ class _Resizable(Protocol):
 
     def resize(self, size: tuple[int, int], resample: int) -> PILImage.Image: ...
 
+
+_Source = Callable[[], PILImage.Image]
+_PixelOp = Callable[[PILImage.Image], PILImage.Image]
 
 _SUPPORTED_FORMATS: dict[str, str] = {
     "jpeg": "JPEG",
@@ -55,49 +66,70 @@ def _normalize_format(fmt: str) -> str:
     return _SUPPORTED_FORMATS[key]
 
 
+def _decode_path(path: str | Path) -> PILImage.Image:
+    with PILImage.open(path) as opened:
+        opened.load()
+        return opened.copy()
+
+
+def _decode_bytes(data: bytes) -> PILImage.Image:
+    with PILImage.open(BytesIO(data)) as opened:
+        opened.load()
+        return opened.copy()
+
+
 class Image:
     """Fluent wrapper around a Pillow image. Chain operations, terminate with
-    :meth:`to_bytes` or :meth:`save`.
+    :meth:`to_bytes` / :meth:`to_bytes_async` or :meth:`save` / :meth:`save_async`.
+
+    Building is deferred and side-effect free, so an instance is reusable —
+    calling a terminal twice decodes and replays the chain each time rather
+    than mutating shared state.
     """
 
-    def __init__(self, pil_image: PILImage.Image) -> None:
-        self._image = pil_image
-        self._format: str | None = pil_image.format
+    def __init__(self, source: _Source) -> None:
+        self._source = source
+        self._ops: list[_PixelOp] = []
+        self._explicit_format: str | None = None
         self._quality: int | None = None
 
     @classmethod
     def load(cls, source: str | Path | IO[bytes] | bytes) -> Self:
         """Open an image from a path, bytes, or a binary file-like object.
 
-        The underlying file is read fully and decoded eagerly so callers can
-        close the source without losing pixels.
+        Paths and bytes decode lazily at the terminal. File-like sources are
+        read into memory now (they may be closed before the terminal runs),
+        but decoding is still deferred.
         """
         if isinstance(source, (str, Path)):
-            with PILImage.open(source) as opened:
-                opened.load()
-                return cls(opened.copy())
+            path = source
+            return cls(lambda: _decode_path(path))
         if isinstance(source, bytes):
-            with PILImage.open(BytesIO(source)) as opened:
-                opened.load()
-                return cls(opened.copy())
-        with PILImage.open(source) as opened:
-            opened.load()
-            return cls(opened.copy())
+            data = source
+            return cls(lambda: _decode_bytes(data))
+        snapshot = source.read()
+        return cls(lambda: _decode_bytes(snapshot))
 
     @property
     def width(self) -> int:
-        return self._image.width
+        """Width after replaying the chain. Forces a decode."""
+        return self._build().width
 
     @property
     def height(self) -> int:
-        return self._image.height
+        """Height after replaying the chain. Forces a decode."""
+        return self._build().height
 
     def resize(self, *, width: int, height: int) -> Self:
         """Stretch the image to the exact (width, height) box."""
         if width <= 0 or height <= 0:
             raise ValueError("width and height must be positive")
-        resizable = cast("_Resizable", self._image)
-        self._image = resizable.resize((width, height), PILImage.Resampling.LANCZOS)
+
+        def _op(image: PILImage.Image) -> PILImage.Image:
+            resizable = cast("_Resizable", image)
+            return resizable.resize((width, height), PILImage.Resampling.LANCZOS)
+
+        self._ops.append(_op)
         return self
 
     def fit(self, mode: _FitMode, width: int, height: int) -> Self:
@@ -108,20 +140,22 @@ class Image:
         """
         if width <= 0 or height <= 0:
             raise ValueError("width and height must be positive")
-        if mode == "cover":
-            fitted = ImageOps.fit(self._image, (width, height), method=PILImage.Resampling.LANCZOS)
-        elif mode == "contain":
-            copy = self._image.copy()
-            copy.thumbnail((width, height), PILImage.Resampling.LANCZOS)
-            fitted = copy
-        else:
+        if mode not in {"cover", "contain"}:
             raise ValueError(f"Unknown fit mode '{mode}'. Use 'cover' or 'contain'.")
-        self._image = fitted
+
+        def _op(image: PILImage.Image) -> PILImage.Image:
+            if mode == "cover":
+                return ImageOps.fit(image, (width, height), method=PILImage.Resampling.LANCZOS)
+            copy = image.copy()
+            copy.thumbnail((width, height), PILImage.Resampling.LANCZOS)
+            return copy
+
+        self._ops.append(_op)
         return self
 
     def crop(self, *, left: int, top: int, width: int, height: int) -> Self:
         box = (left, top, left + width, top + height)
-        self._image = self._image.crop(box)
+        self._ops.append(lambda image: image.crop(box))
         return self
 
     def quality(self, value: int) -> Self:
@@ -131,7 +165,7 @@ class Image:
         return self
 
     def format(self, image_format: str) -> Self:
-        self._format = _normalize_format(image_format)
+        self._explicit_format = _normalize_format(image_format)
         return self
 
     def optimize(self) -> Self:
@@ -140,31 +174,58 @@ class Image:
         Privacy default: EXIF is removed from JPEG output. Non-JPEG images are
         left structurally unchanged (PNG has no EXIF standard slot).
         """
-        # Auto-orient then strip EXIF by re-encoding without the exif kwarg.
-        self._image = ImageOps.exif_transpose(self._image) or self._image
+        self._ops.append(lambda image: ImageOps.exif_transpose(image) or image)
         return self
 
     def to_bytes(self, image_format: str | None = None) -> bytes:
         """Serialize the image to bytes using the chosen format (or current)."""
-        target = _normalize_format(image_format) if image_format else (self._format or "PNG")
+        image = self._build()
+        target = self._resolve_to_bytes_target(image, image_format)
         buffer = BytesIO()
         kwargs = self._save_kwargs(target)
-        self._encode_for_target(target).save(buffer, format=target, **kwargs)
+        self._encode_for_target(image, target).save(buffer, format=target, **kwargs)
         return buffer.getvalue()
+
+    async def to_bytes_async(self, image_format: str | None = None) -> bytes:
+        """Offload the whole pipeline (decode + transforms + encode) to a thread."""
+        return await asyncio.to_thread(self.to_bytes, image_format)
 
     def save(self, path: str | Path, *, image_format: str | None = None) -> Self:
         """Persist to disk. Format is taken from ``image_format``, then
-        :meth:`format`, then the file extension, then PNG.
+        :meth:`format`, then the source format, then the file extension, then PNG.
         """
-        if image_format is not None:
-            target = _normalize_format(image_format)
-        elif self._format and self._format != "MPO":
-            target = self._format
-        else:
-            target = _normalize_format(Path(path).suffix.lstrip(".") or "png")
+        image = self._build()
+        target = self._resolve_save_target(image, path, image_format)
         kwargs = self._save_kwargs(target)
-        self._encode_for_target(target).save(path, format=target, **kwargs)
+        self._encode_for_target(image, target).save(path, format=target, **kwargs)
         return self
+
+    async def save_async(self, path: str | Path, *, image_format: str | None = None) -> Self:
+        """Offload the whole pipeline (decode + transforms + encode) to a thread."""
+        return await asyncio.to_thread(self.save, path, image_format=image_format)
+
+    def _build(self) -> PILImage.Image:
+        """Decode the source and replay the recorded pixel ops, fresh each call."""
+        image = self._source()
+        for op in self._ops:
+            image = op(image)
+        return image
+
+    def _resolve_to_bytes_target(self, image: PILImage.Image, image_format: str | None) -> str:
+        if image_format is not None:
+            return _normalize_format(image_format)
+        return self._explicit_format or image.format or "PNG"
+
+    def _resolve_save_target(
+        self, image: PILImage.Image, path: str | Path, image_format: str | None
+    ) -> str:
+        if image_format is not None:
+            return _normalize_format(image_format)
+        if self._explicit_format is not None:
+            return self._explicit_format
+        if image.format and image.format != "MPO":
+            return image.format
+        return _normalize_format(Path(path).suffix.lstrip(".") or "png")
 
     def _save_kwargs(self, target: str) -> dict[str, object]:
         kwargs: dict[str, object] = {}
@@ -172,18 +233,18 @@ class Image:
             kwargs["quality"] = self._quality
         return kwargs
 
-    def _encode_for_target(self, target: str) -> PILImage.Image:
+    def _encode_for_target(self, image: PILImage.Image, target: str) -> PILImage.Image:
         """Convert the working image to a mode the target encoder accepts.
 
         JPEG cannot encode alpha — composite RGBA over white before saving.
         Other formats pass through.
         """
-        if target == "JPEG" and self._image.mode in {"RGBA", "LA", "P"}:
-            converted = self._image.convert("RGBA")
+        if target == "JPEG" and image.mode in {"RGBA", "LA", "P"}:
+            converted = image.convert("RGBA")
             background = PILImage.new("RGB", converted.size, (255, 255, 255))
             background.paste(converted, mask=converted.split()[-1])
             return background
-        return self._image
+        return image
 
     def __repr__(self) -> str:  # pragma: no cover - cosmetic
-        return f"<Image {self.width}x{self.height} format={self._format}>"
+        return f"<Image ops={len(self._ops)} format={self._explicit_format}>"
