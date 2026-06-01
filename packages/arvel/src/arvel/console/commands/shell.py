@@ -20,10 +20,11 @@ import importlib
 import importlib.util
 import logging
 import sys
+from collections.abc import Callable
 from contextvars import Token
 from pathlib import Path
 from types import ModuleType
-from typing import Annotated, Any, ClassVar
+from typing import Annotated, Any, ClassVar, cast
 
 import typer
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -148,7 +149,8 @@ class ShellCommand(Command):
             from IPython.core.async_helpers import get_asyncio_loop  # noqa: PLC0415
         except ImportError:
             return asyncio.new_event_loop(), True
-        return get_asyncio_loop(), False
+        typed_get_loop = cast("Callable[[], asyncio.AbstractEventLoop]", get_asyncio_loop)
+        return typed_get_loop(), False
 
     # ------------------------------------------------------------------ public
 
@@ -344,7 +346,7 @@ def _find_loaded_module(file_path: Path) -> ModuleType | None:
         try:
             if Path(mod_file).resolve() == target:
                 return module
-        except (OSError, ValueError):
+        except OSError, ValueError:
             continue
     return None
 
