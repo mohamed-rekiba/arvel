@@ -44,3 +44,38 @@ async def test_amake_falls_back_to_sync_for_sync_bindings() -> None:
     c.bind(Service)
     obj = await c.amake(Service)
     assert isinstance(obj, Service)
+
+
+class Dep:
+    def __init__(self) -> None:
+        self.tag = "dep"
+
+
+class Handler:
+    def run(self, dep: Dep, *, label: str) -> str:
+        return f"{label}:{dep.tag}"
+
+
+async def test_acall_injects_bound_dependency_and_honours_overrides() -> None:
+    from arvel.container import Container
+
+    c = Container()
+    c.bind(Dep)
+    # `dep` is type-resolved from the container; `label` comes from overrides.
+    result = await c.acall(Handler, "run", overrides={"label": "hi"})
+    assert result == "hi:dep"
+
+
+class UnboundHandler:
+    def run(self, missing: Service) -> str:
+        # `missing` is unbound, so acall leaves it out and the call would fail
+        # unless supplied via overrides. Here we pass it explicitly.
+        return f"got:{type(missing).__name__}"
+
+
+async def test_acall_skips_unbound_param_uses_override() -> None:
+    from arvel.container import Container
+
+    c = Container()
+    result = await c.acall(UnboundHandler, "run", overrides={"missing": Service()})
+    assert result == "got:Service"

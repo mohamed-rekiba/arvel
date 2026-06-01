@@ -286,3 +286,35 @@ def test_values_returns_new_collection() -> None:
     assert isinstance(copy, Collection)
     assert list(copy) == [1, 2, 3]
     assert copy is not coll
+
+
+def test_last_with_predicate_no_match_returns_none() -> None:
+    assert Collection([1, 2, 3]).last(lambda x: x > 10) is None
+
+
+def test_intersect_keeps_shared_identities() -> None:
+    a, b = object(), object()
+    coll = Collection([a, b])
+    assert list(coll.intersect([a])) == [a]
+
+
+def test_diff_drops_shared_identities() -> None:
+    a, b = object(), object()
+    coll = Collection([a, b])
+    assert list(coll.diff([a])) == [b]
+
+
+def test_to_json_with_to_dict_objects() -> None:
+    import json
+
+    class Row:
+        def to_dict(self) -> dict[str, int]:
+            return {"n": 1}
+
+    assert json.loads(Collection([Row()]).to_json()) == [{"n": 1}]
+
+
+def test_to_json_with_plain_scalars() -> None:
+    import json
+
+    assert json.loads(Collection([1, 2, 3]).to_json()) == [1, 2, 3]

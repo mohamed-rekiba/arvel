@@ -134,3 +134,40 @@ def test_discover_config_files_empty_directory_returns_empty_list(tmp_path: Path
     found = discover_config_files(tmp_path)
 
     assert found == []
+
+
+def test_discover_config_files_path_is_a_file_raises(tmp_path: Path) -> None:
+    a_file = tmp_path / "app.py"
+    a_file.touch()
+
+    with pytest.raises(NotADirectoryError):
+        discover_config_files(a_file)
+
+
+def test_load_module_unsupported_extension_raises_loader_error(tmp_path: Path) -> None:
+    """A path with no importable loader (e.g. ``.txt``) raises LoaderError."""
+    path = tmp_path / "data.txt"
+    path.write_text("not python\n")
+
+    with pytest.raises(LoaderError):
+        load_module_from_path(path, f"{NAMESPACE_PREFIX}.tests.data_txt")
+
+
+def test_load_module_caches_and_clear_forces_reload(tmp_path: Path) -> None:
+    """Unchanged (path, mtime) is served from cache; clear_module_cache reloads."""
+    from arvel.application import _loader
+
+    path = tmp_path / "cached.py"
+    path.write_text("X = 1\n")
+    name = f"{NAMESPACE_PREFIX}.tests.cache_clear"
+
+    try:
+        first = load_module_from_path(path, name)
+        # Same (path, mtime) -> cache hit returns the identical object.
+        assert load_module_from_path(path, name) is first
+
+        _loader.clear_module_cache()
+        assert load_module_from_path(path, name) is not first
+    finally:
+        sys.modules.pop(name, None)
+        _loader.clear_module_cache()
