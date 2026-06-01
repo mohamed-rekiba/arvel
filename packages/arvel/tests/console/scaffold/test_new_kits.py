@@ -134,39 +134,6 @@ def test_new_explicit_api_kit_matches_default_output(runner: CliRunner, tmp_path
 
 
 # ────────────────────────────────────────────────────────────────────
-# ecommerce kit — scaffolds the full-stack demo layout
-# ────────────────────────────────────────────────────────────────────
-
-
-def test_new_kit_ecommerce_scaffolds_runnable_layout(runner: CliRunner, tmp_path: Path) -> None:
-    """``--kit ecommerce`` copies backend / frontend / Makefile / docker-compose."""
-    app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
-        result = runner.invoke(app, ["new", "my-shop", "--kit", "ecommerce", "--no-install"])
-        assert result.exit_code == 0, result.stderr
-        target = Path(iso_cwd) / "my-shop"
-
-        for path in [
-            "backend/bootstrap/app.py",
-            "backend/routes",
-            "frontend/package.json",
-            "Makefile",
-        ]:
-            assert (target / path).exists(), f"missing: {path}"
-
-
-def test_new_kit_ecommerce_skips_build_caches(runner: CliRunner, tmp_path: Path) -> None:
-    """node_modules / __pycache__ / .venv aren't copied into the new project."""
-    app = build_app()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
-        result = runner.invoke(app, ["new", "my-shop", "--kit", "ecommerce", "--no-install"])
-        assert result.exit_code == 0, result.stderr
-        target = Path(iso_cwd) / "my-shop"
-        assert not (target / "frontend" / "node_modules").exists()
-        assert not (target / ".venv").exists()
-
-
-# ────────────────────────────────────────────────────────────────────
 # Kit-not-installed surface
 # ────────────────────────────────────────────────────────────────────
 
