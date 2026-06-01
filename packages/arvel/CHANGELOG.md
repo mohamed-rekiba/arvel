@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.6.1...arvel-v0.7.0) (2026-06-01)
+
+
+### Features
+
+* **console:** make:* companion generation + REPL/CLI loop fixes ([9f5571d](https://github.com/mohamed-rekiba/arvel/commit/9f5571d18943c5e909d44ef3955acd202b4c64b4))
+
+
+### Bug Fixes
+
+* **console:** expose public generate() for make companions ([ca1e204](https://github.com/mohamed-rekiba/arvel/commit/ca1e204ed86c96413ecd42956a3ba7d95960bb4b))
+* **console:** reuse boot-imported model modules in shell ([edbf2f8](https://github.com/mohamed-rekiba/arvel/commit/edbf2f8c0c8392f4a8212504a5bacdf3021eeae3))
+* resolve skeleton missing dev packages nad database seeder ([80ac1dd](https://github.com/mohamed-rekiba/arvel/commit/80ac1ddff4e727379029fffc26973655882e8e16))
+
 ## [0.6.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.6.0...arvel-v0.6.1) (2026-06-01)
 
 
