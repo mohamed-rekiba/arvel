@@ -2,10 +2,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  apiAdminPermissionsIndexApiAdminPermissionsGet,
-  apiAdminRolesIndexApiAdminRolesGet,
+  adminRolesPermissionsIndexApiAdminRolesPermissionsGet,
+  adminRolesIndexApiAdminRolesGet,
 } from '@/api/admin-roles-permissions/admin-roles-permissions'
-import { apiAdminTranslationsIndexApiAdminTranslationsGet } from '@/api/admin-translations/admin-translations'
+import { adminTranslationsIndexApiAdminTranslationsGet } from '@/api/admin-translations/admin-translations'
 import type { PermissionOut, RoleOut, TranslationEntryOut } from '@/api/schemas'
 import { pickLocalized } from '@/lib/i18n'
 
@@ -30,13 +30,13 @@ onMounted(async () => {
   try {
     if (props.pageType === 'roles') {
       const [rolesOut, permsOut] = await Promise.all([
-        apiAdminRolesIndexApiAdminRolesGet(),
-        apiAdminPermissionsIndexApiAdminPermissionsGet(),
+        adminRolesIndexApiAdminRolesGet(),
+        adminRolesPermissionsIndexApiAdminRolesPermissionsGet(),
       ])
       roles.value = rolesOut.data
       permissions.value = permsOut.data
     } else {
-      translations.value = (await apiAdminTranslationsIndexApiAdminTranslationsGet()).data
+      translations.value = (await adminTranslationsIndexApiAdminTranslationsGet()).data
     }
   } finally {
     loading.value = false

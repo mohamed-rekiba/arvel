@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { storefrontCategoriesIndexApiCategoriesGet } from '@/api/default/default'
+import { storefrontCategoriesIndexApiCategoriesGet } from '@/api/storefront/storefront'
 import type { AdminCategoryOut } from '@/api/schemas'
 
 export const useCategoriesStore = defineStore('storefront-categories', () => {

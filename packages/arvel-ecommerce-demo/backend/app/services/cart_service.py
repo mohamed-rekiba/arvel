@@ -34,7 +34,7 @@ class CartService:
         total = float(
             sum(Decimal(str(i.unit_price_snapshot or 0)) * int(i.quantity) for i in items)
         )
-        return {"items": formatted, "total": total}
+        return {"id": str(cart_id), "items": formatted, "total": total}
 
     async def add_item(
         self, user_id: int, product_id: str, quantity: int, *, locale: str = "en"

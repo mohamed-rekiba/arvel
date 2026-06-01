@@ -4,8 +4,10 @@
  * FastAPI
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminVendorsIndexApiAdminVendorsGetTrashed } from './adminVendorsIndexApiAdminVendorsGetTrashed'
 
 export type AdminVendorsIndexApiAdminVendorsGetParams = {
+  trashed?: AdminVendorsIndexApiAdminVendorsGetTrashed
   limit?: number
   offset?: number
 }

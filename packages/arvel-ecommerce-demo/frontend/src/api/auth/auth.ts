@@ -21,12 +21,12 @@ import { unref } from 'vue'
 import type { MaybeRef } from 'vue'
 
 import type {
-  ApiErrorOut,
-  LoginPayload,
+  AuthEnvelopeUserResource,
+  HTTPValidationError,
+  LoginRequest,
+  LoginResponse,
   MeOut,
-  RegisterOut,
-  RegisterPayload,
-  TokenOut,
+  RegisterRequest,
 } from '.././schemas'
 
 import { request } from '../../lib/api'
@@ -34,52 +34,46 @@ import { request } from '../../lib/api'
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.Auth.Login
+ * ``POST /auth/login`` — issue JWT + set refresh/CSRF cookie pair.
+ * @summary Auth.Login
  */
-export const apiAuthLoginApiAuthLoginPost = (
-  loginPayload: MaybeRef<LoginPayload>,
+export const authLoginApiAuthLoginPost = (
+  loginRequest: MaybeRef<LoginRequest>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
-  loginPayload = unref(loginPayload)
+  loginRequest = unref(loginRequest)
 
-  return request<TokenOut>(
+  return request<LoginResponse>(
     {
       url: `/api/auth/login`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      data: loginPayload,
+      data: loginRequest,
       signal,
     },
     options,
   )
 }
 
-export const getApiAuthLoginApiAuthLoginPostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAuthLoginApiAuthLoginPostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAuthLoginApiAuthLoginPost>>,
+    Awaited<ReturnType<typeof authLoginApiAuthLoginPost>>,
     TError,
-    { data: LoginPayload },
+    { data: LoginRequest },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAuthLoginApiAuthLoginPost>>,
+  Awaited<ReturnType<typeof authLoginApiAuthLoginPost>>,
   TError,
-  { data: LoginPayload },
+  { data: LoginRequest },
   TContext
 > => {
-  const mutationKey = ['apiAuthLoginApiAuthLoginPost']
+  const mutationKey = ['authLoginApiAuthLoginPost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -87,142 +81,194 @@ export const getApiAuthLoginApiAuthLoginPostMutationOptions = <
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAuthLoginApiAuthLoginPost>>,
-    { data: LoginPayload }
+    Awaited<ReturnType<typeof authLoginApiAuthLoginPost>>,
+    { data: LoginRequest }
   > = (props) => {
     const { data } = props ?? {}
 
-    return apiAuthLoginApiAuthLoginPost(data, requestOptions)
+    return authLoginApiAuthLoginPost(data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAuthLoginApiAuthLoginPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAuthLoginApiAuthLoginPost>>
+export type AuthLoginApiAuthLoginPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof authLoginApiAuthLoginPost>>
 >
-export type ApiAuthLoginApiAuthLoginPostMutationBody = LoginPayload
-export type ApiAuthLoginApiAuthLoginPostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AuthLoginApiAuthLoginPostMutationBody = LoginRequest
+export type AuthLoginApiAuthLoginPostMutationError = HTTPValidationError
 
 /**
- * @summary Api.Auth.Login
+ * @summary Auth.Login
  */
-export const useApiAuthLoginApiAuthLoginPost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(
+export const useAuthLoginApiAuthLoginPost = <TError = HTTPValidationError, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAuthLoginApiAuthLoginPost>>,
+      Awaited<ReturnType<typeof authLoginApiAuthLoginPost>>,
       TError,
-      { data: LoginPayload },
+      { data: LoginRequest },
       TContext
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAuthLoginApiAuthLoginPost>>,
+  Awaited<ReturnType<typeof authLoginApiAuthLoginPost>>,
   TError,
-  { data: LoginPayload },
+  { data: LoginRequest },
   TContext
 > => {
-  const mutationOptions = getApiAuthLoginApiAuthLoginPostMutationOptions(options)
+  const mutationOptions = getAuthLoginApiAuthLoginPostMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Auth.Me
+ * ``POST /auth/register`` — create a user and queue a verification email.
+ * @summary Auth.Register
  */
-export const apiAuthMeApiAuthMeGet = (
+export const authRegisterApiAuthRegisterPost = (
+  registerRequest: MaybeRef<RegisterRequest>,
+  options?: SecondParameter<typeof request>,
+  signal?: AbortSignal,
+) => {
+  registerRequest = unref(registerRequest)
+
+  return request<AuthEnvelopeUserResource>(
+    {
+      url: `/api/auth/register`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: registerRequest,
+      signal,
+    },
+    options,
+  )
+}
+
+export const getAuthRegisterApiAuthRegisterPostMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof authRegisterApiAuthRegisterPost>>,
+    TError,
+    { data: RegisterRequest },
+    TContext
+  >
+  request?: SecondParameter<typeof request>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof authRegisterApiAuthRegisterPost>>,
+  TError,
+  { data: RegisterRequest },
+  TContext
+> => {
+  const mutationKey = ['authRegisterApiAuthRegisterPost']
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof authRegisterApiAuthRegisterPost>>,
+    { data: RegisterRequest }
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return authRegisterApiAuthRegisterPost(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AuthRegisterApiAuthRegisterPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof authRegisterApiAuthRegisterPost>>
+>
+export type AuthRegisterApiAuthRegisterPostMutationBody = RegisterRequest
+export type AuthRegisterApiAuthRegisterPostMutationError = HTTPValidationError
+
+/**
+ * @summary Auth.Register
+ */
+export const useAuthRegisterApiAuthRegisterPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof authRegisterApiAuthRegisterPost>>,
+      TError,
+      { data: RegisterRequest },
+      TContext
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof authRegisterApiAuthRegisterPost>>,
+  TError,
+  { data: RegisterRequest },
+  TContext
+> => {
+  const mutationOptions = getAuthRegisterApiAuthRegisterPostMutationOptions(options)
+
+  return useMutation(mutationOptions, queryClient)
+}
+/**
+ * @summary Auth.Me
+ */
+export const authMeApiAuthMeGet = (
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
   return request<MeOut>({ url: `/api/auth/me`, method: 'GET', signal }, options)
 }
 
-export const getApiAuthMeApiAuthMeGetQueryKey = () => {
+export const getAuthMeApiAuthMeGetQueryKey = () => {
   return ['api', 'auth', 'me'] as const
 }
 
-export const getApiAuthMeApiAuthMeGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAuthMeApiAuthMeGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAuthMeApiAuthMeGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof authMeApiAuthMeGet>>,
+  TError = unknown,
 >(options?: {
-  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof apiAuthMeApiAuthMeGet>>, TError, TData>>
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof authMeApiAuthMeGet>>, TError, TData>>
   request?: SecondParameter<typeof request>
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAuthMeApiAuthMeGetQueryKey()
+  const queryKey = getAuthMeApiAuthMeGetQueryKey()
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof apiAuthMeApiAuthMeGet>>> = ({ signal }) =>
-    apiAuthMeApiAuthMeGet(requestOptions, signal)
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof authMeApiAuthMeGet>>> = ({ signal }) =>
+    authMeApiAuthMeGet(requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAuthMeApiAuthMeGet>>,
+    Awaited<ReturnType<typeof authMeApiAuthMeGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAuthMeApiAuthMeGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAuthMeApiAuthMeGet>>
+export type AuthMeApiAuthMeGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof authMeApiAuthMeGet>>
 >
-export type ApiAuthMeApiAuthMeGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AuthMeApiAuthMeGetQueryError = unknown
 
 /**
- * @summary Api.Auth.Me
+ * @summary Auth.Me
  */
 
-export function useApiAuthMeApiAuthMeGet<
-  TData = Awaited<ReturnType<typeof apiAuthMeApiAuthMeGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAuthMeApiAuthMeGet<
+  TData = Awaited<ReturnType<typeof authMeApiAuthMeGet>>,
+  TError = unknown,
 >(
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiAuthMeApiAuthMeGet>>, TError, TData>
-    >
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof authMeApiAuthMeGet>>, TError, TData>>
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAuthMeApiAuthMeGetQueryOptions(options)
+  const queryOptions = getAuthMeApiAuthMeGetQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -231,118 +277,4 @@ export function useApiAuthMeApiAuthMeGet<
   query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
   return query
-}
-
-/**
- * Auto-verifies email so the user can log in immediately — demo has no email flow.
- * @summary Api.Auth.Register
- */
-export const apiAuthRegisterApiAuthRegisterPost = (
-  registerPayload: MaybeRef<RegisterPayload>,
-  options?: SecondParameter<typeof request>,
-  signal?: AbortSignal,
-) => {
-  registerPayload = unref(registerPayload)
-
-  return request<RegisterOut>(
-    {
-      url: `/api/auth/register`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: registerPayload,
-      signal,
-    },
-    options,
-  )
-}
-
-export const getApiAuthRegisterApiAuthRegisterPostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAuthRegisterApiAuthRegisterPost>>,
-    TError,
-    { data: RegisterPayload },
-    TContext
-  >
-  request?: SecondParameter<typeof request>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAuthRegisterApiAuthRegisterPost>>,
-  TError,
-  { data: RegisterPayload },
-  TContext
-> => {
-  const mutationKey = ['apiAuthRegisterApiAuthRegisterPost']
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAuthRegisterApiAuthRegisterPost>>,
-    { data: RegisterPayload }
-  > = (props) => {
-    const { data } = props ?? {}
-
-    return apiAuthRegisterApiAuthRegisterPost(data, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type ApiAuthRegisterApiAuthRegisterPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAuthRegisterApiAuthRegisterPost>>
->
-export type ApiAuthRegisterApiAuthRegisterPostMutationBody = RegisterPayload
-export type ApiAuthRegisterApiAuthRegisterPostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-
-/**
- * @summary Api.Auth.Register
- */
-export const useApiAuthRegisterApiAuthRegisterPost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAuthRegisterApiAuthRegisterPost>>,
-      TError,
-      { data: RegisterPayload },
-      TContext
-    >
-    request?: SecondParameter<typeof request>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAuthRegisterApiAuthRegisterPost>>,
-  TError,
-  { data: RegisterPayload },
-  TContext
-> => {
-  const mutationOptions = getApiAuthRegisterApiAuthRegisterPostMutationOptions(options)
-
-  return useMutation(mutationOptions, queryClient)
 }

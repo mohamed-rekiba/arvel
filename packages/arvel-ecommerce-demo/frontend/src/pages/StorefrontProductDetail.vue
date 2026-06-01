@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import ProductRating from '@/components/storefront/ProductRating.vue'
 import { fetchProductBySlug } from '../lib/api'
-import { useApiProductsShowApiProductsSlugGet } from '@/api/storefront/storefront'
+import { useStorefrontShowApiProductsSlugGet } from '@/api/storefront/storefront'
 import { formatCurrency, routeParam, toSupportedLocale } from '@/lib/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
@@ -23,7 +23,7 @@ const adding = ref(false)
 const currentLocale = computed(() => toSupportedLocale(locale.value))
 const slug = computed(() => routeParam(route.params.slug))
 
-const { data: productWrapper, isPending } = useApiProductsShowApiProductsSlugGet(
+const { data: productWrapper, isPending } = useStorefrontShowApiProductsSlugGet(
   slug,
   computed(() => ({ locale: currentLocale.value })),
 )

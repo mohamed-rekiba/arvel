@@ -123,6 +123,24 @@ const router = createRouter({
           props: { catalog: 'vendors' },
         },
         {
+          path: '/admin/products/new',
+          name: 'admin-product-new',
+          component: () => import('@/pages/AdminCatalogEditPage.vue'),
+          props: { catalog: 'products', mode: 'create' },
+        },
+        {
+          path: '/admin/categories/new',
+          name: 'admin-category-new',
+          component: () => import('@/pages/AdminCatalogEditPage.vue'),
+          props: { catalog: 'categories', mode: 'create' },
+        },
+        {
+          path: '/admin/vendors/new',
+          name: 'admin-vendor-new',
+          component: () => import('@/pages/AdminCatalogEditPage.vue'),
+          props: { catalog: 'vendors', mode: 'create' },
+        },
+        {
           path: '/admin/products/:editId/edit',
           name: 'admin-product-edit',
           component: () => import('@/pages/AdminCatalogEditPage.vue'),

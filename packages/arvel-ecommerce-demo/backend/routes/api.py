@@ -42,7 +42,7 @@ async def healthz() -> dict[str, str]:
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
-with Route.group(prefix="/api/auth", name_prefix="auth.", middleware=DB_TX):
+with Route.group(prefix="/api/auth", name_prefix="auth.", middleware=DB_TX, tags=["Auth"]):
     Route.post("/login", controller=AuthController, action="login", name="login")
     Route.post("/register", controller=AuthController, action="register", name="register")
     Route.get("/me", controller=AuthController, action="me", name="me")
@@ -50,7 +50,7 @@ with Route.group(prefix="/api/auth", name_prefix="auth.", middleware=DB_TX):
 
 # ─── Public storefront ────────────────────────────────────────────────────────
 
-with Route.group(prefix="/api", name_prefix="storefront.", middleware=DB_TX):
+with Route.group(prefix="/api", name_prefix="storefront.", middleware=DB_TX, tags=["Storefront"]):
     Route.get("/products", controller=StorefrontController, action="index", name="index")
     Route.get("/products/{slug}", controller=StorefrontController, action="show", name="show")
     # /categories must be registered before /{slug} variants to avoid shadowing
@@ -77,7 +77,7 @@ with Route.group(prefix="/api", name_prefix="storefront.", middleware=DB_TX):
 
 # ─── Cart ─────────────────────────────────────────────────────────────────────
 
-with Route.group(prefix="/api/cart", name_prefix="cart.", middleware=DB_TX):
+with Route.group(prefix="/api/cart", name_prefix="cart.", middleware=DB_TX, tags=["Cart"]):
     Route.get("", controller=CartController, action="show", name="show")
     Route.post("/items", controller=CartController, action="add_item", name="items.store")
     Route.patch(
@@ -96,7 +96,7 @@ with Route.group(prefix="/api/cart", name_prefix="cart.", middleware=DB_TX):
 
 # ─── Checkout ─────────────────────────────────────────────────────────────────
 
-with Route.group(prefix="/api", middleware=DB_TX):
+with Route.group(prefix="/api", middleware=DB_TX, tags=["Checkout"]):
     Route.post(
         "/checkout",
         controller=CheckoutController,
@@ -108,7 +108,7 @@ with Route.group(prefix="/api", middleware=DB_TX):
 
 # ─── Account ──────────────────────────────────────────────────────────────────
 
-with Route.group(prefix="/api/account", name_prefix="account.", middleware=DB_TX):
+with Route.group(prefix="/api/account", name_prefix="account.", middleware=DB_TX, tags=["Account"]):
     Route.get("/orders", controller=AccountController, action="list_orders", name="orders.index")
     Route.get(
         "/orders/{order_id}",
@@ -120,7 +120,7 @@ with Route.group(prefix="/api/account", name_prefix="account.", middleware=DB_TX
 
 # ─── i18n ─────────────────────────────────────────────────────────────────────
 
-with Route.group(prefix="/api/i18n", name_prefix="i18n."):
+with Route.group(prefix="/api/i18n", name_prefix="i18n.", tags=["I18n"]):
     Route.get("/{locale}", controller=I18nController, action="catalogue", name="catalogue")
 
 
@@ -128,7 +128,7 @@ with Route.group(prefix="/api/i18n", name_prefix="i18n."):
 
 with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
     # Products
-    with Route.group(prefix="/products", name_prefix="products."):
+    with Route.group(prefix="/products", name_prefix="products.", tags=["Admin Products"]):
         Route.get("", controller=AdminProductsController, action="index", name="index")
         Route.post(
             "", controller=AdminProductsController, action="store", name="store", status_code=201
@@ -203,7 +203,7 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
         )
 
     # Categories
-    with Route.group(prefix="/categories", name_prefix="categories."):
+    with Route.group(prefix="/categories", name_prefix="categories.", tags=["Admin Categories"]):
         Route.get("", controller=AdminCategoriesController, action="index", name="index")
         Route.post(
             "", controller=AdminCategoriesController, action="store", name="store", status_code=201
@@ -252,7 +252,7 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
         )
 
     # Vendors
-    with Route.group(prefix="/vendors", name_prefix="vendors."):
+    with Route.group(prefix="/vendors", name_prefix="vendors.", tags=["Admin Vendors"]):
         Route.get("", controller=AdminVendorsController, action="index", name="index")
         Route.post(
             "", controller=AdminVendorsController, action="store", name="store", status_code=201
@@ -301,7 +301,7 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
         )
 
     # Orders
-    with Route.group(prefix="/orders", name_prefix="orders."):
+    with Route.group(prefix="/orders", name_prefix="orders.", tags=["Admin Orders"]):
         Route.get("", controller=AdminOrdersController, action="index", name="index")
         # Static segments must come before /{order_id} to avoid route conflicts.
         Route.get(
@@ -324,7 +324,7 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
         )
 
     # Users
-    with Route.group(prefix="/users", name_prefix="users."):
+    with Route.group(prefix="/users", name_prefix="users.", tags=["Admin Users"]):
         Route.get("", controller=AdminUsersController, action="index", name="index")
         Route.get("/{user_id}", controller=AdminUsersController, action="show", name="show")
         Route.delete(
@@ -380,7 +380,7 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
         )
 
     # Roles
-    with Route.group(prefix="/roles", name_prefix="roles."):
+    with Route.group(prefix="/roles", name_prefix="roles.", tags=["Admin Roles Permissions"]):
         Route.get("", controller=AdminRolesController, action="index", name="index")
         Route.get(
             "/permissions",
@@ -390,7 +390,9 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
         )
 
     # Translations
-    with Route.group(prefix="/translations", name_prefix="translations."):
+    with Route.group(
+        prefix="/translations", name_prefix="translations.", tags=["Admin Translations"]
+    ):
         Route.get("", controller=AdminTranslationsController, action="index", name="index")
 
 

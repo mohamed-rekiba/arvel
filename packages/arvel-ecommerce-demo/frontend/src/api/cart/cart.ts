@@ -22,12 +22,12 @@ import type { MaybeRef } from 'vue'
 
 import type {
   AddCartItemPayload,
-  ApiCartItemsAddApiCartItemsPostParams,
-  ApiCartItemsRemoveApiCartItemsItemIdDeleteParams,
-  ApiCartItemsUpdateApiCartItemsItemIdPatchParams,
-  ApiCartShowApiCartGetParams,
-  ApiErrorOut,
+  CartItemsDestroyApiCartItemsItemIdDeleteParams,
+  CartItemsStoreApiCartItemsPostParams,
+  CartItemsUpdateApiCartItemsItemIdPatchParams,
+  CartShowApiCartGetParams,
   CartWrapperOut,
+  HTTPValidationError,
   UpdateCartItemPayload,
 } from '.././schemas'
 
@@ -36,10 +36,10 @@ import { request } from '../../lib/api'
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.Cart.Show
+ * @summary Cart.Show
  */
-export const apiCartShowApiCartGet = (
-  params?: MaybeRef<ApiCartShowApiCartGetParams>,
+export const cartShowApiCartGet = (
+  params?: MaybeRef<CartShowApiCartGetParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
@@ -51,82 +51,55 @@ export const apiCartShowApiCartGet = (
   )
 }
 
-export const getApiCartShowApiCartGetQueryKey = (
-  params?: MaybeRef<ApiCartShowApiCartGetParams>,
-) => {
+export const getCartShowApiCartGetQueryKey = (params?: MaybeRef<CartShowApiCartGetParams>) => {
   return ['api', 'cart', ...(params ? [params] : [])] as const
 }
 
-export const getApiCartShowApiCartGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiCartShowApiCartGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getCartShowApiCartGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof cartShowApiCartGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiCartShowApiCartGetParams>,
+  params?: MaybeRef<CartShowApiCartGetParams>,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiCartShowApiCartGet>>, TError, TData>
-    >
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cartShowApiCartGet>>, TError, TData>>
     request?: SecondParameter<typeof request>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiCartShowApiCartGetQueryKey(params)
+  const queryKey = getCartShowApiCartGetQueryKey(params)
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof apiCartShowApiCartGet>>> = ({ signal }) =>
-    apiCartShowApiCartGet(params, requestOptions, signal)
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof cartShowApiCartGet>>> = ({ signal }) =>
+    cartShowApiCartGet(params, requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiCartShowApiCartGet>>,
+    Awaited<ReturnType<typeof cartShowApiCartGet>>,
     TError,
     TData
   >
 }
 
-export type ApiCartShowApiCartGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiCartShowApiCartGet>>
+export type CartShowApiCartGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof cartShowApiCartGet>>
 >
-export type ApiCartShowApiCartGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type CartShowApiCartGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Cart.Show
+ * @summary Cart.Show
  */
 
-export function useApiCartShowApiCartGet<
-  TData = Awaited<ReturnType<typeof apiCartShowApiCartGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useCartShowApiCartGet<
+  TData = Awaited<ReturnType<typeof cartShowApiCartGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiCartShowApiCartGetParams>,
+  params?: MaybeRef<CartShowApiCartGetParams>,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiCartShowApiCartGet>>, TError, TData>
-    >
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cartShowApiCartGet>>, TError, TData>>
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiCartShowApiCartGetQueryOptions(params, options)
+  const queryOptions = getCartShowApiCartGetQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -138,11 +111,11 @@ export function useApiCartShowApiCartGet<
 }
 
 /**
- * @summary Api.Cart.Items.Add
+ * @summary Cart.Items.Store
  */
-export const apiCartItemsAddApiCartItemsPost = (
+export const cartItemsStoreApiCartItemsPost = (
   addCartItemPayload: MaybeRef<AddCartItemPayload>,
-  params?: MaybeRef<ApiCartItemsAddApiCartItemsPostParams>,
+  params?: MaybeRef<CartItemsStoreApiCartItemsPostParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
@@ -162,31 +135,24 @@ export const apiCartItemsAddApiCartItemsPost = (
   )
 }
 
-export const getApiCartItemsAddApiCartItemsPostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getCartItemsStoreApiCartItemsPostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiCartItemsAddApiCartItemsPost>>,
+    Awaited<ReturnType<typeof cartItemsStoreApiCartItemsPost>>,
     TError,
-    { data: AddCartItemPayload; params?: ApiCartItemsAddApiCartItemsPostParams },
+    { data: AddCartItemPayload; params?: CartItemsStoreApiCartItemsPostParams },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiCartItemsAddApiCartItemsPost>>,
+  Awaited<ReturnType<typeof cartItemsStoreApiCartItemsPost>>,
   TError,
-  { data: AddCartItemPayload; params?: ApiCartItemsAddApiCartItemsPostParams },
+  { data: AddCartItemPayload; params?: CartItemsStoreApiCartItemsPostParams },
   TContext
 > => {
-  const mutationKey = ['apiCartItemsAddApiCartItemsPost']
+  const mutationKey = ['cartItemsStoreApiCartItemsPost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -194,71 +160,54 @@ export const getApiCartItemsAddApiCartItemsPostMutationOptions = <
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiCartItemsAddApiCartItemsPost>>,
-    { data: AddCartItemPayload; params?: ApiCartItemsAddApiCartItemsPostParams }
+    Awaited<ReturnType<typeof cartItemsStoreApiCartItemsPost>>,
+    { data: AddCartItemPayload; params?: CartItemsStoreApiCartItemsPostParams }
   > = (props) => {
     const { data, params } = props ?? {}
 
-    return apiCartItemsAddApiCartItemsPost(data, params, requestOptions)
+    return cartItemsStoreApiCartItemsPost(data, params, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiCartItemsAddApiCartItemsPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiCartItemsAddApiCartItemsPost>>
+export type CartItemsStoreApiCartItemsPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cartItemsStoreApiCartItemsPost>>
 >
-export type ApiCartItemsAddApiCartItemsPostMutationBody = AddCartItemPayload
-export type ApiCartItemsAddApiCartItemsPostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type CartItemsStoreApiCartItemsPostMutationBody = AddCartItemPayload
+export type CartItemsStoreApiCartItemsPostMutationError = HTTPValidationError
 
 /**
- * @summary Api.Cart.Items.Add
+ * @summary Cart.Items.Store
  */
-export const useApiCartItemsAddApiCartItemsPost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(
+export const useCartItemsStoreApiCartItemsPost = <TError = HTTPValidationError, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiCartItemsAddApiCartItemsPost>>,
+      Awaited<ReturnType<typeof cartItemsStoreApiCartItemsPost>>,
       TError,
-      { data: AddCartItemPayload; params?: ApiCartItemsAddApiCartItemsPostParams },
+      { data: AddCartItemPayload; params?: CartItemsStoreApiCartItemsPostParams },
       TContext
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiCartItemsAddApiCartItemsPost>>,
+  Awaited<ReturnType<typeof cartItemsStoreApiCartItemsPost>>,
   TError,
-  { data: AddCartItemPayload; params?: ApiCartItemsAddApiCartItemsPostParams },
+  { data: AddCartItemPayload; params?: CartItemsStoreApiCartItemsPostParams },
   TContext
 > => {
-  const mutationOptions = getApiCartItemsAddApiCartItemsPostMutationOptions(options)
+  const mutationOptions = getCartItemsStoreApiCartItemsPostMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Cart.Items.Update
+ * @summary Cart.Items.Update
  */
-export const apiCartItemsUpdateApiCartItemsItemIdPatch = (
+export const cartItemsUpdateApiCartItemsItemIdPatch = (
   itemId: MaybeRef<string>,
   updateCartItemPayload: MaybeRef<UpdateCartItemPayload>,
-  params?: MaybeRef<ApiCartItemsUpdateApiCartItemsItemIdPatchParams>,
+  params?: MaybeRef<CartItemsUpdateApiCartItemsItemIdPatchParams>,
   options?: SecondParameter<typeof request>,
 ) => {
   itemId = unref(itemId)
@@ -277,39 +226,32 @@ export const apiCartItemsUpdateApiCartItemsItemIdPatch = (
   )
 }
 
-export const getApiCartItemsUpdateApiCartItemsItemIdPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getCartItemsUpdateApiCartItemsItemIdPatchMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiCartItemsUpdateApiCartItemsItemIdPatch>>,
+    Awaited<ReturnType<typeof cartItemsUpdateApiCartItemsItemIdPatch>>,
     TError,
     {
       itemId: string
       data: UpdateCartItemPayload
-      params?: ApiCartItemsUpdateApiCartItemsItemIdPatchParams
+      params?: CartItemsUpdateApiCartItemsItemIdPatchParams
     },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiCartItemsUpdateApiCartItemsItemIdPatch>>,
+  Awaited<ReturnType<typeof cartItemsUpdateApiCartItemsItemIdPatch>>,
   TError,
   {
     itemId: string
     data: UpdateCartItemPayload
-    params?: ApiCartItemsUpdateApiCartItemsItemIdPatchParams
+    params?: CartItemsUpdateApiCartItemsItemIdPatchParams
   },
   TContext
 > => {
-  const mutationKey = ['apiCartItemsUpdateApiCartItemsItemIdPatch']
+  const mutationKey = ['cartItemsUpdateApiCartItemsItemIdPatch']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -317,56 +259,42 @@ export const getApiCartItemsUpdateApiCartItemsItemIdPatchMutationOptions = <
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiCartItemsUpdateApiCartItemsItemIdPatch>>,
+    Awaited<ReturnType<typeof cartItemsUpdateApiCartItemsItemIdPatch>>,
     {
       itemId: string
       data: UpdateCartItemPayload
-      params?: ApiCartItemsUpdateApiCartItemsItemIdPatchParams
+      params?: CartItemsUpdateApiCartItemsItemIdPatchParams
     }
   > = (props) => {
     const { itemId, data, params } = props ?? {}
 
-    return apiCartItemsUpdateApiCartItemsItemIdPatch(itemId, data, params, requestOptions)
+    return cartItemsUpdateApiCartItemsItemIdPatch(itemId, data, params, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiCartItemsUpdateApiCartItemsItemIdPatchMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiCartItemsUpdateApiCartItemsItemIdPatch>>
+export type CartItemsUpdateApiCartItemsItemIdPatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cartItemsUpdateApiCartItemsItemIdPatch>>
 >
-export type ApiCartItemsUpdateApiCartItemsItemIdPatchMutationBody = UpdateCartItemPayload
-export type ApiCartItemsUpdateApiCartItemsItemIdPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type CartItemsUpdateApiCartItemsItemIdPatchMutationBody = UpdateCartItemPayload
+export type CartItemsUpdateApiCartItemsItemIdPatchMutationError = HTTPValidationError
 
 /**
- * @summary Api.Cart.Items.Update
+ * @summary Cart.Items.Update
  */
-export const useApiCartItemsUpdateApiCartItemsItemIdPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useCartItemsUpdateApiCartItemsItemIdPatch = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiCartItemsUpdateApiCartItemsItemIdPatch>>,
+      Awaited<ReturnType<typeof cartItemsUpdateApiCartItemsItemIdPatch>>,
       TError,
       {
         itemId: string
         data: UpdateCartItemPayload
-        params?: ApiCartItemsUpdateApiCartItemsItemIdPatchParams
+        params?: CartItemsUpdateApiCartItemsItemIdPatchParams
       },
       TContext
     >
@@ -374,25 +302,25 @@ export const useApiCartItemsUpdateApiCartItemsItemIdPatch = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiCartItemsUpdateApiCartItemsItemIdPatch>>,
+  Awaited<ReturnType<typeof cartItemsUpdateApiCartItemsItemIdPatch>>,
   TError,
   {
     itemId: string
     data: UpdateCartItemPayload
-    params?: ApiCartItemsUpdateApiCartItemsItemIdPatchParams
+    params?: CartItemsUpdateApiCartItemsItemIdPatchParams
   },
   TContext
 > => {
-  const mutationOptions = getApiCartItemsUpdateApiCartItemsItemIdPatchMutationOptions(options)
+  const mutationOptions = getCartItemsUpdateApiCartItemsItemIdPatchMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Cart.Items.Remove
+ * @summary Cart.Items.Destroy
  */
-export const apiCartItemsRemoveApiCartItemsItemIdDelete = (
+export const cartItemsDestroyApiCartItemsItemIdDelete = (
   itemId: MaybeRef<string>,
-  params?: MaybeRef<ApiCartItemsRemoveApiCartItemsItemIdDeleteParams>,
+  params?: MaybeRef<CartItemsDestroyApiCartItemsItemIdDeleteParams>,
   options?: SecondParameter<typeof request>,
 ) => {
   itemId = unref(itemId)
@@ -404,31 +332,24 @@ export const apiCartItemsRemoveApiCartItemsItemIdDelete = (
   )
 }
 
-export const getApiCartItemsRemoveApiCartItemsItemIdDeleteMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getCartItemsDestroyApiCartItemsItemIdDeleteMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiCartItemsRemoveApiCartItemsItemIdDelete>>,
+    Awaited<ReturnType<typeof cartItemsDestroyApiCartItemsItemIdDelete>>,
     TError,
-    { itemId: string; params?: ApiCartItemsRemoveApiCartItemsItemIdDeleteParams },
+    { itemId: string; params?: CartItemsDestroyApiCartItemsItemIdDeleteParams },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiCartItemsRemoveApiCartItemsItemIdDelete>>,
+  Awaited<ReturnType<typeof cartItemsDestroyApiCartItemsItemIdDelete>>,
   TError,
-  { itemId: string; params?: ApiCartItemsRemoveApiCartItemsItemIdDeleteParams },
+  { itemId: string; params?: CartItemsDestroyApiCartItemsItemIdDeleteParams },
   TContext
 > => {
-  const mutationKey = ['apiCartItemsRemoveApiCartItemsItemIdDelete']
+  const mutationKey = ['cartItemsDestroyApiCartItemsItemIdDelete']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -436,61 +357,47 @@ export const getApiCartItemsRemoveApiCartItemsItemIdDeleteMutationOptions = <
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiCartItemsRemoveApiCartItemsItemIdDelete>>,
-    { itemId: string; params?: ApiCartItemsRemoveApiCartItemsItemIdDeleteParams }
+    Awaited<ReturnType<typeof cartItemsDestroyApiCartItemsItemIdDelete>>,
+    { itemId: string; params?: CartItemsDestroyApiCartItemsItemIdDeleteParams }
   > = (props) => {
     const { itemId, params } = props ?? {}
 
-    return apiCartItemsRemoveApiCartItemsItemIdDelete(itemId, params, requestOptions)
+    return cartItemsDestroyApiCartItemsItemIdDelete(itemId, params, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiCartItemsRemoveApiCartItemsItemIdDeleteMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiCartItemsRemoveApiCartItemsItemIdDelete>>
+export type CartItemsDestroyApiCartItemsItemIdDeleteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cartItemsDestroyApiCartItemsItemIdDelete>>
 >
 
-export type ApiCartItemsRemoveApiCartItemsItemIdDeleteMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type CartItemsDestroyApiCartItemsItemIdDeleteMutationError = HTTPValidationError
 
 /**
- * @summary Api.Cart.Items.Remove
+ * @summary Cart.Items.Destroy
  */
-export const useApiCartItemsRemoveApiCartItemsItemIdDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useCartItemsDestroyApiCartItemsItemIdDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiCartItemsRemoveApiCartItemsItemIdDelete>>,
+      Awaited<ReturnType<typeof cartItemsDestroyApiCartItemsItemIdDelete>>,
       TError,
-      { itemId: string; params?: ApiCartItemsRemoveApiCartItemsItemIdDeleteParams },
+      { itemId: string; params?: CartItemsDestroyApiCartItemsItemIdDeleteParams },
       TContext
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiCartItemsRemoveApiCartItemsItemIdDelete>>,
+  Awaited<ReturnType<typeof cartItemsDestroyApiCartItemsItemIdDelete>>,
   TError,
-  { itemId: string; params?: ApiCartItemsRemoveApiCartItemsItemIdDeleteParams },
+  { itemId: string; params?: CartItemsDestroyApiCartItemsItemIdDeleteParams },
   TContext
 > => {
-  const mutationOptions = getApiCartItemsRemoveApiCartItemsItemIdDeleteMutationOptions(options)
+  const mutationOptions = getCartItemsDestroyApiCartItemsItemIdDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }

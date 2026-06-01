@@ -9,6 +9,8 @@ import type { UpdateProductPayloadSlug } from './updateProductPayloadSlug'
 import type { UpdateProductPayloadDescription } from './updateProductPayloadDescription'
 import type { UpdateProductPayloadPrice } from './updateProductPayloadPrice'
 import type { UpdateProductPayloadStockQty } from './updateProductPayloadStockQty'
+import type { UpdateProductPayloadCategoryId } from './updateProductPayloadCategoryId'
+import type { UpdateProductPayloadVendorId } from './updateProductPayloadVendorId'
 
 export interface UpdateProductPayload {
   name?: UpdateProductPayloadName
@@ -16,4 +18,6 @@ export interface UpdateProductPayload {
   description?: UpdateProductPayloadDescription
   price?: UpdateProductPayloadPrice
   stock_qty?: UpdateProductPayloadStockQty
+  category_id?: UpdateProductPayloadCategoryId
+  vendor_id?: UpdateProductPayloadVendorId
 }

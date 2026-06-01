@@ -1,5 +1,3 @@
-import type { AdminProductOut } from '@/api/schemas'
-
 export type LocalizedText = Record<string, string>
 
 export type OrderStatus =
@@ -38,12 +36,6 @@ export interface ShippingAddress {
   street?: string
   city?: string
   country?: string
-}
-
-// AdminProductOut extended with real_status which the backend returns but the
-// generated OpenAPI types omit.
-export interface AdminProductWithStatus extends AdminProductOut {
-  real_status?: string
 }
 
 const ORDER_STATUSES: readonly string[] = [

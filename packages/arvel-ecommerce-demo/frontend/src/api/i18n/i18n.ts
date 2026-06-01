@@ -17,16 +17,16 @@ import type {
 import { computed, unref } from 'vue'
 import type { MaybeRef } from 'vue'
 
-import type { ApiErrorOut } from '.././schemas'
+import type { HTTPValidationError } from '.././schemas'
 
 import { request } from '../../lib/api'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.I18N.Catalogue
+ * @summary I18N.Catalogue
  */
-export const apiI18nCatalogueApiI18nLocaleGet = (
+export const i18nCatalogueApiI18nLocaleGet = (
   locale: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -36,82 +36,61 @@ export const apiI18nCatalogueApiI18nLocaleGet = (
   return request<unknown>({ url: `/api/i18n/${locale}`, method: 'GET', signal }, options)
 }
 
-export const getApiI18nCatalogueApiI18nLocaleGetQueryKey = (locale?: MaybeRef<string>) => {
+export const getI18nCatalogueApiI18nLocaleGetQueryKey = (locale?: MaybeRef<string>) => {
   return ['api', 'i18n', locale] as const
 }
 
-export const getApiI18nCatalogueApiI18nLocaleGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiI18nCatalogueApiI18nLocaleGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getI18nCatalogueApiI18nLocaleGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof i18nCatalogueApiI18nLocaleGet>>,
+  TError = HTTPValidationError,
 >(
   locale: MaybeRef<string>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiI18nCatalogueApiI18nLocaleGet>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof i18nCatalogueApiI18nLocaleGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiI18nCatalogueApiI18nLocaleGetQueryKey(locale)
+  const queryKey = getI18nCatalogueApiI18nLocaleGetQueryKey(locale)
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof apiI18nCatalogueApiI18nLocaleGet>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof i18nCatalogueApiI18nLocaleGet>>> = ({
     signal,
-  }) => apiI18nCatalogueApiI18nLocaleGet(locale, requestOptions, signal)
+  }) => i18nCatalogueApiI18nLocaleGet(locale, requestOptions, signal)
 
   return {
     queryKey,
     queryFn,
     enabled: computed(() => !!unref(locale)),
     ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof apiI18nCatalogueApiI18nLocaleGet>>, TError, TData>
+  } as UseQueryOptions<Awaited<ReturnType<typeof i18nCatalogueApiI18nLocaleGet>>, TError, TData>
 }
 
-export type ApiI18nCatalogueApiI18nLocaleGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiI18nCatalogueApiI18nLocaleGet>>
+export type I18nCatalogueApiI18nLocaleGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof i18nCatalogueApiI18nLocaleGet>>
 >
-export type ApiI18nCatalogueApiI18nLocaleGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type I18nCatalogueApiI18nLocaleGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.I18N.Catalogue
+ * @summary I18N.Catalogue
  */
 
-export function useApiI18nCatalogueApiI18nLocaleGet<
-  TData = Awaited<ReturnType<typeof apiI18nCatalogueApiI18nLocaleGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useI18nCatalogueApiI18nLocaleGet<
+  TData = Awaited<ReturnType<typeof i18nCatalogueApiI18nLocaleGet>>,
+  TError = HTTPValidationError,
 >(
   locale: MaybeRef<string>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiI18nCatalogueApiI18nLocaleGet>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof i18nCatalogueApiI18nLocaleGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiI18nCatalogueApiI18nLocaleGetQueryOptions(locale, options)
+  const queryOptions = getI18nCatalogueApiI18nLocaleGetQueryOptions(locale, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

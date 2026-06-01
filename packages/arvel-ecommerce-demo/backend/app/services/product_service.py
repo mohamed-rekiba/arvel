@@ -221,6 +221,8 @@ class ProductService:
         for key, val in changes.items():
             if key == "price":
                 product.price = Decimal(str(val))
+            elif key in {"category_id", "vendor_id"}:
+                setattr(product, key, uuid.UUID(str(val)) if val else None)
             elif key in {"name", "slug", "description", "stock_qty", "status"}:
                 setattr(product, key, val)
         await product.save()

@@ -23,10 +23,12 @@ import type { MaybeRef } from 'vue'
 import type {
   AdminUserListOut,
   AdminUserWrapperOut,
-  ApiAdminUsersIndexApiAdminUsersGetParams,
-  ApiErrorOut,
+  AdminUsersIndexApiAdminUsersGetParams,
+  AdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDeleteParams,
+  AdminUsersRolesRevokeApiAdminUsersUserIdRolesDeleteParams,
   AssignRolePayload,
   GrantPermissionPayload,
+  HTTPValidationError,
 } from '.././schemas'
 
 import { request } from '../../lib/api'
@@ -34,10 +36,10 @@ import { request } from '../../lib/api'
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.Admin.Users.Index
+ * @summary Admin.Users.Index
  */
-export const apiAdminUsersIndexApiAdminUsersGet = (
-  params?: MaybeRef<ApiAdminUsersIndexApiAdminUsersGetParams>,
+export const adminUsersIndexApiAdminUsersGet = (
+  params?: MaybeRef<AdminUsersIndexApiAdminUsersGetParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
@@ -49,83 +51,62 @@ export const apiAdminUsersIndexApiAdminUsersGet = (
   )
 }
 
-export const getApiAdminUsersIndexApiAdminUsersGetQueryKey = (
-  params?: MaybeRef<ApiAdminUsersIndexApiAdminUsersGetParams>,
+export const getAdminUsersIndexApiAdminUsersGetQueryKey = (
+  params?: MaybeRef<AdminUsersIndexApiAdminUsersGetParams>,
 ) => {
   return ['api', 'admin', 'users', ...(params ? [params] : [])] as const
 }
 
-export const getApiAdminUsersIndexApiAdminUsersGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminUsersIndexApiAdminUsersGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminUsersIndexApiAdminUsersGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminUsersIndexApiAdminUsersGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiAdminUsersIndexApiAdminUsersGetParams>,
+  params?: MaybeRef<AdminUsersIndexApiAdminUsersGetParams>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiAdminUsersIndexApiAdminUsersGet>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof adminUsersIndexApiAdminUsersGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminUsersIndexApiAdminUsersGetQueryKey(params)
+  const queryKey = getAdminUsersIndexApiAdminUsersGetQueryKey(params)
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof apiAdminUsersIndexApiAdminUsersGet>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof adminUsersIndexApiAdminUsersGet>>> = ({
     signal,
-  }) => apiAdminUsersIndexApiAdminUsersGet(params, requestOptions, signal)
+  }) => adminUsersIndexApiAdminUsersGet(params, requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminUsersIndexApiAdminUsersGet>>,
+    Awaited<ReturnType<typeof adminUsersIndexApiAdminUsersGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminUsersIndexApiAdminUsersGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminUsersIndexApiAdminUsersGet>>
+export type AdminUsersIndexApiAdminUsersGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersIndexApiAdminUsersGet>>
 >
-export type ApiAdminUsersIndexApiAdminUsersGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminUsersIndexApiAdminUsersGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Users.Index
+ * @summary Admin.Users.Index
  */
 
-export function useApiAdminUsersIndexApiAdminUsersGet<
-  TData = Awaited<ReturnType<typeof apiAdminUsersIndexApiAdminUsersGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminUsersIndexApiAdminUsersGet<
+  TData = Awaited<ReturnType<typeof adminUsersIndexApiAdminUsersGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiAdminUsersIndexApiAdminUsersGetParams>,
+  params?: MaybeRef<AdminUsersIndexApiAdminUsersGetParams>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof apiAdminUsersIndexApiAdminUsersGet>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof adminUsersIndexApiAdminUsersGet>>, TError, TData>
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminUsersIndexApiAdminUsersGetQueryOptions(params, options)
+  const queryOptions = getAdminUsersIndexApiAdminUsersGetQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -137,9 +118,9 @@ export function useApiAdminUsersIndexApiAdminUsersGet<
 }
 
 /**
- * @summary Api.Admin.Users.Show
+ * @summary Admin.Users.Show
  */
-export const apiAdminUsersShowApiAdminUsersUserIdGet = (
+export const adminUsersShowApiAdminUsersUserIdGet = (
   userId: MaybeRef<number>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -152,26 +133,19 @@ export const apiAdminUsersShowApiAdminUsersUserIdGet = (
   )
 }
 
-export const getApiAdminUsersShowApiAdminUsersUserIdGetQueryKey = (userId?: MaybeRef<number>) => {
+export const getAdminUsersShowApiAdminUsersUserIdGetQueryKey = (userId?: MaybeRef<number>) => {
   return ['api', 'admin', 'users', userId] as const
 }
 
-export const getApiAdminUsersShowApiAdminUsersUserIdGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminUsersShowApiAdminUsersUserIdGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminUsersShowApiAdminUsersUserIdGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminUsersShowApiAdminUsersUserIdGet>>,
+  TError = HTTPValidationError,
 >(
   userId: MaybeRef<number>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminUsersShowApiAdminUsersUserIdGet>>,
+        Awaited<ReturnType<typeof adminUsersShowApiAdminUsersUserIdGet>>,
         TError,
         TData
       >
@@ -181,11 +155,11 @@ export const getApiAdminUsersShowApiAdminUsersUserIdGetQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminUsersShowApiAdminUsersUserIdGetQueryKey(userId)
+  const queryKey = getAdminUsersShowApiAdminUsersUserIdGetQueryKey(userId)
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminUsersShowApiAdminUsersUserIdGet>>
-  > = ({ signal }) => apiAdminUsersShowApiAdminUsersUserIdGet(userId, requestOptions, signal)
+    Awaited<ReturnType<typeof adminUsersShowApiAdminUsersUserIdGet>>
+  > = ({ signal }) => adminUsersShowApiAdminUsersUserIdGet(userId, requestOptions, signal)
 
   return {
     queryKey,
@@ -193,44 +167,30 @@ export const getApiAdminUsersShowApiAdminUsersUserIdGetQueryOptions = <
     enabled: computed(() => !!unref(userId)),
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminUsersShowApiAdminUsersUserIdGet>>,
+    Awaited<ReturnType<typeof adminUsersShowApiAdminUsersUserIdGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminUsersShowApiAdminUsersUserIdGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminUsersShowApiAdminUsersUserIdGet>>
+export type AdminUsersShowApiAdminUsersUserIdGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersShowApiAdminUsersUserIdGet>>
 >
-export type ApiAdminUsersShowApiAdminUsersUserIdGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminUsersShowApiAdminUsersUserIdGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Users.Show
+ * @summary Admin.Users.Show
  */
 
-export function useApiAdminUsersShowApiAdminUsersUserIdGet<
-  TData = Awaited<ReturnType<typeof apiAdminUsersShowApiAdminUsersUserIdGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminUsersShowApiAdminUsersUserIdGet<
+  TData = Awaited<ReturnType<typeof adminUsersShowApiAdminUsersUserIdGet>>,
+  TError = HTTPValidationError,
 >(
   userId: MaybeRef<number>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminUsersShowApiAdminUsersUserIdGet>>,
+        Awaited<ReturnType<typeof adminUsersShowApiAdminUsersUserIdGet>>,
         TError,
         TData
       >
@@ -239,7 +199,7 @@ export function useApiAdminUsersShowApiAdminUsersUserIdGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminUsersShowApiAdminUsersUserIdGetQueryOptions(userId, options)
+  const queryOptions = getAdminUsersShowApiAdminUsersUserIdGetQueryOptions(userId, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -251,42 +211,35 @@ export function useApiAdminUsersShowApiAdminUsersUserIdGet<
 }
 
 /**
- * @summary Api.Admin.Users.Destroy
+ * @summary Admin.Users.Destroy
  */
-export const apiAdminUsersDestroyApiAdminUsersUserIdDelete = (
+export const adminUsersDestroyApiAdminUsersUserIdDelete = (
   userId: MaybeRef<number>,
   options?: SecondParameter<typeof request>,
 ) => {
   userId = unref(userId)
 
-  return request<void>({ url: `/api/admin/users/${userId}`, method: 'DELETE' }, options)
+  return request<unknown>({ url: `/api/admin/users/${userId}`, method: 'DELETE' }, options)
 }
 
-export const getApiAdminUsersDestroyApiAdminUsersUserIdDeleteMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminUsersDestroyApiAdminUsersUserIdDeleteMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminUsersDestroyApiAdminUsersUserIdDelete>>,
+    Awaited<ReturnType<typeof adminUsersDestroyApiAdminUsersUserIdDelete>>,
     TError,
     { userId: number },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminUsersDestroyApiAdminUsersUserIdDelete>>,
+  Awaited<ReturnType<typeof adminUsersDestroyApiAdminUsersUserIdDelete>>,
   TError,
   { userId: number },
   TContext
 > => {
-  const mutationKey = ['apiAdminUsersDestroyApiAdminUsersUserIdDelete']
+  const mutationKey = ['adminUsersDestroyApiAdminUsersUserIdDelete']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -294,47 +247,33 @@ export const getApiAdminUsersDestroyApiAdminUsersUserIdDeleteMutationOptions = <
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminUsersDestroyApiAdminUsersUserIdDelete>>,
+    Awaited<ReturnType<typeof adminUsersDestroyApiAdminUsersUserIdDelete>>,
     { userId: number }
   > = (props) => {
     const { userId } = props ?? {}
 
-    return apiAdminUsersDestroyApiAdminUsersUserIdDelete(userId, requestOptions)
+    return adminUsersDestroyApiAdminUsersUserIdDelete(userId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminUsersDestroyApiAdminUsersUserIdDeleteMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminUsersDestroyApiAdminUsersUserIdDelete>>
+export type AdminUsersDestroyApiAdminUsersUserIdDeleteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersDestroyApiAdminUsersUserIdDelete>>
 >
 
-export type ApiAdminUsersDestroyApiAdminUsersUserIdDeleteMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminUsersDestroyApiAdminUsersUserIdDeleteMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Users.Destroy
+ * @summary Admin.Users.Destroy
  */
-export const useApiAdminUsersDestroyApiAdminUsersUserIdDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminUsersDestroyApiAdminUsersUserIdDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminUsersDestroyApiAdminUsersUserIdDelete>>,
+      Awaited<ReturnType<typeof adminUsersDestroyApiAdminUsersUserIdDelete>>,
       TError,
       { userId: number },
       TContext
@@ -343,52 +282,45 @@ export const useApiAdminUsersDestroyApiAdminUsersUserIdDelete = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminUsersDestroyApiAdminUsersUserIdDelete>>,
+  Awaited<ReturnType<typeof adminUsersDestroyApiAdminUsersUserIdDelete>>,
   TError,
   { userId: number },
   TContext
 > => {
-  const mutationOptions = getApiAdminUsersDestroyApiAdminUsersUserIdDeleteMutationOptions(options)
+  const mutationOptions = getAdminUsersDestroyApiAdminUsersUserIdDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Users.Force-Destroy
+ * @summary Admin.Users.Force Destroy
  */
-export const apiAdminUsersForceDestroyApiAdminUsersUserIdForceDelete = (
+export const adminUsersForceDestroyApiAdminUsersUserIdForceDelete = (
   userId: MaybeRef<number>,
   options?: SecondParameter<typeof request>,
 ) => {
   userId = unref(userId)
 
-  return request<void>({ url: `/api/admin/users/${userId}/force`, method: 'DELETE' }, options)
+  return request<unknown>({ url: `/api/admin/users/${userId}/force`, method: 'DELETE' }, options)
 }
 
-export const getApiAdminUsersForceDestroyApiAdminUsersUserIdForceDeleteMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminUsersForceDestroyApiAdminUsersUserIdForceDeleteMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminUsersForceDestroyApiAdminUsersUserIdForceDelete>>,
+    Awaited<ReturnType<typeof adminUsersForceDestroyApiAdminUsersUserIdForceDelete>>,
     TError,
     { userId: number },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminUsersForceDestroyApiAdminUsersUserIdForceDelete>>,
+  Awaited<ReturnType<typeof adminUsersForceDestroyApiAdminUsersUserIdForceDelete>>,
   TError,
   { userId: number },
   TContext
 > => {
-  const mutationKey = ['apiAdminUsersForceDestroyApiAdminUsersUserIdForceDelete']
+  const mutationKey = ['adminUsersForceDestroyApiAdminUsersUserIdForceDelete']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -396,47 +328,33 @@ export const getApiAdminUsersForceDestroyApiAdminUsersUserIdForceDeleteMutationO
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminUsersForceDestroyApiAdminUsersUserIdForceDelete>>,
+    Awaited<ReturnType<typeof adminUsersForceDestroyApiAdminUsersUserIdForceDelete>>,
     { userId: number }
   > = (props) => {
     const { userId } = props ?? {}
 
-    return apiAdminUsersForceDestroyApiAdminUsersUserIdForceDelete(userId, requestOptions)
+    return adminUsersForceDestroyApiAdminUsersUserIdForceDelete(userId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminUsersForceDestroyApiAdminUsersUserIdForceDeleteMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminUsersForceDestroyApiAdminUsersUserIdForceDelete>>
+export type AdminUsersForceDestroyApiAdminUsersUserIdForceDeleteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersForceDestroyApiAdminUsersUserIdForceDelete>>
 >
 
-export type ApiAdminUsersForceDestroyApiAdminUsersUserIdForceDeleteMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminUsersForceDestroyApiAdminUsersUserIdForceDeleteMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Users.Force-Destroy
+ * @summary Admin.Users.Force Destroy
  */
-export const useApiAdminUsersForceDestroyApiAdminUsersUserIdForceDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminUsersForceDestroyApiAdminUsersUserIdForceDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminUsersForceDestroyApiAdminUsersUserIdForceDelete>>,
+      Awaited<ReturnType<typeof adminUsersForceDestroyApiAdminUsersUserIdForceDelete>>,
       TError,
       { userId: number },
       TContext
@@ -445,232 +363,20 @@ export const useApiAdminUsersForceDestroyApiAdminUsersUserIdForceDelete = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminUsersForceDestroyApiAdminUsersUserIdForceDelete>>,
+  Awaited<ReturnType<typeof adminUsersForceDestroyApiAdminUsersUserIdForceDelete>>,
   TError,
   { userId: number },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminUsersForceDestroyApiAdminUsersUserIdForceDeleteMutationOptions(options)
+    getAdminUsersForceDestroyApiAdminUsersUserIdForceDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Users.Suspend
+ * @summary Admin.Users.Restore
  */
-export const apiAdminUsersSuspendApiAdminUsersUserIdSuspendPatch = (
-  userId: MaybeRef<number>,
-  options?: SecondParameter<typeof request>,
-) => {
-  userId = unref(userId)
-
-  return request<AdminUserWrapperOut>(
-    { url: `/api/admin/users/${userId}/suspend`, method: 'PATCH' },
-    options,
-  )
-}
-
-export const getApiAdminUsersSuspendApiAdminUsersUserIdSuspendPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminUsersSuspendApiAdminUsersUserIdSuspendPatch>>,
-    TError,
-    { userId: number },
-    TContext
-  >
-  request?: SecondParameter<typeof request>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminUsersSuspendApiAdminUsersUserIdSuspendPatch>>,
-  TError,
-  { userId: number },
-  TContext
-> => {
-  const mutationKey = ['apiAdminUsersSuspendApiAdminUsersUserIdSuspendPatch']
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminUsersSuspendApiAdminUsersUserIdSuspendPatch>>,
-    { userId: number }
-  > = (props) => {
-    const { userId } = props ?? {}
-
-    return apiAdminUsersSuspendApiAdminUsersUserIdSuspendPatch(userId, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type ApiAdminUsersSuspendApiAdminUsersUserIdSuspendPatchMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminUsersSuspendApiAdminUsersUserIdSuspendPatch>>
->
-
-export type ApiAdminUsersSuspendApiAdminUsersUserIdSuspendPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-
-/**
- * @summary Api.Admin.Users.Suspend
- */
-export const useApiAdminUsersSuspendApiAdminUsersUserIdSuspendPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminUsersSuspendApiAdminUsersUserIdSuspendPatch>>,
-      TError,
-      { userId: number },
-      TContext
-    >
-    request?: SecondParameter<typeof request>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminUsersSuspendApiAdminUsersUserIdSuspendPatch>>,
-  TError,
-  { userId: number },
-  TContext
-> => {
-  const mutationOptions =
-    getApiAdminUsersSuspendApiAdminUsersUserIdSuspendPatchMutationOptions(options)
-
-  return useMutation(mutationOptions, queryClient)
-}
-/**
- * @summary Api.Admin.Users.Unsuspend
- */
-export const apiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch = (
-  userId: MaybeRef<number>,
-  options?: SecondParameter<typeof request>,
-) => {
-  userId = unref(userId)
-
-  return request<AdminUserWrapperOut>(
-    { url: `/api/admin/users/${userId}/unsuspend`, method: 'PATCH' },
-    options,
-  )
-}
-
-export const getApiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>,
-    TError,
-    { userId: number },
-    TContext
-  >
-  request?: SecondParameter<typeof request>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>,
-  TError,
-  { userId: number },
-  TContext
-> => {
-  const mutationKey = ['apiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch']
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>,
-    { userId: number }
-  > = (props) => {
-    const { userId } = props ?? {}
-
-    return apiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch(userId, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type ApiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatchMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>
->
-
-export type ApiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-
-/**
- * @summary Api.Admin.Users.Unsuspend
- */
-export const useApiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>,
-      TError,
-      { userId: number },
-      TContext
-    >
-    request?: SecondParameter<typeof request>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>,
-  TError,
-  { userId: number },
-  TContext
-> => {
-  const mutationOptions =
-    getApiAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatchMutationOptions(options)
-
-  return useMutation(mutationOptions, queryClient)
-}
-/**
- * @summary Api.Admin.Users.Restore
- */
-export const apiAdminUsersRestoreApiAdminUsersUserIdRestorePost = (
+export const adminUsersRestoreApiAdminUsersUserIdRestorePost = (
   userId: MaybeRef<number>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -683,31 +389,24 @@ export const apiAdminUsersRestoreApiAdminUsersUserIdRestorePost = (
   )
 }
 
-export const getApiAdminUsersRestoreApiAdminUsersUserIdRestorePostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminUsersRestoreApiAdminUsersUserIdRestorePostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminUsersRestoreApiAdminUsersUserIdRestorePost>>,
+    Awaited<ReturnType<typeof adminUsersRestoreApiAdminUsersUserIdRestorePost>>,
     TError,
     { userId: number },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminUsersRestoreApiAdminUsersUserIdRestorePost>>,
+  Awaited<ReturnType<typeof adminUsersRestoreApiAdminUsersUserIdRestorePost>>,
   TError,
   { userId: number },
   TContext
 > => {
-  const mutationKey = ['apiAdminUsersRestoreApiAdminUsersUserIdRestorePost']
+  const mutationKey = ['adminUsersRestoreApiAdminUsersUserIdRestorePost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -715,47 +414,33 @@ export const getApiAdminUsersRestoreApiAdminUsersUserIdRestorePostMutationOption
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminUsersRestoreApiAdminUsersUserIdRestorePost>>,
+    Awaited<ReturnType<typeof adminUsersRestoreApiAdminUsersUserIdRestorePost>>,
     { userId: number }
   > = (props) => {
     const { userId } = props ?? {}
 
-    return apiAdminUsersRestoreApiAdminUsersUserIdRestorePost(userId, requestOptions)
+    return adminUsersRestoreApiAdminUsersUserIdRestorePost(userId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminUsersRestoreApiAdminUsersUserIdRestorePostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminUsersRestoreApiAdminUsersUserIdRestorePost>>
+export type AdminUsersRestoreApiAdminUsersUserIdRestorePostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersRestoreApiAdminUsersUserIdRestorePost>>
 >
 
-export type ApiAdminUsersRestoreApiAdminUsersUserIdRestorePostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminUsersRestoreApiAdminUsersUserIdRestorePostMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Users.Restore
+ * @summary Admin.Users.Restore
  */
-export const useApiAdminUsersRestoreApiAdminUsersUserIdRestorePost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminUsersRestoreApiAdminUsersUserIdRestorePost = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminUsersRestoreApiAdminUsersUserIdRestorePost>>,
+      Awaited<ReturnType<typeof adminUsersRestoreApiAdminUsersUserIdRestorePost>>,
       TError,
       { userId: number },
       TContext
@@ -764,20 +449,189 @@ export const useApiAdminUsersRestoreApiAdminUsersUserIdRestorePost = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminUsersRestoreApiAdminUsersUserIdRestorePost>>,
+  Awaited<ReturnType<typeof adminUsersRestoreApiAdminUsersUserIdRestorePost>>,
+  TError,
+  { userId: number },
+  TContext
+> => {
+  const mutationOptions = getAdminUsersRestoreApiAdminUsersUserIdRestorePostMutationOptions(options)
+
+  return useMutation(mutationOptions, queryClient)
+}
+/**
+ * @summary Admin.Users.Suspend
+ */
+export const adminUsersSuspendApiAdminUsersUserIdSuspendPatch = (
+  userId: MaybeRef<number>,
+  options?: SecondParameter<typeof request>,
+) => {
+  userId = unref(userId)
+
+  return request<AdminUserWrapperOut>(
+    { url: `/api/admin/users/${userId}/suspend`, method: 'PATCH' },
+    options,
+  )
+}
+
+export const getAdminUsersSuspendApiAdminUsersUserIdSuspendPatchMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminUsersSuspendApiAdminUsersUserIdSuspendPatch>>,
+    TError,
+    { userId: number },
+    TContext
+  >
+  request?: SecondParameter<typeof request>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminUsersSuspendApiAdminUsersUserIdSuspendPatch>>,
+  TError,
+  { userId: number },
+  TContext
+> => {
+  const mutationKey = ['adminUsersSuspendApiAdminUsersUserIdSuspendPatch']
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminUsersSuspendApiAdminUsersUserIdSuspendPatch>>,
+    { userId: number }
+  > = (props) => {
+    const { userId } = props ?? {}
+
+    return adminUsersSuspendApiAdminUsersUserIdSuspendPatch(userId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AdminUsersSuspendApiAdminUsersUserIdSuspendPatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersSuspendApiAdminUsersUserIdSuspendPatch>>
+>
+
+export type AdminUsersSuspendApiAdminUsersUserIdSuspendPatchMutationError = HTTPValidationError
+
+/**
+ * @summary Admin.Users.Suspend
+ */
+export const useAdminUsersSuspendApiAdminUsersUserIdSuspendPatch = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminUsersSuspendApiAdminUsersUserIdSuspendPatch>>,
+      TError,
+      { userId: number },
+      TContext
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof adminUsersSuspendApiAdminUsersUserIdSuspendPatch>>,
   TError,
   { userId: number },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminUsersRestoreApiAdminUsersUserIdRestorePostMutationOptions(options)
+    getAdminUsersSuspendApiAdminUsersUserIdSuspendPatchMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Users.Roles.Assign
+ * @summary Admin.Users.Unsuspend
  */
-export const apiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost = (
+export const adminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch = (
+  userId: MaybeRef<number>,
+  options?: SecondParameter<typeof request>,
+) => {
+  userId = unref(userId)
+
+  return request<AdminUserWrapperOut>(
+    { url: `/api/admin/users/${userId}/unsuspend`, method: 'PATCH' },
+    options,
+  )
+}
+
+export const getAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatchMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>,
+    TError,
+    { userId: number },
+    TContext
+  >
+  request?: SecondParameter<typeof request>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>,
+  TError,
+  { userId: number },
+  TContext
+> => {
+  const mutationKey = ['adminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch']
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>,
+    { userId: number }
+  > = (props) => {
+    const { userId } = props ?? {}
+
+    return adminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch(userId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>
+>
+
+export type AdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatchMutationError = HTTPValidationError
+
+/**
+ * @summary Admin.Users.Unsuspend
+ */
+export const useAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>,
+      TError,
+      { userId: number },
+      TContext
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof adminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch>>,
+  TError,
+  { userId: number },
+  TContext
+> => {
+  const mutationOptions =
+    getAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatchMutationOptions(options)
+
+  return useMutation(mutationOptions, queryClient)
+}
+/**
+ * @summary Admin.Users.Roles.Assign
+ */
+export const adminUsersRolesAssignApiAdminUsersUserIdRolesPost = (
   userId: MaybeRef<number>,
   assignRolePayload: MaybeRef<AssignRolePayload>,
   options?: SecondParameter<typeof request>,
@@ -798,31 +652,24 @@ export const apiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost = (
   )
 }
 
-export const getApiAdminUsersRolesAssignApiAdminUsersUserIdRolesPostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminUsersRolesAssignApiAdminUsersUserIdRolesPostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost>>,
+    Awaited<ReturnType<typeof adminUsersRolesAssignApiAdminUsersUserIdRolesPost>>,
     TError,
     { userId: number; data: AssignRolePayload },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost>>,
+  Awaited<ReturnType<typeof adminUsersRolesAssignApiAdminUsersUserIdRolesPost>>,
   TError,
   { userId: number; data: AssignRolePayload },
   TContext
 > => {
-  const mutationKey = ['apiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost']
+  const mutationKey = ['adminUsersRolesAssignApiAdminUsersUserIdRolesPost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -830,47 +677,33 @@ export const getApiAdminUsersRolesAssignApiAdminUsersUserIdRolesPostMutationOpti
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost>>,
+    Awaited<ReturnType<typeof adminUsersRolesAssignApiAdminUsersUserIdRolesPost>>,
     { userId: number; data: AssignRolePayload }
   > = (props) => {
     const { userId, data } = props ?? {}
 
-    return apiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost(userId, data, requestOptions)
+    return adminUsersRolesAssignApiAdminUsersUserIdRolesPost(userId, data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminUsersRolesAssignApiAdminUsersUserIdRolesPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost>>
+export type AdminUsersRolesAssignApiAdminUsersUserIdRolesPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersRolesAssignApiAdminUsersUserIdRolesPost>>
 >
-export type ApiAdminUsersRolesAssignApiAdminUsersUserIdRolesPostMutationBody = AssignRolePayload
-export type ApiAdminUsersRolesAssignApiAdminUsersUserIdRolesPostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminUsersRolesAssignApiAdminUsersUserIdRolesPostMutationBody = AssignRolePayload
+export type AdminUsersRolesAssignApiAdminUsersUserIdRolesPostMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Users.Roles.Assign
+ * @summary Admin.Users.Roles.Assign
  */
-export const useApiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminUsersRolesAssignApiAdminUsersUserIdRolesPost = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost>>,
+      Awaited<ReturnType<typeof adminUsersRolesAssignApiAdminUsersUserIdRolesPost>>,
       TError,
       { userId: number; data: AssignRolePayload },
       TContext
@@ -879,58 +712,51 @@ export const useApiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminUsersRolesAssignApiAdminUsersUserIdRolesPost>>,
+  Awaited<ReturnType<typeof adminUsersRolesAssignApiAdminUsersUserIdRolesPost>>,
   TError,
   { userId: number; data: AssignRolePayload },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminUsersRolesAssignApiAdminUsersUserIdRolesPostMutationOptions(options)
+    getAdminUsersRolesAssignApiAdminUsersUserIdRolesPostMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Users.Roles.Revoke
+ * @summary Admin.Users.Roles.Revoke
  */
-export const apiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete = (
+export const adminUsersRolesRevokeApiAdminUsersUserIdRolesDelete = (
   userId: MaybeRef<number>,
-  roleName: MaybeRef<string>,
+  params: MaybeRef<AdminUsersRolesRevokeApiAdminUsersUserIdRolesDeleteParams>,
   options?: SecondParameter<typeof request>,
 ) => {
   userId = unref(userId)
-  roleName = unref(roleName)
+  params = unref(params)
 
   return request<AdminUserWrapperOut>(
-    { url: `/api/admin/users/${userId}/roles/${roleName}`, method: 'DELETE' },
+    { url: `/api/admin/users/${userId}/roles`, method: 'DELETE', params: unref(params) },
     options,
   )
 }
 
-export const getApiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDeleteMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminUsersRolesRevokeApiAdminUsersUserIdRolesDeleteMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete>>,
+    Awaited<ReturnType<typeof adminUsersRolesRevokeApiAdminUsersUserIdRolesDelete>>,
     TError,
-    { userId: number; roleName: string },
+    { userId: number; params: AdminUsersRolesRevokeApiAdminUsersUserIdRolesDeleteParams },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete>>,
+  Awaited<ReturnType<typeof adminUsersRolesRevokeApiAdminUsersUserIdRolesDelete>>,
   TError,
-  { userId: number; roleName: string },
+  { userId: number; params: AdminUsersRolesRevokeApiAdminUsersUserIdRolesDeleteParams },
   TContext
 > => {
-  const mutationKey = ['apiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete']
+  const mutationKey = ['adminUsersRolesRevokeApiAdminUsersUserIdRolesDelete']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -938,74 +764,55 @@ export const getApiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDeleteMu
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete>>,
-    { userId: number; roleName: string }
+    Awaited<ReturnType<typeof adminUsersRolesRevokeApiAdminUsersUserIdRolesDelete>>,
+    { userId: number; params: AdminUsersRolesRevokeApiAdminUsersUserIdRolesDeleteParams }
   > = (props) => {
-    const { userId, roleName } = props ?? {}
+    const { userId, params } = props ?? {}
 
-    return apiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete(
-      userId,
-      roleName,
-      requestOptions,
-    )
+    return adminUsersRolesRevokeApiAdminUsersUserIdRolesDelete(userId, params, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDeleteMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof apiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete>>
-  >
+export type AdminUsersRolesRevokeApiAdminUsersUserIdRolesDeleteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersRolesRevokeApiAdminUsersUserIdRolesDelete>>
+>
 
-export type ApiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDeleteMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminUsersRolesRevokeApiAdminUsersUserIdRolesDeleteMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Users.Roles.Revoke
+ * @summary Admin.Users.Roles.Revoke
  */
-export const useApiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminUsersRolesRevokeApiAdminUsersUserIdRolesDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete>>,
+      Awaited<ReturnType<typeof adminUsersRolesRevokeApiAdminUsersUserIdRolesDelete>>,
       TError,
-      { userId: number; roleName: string },
+      { userId: number; params: AdminUsersRolesRevokeApiAdminUsersUserIdRolesDeleteParams },
       TContext
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDelete>>,
+  Awaited<ReturnType<typeof adminUsersRolesRevokeApiAdminUsersUserIdRolesDelete>>,
   TError,
-  { userId: number; roleName: string },
+  { userId: number; params: AdminUsersRolesRevokeApiAdminUsersUserIdRolesDeleteParams },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminUsersRolesRevokeApiAdminUsersUserIdRolesRoleNameDeleteMutationOptions(options)
+    getAdminUsersRolesRevokeApiAdminUsersUserIdRolesDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Users.Permissions.Grant
+ * @summary Admin.Users.Permissions.Grant
  */
-export const apiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost = (
+export const adminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost = (
   userId: MaybeRef<number>,
   grantPermissionPayload: MaybeRef<GrantPermissionPayload>,
   options?: SecondParameter<typeof request>,
@@ -1026,31 +833,24 @@ export const apiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost = (
   )
 }
 
-export const getApiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>,
+    Awaited<ReturnType<typeof adminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>,
     TError,
     { userId: number; data: GrantPermissionPayload },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>,
+  Awaited<ReturnType<typeof adminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>,
   TError,
   { userId: number; data: GrantPermissionPayload },
   TContext
 > => {
-  const mutationKey = ['apiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost']
+  const mutationKey = ['adminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -1058,12 +858,12 @@ export const getApiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostM
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>,
+    Awaited<ReturnType<typeof adminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>,
     { userId: number; data: GrantPermissionPayload }
   > = (props) => {
     const { userId, data } = props ?? {}
 
-    return apiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost(
+    return adminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost(
       userId,
       data,
       requestOptions,
@@ -1073,38 +873,25 @@ export const getApiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostM
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostMutationResult =
+export type AdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostMutationResult =
   NonNullable<
-    Awaited<ReturnType<typeof apiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>
+    Awaited<ReturnType<typeof adminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>
   >
-export type ApiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostMutationBody =
+export type AdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostMutationBody =
   GrantPermissionPayload
-export type ApiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Users.Permissions.Grant
+ * @summary Admin.Users.Permissions.Grant
  */
-export const useApiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>,
+      Awaited<ReturnType<typeof adminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>,
       TError,
       { userId: number; data: GrantPermissionPayload },
       TContext
@@ -1113,149 +900,115 @@ export const useApiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost 
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>,
+  Awaited<ReturnType<typeof adminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPost>>,
   TError,
   { userId: number; data: GrantPermissionPayload },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostMutationOptions(options)
+    getAdminUsersPermissionsGrantApiAdminUsersUserIdPermissionsPostMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Users.Permissions.Revoke
+ * @summary Admin.Users.Permissions.Revoke
  */
-export const apiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDelete = (
+export const adminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDelete = (
   userId: MaybeRef<number>,
-  permissionName: MaybeRef<string>,
+  params: MaybeRef<AdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDeleteParams>,
   options?: SecondParameter<typeof request>,
 ) => {
   userId = unref(userId)
-  permissionName = unref(permissionName)
+  params = unref(params)
 
   return request<AdminUserWrapperOut>(
-    { url: `/api/admin/users/${userId}/permissions/${permissionName}`, method: 'DELETE' },
+    { url: `/api/admin/users/${userId}/permissions`, method: 'DELETE', params: unref(params) },
     options,
   )
 }
 
-export const getApiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDeleteMutationOptions =
-  <
-    TError =
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut
-      | ApiErrorOut,
-    TContext = unknown,
-  >(options?: {
-    mutation?: UseMutationOptions<
-      Awaited<
-        ReturnType<
-          typeof apiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDelete
-        >
-      >,
-      TError,
-      { userId: number; permissionName: string },
-      TContext
-    >
-    request?: SecondParameter<typeof request>
-  }): UseMutationOptions<
-    Awaited<
-      ReturnType<
-        typeof apiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDelete
-      >
-    >,
+export const getAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDeleteMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDelete>>,
     TError,
-    { userId: number; permissionName: string },
+    {
+      userId: number
+      params: AdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDeleteParams
+    },
     TContext
-  > => {
-    const mutationKey = [
-      'apiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDelete',
-    ]
-    const { mutation: mutationOptions, request: requestOptions } = options
-      ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-        ? options
-        : { ...options, mutation: { ...options.mutation, mutationKey } }
-      : { mutation: { mutationKey }, request: undefined }
+  >
+  request?: SecondParameter<typeof request>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDelete>>,
+  TError,
+  { userId: number; params: AdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDeleteParams },
+  TContext
+> => {
+  const mutationKey = ['adminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDelete']
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
 
-    const mutationFn: MutationFunction<
-      Awaited<
-        ReturnType<
-          typeof apiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDelete
-        >
-      >,
-      { userId: number; permissionName: string }
-    > = (props) => {
-      const { userId, permissionName } = props ?? {}
-
-      return apiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDelete(
-        userId,
-        permissionName,
-        requestOptions,
-      )
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDelete>>,
+    {
+      userId: number
+      params: AdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDeleteParams
     }
+  > = (props) => {
+    const { userId, params } = props ?? {}
 
-    return { mutationFn, ...mutationOptions }
+    return adminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDelete(
+      userId,
+      params,
+      requestOptions,
+    )
   }
 
-export type ApiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDeleteMutationResult =
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDeleteMutationResult =
   NonNullable<
-    Awaited<
-      ReturnType<
-        typeof apiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDelete
-      >
-    >
+    Awaited<ReturnType<typeof adminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDelete>>
   >
 
-export type ApiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDeleteMutationError =
-  ApiErrorOut | ApiErrorOut | ApiErrorOut | ApiErrorOut | ApiErrorOut | ApiErrorOut | ApiErrorOut
+export type AdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDeleteMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Users.Permissions.Revoke
+ * @summary Admin.Users.Permissions.Revoke
  */
-export const useApiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<
-        ReturnType<
-          typeof apiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDelete
-        >
-      >,
+      Awaited<ReturnType<typeof adminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDelete>>,
       TError,
-      { userId: number; permissionName: string },
+      {
+        userId: number
+        params: AdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDeleteParams
+      },
       TContext
     >
     request?: SecondParameter<typeof request>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<
-    ReturnType<
-      typeof apiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDelete
-    >
-  >,
+  Awaited<ReturnType<typeof adminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDelete>>,
   TError,
-  { userId: number; permissionName: string },
+  { userId: number; params: AdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDeleteParams },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsPermissionNameDeleteMutationOptions(
-      options,
-    )
+    getAdminUsersPermissionsRevokeApiAdminUsersUserIdPermissionsDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }

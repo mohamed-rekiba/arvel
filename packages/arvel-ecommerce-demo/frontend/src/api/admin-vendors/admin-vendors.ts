@@ -23,9 +23,9 @@ import type { MaybeRef } from 'vue'
 import type {
   AdminVendorListOut,
   AdminVendorWrapperOut,
-  ApiAdminVendorsIndexApiAdminVendorsGetParams,
-  ApiErrorOut,
+  AdminVendorsIndexApiAdminVendorsGetParams,
   CreateVendorPayload,
+  HTTPValidationError,
   UpdateVendorPayload,
 } from '.././schemas'
 
@@ -34,43 +34,36 @@ import { request } from '../../lib/api'
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.Admin.Vendors.Index
+ * @summary Admin.Vendors.Index
  */
-export const apiAdminVendorsIndexApiAdminVendorsGet = (
-  params?: MaybeRef<ApiAdminVendorsIndexApiAdminVendorsGetParams>,
+export const adminVendorsIndexApiAdminVendorsGet = (
+  params?: MaybeRef<AdminVendorsIndexApiAdminVendorsGetParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
   params = unref(params)
 
   return request<AdminVendorListOut>(
-    { url: `/api/admin/vendors`, method: 'GET', params, signal },
+    { url: `/api/admin/vendors`, method: 'GET', params: unref(params), signal },
     options,
   )
 }
 
-export const getApiAdminVendorsIndexApiAdminVendorsGetQueryKey = (
-  params?: MaybeRef<ApiAdminVendorsIndexApiAdminVendorsGetParams>,
+export const getAdminVendorsIndexApiAdminVendorsGetQueryKey = (
+  params?: MaybeRef<AdminVendorsIndexApiAdminVendorsGetParams>,
 ) => {
-  return ['api', 'admin', 'vendors', params] as const
+  return ['api', 'admin', 'vendors', ...(params ? [params] : [])] as const
 }
 
-export const getApiAdminVendorsIndexApiAdminVendorsGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminVendorsIndexApiAdminVendorsGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminVendorsIndexApiAdminVendorsGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminVendorsIndexApiAdminVendorsGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiAdminVendorsIndexApiAdminVendorsGetParams>,
+  params?: MaybeRef<AdminVendorsIndexApiAdminVendorsGetParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminVendorsIndexApiAdminVendorsGet>>,
+        Awaited<ReturnType<typeof adminVendorsIndexApiAdminVendorsGet>>,
         TError,
         TData
       >
@@ -80,51 +73,37 @@ export const getApiAdminVendorsIndexApiAdminVendorsGetQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminVendorsIndexApiAdminVendorsGetQueryKey(params)
+  const queryKey = getAdminVendorsIndexApiAdminVendorsGetQueryKey(params)
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminVendorsIndexApiAdminVendorsGet>>
-  > = ({ signal }) => apiAdminVendorsIndexApiAdminVendorsGet(params, requestOptions, signal)
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof adminVendorsIndexApiAdminVendorsGet>>> = ({
+    signal,
+  }) => adminVendorsIndexApiAdminVendorsGet(params, requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminVendorsIndexApiAdminVendorsGet>>,
+    Awaited<ReturnType<typeof adminVendorsIndexApiAdminVendorsGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminVendorsIndexApiAdminVendorsGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminVendorsIndexApiAdminVendorsGet>>
+export type AdminVendorsIndexApiAdminVendorsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminVendorsIndexApiAdminVendorsGet>>
 >
-export type ApiAdminVendorsIndexApiAdminVendorsGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminVendorsIndexApiAdminVendorsGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Vendors.Index
+ * @summary Admin.Vendors.Index
  */
 
-export function useApiAdminVendorsIndexApiAdminVendorsGet<
-  TData = Awaited<ReturnType<typeof apiAdminVendorsIndexApiAdminVendorsGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminVendorsIndexApiAdminVendorsGet<
+  TData = Awaited<ReturnType<typeof adminVendorsIndexApiAdminVendorsGet>>,
+  TError = HTTPValidationError,
 >(
-  params?: MaybeRef<ApiAdminVendorsIndexApiAdminVendorsGetParams>,
+  params?: MaybeRef<AdminVendorsIndexApiAdminVendorsGetParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminVendorsIndexApiAdminVendorsGet>>,
+        Awaited<ReturnType<typeof adminVendorsIndexApiAdminVendorsGet>>,
         TError,
         TData
       >
@@ -133,7 +112,7 @@ export function useApiAdminVendorsIndexApiAdminVendorsGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminVendorsIndexApiAdminVendorsGetQueryOptions(params, options)
+  const queryOptions = getAdminVendorsIndexApiAdminVendorsGetQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -145,9 +124,9 @@ export function useApiAdminVendorsIndexApiAdminVendorsGet<
 }
 
 /**
- * @summary Api.Admin.Vendors.Store
+ * @summary Admin.Vendors.Store
  */
-export const apiAdminVendorsStoreApiAdminVendorsPost = (
+export const adminVendorsStoreApiAdminVendorsPost = (
   createVendorPayload: MaybeRef<CreateVendorPayload>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -166,31 +145,24 @@ export const apiAdminVendorsStoreApiAdminVendorsPost = (
   )
 }
 
-export const getApiAdminVendorsStoreApiAdminVendorsPostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminVendorsStoreApiAdminVendorsPostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminVendorsStoreApiAdminVendorsPost>>,
+    Awaited<ReturnType<typeof adminVendorsStoreApiAdminVendorsPost>>,
     TError,
     { data: CreateVendorPayload },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminVendorsStoreApiAdminVendorsPost>>,
+  Awaited<ReturnType<typeof adminVendorsStoreApiAdminVendorsPost>>,
   TError,
   { data: CreateVendorPayload },
   TContext
 > => {
-  const mutationKey = ['apiAdminVendorsStoreApiAdminVendorsPost']
+  const mutationKey = ['adminVendorsStoreApiAdminVendorsPost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -198,47 +170,33 @@ export const getApiAdminVendorsStoreApiAdminVendorsPostMutationOptions = <
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminVendorsStoreApiAdminVendorsPost>>,
+    Awaited<ReturnType<typeof adminVendorsStoreApiAdminVendorsPost>>,
     { data: CreateVendorPayload }
   > = (props) => {
     const { data } = props ?? {}
 
-    return apiAdminVendorsStoreApiAdminVendorsPost(data, requestOptions)
+    return adminVendorsStoreApiAdminVendorsPost(data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminVendorsStoreApiAdminVendorsPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminVendorsStoreApiAdminVendorsPost>>
+export type AdminVendorsStoreApiAdminVendorsPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminVendorsStoreApiAdminVendorsPost>>
 >
-export type ApiAdminVendorsStoreApiAdminVendorsPostMutationBody = CreateVendorPayload
-export type ApiAdminVendorsStoreApiAdminVendorsPostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminVendorsStoreApiAdminVendorsPostMutationBody = CreateVendorPayload
+export type AdminVendorsStoreApiAdminVendorsPostMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Vendors.Store
+ * @summary Admin.Vendors.Store
  */
-export const useApiAdminVendorsStoreApiAdminVendorsPost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminVendorsStoreApiAdminVendorsPost = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminVendorsStoreApiAdminVendorsPost>>,
+      Awaited<ReturnType<typeof adminVendorsStoreApiAdminVendorsPost>>,
       TError,
       { data: CreateVendorPayload },
       TContext
@@ -247,19 +205,19 @@ export const useApiAdminVendorsStoreApiAdminVendorsPost = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminVendorsStoreApiAdminVendorsPost>>,
+  Awaited<ReturnType<typeof adminVendorsStoreApiAdminVendorsPost>>,
   TError,
   { data: CreateVendorPayload },
   TContext
 > => {
-  const mutationOptions = getApiAdminVendorsStoreApiAdminVendorsPostMutationOptions(options)
+  const mutationOptions = getAdminVendorsStoreApiAdminVendorsPostMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Vendors.Show
+ * @summary Admin.Vendors.Show
  */
-export const apiAdminVendorsShowApiAdminVendorsVendorIdGet = (
+export const adminVendorsShowApiAdminVendorsVendorIdGet = (
   vendorId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -272,28 +230,21 @@ export const apiAdminVendorsShowApiAdminVendorsVendorIdGet = (
   )
 }
 
-export const getApiAdminVendorsShowApiAdminVendorsVendorIdGetQueryKey = (
+export const getAdminVendorsShowApiAdminVendorsVendorIdGetQueryKey = (
   vendorId?: MaybeRef<string>,
 ) => {
   return ['api', 'admin', 'vendors', vendorId] as const
 }
 
-export const getApiAdminVendorsShowApiAdminVendorsVendorIdGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminVendorsShowApiAdminVendorsVendorIdGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminVendorsShowApiAdminVendorsVendorIdGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminVendorsShowApiAdminVendorsVendorIdGet>>,
+  TError = HTTPValidationError,
 >(
   vendorId: MaybeRef<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminVendorsShowApiAdminVendorsVendorIdGet>>,
+        Awaited<ReturnType<typeof adminVendorsShowApiAdminVendorsVendorIdGet>>,
         TError,
         TData
       >
@@ -303,12 +254,11 @@ export const getApiAdminVendorsShowApiAdminVendorsVendorIdGetQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminVendorsShowApiAdminVendorsVendorIdGetQueryKey(vendorId)
+  const queryKey = getAdminVendorsShowApiAdminVendorsVendorIdGetQueryKey(vendorId)
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminVendorsShowApiAdminVendorsVendorIdGet>>
-  > = ({ signal }) =>
-    apiAdminVendorsShowApiAdminVendorsVendorIdGet(vendorId, requestOptions, signal)
+    Awaited<ReturnType<typeof adminVendorsShowApiAdminVendorsVendorIdGet>>
+  > = ({ signal }) => adminVendorsShowApiAdminVendorsVendorIdGet(vendorId, requestOptions, signal)
 
   return {
     queryKey,
@@ -316,44 +266,30 @@ export const getApiAdminVendorsShowApiAdminVendorsVendorIdGetQueryOptions = <
     enabled: computed(() => !!unref(vendorId)),
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminVendorsShowApiAdminVendorsVendorIdGet>>,
+    Awaited<ReturnType<typeof adminVendorsShowApiAdminVendorsVendorIdGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminVendorsShowApiAdminVendorsVendorIdGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminVendorsShowApiAdminVendorsVendorIdGet>>
+export type AdminVendorsShowApiAdminVendorsVendorIdGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminVendorsShowApiAdminVendorsVendorIdGet>>
 >
-export type ApiAdminVendorsShowApiAdminVendorsVendorIdGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminVendorsShowApiAdminVendorsVendorIdGetQueryError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Vendors.Show
+ * @summary Admin.Vendors.Show
  */
 
-export function useApiAdminVendorsShowApiAdminVendorsVendorIdGet<
-  TData = Awaited<ReturnType<typeof apiAdminVendorsShowApiAdminVendorsVendorIdGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminVendorsShowApiAdminVendorsVendorIdGet<
+  TData = Awaited<ReturnType<typeof adminVendorsShowApiAdminVendorsVendorIdGet>>,
+  TError = HTTPValidationError,
 >(
   vendorId: MaybeRef<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminVendorsShowApiAdminVendorsVendorIdGet>>,
+        Awaited<ReturnType<typeof adminVendorsShowApiAdminVendorsVendorIdGet>>,
         TError,
         TData
       >
@@ -362,10 +298,7 @@ export function useApiAdminVendorsShowApiAdminVendorsVendorIdGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminVendorsShowApiAdminVendorsVendorIdGetQueryOptions(
-    vendorId,
-    options,
-  )
+  const queryOptions = getAdminVendorsShowApiAdminVendorsVendorIdGetQueryOptions(vendorId, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -377,9 +310,9 @@ export function useApiAdminVendorsShowApiAdminVendorsVendorIdGet<
 }
 
 /**
- * @summary Api.Admin.Vendors.Update
+ * @summary Admin.Vendors.Update
  */
-export const apiAdminVendorsUpdateApiAdminVendorsVendorIdPatch = (
+export const adminVendorsUpdateApiAdminVendorsVendorIdPatch = (
   vendorId: MaybeRef<string>,
   updateVendorPayload: MaybeRef<UpdateVendorPayload>,
   options?: SecondParameter<typeof request>,
@@ -398,31 +331,24 @@ export const apiAdminVendorsUpdateApiAdminVendorsVendorIdPatch = (
   )
 }
 
-export const getApiAdminVendorsUpdateApiAdminVendorsVendorIdPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminVendorsUpdateApiAdminVendorsVendorIdPatchMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminVendorsUpdateApiAdminVendorsVendorIdPatch>>,
+    Awaited<ReturnType<typeof adminVendorsUpdateApiAdminVendorsVendorIdPatch>>,
     TError,
     { vendorId: string; data: UpdateVendorPayload },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminVendorsUpdateApiAdminVendorsVendorIdPatch>>,
+  Awaited<ReturnType<typeof adminVendorsUpdateApiAdminVendorsVendorIdPatch>>,
   TError,
   { vendorId: string; data: UpdateVendorPayload },
   TContext
 > => {
-  const mutationKey = ['apiAdminVendorsUpdateApiAdminVendorsVendorIdPatch']
+  const mutationKey = ['adminVendorsUpdateApiAdminVendorsVendorIdPatch']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -430,47 +356,33 @@ export const getApiAdminVendorsUpdateApiAdminVendorsVendorIdPatchMutationOptions
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminVendorsUpdateApiAdminVendorsVendorIdPatch>>,
+    Awaited<ReturnType<typeof adminVendorsUpdateApiAdminVendorsVendorIdPatch>>,
     { vendorId: string; data: UpdateVendorPayload }
   > = (props) => {
     const { vendorId, data } = props ?? {}
 
-    return apiAdminVendorsUpdateApiAdminVendorsVendorIdPatch(vendorId, data, requestOptions)
+    return adminVendorsUpdateApiAdminVendorsVendorIdPatch(vendorId, data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminVendorsUpdateApiAdminVendorsVendorIdPatchMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminVendorsUpdateApiAdminVendorsVendorIdPatch>>
+export type AdminVendorsUpdateApiAdminVendorsVendorIdPatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminVendorsUpdateApiAdminVendorsVendorIdPatch>>
 >
-export type ApiAdminVendorsUpdateApiAdminVendorsVendorIdPatchMutationBody = UpdateVendorPayload
-export type ApiAdminVendorsUpdateApiAdminVendorsVendorIdPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminVendorsUpdateApiAdminVendorsVendorIdPatchMutationBody = UpdateVendorPayload
+export type AdminVendorsUpdateApiAdminVendorsVendorIdPatchMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Vendors.Update
+ * @summary Admin.Vendors.Update
  */
-export const useApiAdminVendorsUpdateApiAdminVendorsVendorIdPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminVendorsUpdateApiAdminVendorsVendorIdPatch = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminVendorsUpdateApiAdminVendorsVendorIdPatch>>,
+      Awaited<ReturnType<typeof adminVendorsUpdateApiAdminVendorsVendorIdPatch>>,
       TError,
       { vendorId: string; data: UpdateVendorPayload },
       TContext
@@ -479,53 +391,45 @@ export const useApiAdminVendorsUpdateApiAdminVendorsVendorIdPatch = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminVendorsUpdateApiAdminVendorsVendorIdPatch>>,
+  Awaited<ReturnType<typeof adminVendorsUpdateApiAdminVendorsVendorIdPatch>>,
   TError,
   { vendorId: string; data: UpdateVendorPayload },
   TContext
 > => {
-  const mutationOptions =
-    getApiAdminVendorsUpdateApiAdminVendorsVendorIdPatchMutationOptions(options)
+  const mutationOptions = getAdminVendorsUpdateApiAdminVendorsVendorIdPatchMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Vendors.Destroy
+ * @summary Admin.Vendors.Destroy
  */
-export const apiAdminVendorsDestroyApiAdminVendorsVendorIdDelete = (
+export const adminVendorsDestroyApiAdminVendorsVendorIdDelete = (
   vendorId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
 ) => {
   vendorId = unref(vendorId)
 
-  return request<void>({ url: `/api/admin/vendors/${vendorId}`, method: 'DELETE' }, options)
+  return request<unknown>({ url: `/api/admin/vendors/${vendorId}`, method: 'DELETE' }, options)
 }
 
-export const getApiAdminVendorsDestroyApiAdminVendorsVendorIdDeleteMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminVendorsDestroyApiAdminVendorsVendorIdDeleteMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminVendorsDestroyApiAdminVendorsVendorIdDelete>>,
+    Awaited<ReturnType<typeof adminVendorsDestroyApiAdminVendorsVendorIdDelete>>,
     TError,
     { vendorId: string },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminVendorsDestroyApiAdminVendorsVendorIdDelete>>,
+  Awaited<ReturnType<typeof adminVendorsDestroyApiAdminVendorsVendorIdDelete>>,
   TError,
   { vendorId: string },
   TContext
 > => {
-  const mutationKey = ['apiAdminVendorsDestroyApiAdminVendorsVendorIdDelete']
+  const mutationKey = ['adminVendorsDestroyApiAdminVendorsVendorIdDelete']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -533,47 +437,33 @@ export const getApiAdminVendorsDestroyApiAdminVendorsVendorIdDeleteMutationOptio
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminVendorsDestroyApiAdminVendorsVendorIdDelete>>,
+    Awaited<ReturnType<typeof adminVendorsDestroyApiAdminVendorsVendorIdDelete>>,
     { vendorId: string }
   > = (props) => {
     const { vendorId } = props ?? {}
 
-    return apiAdminVendorsDestroyApiAdminVendorsVendorIdDelete(vendorId, requestOptions)
+    return adminVendorsDestroyApiAdminVendorsVendorIdDelete(vendorId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminVendorsDestroyApiAdminVendorsVendorIdDeleteMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminVendorsDestroyApiAdminVendorsVendorIdDelete>>
+export type AdminVendorsDestroyApiAdminVendorsVendorIdDeleteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminVendorsDestroyApiAdminVendorsVendorIdDelete>>
 >
 
-export type ApiAdminVendorsDestroyApiAdminVendorsVendorIdDeleteMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminVendorsDestroyApiAdminVendorsVendorIdDeleteMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Vendors.Destroy
+ * @summary Admin.Vendors.Destroy
  */
-export const useApiAdminVendorsDestroyApiAdminVendorsVendorIdDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminVendorsDestroyApiAdminVendorsVendorIdDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminVendorsDestroyApiAdminVendorsVendorIdDelete>>,
+      Awaited<ReturnType<typeof adminVendorsDestroyApiAdminVendorsVendorIdDelete>>,
       TError,
       { vendorId: string },
       TContext
@@ -582,56 +472,49 @@ export const useApiAdminVendorsDestroyApiAdminVendorsVendorIdDelete = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminVendorsDestroyApiAdminVendorsVendorIdDelete>>,
+  Awaited<ReturnType<typeof adminVendorsDestroyApiAdminVendorsVendorIdDelete>>,
   TError,
   { vendorId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminVendorsDestroyApiAdminVendorsVendorIdDeleteMutationOptions(options)
+    getAdminVendorsDestroyApiAdminVendorsVendorIdDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Vendors.Publish
+ * @summary Admin.Vendors.Force Destroy
  */
-export const apiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch = (
+export const adminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete = (
   vendorId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
 ) => {
   vendorId = unref(vendorId)
 
-  return request<AdminVendorWrapperOut>(
-    { url: `/api/admin/vendors/${vendorId}/publish`, method: 'POST' },
+  return request<unknown>(
+    { url: `/api/admin/vendors/${vendorId}/force`, method: 'DELETE' },
     options,
   )
 }
 
-export const getApiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDeleteMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>,
+    Awaited<ReturnType<typeof adminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>,
     TError,
     { vendorId: string },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>,
+  Awaited<ReturnType<typeof adminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>,
   TError,
   { vendorId: string },
   TContext
 > => {
-  const mutationKey = ['apiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch']
+  const mutationKey = ['adminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -639,47 +522,34 @@ export const getApiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatchMutatio
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>,
+    Awaited<ReturnType<typeof adminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>,
     { vendorId: string }
   > = (props) => {
     const { vendorId } = props ?? {}
 
-    return apiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch(vendorId, requestOptions)
+    return adminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete(vendorId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatchMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>
+export type AdminVendorsForceDestroyApiAdminVendorsVendorIdForceDeleteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>
 >
 
-export type ApiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminVendorsForceDestroyApiAdminVendorsVendorIdForceDeleteMutationError =
+  HTTPValidationError
 
 /**
- * @summary Api.Admin.Vendors.Publish
+ * @summary Admin.Vendors.Force Destroy
  */
-export const useApiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>,
+      Awaited<ReturnType<typeof adminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>,
       TError,
       { vendorId: string },
       TContext
@@ -688,231 +558,20 @@ export const useApiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>,
+  Awaited<ReturnType<typeof adminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>,
   TError,
   { vendorId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminVendorsPublishApiAdminVendorsVendorIdPublishPatchMutationOptions(options)
+    getAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDeleteMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }
 /**
- * @summary Api.Admin.Vendors.Unpublish
+ * @summary Admin.Vendors.Restore
  */
-export const apiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch = (
-  vendorId: MaybeRef<string>,
-  options?: SecondParameter<typeof request>,
-) => {
-  vendorId = unref(vendorId)
-
-  return request<AdminVendorWrapperOut>(
-    { url: `/api/admin/vendors/${vendorId}/unpublish`, method: 'POST' },
-    options,
-  )
-}
-
-export const getApiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatchMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>,
-    TError,
-    { vendorId: string },
-    TContext
-  >
-  request?: SecondParameter<typeof request>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>,
-  TError,
-  { vendorId: string },
-  TContext
-> => {
-  const mutationKey = ['apiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch']
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>,
-    { vendorId: string }
-  > = (props) => {
-    const { vendorId } = props ?? {}
-
-    return apiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch(vendorId, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type ApiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatchMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof apiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>
-  >
-
-export type ApiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatchMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-
-/**
- * @summary Api.Admin.Vendors.Unpublish
- */
-export const useApiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>,
-      TError,
-      { vendorId: string },
-      TContext
-    >
-    request?: SecondParameter<typeof request>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>,
-  TError,
-  { vendorId: string },
-  TContext
-> => {
-  const mutationOptions =
-    getApiAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatchMutationOptions(options)
-
-  return useMutation(mutationOptions, queryClient)
-}
-/**
- * @summary Api.Admin.Vendors.Force-Destroy
- */
-export const apiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete = (
-  vendorId: MaybeRef<string>,
-  options?: SecondParameter<typeof request>,
-) => {
-  vendorId = unref(vendorId)
-
-  return request<void>({ url: `/api/admin/vendors/${vendorId}/force`, method: 'DELETE' }, options)
-}
-
-export const getApiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDeleteMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>,
-    TError,
-    { vendorId: string },
-    TContext
-  >
-  request?: SecondParameter<typeof request>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>,
-  TError,
-  { vendorId: string },
-  TContext
-> => {
-  const mutationKey = ['apiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete']
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>,
-    { vendorId: string }
-  > = (props) => {
-    const { vendorId } = props ?? {}
-
-    return apiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete(vendorId, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type ApiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDeleteMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof apiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>
-  >
-
-export type ApiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDeleteMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-
-/**
- * @summary Api.Admin.Vendors.Force-Destroy
- */
-export const useApiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>,
-      TError,
-      { vendorId: string },
-      TContext
-    >
-    request?: SecondParameter<typeof request>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDelete>>,
-  TError,
-  { vendorId: string },
-  TContext
-> => {
-  const mutationOptions =
-    getApiAdminVendorsForceDestroyApiAdminVendorsVendorIdForceDeleteMutationOptions(options)
-
-  return useMutation(mutationOptions, queryClient)
-}
-/**
- * @summary Api.Admin.Vendors.Restore
- */
-export const apiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost = (
+export const adminVendorsRestoreApiAdminVendorsVendorIdRestorePost = (
   vendorId: MaybeRef<string>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
@@ -925,31 +584,24 @@ export const apiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost = (
   )
 }
 
-export const getApiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePostMutationOptions = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminVendorsRestoreApiAdminVendorsVendorIdRestorePostMutationOptions = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof apiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>,
+    Awaited<ReturnType<typeof adminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>,
     TError,
     { vendorId: string },
     TContext
   >
   request?: SecondParameter<typeof request>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof apiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>,
+  Awaited<ReturnType<typeof adminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>,
   TError,
   { vendorId: string },
   TContext
 > => {
-  const mutationKey = ['apiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost']
+  const mutationKey = ['adminVendorsRestoreApiAdminVendorsVendorIdRestorePost']
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -957,47 +609,33 @@ export const getApiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePostMutation
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof apiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>,
+    Awaited<ReturnType<typeof adminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>,
     { vendorId: string }
   > = (props) => {
     const { vendorId } = props ?? {}
 
-    return apiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost(vendorId, requestOptions)
+    return adminVendorsRestoreApiAdminVendorsVendorIdRestorePost(vendorId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ApiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>
+export type AdminVendorsRestoreApiAdminVendorsVendorIdRestorePostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>
 >
 
-export type ApiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePostMutationError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminVendorsRestoreApiAdminVendorsVendorIdRestorePostMutationError = HTTPValidationError
 
 /**
- * @summary Api.Admin.Vendors.Restore
+ * @summary Admin.Vendors.Restore
  */
-export const useApiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost = <
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const useAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost = <
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof apiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>,
+      Awaited<ReturnType<typeof adminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>,
       TError,
       { vendorId: string },
       TContext
@@ -1006,13 +644,185 @@ export const useApiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost = <
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof apiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>,
+  Awaited<ReturnType<typeof adminVendorsRestoreApiAdminVendorsVendorIdRestorePost>>,
   TError,
   { vendorId: string },
   TContext
 > => {
   const mutationOptions =
-    getApiAdminVendorsRestoreApiAdminVendorsVendorIdRestorePostMutationOptions(options)
+    getAdminVendorsRestoreApiAdminVendorsVendorIdRestorePostMutationOptions(options)
+
+  return useMutation(mutationOptions, queryClient)
+}
+/**
+ * @summary Admin.Vendors.Publish
+ */
+export const adminVendorsPublishApiAdminVendorsVendorIdPublishPatch = (
+  vendorId: MaybeRef<string>,
+  options?: SecondParameter<typeof request>,
+) => {
+  vendorId = unref(vendorId)
+
+  return request<AdminVendorWrapperOut>(
+    { url: `/api/admin/vendors/${vendorId}/publish`, method: 'PATCH' },
+    options,
+  )
+}
+
+export const getAdminVendorsPublishApiAdminVendorsVendorIdPublishPatchMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>,
+    TError,
+    { vendorId: string },
+    TContext
+  >
+  request?: SecondParameter<typeof request>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>,
+  TError,
+  { vendorId: string },
+  TContext
+> => {
+  const mutationKey = ['adminVendorsPublishApiAdminVendorsVendorIdPublishPatch']
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>,
+    { vendorId: string }
+  > = (props) => {
+    const { vendorId } = props ?? {}
+
+    return adminVendorsPublishApiAdminVendorsVendorIdPublishPatch(vendorId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AdminVendorsPublishApiAdminVendorsVendorIdPublishPatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>
+>
+
+export type AdminVendorsPublishApiAdminVendorsVendorIdPublishPatchMutationError =
+  HTTPValidationError
+
+/**
+ * @summary Admin.Vendors.Publish
+ */
+export const useAdminVendorsPublishApiAdminVendorsVendorIdPublishPatch = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>,
+      TError,
+      { vendorId: string },
+      TContext
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof adminVendorsPublishApiAdminVendorsVendorIdPublishPatch>>,
+  TError,
+  { vendorId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAdminVendorsPublishApiAdminVendorsVendorIdPublishPatchMutationOptions(options)
+
+  return useMutation(mutationOptions, queryClient)
+}
+/**
+ * @summary Admin.Vendors.Unpublish
+ */
+export const adminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch = (
+  vendorId: MaybeRef<string>,
+  options?: SecondParameter<typeof request>,
+) => {
+  vendorId = unref(vendorId)
+
+  return request<AdminVendorWrapperOut>(
+    { url: `/api/admin/vendors/${vendorId}/unpublish`, method: 'PATCH' },
+    options,
+  )
+}
+
+export const getAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatchMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>,
+    TError,
+    { vendorId: string },
+    TContext
+  >
+  request?: SecondParameter<typeof request>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>,
+  TError,
+  { vendorId: string },
+  TContext
+> => {
+  const mutationKey = ['adminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch']
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>,
+    { vendorId: string }
+  > = (props) => {
+    const { vendorId } = props ?? {}
+
+    return adminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch(vendorId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>
+>
+
+export type AdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatchMutationError =
+  HTTPValidationError
+
+/**
+ * @summary Admin.Vendors.Unpublish
+ */
+export const useAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>,
+      TError,
+      { vendorId: string },
+      TContext
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof adminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatch>>,
+  TError,
+  { vendorId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAdminVendorsUnpublishApiAdminVendorsVendorIdUnpublishPatchMutationOptions(options)
 
   return useMutation(mutationOptions, queryClient)
 }

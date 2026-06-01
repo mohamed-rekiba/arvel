@@ -99,17 +99,17 @@ def test_catalog_serializers_use_service_layer() -> None:
 
 
 def test_category_vendor_indexes_honor_trashed_filter() -> None:
-    """Trashed filtering is handled by the controller via parse_trashed_mode,
-    and the service's list() accepts the parsed Literal value."""
+    """Trashed filtering is a typed query param on the controller index, surfaced in
+    the OpenAPI spec, and passed straight to the service's list()."""
     cat_ctrl = _src(CATEGORIES_CTRL)
     ven_ctrl = _src(VENDORS_CTRL)
     cat_svc = _src(CATEGORY_SERVICE)
     ven_svc = _src(VENDOR_SERVICE)
 
-    # parse_trashed_mode belongs in the controller (HTTP layer), not the service.
-    for snippet in ("parse_trashed_mode",):
-        assert snippet in cat_ctrl, f"Expected {snippet!r} in categories controller"
-        assert snippet in ven_ctrl, f"Expected {snippet!r} in vendors controller"
+    # trashed is a typed Literal query param on the controller (shows up in the spec).
+    typed_param = 'trashed: Literal["without", "with", "only"]'
+    assert typed_param in cat_ctrl, "Expected typed trashed param in categories controller"
+    assert typed_param in ven_ctrl, "Expected typed trashed param in vendors controller"
 
     # The service's list() accepts the three trashed modes as a typed parameter.
     for snippet in ('"without"', '"with"', '"only"'):

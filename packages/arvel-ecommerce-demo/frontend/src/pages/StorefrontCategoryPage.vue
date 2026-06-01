@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import ProductCard from '@/components/storefront/ProductCard.vue'
-import { apiCategoriesShowApiCategoriesSlugGet } from '@/api/storefront/storefront'
+import { storefrontProductsCatalogApiCategoriesSlugGet } from '@/api/storefront/storefront'
 import type { ProductCardOut } from '@/api/schemas'
 import { routeParam, toSupportedLocale } from '@/lib/i18n'
 
@@ -33,7 +33,7 @@ async function load(resetCursor = true): Promise<void> {
   loading.value = true
   if (resetCursor) cursor.value = ''
   try {
-    const result = await apiCategoriesShowApiCategoriesSlugGet(slug.value, {
+    const result = await storefrontProductsCatalogApiCategoriesSlugGet(slug.value, {
       locale: currentLocale.value,
       limit: 24,
       cursor: cursor.value || undefined,

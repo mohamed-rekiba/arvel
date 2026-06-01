@@ -5,8 +5,8 @@ import { useRoute } from 'vue-router'
 import ProductCard from '@/components/storefront/ProductCard.vue'
 import { fetchProductList, fetchCategory } from '../lib/api'
 import {
-  apiCategoriesShowApiCategoriesSlugGet,
-  apiProductsIndexApiProductsGet,
+  storefrontProductsCatalogApiCategoriesSlugGet,
+  storefrontIndexApiProductsGet,
 } from '@/api/storefront/storefront'
 import type { ProductCardOut } from '@/api/schemas'
 import { routeQuery, toSupportedLocale } from '@/lib/i18n'
@@ -32,7 +32,7 @@ async function load(resetCursor = true): Promise<void> {
   try {
     if (categorySlug.value) {
       await fetchCategory(categorySlug.value).catch(() => undefined)
-      const result = await apiCategoriesShowApiCategoriesSlugGet(categorySlug.value, {
+      const result = await storefrontProductsCatalogApiCategoriesSlugGet(categorySlug.value, {
         locale: currentLocale.value,
         limit: 24,
         cursor: cursor.value || undefined,
@@ -44,7 +44,7 @@ async function load(resetCursor = true): Promise<void> {
       await fetchProductList('/api/products', { locale: currentLocale.value }).catch(
         () => undefined,
       )
-      const result = await apiProductsIndexApiProductsGet({
+      const result = await storefrontIndexApiProductsGet({
         locale: currentLocale.value,
         limit: 24,
         cursor: cursor.value || undefined,

@@ -16,16 +16,16 @@ import type {
 
 import { unref } from 'vue'
 
-import type { ApiErrorOut, TranslationsListOut } from '.././schemas'
+import type { TranslationsListOut } from '.././schemas'
 
 import { request } from '../../lib/api'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
- * @summary Api.Admin.Translations.Index
+ * @summary Admin.Translations.Index
  */
-export const apiAdminTranslationsIndexApiAdminTranslationsGet = (
+export const adminTranslationsIndexApiAdminTranslationsGet = (
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
@@ -35,24 +35,17 @@ export const apiAdminTranslationsIndexApiAdminTranslationsGet = (
   )
 }
 
-export const getApiAdminTranslationsIndexApiAdminTranslationsGetQueryKey = () => {
+export const getAdminTranslationsIndexApiAdminTranslationsGetQueryKey = () => {
   return ['api', 'admin', 'translations'] as const
 }
 
-export const getApiAdminTranslationsIndexApiAdminTranslationsGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof apiAdminTranslationsIndexApiAdminTranslationsGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export const getAdminTranslationsIndexApiAdminTranslationsGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminTranslationsIndexApiAdminTranslationsGet>>,
+  TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
-      Awaited<ReturnType<typeof apiAdminTranslationsIndexApiAdminTranslationsGet>>,
+      Awaited<ReturnType<typeof adminTranslationsIndexApiAdminTranslationsGet>>,
       TError,
       TData
     >
@@ -61,50 +54,36 @@ export const getApiAdminTranslationsIndexApiAdminTranslationsGetQueryOptions = <
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getApiAdminTranslationsIndexApiAdminTranslationsGetQueryKey()
+  const queryKey = getAdminTranslationsIndexApiAdminTranslationsGetQueryKey()
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof apiAdminTranslationsIndexApiAdminTranslationsGet>>
-  > = ({ signal }) => apiAdminTranslationsIndexApiAdminTranslationsGet(requestOptions, signal)
+    Awaited<ReturnType<typeof adminTranslationsIndexApiAdminTranslationsGet>>
+  > = ({ signal }) => adminTranslationsIndexApiAdminTranslationsGet(requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof apiAdminTranslationsIndexApiAdminTranslationsGet>>,
+    Awaited<ReturnType<typeof adminTranslationsIndexApiAdminTranslationsGet>>,
     TError,
     TData
   >
 }
 
-export type ApiAdminTranslationsIndexApiAdminTranslationsGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof apiAdminTranslationsIndexApiAdminTranslationsGet>>
+export type AdminTranslationsIndexApiAdminTranslationsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminTranslationsIndexApiAdminTranslationsGet>>
 >
-export type ApiAdminTranslationsIndexApiAdminTranslationsGetQueryError =
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
-  | ApiErrorOut
+export type AdminTranslationsIndexApiAdminTranslationsGetQueryError = unknown
 
 /**
- * @summary Api.Admin.Translations.Index
+ * @summary Admin.Translations.Index
  */
 
-export function useApiAdminTranslationsIndexApiAdminTranslationsGet<
-  TData = Awaited<ReturnType<typeof apiAdminTranslationsIndexApiAdminTranslationsGet>>,
-  TError =
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut
-    | ApiErrorOut,
+export function useAdminTranslationsIndexApiAdminTranslationsGet<
+  TData = Awaited<ReturnType<typeof adminTranslationsIndexApiAdminTranslationsGet>>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof apiAdminTranslationsIndexApiAdminTranslationsGet>>,
+        Awaited<ReturnType<typeof adminTranslationsIndexApiAdminTranslationsGet>>,
         TError,
         TData
       >
@@ -113,7 +92,7 @@ export function useApiAdminTranslationsIndexApiAdminTranslationsGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getApiAdminTranslationsIndexApiAdminTranslationsGetQueryOptions(options)
+  const queryOptions = getAdminTranslationsIndexApiAdminTranslationsGetQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
