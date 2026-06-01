@@ -68,6 +68,7 @@ class _GroupFrame:
     prefix: str = ""
     middleware: tuple[MiddlewareRef, ...] = ()
     name_prefix: str = ""
+    tags: tuple[str, ...] = ()
     bindings: dict[str, RouteBindingResolver] = field(
         default_factory=dict[str, RouteBindingResolver]
     )
@@ -91,6 +92,15 @@ def _current_middleware() -> tuple[Middleware, ...]:
 
 def _current_name_prefix() -> str:
     return "".join(frame.name_prefix for frame in _group_stack.get())
+
+
+def _current_tags() -> tuple[str, ...]:
+    # Stack outermost → innermost; dedupe while preserving order.
+    seen: dict[str, None] = {}
+    for frame in _group_stack.get():
+        for tag in frame.tags:
+            seen.setdefault(tag, None)
+    return tuple(seen)
 
 
 def _current_bindings() -> dict[str, RouteBindingResolver]:
@@ -871,6 +881,12 @@ class _RouteFacade:
         )
         spec_bindings: dict[str, RouteBindingResolver] = dict(Router.singleton().bindings())
         spec_bindings.update(_current_bindings())
+        # Group tags prepend per-route tags; flow through extras to add_api_route.
+        group_tags = _current_tags()
+        full_extras = dict(extras)
+        if group_tags:
+            route_tags = tuple(full_extras.get("tags") or ())
+            full_extras["tags"] = [*group_tags, *route_tags]
 
         def _register(handler: Callable[..., Awaitable[Any]]) -> None:
             spec = RouteSpec(
@@ -881,7 +897,7 @@ class _RouteFacade:
                 middleware=full_middleware,
                 controller=controller,
                 action=action,
-                extras=extras,
+                extras=full_extras,
                 caller_locals=caller_locals,
                 bindings=spec_bindings,
             )
@@ -1118,11 +1134,13 @@ class _RouteFacade:
         prefix: str = "",
         middleware: Sequence[MiddlewareRef] | None = None,
         name_prefix: str = "",
+        tags: Sequence[str] | None = None,
     ) -> Any:
         frame = _GroupFrame(
             prefix=prefix,
             middleware=tuple(middleware or ()),
             name_prefix=name_prefix,
+            tags=tuple(tags or ()),
         )
         token = _group_stack.set((*_group_stack.get(), frame))
         try:
