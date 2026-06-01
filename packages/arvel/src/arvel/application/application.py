@@ -189,14 +189,24 @@ class Application:
             except Exception as exc:
                 raise BootError(type(inst), exc) from exc
 
+        from arvel.logging.facade import Log
+        from arvel.routing import Router
+
         for service in self._services:
             try:
                 await service.connect()
             except Exception as exc:
                 raise ServiceConnectError(service.name, exc) from exc
+            Log.info("service.connected", service=service.name)
 
         self._booted = True
         self._log_registered_routes()
+        Log.info(
+            "app.boot.complete",
+            environment=self._environment or "",
+            services=len(self._services),
+            routes=len(Router.singleton().routes()),
+        )
 
     def _log_registered_routes(self) -> None:
         """Emit one DEBUG log per registered route once every provider has booted.

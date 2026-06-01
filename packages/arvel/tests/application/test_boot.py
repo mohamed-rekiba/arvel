@@ -106,6 +106,38 @@ def test_with_environment_sets_environment(tmp_path: Path) -> None:
     assert app.environment() == "production"
 
 
+async def test_boot_logs_connected_services_and_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from arvel import Application
+    from arvel.observability.provider import ObservabilityServiceProvider
+    from arvel.services import BaseService, HealthResult, HealthStatus
+    from arvel.testing.observability import FakeObservability
+
+    # Stop the observability provider from re-bootstrapping the OTel SDK mid-boot,
+    # which would replace the FakeObservability logger provider we're capturing on.
+    async def _noop_boot(self: ObservabilityServiceProvider) -> None:
+        return
+
+    monkeypatch.setattr(ObservabilityServiceProvider, "boot", _noop_boot)
+
+    class DummyService(BaseService):
+        name = "dummy"
+
+        async def health_check(self) -> HealthResult:
+            return HealthResult(status=HealthStatus.healthy)
+
+    app = Application.configure(tmp_path).with_environment("testing").create()
+    app.register_service(DummyService())
+
+    with FakeObservability() as obs:
+        await app.boot()
+
+    obs.assert_logged("service.connected", service="dummy")
+    obs.assert_logged("app.boot.complete")
+    await app.shutdown()
+
+
 # ──────────────────────── Baseline provider auto-registration ───────────────────
 
 
