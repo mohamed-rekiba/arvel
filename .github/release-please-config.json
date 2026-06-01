@@ -53,6 +53,31 @@
           "path": "src/arvel/__init__.py"
         }
       ]
+    },
+    "packages/arvel-permission": {
+      "component": "arvel-permission",
+      "package-name": "arvel-permission",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "packages/arvel-image": {
+      "component": "arvel-image",
+      "package-name": "arvel-image",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "packages/arvel-oauth": {
+      "component": "arvel-oauth",
+      "package-name": "arvel-oauth",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "packages/arvel-search": {
+      "component": "arvel-search",
+      "package-name": "arvel-search",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "packages/arvel-audit": {
+      "component": "arvel-audit",
+      "package-name": "arvel-audit",
+      "changelog-path": "CHANGELOG.md"
     }
   }
 }
