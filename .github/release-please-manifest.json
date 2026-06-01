@@ -1,7 +1,7 @@
 {
   "packages/arvel": "0.5.1",
   "packages/arvel-permission": "0.5.1",
-  "packages/arvel-image": "0.5.1",
+  "packages/arvel-image": "0.6.0",
   "packages/arvel-oauth": "0.5.1",
   "packages/arvel-search": "0.5.1",
   "packages/arvel-audit": "0.5.1"
