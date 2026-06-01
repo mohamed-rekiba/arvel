@@ -1,8 +1,7 @@
-"""WI-arvel-019 — Epic 006 Story 5: unified ``Attribute``-style accessor/mutator.
+"""Unified ``Attribute``-style accessor/mutator.
 
 A single descriptor defines symmetric ``get``/``set`` under one attribute name,
-backed by one or more real columns, with opt-in per-instance caching.
-"""
+backed by one or more real columns, with opt-in per-instance caching."""
 
 from __future__ import annotations
 

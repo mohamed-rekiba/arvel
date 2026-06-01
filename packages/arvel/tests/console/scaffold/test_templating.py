@@ -1,4 +1,4 @@
-"""FR-004-004 + Gate #29: literal string templating + no-unsubstituted-tokens sweep."""
+"""+ : literal string templating + no-unsubstituted-tokens sweep."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ TOKENS = {
 
 
 def test_token_keys_match_documented_set() -> None:
-    """TOKEN_KEYS lists every supported token name (per ADR-020)."""
+    """TOKEN_KEYS lists every supported token name ."""
     assert set(TOKEN_KEYS) == {"project_name", "project_name_pascal", "python_version"}
 
 

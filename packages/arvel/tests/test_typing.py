@@ -1,4 +1,4 @@
-"""FR-001-002: Type-checker baseline.
+"""Type-checker baseline.
 
 Assertions checked at type-check time via typing.assert_type. The test bodies also
 run at runtime as a sanity check, but the real test happens under

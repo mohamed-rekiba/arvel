@@ -1,4 +1,4 @@
-"""model:show command (WI-arvel-023)."""
+"""model:show command."""
 
 from __future__ import annotations
 

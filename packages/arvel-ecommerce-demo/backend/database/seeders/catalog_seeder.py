@@ -1,11 +1,11 @@
 """Seed electronics catalog: vendor, categories, products, and media.
 
 Creates enough data to populate the marketplace-style storefront:
-- 1 vendor  (TechWorld)
+- 1 vendor (TechWorld)
 - 8 categories:
     Level 1: Electronics
     Level 2: Mobiles, Laptops, Speakers, TV Sets, Watches, Headsets
-    Level 3: Smartphones  (child of Mobiles — exercises the recursive CTE)
+    Level 3: Smartphones (child of Mobiles — exercises the recursive CTE)
 - 12 published products (Mobiles/Smartphones share their 2 products)
 - 1 media row per product using a curated real product photo
   (stored via custom_properties.image_url — no file downloads required)

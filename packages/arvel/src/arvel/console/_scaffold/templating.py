@@ -1,10 +1,10 @@
 """Literal string-replacement templating for skeleton files.
 
-No template engine (per ADR-020 § Token substitution). Three tokens,
+No template engine — token substitution only. Three tokens,
 three ``str.replace`` calls, plus a post-condition that asserts no stray
 ``{{ }}`` tokens remain (catches template typos at install time, not at
 user runtime). Contract surface only — bodies raise ``NotImplementedError``
-until Stage 3b makes the QA-Pre tests green.
+until the scaffold implementation lands.
 """
 
 from __future__ import annotations

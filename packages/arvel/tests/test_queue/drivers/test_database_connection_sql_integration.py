@@ -1,5 +1,4 @@
-"""Real-SQL integration tests for ``DatabaseConnection`` — FR-008-005.
-
+"""Real-SQL integration tests for ``DatabaseConnection``
 The fast inner-loop suite in ``test_database.py`` runs against in-memory
 SQLite (which DatabaseConnection bootstraps itself). This file bypasses
 the built-in SQLite engine, injects a Postgres- or MySQL-backed
@@ -79,7 +78,7 @@ async def _create_jobs_table(engine: AsyncEngine) -> None:
         Column("attempts", Integer, nullable=False, default=0),
         Column("available_at", BigInteger, nullable=False),
         Column("created_at", BigInteger, nullable=False),
-        # FR-018-07: priority column added by WI-018.
+        # : priority column added by .
         Column("priority", Integer, nullable=False, default=0),
     )
     async with engine.begin() as conn:
@@ -136,14 +135,14 @@ class TestDatabaseConnectionSql:
     async def test_delayed_job_not_popped_before_available_at(
         self, driver: DatabaseConnection
     ) -> None:
-        """FR-018-07: envelope.delay > 0 sets available_at = now + delay; not popped early."""
+        """envelope.delay > 0 sets available_at = now + delay; not popped early."""
         env = _envelope("delayed")
         env.delay = 3600
         await driver.push(env, queue="default")
         assert await driver.pop_blocking(queue="default", timeout=0) is None
 
     async def test_priority_ordering_on_real_sql(self, driver: DatabaseConnection) -> None:
-        """FR-018-07: pop returns highest-priority envelope first on Postgres + MariaDB."""
+        """pop returns highest-priority envelope first on Postgres + MariaDB."""
         low = _envelope("low")
         high = _envelope("high")
         high.priority = 7

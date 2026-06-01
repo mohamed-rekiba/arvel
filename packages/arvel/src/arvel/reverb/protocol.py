@@ -1,4 +1,4 @@
-"""Pusher Protocol v7 frame builders (FR-013-018, NFR-013-005, ADR-057)."""
+"""Pusher Protocol v7 frame builders."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Epic 001 Story 1 — request-scoped Context, defer(), and Concurrency."""
+"""request-scoped Context, defer(), and Concurrency."""
 
 from __future__ import annotations
 

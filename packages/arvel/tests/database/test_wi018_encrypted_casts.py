@@ -1,10 +1,9 @@
-"""WI-arvel-018 — Epic 006 Story 3: declarative encrypted casts.
+"""Declarative encrypted casts.
 
 ``__casts__`` gains ``"encrypted"`` (and ``encrypted:json|array|object|collection``).
 Writes encrypt through the ``Crypt`` facade; reads decrypt. The stored column value
-is ciphertext; the attribute and ``to_dict()`` expose the decrypted value, matching
-Eloquent's ``toArray``.
-"""
+is ciphertext; the attribute and ``to_dict`` expose the decrypted value, matching
+Eloquent's ``toArray``."""
 
 from __future__ import annotations
 

@@ -1,9 +1,8 @@
-"""In-place JSON dict mutation marks the column dirty and persists on save().
+"""In-place JSON dict mutation marks the column dirty and persists on save.
 
 SQLAlchemy won't notice ``model.meta["k"] = v`` without a mutable type. The
-``json()`` / ``jsonb()`` column helpers wrap the value so in-place dict edits
-are tracked, matching the intuition that editing a JSON field then saving works.
-"""
+``json`` / ``jsonb`` column helpers wrap the value so in-place dict edits
+are tracked, matching the intuition that editing a JSON field then saving works."""
 
 from __future__ import annotations
 
@@ -42,7 +41,7 @@ async def test_in_place_dict_mutation_persists(engine: AsyncEngine, session: Asy
 
     doc.meta["views"] = 42
     await doc.save()
-    # Reload from the DB; if the in-place edit wasn't tracked, save() flushed
+    # Reload from the DB; if the in-place edit wasn't tracked, save flushed
     # nothing and this comes back as 0.
     await session.refresh(doc, ["meta"])
 
@@ -50,7 +49,7 @@ async def test_in_place_dict_mutation_persists(engine: AsyncEngine, session: Asy
 
 
 async def test_in_place_list_mutation_persists(engine: AsyncEngine, session: AsyncSession) -> None:
-    """A list-rooted JSON column tracks .append() in place."""
+    """A list-rooted JSON column tracks .append in place."""
     await _setup(engine)
     doc = await JmtDoc.create(title="list", meta=["a"])
 

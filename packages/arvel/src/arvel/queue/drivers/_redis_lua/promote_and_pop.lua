@@ -1,4 +1,4 @@
--- Atomic promote-and-pop for the arvel redis-direct queue driver (WI-018, ADR-066).
+-- Atomic promote-and-pop for the arvel redis-direct queue driver.
 --
 -- KEYS[1] = <queue_key>:<queue>:scheduled  (ZSET; score = available_at_ms; member = envelope JSON)
 -- KEYS[2] = <queue_key>:<queue>:ready      (ZSET; score = -priority; member = envelope JSON)

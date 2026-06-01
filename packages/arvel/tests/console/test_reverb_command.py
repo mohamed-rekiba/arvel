@@ -1,4 +1,4 @@
-"""FR-013-017 — `arvel reverb:start` console command."""
+"""`arvel reverb:start` console command."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import pytest
 
 
 def test_reverb_command_is_typer_subcommand() -> None:
-    """FR-013-017 AC1: ReverbStartCommand registered with Typer console."""
+    """ReverbStartCommand registered with Typer console."""
     from arvel.console.commands.reverb_commands import ReverbStartCommand
 
     # Smoke check — has the required Console command surface.
@@ -15,7 +15,7 @@ def test_reverb_command_is_typer_subcommand() -> None:
 
 @pytest.mark.asyncio
 async def test_reverb_command_binds_to_configured_host_port() -> None:
-    """FR-013-017 AC2: command honours --host and --port flags (override config)."""
+    """command honours --host and --port flags (override config)."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.console.commands.reverb_commands import build_reverb_runtime
 
@@ -32,7 +32,7 @@ async def test_reverb_command_binds_to_configured_host_port() -> None:
 
 
 def test_reverb_command_emits_startup_log(caplog: pytest.LogCaptureFixture) -> None:
-    """FR-013-017 AC3: structured 'reverb_started' log emitted on bind."""
+    """structured 'reverb_started' log emitted on bind."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.console.commands.reverb_commands import log_reverb_started
 

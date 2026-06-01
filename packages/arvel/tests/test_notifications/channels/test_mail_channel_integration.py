@@ -1,4 +1,4 @@
-"""Real-SMTP integration test for ``MailChannel`` — FR-009-025.
+"""Real-SMTP integration test for ``MailChannel``
 
 The fast inner-loop suite in ``test_mail_channel.py`` uses ``ArrayMailDriver``.
 This file wires a real ``Mailer`` around ``SmtpMailDriver`` pointed at a

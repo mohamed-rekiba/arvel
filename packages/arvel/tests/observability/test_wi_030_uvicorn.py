@@ -1,4 +1,4 @@
-"""Story 7: Uvicorn log capture — FR-030-025."""
+"""Uvicorn log capture."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Tests for SchedulerKernel — FR-015-007..010, NFR-015-002..005, US-015-10."""
+"""Tests for SchedulerKernel."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ async def kernel(cache_manager: CacheManager) -> SchedulerKernel:
 
 
 class TestRunDueTasks:
-    """FR-015-007 + FR-015-009 — runs due tasks, skips not-due."""
+    """+ runs due tasks, skips not-due."""
 
     @pytest.mark.asyncio
     async def test_runs_only_due_tasks(self, kernel: SchedulerKernel) -> None:
@@ -65,7 +65,7 @@ class TestRunDueTasks:
 
 
 class TestWithoutOverlapping:
-    """FR-015-007, NFR-015-002 — concurrent execution lock prevents overlap."""
+    """concurrent execution lock prevents overlap."""
 
     @pytest.mark.asyncio
     async def test_first_run_acquires_lock(self, kernel: SchedulerKernel) -> None:
@@ -83,7 +83,7 @@ class TestWithoutOverlapping:
 
     @pytest.mark.asyncio
     async def test_simultaneous_runs_only_one_executes(self, cache_manager: CacheManager) -> None:
-        """NFR-015-002 — two SchedulerKernel instances see the same lock."""
+        """two SchedulerKernel instances see the same lock."""
         import asyncio
 
         from arvel.scheduling import Schedule, SchedulerKernel
@@ -108,7 +108,7 @@ class TestWithoutOverlapping:
 
 
 class TestOnOneServer:
-    """FR-015-008, NFR-015-003 — onOneServer elects exactly one winner."""
+    """onOneServer elects exactly one winner."""
 
     @pytest.mark.asyncio
     async def test_two_servers_only_one_wins(self, cache_manager: CacheManager) -> None:
@@ -134,7 +134,7 @@ class TestOnOneServer:
 
 
 class TestFailureHandling:
-    """US-015-10, NFR-015-005 — task exception is caught and logged."""
+    """task exception is caught and logged."""
 
     @pytest.mark.asyncio
     async def test_task_exception_logged_to_scheduler_channel(
@@ -179,7 +179,7 @@ class TestFailureHandling:
 
 
 class TestServeForever:
-    """FR-015-010 — schedule:work loop semantics via SchedulerKernel.serve_forever."""
+    """schedule:work loop semantics via SchedulerKernel.serve_forever."""
 
     @pytest.mark.asyncio
     async def test_max_failures_stops_loop(self, kernel: SchedulerKernel) -> None:
@@ -196,9 +196,7 @@ class TestServeForever:
         assert kernel.consecutive_failures >= 2
 
 
-# ---------------------------------------------------------------------------
-# WI-019 Sub-B: Schedule.job() / Schedule.command() dispatch
-# ---------------------------------------------------------------------------
+# Schedule.job() / Schedule.command() dispatch
 
 
 class _RecordingJob(Job):

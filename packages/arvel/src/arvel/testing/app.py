@@ -1,19 +1,19 @@
-"""create_test_app() — async context manager for in-process ASGI testing (ADR-093).
+"""create_test_app — async context manager for in-process ASGI testing.
 
 Usage::
 
-    async with create_test_app(my_app) as client:
-        response = await client.get("http://test/health")
-        assert response.status_code == 200
+ async with create_test_app(my_app) as client:
+ response = await client.get("http://test/health")
+ assert response.status_code == 200
 
 The context manager:
-1. Calls ``app.boot()`` on entry.
-2. Wraps the ASGI callable returned by ``app.into_asgi()`` in an
-   ``httpx.AsyncClient``.
-3. Calls ``app.shutdown()`` on exit, even if the body raises.
+1. Calls ``app.boot`` on entry.
+2. Wraps the ASGI callable returned by ``app.into_asgi`` in an
+ ``httpx.AsyncClient``.
+3. Calls ``app.shutdown`` on exit, even if the body raises.
 
-This replaces the demo's ``StarterApp``/``create_app()`` pattern which used
-``Any`` for the ASGI scope/receive/send types.  Here we use the typed
+This replaces the demo's ``StarterApp``/``create_app`` pattern which used
+``Any`` for the ASGI scope/receive/send types. Here we use the typed
 ``starlette.types.Scope``, ``Receive``, ``Send`` throughout so mypy --strict
 passes with no suppression comments.
 """

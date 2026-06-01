@@ -1,7 +1,7 @@
-"""WI-ecommerce-001 — Framework architecture compliance tests.
+"""Framework architecture compliance tests.
 
 These tests verify that the ecommerce demo follows the Arvel framework's
-documented patterns (ADR-001, ADR-002, ADR-003):
+documented patterns:
 - Routes live in routes/api.py, not in controller files
 - Controllers inherit Controller base class
 - Route.group() and Route.resource() are used
@@ -28,11 +28,11 @@ def _src(path: Path) -> str:
     return path.read_text()
 
 
-# ─── AC-001: No @Route.* decorators in controller files ──────────────────────
+# ─── No @Route.* decorators in controller files ──────────────────────
 
 
 def test_no_route_decorators_in_storefront_controller() -> None:
-    """AC-001: @Route.* must not appear in controller files — storefront."""
+    """@Route.* must not appear in controller files — storefront."""
     src = _src(CONTROLLERS_DIR / "storefront.py")
     assert "@Route." not in src, (
         "AC-001 FAIL: @Route.* found in controllers/storefront.py — routes belong in routes/api.py"
@@ -40,7 +40,7 @@ def test_no_route_decorators_in_storefront_controller() -> None:
 
 
 def test_no_route_decorators_in_auth_controller() -> None:
-    """AC-001: @Route.* must not appear in controller files — auth."""
+    """@Route.* must not appear in controller files — auth."""
     src = _src(CONTROLLERS_DIR / "auth.py")
     assert "@Route." not in src, (
         "AC-001 FAIL: @Route.* found in controllers/auth.py — routes belong in routes/api.py"
@@ -48,7 +48,7 @@ def test_no_route_decorators_in_auth_controller() -> None:
 
 
 def test_no_route_decorators_in_cart_controller() -> None:
-    """AC-001: @Route.* must not appear in controller files — cart."""
+    """@Route.* must not appear in controller files — cart."""
     src = _src(CONTROLLERS_DIR / "cart.py")
     assert "@Route." not in src, (
         "AC-001 FAIL: @Route.* found in controllers/cart.py — routes belong in routes/api.py"
@@ -85,11 +85,11 @@ def test_no_route_decorators_in_admin_users_controller() -> None:
     assert "@Route." not in src, "AC-001 FAIL: @Route.* found in admin/users.py"
 
 
-# ─── AC-002: All controllers inherit Controller ───────────────────────────────
+# ─── All controllers inherit Controller ───────────────────────────────
 
 
 def test_admin_products_controller_inherits_controller() -> None:
-    """AC-002: AdminProductsController must extend Controller."""
+    """AdminProductsController must extend Controller."""
     src = _src(ADMIN_CONTROLLERS_DIR / "products.py")
     assert "Controller" in src, (
         "AC-002 FAIL: admin/products.py does not import or extend Controller"
@@ -101,7 +101,7 @@ def test_admin_products_controller_inherits_controller() -> None:
 
 
 def test_admin_categories_controller_inherits_controller() -> None:
-    """AC-002: AdminCategoriesController must extend Controller."""
+    """AdminCategoriesController must extend Controller."""
     src = _src(ADMIN_CONTROLLERS_DIR / "categories.py")
     assert (
         "class AdminCategoriesController(Controller)" in src
@@ -110,7 +110,7 @@ def test_admin_categories_controller_inherits_controller() -> None:
 
 
 def test_admin_vendors_controller_inherits_controller() -> None:
-    """AC-002: AdminVendorsController must extend Controller."""
+    """AdminVendorsController must extend Controller."""
     src = _src(ADMIN_CONTROLLERS_DIR / "vendors.py")
     assert (
         "class AdminVendorsController(Controller)" in src
@@ -133,17 +133,18 @@ def test_storefront_controller_inherits_controller() -> None:
     ), "AC-002 FAIL: StorefrontController does not extend Controller"
 
 
-# ─── AC-003 & AC-004: Route.group and Route.resource in routes/api.py ────────
+# ─── Route.group and Route.resource in routes/api.py ────────
 
 
 def test_routes_api_uses_route_group() -> None:
-    """AC-003: Route.group must be used in routes/api.py."""
+    """Route.group must be used in routes/api.py."""
     src = _src(ROUTES_FILE)
     assert "Route.group(" in src, "AC-003 FAIL: Route.group() not found in routes/api.py"
 
 
 def test_routes_api_uses_framework_routing() -> None:
-    """AC-004: routes/api.py must use Route.group and controller= pattern.
+    """routes/api.py must use Route.group and controller= pattern.
+
 
     Route.api_resource() uses PUT for updates; since the frontend uses PATCH,
     explicit Route.patch declarations are correct and preferred over api_resource.
@@ -190,17 +191,17 @@ def test_routes_api_registers_vendors_routes() -> None:
     )
 
 
-# ─── AC-005 & AC-006: CategoryService and VendorService exist ────────────────
+# ─── CategoryService and VendorService exist ────────────────
 
 
 def test_category_service_exists() -> None:
-    """AC-005: app/services/category_service.py must exist."""
+    """app/services/category_service.py must exist."""
     service_file = SERVICES_DIR / "category_service.py"
     assert service_file.exists(), "AC-005 FAIL: app/services/category_service.py does not exist"
 
 
 def test_category_service_has_list_method() -> None:
-    """AC-005: CategoryService must have a list method."""
+    """CategoryService must have a list method."""
     service_file = SERVICES_DIR / "category_service.py"
     if not service_file.exists():
         return  # handled by test above
@@ -230,7 +231,7 @@ def test_category_service_has_to_dict_method() -> None:
 
 
 def test_vendor_service_exists() -> None:
-    """AC-006: app/services/vendor_service.py must exist."""
+    """app/services/vendor_service.py must exist."""
     service_file = SERVICES_DIR / "vendor_service.py"
     assert service_file.exists(), "AC-006 FAIL: app/services/vendor_service.py does not exist"
 
@@ -254,11 +255,11 @@ def test_vendor_service_has_to_dict_method() -> None:
     assert "def to_dict" in src, "AC-006 FAIL: VendorService has no to_dict serialization method"
 
 
-# ─── AC-007: JsonResource subclasses ─────────────────────────────────────────
+# ─── JsonResource subclasses ─────────────────────────────────────────
 
 
 def test_json_resource_used_in_demo() -> None:
-    """AC-007: JsonResource must be imported somewhere in the HTTP layer."""
+    """JsonResource must be imported somewhere in the HTTP layer."""
     found = False
     for py_file in (CONTROLLERS_DIR / "..").rglob("*.py"):
         if "__pycache__" in str(py_file):
@@ -273,7 +274,7 @@ def test_json_resource_used_in_demo() -> None:
 
 
 def test_category_controller_uses_category_service() -> None:
-    """AC-005 integration: CategoryService is wired through _deps.py and used by the controller."""
+    """CategoryService is wired through _deps.py and used by the controller."""
     # Services are instantiated in _deps.py and injected into controllers via DI.
     deps_src = _src(CONTROLLERS_DIR / "_deps.py")
     assert "CategoryService" in deps_src, "_deps.py must import and instantiate CategoryService"
@@ -282,22 +283,23 @@ def test_category_controller_uses_category_service() -> None:
 
 
 def test_vendor_controller_uses_vendor_service() -> None:
-    """AC-006 integration: VendorService is wired through _deps.py and used by the controller."""
+    """VendorService is wired through _deps.py and used by the controller."""
     deps_src = _src(CONTROLLERS_DIR / "_deps.py")
     assert "VendorService" in deps_src, "_deps.py must import and instantiate VendorService"
     ctrl_src = _src(ADMIN_CONTROLLERS_DIR / "vendors.py")
     assert "vendors" in ctrl_src, "admin/vendors.py must use the injected VendorService dep"
 
 
-# ─── NFR-001: API contract unchanged ─────────────────────────────────────────
+# ─── API contract unchanged ─────────────────────────────────────────
 
 
 def test_all_original_endpoints_still_declared_in_routes() -> None:
-    """NFR-001: All original resource types must still be covered in routes/api.py.
+    """All original resource types must still be covered in routes/api.py.
+
 
     Routes use Route.group(prefix=...) so full paths like '/api/admin/products'
     are composed from a group prefix + relative path; the literal full path need
-    not appear in the source.  We verify the group prefix + controller references
+    not appear in the source. We verify the group prefix + controller references
     are present instead.
     """
     src = _src(ROUTES_FILE)

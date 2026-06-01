@@ -1,4 +1,4 @@
-"""Epic 001 Story 5 — /_health endpoint aggregating BaseService checks."""
+"""/_health endpoint aggregating BaseService checks."""
 
 from __future__ import annotations
 

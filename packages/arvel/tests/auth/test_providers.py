@@ -1,5 +1,5 @@
 """
-FR-007-028..031 — DatabaseUserProvider + Authenticatable + HasApiTokens mixins.
+DatabaseUserProvider + Authenticatable + HasApiTokens mixins.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ class _UserC(Model):
     password_hash: str = string(255)
 
 
-# ─── FR-007-028: DatabaseUserProvider.by_id ───────────────────────────────────
+# DatabaseUserProvider.by_id
 
 
 @pytest.mark.asyncio
@@ -65,7 +65,7 @@ async def test_database_provider_by_id_returns_none_for_missing_id(
     assert result is None
 
 
-# ─── FR-007-029: DatabaseUserProvider.by_credentials ─────────────────────────
+# DatabaseUserProvider.by_credentials
 
 
 @pytest.mark.asyncio
@@ -85,7 +85,7 @@ async def test_database_provider_by_credentials_finds_by_email(engine: Any, sess
     assert found.email == "b@example.com"
 
 
-# ─── FR-007-030: Authenticatable mixin ───────────────────────────────────────
+# Authenticatable mixin
 
 
 def test_authenticatable_mixin_exposes_get_auth_id() -> None:
@@ -119,7 +119,7 @@ def test_authenticatable_mixin_password_field_is_configurable() -> None:
     assert u.get_auth_password() == "custom_field"
 
 
-# ─── FR-007-031: HasApiTokens mixin ──────────────────────────────────────────
+# HasApiTokens mixin
 
 
 def test_has_api_tokens_mixin_create_token_returns_plain_text_once() -> None:

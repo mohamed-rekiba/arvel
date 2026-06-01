@@ -1,5 +1,4 @@
-"""HTTP-layer typing-test suite — NFR-002-001 + NFR-002-007.
-
+"""HTTP-layer typing-test suite — +.
 Uses `typing.assert_type` to lock the public type signatures of every new symbol.
 mypy --strict and pyright --strict both must accept this file, and pytest also
 runs each function at collection time so unintended regressions surface as test
@@ -95,10 +94,10 @@ def test_attempt_is_named_tuple() -> None:
 
 
 def test_all_existing_foundations_types_still_resolve() -> None:
-    # NFR-002-007 — no signature break on WI-001 symbols.
+    #  no signature break on symbols.
     from arvel import Application, Container, Scope, ServiceProvider, env
 
-    assert_type(env("FOO", "bar"), str)  # FR-001-006 still typed
+    assert_type(env("FOO", "bar"), str)  # still typed
     assert Scope.SINGLETON.value == "singleton"
     assert Container is not None
     assert Application is not None

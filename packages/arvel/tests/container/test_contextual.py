@@ -1,4 +1,4 @@
-"""FR-001-011: Contextual bindings."""
+"""Contextual bindings."""
 
 from __future__ import annotations
 

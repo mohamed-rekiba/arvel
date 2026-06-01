@@ -1,4 +1,4 @@
-"""WI-017 / FR-017-021: release workflow stub exists and fails closed."""
+"""Release workflow stub exists and fails closed."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def test_release_workflow_triggers_on_version_tag() -> None:
 
 
 def test_release_workflow_fails_closed() -> None:
-    """FR-017-021 / SEC-017-004: workflow must NOT execute twine upload.
+    """workflow must NOT execute twine upload.
 
     Scope check: only counts uncommented, executable shell lines (lines that
     start a `run:` block or are inside one). Documentation comments referring

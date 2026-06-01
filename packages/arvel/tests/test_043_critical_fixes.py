@@ -1,4 +1,4 @@
-"""Failing tests for WI-arvel-043: C-001 through C-004.
+"""Failing tests for C-001 through C-004.
 
 All four tests must be RED before implementation begins.
 """
@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-# ─── C-001: SyntaxError in SchedulerKernel ───────────────────────────────────
+# C-001: SyntaxError in SchedulerKernel
 
 
 class TestC001SchedulerImport:
@@ -46,7 +46,7 @@ class TestC001SchedulerImport:
         await kernel.serve_forever(sleep_seconds=0, max_iterations=1)
 
 
-# ─── C-002: Controller DI bypass ─────────────────────────────────────────────
+# C-002: Controller DI bypass
 
 
 class TestC002ControllerDI:
@@ -134,7 +134,7 @@ class TestC002ControllerDI:
             Router.singleton().register_with_app(app)
 
 
-# ─── C-003: Listener DI bypass ───────────────────────────────────────────────
+# C-003: Listener DI bypass
 
 
 class TestC003ListenerDI:
@@ -231,7 +231,7 @@ class TestC003ListenerDI:
         assert ran == ["good"]
 
 
-# ─── C-004: FormRequest.authorize() default ───────────────────────────────────
+# C-004: FormRequest.authorize() default
 
 
 class _Payload(BaseModel):

@@ -1,4 +1,4 @@
-"""BroadcastChannel — real implementation (FR-013-027, ADR-039)."""
+"""BroadcastChannel — real implementation."""
 
 from __future__ import annotations
 

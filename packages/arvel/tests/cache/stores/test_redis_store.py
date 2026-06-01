@@ -1,4 +1,4 @@
-"""Tests for RedisStore — FR-006-004.
+"""Tests for RedisStore
 
 Uses fakeredis so no real Redis server is required.
 """
@@ -62,7 +62,7 @@ class TestRedisStoreBasicOps:
 
     @pytest.mark.asyncio
     async def test_import_error_without_redis(self) -> None:
-        """FR-006-004: helpful ImportError when redis not installed."""
+        """helpful ImportError when redis not installed."""
         import importlib
         import sys
 

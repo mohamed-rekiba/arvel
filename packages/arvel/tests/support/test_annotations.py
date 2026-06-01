@@ -1,4 +1,4 @@
-"""FR-003-040 (FB-009) — extracted ``resolve_annotations`` lives in ``arvel.support``."""
+"""extracted ``resolve_annotations`` lives in ``arvel.support``."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def test_resolve_annotations_handles_classes() -> None:
 
 
 def test_routing_does_not_redefine_resolve_annotations() -> None:
-    """FB-009: arvel.routing reuses arvel.support.annotations — no parallel definition."""
+    """: arvel.routing reuses arvel.support.annotations — no parallel definition."""
     source_file = inspect.getsourcefile(arvel.routing)
     assert source_file is not None
     src = Path(source_file).read_text(encoding="utf-8")

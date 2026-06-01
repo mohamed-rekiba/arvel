@@ -1,7 +1,7 @@
-"""FR-004-008: ``ApplicationBuilder.with_providers(Path)`` overload.
+"""``ApplicationBuilder.with_providers(Path)`` overload.
 
 The existing ``with_providers(list[type[ServiceProvider]])`` continues to
-work unchanged (NFR-004-007). The new overload accepts a ``Path`` (or
+work unchanged (). The new overload accepts a ``Path`` (or
 ``str``) pointing to a ``bootstrap/providers.py`` file whose module-level
 ``providers`` attribute is read by the builder.
 
@@ -23,7 +23,7 @@ class _SampleProvider(ServiceProvider):
 
 
 def test_existing_list_overload_still_works(tmp_path: Path) -> None:
-    """NFR-004-007: existing call sites that pass a list of provider classes pass unchanged."""
+    """: existing call sites that pass a list of provider classes pass unchanged."""
     app = (
         Application.configure(tmp_path)
         .with_environment("testing")

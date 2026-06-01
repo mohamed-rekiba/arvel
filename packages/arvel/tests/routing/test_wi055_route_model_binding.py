@@ -1,10 +1,10 @@
-"""Failing tests for WI-arvel-055: Implicit Route Model Binding.
+"""Failing tests for Implicit Route Model Binding.
 
-Epic 048 Story 1 — FastAPI route parameters typed with a ``Model`` subclass
+— FastAPI route parameters typed with a ``Model`` subclass
 auto-resolve from the database. Hit ``/posts/5`` with ``def show(post: Post)``
 and the handler sees a fully-loaded ``Post`` instance. Miss the row → 404.
 
-Run BEFORE implementation — every test in this file MUST fail (Red state).
+Run BEFORE implementation — every test in this file MUST fail (RED state).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 
-# ─────────────────────────── Test fixtures: models ──────────────────────────
+# Test fixtures: models
 
 
 class _BindPost(Model):
@@ -48,7 +48,7 @@ class _BindArticle(Model):
 
 @pytest_asyncio.fixture
 async def bind_db() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    """Per-test engine with the WI-055 tables created and rows seeded."""
+    """Per-test engine with the tables created and rows seeded."""
     engine: AsyncEngine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -71,7 +71,7 @@ async def bind_db() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
         await engine.dispose()
 
 
-# ─────────────────────────── Unit tests: binder API ─────────────────────────
+# Unit tests: binder API
 
 
 class TestImplicitBinderPublicAPI:
@@ -118,7 +118,7 @@ class TestImplicitBinderPublicAPI:
         assert params == {"article": _BindArticle}
 
 
-# ─────────────────────── Integration: implicit binding ──────────────────────
+# Integration: implicit binding
 
 
 @pytest.mark.usefixtures("bind_db")
@@ -217,7 +217,7 @@ class TestImplicitBindingIntegration:
         assert resp.json() == {"post_id": 1, "article_slug": "parity"}
 
 
-# ─────────────────────── Composition with FormRequest ───────────────────────
+# Composition with FormRequest
 
 
 @pytest.mark.usefixtures("bind_db")
@@ -259,7 +259,7 @@ def test_implicit_binding_coexists_with_form_request(
     assert resp.json() == {"id": 1, "new_title": "fresh"}
 
 
-# ─────────────────────── Stacking with middleware ───────────────────────────
+# Stacking with middleware
 
 
 @pytest.mark.usefixtures("bind_db")

@@ -1,8 +1,7 @@
-"""force_delete() and restore() fire observer hooks; replicate() drops timestamps.
+"""force_delete and restore fire observer hooks; replicate drops timestamps.
 
 Eloquent fires deleting/deleted on forceDelete and restoring/restored on restore,
-and a replicated model starts without timestamps or a soft-delete flag.
-"""
+and a replicated model starts without timestamps or a soft-delete flag."""
 
 from __future__ import annotations
 

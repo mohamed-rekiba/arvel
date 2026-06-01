@@ -1,7 +1,7 @@
-"""WI-017: CI workflow shape assertions.
+"""CI workflow shape assertions.
 
-Covers FR-017-007 (bench-reverb hard gate), FR-017-011 (bench-tracemalloc job),
-FR-017-013/014 (sast + sca jobs).
+bench-reverb must be a hard gate, bench-tracemalloc job must exist,
+and sast/sca jobs must invoke bandit and pip-audit.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def test_ci_yaml_exists() -> None:
 
 
 def test_bench_reverb_is_hard_gate() -> None:
-    """FR-017-007: bench-reverb must not be advisory (no continue-on-error)."""
+    """bench-reverb must not be advisory (no continue-on-error)."""
     jobs = _ci()
     assert "bench-reverb" in jobs, "bench-reverb job must exist in ci.yml"
     job = jobs["bench-reverb"]
@@ -47,7 +47,7 @@ def test_bench_reverb_is_hard_gate() -> None:
 
 
 def test_bench_tracemalloc_job_exists() -> None:
-    """FR-017-011: a bench-tracemalloc CI job must exist."""
+    """a bench-tracemalloc CI job must exist."""
     jobs = _ci()
     assert "bench-tracemalloc" in jobs, "FR-017-011: ci.yml must define a 'bench-tracemalloc' job"
     job = jobs["bench-tracemalloc"]
@@ -57,7 +57,7 @@ def test_bench_tracemalloc_job_exists() -> None:
 
 
 def test_sast_job_exists() -> None:
-    """FR-017-013: a 'sast' job running bandit must exist."""
+    """a 'sast' job running bandit must exist."""
     jobs = _ci()
     assert "sast" in jobs, "FR-017-013: ci.yml must define a 'sast' job"
     job = jobs["sast"]
@@ -66,7 +66,7 @@ def test_sast_job_exists() -> None:
 
 
 def test_sca_job_exists() -> None:
-    """FR-017-014: a 'sca' job running pip-audit must exist."""
+    """a 'sca' job running pip-audit must exist."""
     jobs = _ci()
     assert "sca" in jobs, "FR-017-014: ci.yml must define a 'sca' job"
     job = jobs["sca"]

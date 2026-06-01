@@ -1,15 +1,13 @@
-"""S-005-12 — ORM smoke benchmark.
+"""ORM smoke benchmark.
 
-AC covered:
-  AC-005-022-01  bulk insert 1 000 rows completes in ≤ 500 ms
-  AC-005-022-02  eager-load 1 000 rows with BelongsToMany completes in ≤ 1 500 ms
-  AC-005-022-03  pivot attach per row completes in ≤ 50 ms
+  2-01  bulk insert 1 000 rows completes in ≤ 500 ms
+  2-02  eager-load 1 000 rows with BelongsToMany completes in ≤ 1 500 ms
+  2-03  pivot attach per row completes in ≤ 50 ms
 
 Run exclusively via:
     uv run pytest packages/arvel/tests/database/benchmarks/ -m benchmark
 
-Never included in the default pytest run (excluded via -m 'not benchmark').
-"""
+Never included in the default pytest run (excluded via -m 'not benchmark')."""
 
 from __future__ import annotations
 
@@ -80,12 +78,12 @@ async def bench_session(bench_engine: AsyncEngine) -> AsyncIterator[AsyncSession
         yield s
 
 
-# ─── AC-005-022-01: bulk insert 1 000 rows ≤ 500 ms ─────────────────────────
+# ───  bulk insert 1 000 rows ≤ 500 ms ─────────────────────────
 
 
 @pytest.mark.benchmark(group="orm-insert")
 def test_bulk_insert_1000_posts(benchmark: Any, bench_engine: AsyncEngine) -> None:
-    """AC-005-022-01: inserting 1 000 rows completes in ≤ 500 ms."""
+    """inserting 1 000 rows completes in ≤ 500 ms."""
     maker = async_sessionmaker(bench_engine, expire_on_commit=False)
 
     def _run() -> None:
@@ -104,12 +102,12 @@ def test_bulk_insert_1000_posts(benchmark: Any, bench_engine: AsyncEngine) -> No
     )
 
 
-# ─── AC-005-022-02: eager-load 1 000 rows ≤ 1 500 ms ────────────────────────
+# ───  eager-load 1 000 rows ≤ 1 500 ms ────────────────────────
 
 
 @pytest.mark.benchmark(group="orm-read")
 def test_eager_load_1000_posts_with_tags(benchmark: Any, bench_engine: AsyncEngine) -> None:
-    """AC-005-022-02: loading 1 000 posts and iterating BelongsToMany tags ≤ 1 500 ms."""
+    """loading 1 000 posts and iterating BelongsToMany tags ≤ 1 500 ms."""
     maker = async_sessionmaker(bench_engine, expire_on_commit=False)
 
     def _run() -> None:
@@ -130,12 +128,12 @@ def test_eager_load_1000_posts_with_tags(benchmark: Any, bench_engine: AsyncEngi
     )
 
 
-# ─── AC-005-022-03: pivot attach ≤ 50 ms per row ────────────────────────────
+# ───  pivot attach ≤ 50 ms per row ────────────────────────────
 
 
 @pytest.mark.benchmark(group="orm-pivot")
 def test_pivot_attach_per_row(benchmark: Any, bench_engine: AsyncEngine) -> None:
-    """AC-005-022-03: single pivot attach completes in ≤ 50 ms."""
+    """single pivot attach completes in ≤ 50 ms."""
     maker = async_sessionmaker(bench_engine, expire_on_commit=False)
 
     async def _setup() -> tuple[int, int]:

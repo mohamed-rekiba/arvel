@@ -1,4 +1,4 @@
-"""Unit tests for WI-arvel-041: serialization, model, and behavioral fixes.
+"""Unit tests for serialization, model, and behavioral fixes.
 
 Tests use Path.read_text() to inspect source code — no arvel framework import needed.
 All tests must FAIL before the fixes are applied and PASS after.
@@ -21,7 +21,7 @@ def _src(path: Path) -> str:
     return path.read_text()
 
 
-# ─── V-017: _product_to_admin datetime serialization ─────────────────────────
+# ─── _product_to_admin datetime serialization ─────────────────────────
 
 
 class TestV017ProductAdminDatetimes:
@@ -57,7 +57,7 @@ class TestV017ProductAdminDatetimes:
         )
 
 
-# ─── V-018: ProductCatalog model missing columns ────────────────────────────
+# ─── ProductCatalog model missing columns ────────────────────────────
 
 
 class TestV018ProductCatalogColumns:
@@ -106,11 +106,11 @@ class TestV018ProductCatalogColumns:
     def test_all_new_columns_are_mapped(self) -> None:
         src = _src(_PUBLISHED_PRODUCT)
         for col in ("category_name", "category_slug", "vendor_name", "vendor_slug"):
-            # After WI-arvel-010, plain annotations are used (no Mapped[T] on left side)
+            # After plain annotations are used (no Mapped[T] on left side)
             assert col in src, f"V-018 not fixed: '{col}' column missing from ProductCatalog"
 
 
-# ─── V-019: TOCTOU stock race closed with row lock ───────────────────────────
+# ─── TOCTOU stock race closed with row lock ───────────────────────────
 
 
 class TestV019StockRaceGapComment:
@@ -127,7 +127,7 @@ class TestV019StockRaceGapComment:
         )
 
 
-# ─── V-020: Vendor published_at serialization ────────────────────────────────
+# ─── Vendor published_at serialization ────────────────────────────────
 
 
 class TestV020VendorPublishedAt:
@@ -146,7 +146,7 @@ class TestV020VendorPublishedAt:
         )
 
 
-# ─── V-021: Narrow exception handling in register ────────────────────────────
+# ─── Narrow exception handling in register ────────────────────────────
 
 
 class TestV021RegisterException:
@@ -158,7 +158,7 @@ class TestV021RegisterException:
         )
 
 
-# ─── V-022: Storefront product exposes category/vendor names ─────────────────
+# ─── Storefront product exposes category/vendor names ─────────────────
 
 
 class TestV022StorefrontEnrichedResponse:
@@ -175,7 +175,7 @@ class TestV022StorefrontEnrichedResponse:
         )
 
 
-# ─── V-023: Missing product raises error in cart ─────────────────────────────
+# ─── Missing product raises error in cart ─────────────────────────────
 
 
 class TestV023CartMissingProduct:
@@ -197,7 +197,7 @@ class TestV023CartMissingProduct:
         )
 
 
-# ─── V-024: admin_list_orders / admin_get_order consistency ──────────────────
+# ─── admin_list_orders / admin_get_order consistency ──────────────────
 
 
 class TestV024AdminOrderTrashedConsistency:
@@ -212,7 +212,7 @@ class TestV024AdminOrderTrashedConsistency:
         )
 
 
-# ─── V-025: migration sequence gap documented ────────────────────────────────
+# ─── migration sequence gap documented ────────────────────────────────
 
 
 class TestV025MigrationSequenceGap:

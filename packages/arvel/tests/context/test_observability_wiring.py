@@ -1,4 +1,4 @@
-"""Epic 001 Story 3 — observability auto-wiring and startup route logging."""
+"""observability auto-wiring and startup route logging."""
 
 from __future__ import annotations
 

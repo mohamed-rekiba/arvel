@@ -18,7 +18,7 @@ sync:  ## Install/sync workspace deps (root extras + every workspace member's ex
 	uv sync --all-packages --all-extras
 
 .PHONY: dev
-dev: sync  ## Alias for sync — install everything a contributor needs (FR-017-005)
+dev: sync  ## Alias for sync — install everything a contributor needs
 
 .PHONY: lock
 lock:  ## Refresh uv.lock

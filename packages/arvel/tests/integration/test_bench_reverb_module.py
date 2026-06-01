@@ -1,4 +1,4 @@
-"""Smoke checks for `benchmarks/bench_reverb.py` (FR-014-010/011, NFR-014-003/004).
+"""Smoke checks for `benchmarks/bench_reverb.py` (/011, /004).
 
 These are signature + import checks. The actual benchmark runs live in
 `benchmarks/bench_reverb.py` (entry point script) and the CI `bench-reverb`
@@ -32,7 +32,7 @@ def _load_bench_module() -> ModuleType:
 
 @pytest.mark.skipif(not _BENCH_PATH.exists(), reason="bench_reverb.py not yet implemented")
 def test_bench_publish_p99_latency_signature() -> None:
-    """FR-014-010 — bench_publish_p99_latency(iterations: int) -> list[float] exists."""
+    """bench_publish_p99_latency(iterations: int) -> list[float] exists."""
     module = _load_bench_module()
     fn = getattr(module, "bench_publish_p99_latency", None)
     assert callable(fn), "bench_publish_p99_latency must be defined"
@@ -42,7 +42,7 @@ def test_bench_publish_p99_latency_signature() -> None:
 
 @pytest.mark.skipif(not _BENCH_PATH.exists(), reason="bench_reverb.py not yet implemented")
 def test_bench_resident_memory_signature() -> None:
-    """FR-014-010 — bench_resident_memory(connections: int, channels: int) -> int exists."""
+    """bench_resident_memory(connections: int, channels: int) -> int exists."""
     module = _load_bench_module()
     fn = getattr(module, "bench_resident_memory", None)
     assert callable(fn), "bench_resident_memory must be defined"
@@ -53,7 +53,7 @@ def test_bench_resident_memory_signature() -> None:
 
 @pytest.mark.skipif(not _BENCH_PATH.exists(), reason="bench_reverb.py not yet implemented")
 def test_bench_main_exists() -> None:
-    """FR-014-010 — main() entry point returns int (exit code)."""
+    """main() entry point returns int (exit code)."""
     module = _load_bench_module()
     fn = getattr(module, "main", None)
     assert callable(fn), "main() must be defined as the script entry"

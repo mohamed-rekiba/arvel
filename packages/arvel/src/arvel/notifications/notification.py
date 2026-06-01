@@ -1,4 +1,4 @@
-"""Notification abstract base class (FR-009-022..023)."""
+"""Notification abstract base class."""
 
 from __future__ import annotations
 

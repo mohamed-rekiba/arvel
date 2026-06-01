@@ -1,4 +1,4 @@
-"""Tests for Event facade — FR-009-010."""
+"""Tests for Event facade."""
 
 from __future__ import annotations
 

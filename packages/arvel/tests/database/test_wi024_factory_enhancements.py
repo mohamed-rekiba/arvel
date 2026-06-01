@@ -1,11 +1,10 @@
-"""WI-arvel-024 — Epic 006 Story 13: factory enhancements.
+"""Factory enhancements.
 
 - ``has_attached`` — create related rows and link them through a M2M pivot.
-- ``trashed()`` state — created row lands soft-deleted.
+- ``trashed`` state — created row lands soft-deleted.
 - ``after_creating`` / ``after_making`` receive a Faker instance.
 - ``create_quietly`` — mute model events for the whole build.
-- ``connection(name)`` — persist through a named DB connection.
-"""
+- ``connection(name)`` — persist through a named DB connection."""
 
 from __future__ import annotations
 

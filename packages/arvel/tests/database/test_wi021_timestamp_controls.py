@@ -1,8 +1,7 @@
-"""WI-arvel-021 — Epic 006 Story 12: timestamp controls.
+"""Timestamp controls.
 
 Covers ``__timestamps__`` opt-out, custom ``CREATED_AT`` / ``UPDATED_AT`` columns,
-``touch`` / ``touch_quietly``, and the ``without_timestamps`` context.
-"""
+``touch`` / ``touch_quietly``, and the ``without_timestamps`` context."""
 
 from __future__ import annotations
 

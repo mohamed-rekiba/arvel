@@ -1,4 +1,4 @@
-"""Broadcasting + Reverb configuration (FR-013-008, ReverbConfig)."""
+"""Broadcasting + Reverb configuration."""
 
 from __future__ import annotations
 

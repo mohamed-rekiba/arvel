@@ -1,8 +1,7 @@
-"""WI-arvel-032 — Epic 007 Story 7: polymorphic existence queries.
+"""Polymorphic existence queries.
 
 `where_has_morph` / `has_morph` / `where_morph_relation` filter a MorphTo across several
-target types, building a union of per-type EXISTS/COUNT subqueries that honour the morph map.
-"""
+target types, building a union of per-type EXISTS/COUNT subqueries that honour the morph map."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""FR-013-009 — ShouldBroadcast mixin."""
+"""ShouldBroadcast mixin."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 
 def test_should_broadcast_isinstance_check() -> None:
-    """FR-013-009 AC1: isinstance(event, ShouldBroadcast) is True for mixed-in events."""
+    """isinstance(event, ShouldBroadcast) is True for mixed-in events."""
     from arvel.broadcasting import ShouldBroadcast
     from arvel.events.event import Event
 
@@ -21,7 +21,7 @@ def test_should_broadcast_isinstance_check() -> None:
 
 
 def test_default_broadcast_as_is_class_name() -> None:
-    """FR-013-009 AC2: default broadcast_as returns class name."""
+    """default broadcast_as returns class name."""
     from arvel.broadcasting import ShouldBroadcast
     from arvel.events.event import Event
 
@@ -33,7 +33,7 @@ def test_default_broadcast_as_is_class_name() -> None:
 
 
 def test_default_broadcast_with_returns_model_dump_for_basemodel() -> None:
-    """FR-013-009 AC3: broadcast_with defaults to model_dump() for BaseModel events."""
+    """broadcast_with defaults to model_dump for BaseModel events."""
     from arvel.broadcasting import ShouldBroadcast
     from arvel.events.event import Event
 

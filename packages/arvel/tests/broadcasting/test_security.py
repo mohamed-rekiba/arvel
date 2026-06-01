@@ -1,4 +1,4 @@
-"""SEC-013-001..008, NFR-013-009 — Security tests for WI-013."""
+"""Security tests for broadcasting."""
 
 from __future__ import annotations
 
@@ -10,11 +10,11 @@ from typing import cast
 
 import pytest
 
-# ─── SEC-013-002 — Constant-time signature verification ─────────────────────
+# ─── — Constant-time signature verification ─────────────────────
 
 
 def test_sec_002_signature_verification_uses_compare_digest() -> None:
-    """SEC-013-002: signature comparison MUST use hmac.compare_digest."""
+    """signature comparison MUST use hmac.compare_digest."""
     import inspect
 
     from arvel.reverb import auth as auth_module
@@ -26,11 +26,11 @@ def test_sec_002_signature_verification_uses_compare_digest() -> None:
     assert "actual == expected" not in src
 
 
-# ─── SEC-013-003 — No PII / payload values in logs ──────────────────────────
+# ─── — No PII / payload values in logs ──────────────────────────
 
 
 def test_sec_003_no_payload_values_in_log_driver() -> None:
-    """NFR-013-009 + SEC-013-003: LogBroadcaster doesn't log payload values."""
+    """+ : LogBroadcaster doesn't log payload values."""
     from arvel.broadcasting.drivers.log import LogBroadcaster
 
     records: list[logging.LogRecord] = []
@@ -57,7 +57,7 @@ def test_sec_003_no_payload_values_in_log_driver() -> None:
     assert "AKIA-XXX-PII" not in text
 
 
-# ─── SEC-013-004 — Channel name validation rejects malformed input ─────────
+# ─── — Channel name validation rejects malformed input ─────────
 
 
 @pytest.mark.parametrize(
@@ -72,7 +72,7 @@ def test_sec_003_no_payload_values_in_log_driver() -> None:
     ],
 )
 def test_sec_004_channel_name_validation_rejects_malformed(bad_name: str) -> None:
-    """SEC-013-004: invalid channel names raise BroadcastChannelError."""
+    """invalid channel names raise BroadcastChannelError."""
     from arvel.broadcasting.channels import validate_channel_name
     from arvel.broadcasting.exceptions import BroadcastChannelError
 
@@ -95,11 +95,11 @@ def test_sec_004_channel_name_validation_accepts_valid(good_name: str) -> None:
     validate_channel_name(good_name)  # MUST NOT raise
 
 
-# ─── SEC-013-005 — Rejected auth signatures emit a structured log ──────────
+# ─── — Rejected auth signatures emit a structured log ──────────
 
 
 def test_sec_005_failed_auth_emits_structured_warning(caplog: pytest.LogCaptureFixture) -> None:
-    """SEC-013-005: rejected auth signature emits broadcast_auth_rejected warning."""
+    """rejected auth signature emits broadcast_auth_rejected warning."""
     from arvel.reverb.auth import verify_channel_auth
 
     with caplog.at_level("WARNING"):
@@ -118,7 +118,7 @@ def test_sec_005_failed_auth_emits_structured_warning(caplog: pytest.LogCaptureF
     _ = relevant
 
 
-# ─── SEC-013-006 — Origin allow-list ────────────────────────────────────────
+# ─── — Origin allow-list ────────────────────────────────────────
 
 
 def test_sec_006_reverb_config_origins_default_empty_means_any() -> None:
@@ -136,12 +136,12 @@ def test_sec_006_reverb_config_origins_validation() -> None:
     ReverbConfig(app_id="x", key="k", secret="s", allowed_origins=["https://app.example.com"])
 
 
-# ─── SEC-013-007 — Secrets never appear in error responses ──────────────────
+# ─── — Secrets never appear in error responses ──────────────────
 
 
 @pytest.mark.asyncio
 async def test_sec_007_error_responses_do_not_expose_secret() -> None:
-    """SEC-013-007: BroadcastAuthController error payloads never contain secret."""
+    """BroadcastAuthController error payloads never contain secret."""
     from arvel.broadcasting.channels import ChannelRegistry
     from arvel.broadcasting.config import BroadcastConfig, ReverbConfig
     from arvel.broadcasting.exceptions import BroadcastAuthError
@@ -165,11 +165,11 @@ async def test_sec_007_error_responses_do_not_expose_secret() -> None:
     assert "SUPER-SECRET-XYZ" not in str(excinfo.value)
 
 
-# ─── SEC-013-008 — Channel name max length ──────────────────────────────────
+# ─── — Channel name max length ──────────────────────────────────
 
 
 def test_sec_008_channel_name_max_length() -> None:
-    """SEC-013-008: channel name length is bounded."""
+    """channel name length is bounded."""
     from arvel.broadcasting.channels import validate_channel_name
     from arvel.broadcasting.exceptions import BroadcastChannelError
 
@@ -178,11 +178,11 @@ def test_sec_008_channel_name_max_length() -> None:
         validate_channel_name("x" * 1025)
 
 
-# ─── SEC-013-001 — Auth endpoint requires authentication ────────────────────
+# ─── — Auth endpoint requires authentication ────────────────────
 
 
 def test_sec_001_auth_endpoint_inherits_session_middleware() -> None:
-    """SEC-013-001: BroadcastAuthController.handle requires a `user` parameter.
+    """BroadcastAuthController.handle requires a `user` parameter.
 
     Endpoint integration enforces auth via middleware; the controller refuses
     when user is None.

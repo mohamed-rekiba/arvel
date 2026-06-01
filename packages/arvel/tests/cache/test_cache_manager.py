@@ -1,4 +1,4 @@
-"""Tests for CacheManager — FR-006-001..007, FR-006-013..015."""
+"""Tests for CacheManager."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 
 class TestCacheManagerDriverSelection:
-    """FR-006-001: CacheManager returns the configured store."""
+    """CacheManager returns the configured store."""
 
     def test_default_store_is_array(self) -> None:
         manager = CacheManager(CacheConfig(connection=CacheDriver.ARRAY))
@@ -31,7 +31,7 @@ class TestCacheManagerDriverSelection:
 
 
 class TestCacheManagerDelegation:
-    """FR-006-001..007: CacheManager delegates to active store correctly."""
+    """CacheManager delegates to active store correctly."""
 
     @pytest.mark.asyncio
     async def test_put_and_get(self, cache_manager: CacheManager) -> None:
@@ -76,7 +76,7 @@ class TestCacheManagerDelegation:
 
 
 class TestCacheManagerRemember:
-    """FR-006-007: remember[T] lazy population."""
+    """remember[T] lazy population."""
 
     @pytest.mark.asyncio
     async def test_remember_calls_callback_on_miss(self, cache_manager: CacheManager) -> None:
@@ -117,7 +117,7 @@ class TestCacheManagerRemember:
 
 
 class TestCacheFacade:
-    """FR-006-015: Cache facade classmethod API."""
+    """Cache facade classmethod API."""
 
     def test_facade_not_bound_raises(self) -> None:
         from arvel.cache.exceptions import FacadeNotBoundError

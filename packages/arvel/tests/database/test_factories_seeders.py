@@ -1,4 +1,4 @@
-"""FR-003-035..037 — Factories and seeders."""
+"""Factories and seeders."""
 
 from __future__ import annotations
 

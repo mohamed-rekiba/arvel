@@ -1,11 +1,4 @@
-"""QA-Pre tests for WI-arvel-050 — arvel-image medialibrary v11 parity (Round 2).
-
-Maps to PRD-050 FRs FR-050-01 .. FR-050-29.
-
-All tests in this file are expected to FAIL until Stage 3b (Execution) implements
-the corresponding features. They compile and the infrastructure runs; the assertions
-fail because the features do not yet exist.
-"""
+"""Tests for medialibrary v11 parity (round 2)."""
 
 from __future__ import annotations
 
@@ -103,13 +96,13 @@ def _host_custom_pk_050() -> type[Any]:
     return HostCustomPk050
 
 
-# ─── FR-050-01/02/03: regenerate() no-args + disk resolution ─────────────────
+# ─── regenerate() no-args + disk resolution ─────────────────
 
 
 async def test_regenerate_no_args_processes_all_rows(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-01: regenerate() with no arguments processes all media rows."""
+    """regenerate() with no arguments processes all media rows."""
     from arvel.facades import Storage
     from arvel_image import MediaLibrary
 
@@ -131,7 +124,7 @@ async def test_regenerate_no_args_processes_all_rows(
 async def test_regenerate_no_args_returns_zero_for_empty_table(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """FR-050-01: regenerate() with no rows returns 0, not an error."""
+    """regenerate() with no rows returns 0, not an error."""
     from arvel_image import MediaLibrary
 
     await _create_tables_050(engine)
@@ -144,7 +137,7 @@ async def test_regenerate_no_args_returns_zero_for_empty_table(
 async def test_regenerate_reads_from_media_disk_not_collection_disk(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-02: regenerate() reads from media.disk, not collection default disk."""
+    """regenerate() reads from media.disk, not collection default disk."""
     from arvel.database import Model, Timestamps
     from arvel.database.columns import id_, string
     from arvel.facades import Storage
@@ -196,7 +189,7 @@ async def test_regenerate_reads_from_media_disk_not_collection_disk(
 async def test_regenerate_writes_to_conversions_disk(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-03: regenerate() writes conversions to media.conversions_disk."""
+    """regenerate() writes conversions to media.conversions_disk."""
     from arvel.database import Model, Timestamps
     from arvel.database.columns import id_, string
     from arvel.facades import Storage
@@ -227,13 +220,13 @@ async def test_regenerate_writes_to_conversions_disk(
         await lib.regenerate()
 
 
-# ─── FR-050-04/05: order_column auto-assignment ───────────────────────────────
+# ─── order_column auto-assignment ───────────────────────────────
 
 
 async def test_order_column_set_on_first_insert(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-04: first media in a collection gets order_column=1."""
+    """first media in a collection gets order_column=1."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -249,7 +242,7 @@ async def test_order_column_set_on_first_insert(
 async def test_order_column_increments_on_subsequent_inserts(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-04: second and third media get order_column=2 and 3."""
+    """second and third media get order_column=2 and 3."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -269,7 +262,7 @@ async def test_order_column_increments_on_subsequent_inserts(
 async def test_order_column_resets_for_single_file_collection(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-05: single_file collection resets order_column to 1 on replace."""
+    """single_file collection resets order_column to 1 on replace."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -285,13 +278,13 @@ async def test_order_column_resets_for_single_file_collection(
     assert new_media.order_column == 1
 
 
-# ─── FR-050-06: Media.set_new_order ──────────────────────────────────────────
+# ─── Media.set_new_order ──────────────────────────────────────────
 
 
 async def test_set_new_order_reorders_rows(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-06: set_new_order([id3, id1, id2]) assigns order_column=1,2,3."""
+    """set_new_order([id3, id1, id2]) assigns order_column=1,2,3."""
     from arvel.facades import Storage
     from arvel_image import Media
 
@@ -318,7 +311,7 @@ async def test_set_new_order_reorders_rows(
 async def test_set_new_order_with_start_order(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-06: start_order=5 makes first ID get order_column=5."""
+    """start_order=5 makes first ID get order_column=5."""
     from arvel.facades import Storage
     from arvel_image import Media
 
@@ -342,7 +335,7 @@ async def test_set_new_order_with_start_order(
 async def test_set_new_order_skips_unknown_ids(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-06: unknown IDs are silently skipped."""
+    """unknown IDs are silently skipped."""
     from arvel.facades import Storage
     from arvel_image import Media
 
@@ -360,13 +353,13 @@ async def test_set_new_order_skips_unknown_ids(
     assert m1.order_column == 1
 
 
-# ─── FR-050-07/08: copy/move use host_pk + carry conversions ──────────────────
+# ─── copy/move use host_pk + carry conversions ──────────────────
 
 
 async def test_copy_uses_host_pk(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-07: copy() sets model_id = target.host_pk()."""
+    """copy() sets model_id = target.host_pk()."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -393,7 +386,7 @@ async def test_copy_uses_host_pk(
 async def test_move_uses_host_pk(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-07: move() sets model_id = target.host_pk()."""
+    """move() sets model_id = target.host_pk()."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -419,7 +412,7 @@ async def test_move_uses_host_pk(
 async def test_copy_carries_generated_conversions(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-08: copy() carries generated_conversions JSON."""
+    """copy() carries generated_conversions JSON."""
     from arvel.database import Model, Timestamps
     from arvel.database.columns import id_, string
     from arvel.facades import Storage
@@ -454,7 +447,7 @@ async def test_copy_carries_generated_conversions(
 async def test_move_does_not_copy_files(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-08: move() does not copy conversion files — DB row only."""
+    """move() does not copy conversion files — DB row only."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -481,30 +474,30 @@ async def test_move_does_not_copy_files(
     assert put_calls == [], "move() should not write any files"
 
 
-# ─── FR-050-09: MediaLibrary exported from arvel_image ───────────────────────
+# ─── MediaLibrary exported from arvel_image ───────────────────────
 
 
 def test_media_library_importable_from_arvel_image() -> None:
-    """FR-050-09: from arvel_image import MediaLibrary works."""
+    """from arvel_image import MediaLibrary works."""
     from arvel_image import MediaLibrary
 
     assert MediaLibrary is not None
 
 
 def test_media_library_in_dunder_all() -> None:
-    """FR-050-09: MediaLibrary in arvel_image.__all__."""
+    """MediaLibrary in arvel_image.__all__."""
     import arvel_image
 
     assert "MediaLibrary" in arvel_image.__all__
 
 
-# ─── FR-050-10: to_media_collection disk override ────────────────────────────
+# ─── to_media_collection disk override ────────────────────────────
 
 
 async def test_to_media_collection_disk_arg_overrides_collection_disk(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-10: to_media_collection(name, disk='s3') stores on 's3'."""
+    """to_media_collection(name, disk='s3') stores on 's3'."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -522,7 +515,7 @@ async def test_to_media_collection_disk_arg_overrides_collection_disk(
 async def test_to_media_collection_disk_arg_overrides_to_disk_chain(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-10: disk arg takes priority over .to_disk() chain."""
+    """disk arg takes priority over .to_disk() chain."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -539,11 +532,11 @@ async def test_to_media_collection_disk_arg_overrides_to_disk_chain(
     assert media.disk == "s3"
 
 
-# ─── FR-050-11: URL scheme allowlist ─────────────────────────────────────────
+# ─── URL scheme allowlist ─────────────────────────────────────────
 
 
 async def test_add_media_from_url_rejects_file_scheme() -> None:
-    """FR-050-11: file:// URLs raise MediaError before network I/O."""
+    """file:// URLs raise MediaError before network I/O."""
     from arvel_image import HasMedia
     from arvel_image.media.exceptions import MediaError
 
@@ -557,7 +550,7 @@ async def test_add_media_from_url_rejects_file_scheme() -> None:
 
 
 async def test_add_media_from_url_rejects_ftp_scheme() -> None:
-    """FR-050-11: ftp:// URLs raise MediaError."""
+    """ftp:// URLs raise MediaError."""
     from arvel_image import HasMedia
     from arvel_image.media.exceptions import MediaError
 
@@ -571,7 +564,7 @@ async def test_add_media_from_url_rejects_ftp_scheme() -> None:
 
 
 async def test_fetch_url_rejects_file_scheme() -> None:
-    """FR-050-11: url_fetcher.fetch_url raises MediaError for file:// scheme."""
+    """url_fetcher.fetch_url raises MediaError for file:// scheme."""
     from arvel_image.media.exceptions import MediaError
     from arvel_image.media.url_fetcher import fetch_url
 
@@ -579,13 +572,13 @@ async def test_fetch_url_rejects_file_scheme() -> None:
         await fetch_url("file:///etc/passwd", max_bytes=1024)
 
 
-# ─── FR-050-12: get_last_media / get_last_media_url ──────────────────────────
+# ─── get_last_media / get_last_media_url ──────────────────────────
 
 
 async def test_get_last_media_returns_highest_order_column(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-12: get_last_media returns row with highest order_column."""
+    """get_last_media returns row with highest order_column."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -605,7 +598,7 @@ async def test_get_last_media_returns_highest_order_column(
 async def test_get_last_media_returns_none_for_empty_collection(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """FR-050-12: get_last_media returns None when collection is empty."""
+    """get_last_media returns None when collection is empty."""
     await _create_tables_050(engine)
     Host = _host_050()
     host = await Host.create(name="alice")
@@ -617,7 +610,7 @@ async def test_get_last_media_returns_none_for_empty_collection(
 async def test_get_last_media_url_returns_url(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-12: get_last_media_url returns URL of the last media."""
+    """get_last_media_url returns URL of the last media."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -636,7 +629,7 @@ async def test_get_last_media_url_returns_url(
 async def test_get_last_media_url_returns_none_for_empty_collection(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """FR-050-12: get_last_media_url returns None for empty collection."""
+    """get_last_media_url returns None for empty collection."""
     await _create_tables_050(engine)
     Host = _host_050()
     host = await Host.create(name="alice")
@@ -645,13 +638,13 @@ async def test_get_last_media_url_returns_none_for_empty_collection(
     assert url is None
 
 
-# ─── FR-050-13: clear_media_collection_except ────────────────────────────────
+# ─── clear_media_collection_except ────────────────────────────────
 
 
 async def test_clear_media_collection_except_deletes_others(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-13: clear_media_collection_except keeps the supplied item(s)."""
+    """clear_media_collection_except keeps the supplied item(s)."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -676,7 +669,7 @@ async def test_clear_media_collection_except_deletes_others(
 async def test_clear_media_collection_except_accepts_list(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-13: kept_media may be a list of Media instances."""
+    """kept_media may be a list of Media instances."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -698,13 +691,13 @@ async def test_clear_media_collection_except_accepts_list(
     assert m2.id not in remaining_ids
 
 
-# ─── FR-050-14: get_registered_media_collections ─────────────────────────────
+# ─── get_registered_media_collections ─────────────────────────────
 
 
 async def test_get_registered_media_collections_returns_list(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """FR-050-14: get_registered_media_collections returns declared collections."""
+    """get_registered_media_collections returns declared collections."""
     await _create_tables_050(engine)
     Host = _host_050()
     host = await Host.create(name="alice")
@@ -719,7 +712,7 @@ async def test_get_registered_media_collections_returns_list(
 async def test_get_registered_media_collections_empty_when_none(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """FR-050-14: returns [] when no collections registered."""
+    """returns [] when no collections registered."""
     from arvel.database import Model, Timestamps
     from arvel.database.columns import id_, string
     from arvel_image import HasMedia
@@ -738,11 +731,11 @@ async def test_get_registered_media_collections_empty_when_none(
     assert host.get_registered_media_collections() == []
 
 
-# ─── FR-050-15: per-collection fallback URL ──────────────────────────────────
+# ─── per-collection fallback URL ──────────────────────────────────
 
 
 def test_media_collection_use_fallback_url_stores_base() -> None:
-    """FR-050-15: use_fallback_url stores the base fallback URL."""
+    """use_fallback_url stores the base fallback URL."""
     from arvel_image import MediaCollection
 
     coll = MediaCollection("avatar").use_fallback_url("/default.jpg")
@@ -750,7 +743,7 @@ def test_media_collection_use_fallback_url_stores_base() -> None:
 
 
 def test_media_collection_use_fallback_url_stores_per_conversion() -> None:
-    """FR-050-15: use_fallback_url(url, 'thumb') stores per-conversion fallback."""
+    """use_fallback_url(url, 'thumb') stores per-conversion fallback."""
     from arvel_image import MediaCollection
 
     coll = MediaCollection("avatar").use_fallback_url("/thumb.jpg", "thumb")
@@ -760,7 +753,7 @@ def test_media_collection_use_fallback_url_stores_per_conversion() -> None:
 async def test_get_media_url_uses_collection_fallback_when_empty(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """FR-050-15: empty collection → collection fallback URL returned."""
+    """empty collection → collection fallback URL returned."""
     from arvel.database import Model, Timestamps
     from arvel.database.columns import id_, string
     from arvel_image import HasMedia, MediaCollection
@@ -785,7 +778,7 @@ async def test_get_media_url_uses_collection_fallback_when_empty(
 async def test_get_media_url_callsite_fallback_takes_precedence(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """FR-050-15: call-site fallback= takes precedence over collection fallback."""
+    """call-site fallback= takes precedence over collection fallback."""
     from arvel.database import Model, Timestamps
     from arvel.database.columns import id_, string
     from arvel_image import HasMedia, MediaCollection
@@ -807,11 +800,11 @@ async def test_get_media_url_callsite_fallback_takes_precedence(
     assert url == "/callsite.jpg"
 
 
-# ─── FR-050-16/17: custom property helpers on Media ──────────────────────────
+# ─── custom property helpers on Media ──────────────────────────
 
 
 def test_has_custom_property_true_when_key_exists() -> None:
-    """FR-050-16: has_custom_property returns True when key present."""
+    """has_custom_property returns True when key present."""
     import types
 
     from arvel_image import Media
@@ -821,7 +814,7 @@ def test_has_custom_property_true_when_key_exists() -> None:
 
 
 def test_has_custom_property_false_when_key_missing() -> None:
-    """FR-050-16: has_custom_property returns False when key absent."""
+    """has_custom_property returns False when key absent."""
     import types
 
     from arvel_image import Media
@@ -831,7 +824,7 @@ def test_has_custom_property_false_when_key_missing() -> None:
 
 
 def test_get_custom_property_returns_value() -> None:
-    """FR-050-16: get_custom_property returns the stored value."""
+    """get_custom_property returns the stored value."""
     import types
 
     from arvel_image import Media
@@ -841,7 +834,7 @@ def test_get_custom_property_returns_value() -> None:
 
 
 def test_get_custom_property_returns_default_when_missing() -> None:
-    """FR-050-16: get_custom_property returns default when key absent."""
+    """get_custom_property returns default when key absent."""
     import types
 
     from arvel_image import Media
@@ -852,7 +845,7 @@ def test_get_custom_property_returns_default_when_missing() -> None:
 
 
 def test_get_custom_property_dot_notation() -> None:
-    """FR-050-16: get_custom_property supports 'group.sub_key' dot notation."""
+    """get_custom_property supports 'group.sub_key' dot notation."""
     import types
 
     from arvel_image import Media
@@ -862,7 +855,7 @@ def test_get_custom_property_dot_notation() -> None:
 
 
 def test_set_custom_property_adds_key() -> None:
-    """FR-050-16: set_custom_property adds/updates key in memory (not persisted)."""
+    """set_custom_property adds/updates key in memory (not persisted)."""
     import types
 
     from arvel_image import Media
@@ -873,7 +866,7 @@ def test_set_custom_property_adds_key() -> None:
 
 
 def test_forget_custom_property_removes_key() -> None:
-    """FR-050-16: forget_custom_property removes the key."""
+    """forget_custom_property removes the key."""
     import types
 
     from arvel_image import Media
@@ -886,7 +879,7 @@ def test_forget_custom_property_removes_key() -> None:
 async def test_get_media_with_dict_filter(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-17: get_media(collection, filters={'key': 'val'}) filters by custom property."""
+    """get_media(collection, filters={'key': 'val'}) filters by custom property."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -913,7 +906,7 @@ async def test_get_media_with_dict_filter(
 async def test_get_media_with_callable_filter(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-17: get_media(collection, filters=callable) applies the callable."""
+    """get_media(collection, filters=callable) applies the callable."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -940,11 +933,11 @@ async def test_get_media_with_callable_filter(
     assert visible[0].id == m_visible.id
 
 
-# ─── FR-050-18/19/20: QoL helpers on Media ───────────────────────────────────
+# ─── QoL helpers on Media ───────────────────────────────────
 
 
 def test_has_generated_conversion_returns_true() -> None:
-    """FR-050-18: has_generated_conversion returns True for truthy entry."""
+    """has_generated_conversion returns True for truthy entry."""
     import types
 
     from arvel_image import Media
@@ -954,7 +947,7 @@ def test_has_generated_conversion_returns_true() -> None:
 
 
 def test_has_generated_conversion_returns_false() -> None:
-    """FR-050-18: has_generated_conversion returns False for missing/falsy."""
+    """has_generated_conversion returns False for missing/falsy."""
     import types
 
     from arvel_image import Media
@@ -964,7 +957,7 @@ def test_has_generated_conversion_returns_false() -> None:
 
 
 def test_human_readable_size_formats_bytes() -> None:
-    """FR-050-20: human_readable_size returns '800 B' for 800 bytes."""
+    """human_readable_size returns '800 B' for 800 bytes."""
     import types
 
     from arvel_image import Media
@@ -974,7 +967,7 @@ def test_human_readable_size_formats_bytes() -> None:
 
 
 def test_human_readable_size_formats_kilobytes() -> None:
-    """FR-050-20: human_readable_size returns '1.0 KB' for 1024 bytes."""
+    """human_readable_size returns '1.0 KB' for 1024 bytes."""
     import types
 
     from arvel_image import Media
@@ -985,7 +978,7 @@ def test_human_readable_size_formats_kilobytes() -> None:
 
 
 def test_human_readable_size_formats_megabytes() -> None:
-    """FR-050-20: human_readable_size returns MB string for large files."""
+    """human_readable_size returns MB string for large files."""
     import types
 
     from arvel_image import Media
@@ -998,7 +991,7 @@ def test_human_readable_size_formats_megabytes() -> None:
 async def test_get_full_url_returns_string(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-19: get_full_url returns a string URL."""
+    """get_full_url returns a string URL."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -1013,13 +1006,13 @@ async def test_get_full_url_returns_string(
     assert len(url) > 0
 
 
-# ─── FR-050-21/22/23: ingestion entry points ──────────────────────────────────
+# ─── ingestion entry points ──────────────────────────────────
 
 
 async def test_using_file_name_overrides_file_name(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-21: using_file_name('custom.jpg') stores file as custom.jpg."""
+    """using_file_name('custom.jpg') stores file as custom.jpg."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -1039,7 +1032,7 @@ async def test_using_file_name_overrides_file_name(
 async def test_set_file_name_is_alias_for_using_file_name(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-21: set_file_name is an alias for using_file_name."""
+    """set_file_name is an alias for using_file_name."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -1059,7 +1052,7 @@ async def test_set_file_name_is_alias_for_using_file_name(
 async def test_add_media_from_disk_reads_and_creates_media(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes, tmp_path: Any
 ) -> None:
-    """FR-050-22: add_media_from_disk reads file via Storage facade."""
+    """add_media_from_disk reads file via Storage facade."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -1081,7 +1074,7 @@ async def test_add_media_from_disk_reads_and_creates_media(
 async def test_add_media_from_string_creates_text_media(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """FR-050-23: add_media_from_string wraps content in BytesIO with default file_name."""
+    """add_media_from_string wraps content in BytesIO with default file_name."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -1099,7 +1092,7 @@ async def test_add_media_from_string_creates_text_media(
 async def test_add_media_from_string_custom_file_name(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """FR-050-23: add_media_from_string supports using_file_name override."""
+    """add_media_from_string supports using_file_name override."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -1113,13 +1106,13 @@ async def test_add_media_from_string_custom_file_name(
     assert media.file_name == "readme.txt"
 
 
-# ─── FR-050-24/25: custom callbacks ──────────────────────────────────────────
+# ─── custom callbacks ──────────────────────────────────────────
 
 
 async def test_sanitizing_file_name_callback_applied(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-24: sanitizing_file_name callback applied after built-in strip."""
+    """sanitizing_file_name callback applied after built-in strip."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -1142,7 +1135,7 @@ async def test_sanitizing_file_name_callback_applied(
 async def test_accepts_file_callback_rejects_wrong_mime(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes, png_bytes: bytes
 ) -> None:
-    """FR-050-25: accepts_file callback raises InvalidMimeTypeError for non-matching files."""
+    """accepts_file callback raises InvalidMimeTypeError for non-matching files."""
     from arvel.database import Model, Timestamps
     from arvel.database.columns import id_, string
     from arvel.facades import Storage
@@ -1180,13 +1173,13 @@ async def test_accepts_file_callback_rejects_wrong_mime(
     assert media is not None
 
 
-# ─── FR-050-26: delete_preserving_media ──────────────────────────────────────
+# ─── delete_preserving_media ──────────────────────────────────────
 
 
 async def test_delete_preserving_media_leaves_media_rows(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-26: delete_preserving_media deletes host but keeps Media rows."""
+    """delete_preserving_media deletes host but keeps Media rows."""
     from arvel.facades import Storage
     from arvel_image import Media
 
@@ -1217,13 +1210,13 @@ async def test_delete_preserving_media_leaves_media_rows(
     assert surviving is not None
 
 
-# ─── FR-050-27: get_media("*") ───────────────────────────────────────────────
+# ─── get_media("*") ───────────────────────────────────────────────
 
 
 async def test_get_media_star_returns_all_collections(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-27: get_media('*') returns rows from all collections."""
+    """get_media('*') returns rows from all collections."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -1241,7 +1234,7 @@ async def test_get_media_star_returns_all_collections(
 async def test_get_media_no_args_returns_only_default(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FR-050-27: get_media() with no args still queries 'default' collection."""
+    """get_media() with no args still queries 'default' collection."""
     from arvel.facades import Storage
 
     await _create_tables_050(engine)
@@ -1257,18 +1250,18 @@ async def test_get_media_no_args_returns_only_default(
     assert default_media == []
 
 
-# ─── FR-050-28/29: PathGenerator DI + public rename ──────────────────────────
+# ─── PathGenerator DI + public rename ──────────────────────────
 
 
 def test_get_media_ordered_is_public(engine: AsyncEngine) -> None:
-    """FR-050-29: get_media_ordered is importable as a public function (no underscore)."""
+    """get_media_ordered is importable as a public function (no underscore)."""
     from arvel_image.media.trait import get_media_ordered
 
     assert get_media_ordered is not None
 
 
 def test_private_get_media_ordered_does_not_exist() -> None:
-    """FR-050-29: _get_media_ordered should no longer exist in trait module."""
+    """_get_media_ordered should no longer exist in trait module."""
     import arvel_image.media.trait as trait_mod
 
     assert not hasattr(trait_mod, "_get_media_ordered"), (
@@ -1277,7 +1270,7 @@ def test_private_get_media_ordered_does_not_exist() -> None:
 
 
 def test_path_generator_di_resolution_uses_default_when_no_binding() -> None:
-    """FR-050-28: resolve_path_generator() returns DefaultPathGenerator when no binding."""
+    """resolve_path_generator() returns DefaultPathGenerator when no binding."""
     from arvel_image.media import file_adder
     from arvel_image.media.path_generator import DefaultPathGenerator
 

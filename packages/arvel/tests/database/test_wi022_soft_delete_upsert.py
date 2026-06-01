@@ -1,8 +1,7 @@
-"""WI-arvel-022 — Epic 006 Story 10: soft-delete upsert + bulk restore.
+"""Soft-delete upsert + bulk restore.
 
-Covers ``restore_or_create`` / ``create_or_restore``, bulk ``QueryBuilder.restore()``,
-the instance ``trashed()`` helper, and ``force_destroy(ids)``.
-"""
+Covers ``restore_or_create`` / ``create_or_restore``, bulk ``QueryBuilder.restore``,
+the instance ``trashed`` helper, and ``force_destroy(ids)``."""
 
 from __future__ import annotations
 

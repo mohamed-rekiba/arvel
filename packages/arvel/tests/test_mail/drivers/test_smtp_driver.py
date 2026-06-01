@@ -1,4 +1,4 @@
-"""Tests for SmtpMailDriver — FR-009-019, NFR-009-005, NFR-009-006."""
+"""Tests for SmtpMailDriver — ."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ class TestSmtpDriver:
         assert cfg.port == 587
 
     def test_smtp_password_not_in_repr(self) -> None:
-        """NFR-009-005: SMTP password must never appear in logs/repr."""
+        """: SMTP password must never appear in logs/repr."""
         cfg = SmtpConfig(
             host="smtp.example.com",
             port=587,
@@ -30,7 +30,7 @@ class TestSmtpDriver:
         assert "secret123" not in str(cfg)
 
     def test_smtp_driver_warns_when_tls_disabled(self) -> None:
-        """NFR-009-006: emit UserWarning when encryption=None outside test."""
+        """: emit UserWarning when encryption=None outside test."""
         from types import SimpleNamespace
 
         from arvel.config._lookup_registry import register
@@ -43,7 +43,7 @@ class TestSmtpDriver:
 
     @pytest.mark.asyncio
     async def test_smtp_driver_raises_mail_exception_on_failure(self) -> None:
-        """FR-009-019: raises MailException wrapping aiosmtplib error."""
+        """raises MailException wrapping aiosmtplib error."""
         from unittest.mock import AsyncMock, patch
 
         from arvel.mail.content import Content

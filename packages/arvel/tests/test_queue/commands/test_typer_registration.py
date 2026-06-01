@@ -1,11 +1,9 @@
-"""WI-021 — Queue commands honour the Command contract via register() override.
-
-Covers (red until Stage 3b):
-  FR-021-12  Each of the 5 queue commands overrides register() with a Typer callback
-             whose signature matches its CLI flags.
-  FR-021-13  `# type: ignore[override]` comments are removed; handle(ctx) signature
-             matches the base class.
-  FR-021-14  Each command exercises end-to-end via CliRunner (Typer callback path).
+"""Queue commands honour the Command contract via register override.
+Each of the 5 queue commands overrides register with a Typer callback
+ whose signature matches its CLI flags.
+ `# type: ignore[override]` comments are removed; handle(ctx) signature
+ matches the base class.
+ Each command exercises end-to-end via CliRunner (Typer callback path).
 """
 
 from __future__ import annotations
@@ -30,7 +28,7 @@ async def _setup_db() -> DatabaseConnection:
     return db
 
 
-# ─── FR-021-12 — register() override present on all 5 queue commands ────────
+# ─── — register() override present on all 5 queue commands ────────
 
 
 class TestRegisterOverridden:
@@ -60,7 +58,7 @@ class TestRegisterOverridden:
         assert "register" in QueueForgetCommand.__dict__
 
 
-# ─── FR-021-13 — handle(ctx) signature matches Command base, no override-ignore ────
+# ─── — handle(ctx) signature matches Command base, no override-ignore ────
 
 
 class TestHandleSignatureMatchesBase:
@@ -87,7 +85,7 @@ class TestHandleSignatureMatchesBase:
             cmd.handle(Context())
 
 
-# ─── FR-021-14 — CliRunner smokes the Typer callback for each queue command ────
+# ─── — CliRunner smokes the Typer callback for each queue command ────
 
 
 def _build_runner_app(cmd: Command) -> tuple[CliRunner, typer.Typer]:

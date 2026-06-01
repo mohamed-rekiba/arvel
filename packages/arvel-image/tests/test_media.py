@@ -1,8 +1,6 @@
-"""QA-Pre tests for the arvel-image media-library runtime (WI-arvel-026).
+"""Tests for the arvel-image media-library runtime.
 
-Maps to PRD-026 acceptance criteria AC-026-01 .. AC-026-20.
-
-These tests fail until Stage 3b creates ``arvel_image.media``.
+These tests fail until ``arvel_image.media`` exists.
 """
 
 from __future__ import annotations
@@ -49,7 +47,7 @@ def png_bytes_4x4() -> bytes:
 
 
 def test_public_exports_resolve() -> None:
-    """AC-026-18 / FR-026-37: public names import."""
+    """public names import."""
     from arvel_image import (
         Conversion,
         ConversionFailedError,
@@ -73,7 +71,7 @@ def test_public_exports_resolve() -> None:
 
 
 def test_default_path_generator_original_layout() -> None:
-    """AC-026-15 / FR-026-33: original path is ``{id}/{file_name}``."""
+    """original path is ``{id}/{file_name}``."""
     from types import SimpleNamespace
 
     from arvel_image.media import DefaultPathGenerator
@@ -85,7 +83,7 @@ def test_default_path_generator_original_layout() -> None:
 
 
 def test_default_path_generator_conversion_layout() -> None:
-    """AC-026-15 / FR-026-33: conversion path is ``{id}/conversions/{conv}-{file_name}``."""
+    """conversion path is ``{id}/conversions/{conv}-{file_name}``."""
     from types import SimpleNamespace
 
     from arvel_image.media import DefaultPathGenerator
@@ -97,7 +95,7 @@ def test_default_path_generator_conversion_layout() -> None:
 
 
 def test_conversion_default_accepts_image_mime() -> None:
-    """FR-026-29: default accept matches image/*, rejects others."""
+    """default accept matches image/*, rejects others."""
     from arvel_image.media import Conversion
 
     conv = Conversion("thumb")
@@ -110,7 +108,7 @@ def test_conversion_default_accepts_image_mime() -> None:
 
 
 def test_conversion_apply_runs_chain_against_image(jpeg_bytes_8x8: bytes) -> None:
-    """FR-026-27 / FR-026-30: Conversion.apply chains Image ops."""
+    """Conversion.apply chains Image ops."""
     from arvel_image import Image
     from arvel_image.media import Conversion
 
@@ -128,7 +126,7 @@ def test_conversion_apply_runs_chain_against_image(jpeg_bytes_8x8: bytes) -> Non
 
 
 def test_media_collection_with_conversions_registers_them() -> None:
-    """FR-026-25: MediaCollection.with_conversions stores conversions."""
+    """MediaCollection.with_conversions stores conversions."""
     from arvel_image.media import Conversion, MediaCollection
 
     coll = MediaCollection("avatar", single_file=True).with_conversions(
@@ -141,7 +139,7 @@ def test_media_collection_with_conversions_registers_them() -> None:
 
 
 def test_file_adder_sanitizes_path_traversal_filename() -> None:
-    """AC-026-16 / SEC-026-01: ../-style filenames are flattened to a basename."""
+    """../-style filenames are flattened to a basename."""
     from arvel_image.media.file_adder import FileAdder
 
     sanitized = FileAdder.sanitize_file_name("../../../etc/passwd")
@@ -151,7 +149,7 @@ def test_file_adder_sanitizes_path_traversal_filename() -> None:
 
 
 def test_file_adder_sanitizes_control_characters() -> None:
-    """SEC-026-01: control characters and NUL bytes are stripped."""
+    """control characters and NUL bytes are stripped."""
     from arvel_image.media.file_adder import FileAdder
 
     sanitized = FileAdder.sanitize_file_name("evil\x00name\nfoo.png")
@@ -161,7 +159,7 @@ def test_file_adder_sanitizes_control_characters() -> None:
 
 
 def test_file_adder_rejects_empty_filename() -> None:
-    """SEC-026-01: empty / dot-only filenames raise."""
+    """empty / dot-only filenames raise."""
     from arvel_image.media import MediaError
     from arvel_image.media.file_adder import FileAdder
 
@@ -242,7 +240,7 @@ def _host_user_class() -> type[Any]:
 async def test_media_row_defaults_json_columns_to_empty_dict(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """AC-026-02 / FR-026-2: JSON columns default to ``{}``, not None."""
+    """JSON columns default to ``{}``, not None."""
     from arvel_image import Media
 
     await _create_tables(engine)
@@ -266,7 +264,7 @@ async def test_media_row_defaults_json_columns_to_empty_dict(
 async def test_has_media_exposes_media_morphmany(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """AC-026-06 / FR-026-10: HasMedia gives the host a ``media`` MorphMany."""
+    """HasMedia gives the host a ``media`` MorphMany."""
     from arvel.facades import Storage
     from arvel_image import Media
 
@@ -294,7 +292,7 @@ async def test_has_media_exposes_media_morphmany(
 async def test_add_media_to_collection_round_trip(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """AC-026-07 / FR-026-12: full ingestion round-trips to disk + media row."""
+    """full ingestion round-trips to disk + media row."""
     from arvel.facades import Storage
 
     await _create_tables(engine)
@@ -322,7 +320,7 @@ async def test_add_media_to_collection_round_trip(
 async def test_add_media_marks_generated_conversions(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """AC-026-09 / FR-026-30: a generated conversion is flagged in JSON."""
+    """a generated conversion is flagged in JSON."""
     from arvel.facades import Storage
 
     await _create_tables(engine)
@@ -341,7 +339,7 @@ async def test_add_media_marks_generated_conversions(
 async def test_get_media_url_returns_disk_url(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """AC-026-03 / AC-026-04 / AC-026-09: get_media_url proxies to the storage disk."""
+    """get_media_url proxies to the storage disk."""
     from arvel.facades import Storage
 
     await _create_tables(engine)
@@ -365,7 +363,7 @@ async def test_get_media_url_returns_disk_url(
 async def test_get_media_filters_by_collection(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """AC-026-08 / FR-026-13."""
+    """get_media returns only rows in the requested collection."""
     from arvel.facades import Storage
 
     await _create_tables(engine)
@@ -387,7 +385,7 @@ async def test_get_media_filters_by_collection(
 async def test_clear_media_collection_deletes_rows_and_files(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """AC-026-10 / FR-026-16."""
+    """clear_media_collection deletes rows and files on disk."""
     from arvel.facades import Storage
     from arvel_image import Media
 
@@ -412,7 +410,7 @@ async def test_clear_media_collection_deletes_rows_and_files(
 async def test_single_file_collection_replaces_previous(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """AC-026-11 / FR-026-19."""
+    """single_file collection replaces the previous media on add."""
     from arvel.facades import Storage
 
     await _create_tables(engine)
@@ -441,7 +439,7 @@ async def test_single_file_collection_replaces_previous(
 async def test_media_delete_removes_files(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """AC-026-05 / FR-026-6 / FR-026-38."""
+    """Media.delete removes original and conversion files from disk."""
     from arvel.facades import Storage
 
     await _create_tables(engine)
@@ -467,7 +465,7 @@ async def test_media_delete_removes_files(
 async def test_media_delete_succeeds_when_file_missing(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """AC-026-20 / FR-026-39: best-effort cleanup."""
+    """best-effort cleanup."""
     from arvel.facades import Storage
 
     await _create_tables(engine)
@@ -490,7 +488,7 @@ async def test_media_delete_succeeds_when_file_missing(
 async def test_non_image_media_skips_image_conversions(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """AC-026-13 / FR-026-29."""
+    """Non-image MIME skips image conversions."""
     from arvel.facades import Storage
 
     await _create_tables(engine)
@@ -513,7 +511,7 @@ async def test_non_image_media_skips_image_conversions(
 async def test_failing_conversion_raises_and_leaves_no_partial_file(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """AC-026-14 / FR-026-31."""
+    """Failing conversion raises and leaves no partial file on disk."""
     from arvel.database import Model, Timestamps
     from arvel.database.columns import id_, string
     from arvel.facades import Storage
@@ -552,7 +550,7 @@ async def test_failing_conversion_raises_and_leaves_no_partial_file(
 async def test_image_provider_binds_path_generator_and_runner(
     tmp_path: Any,
 ) -> None:
-    """FR-026-35: ImageServiceProvider.register() binds PathGenerator + ConversionRunner."""
+    """ImageServiceProvider.register() binds PathGenerator + ConversionRunner."""
     from arvel import Application
     from arvel_image import ImageServiceProvider
     from arvel_image.media import ConversionRunner, DefaultPathGenerator, PathGenerator
@@ -579,9 +577,9 @@ async def test_image_provider_binds_path_generator_and_runner(
 
 
 def test_arvel_image_does_not_shell_out() -> None:
-    """AC-026-17 / NFR-026-07: source contains no subprocess / os.system import.
+    """source contains no subprocess / os.system import.
 
-    Extends the same arch test from the WI-arvel-025 suite to cover the new
+    Extends the same arch test from the suite to cover the new
     runtime modules.
     """
     from pathlib import Path

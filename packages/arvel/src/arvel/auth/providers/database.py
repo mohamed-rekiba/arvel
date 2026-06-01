@@ -12,7 +12,7 @@ from arvel.database.session import get_active_session
 class DatabaseUserProvider:
     """Resolves users from an ORM Model class.
 
-    Implements the UserResolver Protocol.
+    Resolves users from the database.
     """
 
     def __init__(

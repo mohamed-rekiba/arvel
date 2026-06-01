@@ -17,6 +17,7 @@ class AppServiceProvider(ServiceProvider):
     Framework providers handle auth, mail, events, queue, storage,
     cache, and images. This provider is the extension point for
     demo-specific bindings.
+
     """
 
     def register(self) -> None:

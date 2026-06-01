@@ -1,4 +1,4 @@
-"""NFR-001-005: Error messages include offending symbol + dependency path + caller name."""
+""": Error messages include offending symbol + dependency path + caller name."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""FR-001-017: ServiceProvider base."""
+"""ServiceProvider base."""
 
 from __future__ import annotations
 

@@ -1,8 +1,7 @@
-"""WI-arvel-033 — Epic 007 Story 8: relation-querying completeness.
+"""Relation-querying completeness.
 
 Nested where_has, or_* relation variants, constrained doesnt_have, operator+count where_has,
-with_where_has, and where_belongs_to.
-"""
+with_where_has, and where_belongs_to."""
 
 from __future__ import annotations
 

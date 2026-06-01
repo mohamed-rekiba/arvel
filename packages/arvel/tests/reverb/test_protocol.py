@@ -1,4 +1,4 @@
-"""FR-013-018, FR-013-022, NFR-013-005 — Pusher protocol v7 frame shapes."""
+"""Pusher protocol v7 frame shapes."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 
 def test_pusher_connection_established_frame_shape() -> None:
-    """FR-013-018 AC1: connection_established frame matches Pusher v7 spec."""
+    """connection_established frame matches Pusher v7 spec."""
     from arvel.reverb.protocol import build_connection_established
 
     frame = build_connection_established(socket_id="123.456", activity_timeout=120)
@@ -18,7 +18,7 @@ def test_pusher_connection_established_frame_shape() -> None:
 
 
 def test_pusher_subscription_succeeded_frame_shape() -> None:
-    """FR-013-018 AC2: pusher_internal:subscription_succeeded carries channel + optional data."""
+    """pusher_internal:subscription_succeeded carries channel + optional data."""
     from arvel.reverb.protocol import build_subscription_succeeded
 
     frame = build_subscription_succeeded(channel="orders", presence_data=None)
@@ -28,7 +28,7 @@ def test_pusher_subscription_succeeded_frame_shape() -> None:
 
 
 def test_pusher_error_frame_shape() -> None:
-    """FR-013-018 AC3: pusher:error frames carry code + message."""
+    """pusher:error frames carry code + message."""
     from arvel.reverb.protocol import build_error
 
     frame = build_error(code=4001, message="Invalid signature")
@@ -40,7 +40,7 @@ def test_pusher_error_frame_shape() -> None:
 
 
 def test_pong_frame_shape() -> None:
-    """FR-013-022 AC2: pong frame echoes the pusher:pong event."""
+    """pong frame echoes the pusher:pong event."""
     from arvel.reverb.protocol import build_pong
 
     parsed = json.loads(build_pong())
@@ -48,7 +48,7 @@ def test_pong_frame_shape() -> None:
 
 
 def test_event_frame_includes_channel() -> None:
-    """NFR-013-005: server-to-client event frame mirrors Pusher v7."""
+    """server-to-client event frame mirrors Pusher v7."""
     from arvel.reverb.protocol import build_event_frame
 
     frame = build_event_frame(channel="orders", event="OrderShipped", data={"order_id": 42})
@@ -59,7 +59,7 @@ def test_event_frame_includes_channel() -> None:
 
 
 def test_member_added_frame_shape() -> None:
-    """FR-013-021 AC3: presence member_added frame carries user info."""
+    """presence member_added frame carries user info."""
     from arvel.reverb.protocol import build_member_added
 
     frame = build_member_added(

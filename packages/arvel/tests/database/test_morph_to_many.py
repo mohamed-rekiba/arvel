@@ -2,8 +2,7 @@
 
 The pivot carries ``{name}_type`` / ``{name}_id`` so one table links several
 owner types to the same related model. The owner id is string-cast on write so
-a VARCHAR pivot column accepts integer PKs.
-"""
+a VARCHAR pivot column accepts integer PKs."""
 
 from __future__ import annotations
 

@@ -1,9 +1,9 @@
 """cache:clear and cache:forget CLI commands.
 
 The clear/forget callbacks deliberately let any failure propagate. The bare
-``except`` swallows that lived here before WI-021 made the commands report
+``except`` swallows that lived here before made the commands report
 ``Cache cleared.`` even when the cache facade was unbound — violating
-NFR-021-04 (CLI exit-code honesty). If the cache subsystem is not registered,
+ (CLI exit-code honesty). If the cache subsystem is not registered,
 the command surfaces ``RuntimeError("cache subsystem not registered")`` so the
 exit code matches reality.
 

@@ -10,13 +10,10 @@ Pipeline:
 1. Validate the project name (allowlist regex + length cap).
 2. Resolve the target directory (containment + non-empty refusal).
 3. Render the packaged skeleton into a staging dir
-   (token substitution, ``_dot_*`` → ``.*``, ``*.tmpl`` → ``*``).
+ (token substitution, ``_dot_*`` → ``.*``, ``*.tmpl`` → ``*``).
 4. Atomically promote staging → target (no half-installed projects).
 5. Optionally run ``uv sync`` to populate ``.venv``.
-6. Print next-steps.
-
-See ADR-075 (consolidated ``arvel`` binary) for the rationale and ADR-020
-for the templating contract.
+6. Print next-steps. for the templating contract.
 """
 
 import shutil

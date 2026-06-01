@@ -1,10 +1,9 @@
-"""WI-arvel-047: Auth Authorization cluster — Stories 17, 18, 19.
-
+"""Auth Authorization cluster.
 Tests are FAILING before the fix and PASSING after.
 
-Story 17 (FR-047-017): Gate must be registered as a DI singleton.
-Story 18 (FR-047-018): Single Authenticate middleware; optional variant renamed.
-Story 19 (FR-047-019): Policy.check() must support sync and async methods.
+): Gate must be registered as a DI singleton.
+): Single Authenticate middleware; optional variant renamed.
+): Policy.check() must support sync and async methods.
 """
 
 from __future__ import annotations
@@ -14,11 +13,11 @@ from typing import Any
 import pytest
 from starlette.requests import Request as _StarletteRequest
 
-# ─── Story 17: Gate DI singleton ──────────────────────────────────────────────
+# Gate DI singleton
 
 
 class TestStory17GateDISingleton:
-    """FR-047-017: AuthServiceProvider must register Gate as a container singleton."""
+    """AuthServiceProvider must register Gate as a container singleton."""
 
     def test_gate_is_resolvable_from_container(self) -> None:
         """Container.make(Gate) must work after AuthServiceProvider registers.
@@ -69,11 +68,11 @@ class TestStory17GateDISingleton:
         assert await gate.allows("view-admin", user) is False
 
 
-# ─── Story 18: Single canonical Authenticate middleware ───────────────────────
+# Single canonical Authenticate middleware
 
 
 class TestStory18SingleAuthenticateMiddleware:
-    """FR-047-018: arvel.http.middleware.Authenticate must be the canonical blocking middleware."""
+    """arvel.http.middleware.Authenticate must be the canonical blocking middleware."""
 
     def test_http_middleware_authenticate_exists(self) -> None:
         """arvel.http.middleware.Authenticate must be importable."""
@@ -127,11 +126,11 @@ class TestStory18SingleAuthenticateMiddleware:
         assert response.status_code in (401, 503)  # 503 acceptable if container unavailable
 
 
-# ─── Story 19: Policy supports sync and async methods ─────────────────────────
+# Policy supports sync and async methods
 
 
 class TestStory19PolicySyncAsync:
-    """FR-047-019: Policy.check() must handle both sync def and async def methods."""
+    """Policy.check() must handle both sync def and async def methods."""
 
     @pytest.mark.asyncio
     async def test_policy_check_with_sync_method(self) -> None:

@@ -1,7 +1,7 @@
-"""FR-004-008/009/010 + NFR-004-004: file-to-module loader contract.
+"""/009/010 + : file-to-module loader contract.
 
-Covers the private ``arvel.application._loader`` module that backs the
-three new ``ApplicationBuilder`` methods. See ADR-019 for the design
+the private ``arvel.application._loader`` module that backs the
+three new ``ApplicationBuilder`` methods.
 (``importlib.util.spec_from_file_location`` + namespaced module names +
 ``sys.path``-invariant assertion at load time).
 """
@@ -62,7 +62,7 @@ def test_load_module_from_path_registers_in_sys_modules(tmp_path: Path) -> None:
 def test_load_module_from_path_namespaced_logging_does_not_shadow_stdlib(tmp_path: Path) -> None:
     """User's ``config/logging.py`` MUST NOT replace stdlib ``logging`` in sys.modules.
 
-    This is the core mitigation in ADR-019 § Conventions: namespaced module
+    This is the core mitigation in § Conventions: namespaced module
     names prevent stdlib shadowing.
     """
     path = tmp_path / "logging.py"

@@ -1,4 +1,4 @@
-"""MailPendingSend — fluent to().send() chain (FR-009-015)."""
+"""MailPendingSend — fluent to.send chain."""
 
 from __future__ import annotations
 

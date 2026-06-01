@@ -1,4 +1,4 @@
-"""LogMailDriver — writes sent mail to the structured log (FR-009-017)."""
+"""LogMailDriver — writes sent mail to the structured log."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ logger = Log.channel(__name__)
 
 
 class LogMailDriver:
-    """Driver that logs envelope fields at INFO level. Never raises (NFR-009-004)."""
+    """Driver that logs envelope fields at INFO level. Never raises."""
 
     async def send(self, mail: RenderedMail) -> None:
         try:

@@ -1,4 +1,4 @@
-"""Tests for cache CLI commands — FR-006-039..041."""
+"""Tests for cache CLI commands"""
 
 from __future__ import annotations
 
@@ -34,11 +34,11 @@ def unbind_cache_facade() -> Any:
 
 
 class TestCacheClearCommand:
-    """FR-006-039 + FR-021-06: ``arvel cache:clear`` is honest about subsystem state.
+    """+ : ``arvel cache:clear`` is honest about subsystem state.
 
-    Pre-WI-021 these tests asserted exit-0 even when the cache facade was
+    Pre- these tests asserted exit-0 even when the cache facade was
     unbound — backed by a bare-except swallow that printed a fake
-    "Cache cleared." Per NFR-021-04 (CLI exit-code honesty) the swallow is gone:
+    "Cache cleared." Per (CLI exit-code honesty) the swallow is gone:
     without a CacheServiceProvider the command surfaces RuntimeError, which
     Typer maps to a non-zero exit code.
     """
@@ -53,7 +53,7 @@ class TestCacheClearCommand:
 
 
 class TestCacheForgetCommand:
-    """FR-006-040 + FR-021-07: ``arvel cache:forget <key>`` honest about subsystem state."""
+    """+ : ``arvel cache:forget <key>`` honest about subsystem state."""
 
     @pytest.mark.usefixtures("unbind_cache_facade")
     def test_cache_forget_fails_loudly_when_subsystem_unbound(
@@ -64,7 +64,7 @@ class TestCacheForgetCommand:
 
 
 class TestStorageLinkCommand:
-    """FR-006-043: arvel storage:link."""
+    """arvel storage:link."""
 
     def test_storage_link_creates_symlink(
         self,

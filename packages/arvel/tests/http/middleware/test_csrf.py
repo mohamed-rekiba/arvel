@@ -1,4 +1,4 @@
-"""FR-002-020 — VerifyCsrf middleware."""
+"""VerifyCsrf middleware."""
 
 from __future__ import annotations
 
@@ -133,7 +133,7 @@ def test_csrf_except_paths_bypasses_check() -> None:
 
 
 def test_csrf_uses_constant_time_comparison() -> None:
-    """Inspect the source for `secrets.compare_digest` usage — NFR-002-004."""
+    """Inspect the source for `secrets.compare_digest` usage — ."""
     import inspect
 
     from arvel.http.middleware import VerifyCsrf

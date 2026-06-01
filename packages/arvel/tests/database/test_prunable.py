@@ -10,7 +10,7 @@ from arvel.database.model import Prunable
 
 
 class TestPrunableMixin:
-    """Prunable raises NotImplementedError on default prunable_query()."""
+    """Prunable raises NotImplementedError on default prunable_query."""
 
     def test_abstract_prunable_query_raises(self) -> None:
         class Unpruned(Prunable):
@@ -37,7 +37,7 @@ class TestPrunableMixin:
 
 
 class TestModelPruneCommand:
-    """model:prune dispatches prunable_query().force_delete() for each registered model."""
+    """model:prune dispatches prunable_query.force_delete for each registered model."""
 
     @pytest.mark.asyncio
     async def test_prune_force_deletes_on_each_model(self) -> None:

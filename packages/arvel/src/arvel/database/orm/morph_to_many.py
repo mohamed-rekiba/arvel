@@ -1,7 +1,7 @@
 """MorphToMany — polymorphic many-to-many via a pivot table with a type discriminator.
 
 Like :class:`BelongsToMany`, but the pivot carries ``{name}_type`` / ``{name}_id``
-columns (ADR-022 short class name + string-cast owner PK) instead of a single
+columns instead of a single
 owner foreign key. One pivot table can therefore link many owner types to the
 same related model — e.g. ``model_has_roles`` linking both ``User`` and ``Team``
 to ``Role``.

@@ -1,4 +1,4 @@
-"""FR-001-016: FastAPI bridge via arvel.dep()."""
+"""FastAPI bridge via arvel.dep()."""
 
 from __future__ import annotations
 

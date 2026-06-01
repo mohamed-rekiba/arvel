@@ -1,4 +1,4 @@
-"""Tests for Notifiable mixin — FR-009-024."""
+"""Tests for Notifiable mixin."""
 
 from __future__ import annotations
 

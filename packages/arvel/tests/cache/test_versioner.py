@@ -1,5 +1,4 @@
-"""Tests for CacheVersioner — FR-032-07 / AC-17..18.
-
+"""Tests for CacheVersioner.
 Tests are written RED — arvel.cache.CacheVersioner does not exist yet.
 """
 
@@ -14,7 +13,7 @@ def array_store() -> ArrayStore:
     return ArrayStore(prefix="test")
 
 
-# ─── AC-17: invalidate() changes versioned keys ──────────────────────────────
+#: invalidate() changes versioned keys
 
 
 @pytest.mark.asyncio
@@ -50,7 +49,7 @@ async def test_invalidate_multiple_times(array_store: ArrayStore) -> None:
     assert len(keys) == 3, "Each invalidation must produce a different key"
 
 
-# ─── AC-18: No key collision between versioners ───────────────────────────────
+#: No key collision between versioners
 
 
 @pytest.mark.asyncio
@@ -66,7 +65,7 @@ async def test_no_collision_between_different_prefixes(array_store: ArrayStore) 
     assert key_v2_before == key_v2_after
 
 
-# ─── importable from arvel.cache ──────────────────────────────────────────────
+# importable from arvel.cache
 
 
 def test_importable_from_arvel_cache() -> None:

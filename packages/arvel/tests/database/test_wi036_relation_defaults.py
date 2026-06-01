@@ -1,7 +1,6 @@
-"""WI-arvel-036 — Epic 007 Story 11: relation defaults, eager control, cascade save.
+"""Relation defaults, eager control, cascade save.
 
-Covers BelongsTo.with_default, QueryBuilder.without/with_only, Model.push, and $touches.
-"""
+Covers BelongsTo.with_default, QueryBuilder.without/with_only, Model.push, and $touches."""
 
 from __future__ import annotations
 
@@ -224,5 +223,5 @@ class TestTouches:
 
         await user.refresh()
         assert user.updated_at is not None
-        # The save() above should have bumped the parent off the year-2000 sentinel.
+        # The save above should have bumped the parent off the year-2000 sentinel.
         assert user.updated_at.year > 2000

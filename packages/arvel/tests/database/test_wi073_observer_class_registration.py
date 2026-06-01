@@ -1,4 +1,4 @@
-"""WI-arvel-073 — Epic 049 Story 9: Model.observe(ObserverClass) + container DI."""
+"""Model.observe(ObserverClass) + container DI."""
 
 from __future__ import annotations
 
@@ -87,7 +87,7 @@ class TestObserveObserverClass:
     ) -> None:
         # Regression: container refused no-__init__ observer classes with
         # BindingResolutionError; _resolve_observer must fall back to direct
-        # instantiation instead of routing through container.make().
+        # instantiation instead of routing through container.make.
         await _setup(engine)
         _NoInitObserver.seen.clear()
         container = Container()

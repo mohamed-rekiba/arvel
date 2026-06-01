@@ -1,4 +1,4 @@
-"""Job class allowlist registry (ADR-035) and deserialization helper."""
+"""Job class allowlist registry and deserialization helper."""
 
 from __future__ import annotations
 

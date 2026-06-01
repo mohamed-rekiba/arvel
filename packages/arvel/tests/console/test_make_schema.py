@@ -1,13 +1,11 @@
 """``arvel make:schema`` — generate Pydantic schemas from a model (lesson L6).
 
-Covers:
-
 * Introspecting an SQLA-mapped class and emitting ``Read`` / ``Create`` /
-  ``Update`` schemas at the canonical path.
+ ``Update`` schemas at the canonical path.
 * Excluding server-managed fields (autoincrement PK, ``created_at``,
-  ``updated_at``, ``deleted_at``, ``__hidden__`` columns) from ``Create``.
+ ``updated_at``, ``deleted_at``, ``__hidden__`` columns) from ``Create``.
 * Mapping common SQLA types (``Integer``, ``String``, ``Boolean``,
-  ``DateTime``) to the matching Python annotations.
+ ``DateTime``) to the matching Python annotations.
 * Emitting valid, ruff-clean Python.
 * Surfacing a useful diagnostic when the model can't be imported.
 """
@@ -105,7 +103,7 @@ def test_create_excludes_server_managed_fields(tmp_path: Path) -> None:
         assert "password:" not in create_body, "__hidden__ columns must not appear on Create"
         assert "name: str" in create_body
         # ``email`` and ``*_email`` columns are upgraded to ``EmailStr`` at the boundary
-        # (ADR-077). Storage stays VARCHAR; the validation lives in the Pydantic schema.
+        # (). Storage stays VARCHAR; the validation lives in the Pydantic schema.
         assert "email: EmailStr" in create_body
         assert "billing_email: EmailStr" in create_body
 

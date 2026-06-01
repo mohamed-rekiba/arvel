@@ -1,10 +1,10 @@
-"""Lazy framework Application bootstrap for the ``arvel`` CLI (WI-021 / ADR-068).
+"""Lazy framework Application bootstrap for the ``arvel`` CLI.
 
 The framework ``arvel.application.Application`` is the kernel that owns the DI
 container and provider lifecycle. CLI commands that need DI (queue, scheduler,
-shell, ...) opt in by declaring ``needs_application: ClassVar[bool] = True`` on
+shell,...) opt in by declaring ``needs_application: ClassVar[bool] = True`` on
 their ``Command`` subclass; the entrypoint then walks up from cwd to discover the
-user's ``bootstrap/app.py``, imports it, and calls ``create_application()``.
+user's ``bootstrap/app.py``, imports it, and calls ``create_application``.
 
 Discovery walks ``_MAX_ANCESTOR_DEPTH = 4`` parent directories of the start path
 (cwd by default), which covers the common ``apps/<name>/<sub>/...`` layouts

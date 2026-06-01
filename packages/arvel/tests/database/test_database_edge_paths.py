@@ -2,8 +2,7 @@
 
 These exercise the small error/empty/None branches that the happy-path suites
 skip: empty collections, unknown lifecycle events, scope descriptor access,
-the after-commit queue, and pagination request fallbacks.
-"""
+the after-commit queue, and pagination request fallbacks."""
 
 from __future__ import annotations
 

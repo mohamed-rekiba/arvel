@@ -1,4 +1,4 @@
-"""`arvel reverb:start` console command (FR-013-017)."""
+"""`arvel reverb:start` console command."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def build_reverb_runtime(
     host_override: str | None,
     port_override: int | None,
 ) -> tuple[ReverbServer, str, int]:
-    """Construct the ReverbServer + resolve effective host/port (FR-013-017 AC2)."""
+    """Construct the ReverbServer + resolve effective host/port."""
     from arvel.reverb.server import ReverbServer
 
     server = ReverbServer(config=config)
@@ -70,7 +70,7 @@ def build_reverb_runtime(
 
 
 def log_reverb_started(config: ReverbConfig) -> None:
-    """Emit the ``reverb_started`` structured event (FR-013-017 AC3)."""
+    """Emit the ``reverb_started`` structured event."""
     logger.info(
         "reverb_started host=%s port=%d app_id=%s",
         config.host,

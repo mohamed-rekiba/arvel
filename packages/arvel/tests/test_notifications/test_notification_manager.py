@@ -1,4 +1,4 @@
-"""Tests for NotificationManager — FR-009-029..030."""
+"""Tests for NotificationManager."""
 
 from __future__ import annotations
 

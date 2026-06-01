@@ -1,4 +1,4 @@
-"""Story 3: Request context middleware — FR-030-015..017."""
+"""Request context middleware."""
 
 from __future__ import annotations
 

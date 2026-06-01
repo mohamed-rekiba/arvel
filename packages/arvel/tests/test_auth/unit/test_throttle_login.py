@@ -1,4 +1,4 @@
-"""FR-028-31 — login throttle middleware (RED state). Closes FB-027-012."""
+"""login throttle middleware (RED state)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+# helpers
 
 
 async def _login_handler(request: Request) -> JSONResponse:

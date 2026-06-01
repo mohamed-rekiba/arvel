@@ -1,4 +1,4 @@
-"""arvel.support.Str — Laravel-parity string facade (Epic 049 Stories 11-12)."""
+"""arvel.support.Str — Laravel-parity string facade."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""event:list command (WI-arvel-023)."""
+"""event:list command."""
 
 from __future__ import annotations
 

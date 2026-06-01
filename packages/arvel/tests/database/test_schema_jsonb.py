@@ -1,8 +1,6 @@
-"""WI-arvel-036 / FR-036-01 — Blueprint.jsonb() QA-Pre tests.
+"""Blueprint.jsonb and JsonB TypeDecorator tests.
 
-All tests in this file should FAIL until Stage 3b adds ``Blueprint.jsonb()``
-and the ``JsonB`` TypeDecorator to ``arvel.database.schema``.
-"""
+Fail until ``Blueprint.jsonb`` and ``JsonB`` exist in ``arvel.database.schema``."""
 
 from __future__ import annotations
 
@@ -55,13 +53,13 @@ def _find_column(emitted_args: tuple[Any, ...], name: str) -> Column[Any]:
 
 
 def test_jsonb_method_exists_on_blueprint() -> None:
-    """FR-036-01: Blueprint exposes a jsonb() method."""
+    """Blueprint exposes a jsonb method."""
     assert hasattr(Blueprint, "jsonb"), "Blueprint.jsonb() not found"
     assert callable(Blueprint.jsonb)
 
 
 def test_jsonb_returns_pending_column() -> None:
-    """FR-036-01c: jsonb() returns a PendingColumn with the standard chain API."""
+    """jsonb returns a PendingColumn with the standard chain API."""
     from arvel.database.schema import PendingColumn
 
     bp = Blueprint(table_name="t")
@@ -72,7 +70,7 @@ def test_jsonb_returns_pending_column() -> None:
 
 
 def test_jsonb_emitted_to_create_table() -> None:
-    """FR-036-01: Schema.create emits the jsonb column into create_table call."""
+    """Schema.create emits the jsonb column into create_table call."""
     ex = _RecordingExecutor()
 
     def build(t: Blueprint) -> None:
@@ -88,12 +86,12 @@ def test_jsonb_emitted_to_create_table() -> None:
 
 
 def test_jsonb_type_is_jsonb_on_postgresql() -> None:
-    """FR-036-01a: JsonB resolves to JSONB on PostgreSQL dialect."""
+    """JsonB resolves to JSONB on PostgreSQL dialect."""
     from arvel.database.schema import JsonB
     from sqlalchemy.dialects.postgresql import dialect as pg_dialect
 
     jb = JsonB()
-    pg = pg_dialect()  # type: ignore[no-untyped-call]  # SQLAlchemy dialect() not typed
+    pg = pg_dialect()  # type: ignore[no-untyped-call]  # SQLAlchemy dialect not typed
     impl = jb.load_dialect_impl(pg)
 
     from sqlalchemy.dialects.postgresql import JSONB
@@ -102,7 +100,7 @@ def test_jsonb_type_is_jsonb_on_postgresql() -> None:
 
 
 def test_jsonb_type_degrades_to_json_on_sqlite() -> None:
-    """FR-036-01b: JsonB degrades to JSON on non-PG dialects without raising."""
+    """JsonB degrades to JSON on non-PG dialects without raising."""
     from arvel.database.schema import JsonB
     from sqlalchemy import JSON
     from sqlalchemy.dialects.sqlite import dialect as sqlite_dialect
@@ -115,7 +113,7 @@ def test_jsonb_type_degrades_to_json_on_sqlite() -> None:
 
 
 def test_jsonb_supports_nullable_chain() -> None:
-    """FR-036-01c: chain modifiers work on jsonb() columns."""
+    """chain modifiers work on jsonb columns."""
     bp = Blueprint(table_name="t")
     col = bp.jsonb("meta").nullable(False)
     sqla_col = col.to_sqla_column()
@@ -124,7 +122,7 @@ def test_jsonb_supports_nullable_chain() -> None:
 
 
 def test_jsonb_supports_unique_chain() -> None:
-    """FR-036-01c: unique() works on jsonb() columns."""
+    """unique works on jsonb columns."""
     bp = Blueprint(table_name="t")
     col = bp.jsonb("key").unique()
     sqla_col = col.to_sqla_column()
@@ -133,7 +131,7 @@ def test_jsonb_supports_unique_chain() -> None:
 
 
 def test_jsonb_does_not_affect_json() -> None:
-    """FR-036-01e: Blueprint.json() still emits JSON (not JSONB) — no regression."""
+    """Blueprint.json still emits JSON (not JSONB) — no regression."""
     from sqlalchemy import JSON
 
     bp = Blueprint(table_name="t")
@@ -149,7 +147,7 @@ def test_jsonb_does_not_affect_json() -> None:
 
 
 def test_jsonb_composable_with_gin_index() -> None:
-    """FR-036-01d: gin_index can be declared alongside a jsonb column."""
+    """gin_index can be declared alongside a jsonb column."""
     ex = _RecordingExecutor()
 
     def build(t: Blueprint) -> None:

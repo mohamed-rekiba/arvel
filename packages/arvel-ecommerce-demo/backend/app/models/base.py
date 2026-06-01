@@ -1,7 +1,7 @@
 """Shared test stubs for the e-commerce domain models.
 
-``LocalMediaMixin``  — sync get_media / attach_media for unit-test compatibility.
-``_MockMediaItem``   — in-memory media record returned by attach_media.
+``LocalMediaMixin`` — sync get_media / attach_media for unit-test compatibility.
+``_MockMediaItem`` — in-memory media record returned by attach_media.
 
 Real media uses ``arvel_image.HasMedia`` directly.
 ``TranslatableMixin`` is imported from ``arvel.database.mixins`` (framework).
@@ -34,6 +34,7 @@ class _MockMediaItem:
 class LocalMediaMixin:
     """Sync get_media / attach_media for in-memory unit-test usage.
 
+
     Overrides arvel_image's async ``get_media`` with a sync version that
     operates on an in-process ``_local_media`` dict. Integration code uses
     ``add_media()`` from arvel_image directly for real file storage.
@@ -62,6 +63,7 @@ class LocalMediaMixin:
 
 class BaseModelMixin:
     """Mixin marker for domain models.
+
 
     Intentionally empty — framework ActiveRecord methods (delete, restore,
     scope_active) must not be shadowed by sync implementations here.

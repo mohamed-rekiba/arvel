@@ -1,4 +1,4 @@
-"""Story 9: Env-var configuration wiring — FR-030-029..030."""
+"""Env-var configuration wiring."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Unit tests for the queued media conversion pipeline (Story 4).
+"""Unit tests for the queued media conversion pipeline.
 
 Covers:
 - FileAdder.queued() sets _queue_conversions flag.

@@ -4,13 +4,12 @@ Combines two Spatie packages:
 
 - **spatie/image v3** — :class:`Image`, a fluent Pillow wrapper for
   resize / crop / fit / format / quality / optimize. Standalone, sync, no
-  shelling out (see ADR-080).
+  shelling out.
 - **spatie/laravel-medialibrary v11** — a polymorphic ``media`` table
   plus a runtime layer (``Media``, ``HasMedia``, collections, conversions,
   file ingestion). Exposed through :class:`ImageServiceProvider`, which
   registers the migration as publishable under the ``arvel-image`` tag
-  and binds :class:`PathGenerator` + :class:`ConversionRunner` (see
-  ADR-081, ADR-082).
+  and binds :class:`PathGenerator` + :class:`ConversionRunner`.
 
 Apps that only need ``Image`` can use it directly without booting an
 Arvel application. Apps that want the media table run::
@@ -33,8 +32,6 @@ Then add :class:`HasMedia` to a model::
 
     media = await user.add_media(bytes_, file_name="avatar.jpg") \\
         .to_media_collection("avatar")
-
-See ``docs/architecture/SAD-026-arvel-image-medialibrary-runtime.md``.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""FR-002-001 + FR-002-002 — Route facade & route groups."""
+"""+ Route facade & route groups."""
 
 from __future__ import annotations
 

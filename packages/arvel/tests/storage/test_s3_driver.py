@@ -1,4 +1,4 @@
-"""Tests for S3Driver — FR-006-029.
+"""Tests for S3Driver
 
 The ``TestS3DriverOps`` suite exercises real put/get/exists/delete/temporary_url
 against a ``motoserver/moto`` container booted by the session-scoped
@@ -43,7 +43,7 @@ class S3Endpoint(Protocol):
 
 class TestS3DriverImportError:
     def test_helpful_import_error_without_extra(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """FR-006-029: helpful ImportError when arvel[s3] not installed.
+        """helpful ImportError when arvel[s3] not installed.
 
         Pinning ``sys.modules["aioboto3"] = None`` is the documented way to
         make Python's import machinery treat a package as unavailable, even

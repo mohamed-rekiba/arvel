@@ -1,4 +1,4 @@
-"""HTTP download with SSRF guard (ADR-109, FR-046-05).
+"""HTTP download with SSRF guard .
 
 Resolves the hostname before connecting and rejects private/loopback/
 link-local IP addresses. DNS rebinding is a known limitation — documented
@@ -56,7 +56,7 @@ async def fetch_url(url: str, max_bytes: int) -> tuple[bytes, str]:
 
     parsed = urlparse(url)
 
-    # Allowlist approach — only http/https permitted (FR-050-11).
+    # Allowlist approach — only http/https permitted
     if parsed.scheme not in ("http", "https"):
         msg = f"URL scheme '{parsed.scheme}' is not permitted; only http and https are allowed"
         raise MediaError(msg)

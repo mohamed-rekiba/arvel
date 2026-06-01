@@ -1,4 +1,4 @@
-"""FR-002-014 — Cors middleware."""
+"""Cors middleware."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import pytest
 
 
 def test_cors_rejects_credentials_with_wildcard_origin() -> None:
-    """Security guardrail (NFR-002-004): never serve credentialed CORS with a wildcard origin."""
+    """Security guardrail (): never serve credentialed CORS with a wildcard origin."""
     from arvel.http.middleware import Cors
     from fastapi import FastAPI
 

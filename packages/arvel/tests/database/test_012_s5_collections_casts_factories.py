@@ -1,9 +1,4 @@
-"""WI-arvel-012 Sprint 5 — Collections, Casts, Factory polish.
-
-Covers FR-012-030 through FR-012-032.
-
-All tests are RED until implementation is complete.
-"""
+"""Collection wiring, attribute casts, factory polish."""
 
 from __future__ import annotations
 
@@ -29,10 +24,10 @@ async def _setup(engine: AsyncEngine) -> None:
         await conn.run_sync(Model.metadata.create_all)
 
 
-# ─── FR-012-030: Collection[T] wiring ─────────────────────────────────────────
+# ───  Collection[T] wiring ─────────────────────────────────────────
 #
 # Behaviour of Collection itself is covered in tests/support/test_collections.py
-# (FR-001-007). This single wiring test proves that the QueryBuilder terminal
+# (-007). This single wiring test proves that the QueryBuilder terminal
 # methods return the canonical arvel.support.Collection.
 
 
@@ -50,7 +45,7 @@ async def test_qb_all_returns_canonical_collection(
     assert len(raw_result) == 2
 
 
-# ─── FR-012-031: Standard attribute casts ─────────────────────────────────────
+# ───  Standard attribute casts ─────────────────────────────────────
 
 
 async def test_boolean_cast_from_int(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -120,7 +115,7 @@ def test_invalid_cast_literal_raises_at_definition() -> None:
         )
 
 
-# ─── FR-012-032: Factory polish ───────────────────────────────────────────────
+# ───  Factory polish ───────────────────────────────────────────────
 
 
 async def test_factory_sequence_produces_distinct_values(

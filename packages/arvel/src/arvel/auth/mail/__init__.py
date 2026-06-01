@@ -12,7 +12,7 @@ from arvel.mail.mailable import Mailable
 
 
 class VerifyEmailMailable(Mailable):
-    """FR-028-05 — sent after registration to confirm the user's email address."""
+    """sent after registration to confirm the user's email address."""
 
     def __init__(
         self, *, user_email: str, verify_url: str, from_address: str = "noreply@arvel.app"
@@ -37,7 +37,7 @@ class VerifyEmailMailable(Mailable):
 
 
 class PasswordResetMailable(Mailable):
-    """FR-028-24 — carries a signed reset URL to the user's inbox."""
+    """carries a signed reset URL to the user's inbox."""
 
     def __init__(
         self,

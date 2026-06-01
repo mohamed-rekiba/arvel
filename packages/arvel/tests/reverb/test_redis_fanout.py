@@ -1,4 +1,4 @@
-"""FR-013-028, NFR-013-010 — Redis-backed cross-node fan-out (uses fakeredis)."""
+"""Redis-backed cross-node fan-out (uses fakeredis)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def fake_redis() -> Any:
 
 @pytest.mark.asyncio
 async def test_redis_fanout_publishes_to_all_subscribed_servers(fake_redis: Any) -> None:
-    """FR-013-028 AC1: PUBLISH by one server is received by another subscribed server."""
+    """PUBLISH by one server is received by another subscribed server."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.reverb.redis_bus import RedisBus
 
@@ -44,7 +44,7 @@ async def test_redis_fanout_publishes_to_all_subscribed_servers(fake_redis: Any)
 
 @pytest.mark.asyncio
 async def test_redis_bus_filters_local_origin(fake_redis: Any) -> None:
-    """FR-013-028 AC2: server doesn't re-process its own broadcasts (origin tag)."""
+    """server doesn't re-process its own broadcasts (origin tag)."""
     from arvel.broadcasting.config import ReverbConfig
     from arvel.reverb.redis_bus import RedisBus
 
@@ -69,7 +69,7 @@ async def test_redis_bus_filters_local_origin(fake_redis: Any) -> None:
 async def test_reverb_server_fans_out_redis_broadcasts_to_local_subscribers(
     fake_redis: Any,
 ) -> None:
-    """FR-013-024 AC1: events arriving on RedisBus are pushed to local WS subscribers."""
+    """events arriving on RedisBus are pushed to local WS subscribers."""
     import json
 
     from arvel.broadcasting.config import ReverbConfig

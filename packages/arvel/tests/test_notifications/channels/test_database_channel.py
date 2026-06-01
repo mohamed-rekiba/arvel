@@ -1,4 +1,4 @@
-"""Tests for DatabaseChannel — FR-009-026, NFR-009-007."""
+"""Tests for DatabaseChannel — ."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ class TestDatabaseChannel:
 
     @pytest.mark.asyncio
     async def test_data_field_truncated_to_65535_chars(self) -> None:
-        """NFR-009-007: data capped at 65535 chars."""
+        """: data capped at 65535 chars."""
         from typing import Any
 
         from arvel.notifications.channels.database_channel import DatabaseChannel

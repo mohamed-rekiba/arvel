@@ -1,4 +1,4 @@
-"""ReverbServer — Pusher-protocol WS server (FR-013-016, 019, 021, 022, 024, 026)."""
+"""ReverbServer — Pusher-protocol WS server."""
 
 from __future__ import annotations
 
@@ -94,8 +94,8 @@ class _Connection:
 class ReverbServer:
     """In-process Pusher-protocol WS server.
 
-    The server may optionally bind a :class:`RedisBus` for cross-process fan-out
-    (FR-013-024). When wired, every envelope received from Redis is fanned out
+    The server may optionally bind a :class:`RedisBus` for cross-process
+    fan-out. When wired, every envelope received from Redis is fanned out
     to local subscribers via :attr:`channels`.
     """
 
@@ -111,7 +111,7 @@ class ReverbServer:
         self._redis_bus: RedisBus | None = redis_bus
         # Hold strong refs to fire-and-forget tasks so the loop doesn't GC them.
         self._background_tasks: set[asyncio.Task[None]] = set()
-        # Watchdog default: activity_timeout + 30s grace per FR-013-022.
+        # Watchdog default: activity_timeout + 30s grace.
         # Public so deployments (and tests) can shrink the window without subclassing.
         self.inactivity_threshold_seconds: float = float(config.activity_timeout + 30)
 

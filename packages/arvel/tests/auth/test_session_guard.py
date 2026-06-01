@@ -1,5 +1,5 @@
 """
-FR-007-007..012 — SessionGuard refactored to use Arvel SessionData.
+SessionGuard refactored to use Arvel SessionData.
 Tests import from arvel.auth.guards.session, which doesn't exist yet → red state.
 """
 
@@ -46,7 +46,7 @@ class _FakeResolver:
         return self._users.get(str(credentials.get("email")))
 
 
-# ─── FR-007-007: user() reads from request.state.session ──────────────────────
+# user() reads from request.state.session
 
 
 @pytest.mark.asyncio
@@ -83,7 +83,7 @@ async def test_session_guard_returns_none_when_user_not_found() -> None:
     assert await guard.user(request) is None
 
 
-# ─── FR-007-008: login() writes id + regenerates session ──────────────────────
+# login() writes id + regenerates session
 
 
 @pytest.mark.asyncio
@@ -116,7 +116,7 @@ async def test_session_guard_login_regenerates_session_to_prevent_fixation() -> 
     assert session.regenerated is True
 
 
-# ─── FR-007-009: logout() clears session key ──────────────────────────────────
+# logout() clears session key
 
 
 @pytest.mark.asyncio
@@ -129,9 +129,6 @@ async def test_session_guard_logout_removes_user_id() -> None:
 
     await guard.logout(request)
     assert session.get("_auth_id") is None
-
-
-# ─── FR-007-010: attempt() ────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -162,7 +159,7 @@ async def test_session_guard_attempt_fails_when_resolver_returns_none() -> None:
     assert ok is False
 
 
-# ─── FR-007-011: session_key is configurable ──────────────────────────────────
+# session_key is configurable
 
 
 @pytest.mark.asyncio
@@ -178,7 +175,7 @@ async def test_session_guard_custom_session_key() -> None:
     assert user == {"id": "u5"}
 
 
-# ─── FR-007-012: raises if request.state has no session ───────────────────────
+# raises if request.state has no session
 
 
 @pytest.mark.asyncio

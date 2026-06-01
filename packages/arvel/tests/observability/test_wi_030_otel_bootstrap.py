@@ -1,4 +1,4 @@
-"""Story 1: OTel SDK bootstrap — FR-030-001..004, FR-030-029..030."""
+"""OTel SDK bootstrap."""
 
 from __future__ import annotations
 

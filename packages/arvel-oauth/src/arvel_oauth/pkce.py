@@ -11,7 +11,7 @@ import base64
 import hashlib
 import secrets
 
-# RFC 7636 §4.1: verifier is 43..128 chars. token_urlsafe(96) yields 128.
+# RFC 7636 sec. 4.1: verifier is 43..128 chars. token_urlsafe(96) yields 128.
 _VERIFIER_NBYTES = 96
 _MIN_VERIFIER_LEN = 43
 

@@ -1,9 +1,4 @@
-"""WI-arvel-012 Sprint 2 — QB read extensions + DB facade.
-
-Covers FR-012-006 through FR-012-013.
-
-All tests are RED until implementation is complete.
-"""
+"""QueryBuilder read extensions and DB facade raw SQL."""
 
 from __future__ import annotations
 
@@ -41,7 +36,7 @@ async def _setup(engine: AsyncEngine) -> None:
         await conn.run_sync(Model.metadata.create_all)
 
 
-# ─── FR-012-006: Explicit column selection and raw expressions ─────────────────
+# ───  Explicit column selection and raw expressions ─────────────────
 
 
 async def test_select_columns(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -92,7 +87,7 @@ async def test_having_raw(engine: AsyncEngine, session: AsyncSession) -> None:
     assert len(rows) == 1
 
 
-# ─── FR-012-007: Joins ────────────────────────────────────────────────────────
+# ───  Joins ────────────────────────────────────────────────────────
 
 
 async def test_inner_join(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -112,7 +107,7 @@ async def test_left_join_includes_no_relation(engine: AsyncEngine, session: Asyn
     assert len(rows) == 2
 
 
-# ─── FR-012-008: Additional WHERE variants ────────────────────────────────────
+# ───  Additional WHERE variants ────────────────────────────────────
 
 
 async def test_where_column(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -181,7 +176,7 @@ async def test_where_any(engine: AsyncEngine, session: AsyncSession) -> None:
     assert len(rows) == 1
 
 
-# ─── FR-012-009: Unions ───────────────────────────────────────────────────────
+# ───  Unions ───────────────────────────────────────────────────────
 
 
 async def test_union(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -203,7 +198,7 @@ async def test_union_all_includes_duplicates(engine: AsyncEngine, session: Async
     assert len(rows) == 2  # duplicated because union_all
 
 
-# ─── FR-012-010: Pagination additions ────────────────────────────────────────
+# ───  Pagination additions ────────────────────────────────────────
 
 
 async def test_simple_paginate_no_count_query(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -273,8 +268,7 @@ async def test_keyset_paginate_desc_walks_forward_without_overlap(
     """A DESC keyset walk must move toward smaller values, not loop on the head.
 
     Regression: _apply_keyset_where inverted the comparison, so the second page
-    returned the first page's rows again.
-    """
+    returned the first page's rows again."""
     await _setup(engine)
     # Distinct scores so the leading keyset column alone orders every row.
     for i in range(9):
@@ -318,7 +312,7 @@ async def test_keyset_paginate_handles_tied_leading_column(
     assert len(seen_ids) == len(set(seen_ids)), "pages overlapped on tie"
 
 
-# ─── FR-012-011: Query extras ────────────────────────────────────────────────
+# ───  Query extras ────────────────────────────────────────────────
 
 
 async def test_sole_returns_single_result(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -360,7 +354,7 @@ async def test_lock_for_update(engine: AsyncEngine, session: AsyncSession) -> No
     assert row is not None
 
 
-# ─── FR-012-012: DB.table() TableQueryBuilder ─────────────────────────────────
+# ───  DB.table TableQueryBuilder ─────────────────────────────────
 
 
 async def test_db_table_returns_table_query_builder(
@@ -420,7 +414,7 @@ async def test_db_table_insert_empty_rows_noops(engine: AsyncEngine, session: As
     assert await DB.scalar("SELECT COUNT(*) FROM authors_s2") == 0
 
 
-# ─── FR-012-013: DB facade raw SQL methods ────────────────────────────────────
+# ───  DB facade raw SQL methods ────────────────────────────────────
 
 
 async def test_db_select_returns_dicts(engine: AsyncEngine, session: AsyncSession) -> None:

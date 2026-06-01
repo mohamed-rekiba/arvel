@@ -1,4 +1,4 @@
-"""Tests for CacheLock — FR-006-009..012."""
+"""Tests for CacheLock."""
 
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ class TestCacheLockAcquireRelease:
 class TestCacheLockBlock:
     @pytest.mark.asyncio
     async def test_block_waits_and_acquires(self, manager: CacheManager) -> None:
-        """FR-006-012: block() polls until lock is available."""
+        """block() polls until lock is available."""
         # Acquire the lock, then release it after 0.1s
         lock_held = asyncio.Event()
         lock_released = asyncio.Event()

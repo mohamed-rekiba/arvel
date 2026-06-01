@@ -1,4 +1,4 @@
-"""Tests for ServiceProviders — FR-006-015, FR-006-034..036."""
+"""Tests for ServiceProviders."""
 
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ class TestStorageServiceProvider:
 
 
 class TestCacheFacadeAfterProviderRegister:
-    """FR-006-015: Cache facade usable after CacheServiceProvider.register()."""
+    """Cache facade usable after CacheServiceProvider.register()."""
 
     def test_cache_facade_get_works(self) -> None:
         from arvel.facades import Cache

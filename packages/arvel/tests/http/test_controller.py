@@ -1,4 +1,4 @@
-"""FR-002-005, FR-002-006 — Controller base + invokable controllers."""
+"""Controller base + invokable controllers."""
 
 from __future__ import annotations
 

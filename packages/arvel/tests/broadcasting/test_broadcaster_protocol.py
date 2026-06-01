@@ -1,4 +1,4 @@
-"""FR-013-001 — Broadcaster Protocol contract tests."""
+"""Broadcaster Protocol contract tests."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 
 
 def test_broadcaster_is_runtime_checkable_protocol() -> None:
-    """FR-013-001 AC1: Broadcaster is @runtime_checkable Protocol."""
+    """Broadcaster is @runtime_checkable Protocol."""
     from arvel.broadcasting import Broadcaster
 
     assert hasattr(Broadcaster, "__protocol_attrs__") or hasattr(
@@ -17,7 +17,7 @@ def test_broadcaster_is_runtime_checkable_protocol() -> None:
 
 
 def test_broadcaster_has_async_broadcast_method() -> None:
-    """FR-013-001 AC3: signature accepts channels list, event name, payload, optional socket_id."""
+    """signature accepts channels list, event name, payload, optional socket_id."""
     from arvel.broadcasting import Broadcaster
 
     assert hasattr(Broadcaster, "broadcast")
@@ -33,7 +33,7 @@ def test_broadcaster_has_async_broadcast_method() -> None:
     ],
 )
 def test_every_shipped_driver_implements_broadcaster(driver_path: str) -> None:
-    """FR-013-001 AC2: isinstance(driver, Broadcaster) returns True for every shipped driver."""
+    """isinstance(driver, Broadcaster) returns True for every shipped driver."""
     import importlib
 
     module_path, cls_name = driver_path.rsplit(".", 1)
@@ -57,7 +57,7 @@ async def test_null_broadcaster_isinstance_check() -> None:
 
 
 def test_broadcaster_signature_accepts_named_params() -> None:
-    """FR-013-001 AC3: broadcast(channels, event, payload, *, except_socket_id=None)."""
+    """broadcast(channels, event, payload, *, except_socket_id=None)."""
     import inspect
 
     from arvel.broadcasting import Broadcaster

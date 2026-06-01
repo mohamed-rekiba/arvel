@@ -1,4 +1,4 @@
-"""NotificationManager — channel dispatch orchestrator (FR-009-029)."""
+"""NotificationManager — channel dispatch orchestrator."""
 
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ logger = Log.channel(__name__)
 class NotificationManager:
     """Resolves channel objects and dispatches notifications through them.
 
-    Raises UnknownChannelError for unregistered channel names (ADR-039).
-    Per-channel errors are caught and logged; remaining channels still run (SEC-009-05).
+    Raises UnknownChannelError for unregistered channel names.
+    Per-channel errors are caught and logged; remaining channels still run.
     """
 
     def __init__(self, container: Container) -> None:

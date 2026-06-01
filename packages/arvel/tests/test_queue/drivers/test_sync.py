@@ -1,4 +1,4 @@
-"""Tests for the sync driver — FR-008-004."""
+"""Tests for the sync driver"""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class _FailingJob(Job):
 
 
 class TestSyncDriver:
-    """FR-008-004: Sync driver executes inline."""
+    """Sync driver executes inline."""
 
     def setup_method(self) -> None:
         _SyncJob.executed.clear()
@@ -65,7 +65,7 @@ class TestSyncDriver:
 
 
 class TestSyncDriverDelay:
-    """FR-018-06: sync driver honours envelope.delay via asyncio.sleep."""
+    """sync driver honours envelope.delay via asyncio.sleep."""
 
     def setup_method(self) -> None:
         _SyncJob.executed.clear()
@@ -101,7 +101,7 @@ class TestSyncDriverDelay:
 
     @pytest.mark.asyncio
     async def test_priority_is_noop_for_sync(self) -> None:
-        """FR-018-06: priority on sync driver is a documented no-op."""
+        """priority on sync driver is a documented no-op."""
         driver = SyncConnection()
         job_high = _SyncJob(message="h", priority=9)
         job_low = _SyncJob(message="l", priority=0)

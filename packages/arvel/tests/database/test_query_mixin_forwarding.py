@@ -1,10 +1,9 @@
 """Model class-level shortcuts forward to QueryBuilder.
 
 QueryMixin exposes the whole QueryBuilder surface as classmethods so
-``Model.where_null(...)`` works without ``Model.query()`` first. These are thin
+``Model.where_null(...)`` works without ``Model.query`` first. These are thin
 delegators; this suite exercises the ones that are otherwise only reached via
-the builder instance.
-"""
+the builder instance."""
 
 from __future__ import annotations
 

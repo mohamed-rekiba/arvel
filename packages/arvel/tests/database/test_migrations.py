@@ -1,4 +1,4 @@
-"""FR-003-032 + ADR-015 — Migration reversibility enforcement."""
+"""Migration reversibility enforcement."""
 
 from __future__ import annotations
 

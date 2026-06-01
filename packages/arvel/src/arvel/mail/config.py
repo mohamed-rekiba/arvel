@@ -16,7 +16,7 @@ class MailEncryption(StrEnum):
 class SmtpConfig(BaseSettings):
     """SMTP driver settings.
 
-    ``password`` uses SecretStr so it never appears in repr/logs (NFR-009-005).
+    ``password`` uses SecretStr so it never appears in repr/logs.
     """
 
     host: str = "localhost"

@@ -1,4 +1,4 @@
-"""Tests for Bus class and Bus facade — FR-008-007..009."""
+"""Tests for Bus class and Bus facade"""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def _make_bus() -> tuple[Bus, QueueManager]:
 
 
 class TestBusDispatch:
-    """FR-008-007: Bus.dispatch(job) routes to the configured connection."""
+    """Bus.dispatch(job) routes to the configured connection."""
 
     def setup_method(self) -> None:
         _BusJob.executed.clear()
@@ -52,7 +52,7 @@ class TestBusDispatch:
 
 
 class TestBusBatch:
-    """FR-008-008: Bus.batch([jobs]) groups jobs together."""
+    """Bus.batch([jobs]) groups jobs together."""
 
     def setup_method(self) -> None:
         _BusJob.executed.clear()
@@ -67,7 +67,7 @@ class TestBusBatch:
 
 
 class TestBusChain:
-    """FR-008-009: Bus.chain([jobs]) runs jobs sequentially."""
+    """Bus.chain([jobs]) runs jobs sequentially."""
 
     def setup_method(self) -> None:
         _BusJob.executed.clear()
@@ -91,7 +91,7 @@ class TestBusChain:
 
 
 class TestBusFacade:
-    """FR-008-007: Bus facade proxies to Bus instance."""
+    """Bus facade proxies to Bus instance."""
 
     def test_facade_not_bound_raises(self) -> None:
         from arvel.queue.exceptions import FacadeNotBoundError

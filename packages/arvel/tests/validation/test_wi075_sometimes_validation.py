@@ -1,4 +1,4 @@
-"""WI-arvel-075 — Epic 049 Story 15: conditional sometimes validation."""
+"""conditional sometimes validation."""
 
 from __future__ import annotations
 

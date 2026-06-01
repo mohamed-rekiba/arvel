@@ -1,4 +1,4 @@
-"""Notifiable mixin — adds notify() and notify_now() to ORM models (FR-009-024)."""
+"""Notifiable mixin — adds notify and notify_now to ORM models."""
 
 from __future__ import annotations
 

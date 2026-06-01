@@ -1,11 +1,10 @@
 """Eloquent-style ``Collection[T]`` — a typed ``list[T]`` subclass with chainable helpers.
 
-Behaviour is documented in PRD-001 §FR-001-007. The single canonical Collection
-for the whole framework lives here; downstream layers (``arvel.database``,
-``arvel.http``, ...) re-export it.
+The single canonical Collection for the whole framework lives here;
+downstream layers (``arvel.database``, ``arvel.http``,...) re-export it.
 
 Because ``Collection`` is a ``list`` subclass, ``isinstance(c, list)`` is ``True``
-and indexing, slicing, iteration, and ``len()`` all work without ceremony.
+and indexing, slicing, iteration, and ``len`` all work without ceremony.
 """
 
 from __future__ import annotations
@@ -22,8 +21,7 @@ class Collection(list[T], Generic[T]):
     """Typed list subclass with chainable Eloquent-style helpers.
 
     Single canonical Collection for the whole framework. ``isinstance(c, list)``
-    is True; indexing, iteration, slicing, and ``len()`` work without ceremony.
-    See PRD-001 §FR-001-007.
+    is True; indexing, iteration, slicing, and ``len`` work without ceremony.
     """
 
     # ── transformation ──────────────────────────────────────────────────────

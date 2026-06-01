@@ -6,8 +6,7 @@ Tests cover three contracts:
 2. Models declared with the helpers behave identically to ``mapped_column``-
    declared models — CRUD, ``to_dict``, ``__hidden__``, ``Timestamps``.
 3. The helpers are exported from ``arvel.database`` so a user can import them
-   alongside ``Model`` and ``Timestamps``.
-"""
+   alongside ``Model`` and ``Timestamps``."""
 
 from __future__ import annotations
 
@@ -48,7 +47,7 @@ from sqlalchemy.types import TypeDecorator
 
 
 class _UpperString(TypeDecorator[str]):
-    """Custom TypeDecorator used to exercise the generic ``column()`` helper."""
+    """Custom TypeDecorator used to exercise the generic ``column`` helper."""
 
     impl = String
     cache_ok = True
@@ -65,16 +64,15 @@ def _column_from(value: Any) -> Column[Any]:
 
     ``mapped_column`` returns a ``MappedColumn`` proxy whose underlying SQLA
     ``Column`` lives at ``.column``. The two-checker pattern below matches
-    the existing convention at ``test_schema_dsl.py:113-114`` documented under
-    ADR-052: mypy narrows ``isinstance(x, Column)`` to ``Column[Any]`` (so
+    the dual-checker cast pattern at ``test_schema_dsl.py:113-114`` — mypy
+    narrows ``isinstance(x, Column)`` to ``Column[Any]`` (so
     the cast is redundant to mypy) while pyright leaves the generic parameter
-    unbound (so the cast is required). Both suppressions are specific codes.
-    """
+    unbound (so the cast is required). Both suppressions are specific codes."""
     col = value.column
     if not isinstance(col, Column):
         msg = f"expected Column, got {type(col).__name__}"
         raise TypeError(msg)
-    return cast("Column[Any]", col)  # type: ignore[redundant-cast]  # ADR-052
+    return cast("Column[Any]", col)  # type: ignore[redundant-cast]  # dual-checker cast
 
 
 def test_unset_repr_is_debuggable() -> None:
@@ -257,7 +255,7 @@ async def test_helper_model_inherits_timestamps(engine: Any, session: AsyncSessi
 async def test_column_routes_custom_type_bind_processing(
     engine: Any, session: AsyncSession
 ) -> None:
-    """A column() field runs the custom type's bind processing on write."""
+    """A column field runs the custom type's bind processing on write."""
     await _create_tables(engine)
     row = await _Vault.create(secret="hunter2")
     # Refresh past the identity map to read what actually landed in the column.

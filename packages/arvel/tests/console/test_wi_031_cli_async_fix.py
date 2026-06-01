@@ -1,11 +1,9 @@
-"""WI-031 — Single-loop CLI + schedule_async + OpenAPI commands.
-
-Covers (RED until Stage 3b implementation):
-  FR-031-001 AC-001-x  Single asyncio event loop — migrate uses schedule_async
-  FR-031-002 AC-002-x  Provider commands always attached after boot
-  FR-031-003 AC-003-x  db:seed binds AsyncSession via use_session before running seeder
-  FR-031-004 AC-004-x  openapi:export command writes YAML / JSON / stdout
-  FR-031-005 AC-005-x  openapi:validate command validates spec, exits 1 on failure
+"""Single-loop CLI + schedule_async + OpenAPI commands.
+-x Single asyncio event loop — migrate uses schedule_async
+ -x Provider commands always attached after boot
+ -x db:seed binds AsyncSession via use_session before running seeder
+ -x openapi:export command writes YAML / JSON / stdout
+ -x openapi:validate command validates spec, exits 1 on failure
 """
 
 from __future__ import annotations
@@ -66,7 +64,7 @@ class TestScheduleAsync:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-031-001 — migrate commands use schedule_async, not asyncio.run
+# — migrate commands use schedule_async, not asyncio.run
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -89,7 +87,7 @@ class TestMigrateUsesScheduleAsync:
         return app
 
     def test_migrate_callback_calls_schedule_async_not_asyncio_run(self, tmp_path: Path) -> None:
-        """The Typer callback must call schedule_async(), not asyncio.run()."""
+        """The Typer callback must call schedule_async, not asyncio.run."""
         from arvel.console._async import schedule_async
         from arvel.console.commands.migrate import MigrateCommand
 
@@ -145,7 +143,7 @@ class TestMigrateUsesScheduleAsync:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-031-001 — Entrypoint: _async_main function exists and awaits scheduled coro
+# — Entrypoint: _async_main function exists and awaits scheduled coro
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -160,7 +158,7 @@ class TestEntrypointSingleLoop:
         assert inspect.iscoroutinefunction(ep.async_main)
 
     def test_main_does_not_call_asyncio_run_for_boot_directly(self) -> None:
-        """main() must use asyncio.run(async_main()), not asyncio.run(boot()) directly."""
+        """main must use asyncio.run(async_main), not asyncio.run(boot) directly."""
         import inspect
 
         import arvel.console.entrypoint as ep
@@ -193,7 +191,7 @@ class TestEntrypointSingleLoop:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-031-003 — db:seed session lifecycle
+# — db:seed session lifecycle
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -223,7 +221,7 @@ class TestDbSeedSessionLifecycle:
         return app
 
     def test_seeder_run_called_with_active_session(self, tmp_path: Path) -> None:
-        """After refactor, the seeder's run() executes with an active session bound."""
+        """After refactor, the seeder's run executes with an active session bound."""
         # Set up the seeder file
         seeder_dir = tmp_path / "database" / "seeders"
         seeder_dir.mkdir(parents=True)
@@ -313,7 +311,7 @@ class TestDbSeedSessionLifecycle:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-031-004 — openapi:export command
+# — openapi:export command
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -422,7 +420,7 @@ class TestOpenApiExportCommand:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-031-005 — openapi:validate command
+# — openapi:validate command
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -533,7 +531,7 @@ class TestOpenApiValidateCommand:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FR-031-002 — provider commands always attached after boot
+# — provider commands always attached after boot
 # ─────────────────────────────────────────────────────────────────────────────
 
 

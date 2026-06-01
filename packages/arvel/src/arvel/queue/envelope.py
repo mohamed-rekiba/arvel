@@ -1,7 +1,7 @@
 """JobEnvelope — the JSON wire format for a queued job.
 
-WI-018 added ``delay`` (int seconds) and ``priority`` (int 0..9) per ADR-066.
-Pre-018 envelopes lacking these fields read back as ``delay=0, priority=0``.
+Envelopes carry ``delay`` (int seconds) and ``priority`` (int 0..9).
+Older wire payloads without these fields read back as ``delay=0, priority=0``.
 """
 
 from __future__ import annotations

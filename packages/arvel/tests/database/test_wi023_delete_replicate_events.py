@@ -1,11 +1,10 @@
-"""WI-arvel-023 — Epic 006 Story 11: distinct soft/hard-delete + replicate events.
+"""Distinct soft/hard-delete + replicate events.
 
 - ``trashed`` fires on a soft delete (alongside ``deleted``), never on a hard delete.
-- ``force_deleting`` / ``force_deleted`` fire on ``force_delete()``; ``trashed`` does not.
-- ``replicating`` fires on the fresh clone returned by ``replicate()``.
+- ``force_deleting`` / ``force_deleted`` fire on ``force_delete``; ``trashed`` does not.
+- ``replicating`` fires on the fresh clone returned by ``replicate``.
 
-Each model gets its own observer list so ``clear_observers`` stays isolated.
-"""
+Each model gets its own observer list so ``clear_observers`` stays isolated."""
 
 from __future__ import annotations
 

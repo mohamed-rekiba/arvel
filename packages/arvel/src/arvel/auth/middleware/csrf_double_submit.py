@@ -1,4 +1,4 @@
-"""CSRF double-submit middleware for the auth cookie flow (FR-028-16).
+"""CSRF double-submit middleware for the auth cookie flow.
 
 Reads the ``_csrf`` cookie set by the login endpoint and compares it to
 the ``X-CSRF-TOKEN`` request header. Uses ``secrets.compare_digest`` for
@@ -6,7 +6,7 @@ constant-time comparison.
 
 This middleware is ASGI-native (not ``BaseHTTPMiddleware``) so framework
 exception handlers see :class:`CsrfMismatchException` through the normal
-handler chain (closes FB-027-008).
+handler chain (closes ).
 
 Exempt paths (checked with ``startswith``): login, register,
 forgot-password, reset-password, and the verify-email GET — these
@@ -41,7 +41,7 @@ _DEFAULT_EXEMPT: tuple[str, ...] = (
 
 
 class CsrfMismatchException(HttpException):
-    """Raised when the CSRF cookie and header do not match (FR-028-16).
+    """Raised when the CSRF cookie and header do not match.
 
     Re-exported here so callers only need to import from this module.
     """

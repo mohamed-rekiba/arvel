@@ -1,4 +1,4 @@
-"""Public test utilities for arvel apps (ADR-059)."""
+"""Public test utilities for arvel apps."""
 
 from arvel.testing.app import create_test_app
 from arvel.testing.case import ArvelTestCase

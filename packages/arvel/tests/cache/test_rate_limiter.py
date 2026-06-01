@@ -1,4 +1,4 @@
-"""Tests for RateLimiter — FR-006-013."""
+"""Tests for RateLimiter."""
 
 from __future__ import annotations
 

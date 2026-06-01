@@ -1,12 +1,11 @@
-"""WI-arvel-029 — Epic 007 Story 4: morphedByMany (inverse morph pivot).
+"""MorphedByMany (inverse morph pivot).
 
 `MorphedByMany` is the inverse of `MorphToMany`: declared on the model the pivot's
 `{name}_type`/`{name}_id` point at, with a plain owner FK column holding this owner's PK.
 Mirrors Laravel's `morphedByMany` — e.g. `tag.posts` / `tag.videos` over one `taggables` pivot.
 
 Covers: attach/detach/toggle/sync from the inverse side, discriminator isolation between
-related types, batched eager loading (`with_`), `where_has`, and `with_count`.
-"""
+related types, batched eager loading (`with_`), `where_has`, and `with_count`."""
 
 from __future__ import annotations
 

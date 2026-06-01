@@ -3,7 +3,7 @@
 A ``ResourceCollection`` can be backed by either a plain ``list[T]`` (the
 classic Laravel ``data``-only envelope) or any object that quacks like a
 paginator. The paginator path is structurally typed via ``Paginatable[T]``
-so the HTTP layer doesn't need to import from ``arvel.database`` (ADR-016).
+so the HTTP layer doesn't need to import from ``arvel.database``.
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
-"""Login-throttle middleware (FR-028-31, closes FB-027-012).
+"""Login-throttle middleware.
 
-Tracks failed login attempts keyed on ``(email, ip)``.  After
+Tracks failed login attempts keyed on ``(email, ip)``. After
 ``max_attempts`` failures within ``window_seconds``, the middleware
 returns a 429 with a ``Retry-After`` header without touching the handler.
 

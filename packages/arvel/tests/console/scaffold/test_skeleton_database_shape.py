@@ -1,4 +1,4 @@
-"""DBA handoff §5 + FR-004-017/020/023 + Security NFR-004-003.
+"""/020/023 + Security .
 
 Byte-level shape assertions on the skeleton's database surface — catches
 cli drift before it reaches end users.

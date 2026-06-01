@@ -1,9 +1,9 @@
 """Integration tests for `TaskiqConnection` against a real Redis broker.
 
-Renamed from `test_taskiq_connection_integration.py` per FR-018-15.
-Covers FR-018-09 (URL scheme picks redis broker), FR-018-11 (priority via
-queue-name suffix routing on the Redis Taskiq broker), and FR-018-12
-(no `result_backend_url` field).
+Renamed from `test_taskiq_connection_integration.py`.
+Covers URL-scheme broker selection, priority via queue-name
+suffix routing on the Redis Taskiq broker, and removal of
+`result_backend_url`.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def _envelope(payload: str = "hello", *, priority: int = 0, delay: int = 0) -> J
 class TestTaskiqRedisBrokerOps:
     @pytest_asyncio.fixture
     async def driver(self, redis_endpoint: RedisEndpoint) -> AsyncIterator[TaskiqConnection]:
-        # FR-018-12: result_backend_url is gone — only broker_url
+        # : result_backend_url is gone — only broker_url
         config = TaskiqQueueConfig(broker_url=redis_endpoint.url)
         connection = TaskiqConnection(config)
         try:
@@ -53,7 +53,7 @@ class TestTaskiqRedisBrokerOps:
             await connection.close()
 
     async def test_url_scheme_picks_redis_broker(self, driver: TaskiqConnection) -> None:
-        """FR-018-09: redis:// scheme resolves to a taskiq_redis broker class."""
+        """redis:// scheme resolves to a taskiq_redis broker class."""
         broker = await driver._get_broker()  # pyright: ignore[reportPrivateUsage]
         # Class qualname must come from taskiq_redis
         assert type(broker).__module__.startswith("taskiq_redis")
@@ -82,7 +82,7 @@ class TestTaskiqRedisBrokerOps:
     async def test_redis_priority_via_queue_suffix(
         self, driver: TaskiqConnection, redis_endpoint: RedisEndpoint
     ) -> None:
-        """FR-018-11 redis branch: priority routed to `<base>:p<N>` queue."""
+        """redis branch: priority routed to `<base>:p<N>` queue."""
         import importlib
 
         redis_asyncio: Any = importlib.import_module("redis.asyncio")

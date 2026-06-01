@@ -1,4 +1,4 @@
-"""FR-028-18..22 — EmailVerificationService unit tests.
+"""EmailVerificationService unit tests.
 
 The service uses the real ``User`` model on in-memory async SQLite.
 ``consume()`` no longer takes ``ip`` or ``user_agent``.
@@ -57,13 +57,13 @@ async def alice(setup_db: AsyncSession) -> User:
     )
 
 
-# ─── issue ─────────────────────────────────────────────────────────────────
+# issue
 
 
 def test_issue_generates_signed_payload(
     ev_service: EmailVerificationService,
 ) -> None:
-    """FR-028-18 — payload encodes {id, h=sha256(email)[:16]} with HMAC."""
+    """payload encodes {id, h=sha256(email)[:16]} with HMAC."""
     signed = ev_service.issue(user_id="1", email="alice@example.com")
     assert "." in signed
     user_id, email_hash = ev_service.peek(signed)
@@ -71,7 +71,7 @@ def test_issue_generates_signed_payload(
     assert len(email_hash) == 16
 
 
-# ─── consume — happy path ──────────────────────────────────────────────────
+# consume — happy path
 
 
 @pytest.mark.asyncio
@@ -80,7 +80,7 @@ async def test_consume_valid_url_marks_user_verified(
     alice: User,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-19 — successful consume marks email_verified_at + dispatches event."""
+    """successful consume marks email_verified_at + dispatches event."""
     signed = ev_service.issue(user_id=str(alice.id), email="alice@example.com")
     user = await ev_service.consume(signed)
 
@@ -91,7 +91,7 @@ async def test_consume_valid_url_marks_user_verified(
     assert ev_events[0].email == "alice@example.com"
 
 
-# ─── consume — failure paths ───────────────────────────────────────────────
+# consume — failure paths
 
 
 @pytest.mark.asyncio
@@ -100,7 +100,7 @@ async def test_consume_tampered_payload_raises(
     alice: User,
     event_fake: EventFake,
 ) -> None:
-    """FR-028-22 — tampered signature → EmailVerificationInvalidError."""
+    """tampered signature → EmailVerificationInvalidError."""
     signed = ev_service.issue(user_id=str(alice.id), email="alice@example.com")
     tampered = signed[:-3] + "AAA"
     with pytest.raises(EmailVerificationInvalidError):
@@ -110,7 +110,7 @@ async def test_consume_tampered_payload_raises(
 
 @pytest.mark.asyncio
 async def test_consume_expired_payload_raises(alice: User, event_fake: EventFake) -> None:
-    """FR-028-22 — expired signature (TTL elapsed) → EmailVerificationInvalidError."""
+    """expired signature (TTL elapsed) → EmailVerificationInvalidError."""
     short = EmailVerificationService(secret="secret-key", ttl_seconds=1)
     signed = short.issue(user_id=str(alice.id), email="alice@example.com")
     future = time.time() + 60

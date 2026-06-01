@@ -1,4 +1,4 @@
-"""NFR-001-003: container cannot be exploited for arbitrary code execution."""
+""": container cannot be exploited for arbitrary code execution."""
 
 from __future__ import annotations
 

@@ -56,7 +56,7 @@ async def test_fresh_returns_persisted_instance(engine: Any, session: AsyncSessi
     await _setup(engine)
     doc = await Doc.create(title="t")
     refreshed = await doc.fresh()
-    # `fresh()` returns the row from the identity map. Same identity → same row.
+    # `fresh` returns the row from the identity map. Same identity → same row.
     assert refreshed is not None
     assert refreshed.id == doc.id
 

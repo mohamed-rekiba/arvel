@@ -1,4 +1,4 @@
-"""FR-003-001 / 002 / 003 — Model + ActiveRecord + Timestamps + SoftDeletes."""
+"""Model, ActiveRecord, Timestamps, and SoftDeletes."""
 
 from __future__ import annotations
 
@@ -148,5 +148,5 @@ async def test_to_pydantic_with_unloaded_relation_raises(
     assert pyd.id == user.id
     assert pyd.name == "Margaret"
 
-    # RelationNotLoadedError is import-checked here (FR-003-007 contract).
+    # RelationNotLoadedError is import-checked here (-007 contract).
     assert issubclass(RelationNotLoadedError, Exception)

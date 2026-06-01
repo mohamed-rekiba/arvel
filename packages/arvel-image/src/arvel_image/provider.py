@@ -42,7 +42,7 @@ class ImageServiceProvider(ServiceProvider):
         """
         # ``Container.singleton(abstract: type[T], ...)`` — strict mypy
         # rejects ``Protocol`` types here, but ``PathGenerator`` is the
-        # canonical binding key per PRD-026 FR-026-32. Carry it through
+        # canonical PathGenerator binding key. Carry it through
         # an ``Any``-typed local to bypass the strict-mode check.
         path_generator_key: Any = PathGenerator
         self.container.singleton(path_generator_key, DefaultPathGenerator)

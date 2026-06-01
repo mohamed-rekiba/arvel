@@ -1,4 +1,4 @@
-"""Tests for FlashBag — FR-006-022."""
+"""Tests for FlashBag."""
 
 from __future__ import annotations
 

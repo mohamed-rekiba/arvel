@@ -42,7 +42,7 @@ class Translator:
     def cached_namespaces(self) -> frozenset[tuple[str, str]]:
         """Return the ``(locale, namespace)`` pairs currently in the cache.
 
-        Exposes the NFR-015-006 caching invariant to callers and tests
+        Exposes the caching invariant to callers and tests
         without leaking the underlying mapping.
         """
         return frozenset(self._cache)
@@ -98,7 +98,7 @@ class Translator:
 
 
 def _traverse(data: dict[str, TranslationValue], path: str) -> TranslationValue | None:
-    """Walk dotted path through nested dicts (FR-015-025)."""
+    """Walk dotted path through nested dicts."""
     current: TranslationValue = data
     for part in path.split("."):
         if not isinstance(current, dict) or part not in current:
@@ -108,7 +108,7 @@ def _traverse(data: dict[str, TranslationValue], path: str) -> TranslationValue 
 
 
 def _substitute(text: str, replace: Mapping[str, object]) -> str:
-    """SEC-015-003: pure string replacement; never eval'd."""
+    """003: pure string replacement; never eval'd."""
     result = text
     for key, value in replace.items():
         result = result.replace(f":{key}", str(value))

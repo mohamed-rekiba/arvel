@@ -1,11 +1,10 @@
-"""WI-arvel-030 — Epic 007 Story 5: has-one-of-many (latest/oldest/of_many).
+"""Has-one-of-many (latest/oldest/of_many).
 
 Two surfaces:
 - Method style off `has_many`/`has_one`:
   `await post.has_many(Comment).latest_of_many("created_at")`.
 - Descriptor style for eager loading: `HasOneOfMany(...)` resolves one row per parent through a
-  single grouped subquery (`with_("latest_comment")`).
-"""
+  single grouped subquery (`with_("latest_comment")`)."""
 
 from __future__ import annotations
 

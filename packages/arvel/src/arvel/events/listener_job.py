@@ -1,4 +1,4 @@
-"""ListenerJob — bridges ShouldQueue listener dispatch to the queue (ADR-040)."""
+"""ListenerJob — bridges ShouldQueue listener dispatch to the queue."""
 
 from __future__ import annotations
 

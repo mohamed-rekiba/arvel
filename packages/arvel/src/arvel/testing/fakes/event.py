@@ -1,4 +1,4 @@
-"""EventFake + Event.fake()/.assert_*() — FR-016-010."""
+"""EventFake + Event.fake/.assert_* —"""
 
 from __future__ import annotations
 

@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import (
 from arvel.queue.envelope import JobEnvelope
 from arvel.queue.models.failed_job import FailedJob, FailedJobBase
 
-_MAX_ERROR_LEN = 1_000  # NFR-008-012: cap error messages to prevent information disclosure
+_MAX_ERROR_LEN = 1_000  # cap error messages to prevent information disclosure
 
 
 class FailedJobStore:

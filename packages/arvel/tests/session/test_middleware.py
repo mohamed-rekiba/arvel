@@ -1,4 +1,4 @@
-"""Tests for StartSession middleware — FR-006-023..025."""
+"""Tests for StartSession middleware."""
 
 from __future__ import annotations
 

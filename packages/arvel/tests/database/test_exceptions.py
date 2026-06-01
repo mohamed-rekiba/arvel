@@ -1,4 +1,4 @@
-"""FR-003-043 — typed exception messages and inheritance."""
+"""Typed exception messages and inheritance."""
 
 from __future__ import annotations
 

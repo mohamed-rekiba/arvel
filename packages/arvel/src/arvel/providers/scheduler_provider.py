@@ -36,7 +36,7 @@ class SchedulerServiceProvider(ServiceProvider):
 
             cache_manager = c.make(CacheManager) if c.bound(CacheManager) else None
 
-            # WI-019 Gap-A: wire Schedule.job() to actually dispatch via Bus
+            # Wire Schedule.job() to actually dispatch via Bus
             # when the queue subsystem is registered. Apps without the queue
             # bound continue to get "skipped: no_dispatch_job_callback".
             dispatch_job_cb: Any = None
@@ -48,7 +48,7 @@ class SchedulerServiceProvider(ServiceProvider):
 
                 dispatch_job_cb = _dispatch
 
-            # WI-020 FB-019-001: wire Schedule.command("name") to invoke the
+            # Wire Schedule.command("name") to invoke the
             # registered console command when ConsoleServiceProvider has bound
             # the Application. Apps without the console provider continue to
             # get "skipped: no_run_command_callback".

@@ -1,4 +1,4 @@
-"""FR-003-020..024 — Pydantic, Enum, and Encrypted casts."""
+"""Pydantic, Enum, and Encrypted casts."""
 
 from __future__ import annotations
 

@@ -1,11 +1,6 @@
-"""WI-arvel-022 — Unit tests for arvel.database.migrator.Migrator.
+"""Unit tests for arvel.database.migrator.Migrator.
 
-These tests were authored in Stage 3a (QA-Pre) BEFORE the implementation lands.
-They will FAIL on import until the migrator module exists. That's intentional —
-this is Test-Authoring (Red), not Implementation (Green).
-
-Traces to PRD-022 FR-022-001 .. FR-022-007 and the matching ACs.
-"""
+Red-state tests: they fail on import until the migrator module ships."""
 
 from __future__ import annotations
 
@@ -99,17 +94,17 @@ def _write_migration(migrations_dir: Path, name: str, body: str) -> Path:
 
 
 # ============================================================
-# FR-022-001 — Migrator orchestrator module
+# -001 — Migrator orchestrator module
 # ============================================================
 
 
 def test_migrator_instantiates_without_db_touch(engine: AsyncEngine, migrations_dir: Path) -> None:
-    """AC-022-001-01: construction does not touch the database."""
+    """construction does not touch the database."""
     Migrator(engine, migrations_dir)
 
 
 def test_migration_status_is_frozen_dataclass() -> None:
-    """AC-022-001-03: MigrationStatus has the required fields and is frozen."""
+    """MigrationStatus has the required fields and is frozen."""
     from dataclasses import FrozenInstanceError, fields, is_dataclass
 
     s = MigrationStatus(name="foo", applied=False, batch=None, applied_at=None)
@@ -130,7 +125,7 @@ def test_migration_status_is_frozen_dataclass() -> None:
 
 
 # ============================================================
-# FR-022-002 — Tracking table created on first run
+# -002 — Tracking table created on first run
 # ============================================================
 
 
@@ -138,7 +133,7 @@ def test_migration_status_is_frozen_dataclass() -> None:
 async def test_ensure_table_creates_migrations_table(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-002-01: After ensure_table(), the `migrations` table exists."""
+    """After ensure_table, the `migrations` table exists."""
     migrator = Migrator(engine, migrations_dir)
     await migrator.ensure_table()
     from arvel.database.schema import Schema
@@ -149,14 +144,14 @@ async def test_ensure_table_creates_migrations_table(
 
 @pytest.mark.asyncio
 async def test_ensure_table_is_idempotent(engine: AsyncEngine, migrations_dir: Path) -> None:
-    """AC-022-002-02: second ensure_table() call does not raise."""
+    """second ensure_table call does not raise."""
     migrator = Migrator(engine, migrations_dir)
     await migrator.ensure_table()
     await migrator.ensure_table()
 
 
 # ============================================================
-# FR-022-003 — applied() returns ordered list of names
+# -003 — applied returns ordered list of names
 # ============================================================
 
 
@@ -164,7 +159,7 @@ async def test_ensure_table_is_idempotent(engine: AsyncEngine, migrations_dir: P
 async def test_applied_empty_table_returns_empty_list(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-003-01."""
+    """3-01."""
     migrator = Migrator(engine, migrations_dir)
     await migrator.ensure_table()
     assert await migrator.applied() == []
@@ -174,7 +169,7 @@ async def test_applied_empty_table_returns_empty_list(
 async def test_applied_returns_stems_in_insertion_order(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-003-02 + AC-022-003-03."""
+    """3-02 + 3-03."""
     _write_migration(migrations_dir, "2026_01_01_000001_first", _NOOP_UP)
     _write_migration(migrations_dir, "2026_01_01_000002_second", _NOOP_UP)
     migrator = Migrator(engine, migrations_dir)
@@ -185,13 +180,13 @@ async def test_applied_returns_stems_in_insertion_order(
 
 
 # ============================================================
-# FR-022-004 — pending() returns files not yet applied
+# -004 — pending returns files not yet applied
 # ============================================================
 
 
 @pytest.mark.asyncio
 async def test_pending_returns_unapplied_files(engine: AsyncEngine, migrations_dir: Path) -> None:
-    """AC-022-004-01."""
+    """4-01."""
     _write_migration(migrations_dir, "2026_01_01_000001_a", _NOOP_UP)
     _write_migration(migrations_dir, "2026_01_01_000002_b", _NOOP_UP)
     _write_migration(migrations_dir, "2026_01_01_000003_c", _NOOP_UP)
@@ -210,7 +205,7 @@ async def test_pending_returns_unapplied_files(engine: AsyncEngine, migrations_d
 async def test_pending_skips_underscore_prefixed_files(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-004-03: `__init__.py` and friends are not picked up."""
+    """`__init__.py` and friends are not picked up."""
     _write_migration(migrations_dir, "__init__", "")
     _write_migration(migrations_dir, "_helper", "")
     _write_migration(migrations_dir, "2026_01_01_real_migration", _NOOP_UP)
@@ -222,7 +217,7 @@ async def test_pending_skips_underscore_prefixed_files(
 
 @pytest.mark.asyncio
 async def test_pending_does_not_import_modules(engine: AsyncEngine, migrations_dir: Path) -> None:
-    """AC-022-004-02: pending() is non-destructive — even a syntactically
+    """pending is non-destructive — even a syntactically
     invalid file is listed without raising."""
     _write_migration(migrations_dir, "2026_01_01_syntax_error", "this is not valid python")
     migrator = Migrator(engine, migrations_dir)
@@ -232,7 +227,7 @@ async def test_pending_does_not_import_modules(engine: AsyncEngine, migrations_d
 
 
 # ============================================================
-# FR-022-005 — upgrade() runs migrations in transactions
+# -005 — upgrade runs migrations in transactions
 # ============================================================
 
 
@@ -240,7 +235,7 @@ async def test_pending_does_not_import_modules(engine: AsyncEngine, migrations_d
 async def test_upgrade_dry_run_returns_names_without_inserting(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-005-04: dry_run=True returns names but does not write."""
+    """dry_run=True returns names but does not write."""
     _write_migration(migrations_dir, "2026_01_01_a", _NOOP_UP)
     _write_migration(migrations_dir, "2026_01_01_b", _NOOP_UP)
     migrator = Migrator(engine, migrations_dir)
@@ -255,7 +250,7 @@ async def test_upgrade_dry_run_returns_names_without_inserting(
 async def test_upgrade_assigns_same_batch_to_one_invocation(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-005-01 + AC-022-005-05: all migrations in one upgrade()
+    """5-01 + 5-05: all migrations in one upgrade
     share the same batch number."""
     _write_migration(migrations_dir, "2026_01_01_a", _NOOP_UP)
     _write_migration(migrations_dir, "2026_01_01_b", _NOOP_UP)
@@ -273,7 +268,7 @@ async def test_upgrade_assigns_same_batch_to_one_invocation(
 async def test_upgrade_subsequent_calls_increment_batch(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-005-05 (delta across calls)."""
+    """5-05 (delta across calls)."""
     _write_migration(migrations_dir, "2026_01_01_a", _NOOP_UP)
     migrator = Migrator(engine, migrations_dir)
     await migrator.ensure_table()
@@ -289,7 +284,7 @@ async def test_upgrade_subsequent_calls_increment_batch(
 async def test_upgrade_with_nothing_pending_returns_empty(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-005-06."""
+    """5-06."""
     migrator = Migrator(engine, migrations_dir)
     await migrator.ensure_table()
     assert await migrator.upgrade() == []
@@ -299,7 +294,7 @@ async def test_upgrade_with_nothing_pending_returns_empty(
 async def test_upgrade_stops_at_failure_keeps_earlier_applied(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-005-02 + AC-022-005-03: per-migration transactions; failure
+    """5-02 + 5-03: per-migration transactions; failure
     leaves earlier applied; raises MigrationFailedError with the name."""
     _write_migration(migrations_dir, "2026_01_01_a", _NOOP_UP)
     _write_migration(migrations_dir, "2026_01_01_b", _RAISING_UP)
@@ -315,7 +310,7 @@ async def test_upgrade_stops_at_failure_keeps_earlier_applied(
 
 
 # ============================================================
-# FR-022-006 — rollback() undoes the last batch
+# -006 — rollback undoes the last batch
 # ============================================================
 
 
@@ -323,7 +318,7 @@ async def test_upgrade_stops_at_failure_keeps_earlier_applied(
 async def test_rollback_with_nothing_applied_returns_empty(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-006-03."""
+    """6-03."""
     migrator = Migrator(engine, migrations_dir)
     await migrator.ensure_table()
     assert await migrator.rollback() == []
@@ -331,7 +326,7 @@ async def test_rollback_with_nothing_applied_returns_empty(
 
 @pytest.mark.asyncio
 async def test_rollback_undoes_only_last_batch(engine: AsyncEngine, migrations_dir: Path) -> None:
-    """AC-022-006-01 + AC-022-006-04: batch 2 (size 2) is undone; batch 1
+    """6-01 + 6-04: batch 2 (size 2) is undone; batch 1
     (size 3) stays."""
     for name in ("2026_01_01_a", "2026_01_01_b", "2026_01_01_c"):
         _write_migration(migrations_dir, name, _NOOP_UP)
@@ -350,13 +345,13 @@ async def test_rollback_undoes_only_last_batch(engine: AsyncEngine, migrations_d
 
 
 # ============================================================
-# FR-022-007 — status() reflects current state
+# -007 — status reflects current state
 # ============================================================
 
 
 @pytest.mark.asyncio
 async def test_status_returns_row_per_file(engine: AsyncEngine, migrations_dir: Path) -> None:
-    """AC-022-007-01 + AC-022-007-04."""
+    """7-01 + 7-04."""
     _write_migration(migrations_dir, "2026_01_01_a", _NOOP_UP)
     _write_migration(migrations_dir, "2026_01_02_b", _NOOP_UP)
     migrator = Migrator(engine, migrations_dir)
@@ -372,7 +367,7 @@ async def test_status_returns_row_per_file(engine: AsyncEngine, migrations_dir: 
 async def test_status_marks_applied_with_batch_and_timestamp(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-007-02 + AC-022-007-03."""
+    """7-02 + 7-03."""
     _write_migration(migrations_dir, "2026_01_01_a", _NOOP_UP)
     _write_migration(migrations_dir, "2026_01_02_b", _NOOP_UP)
     migrator = Migrator(engine, migrations_dir)
@@ -393,9 +388,9 @@ async def test_status_marks_applied_with_batch_and_timestamp(
 async def test_status_does_not_import_user_modules(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """AC-022-007-05: even a syntactically broken file is listed without
+    """even a syntactically broken file is listed without
     raising. (Same property as test_pending_does_not_import_modules but for
-    status())."""
+    status)."""
     _write_migration(migrations_dir, "2026_01_01_syntax_error", "this is not valid python")
     migrator = Migrator(engine, migrations_dir)
     await migrator.ensure_table()
@@ -404,13 +399,13 @@ async def test_status_does_not_import_user_modules(
 
 
 # ============================================================
-# FR-022-012 — Migration file shape validation
+# -012 — Migration file shape validation
 # ============================================================
 
 
 @pytest.mark.asyncio
 async def test_upgrade_rejects_file_without_up(engine: AsyncEngine, migrations_dir: Path) -> None:
-    """AC-022-012-01: missing `up` callable → MigrationFileInvalidError with name."""
+    """missing `up` callable → MigrationFileInvalidError with name."""
     _write_migration(migrations_dir, "2026_01_01_bad", _MISSING_UP)
     migrator = Migrator(engine, migrations_dir)
     await migrator.ensure_table()
@@ -540,7 +535,7 @@ async def down(schema: Schema) -> None:
 async def test_upgrade_rejects_real_await_in_migration(
     engine: AsyncEngine, migrations_dir: Path
 ) -> None:
-    """`await` inside up()/down() bodies is not supported and surfaces as
+    """`await` inside up/down bodies is not supported and surfaces as
     a MigrationFailedError wrapping a RuntimeError."""
     _write_migration(migrations_dir, "2026_01_01_real_await", _REAL_AWAIT_UP)
     migrator = Migrator(engine, migrations_dir)

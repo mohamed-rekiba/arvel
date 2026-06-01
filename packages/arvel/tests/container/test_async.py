@@ -1,4 +1,4 @@
-"""FR-001-015: Async resolution + AsyncBindingError."""
+"""Async resolution + AsyncBindingError."""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """Alter media.model_id from INTEGER to VARCHAR(36).
 
-Run this migration after upgrading to arvel-image WI-046 on an existing
+Run this migration after upgrading to arvel-image a medialibrary parity release on an existing
 database. New installs will have VARCHAR(36) from the create_media_table
 migration directly.
 """

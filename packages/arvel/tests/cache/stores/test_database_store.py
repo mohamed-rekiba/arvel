@@ -1,4 +1,4 @@
-"""Tests for DatabaseStore — FR-006-005."""
+"""Tests for DatabaseStore."""
 
 from __future__ import annotations
 

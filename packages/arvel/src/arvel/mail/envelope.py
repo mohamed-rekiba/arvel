@@ -1,4 +1,4 @@
-"""Envelope dataclass — email addressing and metadata (FR-009-012)."""
+"""Envelope dataclass — email addressing and metadata."""
 
 from __future__ import annotations
 

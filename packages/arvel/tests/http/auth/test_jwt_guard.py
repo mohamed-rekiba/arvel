@@ -1,4 +1,4 @@
-"""FR-002-019 + NFR-002-004 — JwtGuard."""
+"""+ — JwtGuard."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from arvel.auth.config import JwtConfig
 
-# FR-017-003: JWT support is via the [jwt] extra. SKIP cleanly when missing.
+# JWT support is via the [jwt] extra. SKIP cleanly when missing.
 pytest.importorskip("jwt", reason="install arvel[jwt] to run JWT guard tests")
 
 
@@ -112,7 +112,7 @@ async def test_jwt_guard_returns_none_for_malformed_header() -> None:
 
 
 def test_jwt_guard_rejects_short_hmac_secret() -> None:
-    """NFR-002-004 security guardrail: < 32-byte HMAC secret rejected at construction."""
+    """security guardrail: < 32-byte HMAC secret rejected at construction."""
     from arvel.http.auth import JwtGuard
 
     resolver = _FakeResolver({})
@@ -122,7 +122,7 @@ def test_jwt_guard_rejects_short_hmac_secret() -> None:
 
 
 def test_jwt_guard_rejects_alg_none() -> None:
-    """NFR-002-004: alg=none JWTs MUST be refused."""
+    """: alg=none JWTs MUST be refused."""
     from arvel.http.auth import JwtGuard
 
     resolver = _FakeResolver({})

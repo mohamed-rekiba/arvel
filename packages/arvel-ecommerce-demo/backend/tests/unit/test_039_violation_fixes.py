@@ -1,8 +1,4 @@
-"""WI-arvel-039 — RED tests for V-001 through V-010.
-
-All tests in this file must FAIL before the fixes are applied (RED state).
-They turn GREEN after execution in Stage 3b.
-"""
+"""Contract violation fixes for routes, product service, and admin users."""
 
 from __future__ import annotations
 
@@ -27,11 +23,11 @@ def _product_svc_src() -> str:
     return PRODUCT_SVC_FILE.read_text()
 
 
-# ─── V-001: Python 2 except tuple syntax in image upload route ───────────────
+# ─── Python 2 except tuple syntax in image upload route ───────────────
 
 
 class TestV001ExceptSyntax:
-    """AC-001a: routes/api.py must use `except (OSError, RuntimeError):`."""
+    """routes/api.py must use `except (OSError, RuntimeError):`."""
 
     def test_no_python2_except_tuple_syntax(self) -> None:
         src = _routes_src()
@@ -57,7 +53,7 @@ class TestV001ExceptSyntax:
         assert RuntimeError in caught
 
     def test_routes_has_no_bare_image_manager_block(self) -> None:
-        """V-001 is fixed: the broken ImageManager block (with its Python 2 except) is removed."""
+        """the broken ImageManager block (with its Python 2 except) is removed."""
         src = _routes_src()
         # The entire broken block was removed — neither the Python 2 nor Python 3 form exists.
         # Confirming the Python 2 form is absent is sufficient.
@@ -66,11 +62,11 @@ class TestV001ExceptSyntax:
         )
 
 
-# ─── V-002: guard_name="web" must be "api" ───────────────────────────────────
+# ─── guard_name="web" must be "api" ───────────────────────────────────
 
 
 class TestV002GuardName:
-    """AC-002a: Role lookup must use guard_name='api'."""
+    """Role lookup must use guard_name='api'."""
 
     def test_no_guard_name_web_in_role_lookup(self) -> None:
         src = _routes_src()
@@ -88,11 +84,11 @@ class TestV002GuardName:
         )
 
 
-# ─── V-003: ProductService.create() must not use raw SQL ─────────────────────
+# ─── ProductService.create() must not use raw SQL ─────────────────────
 
 
 class TestV003CreateUsesOrm:
-    """AC-003a/b: create() must use ORM, not DB.statement."""
+    """create() must use ORM, not DB.statement."""
 
     def test_create_does_not_use_db_statement(self) -> None:
         src = _product_svc_src()
@@ -161,11 +157,11 @@ class TestV003CreateUsesOrm:
         assert result["name"] == {"en": "Test"}
 
 
-# ─── V-004: Write methods must use ORM ───────────────────────────────────────
+# ─── Write methods must use ORM ───────────────────────────────────────
 
 
 class TestV004WriteMethodsUseOrm:
-    """AC-004a-d: update, soft_delete, force_delete, restore, publish, unpublish use ORM."""
+    """update, soft_delete, force_delete, restore, publish, unpublish use ORM."""
 
     def test_no_raw_update_sql_in_product_service(self) -> None:
         src = _product_svc_src()
@@ -235,11 +231,11 @@ class TestV004WriteMethodsUseOrm:
         assert mock_product.status == "published"
 
 
-# ─── V-005: admin_list and admin_get must use ORM ────────────────────────────
+# ─── admin_list and admin_get must use ORM ────────────────────────────
 
 
 class TestV005ReadMethodsUseOrm:
-    """AC-005a-d: admin_list and admin_get use Product.query() / Product.find()."""
+    """admin_list and admin_get use Product.query() / Product.find()."""
 
     def test_no_raw_select_in_product_service(self) -> None:
         src = _product_svc_src()
@@ -260,11 +256,11 @@ class TestV005ReadMethodsUseOrm:
         )
 
 
-# ─── V-006: get_stock / decrement_stock must be ORM / removed ────────────────
+# ─── get_stock / decrement_stock must be ORM / removed ────────────────
 
 
 class TestV006StockMethodsClean:
-    """AC-006a/b: get_stock uses ORM; decrement_stock removed."""
+    """get_stock uses ORM; decrement_stock removed."""
 
     def test_no_select_stock_qty_raw_sql(self) -> None:
         src = _product_svc_src()
@@ -280,11 +276,11 @@ class TestV006StockMethodsClean:
         )
 
 
-# ─── V-007: Dead code removed ────────────────────────────────────────────────
+# ─── Dead code removed ────────────────────────────────────────────────
 
 
 class TestV007DeadCodeRemoved:
-    """AC-007a: _row_to_storefront_product deleted."""
+    """_row_to_storefront_product deleted."""
 
     def test_row_to_storefront_product_removed(self) -> None:
         from app.services.product_service import ProductService
@@ -300,11 +296,11 @@ class TestV007DeadCodeRemoved:
         )
 
 
-# ─── V-008: User lifecycle endpoints exist in routes ─────────────────────────
+# ─── User lifecycle endpoints exist in routes ─────────────────────────
 
 
 class TestV008UserLifecycleEndpoints:
-    """AC-008a-d: suspend/unsuspend/restore routes exist."""
+    """suspend/unsuspend/restore routes exist."""
 
     def test_suspend_route_exists(self) -> None:
         src = _routes_src()
@@ -331,11 +327,11 @@ class TestV008UserLifecycleEndpoints:
         )
 
 
-# ─── V-009: Revoke permission endpoint exists ─────────────────────────────────
+# ─── Revoke permission endpoint exists ─────────────────────────────────
 
 
 class TestV009RevokePermissionEndpoint:
-    """AC-009a-c: DELETE /api/admin/users/{id}/permissions/{perm} exists."""
+    """DELETE /api/admin/users/{id}/permissions/{perm} exists."""
 
     def test_revoke_permission_route_exists(self) -> None:
         src = _routes_src()
@@ -360,11 +356,11 @@ class TestV009RevokePermissionEndpoint:
         )
 
 
-# ─── V-010: Materialized view refresh uses ORM helper ────────────────────────
+# ─── Materialized view refresh uses ORM helper ────────────────────────
 
 
 class TestV010RefreshViewConsistency:
-    """AC-010a/b: routes use the shared materialized-view refresh helper."""
+    """routes use the shared materialized-view refresh helper."""
 
     def test_no_raw_refresh_sql_in_routes(self) -> None:
         src = _routes_src()

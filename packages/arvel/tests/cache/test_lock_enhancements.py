@@ -1,4 +1,4 @@
-"""Epic 001 Story 8 — cache lock enhancements (extend, backoff, fake)."""
+"""cache lock enhancements (extend, backoff, fake)."""
 
 from __future__ import annotations
 

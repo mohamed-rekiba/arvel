@@ -1,8 +1,6 @@
 """Routing facade + Router + RouteServiceProvider.
 
-Wraps ``fastapi.APIRouter`` with the Laravel route DSL. See
-``docs/adr/ADR-006-route-facade-fastapi-wrapping.md`` and
-``docs/api/http-api.md`` §arvel.routing.
+Wraps ``fastapi.APIRouter`` with the Laravel route DSL. ``docs/api/http-api.md`` §arvel.routing.
 """
 
 from __future__ import annotations
@@ -1096,9 +1094,9 @@ class _RouteFacade:
 
         ``Route.resource("/posts", PostController)`` mounts ``index``,
         ``create``, ``store``, ``show``, ``edit``, ``update``, and ``destroy``
-        with conventional paths and names (``posts.index``, ``posts.show``,
-        ...). Member routes use a singular path parameter (``{post}`` for
-        ``/posts``) so [WI-055] implicit model binding can resolve it. Override
+        with conventional paths and names (``posts.index``, ``posts.show``,...).
+        Member routes use a singular path parameter (``{post}`` for
+        ``/posts``) so implicit model binding can resolve it. Override
         the parameter name with ``parameter=``. The returned
         :class:`ResourceRegistration` chains ``only``, ``except_``, and
         ``names`` to trim or rename the generated routes.

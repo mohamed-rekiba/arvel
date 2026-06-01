@@ -1,4 +1,4 @@
-"""FR-001-019: ConfigServiceProvider."""
+"""ConfigServiceProvider."""
 
 from __future__ import annotations
 

@@ -1,5 +1,4 @@
-"""Tests for the database driver — FR-008-005.
-
+"""Tests for the database driver
 Uses in-memory SQLite via arvel's test infrastructure.
 """
 
@@ -29,7 +28,7 @@ async def db_driver() -> DatabaseConnection:
 
 
 class TestDatabaseDriver:
-    """FR-008-005: Database driver persists jobs in the jobs table."""
+    """Database driver persists jobs in the jobs table."""
 
     @pytest.mark.asyncio
     async def test_push_increases_size(self, db_driver: DatabaseConnection) -> None:
@@ -70,7 +69,7 @@ class TestDatabaseDriver:
     async def test_delayed_job_not_returned_immediately(
         self, db_driver: DatabaseConnection
     ) -> None:
-        """FR-018-07: Jobs whose envelope.delay > 0 are not popped before available_at."""
+        """Jobs whose envelope.delay > 0 are not popped before available_at."""
         job = _DbJob(message="delayed", delay=3600)
         await db_driver.push(job.to_envelope(), queue="default")
         result = await db_driver.pop_blocking(queue="default", timeout=0)
@@ -80,7 +79,7 @@ class TestDatabaseDriver:
     async def test_pop_orders_by_priority_then_available_at(
         self, db_driver: DatabaseConnection
     ) -> None:
-        """FR-018-07: pop SELECT applies ORDER BY priority DESC, available_at ASC."""
+        """pop SELECT applies ORDER BY priority DESC, available_at ASC."""
         # Push lower priority first (would be FIFO under the old query)
         await db_driver.push(_DbJob(message="low").to_envelope(), queue="default")
         # Then push higher priority — should pop FIRST

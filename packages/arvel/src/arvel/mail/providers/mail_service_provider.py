@@ -1,12 +1,12 @@
-"""MailServiceProvider — registers Mailer and Mail facade (FR-009-021).
+"""MailServiceProvider — registers Mailer and Mail facade.
 
 Driver selection follows Laravel's priority order:
 
 1. ``config/mail.py`` (Laravel-shaped config file, read via
-   :func:`arvel.config.lookup`) — used when the application ships a
-   ``config/mail.py`` module.
+ :func:`arvel.config.lookup`) — used when the application ships a
+ ``config/mail.py`` module.
 2. ``MAIL_*`` / ``MAIL_SMTP_*`` env vars via :class:`MailConfig` (Pydantic
-   ``BaseSettings``) — used when no config file is present.
+ ``BaseSettings``) — used when no config file is present.
 
 This means any Arvel app that provides ``config/mail.py`` gets full
 mail wiring without writing a custom provider.

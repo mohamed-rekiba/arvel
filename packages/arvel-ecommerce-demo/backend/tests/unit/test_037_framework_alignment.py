@@ -1,12 +1,10 @@
-"""QA-Pre tests — WI-arvel-037: Demo Framework Alignment.
+"""Demo framework alignment.
 
-RED until Stage 3b implementation.
-
-Acceptance criteria:
-- FR-001: uuid7 is stdlib (uuid.uuid7), not custom bit-manipulation
-- FR-005: _get_user_level / _require_level are deleted
-- FR-006: BaseModelMixin has no delete/restore/scope_active/to_dict/__post_init__
-- FR-004: _require_permission delegates to user.has_permission_to (trait)
+Coverage:
+- uuid7 is stdlib (uuid.uuid7), not custom bit-manipulation
+- _get_user_level / _require_level are deleted
+- BaseModelMixin has no delete/restore/scope_active/to_dict/__post_init__
+- _require_permission delegates to user.has_permission_to (trait)
 """
 
 from __future__ import annotations
@@ -20,7 +18,7 @@ pytestmark = pytest.mark.unit
 
 
 class TestUuid7StdlibOnly:
-    """FR-001: uuid7 must be the stdlib function, not a custom implementation."""
+    """uuid7 must be the stdlib function, not a custom implementation."""
 
     def test_uuid7_is_stdlib_function(self) -> None:
         """uuid.uuid7 must be the stdlib function (not a custom implementation)."""
@@ -35,7 +33,7 @@ class TestUuid7StdlibOnly:
 
     def test_base_module_has_no_custom_uuid7_source(self) -> None:
         """The custom bit-manipulation block must not exist in base.py."""
-        import app.models.base as base_mod  # RED until 3b
+        import app.models.base as base_mod
 
         src = inspect.getsource(base_mod)
         assert "rand_b" not in src, "Custom bit-twiddling uuid7 implementation still present"
@@ -44,11 +42,11 @@ class TestUuid7StdlibOnly:
 
 
 class TestBaseModelMixinShadowsRemoved:
-    """FR-006: BaseModelMixin must not shadow async framework methods."""
+    """BaseModelMixin must not shadow async framework methods."""
 
     def test_basemodelmixin_has_no_sync_delete(self) -> None:
         """BaseModelMixin.delete must not be defined (routes must use await model.delete())."""
-        from app.models.base import BaseModelMixin  # RED until 3b
+        from app.models.base import BaseModelMixin
 
         # delete() must either not exist on BaseModelMixin directly, or must not be sync
         delete_fn = BaseModelMixin.__dict__.get("delete")
@@ -58,7 +56,7 @@ class TestBaseModelMixinShadowsRemoved:
 
     def test_basemodelmixin_has_no_sync_restore(self) -> None:
         """BaseModelMixin.restore must not be defined."""
-        from app.models.base import BaseModelMixin  # RED until 3b
+        from app.models.base import BaseModelMixin
 
         restore_fn = BaseModelMixin.__dict__.get("restore")
         assert restore_fn is None or inspect.iscoroutinefunction(restore_fn), (
@@ -67,7 +65,7 @@ class TestBaseModelMixinShadowsRemoved:
 
     def test_basemodelmixin_has_no_scope_active(self) -> None:
         """BaseModelMixin.scope_active must not be defined (global scope handles this)."""
-        from app.models.base import BaseModelMixin  # RED until 3b
+        from app.models.base import BaseModelMixin
 
         assert "scope_active" not in BaseModelMixin.__dict__, (
             "BaseModelMixin still defines scope_active(); remove it"
@@ -75,7 +73,7 @@ class TestBaseModelMixinShadowsRemoved:
 
     def test_basemodelmixin_has_no_to_dict(self) -> None:
         """BaseModelMixin.to_dict must not be defined (use model_dump() from framework)."""
-        from app.models.base import BaseModelMixin  # RED until 3b
+        from app.models.base import BaseModelMixin
 
         assert "to_dict" not in BaseModelMixin.__dict__, (
             "BaseModelMixin still defines to_dict(); remove it"
@@ -83,7 +81,7 @@ class TestBaseModelMixinShadowsRemoved:
 
     def test_basemodelmixin_has_no_post_init(self) -> None:
         """BaseModelMixin.__post_init__ must not be defined (Timestamps mixin handles this)."""
-        from app.models.base import BaseModelMixin  # RED until 3b
+        from app.models.base import BaseModelMixin
 
         assert "__post_init__" not in BaseModelMixin.__dict__, (
             "BaseModelMixin still defines __post_init__; Timestamps mixin handles timestamps"
@@ -91,7 +89,7 @@ class TestBaseModelMixinShadowsRemoved:
 
 
 class TestLevelMethodsDeleted:
-    """FR-005: _get_user_level and _require_level must not exist in routes/api.py."""
+    """_get_user_level and _require_level must not exist in routes/api.py."""
 
     def test_no_get_user_level_in_routes(self) -> None:
         """_get_user_level was deleted from routes/api.py."""
@@ -123,7 +121,7 @@ class TestLevelMethodsDeleted:
 
 
 class TestNoRawSqlInServices:
-    """FR-002/FR-003: No DB.select/DB.statement raw SQL calls in service files."""
+    """No DB.select/DB.statement raw SQL calls in service files."""
 
     def _read_service(self, name: str) -> str:
         from pathlib import Path
@@ -156,7 +154,7 @@ class TestNoRawSqlInServices:
 
 
 class TestNoRawRbacSqlInRoutes:
-    """FR-004: No raw SQL RBAC joins in routes/api.py."""
+    """No raw SQL RBAC joins in routes/api.py."""
 
     def _read_routes(self) -> str:
         from pathlib import Path
@@ -186,7 +184,7 @@ class TestTranslatableMixinPreserved:
     """TranslatableMixin must still work after BaseModelMixin cleanup."""
 
     def test_get_translation_still_works(self) -> None:
-        from app.models.base import TranslatableMixin  # RED until 3b
+        from app.models.base import TranslatableMixin
 
         class FakeModel(TranslatableMixin):
             name: dict = {}
@@ -197,7 +195,7 @@ class TestTranslatableMixinPreserved:
         assert m.get_translation("name", "tr") == "Hello"  # fallback to en
 
     def test_set_translation_still_works(self) -> None:
-        from app.models.base import TranslatableMixin  # RED until 3b
+        from app.models.base import TranslatableMixin
 
         class FakeModel(TranslatableMixin):
             name: dict = {}
@@ -212,7 +210,7 @@ class TestLocalMediaMixinPreserved:
     """LocalMediaMixin must still work after BaseModelMixin cleanup."""
 
     def test_get_media_returns_empty_by_default(self) -> None:
-        from app.models.base import LocalMediaMixin  # RED until 3b
+        from app.models.base import LocalMediaMixin
 
         class FakeModel(LocalMediaMixin):
             pass
@@ -221,7 +219,7 @@ class TestLocalMediaMixinPreserved:
         assert m.get_media("images") == []
 
     def test_attach_media_adds_item(self) -> None:
-        from app.models.base import LocalMediaMixin, _MockMediaItem  # RED until 3b
+        from app.models.base import LocalMediaMixin, _MockMediaItem
 
         class FakeFile:
             filename = "photo.jpg"

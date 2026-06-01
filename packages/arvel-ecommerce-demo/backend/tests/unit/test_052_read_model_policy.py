@@ -1,4 +1,4 @@
-"""Runtime read-model policy guard — Story 3 of WI-arvel-052.
+"""Runtime read-model policy guard.
 
 Verifies that :class:`arvel.database.ReadModelPolicy` raises
 :class:`ReadModelPolicyViolation` when storefront paths attempt to query
@@ -23,6 +23,7 @@ class _FakeProductCatalog:
 
 class _FakeWriteModel:
     """Minimal stub for the write-model side of the policy.
+
 
     Mirrors the ``add_global_scope`` / ``__arvel_global_scopes__`` API that
     :class:`arvel.database.Model` exposes so the policy can be tested without

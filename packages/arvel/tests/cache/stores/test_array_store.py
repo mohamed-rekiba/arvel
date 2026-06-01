@@ -1,4 +1,4 @@
-"""Tests for ArrayStore — FR-006-002."""
+"""Tests for ArrayStore."""
 
 from __future__ import annotations
 

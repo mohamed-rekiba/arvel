@@ -1,7 +1,7 @@
 """``arvel new <name>`` CLI surface.
 
 Uses Typer's ``CliRunner`` against the same Typer app the framework binary
-builds (``build_app()``). Covers input validation (invalid names → exit 2),
+builds (``build_app``). Covers input validation (invalid names → exit 2),
 the happy path (generates a project from the packaged skeleton), pre-existing
 target handling, and the `--no-install` / `--python` flags.
 """

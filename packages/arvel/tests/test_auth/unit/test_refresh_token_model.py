@@ -1,4 +1,4 @@
-"""FR-028-13, FR-028-15, FR-028-26 — RefreshToken model rotation behaviour.
+"""RefreshToken model rotation behaviour.
 
 These exercise the model invariants the broker depends on directly — no
 fakes, no broker, just the ORM. Pairs with the broker integration tests
@@ -29,7 +29,7 @@ async def setup_db(engine: AsyncEngine, session: AsyncSession) -> AsyncSession:
 async def test_rotate_replaces_old_row_atomically_via_orm(
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-13 — rotation = ``where(token_hash=h).delete()`` + ``.create(...)``."""
+    """rotation = ``where(token_hash=h).delete()`` + ``.create(...)``."""
     h_old = hash_refresh_token("old-plain")
     await RefreshToken.create(
         user_id="1",
@@ -56,7 +56,7 @@ async def test_rotate_replaces_old_row_atomically_via_orm(
 async def test_delete_family_revokes_every_token_for_user(
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-26 — ``where(user_id=u).delete()`` revokes every active row."""
+    """``where(user_id=u).delete()`` revokes every active row."""
     for i in range(3):
         await RefreshToken.create(
             user_id="42",
@@ -78,7 +78,7 @@ async def test_find_returns_none_for_unknown_hash(setup_db: AsyncSession) -> Non
 async def test_unique_constraint_prevents_duplicate_hash(
     setup_db: AsyncSession,
 ) -> None:
-    """FR-028-13 invariant — UNIQUE(token_hash) blocks INSERT of a clashing digest."""
+    """invariant — UNIQUE(token_hash) blocks INSERT of a clashing digest."""
     from sqlalchemy.exc import IntegrityError
 
     digest = hash_refresh_token("plain-1")

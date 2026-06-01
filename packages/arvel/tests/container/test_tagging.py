@@ -1,4 +1,4 @@
-"""FR-001-012: Tagged bindings."""
+"""Tagged bindings."""
 
 from __future__ import annotations
 

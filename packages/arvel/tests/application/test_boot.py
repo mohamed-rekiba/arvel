@@ -1,4 +1,4 @@
-"""FR-001-018: Application kernel — fluent builder + two-pass boot lifecycle."""
+"""Application kernel — fluent builder + two-pass boot lifecycle."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ def test_provider_raising_in_register_yields_boot_error_at_create(tmp_path: Path
         def register(self) -> None:
             raise RuntimeError("nope")
 
-    # register() now runs eagerly in .create() so container bindings are
+    # register() now runs eagerly create() so container bindings are
     # available before await app.boot(). Failures surface here, not later.
     with pytest.raises(BootError) as excinfo:
         Application.configure(tmp_path).with_environment("testing").with_providers(
@@ -138,7 +138,7 @@ async def test_boot_logs_connected_services_and_summary(
     await app.shutdown()
 
 
-# ──────────────────────── Baseline provider auto-registration ───────────────────
+# Baseline provider auto-registration
 
 
 def test_baseline_providers_register_without_user_list(tmp_path: Path) -> None:

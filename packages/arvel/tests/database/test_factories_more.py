@@ -72,7 +72,7 @@ async def test_factory_has_creates_children(engine: Any, session: AsyncSession) 
     await _setup(engine)
     created = await AuthorFactory().has("books", BookFactory(), count=2).create()
     author = created if isinstance(created, Author) else created[0]
-    # Re-fetch with eager load — `where(id=...).first()` honours `.with_(...)`,
+    # Re-fetch with eager load — `where(id=...).first` honours `.with_(...)`,
     # whereas `find(pk)` bypasses statement options.
     fresh = await Author.with_("books").where(id=author.id).first()
     assert fresh is not None

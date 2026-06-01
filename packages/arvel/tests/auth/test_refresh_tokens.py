@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 
-# ─── Plaintext helpers ─────────────────────────────────────────────────────
+# Plaintext helpers
 
 
 def test_hash_refresh_token_is_sha256_hex() -> None:
@@ -38,7 +38,7 @@ def test_generate_refresh_token_unique_and_long() -> None:
     assert len(a) >= 32
 
 
-# ─── RefreshToken model — round-trip + accessors ───────────────────────────
+# RefreshToken model — round-trip + accessors
 
 
 async def _setup(engine: AsyncEngine) -> None:

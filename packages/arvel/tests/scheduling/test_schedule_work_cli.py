@@ -1,4 +1,4 @@
-"""Tests for `arvel schedule:work` Typer command — FR-015-009, FR-015-010."""
+"""Tests for `arvel schedule:work` Typer command."""
 
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ def test_schedule_work_command_is_registered() -> None:
 
 
 def test_schedule_work_once_requires_bound_application() -> None:
-    """FR-021-21: schedule:work needs a framework Application bound to ``self.app``.
+    """schedule:work needs a framework Application bound to ``self.app``.
 
     Previously this test relied on schedule_commands silently building an empty
     Schedule when invoked, which meant the user's actual Kernel.schedule() tasks
-    never ran. WI-021 made the command refuse to run unless the entrypoint has
+    never ran. made the command refuse to run unless the entrypoint has
     bootstrapped a framework Application and bound it to ``self.app``.
     """
     from arvel.console.entrypoint import build_app

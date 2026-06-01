@@ -1,4 +1,4 @@
-"""Tests for LogMailDriver — FR-009-017."""
+"""Tests for LogMailDriver."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ class TestLogMailDriver:
 
     @pytest.mark.asyncio
     async def test_send_logs_envelope_subject(self) -> None:
-        """FR-009-017: log driver emits envelope details."""
+        """log driver emits envelope details."""
         from arvel.testing.observability import FakeObservability
 
         driver = LogMailDriver()

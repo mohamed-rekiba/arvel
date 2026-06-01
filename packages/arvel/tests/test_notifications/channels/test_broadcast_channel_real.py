@@ -1,4 +1,4 @@
-"""FR-013-027 — BroadcastChannel (real implementation, WI-013-S3)."""
+"""BroadcastChannel (real implementation."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from test_notifications.helpers import FakeUser  # type: ignore[import-not-found
 
 @pytest.mark.asyncio
 async def test_broadcast_channel_routes_to_broadcaster() -> None:
-    """FR-013-027 AC1: real BroadcastChannel calls Broadcast.driver().broadcast."""
+    """AC1: real BroadcastChannel calls Broadcast.driver().broadcast."""
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.manager import BroadcastManager
     from arvel.facades.broadcast import Broadcast
@@ -60,7 +60,7 @@ async def test_broadcast_channel_routes_to_broadcaster() -> None:
 
 @pytest.mark.asyncio
 async def test_broadcast_channel_skips_when_no_via_data() -> None:
-    """FR-013-027 AC2: if to_broadcast not implemented, channel is a no-op (no broadcast call)."""
+    """AC2: if to_broadcast not implemented, channel is a no-op (no broadcast call)."""
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.manager import BroadcastManager
     from arvel.facades.broadcast import Broadcast
@@ -89,7 +89,7 @@ async def test_broadcast_channel_skips_when_no_via_data() -> None:
         # to_broadcast is missing. The current stub never calls Broadcast at all,
         # so this assertion still flags the stub as RED via a follow-up check.
         assert not calls
-        # And the channel MUST be the post-WI-013 implementation (not the stub).
+        # And the channel MUST be the post-implementation (not the stub).
         import inspect as _inspect
 
         from arvel.notifications.channels import broadcast_channel as bc

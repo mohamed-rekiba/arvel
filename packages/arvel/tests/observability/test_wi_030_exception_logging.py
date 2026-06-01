@@ -1,4 +1,4 @@
-"""Story 8: Automatic exception logging — FR-030-026..027."""
+"""Automatic exception logging."""
 
 from __future__ import annotations
 

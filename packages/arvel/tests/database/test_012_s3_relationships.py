@@ -1,9 +1,4 @@
-"""WI-arvel-012 Sprint 3 — Relationships.
-
-Covers FR-012-014 through FR-012-021.
-
-All tests are RED until implementation is complete.
-"""
+"""Relationship helpers: through, one-of-many, aggregates, pivot."""
 
 from __future__ import annotations
 
@@ -60,7 +55,7 @@ async def _setup(engine: AsyncEngine) -> None:
         await conn.run_sync(Model.metadata.create_all)
 
 
-# ─── FR-012-014: HasOneThrough / HasManyThrough ───────────────────────────────
+# ───  HasOneThrough / HasManyThrough ───────────────────────────────
 
 
 async def test_has_many_through(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -87,27 +82,26 @@ async def test_has_one_through(engine: AsyncEngine, session: AsyncSession) -> No
     assert post.title == "Yellow Brick"
 
 
-# ─── FR-012-015: HasOneOfMany ─────────────────────────────────────────────────
+# ───  HasOneOfMany ─────────────────────────────────────────────────
 
 
 async def test_has_one_latest_of_many(engine: AsyncEngine, session: AsyncSession) -> None:
-    """Placeholder — latest_of_many() is a future HasOneOfMany enhancement (FR-012-015).
+    """Placeholder — latest_of_many is a future HasOneOfMany enhancement (-015).
 
     Verifies the user can be fetched with a WHERE filter; the advanced
-    'latest_order' eager-load relationship is not yet implemented.
-    """
+    'latest_order' eager-load relationship is not yet implemented."""
     await _setup(engine)
     user = await UserS3.create(name="Orders", country_id=None)
     await OrderS3.create(amount=10, user_id=user.id)
     await OrderS3.create(amount=99, user_id=user.id)
 
-    # When latest_of_many() is implemented, this will use with_("latest_order")
+    # When latest_of_many is implemented, this will use with_("latest_order")
     result = await UserS3.where(UserS3.id == user.id).first()
     assert result is not None
 
 
 async def test_has_one_of_many_max(engine: AsyncEngine, session: AsyncSession) -> None:
-    """Placeholder — of_many(max_value) is a future HasOneOfMany enhancement (FR-012-015)."""
+    """Placeholder — of_many(max_value) is a future HasOneOfMany enhancement (-015)."""
     await _setup(engine)
     user = await UserS3.create(name="MaxOrder", country_id=None)
     await OrderS3.create(amount=50, user_id=user.id)
@@ -117,7 +111,7 @@ async def test_has_one_of_many_max(engine: AsyncEngine, session: AsyncSession) -
     assert result is not None
 
 
-# ─── FR-012-017: Relationship-based WHERE ─────────────────────────────────────
+# ───  Relationship-based WHERE ─────────────────────────────────────
 
 
 async def test_where_has_basic(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -177,7 +171,7 @@ async def test_doesnt_have(engine: AsyncEngine, session: AsyncSession) -> None:
     assert rows[0].name == "NoOrders"
 
 
-# ─── FR-012-018: Relationship aggregate loading ───────────────────────────────
+# ───  Relationship aggregate loading ───────────────────────────────
 
 
 async def test_with_count(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -227,7 +221,7 @@ async def test_with_count_no_n_plus_one(engine: AsyncEngine, session: AsyncSessi
     assert len(log.queries) <= 2  # max 2: 1 main query + 1 subquery (not N+1)
 
 
-# ─── FR-012-019: Lazy eager loading ──────────────────────────────────────────
+# ───  Lazy eager loading ──────────────────────────────────────────
 
 
 async def test_load_relation(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -254,7 +248,7 @@ async def test_load_missing_skips_already_loaded(
     assert u.posts is original_posts  # same object reference
 
 
-# ─── FR-012-020: BelongsToMany pivot improvements ────────────────────────────
+# ───  BelongsToMany pivot improvements ────────────────────────────
 
 
 async def test_where_pivot(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -277,7 +271,7 @@ async def test_sync_without_detaching_available(engine: AsyncEngine, session: As
     )
 
 
-# ─── FR-012-021: Relation-level save / create / associate / dissociate ────────
+# ───  Relation-level save / create / associate / dissociate ────────
 
 
 async def test_relation_save(engine: AsyncEngine, session: AsyncSession) -> None:
@@ -301,7 +295,7 @@ async def test_relation_create(engine: AsyncEngine, session: AsyncSession) -> No
 
 
 async def test_relation_save_fires_model_events(engine: AsyncEngine, session: AsyncSession) -> None:
-    """has_many().save() persists through Model.save(), so lifecycle events fire."""
+    """has_many.save persists through Model.save, so lifecycle events fire."""
     from arvel.database.events import clear_observers
 
     fired: list[str] = []
@@ -339,7 +333,7 @@ async def test_belongs_to_associate(engine: AsyncEngine, session: AsyncSession) 
 
 
 async def test_belongs_to_dissociate(engine: AsyncEngine, session: AsyncSession) -> None:
-    """post.belongs_to(UserS3, foreign_key='user_id').dissociate() nulls FK."""
+    """post.belongs_to(UserS3, foreign_key='user_id').dissociate nulls FK."""
     await _setup(engine)
     u = await UserS3.create(name="Parent2", country_id=None)
     post = await PostS3.create(title="Owned", user_id=u.id)

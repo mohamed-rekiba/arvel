@@ -1,4 +1,4 @@
-"""Channel-auth HMAC-SHA256 signature scheme (FR-013-020, NFR-013-007, ADR-058)."""
+"""Channel-auth HMAC-SHA256 signature scheme."""
 
 from __future__ import annotations
 

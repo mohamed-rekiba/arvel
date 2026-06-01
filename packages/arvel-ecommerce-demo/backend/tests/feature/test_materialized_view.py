@@ -1,13 +1,11 @@
-"""Materialized view tests — US-017.
+"""Materialized view refresh on catalog changes.
 
-RED: all tests fail at import until Stage 3b.
-
-Acceptance criteria:
-- US-017: publishing a product triggers view refresh; product appears in storefront
-- US-017: unpublishing removes product from storefront after refresh
-- US-017: soft-deleting a category removes its products from storefront
-- US-017: deactivating a vendor removes its products from storefront
-- US-017: REFRESH CONCURRENTLY does not block storefront reads
+Coverage:
+- publishing a product triggers view refresh; product appears in storefront
+- unpublishing removes product from storefront after refresh
+- soft-deleting a category removes its products from storefront
+- deactivating a vendor removes its products from storefront
+- REFRESH CONCURRENTLY does not block storefront reads
 """
 
 from __future__ import annotations
@@ -48,7 +46,7 @@ async def app(
     monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.setenv("APP_KEY", "matview-test-key-must-be-32-bytes-or-more!")
 
-    from app.bootstrap import create_app  # RED until Stage 3b
+    from app.bootstrap import create_app
 
     application = await create_app()
     await application.seed("catalog")
@@ -81,7 +79,7 @@ async def admin_token(client: Any) -> str:
 async def test_publishing_draft_product_appears_in_storefront(
     client: Any, admin_token: str
 ) -> None:
-    """US-017: publish triggers view refresh; product becomes visible in storefront."""
+    """publish triggers view refresh; product becomes visible in storefront."""
     # Get the draft product
     products = await client.get(
         "/api/admin/products?status=draft",
@@ -114,7 +112,7 @@ async def test_publishing_draft_product_appears_in_storefront(
 async def test_unpublishing_product_disappears_from_storefront(
     client: Any, admin_token: str
 ) -> None:
-    """US-017: unpublish triggers view refresh; product removed from storefront."""
+    """unpublish triggers view refresh; product removed from storefront."""
     products = await client.get(
         "/api/admin/products?status=published",
         headers={"Authorization": f"Bearer {admin_token}"},
@@ -135,7 +133,7 @@ async def test_unpublishing_product_disappears_from_storefront(
 async def test_soft_deleting_category_removes_its_products_from_storefront(
     client: Any, admin_token: str
 ) -> None:
-    """US-017: category deletion propagates to storefront via view refresh."""
+    """category deletion propagates to storefront via view refresh."""
     categories = await client.get(
         "/api/admin/categories",
         headers={"Authorization": f"Bearer {admin_token}"},
@@ -170,7 +168,7 @@ async def test_soft_deleting_category_removes_its_products_from_storefront(
 async def test_deactivating_vendor_removes_products_from_storefront(
     client: Any, admin_token: str
 ) -> None:
-    """US-017: vendor deactivation propagates to storefront via view refresh."""
+    """vendor deactivation propagates to storefront via view refresh."""
     vendors = await client.get(
         "/api/admin/vendors",
         headers={"Authorization": f"Bearer {admin_token}"},

@@ -1,4 +1,4 @@
-"""Broadcasting subsystem exceptions (FR-013-013)."""
+"""Broadcasting subsystem exceptions."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""FR-002-007, FR-002-008, FR-002-009 — FormRequest validation + authorize + FastAPI binding."""
+"""FormRequest validation + authorize + FastAPI binding."""
 
 from __future__ import annotations
 

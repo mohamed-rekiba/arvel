@@ -1,12 +1,12 @@
-"""WI-arvel-060 — ``make:controller --resource`` scaffold.
+"""``make:controller --resource`` scaffold.
 
-Epic 048 Story 10. The base ``make:controller`` already exists (WI-005);
+The base ``make:controller`` already exists ;
 this iteration adds three flags:
 
-- ``--resource``  : generate the seven canonical CRUD method stubs
-- ``--api``       : drop ``create`` and ``edit`` (HTML form methods)
+- ``--resource`` : generate the seven canonical CRUD method stubs
+- ``--api`` : drop ``create`` and ``edit`` (HTML form methods)
 - ``--model=Post``: import ``Post`` from ``app.models.<snake>`` and type
-  the member-method parameter accordingly
+ the member-method parameter accordingly
 
 The generated file must pass ``ruff`` immediately (lint + format).
 """
@@ -50,7 +50,7 @@ def _ruff_lint_check(path: Path) -> bool:
 
 
 class TestResourceFlag:
-    """AC-10.1 — --resource generates all seven RESTful method stubs."""
+    """--resource generates all seven RESTful method stubs."""
 
     def test_resource_creates_file_at_canonical_path(self, tmp_path: Path) -> None:
         app = _app(MakeControllerCommand())
@@ -89,7 +89,7 @@ class TestResourceFlag:
 
 
 class TestApiFlag:
-    """AC-10.3 — --api omits create() and edit() (the HTML form methods)."""
+    """--api omits create and edit (the HTML form methods)."""
 
     def test_api_drops_create_and_edit(self, tmp_path: Path) -> None:
         app = _app(MakeControllerCommand())
@@ -126,7 +126,7 @@ class TestApiFlag:
 
 
 class TestModelFlag:
-    """AC-10.2 — --model imports the model and types the member parameter."""
+    """--model imports the model and types the member parameter."""
 
     def test_model_imports_named_class(self, tmp_path: Path) -> None:
         app = _app(MakeControllerCommand())
@@ -203,7 +203,7 @@ class TestModelFlag:
 
 
 class TestGeneratedFileQuality:
-    """AC-10.4 — generated file passes ruff (format + lint) immediately."""
+    """generated file passes ruff (format + lint) immediately."""
 
     def test_resource_file_passes_ruff_format(self, tmp_path: Path) -> None:
         app = _app(MakeControllerCommand())
@@ -244,10 +244,10 @@ class TestGeneratedFileQuality:
 
 
 class TestBackwardCompat:
-    """Without --resource, the existing WI-005 behavior holds."""
+    """Without --resource, the existing behavior holds."""
 
     def test_default_make_controller_unchanged(self, tmp_path: Path) -> None:
-        # Existing AC-005-005-03: app/http/controllers/<snake>.py with the
+        # Existing -005-03: app/http/controllers/<snake>.py with the
         # 5-method legacy template still wins when no flags are passed.
         app = _app(MakeControllerCommand())
         with runner.isolated_filesystem(temp_dir=tmp_path):

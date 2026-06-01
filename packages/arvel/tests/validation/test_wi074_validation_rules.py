@@ -1,4 +1,4 @@
-"""WI-arvel-074 — Epic 049 Story 14: exists/unique/mimes/dimensions validation rules."""
+"""exists/unique/mimes/dimensions validation rules."""
 
 from __future__ import annotations
 

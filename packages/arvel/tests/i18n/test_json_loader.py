@@ -1,10 +1,9 @@
-"""Tests for :class:`arvel.i18n.JsonFileLoader` (FB-027-001).
-
+"""Tests for :class:`arvel.i18n.JsonFileLoader`.
 The driver supports two layouts:
 
 - ``resources/lang/{locale}/{namespace}.json`` — one file per namespace.
 - ``resources/lang/{locale}.json`` — one file per locale, namespaces are
-  top-level keys. This is the layout WI-arvel-027 uses so a single file
+  top-level keys. This is the layout uses so a single file
   serves both backend (this loader) and frontend (Vue I18n) consumers.
 """
 

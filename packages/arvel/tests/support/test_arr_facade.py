@@ -1,4 +1,4 @@
-"""arvel.support.Arr — Laravel-parity array/dict facade (Epic 049 Story 13)."""
+"""arvel.support.Arr — Laravel-parity array/dict facade."""
 
 from __future__ import annotations
 

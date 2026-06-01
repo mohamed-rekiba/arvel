@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 # Translator maps a foreign exception (e.g. ORM error) onto an HttpException so
 # the handler can render the standard envelope. Registered by the providers
-# layer so the HTTP module stays free of upstream-layer imports (ADR-016).
+# layer so the HTTP module stays free of upstream-layer imports.
 # Translators target Exception, not BaseException — Starlette won't dispatch on
 # the BaseException hierarchy (KeyboardInterrupt, SystemExit).
 ExceptionTranslator = Callable[[Exception], "HttpException"]

@@ -1,4 +1,4 @@
-"""PusherBroadcaster — HTTP POST to api-<cluster>.pusher.com (FR-013-005)."""
+"""PusherBroadcaster — HTTP POST to api-<cluster>.pusher.com."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def _default_client_factory() -> _HttpClient:
 
 
 class PusherBroadcaster:
-    """Pusher Channels HTTP API driver (FR-013-005, ADR-057-style)."""
+    """Pusher Channels HTTP API driver."""
 
     def __init__(
         self,

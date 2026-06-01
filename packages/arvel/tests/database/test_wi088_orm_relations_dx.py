@@ -2,9 +2,8 @@
 
 Relations are defined once as zero-arg accessor methods returning ``HasMany`` /
 ``HasOne`` / ``BelongsTo``. The same definition powers lazy queries, eager
-loading (``with_("items")``), cached read-back (``await owner.items().get()``),
-and ``where_has`` / ``with_count`` — no separate descriptor declaration.
-"""
+loading (``with_("items")``), cached read-back (``await owner.items.get``),
+and ``where_has`` / ``with_count`` — no separate descriptor declaration."""
 
 from __future__ import annotations
 
@@ -94,7 +93,7 @@ class TestEagerHasMany:
     async def test_lazy_path_still_queries(
         self, engine: AsyncEngine, session: AsyncSession
     ) -> None:
-        """Without with_(), the accessor falls through to a real query."""
+        """Without with_, the accessor falls through to a real query."""
         await _setup(engine)
         o1, _ = await _seed()
 
@@ -139,7 +138,7 @@ class TestChaperone:
     async def test_inverse_inferred_no_extra_query(
         self, engine: AsyncEngine, session: AsyncSession
     ) -> None:
-        """chaperone() hydrates each child's belongs_to back to the loaded owner."""
+        """chaperone hydrates each child's belongs_to back to the loaded owner."""
         await _setup(engine)
         await _seed()
 
@@ -198,7 +197,7 @@ class TestRelationConstraints:
 
 class TestLoadAfterFetch:
     async def test_collection_load(self, engine: AsyncEngine, session: AsyncSession) -> None:
-        """ModelCollection.load() batches a method-style relation into the cache."""
+        """ModelCollection.load batches a method-style relation into the cache."""
         await _setup(engine)
         await _seed()
 

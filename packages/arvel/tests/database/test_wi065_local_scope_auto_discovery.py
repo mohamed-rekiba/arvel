@@ -1,16 +1,15 @@
-"""WI-arvel-065 — Epic 049 Story 1: ``scope_<name>`` auto-discovery.
+"""``scope_<name>`` auto-discovery.
 
 Local query scopes via the Laravel-style naming convention: define
-``scope_active(self, query)`` on a model and call ``Post.active()`` or
-``Post.query().active()`` — no decorator required.
+``scope_active(self, query)`` on a model and call ``Post.active`` or
+``Post.query.active`` — no decorator required.
 
 The framework discovers ``scope_*`` methods at lookup time on both the
 class itself (``_ModelMeta.__getattr__``) and the live query builder
 (``QueryBuilder.__getattr__``). Methods receive the model class as
 ``self`` (Python equivalent of Laravel's "fresh model instance" pattern)
 followed by the query and the user's positional/keyword args, and must
-return the modified query.
-"""
+return the modified query."""
 
 from __future__ import annotations
 
@@ -48,7 +47,7 @@ async def _setup(engine: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Class-level entry: `Post.active()` creates a fresh QB
+# Class-level entry: `Post.active` creates a fresh QB
 # ---------------------------------------------------------------------------
 
 
@@ -83,7 +82,7 @@ class TestClassLevelScopeEntry:
 
 
 # ---------------------------------------------------------------------------
-# QB-level chain: qb.active().published().get()
+# QB-level chain: qb.active.published.get
 # ---------------------------------------------------------------------------
 
 

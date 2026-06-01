@@ -1,4 +1,4 @@
-"""Broadcaster Protocol (FR-013-001, ADR-053)."""
+"""Broadcaster Protocol."""
 
 from __future__ import annotations
 

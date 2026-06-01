@@ -79,13 +79,11 @@ all = [
 arvel = "arvel.console.entrypoint:main"
 
 [project.entry-points."arvel.commands"]
-# WI-020 FR-020-08/09: built-in CLI commands declared as entry-points so the
-# CLI bootstrap no longer hardcodes them and so optional commands (e.g.
-# `reverb:start` when [broadcasting] is installed) plug in cleanly. Queue
-# commands (queue:work/failed/retry/flush/forget) are intentionally NOT
-# declared here — they need DI from the framework container and are loaded
-# via ConsoleServiceProvider.boot() from a running framework Application
-# (the broader CLI-side bootstrap is WI-021 scope).
+# Built-in CLI commands declared as entry-points so the CLI bootstrap doesn't
+# hardcode them and optional commands (e.g. `reverb:start` when [broadcasting]
+# is installed) plug in cleanly. Queue commands (queue:work/failed/retry/flush/
+# forget) are intentionally NOT declared here — they need DI from the framework
+# container and load via ConsoleServiceProvider.boot() from a running Application.
 
 # project scaffolder (works outside an Arvel project)
 "new" = "arvel.console.commands.new:NewCommand"
@@ -101,7 +99,7 @@ arvel = "arvel.console.entrypoint:main"
 "make:request" = "arvel.console.commands.make_request:MakeRequestCommand"
 "make:seeder" = "arvel.console.commands.make_seeder:MakeSeederCommand"
 "make:migration" = "arvel.console.commands.make_migration:MakeMigrationCommand"
-# scaffolding additions (WI-023)
+# scaffolding additions
 "make:test" = "arvel.console.commands.make_test:MakeTestCommand"
 "make:factory" = "arvel.console.commands.make_factory:MakeFactoryCommand"
 "make:listener" = "arvel.console.commands.make_listener:MakeListenerCommand"

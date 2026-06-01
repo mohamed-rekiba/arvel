@@ -1,4 +1,4 @@
-"""Tests for JobEnvelope wire format — FR-008-002."""
+"""Tests for JobEnvelope wire format"""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ class TestJobEnvelope:
 
 
 class TestJobEnvelopeAttempts:
-    """FR-011-001: JobEnvelope carries an attempts counter."""
+    """JobEnvelope carries an attempts counter."""
 
     def test_default_attempts_is_zero(self) -> None:
         env = JobEnvelope(job_class="myapp.jobs.Foo", payload={"x": 1})

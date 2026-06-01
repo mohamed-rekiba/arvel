@@ -1,4 +1,4 @@
-"""AC-010-01..03 — CTE, recursive queries, TreeNode assembly (FR-010-01..03)."""
+"""CTE, recursive queries, and TreeNode assembly."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def test_tree_node_nested() -> None:
 
 
 async def test_with_cte_attaches_cte(engine: Any, session: AsyncSession) -> None:
-    """AC-010-01: with_cte() attaches CTE; SQL contains WITH clause."""
+    """with_cte attaches CTE; SQL contains WITH clause."""
     await _create_tables(engine)
     from sqlalchemy import select
 
@@ -71,7 +71,7 @@ async def test_with_cte_multiple_chains(engine: Any, session: AsyncSession) -> N
 async def test_recursive_returns_recursive_query_builder(
     engine: Any, session: AsyncSession
 ) -> None:
-    """AC-010-02: recursive() returns RecursiveQueryBuilder."""
+    """recursive returns RecursiveQueryBuilder."""
     await _create_tables(engine)
     from arvel.database.query import RecursiveQueryBuilder
 
@@ -104,13 +104,11 @@ async def test_recursive_depth_col_in_sql(engine: Any, session: AsyncSession) ->
 
 
 async def _build_tree(engine: Any, session: AsyncSession) -> None:
-    """
-    Build a tree:
-        root (id=1)
-        ├── child_a (id=2, parent=1)
-        │   └── grandchild (id=4, parent=2)
-        └── child_b (id=3, parent=1)
-    """
+    """Build a tree:
+    root (id=1)
+    ├── child_a (id=2, parent=1)
+    │   └── grandchild (id=4, parent=2)
+    └── child_b (id=3, parent=1)"""
     await _create_tables(engine)
     root = await Category.create(name="root", parent_id=None)
     child_a = await Category.create(name="child_a", parent_id=root.id)
@@ -119,7 +117,7 @@ async def _build_tree(engine: Any, session: AsyncSession) -> None:
 
 
 async def test_as_tree_returns_list_of_tree_nodes(engine: Any, session: AsyncSession) -> None:
-    """AC-010-03: as_tree() returns list[TreeNode[Category]]."""
+    """as_tree returns list[TreeNode[Category]]."""
     await _build_tree(engine, session)
     trees = await (
         Category.query()
@@ -166,7 +164,7 @@ async def test_as_tree_nested_grandchildren(engine: Any, session: AsyncSession) 
 
 
 async def test_as_tree_single_round_trip(engine: Any, session: AsyncSession) -> None:
-    """as_tree() is a single DB round-trip (verified by query count fixture)."""
+    """as_tree is a single DB round-trip (verified by query count fixture)."""
     await _build_tree(engine, session)
     query_count = 0
 

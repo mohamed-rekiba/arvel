@@ -1,4 +1,4 @@
-"""FR-003-038 — request-scoped session context var."""
+"""Request-scoped session context var."""
 
 from __future__ import annotations
 

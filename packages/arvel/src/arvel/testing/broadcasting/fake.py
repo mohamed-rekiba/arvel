@@ -1,4 +1,4 @@
-"""BroadcasterFake — records calls; satisfies the Broadcaster Protocol (FR-013-014)."""
+"""BroadcasterFake — records calls; satisfies the Broadcaster Protocol."""
 
 from __future__ import annotations
 

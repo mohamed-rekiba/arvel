@@ -1,4 +1,4 @@
-"""Lua scripts shipped with the redis-direct queue driver (WI-018, ADR-066).
+"""Lua scripts shipped with the redis-direct queue driver.
 
 The file ``promote_and_pop.lua`` is loaded once per ``RedisConnection``
 instance via ``SCRIPT LOAD`` and invoked via ``EVALSHA`` on every pop.

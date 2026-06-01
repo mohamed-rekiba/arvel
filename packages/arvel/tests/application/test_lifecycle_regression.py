@@ -1,4 +1,4 @@
-"""Epic 001 Story 9 — lifecycle regression suite.
+"""lifecycle regression suite.
 
 Locks the bootstrap contract: provider ordering, middleware composition,
 request-id propagation, reverse-order shutdown, and exception logging. These

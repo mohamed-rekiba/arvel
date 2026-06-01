@@ -1,18 +1,18 @@
 """Path-generator protocol + default scheme.
 
-Default scheme (ADR-082 D3, mirrors Spatie laravel-medialibrary v11)::
+Default scheme (mirrors Spatie laravel-medialibrary v11)::
 
     {id}/{file_name}                                  # original
     {id}/conversions/{conversion}-{file_name}         # derived
 
-``PathGenerator`` is a :class:`typing.Protocol` (PRD-026 FR-026-32) so any
+``PathGenerator`` is a :class:`typing.Protocol`  so any
 class with the matching shape can replace the binding without inheriting
 from a base. Use the :class:`PathGeneratorBase` ABC if you want nominal
 typing for container resolution and tooling that treats Protocols as
 abstract.
 
 Call :func:`set_path_generator` (e.g. in ``ImageServiceProvider.register``) to
-swap in a custom implementation app-wide (FR-050-28).
+swap in a custom implementation app-wide
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from arvel_image.media.model import Media
 
-# Module-level override — None means "use DefaultPathGenerator" (FR-050-28).
+# Module-level override — None means "use DefaultPathGenerator"
 _custom_path_generator: PathGenerator | None = None
 
 
@@ -50,7 +50,7 @@ class DefaultPathGenerator:
 
 
 def set_path_generator(gen: PathGenerator) -> None:
-    """Override the module-level path generator used by FileAdder and Media (FR-050-28).
+    """Override the module-level path generator used by FileAdder and Media
 
     Call this in ``ImageServiceProvider.register()`` or app bootstrap.
     Pass ``DefaultPathGenerator()`` to reset to the default.
