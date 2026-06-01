@@ -542,3 +542,41 @@ class TestServeRegister:
             result = runner.invoke(app, [])
         assert result.exit_code == 0
         mock_run.assert_called_once()
+
+
+class TestServeBypassesEventLoop:
+    """`arvel serve` must run uvicorn OUTSIDE the entrypoint's asyncio.run.
+
+    Regression for: uvicorn.run() calls asyncio.run() internally, which raises
+    "asyncio.run() cannot be called from a running event loop" when the
+    entrypoint has already wrapped the invocation in asyncio.run(async_main()).
+    """
+
+    def test_serve_command_owns_process(self) -> None:
+        from arvel.console.commands.serve import ServeCommand
+
+        assert ServeCommand.owns_process is True
+
+    def test_main_runs_serve_without_entering_event_loop(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from arvel.console import entrypoint
+
+        (tmp_path / "bootstrap").mkdir()
+        (tmp_path / "bootstrap" / "app.py").write_text(
+            "def create_application(): return object()\n"
+        )
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("sys.argv", ["arvel", "serve"])
+
+        with (
+            patch("arvel.console.commands.serve.uvicorn.run") as mock_run,
+            patch.object(entrypoint.asyncio, "run") as mock_asyncio_run,
+        ):
+            with pytest.raises(SystemExit) as exc:
+                entrypoint.main()
+
+        assert exc.value.code == 0
+        mock_run.assert_called_once()
+        # The whole point: serve must NOT be dispatched through asyncio.run.
+        mock_asyncio_run.assert_not_called()

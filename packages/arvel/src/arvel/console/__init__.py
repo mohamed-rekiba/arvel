@@ -73,6 +73,13 @@ class Command:
     help: ClassVar[str] = ""
     needs_application: ClassVar[bool] = False
 
+    #: The command takes over the process and manages its own event loop
+    #: (e.g. ``serve`` → uvicorn, which calls ``asyncio.run`` internally). The
+    #: entrypoint dispatches such commands *outside* its ``asyncio.run`` wrapper,
+    #: otherwise uvicorn raises "asyncio.run() cannot be called from a running
+    #: event loop".
+    owns_process: ClassVar[bool] = False
+
     #: Bound by the entrypoint when ``needs_application`` is True and a project
     #: root is discoverable. ``None`` otherwise.
     app: FrameworkApplication | None = None

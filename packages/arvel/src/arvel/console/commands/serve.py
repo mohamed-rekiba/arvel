@@ -33,6 +33,9 @@ def _graceful_shutdown_timeout() -> int | None:
 class ServeCommand(Command):
     name: ClassVar[str] = "serve"
     help: ClassVar[str] = "Run the project ASGI app under uvicorn (defaults to public.asgi:asgi)"
+    # uvicorn owns the event loop (and, with --reload/--workers, subprocess
+    # supervisors), so serve must run outside the entrypoint's asyncio.run.
+    owns_process: ClassVar[bool] = True
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

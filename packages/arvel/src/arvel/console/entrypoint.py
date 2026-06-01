@@ -72,6 +72,17 @@ def _requested_command(argv: list[str]) -> str | None:
     return None
 
 
+def _owns_process(command: str | None, commands: list[Command]) -> bool:
+    """Return True if *command* takes over the process and its own event loop.
+
+    Such commands (e.g. ``serve`` → uvicorn) must run outside the entrypoint's
+    ``asyncio.run`` wrapper. See :attr:`arvel.console.Command.owns_process`.
+    """
+    if command is None:
+        return False
+    return any(cmd.name == command and cmd.owns_process for cmd in commands)
+
+
 def _is_outside_project_allowed(command: str | None) -> bool:
     if command is None:
         return True
@@ -194,6 +205,16 @@ def main() -> None:
         # Allowed-outside-project path — sync fast-path, no loop needed.
         typer_app = build_app()
         typer_app()
+        raise SystemExit(0)
+
+    # Commands that own the process (e.g. `serve` → uvicorn) must run outside
+    # the asyncio.run wrapper below — uvicorn calls asyncio.run() itself and
+    # would otherwise hit "cannot be called from a running event loop". They
+    # don't need the framework booted in the CLI process; uvicorn re-imports
+    # the ASGI app and boots it via lifespan.
+    commands = get_commands()
+    if _owns_process(command, commands):
+        Application(commands).typer_app()
         raise SystemExit(0)
 
     asyncio.run(async_main())
