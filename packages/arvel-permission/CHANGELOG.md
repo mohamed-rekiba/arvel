@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.5.0...arvel-permission-v0.5.1) (2026-06-01)
+
+
+### Documentation
+
+* **packages:** point package URLs to arvel.dev docs ([4f8d5bd](https://github.com/mohamed-rekiba/arvel/commit/4f8d5bd0d32c443601cb3f4ced566aa493f6c289))
+
 ## [0.5.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.4.0...arvel-permission-v0.5.0) (2026-06-01)
 
 
