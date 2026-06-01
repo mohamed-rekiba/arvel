@@ -13,6 +13,9 @@ Action method parameters are resolved by FastAPI's DI: ``Request``,
 typed path/query params, :class:`arvel.FormRequest` subclasses, and
 ``dep(MyService)`` for container-bound services.
 
+The class name is completed automatically: ``make:controller Post`` and
+``make:controller PostController`` both produce ``PostController``.
+
 Flags:
 
 ``--resource``
@@ -25,11 +28,16 @@ Flags:
     Only valid with ``--resource``. Drops the two HTML-form methods
     (``create``, ``edit``). Mirrors ``Route.api_resource()``.
 
-``--model=Post``
-    Only valid with ``--resource``. Adds ``from app.models.post import
-    Post`` and types the member-method parameter as ``post: Post``
-    instead of ``id: int`` so [implicit model binding](../routing.md)
-    resolves it automatically.
+``--model`` / ``--model-name=Post``
+    Generate the companion model (skipped if it already exists). Bare
+    ``--model`` derives the name from the controller (``PostController`` →
+    ``Post``); ``--model-name`` overrides it. Under ``--resource`` the
+    controller also imports the model and types the member-method parameter
+    as ``post: Post`` so [implicit model binding](../routing.md) resolves it.
+
+``--observer`` / ``--policy`` / ``--requests``
+    Generate the matching companions: ``PostObserver``, ``PostPolicy``,
+    and the ``StorePostRequest`` / ``UpdatePostRequest`` pair.
 """
 
 from __future__ import annotations
@@ -41,6 +49,7 @@ import typer
 
 from arvel.console._t import Argument as _Argument
 from arvel.console._t import Option as _Option
+from arvel.console.commands import _companions
 from arvel.console.commands._base_make import BaseMakeCommand, validate_name
 from arvel.support.str import Str
 
@@ -150,12 +159,13 @@ class MakeControllerCommand(BaseMakeCommand):
     name: ClassVar[str] = "make:controller"
     help: ClassVar[str] = "Generate an HTTP controller (subclass of arvel.Controller)"
     _target_subdir: ClassVar[str] = "app/http/controllers"
+    _suffix: ClassVar[str] = "Controller"
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self
 
         def _callback(
-            name: Annotated[str, _Argument(help="Class name")],
+            name: Annotated[str, _Argument(help="Controller name (e.g. Post or PostController)")],
             *,
             force: Annotated[
                 bool,
@@ -173,22 +183,54 @@ class MakeControllerCommand(BaseMakeCommand):
                 ),
             ] = False,
             model: Annotated[
-                str | None,
+                bool,
                 _Option(
                     "--model",
-                    help=(
-                        "Import the given model and type member-method params. Requires --resource."
-                    ),
+                    help="Generate the model named after the controller (PostController → Post).",
                 ),
+            ] = False,
+            model_name: Annotated[
+                str | None,
+                _Option("--model-name", help="Generate this model instead of the derived name."),
             ] = None,
+            observer: Annotated[
+                bool,
+                _Option("--observer", help="Also generate the matching Observer."),
+            ] = False,
+            policy: Annotated[
+                bool,
+                _Option("--policy", help="Also generate the matching Policy."),
+            ] = False,
+            requests: Annotated[
+                bool,
+                _Option("--requests", help="Also generate Store/Update FormRequests."),
+            ] = False,
         ) -> None:
             if api and not resource:
                 typer.echo("arvel: --api requires --resource.", err=True)
                 raise typer.Exit(2)
-            if model is not None and not resource:
-                typer.echo("arvel: --model requires --resource.", err=True)
-                raise typer.Exit(2)
-            code = cmd_self._generate(name, force=force, resource=resource, api=api, model=model)
+
+            model_root: str | None = None
+            if model_name is not None:
+                model_root = Str.pascal(model_name)
+            elif model:
+                model_root = cmd_self.root_name(name)
+
+            code = cmd_self._generate(
+                name, force=force, resource=resource, api=api, model_root=model_root
+            )
+            if code != 0:
+                raise typer.Exit(code)
+
+            root = cmd_self.root_name(name)
+            if model_root is not None:
+                code = _companions.model(model_root, force=force) or code
+            if observer:
+                code = _companions.observer(root, force=force) or code
+            if policy:
+                code = _companions.policy(root, force=force) or code
+            if requests:
+                code = _companions.form_requests(root, force=force) or code
             if code != 0:
                 raise typer.Exit(code)
 
@@ -199,25 +241,35 @@ class MakeControllerCommand(BaseMakeCommand):
         name: str,
         *,
         force: bool = False,
+        exist_ok: bool = False,
         resource: bool = False,
         api: bool = False,
-        model: str | None = None,
+        model_root: str | None = None,
     ) -> int:
         error = validate_name(name)
         if error is not None:
             typer.echo(f"arvel: {error}", err=True)
             return 2
-        if model is not None:
-            model_error = validate_name(model)
+        if model_root is not None:
+            model_error = validate_name(model_root)
             if model_error is not None:
                 typer.echo(f"arvel: {model_error}", err=True)
                 return 2
-        target = Path(self._target_subdir) / f"{Str.snake(name)}{self._extension}"
+        class_name = self.class_name(name)
+        target = Path(self._target_subdir) / f"{Str.snake(class_name)}{self._extension}"
         if target.exists() and not force:
+            if exist_ok:
+                typer.echo(f"Exists: {target}")
+                return 0
             typer.echo(f"arvel: {target} already exists. Pass --force to overwrite.", err=True)
             return 1
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(self._render_with_flags(name, resource=resource, api=api, model=model))
+        # The model is only imported/typed in resource controllers — the basic
+        # template has no member methods to bind it to.
+        typed_model = model_root if resource else None
+        target.write_text(
+            self._render_with_flags(class_name, resource=resource, api=api, model=typed_model)
+        )
         typer.echo(f"Created: {target}")
         return 0
 

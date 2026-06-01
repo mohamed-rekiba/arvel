@@ -40,6 +40,7 @@ class MakeResourceCommand(BaseMakeCommand):
     name: ClassVar[str] = "make:resource"
     help: ClassVar[str] = "Generate a JsonResource transformer (arvel.http.JsonResource)"
     _target_subdir: ClassVar[str] = "app/http/resources"
+    _suffix: ClassVar[str] = "Resource"
 
     def _render(self, name: str) -> str:
         title = Str.pascal(name)

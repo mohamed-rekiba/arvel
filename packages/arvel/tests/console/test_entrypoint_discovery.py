@@ -295,3 +295,23 @@ def test_discover_commands_logs_runtime_errors_and_continues(
     assert any(
         "broken:cmd" in rec.message and "RuntimeError" in rec.message for rec in caplog.records
     )
+
+
+# ─── Ctrl+C handling: main() exits cleanly on KeyboardInterrupt ─────────────
+
+
+def test_main_exits_130_on_keyboard_interrupt() -> None:
+    """Ctrl+C during a long-running command exits 130 without a traceback."""
+    from arvel.console import entrypoint as entrypoint_mod
+
+    with (
+        patch.object(entrypoint_mod.sys, "argv", ["arvel", "schedule:work"]),
+        patch.object(entrypoint_mod, "find_project_root", return_value=Path("/fake/project")),
+        patch.object(entrypoint_mod, "get_commands", return_value=[]),
+        patch.object(entrypoint_mod, "async_main", new=MagicMock(return_value=None)),
+        patch.object(entrypoint_mod.asyncio, "run", side_effect=KeyboardInterrupt),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        entrypoint_mod.main()
+
+    assert exc_info.value.code == 130

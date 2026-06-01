@@ -217,4 +217,10 @@ def main() -> None:
         Application(commands).typer_app()
         raise SystemExit(0)
 
-    asyncio.run(async_main())
+    try:
+        asyncio.run(async_main())
+    except KeyboardInterrupt:
+        # Ctrl+C during a long-running command (e.g. schedule:work). The command
+        # already logged its graceful-shutdown message and shutdown() ran in the
+        # finally block; exit with the conventional SIGINT code, no traceback.
+        raise SystemExit(130) from None

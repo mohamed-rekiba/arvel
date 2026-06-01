@@ -47,6 +47,7 @@ class MakeChannelCommand(BaseMakeCommand):
     name: ClassVar[str] = "make:channel"
     help: ClassVar[str] = "Generate a broadcast channel authorization callback"
     _target_subdir: ClassVar[str] = "app/broadcasting/channels"
+    _suffix: ClassVar[str] = "Channel"
 
     def _render(self, name: str) -> str:
         return _TEMPLATE.format(title=Str.pascal(name), snake=_channel_slug(name))

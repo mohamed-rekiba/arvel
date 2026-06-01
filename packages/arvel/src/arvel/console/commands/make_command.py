@@ -47,6 +47,7 @@ class MakeCommandCommand(BaseMakeCommand):
     name: ClassVar[str] = "make:command"
     help: ClassVar[str] = "Generate an Arvel console command"
     _target_subdir: ClassVar[str] = "app/console/commands"
+    _suffix: ClassVar[str] = "Command"
 
     def _render(self, name: str) -> str:
         cli_name = _to_cli_name(name)

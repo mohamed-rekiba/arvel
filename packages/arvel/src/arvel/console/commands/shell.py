@@ -7,11 +7,15 @@ auto-imports user models from ``app/models/*.py``, exposes the public facades,
 and hands control to IPython — falling back to the stdlib ``code.interact``
 when IPython is not installed.
 
-Opts into framework DI so the entrypoint sets ``self.app`` before invocation.
+The REPL owns the process (``owns_process = True``): the entrypoint dispatches
+it outside its ``asyncio.run`` wrapper, and the command boots the framework
+itself on the same event loop IPython uses for ``%autoawait`` — see
+:meth:`ShellCommand.run_repl`.
 """
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import importlib.util
 import logging
@@ -27,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from arvel.application.errors import EnvironmentNotSetError
 from arvel.console import Command, Context
 from arvel.console._t import Option as _Option
+from arvel.console.bootstrap import bootstrap_framework_application, find_project_root
 from arvel.container.errors import BindingResolutionError
 from arvel.database.session import reset_active_session, set_active_session
 
@@ -55,7 +60,15 @@ _FACADES: tuple[tuple[str, str, str], ...] = (
 class ShellCommand(Command):
     name: ClassVar[str] = "shell"
     help: ClassVar[str] = "Launch an interactive REPL with the Arvel app bootstrapped"
-    needs_application: ClassVar[bool] = True
+    # The REPL drives an event loop itself: IPython's autoawait runs `await`
+    # expressions on its own persistent loop, and prompt_toolkit calls
+    # asyncio.run() for the prompt UI. Both would hit "asyncio.run() cannot be
+    # called from a running event loop" if we ran inside the entrypoint's
+    # asyncio.run wrapper. So shell owns the process and boots the framework
+    # itself, on the *same* loop IPython uses for autoawait — otherwise the
+    # async engine pinged during boot would be bound to a different loop than
+    # the one the user's `await Model.find()` runs on.
+    owns_process: ClassVar[bool] = True
 
     def __init__(self) -> None:
         super().__init__()
@@ -72,21 +85,70 @@ class ShellCommand(Command):
                 _Option("--dry-run", help="Validate shell bootstrap without launching REPL"),
             ] = False,
         ) -> None:
+            # --dry-run must NOT bootstrap the app (SEC-005-002): it's a cheap
+            # "does the command wire up" check, safe to run anywhere.
             if dry_run:
                 typer.echo("Shell ready (dry run).")
                 return
-
-            namespace = cmd_self.build_namespace()
-            try:
-                cmd_self.print_banner(namespace)
-                cmd_self._launch_repl(namespace)
-            finally:
-                cmd_self.release_active_session()
+            cmd_self.run_repl()
 
         app.command(name=self.name, help=self.help)(_callback)
 
     def handle(self, ctx: Context) -> int:
         raise NotImplementedError
+
+    def run_repl(self) -> None:
+        """Bootstrap (if in a project), build the namespace, and launch the REPL.
+
+        Outside a project — or when bootstrap returns ``None`` — we serve a
+        plain REPL with no app/DB. Inside a project we boot the framework and
+        serve the REPL on IPython's autoawait loop so the engine, session, and
+        user-typed ``await`` expressions all share one event loop.
+        """
+        project_root = find_project_root()
+        framework_app = (
+            bootstrap_framework_application(project_root) if project_root is not None else None
+        )
+
+        if framework_app is None:
+            self.app = None
+            self._serve_repl()
+            return
+
+        loop, created = self._repl_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(framework_app.boot())
+            self.app = framework_app
+            self._serve_repl(loop)
+        finally:
+            loop.run_until_complete(framework_app.shutdown())
+            asyncio.set_event_loop(None)
+            if created:
+                loop.close()
+
+    def _serve_repl(self, loop: asyncio.AbstractEventLoop | None = None) -> None:
+        namespace = self.build_namespace()
+        try:
+            self.print_banner(namespace)
+            self._launch_repl(namespace)
+        finally:
+            self.release_active_session(loop)
+
+    @staticmethod
+    def _repl_loop() -> tuple[asyncio.AbstractEventLoop, bool]:
+        """Return ``(loop, created)`` for the REPL.
+
+        Prefer IPython's persistent autoawait loop so everything the REPL
+        touches (engine, session, user ``await``) lives on one loop. When
+        IPython isn't installed the stdlib fallback has no autoawait, so loop
+        affinity is moot and a fresh loop (which we own and close) is fine.
+        """
+        try:
+            from IPython.core.async_helpers import get_asyncio_loop  # noqa: PLC0415
+        except ImportError:
+            return asyncio.new_event_loop(), True
+        return get_asyncio_loop(), False
 
     # ------------------------------------------------------------------ public
 
@@ -124,35 +186,36 @@ class ShellCommand(Command):
 
         return namespace
 
-    def release_active_session(self) -> None:
+    def release_active_session(self, loop: asyncio.AbstractEventLoop | None = None) -> None:
         """Reset the active-session ContextVar and close the REPL session.
 
         Idempotent — safe to call from a ``finally`` block, and a no-op once
-        the session has already been released. The async ``close()`` is
-        attempted in a fresh event loop; ``RuntimeError`` is swallowed so the
-        REPL exit path stays clean even if the loop is in a degraded state at
-        interpreter teardown.
+        the session has already been released.
+
+        When ``loop`` is given (the REPL's loop), close on it so the session is
+        torn down on the same loop it was created on. Otherwise drive
+        ``close()`` from a one-shot ``asyncio.run`` loop; ``RuntimeError`` is
+        swallowed and the coroutine explicitly closed so it doesn't leak as a
+        "coroutine was never awaited" warning. The connection still returns to
+        the pool when the engine is disposed.
         """
         if self._active_session_token is not None:
             reset_active_session(self._active_session_token)
             self._active_session_token = None
 
         session = self._active_session
-        if session is not None:
-            self._active_session = None
-            import asyncio  # noqa: PLC0415 — keep import-time cost off the hot path
+        if session is None:
+            return
+        self._active_session = None
 
-            # Drive ``close()`` from a one-shot event loop. If a loop is
-            # already running (release called from async code) or the loop is
-            # in teardown, ``asyncio.run`` raises ``RuntimeError`` — we
-            # explicitly close the unfired coroutine so it doesn't leak as a
-            # "coroutine was never awaited" warning. The connection still
-            # returns to the pool when the engine is disposed.
-            coro = session.close()
-            try:
-                asyncio.run(coro)
-            except RuntimeError:
-                coro.close()
+        coro = session.close()
+        if loop is not None and not loop.is_closed() and not loop.is_running():
+            loop.run_until_complete(coro)
+            return
+        try:
+            asyncio.run(coro)
+        except RuntimeError:
+            coro.close()
 
     # ----------------------------------------------------------------- helpers
 

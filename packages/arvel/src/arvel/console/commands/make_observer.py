@@ -58,6 +58,7 @@ class MakeObserverCommand(BaseMakeCommand):
     name: ClassVar[str] = "make:observer"
     help: ClassVar[str] = "Generate a model lifecycle Observer"
     _target_subdir: ClassVar[str] = "app/observers"
+    _suffix: ClassVar[str] = "Observer"
 
     def _render(self, name: str) -> str:
         return _TEMPLATE.format(title=Str.pascal(name))

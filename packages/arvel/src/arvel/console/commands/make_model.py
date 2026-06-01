@@ -31,6 +31,7 @@ import typer
 from arvel.console import Command, Context
 from arvel.console._t import Argument as _Argument
 from arvel.console._t import Option as _Option
+from arvel.console.commands import _companions
 from arvel.database.migrations import extract_table_name
 from arvel.support.str import Str
 
@@ -93,7 +94,7 @@ class MakeModelCommand(Command):
         cmd_self = self
 
         def _callback(
-            name: Annotated[str, _Argument(help="Class name")],
+            name: Annotated[str, _Argument(help="Model name (e.g. Post)")],
             *,
             force: Annotated[bool, _Option("--force", help="Overwrite existing")] = False,
             view: Annotated[bool, _Option("--view", help="Generate a ViewModel stub")] = False,
@@ -101,15 +102,86 @@ class MakeModelCommand(Command):
                 bool,
                 _Option("--materialized-view", help="Generate a materialized ViewModel stub"),
             ] = False,
+            migration: Annotated[
+                bool, _Option("--migration", "-m", help="Also create a migration")
+            ] = False,
+            factory: Annotated[
+                bool, _Option("--factory", "-f", help="Also create a factory")
+            ] = False,
+            seed: Annotated[bool, _Option("--seed", "-s", help="Also create a seeder")] = False,
+            controller: Annotated[
+                bool, _Option("--controller", "-c", help="Also create a controller")
+            ] = False,
+            resource: Annotated[
+                bool, _Option("--resource", help="Make the companion controller a resource")
+            ] = False,
+            api: Annotated[
+                bool, _Option("--api", help="API resource controller (requires --controller)")
+            ] = False,
+            requests: Annotated[
+                bool, _Option("--requests", help="Also create Store/Update FormRequests")
+            ] = False,
+            policy: Annotated[bool, _Option("--policy", "-p", help="Also create a policy")] = False,
+            observer: Annotated[
+                bool, _Option("--observer", "-o", help="Also create an observer")
+            ] = False,
+            json_resource: Annotated[
+                bool, _Option("--json-resource", "-R", help="Also create a JsonResource")
+            ] = False,
+            test: Annotated[bool, _Option("--test", help="Also create a feature test")] = False,
+            all_: Annotated[
+                bool, _Option("--all", "-a", help="Create model + every companion")
+            ] = False,
         ) -> None:
             if view and materialized_view:
                 typer.echo(
                     "arvel: --view and --materialized-view are mutually exclusive.", err=True
                 )
                 raise typer.Exit(2)
+
             code = cmd_self._generate(
                 name, force=force, view=view, materialized_view=materialized_view
             )
+            if code != 0:
+                raise typer.Exit(code)
+
+            # View models are read-only projections — companions don't apply.
+            if view or materialized_view:
+                return
+
+            if all_:
+                migration = factory = seed = controller = True
+                requests = policy = observer = json_resource = test = True
+                resource = True
+
+            if api and not controller:
+                typer.echo("arvel: --api requires --controller.", err=True)
+                raise typer.Exit(2)
+
+            root = Str.pascal(name)
+            if migration:
+                code = _companions.migration(root) or code
+            if factory:
+                code = _companions.factory(root, force=force) or code
+            if seed:
+                code = _companions.seeder(root, force=force) or code
+            if policy:
+                code = _companions.policy(root, force=force) or code
+            if observer:
+                code = _companions.observer(root, force=force) or code
+            if json_resource:
+                code = _companions.json_resource(root, force=force) or code
+            if requests:
+                code = _companions.form_requests(root, force=force) or code
+            if controller:
+                code = (
+                    _companions.controller(
+                        root, force=force, resource=resource, api=api, model_root=root
+                    )
+                    or code
+                )
+            if test:
+                code = _companions.feature_test(root, force=force) or code
             if code != 0:
                 raise typer.Exit(code)
 
@@ -120,6 +192,7 @@ class MakeModelCommand(Command):
         name: str,
         *,
         force: bool = False,
+        exist_ok: bool = False,
         view: bool = False,
         materialized_view: bool = False,
     ) -> int:
@@ -133,6 +206,9 @@ class MakeModelCommand(Command):
 
         target = Path(self._target_subdir) / f"{Str.snake(name)}.py"
         if target.exists() and not force:
+            if exist_ok:
+                typer.echo(f"Exists: {target}")
+                return 0
             typer.echo(f"arvel: {target} already exists. Pass --force to overwrite.", err=True)
             return 1
         target.parent.mkdir(parents=True, exist_ok=True)

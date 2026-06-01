@@ -187,10 +187,10 @@ You can further narrow, rename, or scope a resource registration — see [Partia
 <a name="generating-controllers"></a>
 ## Generating Controllers
 
-The `make:controller` command scaffolds a controller in `app/http/controllers/`:
+The `make:controller` command scaffolds a controller in `app/http/controllers/`. The class name is completed for you — `make:controller Post` and `make:controller PostController` both produce `PostController`:
 
 ```bash
-arvel make:controller UserController
+arvel make:controller Post
 ```
 
 | Flag | Effect |
@@ -198,13 +198,20 @@ arvel make:controller UserController
 | `--force` | Overwrite an existing file. |
 | `--resource` | Generate stubs for all seven REST actions. |
 | `--api` | With `--resource`, omit the `create` and `edit` actions. |
-| `--model Post` | With `--resource`, import `app.models.post` and type member parameters as the model. |
+| `--model` | Generate the companion model (derived from the controller name) and, under `--resource`, import it and type the member parameters. |
+| `--model-name Article` | Same as `--model`, but use this model name instead of the derived one. |
+| `--observer` | Also generate the matching `Observer`. |
+| `--policy` | Also generate the matching `Policy`. |
+| `--requests` | Also generate the `Store…Request` / `Update…Request` pair. |
 
 ```bash
-arvel make:controller PostController --resource
-arvel make:controller PostController --resource --api
-arvel make:controller PostController --resource --model Post
+arvel make:controller Post --resource
+arvel make:controller Post --resource --api
+arvel make:controller Post --resource --model
+arvel make:controller Post --resource --model --observer --policy --requests
 ```
+
+That last command scaffolds `PostController`, the `Post` model, `PostObserver`, `PostPolicy`, and `StorePostRequest` / `UpdatePostRequest` in one shot. Companions that already exist are skipped, not overwritten.
 
 > [!NOTE]
 > The generated resource actions raise `NotImplementedError` until you fill them in — they're stubs, not working endpoints.

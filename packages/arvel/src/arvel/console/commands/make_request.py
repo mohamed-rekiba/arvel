@@ -42,6 +42,7 @@ class MakeRequestCommand(BaseMakeCommand):
     name: ClassVar[str] = "make:request"
     help: ClassVar[str] = "Generate a typed FormRequest (Pydantic payload + authorize)"
     _target_subdir: ClassVar[str] = "app/http/requests"
+    _suffix: ClassVar[str] = "Request"
 
     def _render(self, name: str) -> str:
         return _TEMPLATE.format(title=Str.pascal(name))

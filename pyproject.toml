@@ -311,6 +311,19 @@ ignore = [
     "FBT002",  # CLI flag `once: bool = False` is the standard typer signature
     "E501",    # CLI signature lines exceed 100 due to typer Annotated decorators
 ]
+"packages/arvel/src/arvel/console/commands/_companions.py" = [
+    "PLC0415", # sibling generators imported lazily so the orchestrators avoid an import cycle
+    "SLF001",  # companions delegate to a sibling command's _generate gateway by design
+]
+"packages/arvel/src/arvel/console/commands/make_model.py" = [
+    "C901",    # the hub callback fans out to every companion (-a/--all)
+    "PLR0912", # one branch per companion flag — intrinsic to the make:model hub
+    "PLR0913", # each companion is its own typer flag; the signature is the public API
+]
+"packages/arvel/src/arvel/console/commands/make_controller.py" = [
+    "C901",    # the callback dispatches model + observer/policy/requests companions
+    "PLR0913", # each companion is its own typer flag; the signature is the public API
+]
 "packages/arvel/src/arvel/testing/**" = [
     "PLC0415",  # lazy imports across testing.fakes break circular deps with facades
     "S108",     # /tmp default is for testing only (file_path is unused by ARRAY store)

@@ -51,6 +51,7 @@ class MakeProviderCommand(BaseMakeCommand):
     name: ClassVar[str] = "make:provider"
     help: ClassVar[str] = "Generate a ServiceProvider (register/boot/commands/shutdown)"
     _target_subdir: ClassVar[str] = "app/providers"
+    _suffix: ClassVar[str] = "ServiceProvider"
 
     def _render(self, name: str) -> str:
         return _TEMPLATE.format(title=Str.pascal(name))
