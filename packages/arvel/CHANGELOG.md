@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.6.0...arvel-v0.6.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* **console:** run serve outside the CLI event loop ([03bc57c](https://github.com/mohamed-rekiba/arvel/commit/03bc57ca713de690249d4e5687d32154e5436d78))
+
 ## [0.6.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.5.1...arvel-v0.6.0) (2026-06-01)
 
 
