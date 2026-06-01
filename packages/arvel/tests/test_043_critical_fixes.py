@@ -6,8 +6,9 @@ All four tests must be RED before implementation begins.
 from __future__ import annotations
 
 import inspect
-from typing import Any
+from typing import Any, cast
 
+import httpx
 import pytest
 from pydantic import BaseModel
 
@@ -81,7 +82,7 @@ class TestC002ControllerDI:
         app.state.arvel_container = container
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).get("/greet")
+        resp = cast("httpx.Client", TestClient(app)).get("/greet")
         assert resp.status_code == 200
         assert resp.json() == {"msg": "hello from service"}
 
@@ -103,7 +104,7 @@ class TestC002ControllerDI:
         app = FastAPI()
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).get("/ping")
+        resp = cast("httpx.Client", TestClient(app)).get("/ping")
         assert resp.status_code == 200
         assert resp.json() == {"ping": "pong"}
 
@@ -272,7 +273,7 @@ class TestC004AuthorizeDefault:
         HttpExceptionHandler().register(app)
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).post("/strict", json={"x": 42})
+        resp = cast("httpx.Client", TestClient(app)).post("/strict", json={"x": 42})
         assert resp.status_code == 403
         assert resp.json()["error"]["code"] == "FORBIDDEN"
 
@@ -299,6 +300,6 @@ class TestC004AuthorizeDefault:
         HttpExceptionHandler().register(app)
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).post("/allowed", json={"x": 42})
+        resp = cast("httpx.Client", TestClient(app)).post("/allowed", json={"x": 42})
         assert resp.status_code == 200
         assert resp.json() == {"ok": True, "x": 42}

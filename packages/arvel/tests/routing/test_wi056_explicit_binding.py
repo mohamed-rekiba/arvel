@@ -12,8 +12,9 @@ Run BEFORE implementation — every integration test in this file MUST fail
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
+import httpx
 import pytest
 import pytest_asyncio
 from arvel.database import Model, id_, string
@@ -112,7 +113,7 @@ class TestExplicitBindingResolves:
         app = FastAPI()
         HttpExceptionHandler().register(app)
         Router.singleton().register_with_app(app)
-        return TestClient(app)
+        return cast("httpx.Client", TestClient(app))
 
     def test_resolver_overrides_implicit_binding(
         self, bind_db: async_sessionmaker[AsyncSession]
@@ -227,7 +228,7 @@ def test_group_scoped_binding_applies_only_inside_group(
     app = FastAPI()
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
-    client = TestClient(app)
+    client = cast("httpx.Client", TestClient(app))
 
     resp_in = client.get("/inside/widgets/two")
     assert resp_in.status_code == 200
@@ -289,7 +290,7 @@ def test_nested_group_binding_overrides_outer_binding(
     app = FastAPI()
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
-    client = TestClient(app)
+    client = cast("httpx.Client", TestClient(app))
 
     resp_admin = client.get("/v1/admin/widgets/ONE")
     assert resp_admin.status_code == 200
@@ -335,7 +336,7 @@ def test_global_binding_visible_to_routes_inside_group(
     app = FastAPI()
     HttpExceptionHandler().register(app)
     Router.singleton().register_with_app(app)
-    client = TestClient(app)
+    client = cast("httpx.Client", TestClient(app))
 
     resp = client.get("/api/widgets/one")
     assert resp.status_code == 200

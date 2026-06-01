@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
+
+import httpx
 
 
 def test_controller_base_class_exists() -> None:
@@ -61,6 +63,6 @@ def test_invokable_controller_is_callable_at_route_level() -> None:
 
     app = FastAPI()
     Router.singleton().register_with_app(app)
-    resp = TestClient(app).get("/dashboard")
+    resp = cast("httpx.Client", TestClient(app)).get("/dashboard")
     assert resp.status_code == 200
     assert resp.json() == {"page": "dashboard"}

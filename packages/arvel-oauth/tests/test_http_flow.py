@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from typing import cast
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -42,7 +43,7 @@ def _google_handler(request: httpx.Request) -> httpx.Response:
 
 
 @pytest_asyncio.fixture()
-async def client() -> AsyncGenerator[TestClient]:
+async def client() -> AsyncGenerator[httpx.Client]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -70,13 +71,13 @@ async def client() -> AsyncGenerator[TestClient]:
 
     previous = Event.swap_dispatcher(EventFake())
     try:
-        yield TestClient(app)
+        yield cast("httpx.Client", TestClient(app))
     finally:
         Event.swap_dispatcher(previous)
         await engine.dispose()
 
 
-def test_redirect_sets_state_and_pkce_cookies(client: TestClient) -> None:
+def test_redirect_sets_state_and_pkce_cookies(client: httpx.Client) -> None:
     resp = client.get("/auth/google/redirect", follow_redirects=False)
     assert resp.status_code == 307
     location = resp.headers["location"]
@@ -86,19 +87,19 @@ def test_redirect_sets_state_and_pkce_cookies(client: TestClient) -> None:
     assert "oauth_pkce" in resp.cookies
 
 
-def test_callback_state_mismatch_returns_422(client: TestClient) -> None:
+def test_callback_state_mismatch_returns_422(client: httpx.Client) -> None:
     client.cookies.set("oauth_state", "expected")
     resp = client.get("/auth/google/callback?code=abc&state=tampered", follow_redirects=False)
     assert resp.status_code == 422
 
 
-def test_callback_provider_error_redirects(client: TestClient) -> None:
+def test_callback_provider_error_redirects(client: httpx.Client) -> None:
     resp = client.get("/auth/google/callback?error=access_denied", follow_redirects=False)
     assert resp.status_code == 303
     assert resp.headers["location"] == "/login?error=1"
 
 
-def test_callback_success_issues_session(client: TestClient) -> None:
+def test_callback_success_issues_session(client: httpx.Client) -> None:
     redirect = client.get("/auth/google/redirect", follow_redirects=False)
     state = redirect.cookies["oauth_state"]
 
@@ -108,7 +109,7 @@ def test_callback_success_issues_session(client: TestClient) -> None:
     assert "access_token" in resp.cookies
 
 
-def test_callback_persists_oauth_account(client: TestClient) -> None:
+def test_callback_persists_oauth_account(client: httpx.Client) -> None:
     redirect = client.get("/auth/google/redirect", follow_redirects=False)
     state = redirect.cookies["oauth_state"]
     client.get(f"/auth/google/callback?code=valid&state={state}", follow_redirects=False)

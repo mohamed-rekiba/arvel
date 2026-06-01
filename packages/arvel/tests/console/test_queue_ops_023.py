@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -25,6 +25,7 @@ from arvel.console.commands.queue_clear import QueueClearCommand
 from arvel.console.commands.queue_prune_failed import QueuePruneFailedCommand
 from arvel.console.commands.queue_restart import QueueRestartCommand
 from arvel.queue.restart import QueueRestartSignal
+from click.testing import CliRunner as ClickCliRunner
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -48,7 +49,7 @@ def test_queue_restart_writes_marker(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(QueueRestartSignal, "signal_restart", fake_signal, raising=False)
     app = _app(QueueRestartCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["queue:restart"])
         assert result.exit_code == 0, result.output
         assert "timestamp" in written
@@ -117,7 +118,7 @@ def test_queue_clear_invokes_driver_clear(tmp_path: Path, monkeypatch: pytest.Mo
         raising=False,
     )
     app = _app(QueueClearCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["queue:clear", "--queue", "default"])
         # We allow exit 0 even when bootstrap pieces are stubbed; the test
         # focuses on call routing.
@@ -147,7 +148,7 @@ def test_queue_prune_failed_default_24h_threshold(
         raising=False,
     )
     app = _app(QueuePruneFailedCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app.typer_app, ["queue:prune-failed", "--hours", "24"])
         assert result.exit_code in (0, 2)
         # The 'hours' value was forwarded.

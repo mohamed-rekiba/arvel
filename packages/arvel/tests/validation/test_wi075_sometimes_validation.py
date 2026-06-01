@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
+import httpx
 from arvel.http.exceptions import HttpExceptionHandler
 from arvel.http.requests import FormRequest
 from arvel.routing import Route, Router
@@ -94,7 +95,7 @@ class TestFormRequestWithValidator:
         app = FastAPI()
         HttpExceptionHandler().register(app)
         Router.singleton().register_with_app(app)
-        client = TestClient(app)
+        client = cast("httpx.Client", TestClient(app))
 
         cash_resp = client.post("/pay", json={"payment": "cash"})
         assert cash_resp.status_code == 200
@@ -130,5 +131,5 @@ class TestFormRequestWithValidator:
         HttpExceptionHandler().register(app)
         Router.singleton().register_with_app(app)
 
-        resp = TestClient(app).post("/pay", json={"payment": "card"})
+        resp = cast("httpx.Client", TestClient(app)).post("/pay", json={"payment": "card"})
         assert resp.status_code == 422

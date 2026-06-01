@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import cast
+
+import httpx
 from arvel.session import SessionData
 from arvel.session.middleware import StartSession
 from arvel.session.stores.array import ArraySessionStore
@@ -28,14 +31,14 @@ class TestStartSessionMiddleware:
     def test_session_attached_to_request_state(self) -> None:
         store = ArraySessionStore(lifetime=120)
         app = make_app(store)
-        client = TestClient(app, raise_server_exceptions=True)
+        client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
         response = client.get("/")
         assert response.status_code == 200
 
     def test_session_persists_across_requests(self) -> None:
         store = ArraySessionStore(lifetime=120)
         app = make_app(store)
-        client = TestClient(app, raise_server_exceptions=True)
+        client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
         r1 = client.get("/")
         r2 = client.get("/")
         assert r1.text == "0"
@@ -44,7 +47,7 @@ class TestStartSessionMiddleware:
     def test_session_cookie_set_in_response(self) -> None:
         store = ArraySessionStore(lifetime=120)
         app = make_app(store)
-        client = TestClient(app, raise_server_exceptions=True)
+        client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
         response = client.get("/")
         assert "arvel_session" in response.cookies or "Set-Cookie" in response.headers
 
@@ -58,6 +61,6 @@ class TestStartSessionMiddleware:
         from starlette.routing import Route
 
         app = Starlette(routes=[Route("/", handler)])
-        client = TestClient(app, raise_server_exceptions=False)
+        client = cast("httpx.Client", TestClient(app, raise_server_exceptions=False))
         response = client.get("/")
         assert response.status_code == 500

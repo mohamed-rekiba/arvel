@@ -24,11 +24,13 @@ import shutil
 import sys
 from collections.abc import Iterator
 from pathlib import Path
+from typing import cast
 
 import pytest
 from arvel.console.bootstrap import bootstrap_framework_application
 from arvel.console.commands.migrate import build_migrator
 from arvel.console.entrypoint import build_app
+from click.testing import CliRunner as ClickCliRunner
 from typer.testing import CliRunner
 
 # Minimal migration following the framework's module-level ``up`` / ``down``
@@ -56,7 +58,7 @@ async def down(schema: type[Schema]) -> None:
 def rendered_project(tmp_path: Path) -> Iterator[Path]:
     """Render the real packaged skeleton via ``arvel new`` into ``tmp_path/my-app``."""
     runner = CliRunner()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
         result = runner.invoke(build_app(), ["new", "my-app", "--no-install"])
         assert result.exit_code == 0, result.stderr
         project_root = Path(iso_cwd) / "my-app"
@@ -145,7 +147,7 @@ def test_rendered_skeleton_writes_to_file_based_sqlite_from_dotenv(tmp_path: Pat
     from sqlalchemy.ext.asyncio import AsyncEngine
 
     runner = CliRunner()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
         result = runner.invoke(build_app(), ["new", "my-app", "--no-install"])
         assert result.exit_code == 0, result.stderr
         project_root = Path(iso_cwd) / "my-app"

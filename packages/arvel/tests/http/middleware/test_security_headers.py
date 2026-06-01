@@ -4,6 +4,9 @@ Tests are written RED — arvel.http.middleware.SecurityHeadersMiddleware does n
 
 from __future__ import annotations
 
+from typing import cast
+
+import httpx
 from starlette.responses import Response
 from starlette.testclient import TestClient
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -31,7 +34,7 @@ def _app_with_custom_csp(csp_value: str) -> ASGIApp:
 def test_all_four_headers_present() -> None:
     from arvel.http.middleware import SecurityHeadersMiddleware
 
-    client = TestClient(SecurityHeadersMiddleware(_echo_app()))
+    client = cast("httpx.Client", TestClient(SecurityHeadersMiddleware(_echo_app())))
     response = client.get("/")
 
     assert response.headers.get("strict-transport-security")
@@ -43,7 +46,7 @@ def test_all_four_headers_present() -> None:
 def test_hsts_includes_preload() -> None:
     from arvel.http.middleware import SecurityHeadersMiddleware
 
-    client = TestClient(SecurityHeadersMiddleware(_echo_app()))
+    client = cast("httpx.Client", TestClient(SecurityHeadersMiddleware(_echo_app())))
     response = client.get("/")
     hsts = response.headers["strict-transport-security"]
     assert "preload" in hsts
@@ -53,7 +56,7 @@ def test_hsts_includes_preload() -> None:
 def test_csp_includes_frame_ancestors_none() -> None:
     from arvel.http.middleware import SecurityHeadersMiddleware
 
-    client = TestClient(SecurityHeadersMiddleware(_echo_app()))
+    client = cast("httpx.Client", TestClient(SecurityHeadersMiddleware(_echo_app())))
     response = client.get("/")
     csp = response.headers["content-security-policy"]
     assert "frame-ancestors 'none'" in csp
@@ -66,7 +69,10 @@ def test_csp_not_overwritten_when_handler_sets_it() -> None:
     from arvel.http.middleware import SecurityHeadersMiddleware
 
     custom_csp = "default-src 'none'"
-    client = TestClient(SecurityHeadersMiddleware(_app_with_custom_csp(custom_csp)))
+    client = cast(
+        "httpx.Client",
+        TestClient(SecurityHeadersMiddleware(_app_with_custom_csp(custom_csp))),
+    )
     response = client.get("/")
     assert response.headers["content-security-policy"] == custom_csp
 
@@ -78,7 +84,10 @@ def test_custom_csp_via_constructor() -> None:
     from arvel.http.middleware import SecurityHeadersMiddleware
 
     custom_csp = "default-src 'none'; script-src 'none'"
-    client = TestClient(SecurityHeadersMiddleware(_echo_app(), csp=custom_csp))
+    client = cast(
+        "httpx.Client",
+        TestClient(SecurityHeadersMiddleware(_echo_app(), csp=custom_csp)),
+    )
     response = client.get("/")
     assert response.headers["content-security-policy"] == custom_csp
 
@@ -86,7 +95,10 @@ def test_custom_csp_via_constructor() -> None:
 def test_custom_hsts_max_age() -> None:
     from arvel.http.middleware import SecurityHeadersMiddleware
 
-    client = TestClient(SecurityHeadersMiddleware(_echo_app(), hsts_max_age=86400))
+    client = cast(
+        "httpx.Client",
+        TestClient(SecurityHeadersMiddleware(_echo_app(), hsts_max_age=86400)),
+    )
     response = client.get("/")
     hsts = response.headers["strict-transport-security"]
     assert "max-age=86400" in hsts

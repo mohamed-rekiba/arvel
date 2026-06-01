@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import ModuleType
+from typing import cast
 
 import pytest
 from arvel.console import Application, Command
@@ -23,6 +24,7 @@ from arvel.console.commands.schedule_run import ScheduleRunCommand
 from arvel.console.commands.storage_unlink import StorageUnlinkCommand
 from arvel.console.commands.test_command import TestCommand
 from arvel.console.commands.tinker import TinkerCommand
+from click.testing import CliRunner as ClickCliRunner
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -58,7 +60,7 @@ def test_schedule_run_is_registered() -> None:
 def test_storage_unlink_removes_symlink(tmp_path: Path) -> None:
     """storage:unlink deletes the symlink at public/storage."""
     app = _app(StorageUnlinkCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         Path("public").mkdir(parents=True)
         target = Path("storage/app/public")
         target.mkdir(parents=True)
@@ -73,7 +75,7 @@ def test_storage_unlink_removes_symlink(tmp_path: Path) -> None:
 def test_storage_unlink_is_idempotent(tmp_path: Path) -> None:
     """storage:unlink when no link exists exits 0."""
     app = _app(StorageUnlinkCommand())
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         Path("public").mkdir(parents=True)
         result = runner.invoke(app.typer_app, ["storage:unlink"])
         assert result.exit_code == 0
