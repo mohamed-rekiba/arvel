@@ -8,9 +8,16 @@ FRONTEND_RUN := $(COMPOSE) run --rm --no-deps frontend
 env:
 	test -f .env || cp .env.example .env
 
+HEALTHCHECK_SERVICES := db redis backend frontend
+
 # Wait until db, redis, backend, and frontend all report healthy.
+ifeq ($(OS),Windows_NT)
 healthcheck:
-	COMPOSE="$(COMPOSE)" ./scripts/healthcheck.sh db redis backend frontend
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "$$env:COMPOSE='$(COMPOSE)'; & '$(CURDIR)/scripts/healthcheck.ps1' $(HEALTHCHECK_SERVICES)"
+else
+healthcheck:
+	COMPOSE="$(COMPOSE)" bash "$(CURDIR)/scripts/healthcheck.sh" $(HEALTHCHECK_SERVICES)
+endif
 
 up: env
 	$(COMPOSE) up -d db redis backend frontend

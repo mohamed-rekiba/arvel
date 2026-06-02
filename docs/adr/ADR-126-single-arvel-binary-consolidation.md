@@ -12,7 +12,7 @@ ADR-126 picked a two-binary split to resolve the `[project.scripts] arvel` colli
 
 A few months in, the two-binary split is paying negative dividends:
 
-- Users have to install **two** things (`uv tool install arvel-cli` for the scaffolder, then `arvel` arrives transitively when they `uv sync` inside the project). The split shows up in the install path (`install.sh` / `install.ps1`), the docs (`installation.md`, `starter-kits.md`, every "getting started" page), and the badges (two PyPI badges in the README).
+- Users have to install **two** things (`uv tool install arvel-cli` for the scaffolder, then `arvel` arrives transitively when they `uv sync` inside the project).the docs (`installation.md`, `starter-kits.md`, every "getting started" page), and the badges (two PyPI badges in the README).
 - The scaffolder duplicates infrastructure the framework already has: name validation, templating, Typer wiring, an `Application` shell — without sharing types or tests with the framework.
 - The release pipeline carries two parallel tracks: two `release-please` components, two PyPI Trusted Publishers, two SBOMs, two CycloneDX exports, two `uv build` invocations, two `twine check` calls.
 - Users discover `arvel-new` only through docs. Once they're inside a project, `arvel` is the entry point — `arvel-new` is no longer needed and clutters their `~/.local/bin`.
