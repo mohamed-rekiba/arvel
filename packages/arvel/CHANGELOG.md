@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.9.0...arvel-v0.9.1) (2026-06-02)
+
+
+### Bug Fixes
+
+* bind loopback in serve importability test ([5dc895c](https://github.com/mohamed-rekiba/arvel/commit/5dc895c45d0dc6f4c3bfba0c53eb98e1271620f5))
+
 ## [0.9.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.8.0...arvel-v0.9.0) (2026-06-02)
 
 
