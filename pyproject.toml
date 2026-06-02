@@ -214,6 +214,9 @@ ignore = [
 "packages/arvel/src/arvel/console/entrypoint.py" = [
     "PLC0415", # cache/storage commands imported lazily to keep startup fast
 ]
+"packages/arvel/src/arvel/console/_scaffold/kits.py" = [
+    "PLC0415", # remote_kit imported lazily: breaks the kits↔remote_kit cycle, keeps httpx off startup
+]
 "packages/arvel/src/arvel/facades/**" = [
     "PLC0415", # concrete types imported lazily inside bind() to break circular deps
 ]
