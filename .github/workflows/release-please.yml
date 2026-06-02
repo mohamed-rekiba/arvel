@@ -28,6 +28,9 @@ jobs:
   release-please:
     name: Open / update release PRs
     runs-on: ubuntu-24.04
+    outputs:
+      kit_released: ${{ steps.release.outputs['kits/arvel-ecommerce-kit--release_created'] }}
+      kit_tag: ${{ steps.release.outputs['kits/arvel-ecommerce-kit--tag_name'] }}
     steps:
       - uses: googleapis/release-please-action@v5.0.0
         id: release
@@ -36,9 +39,48 @@ jobs:
           # creates trigger publish.yml. Tags pushed with the default
           # GITHUB_TOKEN do NOT emit events (GitHub blocks recursive runs), so
           # auto-publish stays dormant until RELEASE_PLEASE_TOKEN is set.
+          # The kit tarball is attached by the archive-kit job below instead of
+          # a tag-triggered workflow, so it lands even on the default token.
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: .github/release-please-config.json
           manifest-file: .github/release-please-manifest.json
+
+  archive-kit:
+    name: Archive e-commerce kit and attach to its release
+    needs: release-please
+    if: needs.release-please.outputs.kit_released == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # attach the archive + checksum to the GitHub Release
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release-please.outputs.kit_tag }}
+
+      - name: Build kit tarball + checksum
+        id: build
+        run: |
+          set -euo pipefail
+          tag="${{ needs.release-please.outputs.kit_tag }}"
+          version="${tag#arvel-ecommerce-kit-v}"
+          prefix="arvel-ecommerce-kit-${version}"
+          archive="${prefix}.tar.gz"
+          # git archive only ships tracked files (no node_modules / dist / caches)
+          # and hoists the subtree under <prefix>/ so the CLI strips one level.
+          git archive --format=tar.gz --prefix="${prefix}/" \
+            -o "${archive}" HEAD:kits/arvel-ecommerce-kit
+          sha256sum "${archive}" > "${archive}.sha256"
+          echo "archive=${archive}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Attach to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ steps.build.outputs.tag }}" \
+            "${{ steps.build.outputs.archive }}" \
+            "${{ steps.build.outputs.archive }}.sha256" \
+            --clobber
 
   update-lockfile:
     name: Regenerate uv.lock on release PRs
