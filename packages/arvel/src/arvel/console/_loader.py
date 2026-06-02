@@ -52,6 +52,11 @@ def discover_commands() -> list[Command]:
     return commands
 
 
+def entry_point_names() -> list[str]:
+    """Command names from entry-point metadata only — no module imports."""
+    return [ep.name for ep in importlib.metadata.entry_points(group="arvel.commands")]
+
+
 def load_command(name: str) -> Command | None:
     """Load just the single command matching ``name`` without importing the rest.
 

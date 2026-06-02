@@ -478,7 +478,7 @@ class TestOutsideProjectWrapper:
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(sys, "argv", ["arvel"])
 
-        with patch.object(entrypoint, "build_app") as mock_build:
+        with patch.object(entrypoint, "build_listing_app") as mock_build:
             mock_app = MagicMock()
             mock_build.return_value = mock_app
             with pytest.raises(SystemExit):
@@ -549,7 +549,7 @@ class TestInProjectBootstrap:
         cmd = MigrateCommand()
 
         with (
-            patch.object(entrypoint, "discover_commands", return_value=[cmd]),
+            patch.object(entrypoint, "load_command", return_value=cmd),
             patch.object(entrypoint, "bootstrap_framework_application", return_value=framework_app),
             patch("arvel.console.entrypoint.Application") as console_cls,
         ):
