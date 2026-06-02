@@ -105,6 +105,8 @@ ignore = [
     "BLE001",   # broad except in cookie encryption test is intentional
 ]
 "**/benchmarks/**" = ["S101", "INP001", "T201", "E501"]
+# Executable maintenance scripts: print is the interface, no package __init__.
+"scripts/**" = ["INP001", "T201"]
 "conftest.py" = [
     "UP036",   # tomllib fallback is intentional for portability
     "UP037",   # TYPE_CHECKING-guarded names are stringified by design

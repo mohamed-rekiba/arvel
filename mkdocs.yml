@@ -104,6 +104,27 @@ plugins:
       separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
   # Converts GitHub-style callouts (> [!NOTE]) into Material admonitions at build time.
   - gh-admonitions
+  # Renders the API reference from the installed `arvel` package's docstrings +
+  # type signatures. signature_crossrefs is off on purpose: under `strict`, an
+  # unresolved annotation cross-ref is a fatal warning, and we'd rather ship.
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            docstring_section_style: table
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_signature_annotations: true
+            separate_signature: true
+            signature_crossrefs: false
+            merge_init_into_class: true
+            members_order: source
+            filters: ["!^_"]
   - minify:
       minify_html: true
 
@@ -213,6 +234,7 @@ nav:
   - Kits:
       - Arvel Ecommerce Kit: kits/ecommerce-kit.md
   - Reference:
+      - API Reference: reference/api.md
       - Release Notes: releases.md
       - Upgrade Guide: upgrade.md
       - Contribution Guide: contributions.md
