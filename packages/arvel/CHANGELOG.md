@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.7.3...arvel-v0.8.0) (2026-06-02)
+
+
+### Features
+
+* **cli:** fetch ecommerce kit from github release ([5ece23f](https://github.com/mohamed-rekiba/arvel/commit/5ece23f902f78712f3ba748cd5ed9e4db2ee16ac))
+
 ## [0.7.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.7.2...arvel-v0.7.3) (2026-06-02)
 
 
