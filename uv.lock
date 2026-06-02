@@ -619,7 +619,7 @@ requires-dist = [
 
 [[package]]
 name = "arvel-permission"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "packages/arvel-permission" }
 dependencies = [
     { name = "arvel" },
