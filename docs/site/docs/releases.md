@@ -58,7 +58,7 @@ Optional packages live in the same monorepo and install as extras (`arvel[oauth]
 | [`arvel-image`](packages/image.md) | Image manipulation + a media library |
 | [`arvel-search`](packages/search.md) | Full-text search over models |
 | [`arvel-audit`](packages/audit.md) | Model audit trails & activity logs |
-| [`arvel-ecommerce-kit`](packages/ecommerce-kit.md) | A full reference app built on Arvel |
+| [`arvel-ecommerce-kit`](kits/ecommerce-kit.md) | A full reference app built on Arvel |
 
 <a name="roadmap"></a>
 ## Roadmap
