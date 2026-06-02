@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.7.1...arvel-v0.7.2) (2026-06-02)
+
+
+### Refactors
+
+* **kits:** relocate e-commerce demo to kits/arvel-ecommerce-kit ([6976002](https://github.com/mohamed-rekiba/arvel/commit/6976002ba05edd500e433fa4c3fbc2b08e3d23ea))
+
 ## [0.7.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.7.0...arvel-v0.7.1) (2026-06-02)
 
 
