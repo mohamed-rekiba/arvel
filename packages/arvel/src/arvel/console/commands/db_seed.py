@@ -8,7 +8,8 @@ Exit codes:
 - 0 — success
 - 1 — seeder body raised
 - 2 — bootstrap failed, seeder file missing, seeder class missing,
-       or seeder name violates the allowlist
+       seeder name violates the allowlist, the database is unavailable,
+       or the schema isn't migrated yet
 """
 
 from __future__ import annotations
@@ -25,7 +26,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
 from arvel.console._t import Option as _Option
+from arvel.console.commands.migrate import BootstrapFailedError, build_migrator, resolve_engine
 from arvel.database import Seeder
+from arvel.database.health import (
+    DatabaseNotMigratedError,
+    DatabaseUnavailableError,
+    check_database_connection,
+)
+from arvel.database.schema import Schema
 from arvel.database.session import use_session
 from arvel.support.str import Str
 
@@ -59,6 +67,25 @@ def _coerce_to_path(value: object) -> Path:
     if isinstance(value, str):
         return Path(value)
     raise TypeError(f"base_path must be a str or pathlib.Path, got {type(value).__name__}")
+
+
+async def _assert_db_ready(app: object) -> None:
+    """Verify the database is reachable and the schema is migrated.
+
+    Raises ``DatabaseUnavailableError`` if it can't connect, or
+    ``DatabaseNotMigratedError`` if the migrations table is absent or there are
+    pending migrations. Seeding an un-migrated schema just fails later with a
+    cryptic "no such table" — this fails early with a fix.
+    """
+    engine = resolve_engine(app)
+    await check_database_connection(engine)
+    if not await Schema.has_table(engine, "migrations"):
+        raise DatabaseNotMigratedError("database is not migrated — run `arvel migrate` first")
+    pending = await build_migrator(app).pending()
+    if pending:
+        raise DatabaseNotMigratedError(
+            f"{len(pending)} migration(s) pending — run `arvel migrate` before seeding"
+        )
 
 
 def _load_seeder_class(path: Path, class_name: str) -> type[Seeder]:
@@ -170,6 +197,18 @@ class DbSeedCommand(Command):
         """Run *cls* inside a bound session; commit on success."""
         if self.app is None:
             raise RuntimeError("DbSeedCommand._run_seeder requires a bound Application")
+
+        try:
+            await _assert_db_ready(self.app)
+        except DatabaseUnavailableError as exc:
+            typer.echo(f"arvel: database is not available — {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+        except DatabaseNotMigratedError as exc:
+            typer.echo(f"arvel: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+        except BootstrapFailedError as exc:
+            typer.echo(f"arvel: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
 
         maker: async_sessionmaker[AsyncSession] = self.app.container.make(
             async_sessionmaker[AsyncSession]

@@ -28,6 +28,7 @@ from arvel.console.commands.migrate import (
     MigrateRollbackCommand,
     MigrateStatusCommand,
 )
+from arvel.database.migrator import Migrator
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     async_sessionmaker,
@@ -38,6 +39,11 @@ from typer.testing import CliRunner
 from .conftest import invoke_async
 
 runner = CliRunner()
+
+
+def _mark_migrated(engine: AsyncEngine) -> None:
+    """Create the migrations tracking table so db:seed's preflight passes."""
+    asyncio.run(Migrator(engine, Path(".")).ensure_table())
 
 
 _NOOP_UP = '''"""No-op migration."""
@@ -140,6 +146,16 @@ def engine() -> Iterator[AsyncEngine]:
     """In-memory engine. Tests run sync via asyncio.run on the inner CLI calls
     — the engine just needs to be reachable from inside the CLI callback."""
     eng = create_async_engine("sqlite+aiosqlite:///:memory:")
+    try:
+        yield eng
+    finally:
+        asyncio.run(eng.dispose())
+
+
+@pytest.fixture
+def dead_engine() -> Iterator[AsyncEngine]:
+    """An engine that can't connect — sqlite file in a directory that doesn't exist."""
+    eng = create_async_engine("sqlite+aiosqlite:////nonexistent-arvel-dir/does_not_exist.db")
     try:
         yield eng
     finally:
@@ -282,6 +298,7 @@ def test_db_seed_runs_default_database_seeder(
     (project / "database" / "seeders" / "database_seeder.py").write_text(_BASIC_SEEDER)
     monkeypatch.chdir(project)
     app = _make_app_with_engine(project, engine, DbSeedCommand())
+    _mark_migrated(engine)
     result = invoke_async(runner, app.typer_app, ["db:seed"])
     assert result.exit_code == 0, result.stdout + result.stderr
     assert "Seeded: DatabaseSeeder" in result.stdout or "DatabaseSeeder" in result.stdout
@@ -299,6 +316,7 @@ def test_db_seed_with_explicit_seeder_name(
     (project / "database" / "seeders" / "post_seeder.py").write_text(post_seeder)
     monkeypatch.chdir(project)
     app = _make_app_with_engine(project, engine, DbSeedCommand())
+    _mark_migrated(engine)
     result = invoke_async(runner, app.typer_app, ["db:seed", "--seeder", "PostSeeder"])
     assert result.exit_code == 0, result.stdout + result.stderr
     assert "PostSeeder" in result.stdout
@@ -338,6 +356,7 @@ def test_db_seed_body_failure_exits_1(
     (project / "database" / "seeders" / "bad_seeder.py").write_text(_RAISING_SEEDER)
     monkeypatch.chdir(project)
     app = _make_app_with_engine(project, engine, DbSeedCommand())
+    _mark_migrated(engine)
     result = invoke_async(runner, app.typer_app, ["db:seed", "--seeder", "BadSeeder"])
     assert result.exit_code == 1
     assert "seeder failed" in result.stderr.lower()
@@ -405,6 +424,63 @@ async def down(schema: Schema) -> None:
         return await Schema.has_table(engine, "posts")
 
     assert asyncio.run(_check()) is True
+
+
+# ============================================================
+# Pre-flight validation — DB reachable (migrate) + migrated (db:seed)
+# ============================================================
+
+
+def test_migrate_exits_2_when_database_unavailable(
+    project: Path, dead_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """migrate refuses to run against a database it can't reach."""
+    monkeypatch.chdir(project)
+    app = _make_app_with_engine(project, dead_engine, MigrateCommand())
+    result = invoke_async(runner, app.typer_app, ["migrate"])
+    assert result.exit_code == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "database is not available" in result.stderr.lower()
+
+
+def test_db_seed_exits_2_when_database_unavailable(
+    project: Path, dead_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """db:seed refuses to run against a database it can't reach."""
+    (project / "database" / "seeders" / "database_seeder.py").write_text(_BASIC_SEEDER)
+    monkeypatch.chdir(project)
+    app = _make_app_with_engine(project, dead_engine, DbSeedCommand())
+    result = invoke_async(runner, app.typer_app, ["db:seed"])
+    assert result.exit_code == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "database is not available" in result.stderr.lower()
+
+
+def test_db_seed_exits_2_when_not_migrated(
+    project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """db:seed refuses to seed before any migration has run."""
+    (project / "database" / "seeders" / "database_seeder.py").write_text(_BASIC_SEEDER)
+    monkeypatch.chdir(project)
+    app = _make_app_with_engine(project, engine, DbSeedCommand())
+    # No _mark_migrated — the migrations tracking table doesn't exist.
+    result = invoke_async(runner, app.typer_app, ["db:seed"])
+    assert result.exit_code == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "not migrated" in result.stderr.lower()
+    assert "arvel migrate" in result.stderr.lower()
+
+
+def test_db_seed_exits_2_when_migrations_pending(
+    project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """db:seed refuses to seed while migrations are still pending."""
+    (project / "database" / "seeders" / "database_seeder.py").write_text(_BASIC_SEEDER)
+    (project / "database" / "migrations" / "2026_01_01_a.py").write_text(_NOOP_UP)
+    monkeypatch.chdir(project)
+    app = _make_app_with_engine(project, engine, DbSeedCommand())
+    _mark_migrated(engine)  # creates the tracking table but applies nothing
+    result = invoke_async(runner, app.typer_app, ["db:seed"])
+    assert result.exit_code == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "pending" in result.stderr.lower()
+    assert "arvel migrate" in result.stderr.lower()
 
 
 # ============================================================
