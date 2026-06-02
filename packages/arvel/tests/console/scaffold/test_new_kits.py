@@ -13,7 +13,7 @@ import pytest
 from arvel.console._scaffold import (
     DEFAULT_KIT,
     KITS,
-    KitNotInstalledError,
+    KitDownloadError,
     KitSpec,
     UnknownKitError,
     available_kits,
@@ -136,21 +136,20 @@ def test_new_explicit_api_kit_matches_default_output(runner: CliRunner, tmp_path
 
 
 # ────────────────────────────────────────────────────────────────────
-# Kit-not-installed surface
+# Kit-unavailable surface
 # ────────────────────────────────────────────────────────────────────
 
 
-def test_kit_not_installed_surfaces_install_hint(
+def test_kit_download_failure_surfaces_hint(
     runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A registered kit whose package isn't importable → exit 1 + install hint."""
+    """A kit that can't be fetched → exit 1 + an accurate hint, never `pip install`."""
     from arvel.console._scaffold import kits as kits_module
 
     def _raise() -> Path:
-        raise KitNotInstalledError(
+        raise KitDownloadError(
             name="ecommerce",
-            package="arvel-ecommerce-kit",
-            original=ImportError("simulated"),
+            hint="couldn't fetch the e-commerce kit release. Check your network and retry.",
         )
 
     fake_spec = KitSpec(
@@ -164,5 +163,34 @@ def test_kit_not_installed_surfaces_install_hint(
     with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app, ["new", "my-app", "--kit", "ecommerce", "--no-install"])
         assert result.exit_code == 1
-        assert "arvel-ecommerce-kit" in result.stderr
-        assert "pip install" in result.stderr or "uv add" in result.stderr
+        assert "ecommerce" in result.stderr
+        assert "fetch" in result.stderr
+        # The kit was never published to PyPI — never advise installing it.
+        assert "pip install arvel-ecommerce-kit" not in result.stderr
+
+
+def test_new_ecommerce_renames_project_and_uses_kit_sync(
+    runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The kit copies verbatim, gets its pyproject name rewritten, and syncs with extras."""
+    from arvel.console._scaffold import kits as kits_module
+
+    kit_src = tmp_path / "kit-src"
+    kit_src.mkdir()
+    (kit_src / "pyproject.toml").write_text(
+        '[project]\nname = "arvel-ecommerce-kit"\nversion = "1.0.0"\n', encoding="utf-8"
+    )
+    (kit_src / "README.md").write_text("# kit\n", encoding="utf-8")
+
+    fake_spec = KitSpec(name="ecommerce", description="(local)", resolve=lambda: kit_src)
+    monkeypatch.setitem(kits_module.KITS, "ecommerce", fake_spec)
+
+    app = build_app()
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
+        result = runner.invoke(app, ["new", "my-shop", "--kit", "ecommerce", "--no-install"])
+        assert result.exit_code == 0, result.stderr
+        project = Path(iso_cwd) / "my-shop"
+        pyproject = (project / "pyproject.toml").read_text(encoding="utf-8")
+        assert 'name = "my-shop"' in pyproject
+        assert "arvel-ecommerce-kit" not in pyproject
+        assert "uv sync --all-extras --dev" in result.stdout

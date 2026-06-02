@@ -16,11 +16,13 @@ Pipeline:
 6. Print next-steps. for the templating contract.
 """
 
+import re
 import shutil
 
-# Only invoked with the resolved `uv` binary and a static argv (`uv sync`).
+# Only invoked with the resolved `uv` binary and a static argv (`uv sync …`).
 import subprocess  # nosec B404
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, ClassVar
@@ -31,8 +33,8 @@ from arvel.console import Command, Context
 from arvel.console._scaffold import (
     DEFAULT_KIT,
     InvalidProjectName,
-    KitNotInstalledError,
     KitSpec,
+    KitUnavailableError,
     UnknownKitError,
     format_kit_listing,
     resolve_kit,
@@ -132,14 +134,20 @@ def _render_skeleton(
         destination.write_text(rendered, encoding="utf-8")
 
 
-def _print_next_steps(name: str, *, no_install: bool, kit: str = DEFAULT_KIT) -> None:
+def _print_next_steps(
+    name: str,
+    *,
+    no_install: bool,
+    kit: str = DEFAULT_KIT,
+    sync_args: Sequence[str] = ("sync",),
+) -> None:
     typer.echo("")
     typer.echo(f"Created {name}/ from the {kit!r} kit.")
     typer.echo("")
     typer.echo("Next steps:")
     typer.echo(f"  cd {name}")
     if no_install:
-        typer.echo("  uv sync")
+        typer.echo("  " + "uv " + " ".join(sync_args))
     typer.echo("  uv run arvel serve")
     typer.echo("")
 
@@ -165,13 +173,8 @@ def _resolve_kit_or_exit(kit: str) -> KitSpec:
 def _resolve_kit_root_or_exit(kit_spec: KitSpec) -> Path:
     try:
         return kit_spec.root()
-    except KitNotInstalledError as exc:
-        typer.echo(
-            f"arvel: kit {kit_spec.name!r} requires the {exc.package!r} package; "
-            f"install it with `pip install {exc.package}` (or "
-            f"`uv add {exc.package}`) and try again.",
-            err=True,
-        )
+    except KitUnavailableError as exc:
+        typer.echo(f"arvel: kit {exc.name!r} is unavailable: {exc.hint}", err=True)
         raise typer.Exit(code=1) from exc
     except FileNotFoundError as exc:
         typer.echo(f"arvel: {exc}", err=True)
@@ -214,24 +217,56 @@ def _stage_and_promote(kit_root: Path, opts: _StageOptions) -> None:
             shutil.rmtree(staging_parent, ignore_errors=True)
 
 
-def _run_uv_sync(target: Path) -> None:
+def _uv_sync_args(kit: str) -> tuple[str, ...]:
+    """The api skeleton has no extras; the e-commerce kit pulls many + a dev group."""
+    if kit == DEFAULT_KIT:
+        return ("sync",)
+    return ("sync", "--all-extras", "--dev")
+
+
+def _run_uv_sync(target: Path, args: Sequence[str]) -> None:
     uv_bin = shutil.which("uv")
+    command = "uv " + " ".join(args)
     if uv_bin is None:
         typer.echo(
-            "arvel: 'uv' not found on PATH — skipping `uv sync`. Run it manually.",
+            f"arvel: 'uv' not found on PATH — skipping `{command}`. Run it manually.",
             err=True,
         )
         return
     try:
-        # Static allowlist: resolved `uv` binary + literal "sync"; no user-controlled tokens.
+        # Static allowlist: resolved `uv` binary + literal sync flags; no user-controlled tokens.
         subprocess.run(  # noqa: S603  # nosec B603
-            [uv_bin, "sync"],
+            [uv_bin, *args],
             cwd=target,
             check=True,
         )
     except subprocess.CalledProcessError as exc:
-        typer.echo(f"arvel: `uv sync` failed: {exc}", err=True)
+        typer.echo(f"arvel: `{command}` failed: {exc}", err=True)
         raise typer.Exit(code=1) from exc
+
+
+def _apply_project_identity(target: Path, project: str, kit: str) -> None:
+    """Rename the scaffolded project to the user's name.
+
+    The api skeleton already substitutes ``{{project_name}}`` tokens; the
+    e-commerce kit is copied verbatim, so its ``pyproject.toml`` name is
+    rewritten here. ``project`` is validated against PROJECT_NAME_REGEX, so
+    it's safe to drop into the TOML literal.
+    """
+    if kit == DEFAULT_KIT:
+        return
+    pyproject = target / "pyproject.toml"
+    if not pyproject.is_file():
+        return
+    text = pyproject.read_text(encoding="utf-8")
+    rewritten = re.sub(
+        r'(?m)^name\s*=\s*"arvel-ecommerce-kit"',
+        f'name = "{project}"',
+        text,
+        count=1,
+    )
+    if rewritten != text:
+        pyproject.write_text(rewritten, encoding="utf-8")
 
 
 def _scaffold(
@@ -269,10 +304,13 @@ def _scaffold(
         ),
     )
 
-    if not no_install:
-        _run_uv_sync(target)
+    _apply_project_identity(target, validated, kit_spec.name)
 
-    _print_next_steps(validated, no_install=no_install, kit=kit_spec.name)
+    sync_args = _uv_sync_args(kit_spec.name)
+    if not no_install:
+        _run_uv_sync(target, sync_args)
+
+    _print_next_steps(validated, no_install=no_install, kit=kit_spec.name, sync_args=sync_args)
 
 
 def _new_callback(

@@ -78,6 +78,11 @@
       "component": "arvel-audit",
       "package-name": "arvel-audit",
       "changelog-path": "CHANGELOG.md"
+    },
+    "kits/arvel-ecommerce-kit": {
+      "component": "arvel-ecommerce-kit",
+      "package-name": "arvel-ecommerce-kit",
+      "changelog-path": "CHANGELOG.md"
     }
   }
 }
