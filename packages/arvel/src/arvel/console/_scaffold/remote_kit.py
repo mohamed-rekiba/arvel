@@ -170,9 +170,19 @@ def _fetch_sha256(client: httpx.Client, url: str) -> str:
 
 def _extract(archive: Path, dest: Path) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
+    dest_root = dest.resolve()
     with tarfile.open(archive, "r:gz") as tar:
-        # filter="data" blocks path traversal, absolute paths, and device nodes.
-        tar.extractall(dest, filter="data")
+        for member in tar:
+            # filter="data" rejects absolute paths, traversal, device nodes, and
+            # unsafe links. We extract per-member (never extractall) and re-check
+            # containment, so a crafted archive can't write outside the kit dir.
+            target = (dest_root / member.name).resolve()
+            if not target.is_relative_to(dest_root):
+                raise KitDownloadError(
+                    name="ecommerce",
+                    hint=f"refusing to extract an entry outside the kit dir: {member.name!r}.",
+                )
+            tar.extract(member, dest_root, filter="data")
     return dest
 
 
