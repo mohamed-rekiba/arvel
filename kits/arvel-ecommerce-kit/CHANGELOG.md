@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.2.2...arvel-ecommerce-kit-v1.2.3) (2026-06-02)
+
+
+### Bug Fixes
+
+* **kits:** localize ecommerce docker-compose for scaffolded projects ([27da3f6](https://github.com/mohamed-rekiba/arvel/commit/27da3f6705f4f2646ec4833d25b709c5311e636b))
+
 ## [1.2.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.2.1...arvel-ecommerce-kit-v1.2.2) (2026-06-02)
 
 

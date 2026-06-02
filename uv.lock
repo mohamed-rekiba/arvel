@@ -539,7 +539,7 @@ requires-dist = [
 
 [[package]]
 name = "arvel-ecommerce-kit"
-version = "1.2.2"
+version = "1.2.3"
 source = { virtual = "kits/arvel-ecommerce-kit" }
 dependencies = [
     { name = "arvel", extra = ["bcrypt", "broadcasting", "image", "jwt", "mail", "permission", "postgres", "queue", "queue-amqp", "redis", "s3"] },
