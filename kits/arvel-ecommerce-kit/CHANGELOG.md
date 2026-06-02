@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.2.1...arvel-ecommerce-kit-v1.2.2) (2026-06-02)
+
+
+### Bug Fixes
+
+* **kits:** unbreak ecommerce kit dependency resolution ([5dcd557](https://github.com/mohamed-rekiba/arvel/commit/5dcd557d13547c692ac792fd2b3060e9321fff89))
+
 ## [1.2.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.2.0...arvel-ecommerce-kit-v1.2.1) (2026-06-02)
 
 
