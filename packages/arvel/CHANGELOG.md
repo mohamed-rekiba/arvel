@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.4](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.9.3...arvel-v0.9.4) (2026-06-02)
+
+
+### Performance
+
+* **cli:** lazy-load framework imports and add startup banner ([309bcbf](https://github.com/mohamed-rekiba/arvel/commit/309bcbfecb98041a9866f323335e6edecdf6b6e2))
+
 ## [0.9.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.9.2...arvel-v0.9.3) (2026-06-02)
 
 
