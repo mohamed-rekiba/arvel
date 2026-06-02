@@ -20,7 +20,7 @@ classifiers = [
 # mail: SMTP via Mailpit, s3: MinIO, jwt: token auth, broadcasting: WebSockets,
 # bcrypt: password hashing, permission/image: published companion packages.
 dependencies = [
-    "arvel[postgres,redis,queue,queue-amqp,mail,s3,jwt,broadcasting,bcrypt,permission,image]>=1.0.0",
+    "arvel[postgres,redis,queue,queue-amqp,mail,s3,jwt,broadcasting,bcrypt,permission,image]",
 ]
 
 [dependency-groups]
