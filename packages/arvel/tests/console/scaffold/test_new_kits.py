@@ -177,8 +177,18 @@ def test_new_ecommerce_renames_project_and_uses_kit_sync(
 
     kit_src = tmp_path / "kit-src"
     kit_src.mkdir()
+    # Mirrors the real kit: monorepo name + uv workspace plumbing that must be
+    # stripped so the scaffolded project syncs outside the Arvel checkout.
     (kit_src / "pyproject.toml").write_text(
-        '[project]\nname = "arvel-ecommerce-kit"\nversion = "1.0.0"\n', encoding="utf-8"
+        '[project]\n'
+        'name = "arvel-ecommerce-kit"\n'
+        'version = "1.0.0"\n'
+        'dependencies = ["arvel[postgres]>=1.0.0"]\n\n'
+        "[tool.uv]\n"
+        "package = false\n\n"
+        "[tool.uv.sources]\n"
+        "arvel = { workspace = true }\n",
+        encoding="utf-8",
     )
     (kit_src / "README.md").write_text("# kit\n", encoding="utf-8")
 
@@ -193,4 +203,9 @@ def test_new_ecommerce_renames_project_and_uses_kit_sync(
         pyproject = (project / "pyproject.toml").read_text(encoding="utf-8")
         assert 'name = "my-shop"' in pyproject
         assert "arvel-ecommerce-kit" not in pyproject
+        # Workspace-only plumbing is gone; the dep stays so PyPI resolution works.
+        assert "[tool.uv.sources]" not in pyproject
+        assert "workspace = true" not in pyproject
+        assert "package = false" not in pyproject
+        assert 'arvel[postgres]>=1.0.0' in pyproject
         assert "uv sync --all-extras --dev" in result.stdout
