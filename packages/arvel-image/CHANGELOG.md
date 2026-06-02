@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-image-v0.6.1...arvel-image-v0.7.0) (2026-06-02)
+
+
+### Features
+
+* **cli:** fetch ecommerce kit from github release ([5ece23f](https://github.com/mohamed-rekiba/arvel/commit/5ece23f902f78712f3ba748cd5ed9e4db2ee16ac))
+
 ## [0.6.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-image-v0.6.0...arvel-image-v0.6.1) (2026-06-02)
 
 
