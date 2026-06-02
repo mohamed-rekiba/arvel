@@ -62,7 +62,7 @@ Where each subsystem lives in the tree, so a doc page maps back to code. All pat
 | CLI infra + commands | `console/` | [CLI architecture](../console/cli-architecture.md) |
 | Project skeleton | `_skeleton/` | — |
 | Companion libraries | `packages/arvel-{audit,image,oauth,permission,search}/` | [packages](../packages/overview.md) |
-| Reference app | `kits/arvel-ecommerce-kit/` | [kit](../packages/ecommerce-kit.md) |
+| Reference app | `kits/arvel-ecommerce-kit/` | [kit](../kits/ecommerce-kit.md) |
 
 ## Build & quality
 
