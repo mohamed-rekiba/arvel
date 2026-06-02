@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.7.2...arvel-v0.7.3) (2026-06-02)
+
+
+### Documentation
+
+* add API reference, changelog, and contributor-docs link checker ([d8247e8](https://github.com/mohamed-rekiba/arvel/commit/d8247e8d314c5e9303ae136b812e1dc849ff87d1))
+
 ## [0.7.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.7.1...arvel-v0.7.2) (2026-06-02)
 
 
