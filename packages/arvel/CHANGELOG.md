@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.10.0...arvel-v0.11.0) (2026-06-02)
+
+
+### Features
+
+* **cli:** add db pre-flight checks and ecommerce-kit healthcheck ([f76de0e](https://github.com/mohamed-rekiba/arvel/commit/f76de0e9e23a940233b5ddd9481d05ae3efc94af))
+
 ## [0.10.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.9.4...arvel-v0.10.0) (2026-06-02)
 
 
