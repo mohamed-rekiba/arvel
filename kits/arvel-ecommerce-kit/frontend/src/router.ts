@@ -229,18 +229,20 @@ router.beforeEach(async (to) => {
     await loadCurrentUser()
   }
 
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } }
-  }
-
+  // Admin routes carry both requiresAuth and requiresAdmin. Handle them first
+  // so unauthenticated users land on the admin login, not the storefront one.
   if (to.meta.requiresAdmin) {
     if (!auth.isAuthenticated) {
       return { name: 'admin-login', query: { redirect: to.fullPath } }
     }
-    const user = auth.user
-    if (!hasAdminAccess(user)) {
+    if (!hasAdminAccess(auth.user)) {
       return { name: 'home' }
     }
+    return true
+  }
+
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } }
   }
 
   return true
