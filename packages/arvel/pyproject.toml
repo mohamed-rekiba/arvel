@@ -1,6 +1,6 @@
 [project]
 name = "arvel"
-version = "0.7.0" # x-release-please-version
+version = "0.7.1" # x-release-please-version
 description = "The Laravel of Python — FastAPI + Pydantic + SQLAlchemy, end-to-end type-safe."
 readme = "README.md"
 requires-python = ">=3.14"
