@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.9.4...arvel-v0.10.0) (2026-06-02)
+
+
+### Features
+
+* **cli:** lazy --help listing and in-project command dispatch ([367ea70](https://github.com/mohamed-rekiba/arvel/commit/367ea7047d7d0f163bb5fa849e82518e7a2d59e1))
+
 ## [0.9.4](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.9.3...arvel-v0.9.4) (2026-06-02)
 
 
