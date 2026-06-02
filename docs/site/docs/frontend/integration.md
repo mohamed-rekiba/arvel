@@ -8,7 +8,7 @@ Arvel is an API-first framework. Your handlers return [API resources](../the-bas
 This guide covers the contract between Arvel and those clients: how to generate a typed client from the spec, how to authenticate from a browser versus a phone, how CORS and realtime fit in, and the response shapes every client should expect.
 
 > [!NOTE]
-> The [e-commerce demo](../packages/ecommerce-demo.md) ships a real Vue 3 + Orval frontend wired against an Arvel backend. Every snippet below is drawn from that setup — clone it if you want a working reference.
+> The [e-commerce kit](../packages/ecommerce-kit.md) ships a real Vue 3 + Orval frontend wired against an Arvel backend. Every snippet below is drawn from that setup — clone it if you want a working reference.
 
 <a name="the-openapi-contract"></a>
 ## The OpenAPI Contract
@@ -37,7 +37,7 @@ arvel openapi:validate --spec frontend/openapi.yaml
 <a name="generating-a-typed-client"></a>
 ## Generating a Typed Client
 
-Any OpenAPI generator works against the exported spec. The demo uses [Orval](https://orval.dev), which produces typed functions plus framework-specific hooks. Its config mirrors the demo's `orval.config.ts`:
+Any OpenAPI generator works against the exported spec. The kit uses [Orval](https://orval.dev), which produces typed functions plus framework-specific hooks. Its config mirrors the kit's `orval.config.ts`:
 
 ```ts
 // frontend/orval.config.ts
@@ -99,12 +99,12 @@ export async function request<T>(config: RequestConfig): Promise<T> {
 ```
 
 > [!NOTE]
-> `openapi-typescript`, `openapi-generator`, and the language-specific generators in the [Mobile clients](#mobile-clients) section all consume the same `openapi.yaml`. Orval isn't special — it's just what the demo happens to use.
+> `openapi-typescript`, `openapi-generator`, and the language-specific generators in the [Mobile clients](#mobile-clients) section all consume the same `openapi.yaml`. Orval isn't special — it's just what the kit happens to use.
 
 <a name="keeping-the-client-in-sync"></a>
 ## Keeping the Client in Sync
 
-Regenerate whenever the spec changes. The demo wraps both steps in one `make` target:
+Regenerate whenever the spec changes. The kit wraps both steps in one `make` target:
 
 ```makefile
 api-generate:
@@ -146,7 +146,7 @@ Authorization: Bearer eyJhbGci...
 
 `POST /api/auth/refresh` reads the `__Host-refresh` cookie and issues a fresh access token. `GET /api/auth/me` returns the current user wrapped in a `{ "data": { ... } }` envelope.
 
-**Browser SPAs** get the refresh/CSRF cookies for free — the browser stores and resends them, so a silent refresh is just a `fetch('/api/auth/refresh')`. Keep the short-lived access token in memory (or `localStorage` if you accept the XSS trade-off, as the demo does) and let the HttpOnly refresh cookie do the long-term work.
+**Browser SPAs** get the refresh/CSRF cookies for free — the browser stores and resends them, so a silent refresh is just a `fetch('/api/auth/refresh')`. Keep the short-lived access token in memory (or `localStorage` if you accept the XSS trade-off, as the kit does) and let the HttpOnly refresh cookie do the long-term work.
 
 See [Authentication](../features/authentication.md) for the full endpoint reference and the [Mobile clients](#mobile-clients) section for the bearer-only flow.
 
@@ -261,7 +261,7 @@ async def spa(request: Request, path: str) -> FileResponse:
     return FileResponse(SPA_INDEX)
 ```
 
-Mount the compiled assets as a [static directory](../the-basics/routing.md) and register API routes **before** this catch-all. The [e-commerce demo](../packages/ecommerce-demo.md) does exactly this in production.
+Mount the compiled assets as a [static directory](../the-basics/routing.md) and register API routes **before** this catch-all. The [e-commerce kit](../packages/ecommerce-kit.md) does exactly this in production.
 
 <a name="realtime"></a>
 ## Realtime

@@ -29,7 +29,8 @@ packages/
   arvel-image/           # image manipulation + media library
   arvel-search/          # full-text search
   arvel-audit/           # audit trails & activity logs
-  arvel-ecommerce-demo/  # reference app
+kits/
+  arvel-ecommerce-kit/   # full-stack reference app + `arvel new --kit ecommerce` source
 benchmarks/              # smoke + micro-benchmarks
 docs/
   site/                  # this user-facing docs site (MkDocs)

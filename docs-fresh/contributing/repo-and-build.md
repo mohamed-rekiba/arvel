@@ -1,6 +1,6 @@
 # Repo layout & build
 
-Arvel is a `uv` workspace monorepo: one virtualenv, one lockfile, several packages. The framework core is `packages/arvel`; everything else is a companion library or the demo app.
+Arvel is a `uv` workspace monorepo: one virtualenv, one lockfile, several packages. The framework core is `packages/arvel`; everything else is a companion library or the e-commerce kit.
 
 **Source**: root `pyproject.toml` (`[tool.uv.workspace]`), `Makefile`, `CONTRIBUTING.md`.
 
@@ -19,8 +19,9 @@ arvel/
 │   │       ├── database/       # Arvent ORM
 │   │       ├── http/           # routing, middleware, requests, resources
 │   │       └── <subsystems>/   # cache, queue, events, mail, …
-│   ├── arvel-audit / -image / -oauth / -permission / -search
-│   └── arvel-ecommerce-demo/   # reference app (backend + Vue frontend)
+│   └── arvel-audit / -image / -oauth / -permission / -search
+├── kits/
+│   └── arvel-ecommerce-kit/    # reference app (backend + Vue frontend)
 ├── benchmarks/
 ├── docs/                       # existing site + SDLC artifacts
 └── pyproject.toml              # workspace root, shared tool config

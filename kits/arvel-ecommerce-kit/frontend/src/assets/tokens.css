@@ -1,0 +1,423 @@
+/* Design tokens — Arvel E-Commerce Kit
+ * Colors sourced from the Arvel framework brand (docs/ux/DESIGN.md):
+ * Primary:  Violet  (#6D28D9 light / #A78BFA dark)  — buttons, links, active nav, badges
+ * Accent:   Cyan    (#06B6D4 light / #22D3EE dark)  — highlights on dark, focus rings, energy
+ * Header:   Shell   (#45366F)                        — violet chrome, same both modes
+ * Neutrals: Cool slate (framework neutral scale)
+ */
+
+:root {
+  /* ── Violet primary ramp ─────────────────────────────────────────── */
+  --color-primary-50: oklch(0.969 0.016 296);
+  /* #F5F3FF */
+  --color-primary-100: oklch(0.943 0.036 294);
+  /* #EDE9FE */
+  --color-primary-200: oklch(0.893 0.072 292);
+  /* #DDD6FE */
+  --color-primary-300: oklch(0.823 0.115 292);
+  /* #C4B5FD */
+  --color-primary-400: oklch(0.72 0.167 293);
+  /* #A78BFA ← dark-mode primary */
+  --color-primary-500: oklch(0.591 0.201 294);
+  /* #8B5CF6 */
+  --color-primary-600: oklch(0.511 0.215 292);
+  /* #7C3AED */
+  --color-primary-700: oklch(0.439 0.211 290);
+  /* #6D28D9 ← main light primary */
+  --color-primary-800: oklch(0.371 0.191 290);
+  /* #5B21B6 */
+  --color-primary-900: oklch(0.296 0.152 291);
+  /* #4C1D95 */
+  --color-primary-950: oklch(0.217 0.117 288);
+  /* #2E1065 */
+
+  /* ── Cyan accent ramp ────────────────────────────────────────────── */
+  --color-cyan-50: oklch(0.968 0.039 201);
+  /* #ECFEFF */
+  --color-cyan-100: oklch(0.944 0.065 198);
+  /* #CFFAFE */
+  --color-cyan-200: oklch(0.885 0.106 200);
+  /* #A5F3FC */
+  --color-cyan-300: oklch(0.813 0.143 200);
+  /* #67E8F9 */
+  --color-cyan-400: oklch(0.737 0.148 209);
+  /* #22D3EE ← dark accent */
+  --color-cyan-500: oklch(0.68 0.13 205);
+  /* #06B6D4 ← main light accent */
+  --color-cyan-600: oklch(0.596 0.115 200);
+  /* #0891B2 */
+  --color-cyan-700: oklch(0.508 0.099 200);
+  /* #0E7490 */
+  --color-cyan-800: oklch(0.43 0.084 200);
+  /* #155E75 */
+  --color-cyan-900: oklch(0.36 0.073 198);
+  /* #164E63 */
+
+  /* ── Sale / Discount Red ─────────────────────────────────────────── */
+  --color-sale-50: oklch(0.982 0.018 20);
+  /* #FFF5F5 */
+  --color-sale-100: oklch(0.961 0.04 22);
+  /* #FFE4E1 */
+  --color-sale-500: oklch(0.627 0.257 27);
+  /* #EF4444 */
+  --color-sale-600: oklch(0.537 0.232 25);
+  /* #DC2626 */
+  --color-sale-700: oklch(0.447 0.205 24);
+  /* #B91C1C */
+  --color-sale-900: oklch(0.295 0.13 22);
+  /* #7F1D1D */
+
+  /* ── Rating Gold ─────────────────────────────────────────────────── */
+  --color-gold-400: oklch(0.862 0.163 72);
+  /* #FBBF24 */
+  --color-gold-500: oklch(0.797 0.178 60);
+  /* #F59E0B */
+  --color-gold-600: oklch(0.705 0.165 55);
+  /* #D97706 */
+
+  /* ── Storefront brand aliases (primary = Violet) ─────────────────── */
+  --color-brand: var(--color-primary-700);
+  /* #6D28D9 */
+  --color-brand-hover: var(--color-primary-800);
+  /* #5B21B6 */
+  --color-brand-active: var(--color-primary-900);
+  /* #4C1D95 */
+  --color-brand-soft: var(--color-primary-50);
+  /* #F5F3FF */
+  --color-brand-softest: oklch(0.984 0.008 296);
+  /* lighter lavender */
+
+  /* Header = framework shell violet — same in light and dark modes */
+  --color-brand-hero: oklch(0.315 0.093 289);
+  /* #45366F shell */
+  --color-header-bg: var(--color-brand-hero);
+
+  /* Cart CTA = primary violet (matches framework "Get started" button style) */
+  --color-cart-cta: var(--color-primary-700);
+  --color-cart-cta-hover: var(--color-primary-800);
+
+  /* Cyan accent alias (for highlights on dark surfaces, focus rings) */
+  --color-accent: var(--color-cyan-500);
+  /* #06B6D4 */
+  --color-accent-hover: var(--color-cyan-600);
+  /* #0891B2 */
+
+  /* ── Admin surfaces ──────────────────────────────────────────────── */
+  --color-admin-canvas: oklch(0.975 0.008 286);
+  /* slight cool tint */
+  --color-admin-surface: #ffffff;
+
+  /* ── Admin sidebar — violet brand chrome (midnight → shell) ─────── */
+  --color-admin-sidebar-bg: oklch(0.19 0.07 288); /* #26223C midnight */
+  --color-admin-sidebar-bg-hover: oklch(0.26 0.09 289); /* slightly lighter */
+  --color-admin-sidebar-bg-active: var(--color-primary-700); /* violet-700 brand */
+  --color-admin-sidebar-text: oklch(0.9 0.025 290); /* light violet-white */
+  --color-admin-sidebar-muted: oklch(0.62 0.06 287); /* muted violet-gray */
+  --color-admin-sidebar-active-text: #ffffff;
+  --color-admin-sidebar-border: oklch(0.26 0.085 289); /* subtle violet border */
+  --color-admin-accent: var(--color-cyan-500); /* cyan accent for icons */
+
+  /* ── App surfaces — cool slate (framework neutral scale) ─────────── */
+  --color-app-bg: #ffffff;
+  --color-app-bg-raised: oklch(0.979 0.006 286);
+  /* #F8F8FB */
+  --color-app-bg-sunken: oklch(0.969 0.01 286);
+  /* #F4F4F8 */
+
+  /* ── Foreground / text — cool slate ─────────────────────────────── */
+  --color-fg: oklch(0.1 0.01 285);
+  /* #0B0B12 near-black w/ violet tint */
+  --color-fg-muted: oklch(0.525 0.02 287);
+  /* #6B6B7B */
+  --color-fg-faint: oklch(0.718 0.018 282);
+  /* #A8A8B8 */
+
+  --color-text-primary: var(--color-fg);
+  --color-text-muted: var(--color-fg-muted);
+
+  /* ── Borders — cool slate ────────────────────────────────────────── */
+  --color-border: oklch(0.92 0.012 287);
+  /* #E5E5EC */
+  --color-border-strong: oklch(0.86 0.018 285);
+  /* #D4D4DE */
+  --color-border-subtle: oklch(0.955 0.008 286);
+  /* #F1F1F6 */
+
+  /* ── Status semantic (from framework docs/ux/DESIGN.md) ─────────── */
+  --color-success: oklch(0.62 0.16 162);
+  /* #10B981 emerald */
+  --color-danger: oklch(0.627 0.257 27);
+  /* #EF4444 red */
+  --color-warning: oklch(0.797 0.178 72);
+  /* #F59E0B amber */
+  --color-info: oklch(0.546 0.232 262);
+  /* #3B82F6 blue */
+
+  /* ── Commerce-specific semantic aliases ──────────────────────────── */
+  --color-price-sale: var(--color-sale-500);
+  --color-price-original: var(--color-fg-muted);
+  --color-rating-star: var(--color-gold-500);
+  --color-rating-empty: oklch(0.92 0.012 287);
+  --color-wishlist: var(--color-sale-500);
+  --color-wishlist-empty: oklch(0.718 0.018 282);
+  --color-flash-sale: var(--color-sale-600);
+  --color-flash-sale-bg: var(--color-sale-50);
+  --color-discount-badge: var(--color-sale-500);
+  --color-stock-in: oklch(0.535 0.143 162);
+  /* #059669 */
+  --color-stock-low: var(--color-gold-600);
+  --color-stock-out: var(--color-sale-600);
+
+  /* ── Admin dashboard stat / chart colors ─────────────────────────── */
+  --color-stat-revenue: oklch(0.797 0.178 72);
+  /* amber */
+  --color-stat-orders: oklch(0.546 0.232 262);
+  /* blue */
+  --color-stat-customers: oklch(0.62 0.16 162);
+  /* emerald */
+  --color-stat-conversion: var(--color-primary-600);
+  /* violet */
+  --color-chart-primary: oklch(0.546 0.232 262);
+  --color-chart-secondary: oklch(0.797 0.178 72);
+  --color-trend-up: oklch(0.535 0.143 162);
+  --color-trend-down: var(--color-sale-500);
+
+  /* ── Order / record status badge tokens ──────────────────────────── */
+  --color-status-pending-bg: oklch(0.973 0.055 87);
+  /* amber-100 */
+  --color-status-pending-fg: oklch(0.601 0.148 52);
+  /* amber-700 */
+  --color-status-active-bg: oklch(0.956 0.038 240);
+  --color-status-active-fg: oklch(0.491 0.182 240);
+  --color-status-shipped-bg: var(--color-primary-100);
+  --color-status-shipped-fg: var(--color-primary-700);
+  --color-status-delivered-bg: oklch(0.952 0.047 161);
+  --color-status-delivered-fg: oklch(0.448 0.122 162);
+
+  /* ── Admin KPI card tones ────────────────────────────────────────── */
+  --color-kpi-amber-bg: oklch(0.973 0.055 87);
+  --color-kpi-amber-fg: oklch(0.705 0.165 58);
+  --color-kpi-danger-bg: oklch(0.961 0.04 22);
+  --color-kpi-danger-fg: oklch(0.537 0.232 25);
+  --color-kpi-indigo-bg: var(--color-primary-100);
+  --color-kpi-indigo-fg: var(--color-primary-700);
+  --color-kpi-emerald-bg: oklch(0.952 0.047 161);
+  --color-kpi-emerald-fg: oklch(0.535 0.143 162);
+
+  /* ── Motion tokens ───────────────────────────────────────────────── */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0.1, 1.4);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── Layout constants ────────────────────────────────────────────── */
+  --header-height: 112px;
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 72px;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-pill: 9999px;
+}
+
+/* ── Tailwind v4 @theme integration ──────────────────────────────── */
+@theme {
+  /* Violet primary ramp */
+  --color-primary-50: var(--color-primary-50);
+  --color-primary-100: var(--color-primary-100);
+  --color-primary-200: var(--color-primary-200);
+  --color-primary-300: var(--color-primary-300);
+  --color-primary-400: var(--color-primary-400);
+  --color-primary-500: var(--color-primary-500);
+  --color-primary-600: var(--color-primary-600);
+  --color-primary-700: var(--color-primary-700);
+  --color-primary-800: var(--color-primary-800);
+  --color-primary-900: var(--color-primary-900);
+  --color-primary-950: var(--color-primary-950);
+
+  /* Cyan accent ramp */
+  --color-cyan-50: var(--color-cyan-50);
+  --color-cyan-100: var(--color-cyan-100);
+  --color-cyan-200: var(--color-cyan-200);
+  --color-cyan-300: var(--color-cyan-300);
+  --color-cyan-400: var(--color-cyan-400);
+  --color-cyan-500: var(--color-cyan-500);
+  --color-cyan-600: var(--color-cyan-600);
+  --color-cyan-700: var(--color-cyan-700);
+  --color-cyan-800: var(--color-cyan-800);
+  --color-cyan-900: var(--color-cyan-900);
+
+  /* Navy ramp */
+  --color-navy-50: var(--color-navy-50);
+  --color-navy-100: var(--color-navy-100);
+  --color-navy-500: var(--color-navy-500);
+  --color-navy-900: var(--color-navy-900);
+  --color-navy-950: var(--color-navy-950);
+
+  /* Storefront brand */
+  --color-brand: var(--color-brand);
+  --color-brand-hover: var(--color-brand-hover);
+  --color-brand-active: var(--color-brand-active);
+  --color-brand-soft: var(--color-brand-soft);
+  --color-brand-softest: var(--color-brand-softest);
+  --color-brand-hero: var(--color-brand-hero);
+  --color-header-bg: var(--color-header-bg);
+
+  /* Cart CTA */
+  --color-cart-cta: var(--color-cart-cta);
+  --color-cart-cta-hover: var(--color-cart-cta-hover);
+
+  /* Cyan accent */
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+
+  /* Admin */
+  --color-admin-canvas: var(--color-admin-canvas);
+  --color-admin-surface: var(--color-admin-surface);
+  --color-admin-sidebar-bg: var(--color-admin-sidebar-bg);
+  --color-admin-sidebar-bg-hover: var(--color-admin-sidebar-bg-hover);
+  --color-admin-sidebar-bg-active: var(--color-admin-sidebar-bg-active);
+  --color-admin-sidebar-text: var(--color-admin-sidebar-text);
+  --color-admin-sidebar-muted: var(--color-admin-sidebar-muted);
+  --color-admin-sidebar-active-text: var(--color-admin-sidebar-active-text);
+  --color-admin-sidebar-border: var(--color-admin-sidebar-border);
+  --color-admin-accent: var(--color-admin-accent);
+
+  /* App surfaces */
+  --color-app-bg: var(--color-app-bg);
+  --color-app-bg-raised: var(--color-app-bg-raised);
+  --color-app-bg-sunken: var(--color-app-bg-sunken);
+
+  /* Foreground */
+  --color-fg: var(--color-fg);
+  --color-fg-muted: var(--color-fg-muted);
+  --color-fg-faint: var(--color-fg-faint);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-muted: var(--color-text-muted);
+
+  /* Borders */
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-border-subtle: var(--color-border-subtle);
+
+  /* Status */
+  --color-success: var(--color-success);
+  --color-danger: var(--color-danger);
+  --color-warning: var(--color-warning);
+  --color-info: var(--color-info);
+
+  /* Order status */
+  --color-status-pending-bg: var(--color-status-pending-bg);
+  --color-status-pending-fg: var(--color-status-pending-fg);
+  --color-status-active-bg: var(--color-status-active-bg);
+  --color-status-active-fg: var(--color-status-active-fg);
+  --color-status-shipped-bg: var(--color-status-shipped-bg);
+  --color-status-shipped-fg: var(--color-status-shipped-fg);
+  --color-status-delivered-bg: var(--color-status-delivered-bg);
+  --color-status-delivered-fg: var(--color-status-delivered-fg);
+
+  /* Admin KPI */
+  --color-kpi-amber-bg: var(--color-kpi-amber-bg);
+  --color-kpi-amber-fg: var(--color-kpi-amber-fg);
+  --color-kpi-danger-bg: var(--color-kpi-danger-bg);
+  --color-kpi-danger-fg: var(--color-kpi-danger-fg);
+  --color-kpi-indigo-bg: var(--color-kpi-indigo-bg);
+  --color-kpi-indigo-fg: var(--color-kpi-indigo-fg);
+  --color-kpi-emerald-bg: var(--color-kpi-emerald-bg);
+  --color-kpi-emerald-fg: var(--color-kpi-emerald-fg);
+
+  /* Commerce */
+  --color-price-sale: var(--color-price-sale);
+  --color-price-original: var(--color-price-original);
+  --color-rating-star: var(--color-rating-star);
+  --color-rating-empty: var(--color-rating-empty);
+  --color-wishlist: var(--color-wishlist);
+  --color-wishlist-empty: var(--color-wishlist-empty);
+  --color-flash-sale: var(--color-flash-sale);
+  --color-flash-sale-bg: var(--color-flash-sale-bg);
+  --color-discount-badge: var(--color-discount-badge);
+  --color-stock-in: var(--color-stock-in);
+  --color-stock-low: var(--color-stock-low);
+  --color-stock-out: var(--color-stock-out);
+
+  /* Admin dashboard */
+  --color-stat-revenue: var(--color-stat-revenue);
+  --color-stat-orders: var(--color-stat-orders);
+  --color-stat-customers: var(--color-stat-customers);
+  --color-stat-conversion: var(--color-stat-conversion);
+  --color-chart-primary: var(--color-chart-primary);
+  --color-chart-secondary: var(--color-chart-secondary);
+  --color-trend-up: var(--color-trend-up);
+  --color-trend-down: var(--color-trend-down);
+}
+
+/* ── Dark mode overrides ──────────────────────────────────────────── */
+[data-theme='dark'] {
+  /* Primary adapts to lighter violet on dark backgrounds */
+  --color-brand: var(--color-primary-400); /* #A78BFA */
+  --color-brand-hover: var(--color-primary-300); /* #C4B5FD */
+  --color-brand-active: var(--color-primary-200); /* #DDD6FE */
+  --color-brand-soft: oklch(0.22 0.07 289); /* subtle violet tint on raised */
+  --color-brand-softest: oklch(0.21 0.055 289);
+
+  /* Cart CTA */
+  --color-cart-cta: var(--color-primary-400);
+  --color-cart-cta-hover: var(--color-primary-300);
+
+  /* ── Surfaces — lifted, layered, breathable ─────────────────────── *
+   * Page background:  L 0.205  (dark blue-gray, not near-black)
+   * Raised (cards):   L 0.260  (+0.055 — clearly distinct panels)
+   * Sunken (inputs):  L 0.165  (-0.040 — recessed wells)
+   */
+  --color-app-bg: oklch(0.205 0.025 285); /* #1B1B2D page */
+  --color-app-bg-raised: oklch(0.26 0.028 285); /* #222239 cards, panels */
+  --color-app-bg-sunken: oklch(0.165 0.022 285); /* #141422 inputs, code */
+
+  /* ── Foreground — comfortable contrast, not blinding ────────────── */
+  --color-fg: oklch(0.95 0.01 286); /* #EDEDF4 soft white */
+  --color-fg-muted: oklch(0.73 0.02 284); /* #A3A3B8 readable secondary */
+  --color-fg-faint: oklch(0.56 0.018 284); /* #727285 tertiary, hints */
+  --color-text-primary: oklch(0.95 0.01 286);
+  --color-text-muted: oklch(0.73 0.02 284);
+
+  /* ── Borders — visible at every layer ───────────────────────────── *
+   * subtle: hairline on cards (slightly darker than raised surface)
+   * border: standard separator
+   * strong: prominent divider, focused inputs
+   */
+  --color-border-subtle: oklch(0.28 0.028 285); /* #272740 hairline */
+  --color-border: oklch(0.33 0.032 285); /* #302F4A standard */
+  --color-border-strong: oklch(0.42 0.035 285); /* #3E3D5C prominent */
+
+  /* ── Admin surfaces ─────────────────────────────────────────────── */
+  --color-admin-canvas: oklch(0.185 0.022 285); /* page bg (slightly darker) */
+  --color-admin-surface: oklch(0.26 0.028 285); /* same as raised */
+
+  /* Commerce */
+  --color-flash-sale-bg: var(--color-sale-900);
+  --color-rating-empty: oklch(0.3 0.028 285);
+
+  /* ── Order / record status badges ──────────────────────────────── */
+  --color-status-pending-bg: oklch(0.29 0.06 72);
+  --color-status-pending-fg: oklch(0.9 0.12 82);
+  --color-status-active-bg: oklch(0.265 0.055 240);
+  --color-status-active-fg: oklch(0.83 0.13 240);
+  --color-status-shipped-bg: oklch(0.265 0.07 289);
+  --color-status-shipped-fg: var(--color-primary-300);
+  --color-status-delivered-bg: oklch(0.265 0.053 162);
+  --color-status-delivered-fg: oklch(0.85 0.12 162);
+
+  /* ── Admin KPI ──────────────────────────────────────────────────── */
+  --color-kpi-amber-bg: oklch(0.29 0.06 72);
+  --color-kpi-amber-fg: oklch(0.9 0.12 82);
+  --color-kpi-danger-bg: oklch(0.28 0.07 22);
+  --color-kpi-danger-fg: oklch(0.9 0.08 22);
+  --color-kpi-indigo-bg: oklch(0.265 0.07 289);
+  --color-kpi-indigo-fg: var(--color-primary-300);
+  --color-kpi-emerald-bg: oklch(0.265 0.053 162);
+  --color-kpi-emerald-fg: oklch(0.85 0.12 162);
+}

@@ -6,7 +6,7 @@ Notes for whoever migrates this documentation into its final home. These are the
 
 `docs-fresh/` is a **contributor / framework-internals** documentation set, written from scratch against the code in `packages/`. It explains how Arvel works under the hood and how to extend it — it is not the application-developer site under `docs/site`, which was left untouched per instruction.
 
-It covers: architecture (container, providers, bootstrap, config, facades), HTTP, the Arvent ORM, 13 subsystems, the CLI, the 5 companion packages + demo, and the contributing workflow.
+It covers: architecture (container, providers, bootstrap, config, facades), HTTP, the Arvent ORM, 13 subsystems, the CLI, the 5 companion packages + kit, and the contributing workflow.
 
 ## Assumptions made
 
@@ -31,7 +31,7 @@ These are behaviors that read as gaps or inconsistencies in the source. Each is 
 | `Application.run(args)` | Ignores `args` — scheduled/programmatic invocation can't pass flags. | [CLI architecture](../console/cli-architecture.md) |
 | Stub commands | `key:rotate`, parts of `optimize` (`route:cache`, `event:cache`) are honest stubs. | [CLI architecture](../console/cli-architecture.md) |
 | Encrypter vs `EncryptedType` | Two wire formats (v2 app-level vs v1 column cast). Confirm both are intended. | [encryption](../subsystems/encryption.md) |
-| Demo + permission | Demo uses permission models without `PermissionServiceProvider`, so the Gate bridge doesn't run. | [demo](../packages/ecommerce-demo.md) |
+| Kit + permission | The kit uses permission models without `PermissionServiceProvider`, so the Gate bridge doesn't run. | [kit](../packages/ecommerce-kit.md) |
 | Broadcasting bridge | No built-in bridge from `redis-pubsub` publishing to the Reverb WebSocket server. | [broadcasting](../subsystems/broadcasting.md) |
 
 ## The old `docs/` tree

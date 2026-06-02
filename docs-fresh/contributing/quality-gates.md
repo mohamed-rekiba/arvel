@@ -56,7 +56,7 @@ High/critical findings block merge.
 
 ## CI jobs
 
-`ci.yml` runs: lint, typecheck, tests+coverage, smoke benchmark (non-blocking), Testcontainers integration, **reverb benchmarks** (hard perf gate — never reintroduce `continue-on-error`), reverb tracemalloc (heap budget), bandit, pip-audit, `mkdocs build --strict`, the ecommerce demo (backend + Vue frontend), and a final `build` job gated on the rest.
+`ci.yml` runs: lint, typecheck, tests+coverage, smoke benchmark (non-blocking), Testcontainers integration, **reverb benchmarks** (hard perf gate — never reintroduce `continue-on-error`), reverb tracemalloc (heap budget), bandit, pip-audit, `mkdocs build --strict`, the e-commerce kit (backend + Vue frontend), and a final `build` job gated on the rest.
 
 ## See also
 

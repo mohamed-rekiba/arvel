@@ -9,7 +9,7 @@ Arvel keeps the core small. Optional features ship as separate packages you inst
 | [arvel-image](image.md) | `arvel[image]` | Pillow-based image manipulation + a polymorphic media library |
 | [arvel-search](search.md) | `arvel[search]` | Full-text search with pluggable drivers (database, Meilisearch, Elasticsearch) |
 | [arvel-audit](audit.md) | `arvel[audit]` | Automatic change-audit trail + a fluent activity log |
-| [arvel-ecommerce-demo](ecommerce-demo.md) | — | A full reference app you can read or scaffold |
+| [arvel-ecommerce-kit](ecommerce-kit.md) | — | A full reference app you can read or scaffold |
 
 ## Installing and wiring a package
 

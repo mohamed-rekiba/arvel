@@ -402,7 +402,7 @@ uv add "arvel[s3]"         # S3 storage driver (aioboto3)
 | [`arvel-oauth`](packages/arvel-oauth) | OAuth2/OIDC login (Google, GitHub, Microsoft, Apple, generic OIDC) |
 | [`arvel-search`](packages/arvel-search) | Scout-style full-text search (Meilisearch, Elasticsearch, database) |
 | [`arvel-audit`](packages/arvel-audit) | Automatic audit trail and a fluent activity log |
-| [`arvel-ecommerce-demo`](packages/arvel-ecommerce-demo) | A full-stack reference app exercising the framework |
+| [`arvel-ecommerce-kit`](kits/arvel-ecommerce-kit) | A full-stack reference app exercising the framework |
 
 ```bash
 uv add arvel-permission arvel-image
