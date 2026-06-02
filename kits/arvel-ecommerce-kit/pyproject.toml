@@ -19,7 +19,6 @@ classifiers = [
 # postgres: asyncpg + psycopg, redis: cache, queue + queue-amqp: RabbitMQ jobs,
 # mail: SMTP via Mailpit, s3: MinIO, jwt: token auth, broadcasting: WebSockets,
 # bcrypt: password hashing, permission/image: published companion packages.
-# python-multipart: FastAPI parses multipart/form-data (image uploads).
 dependencies = [
     "arvel[postgres,redis,queue,queue-amqp,mail,s3,jwt,broadcasting,bcrypt,permission,image]>=1.0.0",
 ]

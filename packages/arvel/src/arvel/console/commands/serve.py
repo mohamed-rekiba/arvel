@@ -9,6 +9,7 @@ from uvicorn looking for ``public.asgi``.
 from __future__ import annotations
 
 import os
+import sys
 from typing import Annotated, ClassVar
 
 import typer
@@ -17,6 +18,26 @@ import uvicorn
 from arvel.console import Command, Context
 from arvel.console._t import Option as _Option
 from arvel.console.bootstrap import find_project_root
+
+
+def _make_app_importable() -> None:
+    """Put the project root on sys.path + PYTHONPATH so `public.asgi` resolves.
+
+    `uvicorn.run()` — unlike the `uvicorn` CLI's `--app-dir .` — never adds the
+    project dir to sys.path, so `import public` only works when the project is
+    pip-installed. Kits aren't packages, so we add the dir holding bootstrap/app.py
+    ourselves. PYTHONPATH too: --reload/--workers load the app in a spawned
+    subprocess that won't inherit our in-process sys.path.
+    """
+    root = find_project_root()
+    if root is None:
+        return
+    root_str = str(root)
+    if root_str not in sys.path:
+        sys.path.insert(0, root_str)
+    existing = [p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]
+    if root_str not in existing:
+        os.environ["PYTHONPATH"] = os.pathsep.join([root_str, *existing])
 
 
 def _graceful_shutdown_timeout() -> int | None:
@@ -76,6 +97,7 @@ class ServeCommand(Command):
         reload: bool,
         workers: int | None = None,
     ) -> None:
+        _make_app_importable()
         timeout = _graceful_shutdown_timeout()
         # uvicorn defaults timeout_graceful_shutdown to None, so passing None is a no-op.
         uvicorn.run(

@@ -245,28 +245,44 @@ def _run_uv_sync(target: Path, args: Sequence[str]) -> None:
         raise typer.Exit(code=1) from exc
 
 
-def _apply_project_identity(target: Path, project: str, kit: str) -> None:
-    """Rename the scaffolded project to the user's name.
+# uv workspace plumbing that only works inside the Arvel monorepo. The kit
+# ships these so its own tests resolve `arvel` locally; in a scaffolded project
+# they make `uv sync` fail ("references a workspace … but is not a member").
+_MONOREPO_TOML_TABLES: tuple[str, ...] = ("tool.uv.sources", "tool.uv")
 
-    The api skeleton already substitutes ``{{project_name}}`` tokens; the
-    e-commerce kit is copied verbatim, so its ``pyproject.toml`` name is
-    rewritten here. ``project`` is validated against PROJECT_NAME_REGEX, so
-    it's safe to drop into the TOML literal.
+
+def _strip_toml_table(text: str, header: str) -> str:
+    """Drop a whole ``[header]`` table — its body runs to the next table or EOF."""
+    pattern = rf"(?ms)^\[{re.escape(header)}\][^\n]*\n.*?(?=^\[|\Z)"
+    return re.sub(pattern, "", text)
+
+
+def _localize_scaffolded_pyproject(target: Path, project: str, kit: str) -> None:
+    """Turn the kit's copied pyproject into a standalone project's pyproject.
+
+    The api skeleton substitutes ``{{project_name}}`` tokens; the e-commerce kit
+    is copied verbatim, so its monorepo identity is rewritten here — the project
+    name, and the workspace-only ``[tool.uv]`` / ``[tool.uv.sources]`` tables
+    that otherwise break ``uv sync`` outside the Arvel checkout. ``project`` is
+    validated against PROJECT_NAME_REGEX, so it's safe to inline.
     """
     if kit == DEFAULT_KIT:
         return
     pyproject = target / "pyproject.toml"
     if not pyproject.is_file():
         return
-    text = pyproject.read_text(encoding="utf-8")
-    rewritten = re.sub(
+    original = pyproject.read_text(encoding="utf-8")
+    text = re.sub(
         r'(?m)^name\s*=\s*"arvel-ecommerce-kit"',
         f'name = "{project}"',
-        text,
+        original,
         count=1,
     )
-    if rewritten != text:
-        pyproject.write_text(rewritten, encoding="utf-8")
+    for header in _MONOREPO_TOML_TABLES:
+        text = _strip_toml_table(text, header)
+    text = text.rstrip() + "\n"
+    if text != original:
+        pyproject.write_text(text, encoding="utf-8")
 
 
 def _scaffold(
@@ -304,7 +320,7 @@ def _scaffold(
         ),
     )
 
-    _apply_project_identity(target, validated, kit_spec.name)
+    _localize_scaffolded_pyproject(target, validated, kit_spec.name)
 
     sync_args = _uv_sync_args(kit_spec.name)
     if not no_install:
