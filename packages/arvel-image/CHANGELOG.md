@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-image-v0.6.0...arvel-image-v0.6.1) (2026-06-02)
+
+
+### Bug Fixes
+
+* resolve test issues and remove outdated RTMs ([31a6a69](https://github.com/mohamed-rekiba/arvel/commit/31a6a69b260f8011d558063839765822cee01047))
+
 ## [0.6.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-image-v0.5.1...arvel-image-v0.6.0) (2026-06-01)
 
 
