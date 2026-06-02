@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.9.1...arvel-v0.9.2) (2026-06-02)
+
+
+### Bug Fixes
+
+* disable testcontainers ryuk reaper and document CLI scaffold ([ab12be9](https://github.com/mohamed-rekiba/arvel/commit/ab12be9341a2a498f535f1dcae523d0776ab48a4))
+
 ## [0.9.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.9.0...arvel-v0.9.1) (2026-06-02)
 
 
