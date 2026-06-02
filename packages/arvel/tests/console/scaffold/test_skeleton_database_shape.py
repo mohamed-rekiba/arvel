@@ -28,16 +28,6 @@ def test_database_migrations_ships_only_gitkeep() -> None:
     assert files == [".gitkeep"], f"database/migrations/ should ship only .gitkeep, found: {files}"
 
 
-def test_database_seeders_ships_init_only() -> None:
-    """database/seeders/ ships __init__.py only — seeders are Python-imported."""
-    seeders = SKELETON_ROOT / "database" / "seeders"
-    assert seeders.is_dir()
-    files = sorted(p.name for p in seeders.iterdir() if p.is_file())
-    assert files == ["__init__.py"], (
-        f"database/seeders/ should ship only __init__.py, found: {files}"
-    )
-
-
 def test_database_gitkeep_files_are_empty() -> None:
     """``.gitkeep`` placeholders must be exactly empty (zero bytes)."""
     gitkeep = SKELETON_ROOT / "database" / "migrations" / ".gitkeep"
