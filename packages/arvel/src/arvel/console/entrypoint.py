@@ -12,7 +12,7 @@ Typer dispatch returns.
 
 Sequence inside a project:
 
-1. ``asyncio.run(async_main())`` — one loop for the whole lifecycle.
+1. ``asyncio.run(async_main(project_root))`` — one loop for the whole lifecycle.
 2. ``framework_app.boot()`` — engine and all providers initialised on this loop.
 3. Provider commands merged into the dispatch dict unconditionally.
 4. Typer parses and dispatches; async commands call ``schedule_async(coro)``.
@@ -28,23 +28,38 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 from typing import TYPE_CHECKING
 
 import typer
 
+from arvel import __version__
 from arvel.console import Application, Command
 from arvel.console._async import get_pending_task
-from arvel.console._loader import discover_commands
+from arvel.console._loader import discover_commands, load_command
 from arvel.console.bootstrap import (
     bootstrap_framework_application,
     find_project_root,
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from arvel.application import Application as FrameworkApplication
 
 _log = logging.getLogger("arvel.console")
+
+_BANNER = r"""
+   __ _  _ ____   __  ___  __
+  / _` || '__\ \ / / / _ \| |
+ | (_| || |   \ V / |  __/| |
+  \__,_||_|    \_/   \___||_|
+"""
+
+_ANSI_CYAN = "\033[1;36m"
+_ANSI_DIM = "\033[2m"
+_ANSI_RESET = "\033[0m"
 
 # Commands that must work outside a project (no bootstrap/app.py required).
 _OUTSIDE_PROJECT_ALLOWED_PREFIXES: tuple[str, ...] = ("make:",)
@@ -72,15 +87,46 @@ def _requested_command(argv: list[str]) -> str | None:
     return None
 
 
-def _owns_process(command: str | None, commands: list[Command]) -> bool:
-    """Return True if *command* takes over the process and its own event loop.
+def _banner_suppressed(argv: list[str]) -> bool:
+    return (
+        "--no-banner" in argv or bool(os.environ.get("ARVEL_NO_BANNER")) or not sys.stderr.isatty()
+    )
 
-    Such commands (e.g. ``serve`` → uvicorn) must run outside the entrypoint's
-    ``asyncio.run`` wrapper. See :attr:`arvel.console.Command.owns_process`.
+
+def _print_banner(argv: list[str]) -> None:
+    """Print the arvel banner to stderr before anything else.
+
+    On stderr so it never corrupts stdout (``openapi:export``, ``route:list``
+    piped to grep, JSON output...). TTY-gated and opt-out via ``--no-banner`` /
+    ``ARVEL_NO_BANNER`` so scripts and CI stay clean. ``NO_COLOR`` drops the
+    ANSI styling but still shows the banner.
     """
-    if command is None:
-        return False
-    return any(cmd.name == command and cmd.owns_process for cmd in commands)
+    if _banner_suppressed(argv):
+        return
+    if os.environ.get("NO_COLOR"):
+        typer.echo(_BANNER, err=True)
+        typer.echo(f"  arvel {__version__} — the Laravel of Python\n", err=True)
+        return
+    typer.echo(f"{_ANSI_CYAN}{_BANNER}{_ANSI_RESET}", err=True)
+    typer.echo(
+        f"  {_ANSI_DIM}arvel {__version__} — the Laravel of Python{_ANSI_RESET}\n",
+        err=True,
+    )
+
+
+def _resolve_typer(command: str | None) -> typer.Typer:
+    """Build the Typer app, loading only ``command`` when it's a concrete name.
+
+    The hot path — running one command outside a project — shouldn't import all
+    ~70 command modules. Falls back to full discovery for ``--help``/no-arg (which
+    must list every command) and for an unknown name (so Typer renders a proper
+    "no such command").
+    """
+    if command is not None:
+        only = load_command(command)
+        if only is not None:
+            return Application([only]).typer_app
+    return build_app()
 
 
 def _is_outside_project_allowed(command: str | None) -> bool:
@@ -144,20 +190,13 @@ def _bind_app_to_needs_application_commands(
             cmd.app = framework_app
 
 
-async def async_main() -> None:
-    """Run the full CLI lifecycle on a single event loop.
+async def async_main(project_root: Path) -> None:
+    """Run the in-project CLI lifecycle on a single event loop.
 
-    Called by ``main()`` via ``asyncio.run()``; owns boot, dispatch, and shutdown.
+    Only reached from ``main()`` when a project root exists — ``main()`` handles
+    the outside-project fast path itself. Owns boot, dispatch, and shutdown.
     Typer reads from ``sys.argv``; no argument passing needed.
     """
-    project_root = find_project_root()
-
-    if project_root is None:
-        # Allowed-outside-project path — no DI, no bootstrap, just entry-point commands.
-        typer_app = build_app()
-        typer_app()
-        return
-
     # Inside a project: always boot so provider commands are available.
     discovered = discover_commands()
     commands_by_name: dict[str, Command] = {c.name: c for c in discovered}
@@ -194,6 +233,16 @@ async def async_main() -> None:
 
 def main() -> None:
     argv = sys.argv
+    _print_banner(argv)
+
+    # `--no-banner` is ours, not Typer's — strip it so dispatch doesn't choke.
+    if "--no-banner" in argv:
+        argv[:] = [arg for arg in argv if arg != "--no-banner"]
+
+    if any(flag in argv for flag in ("--version", "-V")):
+        typer.echo(f"arvel {__version__}")
+        raise SystemExit(0)
+
     command = _requested_command(argv)
     project_root = find_project_root()
 
@@ -203,22 +252,22 @@ def main() -> None:
 
     if project_root is None:
         # Allowed-outside-project path — sync fast-path, no loop needed.
-        typer_app = build_app()
-        typer_app()
+        _resolve_typer(command)()
         raise SystemExit(0)
 
     # Commands that own the process (e.g. `serve` → uvicorn) must run outside
     # the asyncio.run wrapper below — uvicorn calls asyncio.run() itself and
     # would otherwise hit "cannot be called from a running event loop". They
     # don't need the framework booted in the CLI process; uvicorn re-imports
-    # the ASGI app and boots it via lifespan.
-    commands = get_commands()
-    if _owns_process(command, commands):
-        Application(commands).typer_app()
-        raise SystemExit(0)
+    # the ASGI app and boots it via lifespan. Load only the requested command.
+    if command is not None:
+        owning = load_command(command)
+        if owning is not None and owning.owns_process:
+            Application([owning]).typer_app()
+            raise SystemExit(0)
 
     try:
-        asyncio.run(async_main())
+        asyncio.run(async_main(project_root))
     except KeyboardInterrupt:
         # Ctrl+C during a long-running command (e.g. schedule:work). The command
         # already logged its graceful-shutdown message and shutdown() ran in the
