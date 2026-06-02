@@ -169,7 +169,7 @@ class TestServe:
         monkeypatch.delenv("PYTHONPATH", raising=False)
 
         with patch("arvel.console.commands.serve.uvicorn.run"):
-            ServeCommand().serve(host="0.0.0.0", port=8001, reload=True)
+            ServeCommand().serve(host="127.0.0.1", port=8001, reload=True)
 
         root = str(tmp_path.resolve())
         assert root in sys.path

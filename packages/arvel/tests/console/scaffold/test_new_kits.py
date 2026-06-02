@@ -180,7 +180,7 @@ def test_new_ecommerce_renames_project_and_uses_kit_sync(
     # Mirrors the real kit: monorepo name + uv workspace plumbing that must be
     # stripped so the scaffolded project syncs outside the Arvel checkout.
     (kit_src / "pyproject.toml").write_text(
-        '[project]\n'
+        "[project]\n"
         'name = "arvel-ecommerce-kit"\n'
         'version = "1.0.0"\n'
         'dependencies = ["arvel[postgres]>=1.0.0"]\n\n'
@@ -207,5 +207,5 @@ def test_new_ecommerce_renames_project_and_uses_kit_sync(
         assert "[tool.uv.sources]" not in pyproject
         assert "workspace = true" not in pyproject
         assert "package = false" not in pyproject
-        assert 'arvel[postgres]>=1.0.0' in pyproject
+        assert "arvel[postgres]>=1.0.0" in pyproject
         assert "uv sync --all-extras --dev" in result.stdout
