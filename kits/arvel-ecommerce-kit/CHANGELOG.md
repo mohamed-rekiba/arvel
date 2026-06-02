@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.3.0...arvel-ecommerce-kit-v1.4.0) (2026-06-02)
+
+
+### Features
+
+* **ecommerce-kit:** add Windows healthcheck script and OS-aware make target ([f855d39](https://github.com/mohamed-rekiba/arvel/commit/f855d39698a657937c6d2bb72aff161568d8c443))
+
 ## [1.3.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.2.3...arvel-ecommerce-kit-v1.3.0) (2026-06-02)
 
 
