@@ -49,7 +49,7 @@ make seed      # seed roles, catalog, and sample users
 
 Then open:
 
-- **Storefront (Vite dev server)**: http://localhost:5173
+- **Storefront (Vite dev server)**: http://localhost:8000
 - **API + built SPA fallback**: http://localhost:8001
 - **Interactive API docs**: http://localhost:8001/docs
 - **Health check**: http://localhost:8001/healthz
@@ -84,7 +84,7 @@ tarball from GitHub, verifies its checksum, and scaffolds it under your project 
 | Service | Image | Port | Purpose |
 |---|---|---|---|
 | `backend` | `python:3.14.5-slim-bookworm` | `8001` | Arvel / FastAPI application |
-| `frontend` | `node:24.15.0-alpine3.23` | `5173` | Vite dev server with HMR |
+| `frontend` | `node:24.15.0-alpine3.23` | `8000` | Vite dev server with HMR |
 | `scheduler` | `python:3.14.5-slim-bookworm` | — | `arvel schedule:work` for read-model refresh |
 | `db` | `postgres:18.4-bookworm` | `5432` | Primary database |
 | `redis` | `redis:8.6.2-alpine3.23` | `6379` | Cache and queue backend |
@@ -96,7 +96,8 @@ any workspace package (`arvel`, `arvel-image`, `arvel-permission`, …) are pick
 
 ```bash
 # Lifecycle
-make up              # start everything, wait for health checks
+make up              # start everything, then wait until all services are healthy
+make healthcheck          # wait until db, redis, backend, frontend are healthy
 make down            # stop services (keep volumes)
 make nuke            # stop services and delete all volumes
 make ps              # list running services
