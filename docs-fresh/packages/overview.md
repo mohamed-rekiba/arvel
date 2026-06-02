@@ -53,4 +53,4 @@ The core extras in `packages/arvel/pyproject.toml` (`permission`, `image`, `oaut
 ## See also
 
 - [Service providers](../architecture/service-providers.md) — `register`/`boot`/`commands`/`publishes`.
-- [Ecommerce kit](ecommerce-kit.md) — a real app exercising several packages.
+- [Ecommerce kit](../kits/ecommerce-kit.md) — a real app exercising several packages.

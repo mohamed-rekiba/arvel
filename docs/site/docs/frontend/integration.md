@@ -8,7 +8,7 @@ Arvel is an API-first framework. Your handlers return [API resources](../the-bas
 This guide covers the contract between Arvel and those clients: how to generate a typed client from the spec, how to authenticate from a browser versus a phone, how CORS and realtime fit in, and the response shapes every client should expect.
 
 > [!NOTE]
-> The [e-commerce kit](../packages/ecommerce-kit.md) ships a real Vue 3 + Orval frontend wired against an Arvel backend. Every snippet below is drawn from that setup — clone it if you want a working reference.
+> The [e-commerce kit](../kits/ecommerce-kit.md) ships a real Vue 3 + Orval frontend wired against an Arvel backend. Every snippet below is drawn from that setup — clone it if you want a working reference.
 
 <a name="the-openapi-contract"></a>
 ## The OpenAPI Contract
@@ -261,7 +261,7 @@ async def spa(request: Request, path: str) -> FileResponse:
     return FileResponse(SPA_INDEX)
 ```
 
-Mount the compiled assets as a [static directory](../the-basics/routing.md) and register API routes **before** this catch-all. The [e-commerce kit](../packages/ecommerce-kit.md) does exactly this in production.
+Mount the compiled assets as a [static directory](../the-basics/routing.md) and register API routes **before** this catch-all. The [e-commerce kit](../kits/ecommerce-kit.md) does exactly this in production.
 
 <a name="realtime"></a>
 ## Realtime
