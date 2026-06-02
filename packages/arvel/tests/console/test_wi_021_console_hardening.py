@@ -448,17 +448,23 @@ class TestOutsideProjectWrapper:
     def test_main_allows_make_commands_outside_project(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """Outside a project, make:* dispatches by loading only that one command."""
         from arvel.console import entrypoint
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(sys, "argv", ["arvel", "make:controller", "Foo"])
 
-        with patch.object(entrypoint, "build_app") as mock_build:
-            mock_app = MagicMock()
-            mock_build.return_value = mock_app
+        fake_cmd = MagicMock(owns_process=False)
+        with (
+            patch.object(entrypoint, "load_command", return_value=fake_cmd) as mock_load,
+            patch.object(entrypoint, "Application") as console_cls,
+        ):
+            typer_app_mock = MagicMock()
+            console_cls.return_value = MagicMock(typer_app=typer_app_mock)
             with pytest.raises(SystemExit):
                 entrypoint.main()
-            mock_app.assert_called_once()
+            mock_load.assert_called_with("make:controller")
+            typer_app_mock.assert_called_once()
 
     def test_main_no_argv_command_allowed_outside_project(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
