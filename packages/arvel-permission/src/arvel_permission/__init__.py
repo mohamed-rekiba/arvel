@@ -1,9 +1,9 @@
-"""arvel-permission — Spatie Laravel Permission v7 parity for Arvel.
+"""arvel-permission — Spatie Laravel Permission v7 feature parity for Arvel.
 
-Provides ``Role``, ``Permission`` SQLAlchemy models, ``HasRoles`` and
-``HasPermissions`` mixins, an async ``PermissionRegistrar``, and a
-``PermissionServiceProvider`` that wires permission-aware ability checks into
-the Arvel ``Gate``.
+Supplies the ``Role`` and ``Permission`` SQLAlchemy models, the ``HasRoles``
+and ``HasPermissions`` mixins, an async ``PermissionRegistrar``, and a
+``PermissionServiceProvider`` that registers permission-aware ability checks
+with the Arvel ``Gate``.
 """
 
 from __future__ import annotations
