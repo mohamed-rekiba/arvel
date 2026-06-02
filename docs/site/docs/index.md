@@ -221,7 +221,7 @@ Arvel ships the parts a real app needs, behind one consistent, typed surface:
 - **Edges** — Redis cache and sessions, S3/GCS/Azure/local storage with signed URLs, JWT auth with refresh rotation, a `Gate` and policies, and field-level encryption.
 - **Developer experience** — a generated OpenAPI contract, structured logging, locale-negotiated i18n, and a test kit with `.fake()` doubles.
 
-And the work that doesn't belong in core lives in companion packages: [OAuth login](packages/oauth.md), [roles & permissions](packages/permission.md), [image processing](packages/image.md), [full-text search](packages/search.md), and [audit trails](packages/audit.md). Want a full reference app? Read the [e-commerce demo](packages/ecommerce-demo.md).
+And the work that doesn't belong in core lives in companion packages: [OAuth login](packages/oauth.md), [roles & permissions](packages/permission.md), [image processing](packages/image.md), [full-text search](packages/search.md), and [audit trails](packages/audit.md). Want a full reference app? Read the [e-commerce kit](packages/ecommerce-kit.md).
 
 ## Ready to build?
 

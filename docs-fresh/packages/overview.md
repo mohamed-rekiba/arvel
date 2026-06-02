@@ -2,7 +2,7 @@
 
 The framework core lives in `packages/arvel`. Optional capabilities ship as separate workspace packages so apps only pull in what they use. They all follow the same shape: a `ServiceProvider`, optional models + published migration stubs, and a public import surface.
 
-**Source**: `packages/arvel-audit`, `packages/arvel-image`, `packages/arvel-oauth`, `packages/arvel-permission`, `packages/arvel-search`, plus the reference app `packages/arvel-ecommerce-demo`. Workspace membership is declared in the root `pyproject.toml` (`[tool.uv.workspace] members = ["packages/*"]`).
+**Source**: `packages/arvel-audit`, `packages/arvel-image`, `packages/arvel-oauth`, `packages/arvel-permission`, `packages/arvel-search`, plus the reference app `kits/arvel-ecommerce-kit`. Workspace membership is declared in the root `pyproject.toml` (`[tool.uv.workspace] members = ["packages/*", "kits/*"]`).
 
 ## The five libraries
 
@@ -53,4 +53,4 @@ The core extras in `packages/arvel/pyproject.toml` (`permission`, `image`, `oaut
 ## See also
 
 - [Service providers](../architecture/service-providers.md) — `register`/`boot`/`commands`/`publishes`.
-- [Ecommerce demo](ecommerce-demo.md) — a real app exercising several packages.
+- [Ecommerce kit](ecommerce-kit.md) — a real app exercising several packages.

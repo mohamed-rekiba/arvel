@@ -10,7 +10,7 @@ authors = [{ name = "Arvel contributors" }]
 dependencies = []
 
 [tool.uv.workspace]
-members = ["packages/*"]
+members = ["packages/*", "kits/*"]
 
 [tool.uv.sources]
 arvel = { workspace = true }
@@ -120,7 +120,7 @@ ignore = [
     "PLR0912",
 ]
 "packages/arvel/src/arvel/application/**" = ["SLF001", "PLC0415"]
-"packages/arvel-ecommerce-demo/backend/bootstrap/app.py" = [
+"kits/arvel-ecommerce-kit/backend/bootstrap/app.py" = [
     "E402", # sys.path must be set before local app.* imports can resolve
 ]
 "packages/arvel-permission/src/arvel_permission/models.py" = [
@@ -158,10 +158,10 @@ ignore = [
 "packages/arvel-search/src/arvel_search/facade.py" = [
     "PLC0415", # SearchFake imported lazily to keep test doubles out of the prod path
 ]
-"packages/arvel-ecommerce-demo/backend/app/http/controllers/i18n.py" = [
+"kits/arvel-ecommerce-kit/backend/app/http/controllers/i18n.py" = [
     "RUF001", # intentional Turkish locale strings — dotless-i is correct spelling
 ]
-"packages/arvel-ecommerce-demo/backend/database/seeders/catalog_seeder.py" = [
+"kits/arvel-ecommerce-kit/backend/database/seeders/catalog_seeder.py" = [
     "RUF001", # intentional Turkish locale strings — dotless-i is correct spelling
     "E501",   # long seeder data lines are intentional (readability beats wrapping)
 ]

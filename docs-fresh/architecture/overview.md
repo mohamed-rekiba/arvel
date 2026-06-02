@@ -109,6 +109,6 @@ Arvel is a `uv` workspace. The core lives in `packages/arvel`; optional capabili
 | `arvel-oauth` | OAuth2 / OIDC login |
 | `arvel-search` | Full-text search |
 | `arvel-audit` | Audit trail / activity log |
-| `arvel-ecommerce-demo` | Full-stack reference app |
+| `arvel-ecommerce-kit` | Full-stack reference app |
 
 See [repo & build](../contributing/repo-and-build.md) for the workspace layout and dev workflow, and the [source map](../reference/source-map.md) for a subsystem-to-path index.

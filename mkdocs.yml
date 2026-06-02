@@ -210,7 +210,7 @@ nav:
       - Arvel Image: packages/image.md
       - Arvel Search: packages/search.md
       - Arvel Audit: packages/audit.md
-      - Arvel Ecommerce Demo: packages/ecommerce-demo.md
+      - Arvel Ecommerce Kit: packages/ecommerce-kit.md
   - Reference:
       - Release Notes: releases.md
       - Upgrade Guide: upgrade.md

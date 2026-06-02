@@ -149,7 +149,7 @@ def test_kit_not_installed_surfaces_install_hint(
     def _raise() -> Path:
         raise KitNotInstalledError(
             name="ecommerce",
-            package="arvel-ecommerce-demo",
+            package="arvel-ecommerce-kit",
             original=ImportError("simulated"),
         )
 
@@ -164,5 +164,5 @@ def test_kit_not_installed_surfaces_install_hint(
     with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app, ["new", "my-app", "--kit", "ecommerce", "--no-install"])
         assert result.exit_code == 1
-        assert "arvel-ecommerce-demo" in result.stderr
+        assert "arvel-ecommerce-kit" in result.stderr
         assert "pip install" in result.stderr or "uv add" in result.stderr

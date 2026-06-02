@@ -28,19 +28,19 @@ Two repository shapes were available: polyrepo (Laravel's PHP/Composer approach 
 
 ## Decision
 
-**Monorepo with `uv` workspaces.** `tool.uv.workspace.members = ["packages/*"]`. One `uv.lock` at the repo root; shared dev tooling (ruff, mypy, pyright, pytest, pre-commit) configured at root. Per-package `pyproject.toml` declares each package's own dependencies; cross-package dev refs use `tool.uv.sources.<pkg> = { workspace = true }`.
+**Monorepo with `uv` workspaces.** `tool.uv.workspace.members = ["packages/*", "kits/*"]`. One `uv.lock` at the repo root; shared dev tooling (ruff, mypy, pyright, pytest, pre-commit) configured at root. Per-package `pyproject.toml` declares each package's own dependencies; cross-package dev refs use `tool.uv.sources.<pkg> = { workspace = true }`. Companion libraries live under `packages/`; starter kits (reference apps scaffolded by `arvel new --kit`) live under `kits/`.
 
-Current workspace members under `packages/`:
+Current workspace members:
 
-| Package | Role |
-|---|---|
-| `arvel` | The framework (ships the `arvel` CLI binary) |
-| `arvel-audit` | Audit-log companion |
-| `arvel-image` | Image manipulation companion |
-| `arvel-oauth` | OAuth/social-login companion |
-| `arvel-permission` | Roles & permissions companion |
-| `arvel-search` | Full-text / engine-backed search companion |
-| `arvel-ecommerce-demo` | Reference application (not published) |
+| Member | Location | Role |
+|---|---|---|
+| `arvel` | `packages/` | The framework (ships the `arvel` CLI binary) |
+| `arvel-audit` | `packages/` | Audit-log companion |
+| `arvel-image` | `packages/` | Image manipulation companion |
+| `arvel-oauth` | `packages/` | OAuth/social-login companion |
+| `arvel-permission` | `packages/` | Roles & permissions companion |
+| `arvel-search` | `packages/` | Full-text / engine-backed search companion |
+| `arvel-ecommerce-kit` | `kits/` | Reference application + `--kit ecommerce` source (not published) |
 
 ## Consequences
 
@@ -50,7 +50,7 @@ Current workspace members under `packages/`:
 
 ## Current implementation
 
-- Layout: `packages/*`, root `pyproject.toml` (`[tool.uv]`), `uv.lock`.
+- Layout: `packages/*` (companion libraries), `kits/*` (starter kits), root `pyproject.toml` (`[tool.uv]`), `uv.lock`.
 - Docs: `docs-fresh/contributing/repo-and-build.md`, `docs-fresh/packages/overview.md`.
 
 ## Notes

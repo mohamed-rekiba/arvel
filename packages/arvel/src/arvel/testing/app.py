@@ -12,7 +12,7 @@ The context manager:
  ``httpx.AsyncClient``.
 3. Calls ``app.shutdown`` on exit, even if the body raises.
 
-This replaces the demo's ``StarterApp``/``create_app`` pattern which used
+This replaces the kit's ``StarterApp``/``create_app`` pattern which used
 ``Any`` for the ASGI scope/receive/send types. Here we use the typed
 ``starlette.types.Scope``, ``Receive``, ``Send`` throughout so mypy --strict
 passes with no suppression comments.

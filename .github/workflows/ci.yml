@@ -240,8 +240,8 @@ jobs:
           path: _site/
           retention-days: 14
 
-  ecommerce-demo:
-    name: E-commerce Demo (integration tests — PostgreSQL)
+  ecommerce-kit:
+    name: E-commerce Kit (integration tests — PostgreSQL)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -251,16 +251,16 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
       - run: uv sync --all-packages --all-extras --frozen
-      - name: Run ecommerce-demo integration suite
-        working-directory: packages/arvel-ecommerce-demo/backend
+      - name: Run ecommerce-kit integration suite
+        working-directory: kits/arvel-ecommerce-kit/backend
         env:
           APP_ENV: testing
         run: >-
           uv run --project ../../.. pytest tests/
           --tb=short -q
 
-  ecommerce-demo-frontend:
-    name: E-commerce Demo Frontend (format + lint + test + build)
+  ecommerce-kit-frontend:
+    name: E-commerce Kit Frontend (format + lint + test + build)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -268,27 +268,27 @@ jobs:
         with:
           node-version: '24.16.0'
           cache: 'npm'
-          cache-dependency-path: packages/arvel-ecommerce-demo/frontend/package-lock.json
+          cache-dependency-path: kits/arvel-ecommerce-kit/frontend/package-lock.json
       - name: npm ci (ecommerce frontend)
-        working-directory: packages/arvel-ecommerce-demo/frontend
+        working-directory: kits/arvel-ecommerce-kit/frontend
         run: npm ci
       - name: Prettier check
-        working-directory: packages/arvel-ecommerce-demo/frontend
+        working-directory: kits/arvel-ecommerce-kit/frontend
         run: npm run format-check
       - name: ESLint (max-warnings 0)
-        working-directory: packages/arvel-ecommerce-demo/frontend
+        working-directory: kits/arvel-ecommerce-kit/frontend
         run: npm run lint
       - name: Vitest
-        working-directory: packages/arvel-ecommerce-demo/frontend
+        working-directory: kits/arvel-ecommerce-kit/frontend
         run: npm run test
       - name: Vite build
-        working-directory: packages/arvel-ecommerce-demo/frontend
+        working-directory: kits/arvel-ecommerce-kit/frontend
         run: npm run build
 
   build:
     name: Build distributions
     runs-on: ubuntu-24.04
-    needs: [lint, typecheck, test, integration, ecommerce-demo, ecommerce-demo-frontend, docs]
+    needs: [lint, typecheck, test, integration, ecommerce-kit, ecommerce-kit-frontend, docs]
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0

@@ -10,7 +10,7 @@ Every ORM ``relationship(...)`` declaration in the framework source uses the
 A relationship attribute that still carries the SQLAlchemy wrapper fails this
 guardrail.
 
-This mirrors the column guardrail in the demo's ``test_056`` (no ``Mapped[T]``
+This mirrors the column guardrail in the kit's ``test_056`` (no ``Mapped[T]``
 on the left side). It walks every Python file under ``arvel.*`` and fails if a
 relationship-bound class attribute still carries the ``Mapped[...]`` wrapper.
 
