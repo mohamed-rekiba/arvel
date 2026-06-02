@@ -78,8 +78,12 @@ bench:  ## Run smoke benchmark
 	uv run python benchmarks/bench_foundations.py
 
 .PHONY: docs
-docs:  ## Build the docs site (strict mode, same as CI)
+docs: docs-linkcheck  ## Build the docs site (strict mode, same as CI)
 	uv run mkdocs build --strict
+
+.PHONY: docs-linkcheck
+docs-linkcheck:  ## Check intra-repo links in the contributor docs tree (docs/README.md + guides)
+	uv run python scripts/check_doc_links.py
 
 .PHONY: docs-serve
 docs-serve:  ## Serve docs locally with live reload

@@ -6,7 +6,7 @@ This documentation set explains **how Arvel works under the hood** and **how to 
 >
 > If you want to *build an app* with Arvel, read the user guide instead. This set is the contributor-facing companion.
 
-> **Source of truth**: Everything here is derived from the package source under `packages/*/src/`, the tests, `pyproject.toml`, and the project skeleton under `packages/arvel/src/arvel/_skeleton/`. Documented against the in-repo state where core reports version `0.3.0`. Anything inferred rather than verified is marked `ASSUMPTION:`; open questions for the team are marked `TODO/QUESTION:` and collected in [CUTOVER-NOTES.md](reference/CUTOVER-NOTES.md).
+> **Source of truth**: Everything here is derived from the package source under `packages/*/src/`, the tests, `pyproject.toml`, and the project skeleton under `packages/arvel/src/arvel/_skeleton/`. The core package version is whatever `packages/arvel/src/arvel/__init__.py` reports as `__version__` (release-please bumps it); don't restate a version number here, it only goes stale. Anything inferred rather than verified is marked `ASSUMPTION:`; open questions for the team are marked `TODO/QUESTION:` and collected in [CUTOVER-NOTES.md](reference/CUTOVER-NOTES.md).
 
 ## What Arvel is
 

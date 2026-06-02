@@ -230,6 +230,8 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
       - run: uv sync --all-extras --frozen
+      - name: Check contributor-docs links
+        run: uv run python scripts/check_doc_links.py
       - name: mkdocs build --strict
         run: uv run mkdocs build --strict --site-dir _site
       - name: Upload docs site
