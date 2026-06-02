@@ -69,6 +69,28 @@ real version callback.
 ### 5. `install.sh`
 `curl -fsSL https://arvel.dev/install.sh | bash` → ensure `uv`, then `uv tool install arvel`.
 
+### 6. Fast `arvel --help` (follow-up) — listing without importing commands
+
+Even after (1)–(2), `arvel --help` outside a project was ~3.9s cold: Typer must show
+every command's name + help, which meant importing all 73 command classes (27 of them pull
+SQLAlchemy/FastAPI/Starlette/Jinja2/uvicorn). Two changes:
+
+- **Option A — manifest-backed listing (outside project).** A generated, checked-in manifest
+  `console/_command_meta.py` (name → short help) feeds a render-only Typer app
+  (`build_listing_app()`) for the no-command / `--help` / unknown-command paths. No command
+  implementation is imported. Names come from entry-point metadata; help from the manifest.
+  Regenerate with `scripts/gen_command_meta.py`; a drift-guard test fails CI if it goes stale,
+  and a subprocess test asserts the listing never imports the heavy stack. Real dispatch
+  (`arvel <cmd>`, `arvel <cmd> --help`) still routes through `load_command` (one module), so
+  the placeholders are render-only. Result: `arvel --help` ~3.9s → ~0.4s.
+
+- **Option B — lazy in-project dispatch.** `async_main` no longer calls `discover_commands()`
+  (all 73) on every invocation. For a concrete command it resolves just that one (provider
+  binding wins, else `load_command`); full discovery is kept only for the in-project
+  listing/unknown path. The per-invocation selection cost drops from ~2.38s (import all 73) to
+  ~0.40s (light command) / ~0.86s (a command that genuinely needs SQLAlchemy). The async
+  lifecycle (boot → dispatch → `get_pending_task` → shutdown) is unchanged.
+
 ## Verification
 - `python -X importtime` before/after on `import arvel` and the entrypoint.
 - `/usr/bin/time` on `arvel --help`, `arvel make:controller --help`, a real command.

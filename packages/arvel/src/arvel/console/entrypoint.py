@@ -12,9 +12,10 @@ Typer dispatch returns.
 
 Sequence inside a project:
 
-1. ``asyncio.run(async_main(project_root))`` — one loop for the whole lifecycle.
+1. ``asyncio.run(async_main(project_root, command))`` — one loop for the whole lifecycle.
 2. ``framework_app.boot()`` — engine and all providers initialised on this loop.
-3. Provider commands merged into the dispatch dict unconditionally.
+3. Provider commands collected from the container; for a concrete ``command`` only
+   that one command is loaded (no full discovery — keeps startup off the heavy stack).
 4. Typer parses and dispatches; async commands call ``schedule_async(coro)``.
 5. Scheduled coroutine awaited on the live loop.
 6. ``framework_app.shutdown()`` in ``finally`` — engine disposed on the same loop.
@@ -37,13 +38,15 @@ import typer
 from arvel import __version__
 from arvel.console import Application, Command
 from arvel.console._async import get_pending_task
-from arvel.console._loader import discover_commands, load_command
+from arvel.console._command_meta import COMMAND_HELP
+from arvel.console._loader import discover_commands, entry_point_names, load_command
 from arvel.console.bootstrap import (
     bootstrap_framework_application,
     find_project_root,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     from arvel.application import Application as FrameworkApplication
@@ -114,19 +117,51 @@ def _print_banner(argv: list[str]) -> None:
     )
 
 
+def build_listing_app() -> typer.Typer:
+    """Typer app that lists every command for ``arvel --help`` without importing one.
+
+    Rendering the top-level listing only needs each command's name + short help.
+    Importing the ~70 command classes to get that drags in FastAPI, SQLAlchemy,
+    Starlette, and Jinja2 (~3.9s cold). Instead we register render-only placeholders
+    from the generated ``COMMAND_HELP`` manifest. Real dispatch (``arvel <cmd>`` and
+    ``arvel <cmd> --help``) never lands here — it routes through :func:`load_command`
+    first — so the placeholder callbacks are only hit for an entry point that exists
+    but fails to import, where a clear error beats a silent no-op.
+    """
+    app = typer.Typer(add_completion=False)
+
+    def _noop(ctx: typer.Context) -> None:
+        if ctx.invoked_subcommand is None:
+            typer.echo(ctx.get_help())
+
+    app.callback(invoke_without_command=True)(_noop)
+
+    def _make_unavailable(cmd_name: str) -> Callable[[], None]:
+        def _cb() -> None:
+            typer.echo(f"Command {cmd_name!r} is unavailable (failed to load).", err=True)
+            raise typer.Exit(1)
+
+        return _cb
+
+    for name in entry_point_names():
+        app.command(name=name, help=COMMAND_HELP.get(name, ""))(_make_unavailable(name))
+
+    return app
+
+
 def _resolve_typer(command: str | None) -> typer.Typer:
     """Build the Typer app, loading only ``command`` when it's a concrete name.
 
     The hot path — running one command outside a project — shouldn't import all
-    ~70 command modules. Falls back to full discovery for ``--help``/no-arg (which
-    must list every command) and for an unknown name (so Typer renders a proper
-    "no such command").
+    ~70 command modules. Falls back to the manifest-backed listing app for
+    ``--help``/no-arg (which must list every command) and for an unknown name (so
+    Typer renders a proper "no such command"), neither of which imports a command.
     """
     if command is not None:
         only = load_command(command)
         if only is not None:
             return Application([only]).typer_app
-    return build_app()
+    return build_listing_app()
 
 
 def _is_outside_project_allowed(command: str | None) -> bool:
@@ -155,31 +190,28 @@ def _print_outside_project_message(command: str | None) -> None:
     )
 
 
-def _attach_provider_commands(
-    framework_app: FrameworkApplication, commands_by_name: dict[str, Command]
-) -> None:
-    """Merge container-resolved commands into the dispatch dict (container wins).
+def _provider_commands(framework_app: FrameworkApplication) -> dict[str, Command]:
+    """Commands registered by providers during boot, keyed by name (``app`` bound).
 
     Provider commands are attached to the bound console Application by
-    ``ConsoleServiceProvider.boot()``; we re-emit them here so the Typer app
-    we build for ``main()`` actually sees them. On name collision the
-    container-resolved binding replaces the entry-point one so user-provided
-    providers can shadow built-ins.
+    ``ConsoleServiceProvider.boot()``. Returns ``{}`` when the console
+    Application isn't bound (provider not registered) so the CLI still works
+    with entry-point commands only.
     """
     try:
         console_app: Application = framework_app.container.make(Application)
     except Exception as exc:  # noqa: BLE001
-        # Container resolution can raise for legitimate reasons (provider not
-        # registered) — log and continue with entry-point commands only.
         _log.warning(
             "ConsoleServiceProvider not bound; provider commands unavailable (%s).",
             exc,
         )
-        return
+        return {}
 
+    out: dict[str, Command] = {}
     for cmd in console_app.iter_commands():
         cmd.app = framework_app
-        commands_by_name[cmd.name] = cmd
+        out[cmd.name] = cmd
+    return out
 
 
 def _bind_app_to_needs_application_commands(
@@ -190,22 +222,52 @@ def _bind_app_to_needs_application_commands(
             cmd.app = framework_app
 
 
-async def async_main(project_root: Path) -> None:
+def _select_in_project_commands(
+    command: str | None,
+    framework_app: FrameworkApplication | None,
+    provider_cmds: dict[str, Command],
+) -> dict[str, Command]:
+    """Pick the commands to register for in-project dispatch.
+
+    For a concrete command we load just that one (provider binding wins over the
+    entry-point class) so a single ``arvel migrate`` doesn't import all ~70
+    command modules — which would drag in SQLAlchemy/FastAPI/Jinja2/uvicorn. Only
+    ``arvel`` / ``--help`` / an unknown name fall back to full discovery, where
+    Typer needs every command to render the listing (or a proper "no such
+    command").
+    """
+    if command is not None:
+        cmd = provider_cmds.get(command)
+        if cmd is None:
+            cmd = load_command(command)
+            if cmd is not None and framework_app is not None and cmd.needs_application:
+                cmd.app = framework_app
+        if cmd is not None:
+            return {cmd.name: cmd}
+
+    commands_by_name: dict[str, Command] = {c.name: c for c in discover_commands()}
+    commands_by_name.update(provider_cmds)  # provider binding wins on name collision
+    if framework_app is not None:
+        _bind_app_to_needs_application_commands(framework_app, commands_by_name)
+    return commands_by_name
+
+
+async def async_main(project_root: Path, command: str | None) -> None:
     """Run the in-project CLI lifecycle on a single event loop.
 
     Only reached from ``main()`` when a project root exists — ``main()`` handles
     the outside-project fast path itself. Owns boot, dispatch, and shutdown.
-    Typer reads from ``sys.argv``; no argument passing needed.
+    Typer reads from ``sys.argv``; ``command`` is the resolved name (or None) used
+    to load only what dispatch needs.
     """
     # Inside a project: always boot so provider commands are available.
-    discovered = discover_commands()
-    commands_by_name: dict[str, Command] = {c.name: c for c in discovered}
-
     framework_app = bootstrap_framework_application(project_root)
+    provider_cmds: dict[str, Command] = {}
     if framework_app is not None:
         await framework_app.boot()
-        _attach_provider_commands(framework_app, commands_by_name)
-        _bind_app_to_needs_application_commands(framework_app, commands_by_name)
+        provider_cmds = _provider_commands(framework_app)
+
+    commands_by_name = _select_in_project_commands(command, framework_app, provider_cmds)
 
     # Typer/Click raises SystemExit(0) after a successful command in standalone
     # mode. We must catch it so get_pending_task() can still run — otherwise
@@ -267,7 +329,7 @@ def main() -> None:
             raise SystemExit(0)
 
     try:
-        asyncio.run(async_main(project_root))
+        asyncio.run(async_main(project_root, command))
     except KeyboardInterrupt:
         # Ctrl+C during a long-running command (e.g. schedule:work). The command
         # already logged its graceful-shutdown message and shutdown() ran in the
