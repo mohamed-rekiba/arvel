@@ -6,7 +6,9 @@ make:migration generates timestamp-prefixed Alembic-shaped file
 
 from __future__ import annotations
 
+import os
 import re
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -137,6 +139,7 @@ class TestServe:
         (tmp_path / "bootstrap").mkdir()
         (tmp_path / "bootstrap" / "app.py").write_text("def create_application(): pass\n")
         monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("sys.path", list(sys.path))
 
         with patch("arvel.console.commands.serve.uvicorn.run") as mock_run:
             ServeCommand().serve(host="127.0.0.1", port=8000, reload=True)
@@ -147,6 +150,30 @@ class TestServe:
         assert kwargs.get("host") == "127.0.0.1"
         assert kwargs.get("port") == 8000
         assert kwargs.get("reload") is True
+
+    def test_serve_makes_unpackaged_project_importable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A non-package project (e.g. a kit) must still resolve public.asgi.
+
+        Regression: `uvicorn.run()` doesn't add the project dir to sys.path the
+        way the uvicorn CLI's --app-dir does, so serve must do it — otherwise
+        uvicorn raises ModuleNotFoundError: No module named 'public'.
+        """
+        from arvel.console.commands.serve import ServeCommand
+
+        (tmp_path / "bootstrap").mkdir()
+        (tmp_path / "bootstrap" / "app.py").write_text("def create_application(): pass\n")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("sys.path", list(sys.path))
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+
+        with patch("arvel.console.commands.serve.uvicorn.run"):
+            ServeCommand().serve(host="0.0.0.0", port=8001, reload=True)
+
+        root = str(tmp_path.resolve())
+        assert root in sys.path
+        assert root in os.environ["PYTHONPATH"].split(os.pathsep)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
