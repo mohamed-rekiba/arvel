@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.6.0...arvel-permission-v0.6.1) (2026-06-02)
+
+
+### Bug Fixes
+
+* **docs:** update module description for clarity and accuracy ([266502a](https://github.com/mohamed-rekiba/arvel/commit/266502a951b545d2ae4c0c1d4d66f5b72c1c18f7))
+
 ## [0.6.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.5.1...arvel-permission-v0.6.0) (2026-06-01)
 
 
