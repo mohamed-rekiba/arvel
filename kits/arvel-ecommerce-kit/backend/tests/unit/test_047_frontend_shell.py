@@ -164,7 +164,7 @@ def test_protected_frontend_routes_use_stored_session_guard() -> None:
     assert "router.beforeEach(" in router
     assert "hasStoredSession()" in router
     assert "loadCurrentUser()" in router
-    assert "hasAdminAccess(user)" in router
+    assert "hasAdminAccess(auth.user)" in router
     assert "meta: { requiresAuth: true" in router
     assert "meta: { requiresAuth: true, requiresAdmin: true }" in router
     assert "path: '/admin/login'" in router
