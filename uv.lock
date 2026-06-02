@@ -10,7 +10,7 @@ resolution-markers = [
 members = [
     "arvel",
     "arvel-audit",
-    "arvel-ecommerce-demo",
+    "arvel-ecommerce-kit",
     "arvel-image",
     "arvel-oauth",
     "arvel-permission",
@@ -538,9 +538,9 @@ requires-dist = [
 ]
 
 [[package]]
-name = "arvel-ecommerce-demo"
+name = "arvel-ecommerce-kit"
 version = "0.1.0"
-source = { editable = "packages/arvel-ecommerce-demo" }
+source = { editable = "kits/arvel-ecommerce-kit" }
 dependencies = [
     { name = "arvel", extra = ["bcrypt", "broadcasting", "image", "jwt", "mail", "permission", "postgres", "queue", "queue-amqp", "redis", "s3"] },
     { name = "python-multipart" },

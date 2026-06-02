@@ -37,8 +37,8 @@ flowchart TB
 `PermissionConfig` is **code-level**, not env-driven. Key fields: `role_model`, `permission_model`, `default_guard_name` (`"web"`), table-name overrides, `wildcard_enabled`, `cache_enabled`, `events_enabled`, `cache_store`, `cache_ttl`, `cache_prefix`.
 
 > **Warning**: Watch for these:
-> - Middleware and the Gate hook only activate when the provider runs and a `Gate` is bound. The demo uses the models/traits directly **without** `PermissionServiceProvider`, so it gets no Gate bridge.
-> - `PermissionConfig` is config-as-code; a Laravel-shaped `config/permission.py` dict (as in the demo) is **not** auto-wired to it.
+> - Middleware and the Gate hook only activate when the provider runs and a `Gate` is bound. The kit uses the models/traits directly **without** `PermissionServiceProvider`, so it gets no Gate bridge.
+> - `PermissionConfig` is config-as-code; a Laravel-shaped `config/permission.py` dict (as in the kit) is **not** auto-wired to it.
 > - `Role`/`Permission` get trait methods grafted at the end of `traits.py`, so import order matters.
 
 ## See also

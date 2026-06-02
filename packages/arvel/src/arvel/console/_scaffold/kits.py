@@ -72,7 +72,7 @@ def _api_kit_root() -> Path:
 
 
 def _ecommerce_kit_root() -> Path:
-    """Resolve via the ``arvel_ecommerce_demo`` companion package.
+    """Resolve via the ``arvel_ecommerce_kit`` companion package.
 
     Wrapping the import keeps the framework usable even when the kit
     package isn't installed — the failure surfaces as
@@ -80,11 +80,11 @@ def _ecommerce_kit_root() -> Path:
     ``--kit ecommerce``.
     """
     try:
-        module = importlib.import_module("arvel_ecommerce_demo")
+        module = importlib.import_module("arvel_ecommerce_kit")
     except ImportError as exc:
         raise KitNotInstalledError(
             name="ecommerce",
-            package="arvel-ecommerce-demo",
+            package="arvel-ecommerce-kit",
             original=exc,
         ) from exc
     kit_root_fn: Callable[[], Path] = module.kit_root
@@ -100,9 +100,9 @@ KITS: dict[str, KitSpec] = {
     "ecommerce": KitSpec(
         name="ecommerce",
         description=(
-            "Full-stack e-commerce demo: FastAPI backend + Vue 3 frontend + "
+            "Full-stack e-commerce kit: FastAPI backend + Vue 3 frontend + "
             "PostgreSQL / Redis / RabbitMQ / MinIO / Mailpit "
-            "(requires arvel-ecommerce-demo package)"
+            "(requires arvel-ecommerce-kit package)"
         ),
         resolve=_ecommerce_kit_root,
     ),

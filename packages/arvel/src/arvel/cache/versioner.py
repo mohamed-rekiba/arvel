@@ -1,6 +1,6 @@
 """CacheVersioner — version-stamped cache key invalidation.
 
-Pattern extracted from the demo's ``ItemService``. Instead of deleting
+Pattern extracted from the kit's ``ItemService``. Instead of deleting
 individual cache entries on write, we bump a version counter stored under a
 dedicated key. Any subsequent call to :meth:`versioned_key` generates a new
 composite key that differs from all pre-invalidation keys, effectively making
