@@ -66,7 +66,7 @@ Use the `@asynccontextmanager` decorator on an `async def lifespan(asgi_app:
 ASGIApp) -> AsyncGenerator[None]` to satisfy this type.
 """
 
-__version__ = "0.9.2"  # x-release-please-version
+__version__ = "0.9.3"  # x-release-please-version
 
 __all__ = [
     "URL",
