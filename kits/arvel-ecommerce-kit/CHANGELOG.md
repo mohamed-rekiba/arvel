@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.2.3...arvel-ecommerce-kit-v1.3.0) (2026-06-02)
+
+
+### Features
+
+* **cli:** add db pre-flight checks and ecommerce-kit healthcheck ([f76de0e](https://github.com/mohamed-rekiba/arvel/commit/f76de0e9e23a940233b5ddd9481d05ae3efc94af))
+
 ## [1.2.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.2.2...arvel-ecommerce-kit-v1.2.3) (2026-06-02)
 
 
