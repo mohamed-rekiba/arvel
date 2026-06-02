@@ -36,8 +36,6 @@ If the download can't be reached, the command fails with a `KitDownloadError` th
 <a name="running-the-bundled-app"></a>
 ## Running the Bundled App
 
-From `kits/arvel-ecommerce-kit/`:
-
 ```bash
 make env       # copy .env.example to .env
 make up        # docker compose up -d db redis backend frontend
