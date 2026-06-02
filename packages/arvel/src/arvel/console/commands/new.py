@@ -285,6 +285,35 @@ def _localize_scaffolded_pyproject(target: Path, project: str, kit: str) -> None
         pyproject.write_text(text, encoding="utf-8")
 
 
+# The kit's docker-compose.yml is authored for the monorepo: it bind-mounts the
+# repo root (`../..`), works out of `kits/arvel-ecommerce-kit/backend`, and syncs
+# the whole uv workspace (`--all-packages`) so `arvel` resolves from source. A
+# scaffolded project has none of that — `pyproject.toml` and `backend/` sit at the
+# project root and `arvel` comes from PyPI. Rewrite the monorepo paths so
+# `docker compose up` works in the generated project.
+_COMPOSE_MONOREPO_REWRITES: tuple[tuple[str, str], ...] = (
+    ("/workspace/kits/arvel-ecommerce-kit/backend", "/workspace/backend"),
+    ("cd kits/arvel-ecommerce-kit/backend", "cd backend"),
+    ("../..:/workspace", ".:/workspace"),
+    ("uv sync --frozen --all-packages", "uv sync --frozen"),
+)
+
+
+def _localize_scaffolded_compose(target: Path, kit: str) -> None:
+    """Rewrite the kit's monorepo docker-compose.yml for the standalone project."""
+    if kit == DEFAULT_KIT:
+        return
+    compose = target / "docker-compose.yml"
+    if not compose.is_file():
+        return
+    original = compose.read_text(encoding="utf-8")
+    text = original
+    for monorepo, standalone in _COMPOSE_MONOREPO_REWRITES:
+        text = text.replace(monorepo, standalone)
+    if text != original:
+        compose.write_text(text, encoding="utf-8")
+
+
 def _scaffold(
     name: str,
     *,
@@ -321,6 +350,7 @@ def _scaffold(
     )
 
     _localize_scaffolded_pyproject(target, validated, kit_spec.name)
+    _localize_scaffolded_compose(target, kit_spec.name)
 
     sync_args = _uv_sync_args(kit_spec.name)
     if not no_install:
