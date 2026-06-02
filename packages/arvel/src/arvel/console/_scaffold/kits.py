@@ -58,6 +58,8 @@ class KitSpec:
     name: str
     description: str
     resolve: Callable[[], Path]
+    # Printed after ``cd <project>`` in ``arvel new`` success output (no leading spaces).
+    next_step_commands: tuple[str, ...] = ("uv run arvel serve",)
 
     def root(self) -> Path:
         """Return the kit's source tree, raising if it can't be located."""
@@ -114,6 +116,13 @@ KITS: dict[str, KitSpec] = {
             "(downloaded from GitHub releases on first use)"
         ),
         resolve=_ecommerce_kit_root,
+        next_step_commands=(
+            "make env",
+            "make up",
+            "make healthcheck",
+            "make migrate",
+            "make seed",
+        ),
     ),
 }
 

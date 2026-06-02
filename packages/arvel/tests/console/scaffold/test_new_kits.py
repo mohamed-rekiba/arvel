@@ -30,6 +30,17 @@ def runner() -> CliRunner:
     return CliRunner()
 
 
+def _local_ecommerce_kit(kit_src: Path) -> KitSpec:
+    """Minimal e-commerce kit tree with the real kit's post-scaffold hints."""
+    base = KITS["ecommerce"]
+    return KitSpec(
+        name=base.name,
+        description=base.description,
+        resolve=lambda: kit_src,
+        next_step_commands=base.next_step_commands,
+    )
+
+
 # ────────────────────────────────────────────────────────────────────
 # Kit registry — typed structure
 # ────────────────────────────────────────────────────────────────────
@@ -192,8 +203,7 @@ def test_new_ecommerce_renames_project_and_uses_kit_sync(
     )
     (kit_src / "README.md").write_text("# kit\n", encoding="utf-8")
 
-    fake_spec = KitSpec(name="ecommerce", description="(local)", resolve=lambda: kit_src)
-    monkeypatch.setitem(kits_module.KITS, "ecommerce", fake_spec)
+    monkeypatch.setitem(kits_module.KITS, "ecommerce", _local_ecommerce_kit(kit_src))
 
     app = build_app()
     with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
@@ -209,6 +219,32 @@ def test_new_ecommerce_renames_project_and_uses_kit_sync(
         assert "package = false" not in pyproject
         assert "arvel[postgres]>=1.0.0" in pyproject
         assert "uv sync --all-extras --dev" in result.stdout
+
+
+def test_new_ecommerce_next_steps_use_make_not_arvel_serve(
+    runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The e-commerce kit runs via Docker Compose, not ``uv run arvel serve``."""
+    from arvel.console._scaffold import kits as kits_module
+
+    kit_src = tmp_path / "kit-src"
+    kit_src.mkdir()
+    (kit_src / "pyproject.toml").write_text(
+        '[project]\nname = "arvel-ecommerce-kit"\nversion = "1.0.0"\n'
+        'dependencies = ["arvel[postgres]"]\n',
+        encoding="utf-8",
+    )
+
+    monkeypatch.setitem(kits_module.KITS, "ecommerce", _local_ecommerce_kit(kit_src))
+
+    app = build_app()
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
+        result = runner.invoke(app, ["new", "my-shop", "--kit", "ecommerce", "--no-install"])
+        assert result.exit_code == 0, result.stderr
+        assert "make up" in result.stdout
+        assert "make migrate" in result.stdout
+        assert "make seed" in result.stdout
+        assert "uv run arvel serve" not in result.stdout
 
 
 def test_new_ecommerce_localizes_docker_compose(
@@ -239,8 +275,7 @@ def test_new_ecommerce_localizes_docker_compose(
         encoding="utf-8",
     )
 
-    fake_spec = KitSpec(name="ecommerce", description="(local)", resolve=lambda: kit_src)
-    monkeypatch.setitem(kits_module.KITS, "ecommerce", fake_spec)
+    monkeypatch.setitem(kits_module.KITS, "ecommerce", _local_ecommerce_kit(kit_src))
 
     app = build_app()
     with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
