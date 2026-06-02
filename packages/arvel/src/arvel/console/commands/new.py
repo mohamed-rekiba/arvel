@@ -138,17 +138,18 @@ def _print_next_steps(
     name: str,
     *,
     no_install: bool,
-    kit: str = DEFAULT_KIT,
+    kit_spec: KitSpec,
     sync_args: Sequence[str] = ("sync",),
 ) -> None:
     typer.echo("")
-    typer.echo(f"Created {name}/ from the {kit!r} kit.")
+    typer.echo(f"Created {name}/ from the {kit_spec.name!r} kit.")
     typer.echo("")
     typer.echo("Next steps:")
     typer.echo(f"  cd {name}")
     if no_install:
         typer.echo("  " + "uv " + " ".join(sync_args))
-    typer.echo("  uv run arvel serve")
+    for command in kit_spec.next_step_commands:
+        typer.echo(f"  {command}")
     typer.echo("")
 
 
@@ -356,7 +357,7 @@ def _scaffold(
     if not no_install:
         _run_uv_sync(target, sync_args)
 
-    _print_next_steps(validated, no_install=no_install, kit=kit_spec.name, sync_args=sync_args)
+    _print_next_steps(validated, no_install=no_install, kit_spec=kit_spec, sync_args=sync_args)
 
 
 def _new_callback(
