@@ -63,6 +63,20 @@ ADMIN_SEED_PASSWORD=AdminPwd!1
 
 Change these before sharing the instance with anyone.
 
+## Scaffold your own project
+
+To start a new project *from* this kit rather than running the reference app in place,
+use the Arvel CLI — it downloads the kit and renames it to your project:
+
+```bash
+uv tool install arvel
+arvel new my-store --kit ecommerce
+cd my-store
+```
+
+The kit isn't on PyPI. `arvel new` fetches the latest `arvel-ecommerce-kit` release
+tarball from GitHub, verifies its checksum, and scaffolds it under your project name.
+
 ## Services
 
 `docker-compose.yml` starts five services:

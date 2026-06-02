@@ -20,6 +20,7 @@ Image pins live in :mod:`._images`. Bump versions there — the fixtures,
 from __future__ import annotations
 
 import importlib
+import os
 import time
 import urllib.request
 from collections.abc import Iterator
@@ -29,6 +30,16 @@ from typing import Any
 import pytest
 
 from ._docker import docker_available
+
+# Every fixture below cleans up via try/finally: container.stop(), so the Ryuk
+# reaper is redundant. Disabling it also drops the implicit testcontainers/ryuk
+# pull from Docker Hub — that pull isn't in our pinned image set and times out
+# on hosts with a slow or blocked registry. setdefault so a host override wins.
+# Must run before testcontainers.core.config is imported (it reads this once at
+# import); this plugin module loads at session start, ahead of the lazy import
+# in _docker_container, and before conftest's per-test os.environ snapshot.
+os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
+
 from ._images import (
     IMAGE_AZURITE,
     IMAGE_FAKE_GCS,
