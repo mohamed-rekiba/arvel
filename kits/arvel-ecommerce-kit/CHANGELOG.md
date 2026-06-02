@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.2.0...arvel-ecommerce-kit-v1.2.1) (2026-06-02)
+
+
+### Bug Fixes
+
+* disable testcontainers ryuk reaper and document CLI scaffold ([ab12be9](https://github.com/mohamed-rekiba/arvel/commit/ab12be9341a2a498f535f1dcae523d0776ab48a4))
+
 ## [1.2.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.1.0...arvel-ecommerce-kit-v1.2.0) (2026-06-02)
 
 
