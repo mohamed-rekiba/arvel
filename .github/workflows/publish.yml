@@ -20,6 +20,9 @@ on:
       # <package>-v1.0.0 / <package>-v1.0.0-rc.1
       - "*-v[0-9]+.[0-9]+.[0-9]+"
       - "*-v[0-9]+.[0-9]+.[0-9]+-*"
+      # The kits aren't PyPI packages — release-kit.yml ships them as a
+      # release tarball. Its tag matches the globs above, so exclude it here.
+      - "!*-kit-v*"
   workflow_dispatch:
     inputs:
       package:

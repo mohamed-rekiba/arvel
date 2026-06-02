@@ -17,13 +17,21 @@ This is an **example**, not a library you depend on. Use it as a worked example.
 <a name="scaffolding-from-the-kit"></a>
 ## Scaffolding From the Kit
 
-The kit doubles as a scaffolding source. Install the `arvel-ecommerce-kit` package first so the kit is importable, then:
+The kit doubles as a scaffolding source. It's **not** on PyPI and isn't bundled in the `arvel` wheel — instead it ships as a tarball attached to its own GitHub Release (`arvel-ecommerce-kit-v*`). Just run:
 
 ```bash
 arvel new my-shop --kit ecommerce
 ```
 
-Without the package installed, this fails with `KitNotInstalledError`.
+The CLI resolves the newest `arvel-ecommerce-kit-v*` release, downloads the tarball (with a progress bar), verifies it against the release's `.sha256` sidecar, caches it under `~/.cache/arvel/kits/`, renames the project to `my-shop`, and runs `uv sync --all-extras --dev`. Inside an Arvel checkout the local workspace copy is used instead, so contributors never hit the network.
+
+Pin a specific version (and skip the release lookup) with `ARVEL_ECOMMERCE_KIT_VERSION`:
+
+```bash
+ARVEL_ECOMMERCE_KIT_VERSION=1.0.0 arvel new my-shop --kit ecommerce
+```
+
+If the download can't be reached, the command fails with a `KitDownloadError` that points you back at the repo.
 
 <a name="running-the-bundled-app"></a>
 ## Running the Bundled App

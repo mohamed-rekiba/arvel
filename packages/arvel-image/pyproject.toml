@@ -15,7 +15,7 @@ classifiers = [
     "Topic :: Multimedia :: Graphics",
     "Typing :: Typed",
 ]
-dependencies = ["arvel", "Pillow>=12.2.0"]
+dependencies = ["arvel", "Pillow>=12.2.0", "python-multipart>=0.0.30"]
 
 [project.optional-dependencies]
 heif = ["pillow-heif>=1.3.0"]

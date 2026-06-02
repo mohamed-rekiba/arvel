@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import importlib.resources
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -11,8 +10,9 @@ from pathlib import Path
 __all__ = [
     "DEFAULT_KIT",
     "KITS",
-    "KitNotInstalledError",
+    "KitDownloadError",
     "KitSpec",
+    "KitUnavailableError",
     "UnknownKitError",
     "available_kits",
     "format_kit_listing",
@@ -32,21 +32,23 @@ class UnknownKitError(Exception):
         self.available = available
 
 
-class KitNotInstalledError(Exception):
-    """Raised when a registered kit's companion package isn't importable.
+class KitUnavailableError(Exception):
+    """A registered kit can't be provided right now.
 
-    The kit is known to the registry but its source tree can't be located
-    at runtime — typically because the companion package isn't installed.
+    ``hint`` carries kit-specific, accurate guidance — never a blanket
+    ``pip install``, since the e-commerce kit ships as a GitHub Release
+    tarball, not a PyPI package.
     """
 
-    def __init__(self, name: str, package: str, original: BaseException) -> None:
-        super().__init__(
-            f"kit {name!r} is registered but its companion package "
-            f"{package!r} is not installed: {original}"
-        )
+    def __init__(self, name: str, hint: str, original: BaseException | None = None) -> None:
+        super().__init__(f"kit {name!r} is unavailable: {hint}")
         self.name = name
-        self.package = package
+        self.hint = hint
         self.original = original
+
+
+class KitDownloadError(KitUnavailableError):
+    """Fetching the kit's release tarball failed — network, 404, or bad checksum."""
 
 
 @dataclass(frozen=True)
@@ -72,23 +74,30 @@ def _api_kit_root() -> Path:
 
 
 def _ecommerce_kit_root() -> Path:
-    """Resolve via the ``arvel_ecommerce_kit`` companion package.
+    """Resolve the e-commerce kit tree — local checkout first, else download.
 
-    Wrapping the import keeps the framework usable even when the kit
-    package isn't installed — the failure surfaces as
-    :class:`KitNotInstalledError` only when the user requests
-    ``--kit ecommerce``.
+    The kit isn't a package: not on PyPI, not bundled in the wheel. In an Arvel
+    checkout the source sits at ``kits/arvel-ecommerce-kit``, so contributors
+    scaffold straight from it. Everyone else (``uv tool install arvel``) gets
+    the newest ``arvel-ecommerce-kit-v*`` release tarball, fetched on first use.
     """
-    try:
-        module = importlib.import_module("arvel_ecommerce_kit")
-    except ImportError as exc:
-        raise KitNotInstalledError(
-            name="ecommerce",
-            package="arvel-ecommerce-kit",
-            original=exc,
-        ) from exc
-    kit_root_fn: Callable[[], Path] = module.kit_root
-    return kit_root_fn()
+    local = _local_kit_source()
+    if local is not None:
+        return local
+    # Imported lazily: keeps httpx off the CLI startup path and avoids a
+    # kits ↔ remote_kit import cycle.
+    from arvel.console._scaffold.remote_kit import fetch_ecommerce_kit
+
+    return fetch_ecommerce_kit()
+
+
+def _local_kit_source() -> Path | None:
+    """Return ``kits/arvel-ecommerce-kit`` from an Arvel checkout, if present."""
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "kits" / "arvel-ecommerce-kit"
+        if (candidate / "backend").is_dir():
+            return candidate
+    return None
 
 
 KITS: dict[str, KitSpec] = {
@@ -102,7 +111,7 @@ KITS: dict[str, KitSpec] = {
         description=(
             "Full-stack e-commerce kit: FastAPI backend + Vue 3 frontend + "
             "PostgreSQL / Redis / RabbitMQ / MinIO / Mailpit "
-            "(requires arvel-ecommerce-kit package)"
+            "(downloaded from GitHub releases on first use)"
         ),
         resolve=_ecommerce_kit_root,
     ),
