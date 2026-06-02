@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.11.0...arvel-v0.12.0) (2026-06-02)
+
+
+### Features
+
+* **cli:** print kit-specific next steps after arvel new ([4311924](https://github.com/mohamed-rekiba/arvel/commit/43119242dc52dba67810f48f927e3a8230d736c4))
+
 ## [0.11.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.10.0...arvel-v0.11.0) (2026-06-02)
 
 
