@@ -209,3 +209,49 @@ def test_new_ecommerce_renames_project_and_uses_kit_sync(
         assert "package = false" not in pyproject
         assert "arvel[postgres]>=1.0.0" in pyproject
         assert "uv sync --all-extras --dev" in result.stdout
+
+
+def test_new_ecommerce_localizes_docker_compose(
+    runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The kit's monorepo compose is rewritten for the standalone project layout."""
+    from arvel.console._scaffold import kits as kits_module
+
+    kit_src = tmp_path / "kit-src"
+    kit_src.mkdir()
+    (kit_src / "pyproject.toml").write_text(
+        '[project]\nname = "arvel-ecommerce-kit"\nversion = "1.0.0"\n'
+        'dependencies = ["arvel[postgres]"]\n',
+        encoding="utf-8",
+    )
+    # Mirrors the real kit: monorepo bind-mount, subtree working dir, workspace sync.
+    (kit_src / "docker-compose.yml").write_text(
+        "services:\n"
+        "  backend:\n"
+        "    working_dir: /workspace/kits/arvel-ecommerce-kit/backend\n"
+        "    command: >\n"
+        '      bash -c "cd /workspace &&\n'
+        "      uv sync --frozen --all-packages --all-extras --no-dev &&\n"
+        "      cd kits/arvel-ecommerce-kit/backend &&\n"
+        '      arvel serve --host 0.0.0.0 --port 8001"\n'
+        "    volumes:\n"
+        "      - ../..:/workspace\n",
+        encoding="utf-8",
+    )
+
+    fake_spec = KitSpec(name="ecommerce", description="(local)", resolve=lambda: kit_src)
+    monkeypatch.setitem(kits_module.KITS, "ecommerce", fake_spec)
+
+    app = build_app()
+    with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path) as iso_cwd:
+        result = runner.invoke(app, ["new", "my-shop", "--kit", "ecommerce", "--no-install"])
+        assert result.exit_code == 0, result.stderr
+        compose = (Path(iso_cwd) / "my-shop" / "docker-compose.yml").read_text(encoding="utf-8")
+        # Monorepo plumbing is gone.
+        assert "kits/arvel-ecommerce-kit" not in compose
+        assert "../..:/workspace" not in compose
+        assert "--all-packages" not in compose
+        # Standalone paths in its place.
+        assert "working_dir: /workspace/backend" in compose
+        assert "cd backend" in compose
+        assert "- .:/workspace" in compose
