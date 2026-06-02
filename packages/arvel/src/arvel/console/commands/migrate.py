@@ -3,7 +3,7 @@
 Exit codes follow the honest-failure rule:
 - 0 — success
 - 1 — migration body raised
-- 2 — bootstrap failed
+- 2 — bootstrap failed or the database is unavailable
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
 from arvel.console._t import Option as _Option
+from arvel.database.health import DatabaseUnavailableError, check_database_connection
 from arvel.database.migrator import (
     MigrationFailedError,
     MigrationFileInvalidError,
@@ -93,6 +94,9 @@ class MigrateCommand(Command):
     async def _exec_migrate(self, *, dry_run: bool) -> None:
         try:
             applied = await self._run_migrations(dry_run=dry_run)
+        except DatabaseUnavailableError as exc:
+            typer.echo(f"arvel: database is not available — {exc}", err=True)
+            raise typer.Exit(code=2) from exc
         except MigrationFailedError as exc:
             typer.echo(
                 f"arvel: migration failed: {exc.name} — "
@@ -116,7 +120,9 @@ class MigrateCommand(Command):
         raise NotImplementedError
 
     async def _run_migrations(self, *, dry_run: bool = False) -> list[str]:
-        migrator = build_migrator(self.app)
+        engine = resolve_engine(self.app)
+        await check_database_connection(engine)
+        migrator = Migrator(engine, _resolve_migrations_dir(self.app))
         await migrator.ensure_table()
         return await migrator.upgrade(dry_run=dry_run)
 

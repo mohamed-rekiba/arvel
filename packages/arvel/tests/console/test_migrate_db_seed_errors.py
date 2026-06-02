@@ -28,6 +28,7 @@ from arvel.console.commands.migrate import (
     MigrateRollbackCommand,
     MigrateStatusCommand,
 )
+from arvel.database.migrator import Migrator
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     async_sessionmaker,
@@ -45,6 +46,11 @@ def _attach_app(framework_app: Any, *cmds: Command) -> Application:
     for cmd in cmds:
         cmd.app = framework_app  # type: ignore[assignment]
     return Application(commands=list(cmds))
+
+
+def _mark_migrated(engine: AsyncEngine) -> None:
+    """Create the migrations tracking table so db:seed's preflight passes."""
+    asyncio.run(Migrator(engine, Path(".")).ensure_table())
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +194,7 @@ def test_db_seed_base_path_string_resolves_correctly(tmp_path: Path, engine: Asy
         "        return\n"
     )
     app = _seeder_app(str(tmp_path), engine)
+    _mark_migrated(engine)
     result = invoke_async(runner, app.typer_app, ["db:seed"])
     assert result.exit_code == 0, result.stdout + result.stderr
     assert "Seeded" in result.stdout or "DatabaseSeeder" in result.stdout
@@ -220,6 +227,7 @@ def test_db_seed_base_path_missing_uses_cwd(
             self.container = _Container()
 
     app = _attach_app(_NoBasePathApp(), DbSeedCommand())
+    _mark_migrated(engine)
     result = invoke_async(runner, app.typer_app, ["db:seed"])
     assert result.exit_code == 0, result.stdout + result.stderr
 

@@ -36,9 +36,21 @@ If the download can't be reached, the command fails with a `KitDownloadError` th
 <a name="running-the-bundled-app"></a>
 ## Running the Bundled App
 
+### Prerequisites
+
+Everything runs in containers, so the host only needs:
+
+- **Docker Engine** with the Compose plugin (`docker compose`).
+- **GNU Make**.
+- **[uv](https://docs.astral.sh/uv/)** — to install and run the Arvel CLI (`uv tool install arvel`) for scaffolding and host-side `arvel` commands.
+- Free local ports: `8001` (backend), `8000` (frontend), `5432` (Postgres), `6379` (Redis). Override them in `.env` if they clash.
+
+### Commands
+
 ```bash
 make env       # copy .env.example to .env
-make up        # docker compose up -d db redis backend frontend
+make up        # start db, redis, backend, frontend, then wait until all are healthy
+make healthcheck    # wait until every service reports healthy
 make migrate   # arvel migrate (inside the backend container)
 make seed      # arvel db:seed
 ```
@@ -46,7 +58,7 @@ make seed      # arvel db:seed
 Default URLs (from `.env.example`):
 
 - Backend: `http://localhost:8001` — health at `GET /healthz`
-- Frontend: `http://localhost:5173`
+- Frontend: `http://localhost:8000`
 
 Run the tests with `make test-backend` and `make test-frontend`.
 
