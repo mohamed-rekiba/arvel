@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.8.0...arvel-v0.9.0) (2026-06-02)
+
+
+### Features
+
+* **kits:** ship ecommerce kit as a github release download ([4995420](https://github.com/mohamed-rekiba/arvel/commit/499542031dac4694b6cadff9bd3a5ac0d9aee218))
+
 ## [0.8.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.7.3...arvel-v0.8.0) (2026-06-02)
 
 
