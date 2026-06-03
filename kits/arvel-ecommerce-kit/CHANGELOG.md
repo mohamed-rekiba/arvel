@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.4.0...arvel-ecommerce-kit-v1.5.0) (2026-06-03)
+
+
+### Features
+
+* **storage:** serve local-disk files at the framework ([653b7c5](https://github.com/mohamed-rekiba/arvel/commit/653b7c59dab6142539fe0bada30d0633eeb4a2f4))
+
 ## [1.4.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.3.0...arvel-ecommerce-kit-v1.4.0) (2026-06-02)
 
 
