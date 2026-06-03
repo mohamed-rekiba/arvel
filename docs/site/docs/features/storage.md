@@ -13,7 +13,13 @@ Storage is configured through `StorageConfig` (the `STORAGE_*` environment varia
 ```ini
 STORAGE_DEFAULT=local
 STORAGE_LOCAL_ROOT=storage/app
+STORAGE_LOCAL_URL=/storage     # prefix for generated URLs; also the serve-route path
+STORAGE_LOCAL_SERVE=true       # let the framework serve files from the local disk
 ```
+
+`STORAGE_LOCAL_URL` is the prefix `disk.url()` puts in front of stored paths. Keep it relative
+(`/storage`) and the browser resolves it against the current origin; set it absolute
+(`https://cdn.example.com`) when a CDN or object store fronts the files.
 
 <a name="drivers"></a>
 ### Drivers
@@ -82,6 +88,31 @@ Get a public URL for a stored file, or a time-limited signed URL for private fil
 public = disk.url("avatars/1.png")
 temporary = disk.temporary_url("private/report.pdf", expiry=300)   # seconds
 ```
+
+`temporary_url` on the local disk signs the URL with HMAC-SHA256 keyed from `APP_KEY`, so it needs
+`APP_KEY` set (run `arvel key:generate`). Cloud drivers use their SDK's native pre-signing.
+
+<a name="serving-local-files"></a>
+## Serving Local Files
+
+The local driver mints URLs, but something has to answer them. When `STORAGE_LOCAL_SERVE` is on
+(the default) and `STORAGE_LOCAL_URL` is a relative path, `StorageServiceProvider` registers a
+route — `GET {STORAGE_LOCAL_URL}/{path}` — that serves files straight from the disk root. This is
+the equivalent of Laravel's `'serve' => true`.
+
+- **Public files** (`disk.url(...)`) are served directly.
+- **Signed files** (`disk.temporary_url(...)`) carry `token` and `expires` query params. The route
+  verifies the HMAC and the expiry; a tampered or expired link gets `403`.
+- A missing file, or any path that tries to escape the root, gets `404` — never a read outside the
+  root.
+
+Turn it off (`STORAGE_LOCAL_SERVE=false`) or point `STORAGE_LOCAL_URL` at an absolute URL when a
+CDN or object store serves the files instead — then no route is registered.
+
+> [!NOTE]
+> Per-file visibility (rejecting a private file requested without a signature) isn't implemented
+> yet. Until then the route serves any file under the root when asked without a signature, which is
+> fine for public media but means private data shouldn't live on a publicly served local disk.
 
 <a name="listing-files"></a>
 ## Listing Files

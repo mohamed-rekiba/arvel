@@ -21,6 +21,11 @@ export default defineConfig({
         // the redirect through this proxy rather than to the backend hostname.
         autoRewrite: true,
       },
+      // Local-disk media is served by the backend at /media/*.
+      '/media': {
+        target: process.env.VITE_DEV_PROXY_TARGET ?? 'http://localhost:8001',
+        changeOrigin: true,
+      },
     },
   },
 })
