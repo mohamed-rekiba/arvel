@@ -308,42 +308,46 @@ class ProductService:
         image_payload = await self._image_payload(media)
         return self._product_to_storefront(product, locale, image_payload=image_payload)
 
-    # Conversion names the storefront card renders, paired with their srcset widths.
-    _SRCSET_CONVERSIONS: tuple[tuple[str, int], ...] = (
-        ("thumbnail", 150),
-        ("card", 400),
-        ("full", 1200),
-    )
-
     @classmethod
     async def _image_payload(cls, media: Media | None) -> dict[str, Any]:
-        empty = {"thumbnail_url": None, "image_srcset": "", "image_sizes": ""}
+        """Build the image payload for a storefront product card.
+
+        Priority:
+        1. Responsive srcset from the ``card`` conversion (width-optimised variants).
+        2. Static width hints from conversion URLs if responsive wasn't generated.
+        3. Seeded ``image_url`` custom property fallback for legacy stub rows.
+        """
+        empty: dict[str, Any] = {"thumbnail_url": None, "image_srcset": "", "image_sizes": ""}
         if media is None:
             return empty
 
-        has_conversion = any(
-            media.has_generated_conversion(name) for name, _ in cls._SRCSET_CONVERSIONS
-        )
+        has_thumb = media.has_generated_conversion("thumbnail")
+        has_card = media.has_generated_conversion("card")
+
         seeded_url = media.get_custom_property("image_url")
-        if seeded_url and not has_conversion:
-            # Seeded sample images live at a URL — no file on disk.
+        if seeded_url and not has_thumb and not has_card:
             return {"thumbnail_url": str(seeded_url), "image_srcset": "", "image_sizes": ""}
 
-        sources: list[tuple[str, int]] = []
-        thumbnail_url: str | None = None
-        for name, width in cls._SRCSET_CONVERSIONS:
-            if media.has_generated_conversion(name):
-                url = await media.get_url(name)
-                if name == "thumbnail":
-                    thumbnail_url = url
-                sources.append((url, width))
-        if thumbnail_url is None:
-            thumbnail_url = await media.get_url()
+        thumbnail_url: str | None = (
+            await media.get_url("thumbnail") if has_thumb else await media.get_url()
+        )
+
+        image_srcset = ""
+        if has_card:
+            # Prefer the per-conversion responsive srcset — richer width steps.
+            image_srcset = await media.get_srcset("card")
+            if not image_srcset:
+                # card exists but responsive wasn't generated — build static hints.
+                parts: list[str] = [f"{await media.get_url('card')} 400w"]
+                if media.has_generated_conversion("full"):
+                    parts.append(f"{await media.get_url('full')} 1200w")
+                image_srcset = ", ".join(parts)
+
         return {
             "thumbnail_url": thumbnail_url,
-            "image_srcset": ", ".join(f"{url} {width}w" for url, width in sources),
+            "image_srcset": image_srcset,
             "image_sizes": "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-            if sources
+            if image_srcset
             else "",
         }
 

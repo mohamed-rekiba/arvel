@@ -7,23 +7,23 @@ Creates enough data to populate the marketplace-style storefront:
     Level 2: Mobiles, Laptops, Speakers, TV Sets, Watches, Headsets
     Level 3: Smartphones (child of Mobiles — exercises the recursive CTE)
 - 12 published products (Mobiles/Smartphones share their 2 products)
-- 1 media row per product using a curated real product photo
-  (stored via custom_properties.image_url — no file downloads required)
+- 1 media row per product, downloaded from Unsplash and stored via the
+  arvel-image API so all conversions + responsive images are generated.
+  Falls back to a synthetic Pillow image when the network is unavailable.
 
 All translatable fields include en/ar/tr values so i18n tests pass.
 """
 
 from __future__ import annotations
 
+import io
 import uuid
 from typing import Any
 
 from app.support.seeder import EcommerceSeeder
 
-# Curated Unsplash photos (free under the Unsplash License) per product slug, so
-# the storefront shows category-correct images instead of random placeholders.
-# Cropped square at the source; the browser loads these URLs directly.
-_IMG = "https://images.unsplash.com/photo-{photo}?w=800&h=800&fit=crop&q=80"
+# Curated Unsplash photos (free under the Unsplash License) per product slug.
+_IMG = "https://images.unsplash.com/photo-{photo}?w=800&h=600&fit=crop&q=80"
 _PRODUCT_IMAGES: dict[str, str] = {
     "iphone-15-pro": _IMG.format(photo="1592750475338-74b7b21085ab"),
     "samsung-galaxy-s25": _IMG.format(photo="1610945415295-d9bbf067e59c"),
@@ -40,6 +40,27 @@ _PRODUCT_IMAGES: dict[str, str] = {
     "wireless-headphones-pro": _IMG.format(photo="1583394838336-acd977736f90"),
     "prototype-gadget-x": _IMG.format(photo="1518770660439-4636190af475"),
 }
+
+_DOWNLOAD_TIMEOUT = 8.0  # seconds
+
+
+async def _fetch_product_image(slug: str) -> bytes:
+    """Download from Unsplash; fall back to a synthetic JPEG on any error."""
+    import httpx  # noqa: PLC0415
+    from PIL import Image as _PILImage  # noqa: PLC0415
+
+    url = _PRODUCT_IMAGES.get(slug, f"https://picsum.photos/seed/{slug}/800/600")
+    try:
+        async with httpx.AsyncClient(timeout=_DOWNLOAD_TIMEOUT, follow_redirects=True) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.content
+    except Exception:  # noqa: BLE001
+        # Network unavailable (CI, offline dev) — synthesise a valid JPEG.
+        img = _PILImage.new("RGB", (800, 600), color=(64, 64, 80))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        return buf.getvalue()
 
 
 def _english_slug(slug: dict[str, str]) -> str:
@@ -550,31 +571,26 @@ class CatalogSeeder(EcommerceSeeder):
                 await self._seed_media(str(record["id"]), slug_en)
 
     async def _seed_media(self, product_id: str, slug: str) -> None:
-        """Upsert the product's sample image. Re-seeding refreshes the URL in place;
-        user-uploaded media (different uuid) is left untouched."""
-        image_url = _PRODUCT_IMAGES.get(slug, f"https://picsum.photos/seed/{slug}/800/800")
+        """Download the product image and attach it via the arvel-image API.
 
-        # Deterministic UUID so re-seeding is idempotent via ON CONFLICT(uuid).
-        media_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, f"product-image:{product_id}"))
-        await self.db.upsert(
-            "media",
-            match_on=["uuid"],
-            data={
-                "model_type": "Product",
-                "model_id": product_id,
-                "uuid": media_uuid,
-                "collection_name": "images",
-                "name": slug,
-                "file_name": f"{slug}.jpg",
-                "mime_type": "image/jpeg",
-                "disk": "local",
-                "size": 0,
-                "manipulations": {},
-                "custom_properties": {"image_url": image_url},
-                "generated_conversions": {},
-                "responsive_images": {},
-                "metadata": {},
-                "order_column": 1,
-            },
-            cast_map={"uuid": "uuid"},
+        On first run: fetches from Unsplash, runs conversions + responsive images
+        inline so all features are exercisable in E2E tests.
+        On re-seed: idempotent — skips when the product already has a thumbnail
+        conversion to avoid redundant downloads and re-processing.
+        On network failure: Pillow synthesises a plain JPEG so tests run offline.
+        """
+        from app.models.product import Product  # noqa: PLC0415
+        from app.models.product_base import IMAGES_COLLECTION  # noqa: PLC0415
+
+        product = await Product.where(Product.id == uuid.UUID(product_id)).first()
+        if product is None:
+            return
+
+        existing = await product.get_first_media(IMAGES_COLLECTION)
+        if existing is not None and existing.has_generated_conversion("thumbnail"):
+            return
+
+        image_bytes = await _fetch_product_image(slug)
+        await product.add_media(image_bytes, file_name=f"{slug}.jpg").to_media_collection(
+            IMAGES_COLLECTION
         )

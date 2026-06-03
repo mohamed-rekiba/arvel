@@ -9,6 +9,8 @@ Coverage:
 - catalog_manager can restore a soft-deleted product
 - catalog_manager can publish/unpublish; materialized view refreshed
 - catalog_manager can list, upload, delete product media
+- upload creates thumbnail / card / full conversions
+- card and full conversions have responsive srcset after upload
 """
 
 from __future__ import annotations
@@ -17,6 +19,16 @@ import io
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
+
+def _make_jpeg(width: int = 400, height: int = 300) -> bytes:
+    """Return a minimal but valid JPEG of the given dimensions via Pillow."""
+    from PIL import Image as _PILImage
+
+    img = _PILImage.new("RGB", (width, height), color=(80, 120, 160))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=85)
+    return buf.getvalue()
 
 pytestmark = pytest.mark.integration
 
@@ -355,17 +367,15 @@ async def test_publish_product_appears_in_storefront(
 # ─── media ──────────────────────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_upload_product_image_creates_conversions(
-    client: Any, catalog_token: str, vendor_id: str, category_id: str
-) -> None:
-    """uploading an image creates thumbnail, card, and full conversions."""
-    created = await client.post(
+async def _create_product(
+    client: Any, token: str, vendor_id: str, category_id: str, name: str, slug: str
+) -> str:
+    resp = await client.post(
         "/api/admin/products",
-        headers={"Authorization": f"Bearer {catalog_token}"},
+        headers={"Authorization": f"Bearer {token}"},
         json={
-            "name": {"en": "Photo Product"},
-            "slug": {"en": "photo-product"},
+            "name": {"en": name},
+            "slug": {"en": slug},
             "description": {"en": "..."},
             "price": 10.00,
             "stock_qty": 1,
@@ -373,30 +383,73 @@ async def test_upload_product_image_creates_conversions(
             "vendor_id": vendor_id,
         },
     )
-    product_id = created.json()["data"]["id"]
+    assert resp.status_code == 201, resp.json()
+    return str(resp.json()["data"]["id"])
 
-    # Minimal 1x1 JPEG
-    tiny_jpeg = (
-        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
-        b"\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c"
-        b"\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c"
-        b"\x1c $.' \",#\x1c\x1c(7),01444\x1f'9=82<.342\x1eC\x19\x1c45\xff\xc0\x00"
-        b"\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05"
-        b"\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04"
-        b"\x05\x06\x07\x08\t\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xfb\xff\xd9"
+
+@pytest.mark.asyncio
+async def test_upload_product_image_creates_conversions(
+    client: Any, catalog_token: str, vendor_id: str, category_id: str
+) -> None:
+    """uploading a 400x300 image creates thumbnail, card, and full conversions."""
+    product_id = await _create_product(
+        client, catalog_token, vendor_id, category_id, "Photo Product", "photo-product"
     )
-
+    jpeg = _make_jpeg(400, 300)
     upload = await client.post(
         f"/api/admin/products/{product_id}/media",
         headers={"Authorization": f"Bearer {catalog_token}"},
-        files={"file": ("photo.jpg", io.BytesIO(tiny_jpeg), "image/jpeg")},
+        files={"file": ("photo.jpg", io.BytesIO(jpeg), "image/jpeg")},
     )
     assert upload.status_code == 201
     body = upload.json()["data"]
     assert "conversions" in body
-    assert "thumbnail" in body["conversions"]
-    assert "card" in body["conversions"]
-    assert "full" in body["conversions"]
+    assert body["conversions"]["thumbnail"] != ""
+    assert body["conversions"]["card"] != ""
+    assert body["conversions"]["full"] != ""
+
+
+@pytest.mark.asyncio
+async def test_upload_product_image_has_responsive_srcset(
+    client: Any, catalog_token: str, vendor_id: str, category_id: str
+) -> None:
+    """uploading a large enough image produces responsive srcset for card and full."""
+    product_id = await _create_product(
+        client, catalog_token, vendor_id, category_id, "Srcset Product", "srcset-product"
+    )
+    # 800x600 gives the FileSizeOptimizedWidthCalculator room to produce 2+ breakpoints.
+    jpeg = _make_jpeg(800, 600)
+    upload = await client.post(
+        f"/api/admin/products/{product_id}/media",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+        files={"file": ("hero.jpg", io.BytesIO(jpeg), "image/jpeg")},
+    )
+    assert upload.status_code == 201
+    body = upload.json()["data"]
+
+    # conversion_srcsets carries per-conversion responsive data.
+    assert "conversion_srcsets" in body
+    card_srcset: str = body["conversion_srcsets"].get("card", "")
+    full_srcset: str = body["conversion_srcsets"].get("full", "")
+    assert card_srcset, "card conversion should have responsive srcset"
+    assert full_srcset, "full conversion should have responsive srcset"
+    # srcset strings are space-separated "url Xw" pairs joined by ", "
+    assert "w" in card_srcset
+    assert "w" in full_srcset
+
+    # Storefront listing uses image_srcset from the card responsive images.
+    # Verify via GET /api/products (requires product to be published first).
+    await client.patch(
+        f"/api/admin/products/{product_id}/publish",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+    )
+    storefront = await client.get("/api/products")
+    product_cards = storefront.json()["data"]
+    matching = [p for p in product_cards if p["id"] == product_id]
+    assert matching, "published product should appear in storefront"
+    card = matching[0]
+    assert card["image_srcset"], "storefront card should expose image_srcset"
+    assert "w" in card["image_srcset"]
 
 
 @pytest.mark.asyncio
