@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.12.0...arvel-v0.13.0) (2026-06-03)
+
+
+### Features
+
+* **storage:** serve local-disk files at the framework ([653b7c5](https://github.com/mohamed-rekiba/arvel/commit/653b7c59dab6142539fe0bada30d0633eeb4a2f4))
+
 ## [0.12.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.11.0...arvel-v0.12.0) (2026-06-02)
 
 
