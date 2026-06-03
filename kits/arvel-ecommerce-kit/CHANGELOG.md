@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.5.0...arvel-ecommerce-kit-v1.5.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* **ecommerce-kit:** point feature-test cache at testcontainer Redis ([6d6be41](https://github.com/mohamed-rekiba/arvel/commit/6d6be41b7569459a6d69b501f3dc42b9a9878c22))
+
 ## [1.5.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.4.0...arvel-ecommerce-kit-v1.5.0) (2026-06-03)
 
 
