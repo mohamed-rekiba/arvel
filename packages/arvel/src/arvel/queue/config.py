@@ -55,6 +55,8 @@ class QueueConfig(ArvelSettings):
     - ``QUEUE_CONNECTION``  (default: ``sync``)
     """
 
+    __config_path__ = "queue"
+
     connection: QueueDriver = QueueDriver.SYNC
 
     database: DatabaseQueueConfig = DatabaseQueueConfig()

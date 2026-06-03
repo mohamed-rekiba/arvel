@@ -28,6 +28,7 @@ class SessionConfig(ArvelSettings):
     """
 
     model_config = SettingsConfigDict(env_prefix="SESSION_")
+    __config_path__ = "session"
 
     driver: str = "cookie"
     lifetime: int = 7200

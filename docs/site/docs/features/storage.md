@@ -8,7 +8,9 @@ Arvel provides a unified filesystem abstraction over local disks and cloud objec
 <a name="configuration"></a>
 ## Configuration
 
-Storage is configured through `StorageConfig` (the `STORAGE_*` environment variables). Set the default disk, then per-disk settings under their own prefixes (`STORAGE_LOCAL_`, `STORAGE_S3_`, `STORAGE_GCS_`, `STORAGE_AZURE_`):
+Storage reads `config/filesystems.py` — `default` picks the active disk and `disks` maps each named disk to its settings. The `STORAGE_*` environment variables are the fallback when a key isn't in the file (see [the cascade](../core-concepts/configuration.md#the-cascade)):
+
+Without that file, the same settings come straight from env (`STORAGE_DEFAULT`, and per-disk prefixes `STORAGE_LOCAL_`, `STORAGE_S3_`, `STORAGE_GCS_`, `STORAGE_AZURE_`):
 
 ```ini
 STORAGE_DEFAULT=local
@@ -100,6 +102,10 @@ The local driver mints URLs, but something has to answer them. When `STORAGE_LOC
 route — `GET {STORAGE_LOCAL_URL}/{path}` — that serves files straight from the disk root. This is
 the equivalent of Laravel's `'serve' => true`.
 
+This route needs **no `storage:link`** and no symlink — the app reads from the disk root
+(`STORAGE_LOCAL_ROOT`) directly. It's the default and works out of the box under plain uvicorn.
+`storage:link` is only for the *other* mode below (serving static files from `public/storage`).
+
 - **Public files** (`disk.url(...)`) are served directly.
 - **Signed files** (`disk.temporary_url(...)`) carry `token` and `expires` query params. The route
   verifies the HMAC and the expiry; a tampered or expired link gets `403`.
@@ -108,6 +114,38 @@ the equivalent of Laravel's `'serve' => true`.
 
 Turn it off (`STORAGE_LOCAL_SERVE=false`) or point `STORAGE_LOCAL_URL` at an absolute URL when a
 CDN or object store serves the files instead — then no route is registered.
+
+### Two serving modes
+
+Arvel can serve local files two ways. Pick one:
+
+| Mode | Path | How | When |
+|---|---|---|---|
+| **`serve=true` route** (above) | `STORAGE_LOCAL_URL` | App streams via the disk; supports signed temporary URLs | Default — works under plain uvicorn, **no `storage:link`** |
+| **`storage:link` + static mount** | `/storage` | Starlette serves files straight from disk, bypassing the app | Run the command; web-server-grade static serving |
+
+For the second mode, populate `public/storage`. The canonical way is to symlink it to the public
+disk root:
+
+```bash
+arvel storage:link    # symlinks public/storage -> storage/app/public
+```
+
+The framework then mounts `public/storage` as static files at `/storage`, so files are retrievable
+with no reverse proxy. This mirrors Laravel's public-disk model. Notes:
+
+- **It serves whatever lives at `public/storage`** — a `storage:link` symlink *or* a plain directory
+  you create there. `storage:link` is just the standard way to point it at `storage/app/public`; a
+  real folder works identically.
+- **The mount is registered at boot, only if `public/storage` exists then.** Create the link (or
+  folder), then (re)start the server. Until it exists, `/storage/*` 404s through the framework, and
+  files added while the server is running aren't picked up until a restart.
+- It only claims `/storage/*`; routing and JSON 404s elsewhere are unaffected.
+- It serves `public/storage` only (never the `public/` parent that holds `asgi.py`), and rejects path
+  traversal — no app source is exposed.
+- To make `disk.url()` point at this static path, set `STORAGE_LOCAL_URL=/storage`.
+- High-traffic deployments should still front the app with nginx/CDN; this mount is the zero-config
+  default, not a performance ceiling.
 
 > [!NOTE]
 > Per-file visibility (rejecting a private file requested without a signature) isn't implemented

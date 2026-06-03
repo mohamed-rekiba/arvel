@@ -50,6 +50,7 @@ class CacheConfig(ArvelSettings):
     """
 
     model_config = SettingsConfigDict(env_prefix="CACHE_", extra="ignore")
+    __config_path__ = "cache.stores.{default}"
 
     # Full Redis URL — reads CACHE_URL.
     url: str | None = None

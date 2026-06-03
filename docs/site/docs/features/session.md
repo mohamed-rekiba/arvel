@@ -11,7 +11,7 @@ Since HTTP-driven applications are stateless, sessions provide a way to store in
 <a name="configuration"></a>
 ## Configuration
 
-Sessions are configured through the `SESSION_*` environment variables:
+Sessions read `config/session.py` when present; the `SESSION_*` environment variables are the fallback for any key the file doesn't set (see [the cascade](../core-concepts/configuration.md#the-cascade)):
 
 ```ini
 SESSION_DRIVER=cookie

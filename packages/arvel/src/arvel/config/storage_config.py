@@ -12,6 +12,7 @@ from arvel.config.settings import ArvelSettings
 
 class LocalConfig(ArvelSettings):
     model_config = SettingsConfigDict(env_prefix="STORAGE_LOCAL_", extra="ignore")
+    __config_path__ = "filesystems.disks.local"
 
     root: str = "storage/app"
     url: str = ""
@@ -28,6 +29,7 @@ class S3Config(ArvelSettings):
     """
 
     model_config = SettingsConfigDict(env_prefix="STORAGE_S3_", extra="ignore")
+    __config_path__ = "filesystems.disks.s3"
 
     key: SecretStr = SecretStr("")
     secret: SecretStr = SecretStr("")
@@ -41,6 +43,7 @@ class S3Config(ArvelSettings):
 
 class GcsConfig(ArvelSettings):
     model_config = SettingsConfigDict(env_prefix="STORAGE_GCS_", extra="ignore")
+    __config_path__ = "filesystems.disks.gcs"
 
     project: str = ""
     bucket: str = ""
@@ -49,6 +52,7 @@ class GcsConfig(ArvelSettings):
 
 class AzureConfig(ArvelSettings):
     model_config = SettingsConfigDict(env_prefix="STORAGE_AZURE_", extra="ignore")
+    __config_path__ = "filesystems.disks.azure"
 
     account: str = ""
     key: SecretStr = SecretStr("")
@@ -64,6 +68,7 @@ class StorageConfig(ArvelSettings):
     """
 
     model_config = SettingsConfigDict(env_prefix="STORAGE_")
+    __config_path__ = "filesystems"
 
     default: str = "local"
 
