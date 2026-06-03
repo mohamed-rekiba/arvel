@@ -22,10 +22,19 @@ import pytest
 
 
 def _make_jpeg(width: int = 400, height: int = 300) -> bytes:
-    """Return a minimal but valid JPEG of the given dimensions via Pillow."""
+    """Return a valid JPEG with enough entropy to stay above the 10 KB responsive threshold.
+
+    A solid-color image compresses to ~3 KB, causing FileSizeOptimizedWidthCalculator
+    to stop immediately (no breakpoints, empty srcset).  Random noise is incompressible
+    for JPEG — a 400x300 noisy image at q=85 is ~90 KB so the calculator produces
+    at least 7 responsive breakpoints.
+    """
+    import os
+
     from PIL import Image as _PILImage
 
-    img = _PILImage.new("RGB", (width, height), color=(80, 120, 160))
+    raw = os.urandom(width * height * 3)
+    img = _PILImage.frombytes("RGB", (width, height), raw)
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=85)
     return buf.getvalue()
