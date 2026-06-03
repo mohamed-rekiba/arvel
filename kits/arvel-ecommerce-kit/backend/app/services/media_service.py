@@ -43,6 +43,8 @@ async def delete_product_image(product: Product, media_id: str) -> bool:
 
 
 _CONVERSIONS: tuple[str, ...] = ("thumbnail", "card", "full")
+# Conversions that produce responsive image variants (mirrors ProductMediaMixin).
+_RESPONSIVE_CONVERSIONS: tuple[str, ...] = ("card", "full")
 
 
 async def serialize_media(media: Media) -> dict[str, Any]:
@@ -56,8 +58,12 @@ async def serialize_media(media: Media) -> dict[str, Any]:
         url = await media.get_url()
         conversions = await _conversion_urls(media)
 
-    srcset = await media.get_srcset() if media.responsive_images else ""
-    placeholder_svg = media.get_placeholder_svg() if media.responsive_images else ""
+    ri = media.responsive_images or {}
+    srcset = await media.get_srcset() if "medialibrary_original" in ri else ""
+    placeholder_svg = media.get_placeholder_svg() if "medialibrary_original" in ri else ""
+
+    # Per-conversion responsive srcsets — card and full get their own srcset.
+    conversion_srcsets = await _conversion_srcsets(media, ri)
 
     return {
         "id": str(media.id),
@@ -70,6 +76,7 @@ async def serialize_media(media: Media) -> dict[str, Any]:
         "srcset": srcset,
         "placeholder_svg": placeholder_svg,
         "conversions": conversions,
+        "conversion_srcsets": conversion_srcsets,
         "metadata": {
             "custom_properties": media.custom_properties or {},
             "generated_conversions": media.generated_conversions or {},
@@ -82,6 +89,15 @@ async def _conversion_urls(media: Media) -> dict[str, str]:
     for name in _CONVERSIONS:
         urls[name] = await media.get_url(name) if media.has_generated_conversion(name) else ""
     return urls
+
+
+async def _conversion_srcsets(media: Media, ri: dict[str, Any]) -> dict[str, str]:
+    """Return ``{conversion_name: srcset_string}`` for conversions that have responsive variants."""
+    result: dict[str, str] = {}
+    for name in _RESPONSIVE_CONVERSIONS:
+        if name in ri and media.has_generated_conversion(name):
+            result[name] = await media.get_srcset(name)
+    return result
 
 
 __all__ = [
