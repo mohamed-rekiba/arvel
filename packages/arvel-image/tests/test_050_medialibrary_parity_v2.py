@@ -572,6 +572,40 @@ async def test_fetch_url_rejects_file_scheme() -> None:
         await fetch_url("file:///etc/passwd", max_bytes=1024)
 
 
+async def test_content_sniff_drives_mime_over_extension(
+    engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes, png_bytes: bytes
+) -> None:
+    """Real image content, not the filename extension, drives MIME gating."""
+    from arvel.database import Model, Timestamps
+    from arvel.database.columns import id_, string
+    from arvel.facades import Storage
+    from arvel_image import HasMedia, MediaCollection
+    from arvel_image.media.exceptions import InvalidMimeTypeError
+
+    class HostSniff050(Model, HasMedia, Timestamps):
+        __tablename__ = "media_050_sniff_hosts"
+        id: int = id_()
+        name: str = string(120)
+
+        def register_media_collections(self) -> None:
+            MediaCollection("png_only").accept_mime_types(["image/png"]).register_on(self)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Model.metadata.create_all)
+
+    host = await HostSniff050.create(name="alice")
+
+    with Storage.fake():
+        # JPEG bytes mislabeled .png are rejected — content wins over extension.
+        with pytest.raises(InvalidMimeTypeError):
+            await host.add_media(jpeg_bytes, file_name="evil.png").to_media_collection("png_only")
+
+        # Real PNG mislabeled .jpg is accepted and stored with its true MIME.
+        adder = host.add_media(png_bytes, file_name="evil.jpg")
+        media = await adder.to_media_collection("png_only")
+        assert media.mime_type == "image/png"
+
+
 # ─── get_last_media / get_last_media_url ──────────────────────────
 
 

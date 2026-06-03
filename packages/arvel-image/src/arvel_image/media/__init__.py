@@ -25,7 +25,11 @@ from __future__ import annotations
 
 from arvel_image.media.collection import FileInfo, MediaCollection
 from arvel_image.media.conversion import Conversion
-from arvel_image.media.conversion_runner import ConversionRunner
+from arvel_image.media.conversion_runner import (
+    ConversionRunner,
+    get_conversion_runner,
+    set_conversion_runner,
+)
 from arvel_image.media.exceptions import (
     ConversionFailedError,
     FileTooLargeError,
@@ -37,7 +41,17 @@ from arvel_image.media.file_adder import FileAdder
 from arvel_image.media.jobs import QueuedConversionJob
 from arvel_image.media.media_library import MediaLibrary
 from arvel_image.media.model import Media
-from arvel_image.media.path_generator import DefaultPathGenerator, PathGenerator
+from arvel_image.media.path_generator import (
+    DefaultPathGenerator,
+    PathGenerator,
+    get_path_generator,
+    set_path_generator,
+)
+from arvel_image.media.responsive_image_generator import (
+    calculate_responsive_widths,
+    generate_placeholder_svg,
+    generate_responsive_images_for_media,
+)
 from arvel_image.media.trait import HasMedia
 
 __all__ = [
@@ -57,4 +71,11 @@ __all__ = [
     "PathGenerator",
     "QueuedConversionJob",
     "UnknownCollectionError",
+    "calculate_responsive_widths",
+    "generate_placeholder_svg",
+    "generate_responsive_images_for_media",
+    "get_conversion_runner",
+    "get_path_generator",
+    "set_conversion_runner",
+    "set_path_generator",
 ]

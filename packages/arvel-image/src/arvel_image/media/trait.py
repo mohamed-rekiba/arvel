@@ -38,6 +38,8 @@ from arvel_image.media.model import Media
 _MEDIA_RELATION_KEY = "media"
 
 if TYPE_CHECKING:
+    from arvel.database import Model
+
     from arvel_image.media.collection import MediaCollection
     from arvel_image.media.file_adder import FileAdder
 
@@ -126,7 +128,12 @@ def _is_dict_filter(
 
 
 class HasMedia:
-    """Mixin providing a polymorphic ``media`` collection on any host model."""
+    """Mixin providing a polymorphic ``media`` collection on any host model.
+
+    Always mixed into a :class:`~arvel.database.Model`; the ``cast`` to ``Model``
+    in :meth:`host_pk` / :meth:`delete_preserving_media` reflects that contract
+    without forcing a base class that would clash with host MRO ordering.
+    """
 
     media: ClassVar[MorphMany[Media]] = MorphMany(Media, name="model")
 
@@ -374,8 +381,11 @@ class HasMedia:
         return await self.clear_media_collection(collection)
 
     async def delete_preserving_media(self) -> Any:
-        """Delete the host row without cascading to Media rows or files"""
-        return await super().delete()  # type: ignore[misc]
+        """Delete the host row without cascading to Media rows or files."""
+        from arvel.database import Model  # noqa: PLC0415
+
+        # Unbound Model.delete bypasses any media-cascading delete a host adds.
+        return await Model.delete(cast("Model", self))
 
     def get_registered_media_collections(self) -> list[MediaCollection]:
         """Return all declared MediaCollection objects"""
@@ -413,9 +423,9 @@ class HasMedia:
         self.register_media_collections()
         cls.__arvel_collections_registered__ = True
 
-    def host_pk(self) -> Any:
-        """Return this host's primary key as a string"""
-        return str(self.id)  # type: ignore[attr-defined]
+    def host_pk(self) -> str:
+        """Return this host's primary key as a string."""
+        return str(cast("Model", self).get_key())
 
     def _invalidate_media_cache(self) -> None:
         """Drop the eager cache after a write so reads don't serve stale media."""

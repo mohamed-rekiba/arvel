@@ -55,6 +55,10 @@ async def serialize_media(media: Media) -> dict[str, Any]:
     else:
         url = await media.get_url()
         conversions = await _conversion_urls(media)
+
+    srcset = await media.get_srcset() if media.responsive_images else ""
+    placeholder_svg = media.get_placeholder_svg() if media.responsive_images else ""
+
     return {
         "id": str(media.id),
         "uuid": media.uuid,
@@ -63,11 +67,12 @@ async def serialize_media(media: Media) -> dict[str, Any]:
         "mime_type": media.mime_type,
         "size": media.size,
         "url": url,
+        "srcset": srcset,
+        "placeholder_svg": placeholder_svg,
         "conversions": conversions,
         "metadata": {
             "custom_properties": media.custom_properties or {},
             "generated_conversions": media.generated_conversions or {},
-            "responsive_images": media.responsive_images or {},
         },
     }
 

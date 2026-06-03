@@ -169,10 +169,12 @@ class Image:
         return self
 
     def optimize(self) -> Self:
-        """Strip EXIF metadata and re-encode at current quality settings
+        """Bake EXIF orientation into the pixels via ``exif_transpose``.
 
-        Privacy default: EXIF is removed from JPEG output. Non-JPEG images are
-        left structurally unchanged (PNG has no EXIF standard slot).
+        The terminals never copy the source EXIF block forward, so every
+        re-encode already drops EXIF (GPS included). This op exists so that
+        orientation survives that drop — without it, a rotated photo would
+        re-encode upright-tag-less and display sideways.
         """
         self._ops.append(lambda image: ImageOps.exif_transpose(image) or image)
         return self

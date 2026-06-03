@@ -13,7 +13,7 @@ from typing import Any
 from arvel.queue.job import Job
 from pydantic import Field
 
-from arvel_image.media.conversion_runner import ConversionRunner
+from arvel_image.media.conversion_runner import get_conversion_runner
 from arvel_image.media.media_library import process_one as _process_one
 from arvel_image.media.media_library import resolve_path_generator
 from arvel_image.media.model import Media
@@ -48,7 +48,7 @@ class QueuedConversionJob(Job):
         if host is None:
             return
 
-        runner = ConversionRunner()
+        runner = get_conversion_runner()
         gen = resolve_path_generator()
         await _process_one(media, host, runner, gen)
 

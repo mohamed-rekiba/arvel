@@ -52,4 +52,21 @@ class ConversionRunner:
             raise ConversionFailedError(msg) from exc
 
 
-__all__ = ["ConversionRunner"]
+# Application-scoped accessor, mirroring path_generator and auth_service: an app
+# overrides the runner (e.g. a queue-driven one) by calling set_conversion_runner
+# in its own provider. None means "use the default ConversionRunner".
+_custom_runner: ConversionRunner | None = None
+
+
+def set_conversion_runner(runner: ConversionRunner) -> None:
+    """Override the runner used by FileAdder, MediaLibrary, and queued jobs."""
+    global _custom_runner  # noqa: PLW0603
+    _custom_runner = runner
+
+
+def get_conversion_runner() -> ConversionRunner:
+    """Return the active conversion runner (custom or default)."""
+    return _custom_runner if _custom_runner is not None else ConversionRunner()
+
+
+__all__ = ["ConversionRunner", "get_conversion_runner", "set_conversion_runner"]
