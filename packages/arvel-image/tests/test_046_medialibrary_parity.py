@@ -791,25 +791,23 @@ def test_image_strip_exif_encodes_with_empty_exif_block(jpeg_bytes: bytes) -> No
 
     Pillow already drops the source EXIF block on re-encode (documented in
     Image.optimize()), so strip_exif() is belt-and-suspenders for callers who
-    need the guarantee in writing. We verify the contract through _save_kwargs.
+    need the guarantee in writing.
     """
     from arvel_image import Image
 
     img = Image.load(jpeg_bytes)
     img.strip_exif()
 
-    # _save_kwargs must include exif=b"" for JPEG and WEBP encoders.
-    assert img._save_kwargs("JPEG").get("exif") == b""
-    assert img._save_kwargs("WEBP").get("exif") == b""
+    # save_kwargs must include exif=b"" for JPEG and WEBP encoders.
+    assert img.save_kwargs("JPEG").get("exif") == b""
+    assert img.save_kwargs("WEBP").get("exif") == b""
 
     # Without strip_exif the key is absent (Pillow default behaviour).
     img_no_strip = Image.load(jpeg_bytes)
-    assert "exif" not in img_no_strip._save_kwargs("JPEG")
+    assert "exif" not in img_no_strip.save_kwargs("JPEG")
 
-    # The strip flag is also cleared from image.info during _build.
-    from PIL import Image as PILImage
-
-    built = img._build()
+    # The strip flag is also cleared from image.info during build().
+    built = img.build()
     assert "exif" not in built.info
 
 

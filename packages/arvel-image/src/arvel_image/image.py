@@ -114,12 +114,12 @@ class Image:
     @property
     def width(self) -> int:
         """Width after replaying the chain. Forces a decode."""
-        return self._build().width
+        return self.build().width
 
     @property
     def height(self) -> int:
         """Height after replaying the chain. Forces a decode."""
-        return self._build().height
+        return self.build().height
 
     def resize(self, *, width: int, height: int) -> Self:
         """Stretch the image to the exact (width, height) box."""
@@ -193,10 +193,10 @@ class Image:
 
     def to_bytes(self, image_format: str | None = None) -> bytes:
         """Serialize the image to bytes using the chosen format (or current)."""
-        image = self._build()
+        image = self.build()
         target = self._resolve_to_bytes_target(image, image_format)
         buffer = BytesIO()
-        kwargs = self._save_kwargs(target)
+        kwargs = self.save_kwargs(target)
         self._encode_for_target(image, target).save(buffer, format=target, **kwargs)
         return buffer.getvalue()
 
@@ -208,9 +208,9 @@ class Image:
         """Persist to disk. Format is taken from ``image_format``, then
         :meth:`format`, then the source format, then the file extension, then PNG.
         """
-        image = self._build()
+        image = self.build()
         target = self._resolve_save_target(image, path, image_format)
-        kwargs = self._save_kwargs(target)
+        kwargs = self.save_kwargs(target)
         self._encode_for_target(image, target).save(path, format=target, **kwargs)
         return self
 
@@ -218,7 +218,7 @@ class Image:
         """Offload the whole pipeline (decode + transforms + encode) to a thread."""
         return await asyncio.to_thread(self.save, path, image_format=image_format)
 
-    def _build(self) -> PILImage.Image:
+    def build(self) -> PILImage.Image:
         """Decode the source and replay the recorded pixel ops, fresh each call."""
         image = self._source()
         for op in self._ops:
@@ -244,7 +244,7 @@ class Image:
             return image.format
         return _normalize_format(Path(path).suffix.lstrip(".") or "png")
 
-    def _save_kwargs(self, target: str) -> dict[str, object]:
+    def save_kwargs(self, target: str) -> dict[str, object]:
         kwargs: dict[str, object] = {}
         if self._quality is not None and target in {"JPEG", "WEBP"}:
             kwargs["quality"] = self._quality
