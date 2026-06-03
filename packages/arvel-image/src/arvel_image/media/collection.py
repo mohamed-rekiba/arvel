@@ -52,6 +52,7 @@ class MediaCollection:
         self.accept_mime_types_list: list[str] | None = None
         self.max_file_size_bytes: int | None = None
         self.keep_latest_n: int | None = None
+        self.responsive_images_enabled: bool = False
         # per-collection fallback URLs
         self._fallback_url: str | None = None
         self._fallback_urls: dict[str, str] = {}
@@ -104,6 +105,11 @@ class MediaCollection:
             self._fallback_urls[conversion] = url
         else:
             self._fallback_url = url
+        return self
+
+    def generate_responsive_images(self) -> Self:
+        """Generate responsive width variants for every file added to this collection."""
+        self.responsive_images_enabled = True
         return self
 
     def accepts_file(self, callback: Callable[[FileInfo], bool]) -> Self:

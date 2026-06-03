@@ -141,6 +141,33 @@ class Media(Model, Timestamps):
             return url
         return url
 
+    async def get_srcset(self, key: str = "medialibrary_original") -> str:
+        """Return a ``srcset`` attribute value for the responsive image group ``key``.
+
+        Each entry is ``{url} {width}w``. Returns ``""`` when no variants exist.
+        """
+        from arvel.facades.storage import Storage  # noqa: PLC0415
+
+        responsive: dict[str, Any] = self.responsive_images or {}
+        entry = responsive.get(key, {})
+        urls: list[Any] = entry.get("urls", [])
+        if not urls:
+            return ""
+        disk = Storage.disk(self.disk_target())
+        parts: list[str] = []
+        for u in urls:
+            path: str = u.get("path", "")
+            width: int = u.get("width", 0)
+            if not path or not width:
+                continue
+            parts.append(f"{disk.url(path)} {width}w")
+        return ", ".join(parts)
+
+    def get_placeholder_svg(self, key: str = "medialibrary_original") -> str:
+        """Return the tiny base64 SVG placeholder for ``key``, or ``""``."""
+        responsive: dict[str, Any] = self.responsive_images or {}
+        return str(responsive.get(key, {}).get("base64svg", ""))
+
     async def get_temporary_url(self, expiry: int, conversion: str | None = None) -> str:
         """Time-limited URL of the original or a conversion"""
         from arvel.facades.storage import Storage  # noqa: PLC0415
@@ -153,9 +180,8 @@ class Media(Model, Timestamps):
     async def delete(self) -> Any:
         """Remove the row + best-effort cleanup of files on disk.
 
-        Cleans the original AND every conversion marked as generated in
-        ``generated_conversions``. Missing files do not raise — the row
-        is the source of truth, files are advisory
+        Cleans the original, every generated conversion, and every responsive
+        image variant. Missing files do not raise — the row is the source of truth.
         """
         from arvel.facades.storage import Storage  # noqa: PLC0415
 
@@ -175,6 +201,14 @@ class Media(Model, Timestamps):
                     except Exception:  # noqa: BLE001
                         cdisk = disk
                     await _delete_quiet(cdisk, gen.path_for_conversion(self, conv_name))
+
+            responsive: dict[str, Any] = self.responsive_images or {}
+            if responsive:
+                from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
+                    delete_responsive_images,
+                )
+
+                await delete_responsive_images(responsive, disk=disk)
 
         return await super().delete()
 

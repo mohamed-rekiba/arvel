@@ -8,8 +8,10 @@ Combines two Spatie packages:
 - **spatie/laravel-medialibrary v11** — a polymorphic ``media`` table
   plus a runtime layer (``Media``, ``HasMedia``, collections, conversions,
   file ingestion). Exposed through :class:`ImageServiceProvider`, which
-  registers the migration as publishable under the ``arvel-image`` tag
-  and binds :class:`PathGenerator` + :class:`ConversionRunner`.
+  registers the migration as publishable under the ``arvel-image`` tag.
+  The path generator and conversion runner resolve through
+  ``get_path_generator`` / ``get_conversion_runner``; override them with
+  ``set_path_generator`` / ``set_conversion_runner``.
 
 Apps that only need ``Image`` can use it directly without booting an
 Arvel application. Apps that want the media table run::
@@ -53,6 +55,13 @@ from arvel_image.media import (
     MediaLibrary,
     PathGenerator,
     UnknownCollectionError,
+    calculate_responsive_widths,
+    generate_placeholder_svg,
+    generate_responsive_images_for_media,
+    get_conversion_runner,
+    get_path_generator,
+    set_conversion_runner,
+    set_path_generator,
 )
 from arvel_image.media.jobs import QueuedConversionJob
 from arvel_image.provider import ImageServiceProvider
@@ -81,4 +90,11 @@ __all__ = [
     "QueuedConversionJob",
     "UnknownCollectionError",
     "UnsupportedFormatError",
+    "calculate_responsive_widths",
+    "generate_placeholder_svg",
+    "generate_responsive_images_for_media",
+    "get_conversion_runner",
+    "get_path_generator",
+    "set_conversion_runner",
+    "set_path_generator",
 ]

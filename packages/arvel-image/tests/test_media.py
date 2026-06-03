@@ -547,33 +547,33 @@ async def test_failing_conversion_raises_and_leaves_no_partial_file(
         )
 
 
-async def test_image_provider_binds_path_generator_and_runner(
-    tmp_path: Any,
-) -> None:
-    """ImageServiceProvider.register() binds PathGenerator + ConversionRunner."""
-    from arvel import Application
-    from arvel_image import ImageServiceProvider
-    from arvel_image.media import ConversionRunner, DefaultPathGenerator, PathGenerator
-
-    app = (
-        Application.configure(tmp_path)
-        .with_environment("testing")
-        .with_providers([ImageServiceProvider])
-        .create()
+def test_path_generator_and_runner_resolve_through_accessors() -> None:
+    """Defaults come from the module accessors; set_* overrides are honored."""
+    from arvel_image.media import (
+        ConversionRunner,
+        DefaultPathGenerator,
+        get_conversion_runner,
+        get_path_generator,
+        set_conversion_runner,
+        set_path_generator,
     )
-    await app.boot()
 
-    # ``Container.make(abstract: type[T])`` — strict mypy refuses abstract
-    # classes (``PathGenerator`` is an ``abc.ABC``, used here as a DI
-    # binding key, not a class to instantiate directly). Carrying it
-    # through an ``Any``-typed local sidesteps the strict check while
-    # preserving the runtime resolution path; the ``isinstance`` assertion
-    # below is the actual contract under test.
-    path_generator_key: Any = PathGenerator
-    gen = app.container.make(path_generator_key)
-    runner = app.container.make(ConversionRunner)
-    assert isinstance(gen, DefaultPathGenerator)
-    assert isinstance(runner, ConversionRunner)
+    assert isinstance(get_path_generator(), DefaultPathGenerator)
+    assert isinstance(get_conversion_runner(), ConversionRunner)
+
+    class _CustomGen(DefaultPathGenerator):
+        pass
+
+    custom_gen = _CustomGen()
+    custom_runner = ConversionRunner()
+    try:
+        set_path_generator(custom_gen)
+        set_conversion_runner(custom_runner)
+        assert get_path_generator() is custom_gen
+        assert get_conversion_runner() is custom_runner
+    finally:
+        set_path_generator(DefaultPathGenerator())
+        set_conversion_runner(ConversionRunner())
 
 
 def test_arvel_image_does_not_shell_out() -> None:
