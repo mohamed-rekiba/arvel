@@ -134,30 +134,18 @@ async def test_soft_deleting_category_removes_its_products_from_storefront(
     client: Any, admin_token: str
 ) -> None:
     """category deletion propagates to storefront via view refresh."""
-    categories = await client.get(
-        "/api/admin/categories",
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    category = categories.json()["data"][0]
-    category_id = category["id"]
+    # Drive off a product that is actually visible in the storefront and resolve
+    # its category from that same payload — picking the "first category" skipped
+    # whenever it happened to hold no published products, so the behavior went
+    # unverified.
+    product_id, category_id = await _visible_product_with("category_id", client)
 
-    # Find a published product in this category
-    products = await client.get(
-        "/api/admin/products?status=published",
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    products_catalog = [p for p in products.json()["data"] if p.get("category_id") == category_id]
-    if not products_catalog:
-        pytest.skip("No published products in the first category")
-    product_id = products_catalog[0]["id"]
-
-    # Soft-delete the category
     await client.delete(
         f"/api/admin/categories/{category_id}",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
 
-    after = await client.get("/api/products")
+    after = await client.get("/api/products?limit=100")
     after_ids = {p["id"] for p in after.json()["data"]}
     assert product_id not in after_ids, (
         "Product in a soft-deleted category must not appear in storefront"
@@ -169,30 +157,27 @@ async def test_deactivating_vendor_removes_products_from_storefront(
     client: Any, admin_token: str
 ) -> None:
     """vendor deactivation propagates to storefront via view refresh."""
-    vendors = await client.get(
-        "/api/admin/vendors",
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    vendor = vendors.json()["data"][0]
-    vendor_id = vendor["id"]
+    product_id, vendor_id = await _visible_product_with("vendor_id", client)
 
-    products = await client.get(
-        "/api/admin/products?status=published",
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    vendor_products = [p for p in products.json()["data"] if p.get("vendor_id") == vendor_id]
-    if not vendor_products:
-        pytest.skip("No published products for this vendor")
-    product_id = vendor_products[0]["id"]
-
-    # Soft-delete the vendor
     await client.delete(
         f"/api/admin/vendors/{vendor_id}",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
 
-    after = await client.get("/api/products")
+    after = await client.get("/api/products?limit=100")
     after_ids = {p["id"] for p in after.json()["data"]}
     assert product_id not in after_ids, (
         "Product from a soft-deleted vendor must not appear in storefront"
     )
+
+
+async def _visible_product_with(fk_field: str, client: Any) -> tuple[str, str]:
+    """Return (product_id, fk_value) for a storefront-visible product whose
+    ``fk_field`` (``category_id`` / ``vendor_id``) is set."""
+    response = await client.get("/api/products?limit=100")
+    assert response.status_code == 200
+    for product in response.json()["data"]:
+        fk_value = product.get(fk_field)
+        if fk_value:
+            return str(product["id"]), str(fk_value)
+    pytest.fail(f"seed must publish a visible product with a {fk_field}")

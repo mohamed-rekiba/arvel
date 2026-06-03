@@ -20,13 +20,22 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TypeGuard, Union
+from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TypeGuard, Union, cast
 
+from arvel.database.orm._eager import (
+    clear_eager_relation,
+    get_eager_relation,
+)
 from arvel.database.orm.morph import MorphMany
+from arvel.database.orm.morph_map import get_morph_alias
 from sqlalchemy import asc, nullslast
 
 from arvel_image.media.exceptions import MediaError
 from arvel_image.media.model import Media
+
+# The MorphMany relation attribute. `.with_("media")` and the `media` accessor
+# both populate/read this one eager cache.
+_MEDIA_RELATION_KEY = "media"
 
 if TYPE_CHECKING:
     from arvel_image.media.collection import MediaCollection
@@ -85,14 +94,9 @@ def _coerce_source(source: MediaSource, file_name: str | None) -> tuple[bytes, s
     raise MediaError(msg)
 
 
-def _model_type_for(host: HasMedia) -> str:
-    """Return the model_type string used to look up Media rows for ``host``.
-
-    Checks for a ``__media_host_type__`` class attribute first so that view
-    models (e.g. ``PublishedProduct``) can transparently reuse the Media rows
-    stored under the canonical mutable model name (e.g. ``"Product"``).
-    """
-    return getattr(type(host), "__media_host_type__", None) or type(host).__name__
+def _ordered(rows: list[Media]) -> list[Media]:
+    """Order media by ``order_column`` (nulls last), then ``id`` — matching the SQL."""
+    return sorted(rows, key=lambda m: (m.order_column is None, m.order_column or 0, m.id))
 
 
 async def get_media_ordered(host: HasMedia, collection: str) -> list[Media]:
@@ -103,7 +107,7 @@ async def get_media_ordered(host: HasMedia, collection: str) -> list[Media]:
     """
     query = (
         Media.query()
-        .where(Media.model_type == _model_type_for(host))
+        .where(Media.model_type == get_morph_alias(type(host)))
         .where(Media.model_id == str(host.host_pk()))
         .where(Media.collection_name == collection)
         .order_by(nullslast(asc(Media.__table__.c.order_column)), asc(Media.__table__.c.id))
@@ -237,8 +241,17 @@ class HasMedia:
 
         ``"*"`` returns all rows across all collections
         ``filters`` applies Python-side filtering
+
+        Serves from memory when this host was eager-loaded via ``.with_("media")``
+        on the query builder, or ``load("media")`` on an in-hand model/collection;
+        otherwise queries.
         """
-        if collection == "*":
+        cached = get_eager_relation(self, _MEDIA_RELATION_KEY)
+        if cached is not None:
+            rows = _ordered([cast("Media", media) for media in cached])
+            if collection != "*":
+                rows = [media for media in rows if media.collection_name == collection]
+        elif collection == "*":
             rows = await self._get_all_media()
         else:
             rows = await get_media_ordered(self, collection)
@@ -256,7 +269,7 @@ class HasMedia:
         """Fetch all Media rows for this host across all collections"""
         query = (
             Media.query()
-            .where(Media.model_type == _model_type_for(self))
+            .where(Media.model_type == get_morph_alias(type(self)))
             .where(Media.model_id == str(self.host_pk()))
             .order_by(nullslast(asc(Media.__table__.c.order_column)), asc(Media.__table__.c.id))
         )
@@ -264,12 +277,12 @@ class HasMedia:
 
     async def get_first_media(self, collection: str = "default") -> Media | None:
         """Return the first :class:`Media` in ``collection``, or ``None``."""
-        rows = await get_media_ordered(self, collection)
+        rows = await self.get_media(collection)
         return rows[0] if rows else None
 
     async def get_last_media(self, collection: str = "default") -> Media | None:
         """Return the :class:`Media` with the highest order_column in ``collection``"""
-        rows = await get_media_ordered(self, collection)
+        rows = await self.get_media(collection)
         return rows[-1] if rows else None
 
     async def get_media_url(
@@ -324,6 +337,7 @@ class HasMedia:
         rows = await get_media_ordered(self, collection)
         for media in rows:
             await media.delete()
+        self._invalidate_media_cache()
         return len(rows)
 
     async def clear_media_collection_except(
@@ -340,6 +354,7 @@ class HasMedia:
             if media.id not in kept_ids:
                 await media.delete()
                 deleted += 1
+        self._invalidate_media_cache()
         return deleted
 
     async def attach_media(
@@ -350,7 +365,9 @@ class HasMedia:
         collection: str = "default",
     ) -> Media:
         """Ingest ``source`` and persist it to ``collection`` in one call."""
-        return await self.add_media(source, file_name=file_name).to_media_collection(collection)
+        media = await self.add_media(source, file_name=file_name).to_media_collection(collection)
+        self._invalidate_media_cache()
+        return media
 
     async def delete_media(self, collection: str = "default") -> int:
         """Alias for ``clear_media_collection``."""
@@ -399,6 +416,10 @@ class HasMedia:
     def host_pk(self) -> Any:
         """Return this host's primary key as a string"""
         return str(self.id)  # type: ignore[attr-defined]
+
+    def _invalidate_media_cache(self) -> None:
+        """Drop the eager cache after a write so reads don't serve stale media."""
+        clear_eager_relation(self, _MEDIA_RELATION_KEY)
 
 
 __all__ = ["HasMedia", "get_media_ordered"]

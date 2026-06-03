@@ -239,6 +239,18 @@ morph_map({"post": Post, "video": Video})
 > [!NOTE]
 > A partial morph map is fine: unmapped types fall back to the short class name. Call `require_morph_map()` to turn on strict mode, where an unmapped type raises `MorphMapError` instead of falling back.
 
+<a name="morph-class-override"></a>
+### Overriding the Morph Class
+
+Every model resolves its polymorphic type token through `get_morph_class()` — Laravel's `getMorphClass()`. By default that's the morph-map alias, else the short class name. Set `__morph_class__` to override it model-wide. A read-only view model uses this to present as the canonical model, so it shares the same polymorphic rows — every `MorphOne`/`MorphMany`/`MorphToMany` on it, plus `.with_(...)` eager loads and the accessors, target the canonical type:
+
+```python
+class ProductCatalog(Model):  # a read-only view of products
+    __morph_class__ = "Product"  # share Product's polymorphic rows
+```
+
+Now `ProductCatalog.get_morph_class()` returns `"Product"`, and `ProductCatalog.with_("media")` loads the rows stored under `"Product"` — no `"ProductCatalog"` rows ever exist.
+
 <a name="through-relationships"></a>
 ## Through Relationships
 

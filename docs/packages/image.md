@@ -24,7 +24,8 @@ flowchart TB
 `Image`, `HasMedia` (`HasMediaMixin` alias), `Media`, `MediaCollection`, `FileAdder`, `FileInfo`, `Conversion`, `ConversionRunner`, `PathGenerator`, `DefaultPathGenerator`, `MediaLibrary`, `QueuedConversionJob`, `ImageServiceProvider`, plus the `MediaError` hierarchy and `UnsupportedFormatError`.
 
 - `Image` works without booting anything — pure Pillow wrapper.
-- `HasMedia` adds a polymorphic `media` relation; hosts register collections via `register_media_collections()`.
+- `HasMedia` adds a polymorphic `media` relation (a plain `MorphMany`); hosts register collections via `register_media_collections()`.
+- `media` is an ordinary relation, so the framework's eager loading covers it: `.with_("media")` on the query builder, or `load("media")` on an in-hand model/collection. Both resolve the host's type through `get_morph_alias`, so a view model that sets `__morph_class__` shares the canonical model's rows. `model_type` is written through `get_morph_alias` too — reads and writes use one resolver, honoring the morph map.
 - `FileAdder` (`model.add_media(...)`) handles upload, storage, and conversions; `.queued()` offloads conversions to a worker.
 
 ## Provider

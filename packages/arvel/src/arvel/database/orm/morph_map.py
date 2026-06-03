@@ -79,10 +79,19 @@ def reset_morph_map() -> None:
 
 
 def get_morph_alias(model_class: type[Any]) -> str:
-    """Stored type token for a class: its mapped alias, else the short class name.
+    """Stored type token for a class — Arvel's ``getMorphClass()``.
 
-    Raises :class:`MorphMapError` when strict mode is on and the class is unmapped.
+    Resolution order:
+
+    1. ``__morph_class__`` on the model — an explicit override. A read-only view
+       model sets it to the canonical host's token so it shares its polymorphic
+       rows (e.g. ``ProductCatalog.__morph_class__ = "Product"``).
+    2. The morph map alias, if registered.
+    3. The short class name (unless strict mode is on, which raises).
     """
+    override = getattr(model_class, "__morph_class__", None)
+    if isinstance(override, str):
+        return override
     for alias, klass in _state.aliases.items():
         if klass is model_class:
             return alias

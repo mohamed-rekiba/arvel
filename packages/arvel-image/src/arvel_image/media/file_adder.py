@@ -16,6 +16,7 @@ from collections.abc import Callable
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any, Self, cast
 
+from arvel.database.orm.morph_map import get_morph_alias
 from arvel.facades.bus import Bus
 from arvel.facades.storage import Storage
 
@@ -162,7 +163,7 @@ class FileAdder:
         media = cast(
             "Media",
             await Media.create(
-                model_type=type(host).__name__,
+                model_type=get_morph_alias(type(host)),
                 model_id=str(host.host_pk()),  # always string
                 collection_name=collection,
                 name=self._name,

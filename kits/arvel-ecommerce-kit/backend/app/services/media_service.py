@@ -42,14 +42,16 @@ async def delete_product_image(product: Product, media_id: str) -> bool:
     return False
 
 
+_CONVERSIONS: tuple[str, ...] = ("thumbnail", "card", "full")
+
+
 async def serialize_media(media: Media) -> dict[str, Any]:
-    custom = media.custom_properties or {}
-    generated = media.generated_conversions or {}
-    seeded_url = custom.get("image_url")
-    if seeded_url and not any(generated.values()):
+    seeded_url = media.get_custom_property("image_url")
+    has_conversion = any(media.has_generated_conversion(name) for name in _CONVERSIONS)
+    if seeded_url and not has_conversion:
         # Seeded sample media has no file on disk; the image lives at this URL.
         url = str(seeded_url)
-        conversions = {"thumbnail": url, "card": url, "full": url}
+        conversions = dict.fromkeys(_CONVERSIONS, url)
     else:
         url = await media.get_url()
         conversions = await _conversion_urls(media)
@@ -71,13 +73,9 @@ async def serialize_media(media: Media) -> dict[str, Any]:
 
 
 async def _conversion_urls(media: Media) -> dict[str, str]:
-    generated = media.generated_conversions or {}
     urls: dict[str, str] = {}
-    for name in ("thumbnail", "card", "full"):
-        if generated.get(name):
-            urls[name] = await media.get_url(name)
-        else:
-            urls[name] = ""
+    for name in _CONVERSIONS:
+        urls[name] = await media.get_url(name) if media.has_generated_conversion(name) else ""
     return urls
 
 

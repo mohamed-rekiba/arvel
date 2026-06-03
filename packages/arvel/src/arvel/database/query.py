@@ -256,7 +256,8 @@ def _resolve_morph_descriptor(model: type[Any], descriptor: Any) -> _RelationTar
         return _RelationTarget(kind="morph_to", morph_name=descriptor.name)
     if isinstance(descriptor, (MorphOne, MorphMany)):
         return _RelationTarget(
-            kind="morph_child", morph_child_link=descriptor.link_spec(get_morph_alias(model))
+            kind="morph_child",
+            morph_child_link=descriptor.link_spec(get_morph_alias(model)),
         )
     return None
 
@@ -469,6 +470,10 @@ def validate_relation_head(model: type[Any], relation_path: str) -> None:
     if head in getattr(model, "__arvel_fk_relations__", _NO_FK_RELATIONS):
         return
     if head in getattr(model, "__arvel_recursive_relations__", _NO_FK_RELATIONS):
+        return
+    # Descriptor relations (Morph*/BelongsToMany/HasOneOfMany) live as class
+    # attributes, not in mapper.relationships — resolve them the same way with_() does.
+    if _resolve_descriptor_relation(model, getattr(model, head, None)) is not None:
         return
     raise UnknownRelationError(model.__name__, head)
 

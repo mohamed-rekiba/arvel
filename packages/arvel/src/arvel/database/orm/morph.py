@@ -6,7 +6,7 @@ The ``{name}_type`` column stores the owner's unqualified class name
 
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
@@ -51,9 +51,15 @@ def _owner_pk(owner: Model) -> Any:
     return getattr(owner, pk_key)
 
 
-def _owner_type(owner: Model) -> str:
-    """Stored ``{name}_type`` token — morph-map alias, else short class name."""
-    return get_morph_alias(type(owner))
+def _morph_id_coercer(id_col: Any) -> Callable[[Any], Any]:
+    """Return a function that casts an owner key to the morph id column's type.
+
+    String id columns get ``str()``; everything else passes through unchanged.
+    """
+    from sqlalchemy import String
+
+    is_string = isinstance(getattr(id_col, "type", None), String)
+    return str if is_string else (lambda v: v)
 
 
 # ── MorphOne ──────────────────────────────────────────────────────────────────
@@ -67,12 +73,19 @@ class MorphOneAccessor(Generic[T]):
     """
 
     def __init__(
-        self, owner: Any, related_model: type[T], name: str, attr_name: str | None = None
+        self,
+        owner: Any,
+        related_model: type[T],
+        name: str,
+        attr_name: str | None = None,
+        *,
+        owner_type: str,
     ) -> None:
         self._owner = owner
         self._related_model = related_model
         self._name = name  # morph base name, e.g. "imageable"
         self._attr_name = attr_name
+        self._owner_type = owner_type
 
     # ── awaitable protocol ──────────────────────────────────────────────────
 
@@ -89,7 +102,7 @@ class MorphOneAccessor(Generic[T]):
         id_col = getattr(self._related_model, f"{self._name}_id")
         stmt = (
             select(self._related_model)
-            .where(type_col == _owner_type(self._owner))
+            .where(type_col == self._owner_type)
             .where(id_col == _owner_pk(self._owner))
             .limit(1)
         )
@@ -101,7 +114,7 @@ class MorphOneAccessor(Generic[T]):
 
     async def create(self, **attrs: Any) -> T:
         """Create a related row with discriminator columns set automatically."""
-        attrs[f"{self._name}_type"] = _owner_type(self._owner)
+        attrs[f"{self._name}_type"] = self._owner_type
         attrs[f"{self._name}_id"] = _owner_pk(self._owner)
         model: Any = self._related_model
         return await model.create(**attrs)  # type: ignore[no-any-return]
@@ -137,7 +150,9 @@ class MorphOne(Generic[T]):
             related_model=self._related_model, name=self._name, owner_type=owner_type, single=True
         )
 
-    def __get__(self, obj: Any, objtype: type | None = None) -> MorphOneAccessor[T] | MorphOne[T]:
+    def __get__(
+        self, obj: object, objtype: type | None = None
+    ) -> MorphOneAccessor[T] | MorphOne[T]:
         if obj is None:
             return self
         return MorphOneAccessor(
@@ -145,6 +160,7 @@ class MorphOne(Generic[T]):
             related_model=self._related_model,
             name=self._name,
             attr_name=self._attr_name,
+            owner_type=get_morph_alias(type(obj)),
         )
 
 
@@ -155,12 +171,19 @@ class MorphManyAccessor(Generic[T]):
     """Accessor returned when accessing a MorphMany descriptor on an instance."""
 
     def __init__(
-        self, owner: Any, related_model: type[T], name: str, attr_name: str | None = None
+        self,
+        owner: Any,
+        related_model: type[T],
+        name: str,
+        attr_name: str | None = None,
+        *,
+        owner_type: str,
     ) -> None:
         self._owner = owner
         self._related_model = related_model
         self._name = name
         self._attr_name = attr_name
+        self._owner_type = owner_type
 
     async def all(self) -> list[T]:
         """Return all related rows for this owner."""
@@ -173,7 +196,7 @@ class MorphManyAccessor(Generic[T]):
         id_col = getattr(self._related_model, f"{self._name}_id")
         stmt = (
             select(self._related_model)
-            .where(type_col == _owner_type(self._owner))
+            .where(type_col == self._owner_type)
             .where(id_col == _owner_pk(self._owner))
         )
         result = await session.execute(stmt)
@@ -181,7 +204,7 @@ class MorphManyAccessor(Generic[T]):
 
     async def create(self, **attrs: Any) -> T:
         """Create a related row with discriminator columns set automatically."""
-        attrs[f"{self._name}_type"] = _owner_type(self._owner)
+        attrs[f"{self._name}_type"] = self._owner_type
         attrs[f"{self._name}_id"] = _owner_pk(self._owner)
         model: Any = self._related_model
         return await model.create(**attrs)  # type: ignore[no-any-return]
@@ -217,7 +240,9 @@ class MorphMany(Generic[T]):
             related_model=self._related_model, name=self._name, owner_type=owner_type, single=False
         )
 
-    def __get__(self, obj: Any, objtype: type | None = None) -> MorphManyAccessor[T] | MorphMany[T]:
+    def __get__(
+        self, obj: object, objtype: type | None = None
+    ) -> MorphManyAccessor[T] | MorphMany[T]:
         if obj is None:
             return self
         return MorphManyAccessor(
@@ -225,6 +250,7 @@ class MorphMany(Generic[T]):
             related_model=self._related_model,
             name=self._name,
             attr_name=self._attr_name,
+            owner_type=get_morph_alias(type(obj)),
         )
 
 
@@ -367,7 +393,12 @@ async def batch_load_morph_children(
     related = link.related_model
     type_col = getattr(related, f"{link.name}_type")
     id_col = getattr(related, f"{link.name}_id")
-    owner_ids = [getattr(o, owner_pk_key) for o in owners]
+    # The morph id column may be a string (some tables store keys as strings to
+    # carry both int and UUID parents) while the owner's PK is an int. Coerce
+    # owner keys to the column's type so both the IN-filter and the regrouping
+    # below line up with what's actually stored.
+    coerce = _morph_id_coercer(id_col)
+    owner_ids = [coerce(getattr(o, owner_pk_key)) for o in owners]
     stmt = select(related).where(type_col == link.owner_type).where(id_col.in_(owner_ids))
     if where is not None:
         stmt = stmt.where(where)
@@ -379,7 +410,7 @@ async def batch_load_morph_children(
 
     flat: list[Any] = []
     for owner in owners:
-        children = grouped.get(getattr(owner, owner_pk_key), [])
+        children = grouped.get(coerce(getattr(owner, owner_pk_key)), [])
         set_eager_relation(owner, attr_name, children)
         flat.extend(children)
     return flat

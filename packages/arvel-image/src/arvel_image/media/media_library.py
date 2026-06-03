@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from arvel.database.orm.morph_map import get_morph_alias
+
 if TYPE_CHECKING:
     from arvel_image.media.conversion_runner import ConversionRunner
     from arvel_image.media.model import Media
@@ -46,7 +48,7 @@ class MediaLibrary:
 
         query = Media.query()
         if host is not None:
-            query = query.where(Media.model_type == type(host).__name__)
+            query = query.where(Media.model_type == get_morph_alias(type(host)))
             query = query.where(Media.model_id == str(host.host_pk()))
         if collection is not None:
             query = query.where(Media.collection_name == collection)
