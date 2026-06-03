@@ -166,7 +166,7 @@ def test_with_manipulations_does_not_mutate_original() -> None:
     _b = original.with_manipulations({"quality": 70})
 
     # Calling apply on both should not bleed ops between them
-    assert len(original._ops) == 1  # SLF001 is not active in tests; direct attr access intentional
+    assert len(original.ops) == 1
 
 
 def test_with_manipulations_empty_overrides_returns_self() -> None:
@@ -413,18 +413,18 @@ async def test_queued_job_carries_generate_responsive_flag(
     async def fake_dispatch(job: Any) -> None:
         captured_jobs.append(job)
 
-    with Storage.fake():
-        with unittest.mock.patch("arvel.facades.bus.Bus.dispatch", side_effect=fake_dispatch):
-            m = await _Media.create(
-                model_type="Host060",
-                model_id=str(host.id),
-                collection_name="images",
-                name="photo",
-                file_name="photo.jpg",
-                disk="default",
-                size=len(large_jpeg_bytes),
-            )
-            await adder._dispatch_conversion_job(m, generate_responsive=True)
+    _patch = unittest.mock.patch("arvel.facades.bus.Bus.dispatch", side_effect=fake_dispatch)
+    with Storage.fake(), _patch:
+        m = await _Media.create(
+            model_type="Host060",
+            model_id=str(host.id),
+            collection_name="images",
+            name="photo",
+            file_name="photo.jpg",
+            disk="default",
+            size=len(large_jpeg_bytes),
+        )
+        await adder.dispatch_conversion_job(m, generate_responsive=True)
 
     assert captured_jobs, "No job was dispatched"
     assert captured_jobs[0].generate_responsive_images is True
@@ -451,19 +451,19 @@ async def test_queued_job_without_responsive_flag_does_not_set_flag(
     async def fake_dispatch(job: Any) -> None:
         captured_jobs.append(job)
 
-    with Storage.fake():
-        with unittest.mock.patch("arvel.facades.bus.Bus.dispatch", side_effect=fake_dispatch):
-            adder = FileAdder(host, large_jpeg_bytes, file_name="photo.jpg")
-            m = await _Media.create(
-                model_type="Host060",
-                model_id=str(host.id),
-                collection_name="images",
-                name="photo",
-                file_name="photo.jpg",
-                disk="default",
-                size=len(large_jpeg_bytes),
-            )
-            await adder._dispatch_conversion_job(m, generate_responsive=False)
+    _patch = unittest.mock.patch("arvel.facades.bus.Bus.dispatch", side_effect=fake_dispatch)
+    with Storage.fake(), _patch:
+        adder = FileAdder(host, large_jpeg_bytes, file_name="photo.jpg")
+        m = await _Media.create(
+            model_type="Host060",
+            model_id=str(host.id),
+            collection_name="images",
+            name="photo",
+            file_name="photo.jpg",
+            disk="default",
+            size=len(large_jpeg_bytes),
+        )
+        await adder.dispatch_conversion_job(m, generate_responsive=False)
 
     assert captured_jobs
     assert captured_jobs[0].generate_responsive_images is False
@@ -617,7 +617,7 @@ async def test_media_copy_rewrites_responsive_image_paths(
     host_a = await Host060.create(name="copy-src-host")
     host_b = await Host060.create(name="copy-dst-host")
 
-    with Storage.fake() as fake_disk:
+    with Storage.fake():
         media = await (
             host_a.add_media(large_jpeg_bytes, file_name="hero.jpg")
             .with_responsive_images()

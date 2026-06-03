@@ -228,7 +228,7 @@ class FileAdder:
 
             if coll.conversions:
                 if self._queue_conversions:
-                    await self._dispatch_conversion_job(
+                    await self.dispatch_conversion_job(
                         media, generate_responsive=should_generate_responsive
                     )
                 else:
@@ -295,7 +295,7 @@ class FileAdder:
 
     # ─── queued conversion dispatch ────────────────────────────────────────
 
-    async def _dispatch_conversion_job(
+    async def dispatch_conversion_job(
         self, media: Media, *, generate_responsive: bool = False
     ) -> None:
         from arvel_image.media.jobs import QueuedConversionJob  # noqa: PLC0415

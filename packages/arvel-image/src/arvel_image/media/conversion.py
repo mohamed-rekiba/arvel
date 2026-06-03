@@ -37,7 +37,7 @@ class Conversion:
             msg = "Conversion name must be a non-empty string"
             raise ValueError(msg)
         self.name = name
-        self._ops: list[_Op] = []
+        self.ops: list[_Op] = []
         self._target_format: str | None = None
         self._responsive_images: bool = False
 
@@ -45,28 +45,28 @@ class Conversion:
 
     def fit(self, mode: str, width: int, height: int) -> Self:
         """Fit into ``(width, height)`` using ``cover`` or ``contain``."""
-        self._ops.append(("fit", (mode, width, height)))
+        self.ops.append(("fit", (mode, width, height)))
         return self
 
     def resize(self, *, width: int, height: int) -> Self:
         """Stretch to ``(width, height)`` exactly."""
-        self._ops.append(("resize", {"width": width, "height": height}))
+        self.ops.append(("resize", {"width": width, "height": height}))
         return self
 
     def crop(self, *, left: int, top: int, width: int, height: int) -> Self:
         """Crop to ``(width, height)`` starting at ``(left, top)``."""
-        self._ops.append(("crop", {"left": left, "top": top, "width": width, "height": height}))
+        self.ops.append(("crop", {"left": left, "top": top, "width": width, "height": height}))
         return self
 
     def quality(self, value: int) -> Self:
         """Output quality (1..100), honoured by JPEG and WEBP."""
-        self._ops.append(("quality", (value,)))
+        self.ops.append(("quality", (value,)))
         return self
 
     def format(self, image_format: str) -> Self:
         """Change the output format (jpeg/png/webp/gif)."""
         self._target_format = image_format
-        self._ops.append(("format", (image_format,)))
+        self.ops.append(("format", (image_format,)))
         return self
 
     def generate_responsive_images(self) -> Self:
@@ -99,7 +99,7 @@ class Conversion:
         if not overrides:
             return self
         patched = Conversion(self.name)
-        patched._ops = list(self._ops)
+        patched.ops = list(self.ops)
         patched._target_format = self._target_format
         patched._responsive_images = self._responsive_images
         w = overrides.get("width")
@@ -127,7 +127,7 @@ class Conversion:
         consumers should treat it as a fresh derivation.
         """
         out = source
-        for method_name, args in self._ops:
+        for method_name, args in self.ops:
             method = getattr(out, method_name)
             out = method(*args) if isinstance(args, tuple) else method(**args)
         return out
