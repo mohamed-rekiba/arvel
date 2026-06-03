@@ -49,6 +49,7 @@ from arvel_image.media.path_generator import (
 )
 from arvel_image.media.responsive_image_generator import (
     calculate_responsive_widths,
+    copy_responsive_images,
     generate_placeholder_svg,
     generate_responsive_images_for_media,
 )
@@ -72,6 +73,7 @@ __all__ = [
     "QueuedConversionJob",
     "UnknownCollectionError",
     "calculate_responsive_widths",
+    "copy_responsive_images",
     "generate_placeholder_svg",
     "generate_responsive_images_for_media",
     "get_conversion_runner",

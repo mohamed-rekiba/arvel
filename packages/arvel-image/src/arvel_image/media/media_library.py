@@ -183,8 +183,13 @@ async def _generate_responsive_for_conversion(
 
 
 async def _maybe_regenerate_responsive(media: Media, contents: bytes, disk: Any) -> None:
-    """Re-generate responsive variants when the media already has them."""
-    if not media.responsive_images:
+    """Re-generate the original's responsive variants when they were previously generated.
+
+    Only runs for the ``"medialibrary_original"`` group — conversion-level
+    groups are handled inside ``_run_conversion_loop`` where the conversion
+    output bytes are available.
+    """
+    if "medialibrary_original" not in (media.responsive_images or {}):
         return
     from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
         generate_responsive_images_for_media,
