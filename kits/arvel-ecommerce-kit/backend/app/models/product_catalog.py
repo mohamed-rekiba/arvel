@@ -19,12 +19,13 @@ class ProductCatalog(ProductBase, ViewModel):
     Storefront queries add ``.where(ProductCatalog.real_status == "visible")``.
     Admin queries use the full table and filter by ``status`` / ``real_status`` as needed.
 
-    ``__media_host_type__`` redirects ``get_media()`` lookups to ``"Product"`` rows in
-    the media table so this view model transparently shares Product's media records.
+    ``__morph_class__`` makes this view present as ``"Product"`` for polymorphic
+    lookups, so ``get_media()`` / ``.with_("media")`` transparently share Product's
+    media rows instead of looking for ``"ProductCatalog"`` rows that never exist.
 
     """
 
-    __media_host_type__: str = "Product"
+    __morph_class__: str = "Product"
 
     __tablename__ = "products_catalog"
     __is_materialized_view__ = True

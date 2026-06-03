@@ -108,6 +108,65 @@ Ingest helpers: `add_media`, `add_media_from_url`, `add_media_from_base64`, `add
 
 Bytes are stored via the [`Storage`](../features/storage.md) facade, so the disk is whatever you've configured. Conversions run on a background thread.
 
+<a name="eager-loading-media"></a>
+## Eager Loading Media (avoiding N+1)
+
+`get_media` queries the `media` table once per host. Calling it inside a loop over a
+page of products is a classic N+1 — one media query per row. The fix is eager loading,
+exactly as in Eloquent: pull all the media in a single batched query up front.
+
+Like Eloquent's `with('media')`, eager loading is still **two queries** — one for the
+rows, one `WHERE model_id IN (...)` for their media. It's not a join. The win is that the
+media query runs once for the whole page instead of once per row.
+
+### `.with_("media")` — the query-builder way
+
+Reach for this whenever you're fetching the hosts. It's the idiomatic form:
+
+```python
+products = await Product.where(is_active=True).with_("media").limit(20).get()
+
+for product in products:
+    # served from memory — no extra query
+    thumb = await product.get_media_url("images", conversion="thumb")
+```
+
+This also works for a read-only **view model** that shares another model's media. Set
+`__morph_class__` so the view presents as the canonical model (see
+[Overriding the Morph Class](../orm/relationships.md#morph-class-override)); `.with_("media")`
+then batches against the canonical type, not the view's own name:
+
+```python
+# ProductCatalog sets __morph_class__ = "Product"; media is stored under "Product"
+products = await ProductCatalog.where(is_active=True).with_("media").get()
+```
+
+Eager-load a relation and its media in one go — `media` is a plain `MorphMany`, so it
+nests like any other relation:
+
+```python
+items = await CartItem.where(cart_id=cart_id).with_("product.media").get()
+
+for item in items:
+    product = await item.product().first()       # from the eager cache
+    thumb = await product.get_media_url("images", conversion="thumb")  # cached too
+```
+
+### `load("media")` — when you already hold the instances
+
+Media is a `MorphMany`, so the framework's own lazy eager loading covers it. Use
+`load("media")` on an in-hand model or collection — Eloquent's `$model->load('media')`
+/ `$collection->load('media')` — when you didn't eager-load up front:
+
+```python
+products = await ProductCatalog.where(is_active=True).get()  # no .with_("media")
+await products.load("media")  # one query, fills the same eager cache
+```
+
+Either way, `get_media`, `get_first_media`, `get_last_media`, and `get_media_url` then
+read from the in-memory cache for those hosts. Attaching or clearing media on a host
+invalidates its cache, so a later read reflects the change.
+
 <a name="regenerating-conversions"></a>
 ## Regenerating Conversions
 

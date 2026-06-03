@@ -2,8 +2,9 @@
 
 Mirrors the schema in
 ``packages/arvel-image/src/arvel_image/migrations/create_media_table.py``.
-Discriminator columns use the host's short class name: ``model_type`` is
-``"User"``, not ``"app.models.User"``.
+``model_type`` stores the host's morph alias (``get_morph_alias`` — its morph-map
+entry, ``__morph_class__`` override, or short class name): ``"User"``, not
+``"app.models.User"``.
 
 JSON columns default to ``{}`` so callers never have to special-case
 ``None`` when reading metadata. ``Media.delete()`` cleans the original
@@ -19,6 +20,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from arvel.database import Model, Timestamps
 from arvel.database.columns import big_integer, field, json
 from arvel.database.columns import uuid as uuid_column
+from arvel.database.orm.morph_map import get_morph_alias
 
 if TYPE_CHECKING:
     from arvel_image.media.path_generator import PathGenerator
@@ -189,7 +191,7 @@ class Media(Model, Timestamps):
         contents = await src_disk.get(gen.path_for(self))
 
         new_media: Media = await Media.create(
-            model_type=type(target).__name__,
+            model_type=get_morph_alias(type(target)),
             model_id=str(target.host_pk()),  # use host_pk()
             collection_name=collection,
             name=self.name,
@@ -230,7 +232,7 @@ class Media(Model, Timestamps):
         Updates the row in place — no new file copy on disk (same path).
         Uses ``target.host_pk()`` for model_id
         """
-        self.model_type = type(target).__name__
+        self.model_type = get_morph_alias(type(target))
         self.model_id = str(target.host_pk())  # use host_pk()
         self.collection_name = collection
         await self.save()

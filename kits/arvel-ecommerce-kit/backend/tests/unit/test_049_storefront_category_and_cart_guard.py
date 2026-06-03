@@ -163,7 +163,8 @@ async def test_cart_add_item_rejects_quantity_above_catalog_stock() -> None:
 
 @pytest.mark.asyncio
 async def test_product_service_uses_get_media_for_images() -> None:
-    """Storefront image loading uses product.get_media() not raw Media.query()."""
+    """Storefront image loading uses the framework media API (get_first_media,
+    has_generated_conversion, get_custom_property), not raw Media.query() or dict-poking."""
     from app.services.product_service import ProductService
 
     published = MagicMock()
@@ -183,8 +184,8 @@ async def test_product_service_uses_get_media_for_images() -> None:
     published.vendor_name = ""
     published.vendor_slug = ""
     media = MagicMock()
-    media.custom_properties = {}
-    media.generated_conversions = {"thumbnail": True, "card": True, "full": True}
+    media.get_custom_property = MagicMock(return_value=None)
+    media.has_generated_conversion = MagicMock(return_value=True)
     media.get_url = AsyncMock(
         side_effect=[
             "/storage/media/thumb.jpg",
@@ -192,11 +193,12 @@ async def test_product_service_uses_get_media_for_images() -> None:
             "/storage/media/full.jpg",
         ]
     )
-    published.get_media = AsyncMock(return_value=[media])
+    published.get_first_media = AsyncMock(return_value=media)
 
     with patch("app.services.product_service.ProductCatalog") as product_catalog_cls:
         product_query = MagicMock()
-        product_query.where_json_path.return_value = MagicMock(
+        # Mock the where -> where_json_path -> with_ media -> first chain.
+        product_query.where_json_path.return_value.with_.return_value = MagicMock(
             first=AsyncMock(return_value=published)
         )
         product_catalog_cls.where.return_value = product_query
@@ -210,7 +212,7 @@ async def test_product_service_uses_get_media_for_images() -> None:
         "/storage/media/thumb.jpg 150w, /storage/media/card.jpg 400w, /storage/media/full.jpg 1200w"
     )
     assert result["image_sizes"]
-    published.get_media.assert_awaited_once()
+    published.get_first_media.assert_awaited_once()
     media.get_url.assert_any_await("thumbnail")
     media.get_url.assert_any_await("card")
     media.get_url.assert_any_await("full")

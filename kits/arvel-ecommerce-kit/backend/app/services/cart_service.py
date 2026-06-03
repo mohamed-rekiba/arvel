@@ -30,7 +30,14 @@ class CartService:
 
     async def get_cart(self, user_id: int, *, locale: str = "en") -> dict[str, Any]:
         cart_id = await self.get_or_create_cart(user_id)
-        items = await self._get_items(cart_id)
+        # with_("product.media") eager-loads each line's catalog row and its media —
+        # belongs-to then morphMany — so _format_item touches the DB zero more times.
+        items: list[CartItem] = (
+            await CartItem.where(cart_id=cart_id)
+            .with_("product.media")
+            .order_by("created_at")
+            .all()
+        )
         formatted = [await self._format_item(i, locale) for i in items]
         total = float(
             sum(Decimal(str(i.unit_price_snapshot or 0)) * int(i.quantity) for i in items)
@@ -78,9 +85,7 @@ class CartService:
             CartItem.id == iid, CartItem.cart_id == cart_id
         ).first()
         if item is not None:
-            product: ProductCatalog | None = await ProductCatalog.where(
-                ProductCatalog.id == item.product_id
-            ).first()
+            product: ProductCatalog | None = await item.product().first()
             if product is None:
                 raise NotFoundException(f"Product '{item.product_id}' not found.")
             if int(product.stock_qty) < quantity:
@@ -129,9 +134,8 @@ class CartService:
         return await CartItem.where(cart_id=cart_id).order_by("created_at").all()
 
     async def _format_item(self, item: CartItem, locale: str) -> dict[str, Any]:
-        product: ProductCatalog | None = await ProductCatalog.where(
-            ProductCatalog.id == item.product_id
-        ).first()
+        # Served from the with_("product.media") eager cache — no query here.
+        product = await item.product().first()
         if product is not None:
             product_data = await self._products.product_to_storefront_with_media(product, locale)
         else:
