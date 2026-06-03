@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from arvel.database.orm.relations import BelongsTo
 
     from app.models.cart import Cart
+    from app.models.product_catalog import ProductCatalog
 
 
 class CartItem(Model, Timestamps):
@@ -30,6 +31,11 @@ class CartItem(Model, Timestamps):
 
     def cart(self) -> BelongsTo[Cart]:
         return self.belongs_to("Cart", foreign_key="cart_id")
+
+    def product(self) -> BelongsTo[ProductCatalog]:
+        # Points at the storefront read model (products_catalog.id == products.id),
+        # so `.with_("product")` + get_media serve cart rows without per-item lookups.
+        return self.belongs_to("ProductCatalog", foreign_key="product_id")
 
 
 __all__ = ["CartItem"]

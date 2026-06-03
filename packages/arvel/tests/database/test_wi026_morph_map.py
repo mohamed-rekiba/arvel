@@ -32,6 +32,15 @@ class Wi026Post(Model):
     image: ClassVar[MorphOne[Wi026Image]] = MorphOne(Wi026Image, name="imageable")
 
 
+class Wi026PostView(Model):
+    """A read-only view that presents as Wi026Post polymorphically."""
+
+    __tablename__ = "wi026_post_views"
+    __morph_class__ = "Wi026Post"
+    id: int = id_()
+    title: str = string(120)
+
+
 async def _setup(engine: AsyncEngine) -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
@@ -45,6 +54,23 @@ class TestGetMorphClass:
         morph_map({"post": Wi026Post})
         assert Wi026Post.get_morph_class() == "post"
         assert get_morph_alias(Wi026Post) == "post"
+
+
+class TestMorphClassOverride:
+    """``__morph_class__`` — Laravel's getMorphClass() override, model-wide."""
+
+    def test_attribute_overrides_to_canonical(self) -> None:
+        assert get_morph_alias(Wi026PostView) == "Wi026Post"
+        assert Wi026PostView.get_morph_class() == "Wi026Post"
+
+    def test_override_wins_over_morph_map(self) -> None:
+        morph_map({"postview": Wi026PostView})
+        assert get_morph_alias(Wi026PostView) == "Wi026Post"
+
+    def test_override_satisfies_strict_mode(self) -> None:
+        require_morph_map(True)
+        # No alias registered, but the explicit override is enough.
+        assert get_morph_alias(Wi026PostView) == "Wi026Post"
 
 
 class TestMorphMapRegistry:

@@ -15,6 +15,7 @@ from typing import Any, TypedDict
 from arvel.database import TranslatableMixin
 from arvel.database.exceptions import InvalidCursorError
 from arvel.logging.facade import Log
+from arvel_image import Media
 
 from app.models.product import Product
 from app.models.product_base import IMAGES_COLLECTION
@@ -76,7 +77,9 @@ class ProductService:
         category_slug: str | None = None,
     ) -> dict[str, Any]:
         """Cursor-paginated storefront listing via ProductCatalog ORM."""
-        query = ProductCatalog.where(ProductCatalog.real_status == "visible")
+        # .with_("media") batches the per-product media into one extra query —
+        # without it the listing is a textbook N+1 (one media fetch per row).
+        query = ProductCatalog.where(ProductCatalog.real_status == "visible").with_("media")
         if category_slug is not None:
             query = query.where_json_path("category_slug", locale, category_slug)
 
@@ -102,6 +105,7 @@ class ProductService:
         product = (
             await ProductCatalog.where(ProductCatalog.real_status == "visible")
             .where_json_path("slug", locale, slug)
+            .with_("media")
             .first()
         )
         if product is None:
@@ -120,6 +124,7 @@ class ProductService:
             await ProductCatalog.where(ProductCatalog.real_status == "visible")
             .where_full_text(sv, q, tsquery_fn="plainto_tsquery", lang="simple")
             .order_by_relevance(sv, q, lang="simple")
+            .with_("media")
             .limit(limit)
             .all()
         )
@@ -299,40 +304,48 @@ class ProductService:
     async def product_to_storefront_with_media(
         self, product: ProductCatalog, locale: str
     ) -> dict[str, Any]:
-        media_items = await product.get_media(IMAGES_COLLECTION)
-        media = media_items[0] if media_items else None
-        if media is not None:
-            generated = media.generated_conversions or {}
-            custom = media.custom_properties or {}
-            if not any(generated.values()) and custom.get("image_url"):
-                # Seeded sample images use custom_properties.image_url (no file on disk).
-                image_payload = {
-                    "thumbnail_url": str(custom["image_url"]),
-                    "image_srcset": "",
-                    "image_sizes": "",
-                }
-            else:
-                sources: list[tuple[str, int]] = []
-                thumbnail_url: str | None = None
-                if generated.get("thumbnail"):
-                    thumbnail_url = await media.get_url("thumbnail")
-                    sources.append((thumbnail_url, 150))
-                if generated.get("card"):
-                    sources.append((await media.get_url("card"), 400))
-                if generated.get("full"):
-                    sources.append((await media.get_url("full"), 1200))
-                if thumbnail_url is None:
-                    thumbnail_url = await media.get_url()
-                image_payload = {
-                    "thumbnail_url": thumbnail_url,
-                    "image_srcset": ", ".join(f"{url} {width}w" for url, width in sources),
-                    "image_sizes": "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                    if sources
-                    else "",
-                }
-        else:
-            image_payload = {"thumbnail_url": None, "image_srcset": "", "image_sizes": ""}
+        media = await product.get_first_media(IMAGES_COLLECTION)
+        image_payload = await self._image_payload(media)
         return self._product_to_storefront(product, locale, image_payload=image_payload)
+
+    # Conversion names the storefront card renders, paired with their srcset widths.
+    _SRCSET_CONVERSIONS: tuple[tuple[str, int], ...] = (
+        ("thumbnail", 150),
+        ("card", 400),
+        ("full", 1200),
+    )
+
+    @classmethod
+    async def _image_payload(cls, media: Media | None) -> dict[str, Any]:
+        empty = {"thumbnail_url": None, "image_srcset": "", "image_sizes": ""}
+        if media is None:
+            return empty
+
+        has_conversion = any(
+            media.has_generated_conversion(name) for name, _ in cls._SRCSET_CONVERSIONS
+        )
+        seeded_url = media.get_custom_property("image_url")
+        if seeded_url and not has_conversion:
+            # Seeded sample images live at a URL — no file on disk.
+            return {"thumbnail_url": str(seeded_url), "image_srcset": "", "image_sizes": ""}
+
+        sources: list[tuple[str, int]] = []
+        thumbnail_url: str | None = None
+        for name, width in cls._SRCSET_CONVERSIONS:
+            if media.has_generated_conversion(name):
+                url = await media.get_url(name)
+                if name == "thumbnail":
+                    thumbnail_url = url
+                sources.append((url, width))
+        if thumbnail_url is None:
+            thumbnail_url = await media.get_url()
+        return {
+            "thumbnail_url": thumbnail_url,
+            "image_srcset": ", ".join(f"{url} {width}w" for url, width in sources),
+            "image_sizes": "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            if sources
+            else "",
+        }
 
     @staticmethod
     def _product_to_storefront(
