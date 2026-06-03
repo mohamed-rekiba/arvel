@@ -34,5 +34,6 @@ changelog once shipped.
 - Laravel-style validation rules
 - Route model binding
 - Resource controllers
+- Framework-level local file serving (`STORAGE_LOCAL_SERVE`, Laravel `serve => true` parity)
 
 > The headline goal before `1.0` is a public-API review and stability pass.

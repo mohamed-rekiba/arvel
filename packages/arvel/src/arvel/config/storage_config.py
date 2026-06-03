@@ -15,6 +15,9 @@ class LocalConfig(ArvelSettings):
 
     root: str = "storage/app"
     url: str = ""
+    # Laravel's `serve => true`: when on (and `url` is a relative path), the framework
+    # registers a route that serves files from `root`. Turn off behind a CDN/object store.
+    serve: bool = True
 
 
 class S3Config(ArvelSettings):
