@@ -1,13 +1,14 @@
 import js from '@eslint/js'
+import { defineConfig, globalIgnores } from 'eslint/config'
 import globals from 'globals'
 import pluginVue from 'eslint-plugin-vue'
 import tseslint from 'typescript-eslint'
 
-export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'src/api/**'] },
+export default defineConfig(
+  globalIgnores(['dist/**', 'node_modules/**', '.vite/**', 'src/api/**']),
   js.configs.recommended,
-  ...tseslint.configs.recommended,
-  ...pluginVue.configs['flat/recommended'],
+  tseslint.configs.recommended,
+  pluginVue.configs['flat/recommended'],
   {
     files: ['**/*.{ts,vue}'],
     languageOptions: {

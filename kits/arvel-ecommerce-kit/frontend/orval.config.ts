@@ -8,7 +8,9 @@ export default defineConfig({
       target: './src/api/index.ts',
       schemas: './src/api/schemas',
       client: 'vue-query',
-      prettier: true,
+      // orval v8 defaults httpClient to 'fetch' (envelope return + url/init mutator sig).
+      // Our custom mutator (src/lib/api.ts) is axios-style and returns the body directly.
+      httpClient: 'axios',
       clean: true,
       override: {
         mutator: {
