@@ -228,11 +228,15 @@ class FileAdder:
 
             if coll.conversions:
                 if self._queue_conversions:
-                    await self._dispatch_conversion_job(media)
+                    await self._dispatch_conversion_job(
+                        media, generate_responsive=should_generate_responsive
+                    )
                 else:
                     await self._run_conversions(media, coll, storage_disk, gen)
 
-            if should_generate_responsive:
+            # Skip inline responsive images when conversions are queued —
+            # the job generates them in the background to keep uploads fast.
+            if should_generate_responsive and not self._queue_conversions:
                 await self._run_responsive_images(media, storage_disk)
 
             await media.save()
@@ -291,12 +295,20 @@ class FileAdder:
 
     # ─── queued conversion dispatch ────────────────────────────────────────
 
-    async def _dispatch_conversion_job(self, media: Media) -> None:
+    async def _dispatch_conversion_job(
+        self, media: Media, *, generate_responsive: bool = False
+    ) -> None:
         from arvel_image.media.jobs import QueuedConversionJob  # noqa: PLC0415
 
         host_cls = self._host.__class__
         class_path = f"{host_cls.__module__}.{host_cls.__qualname__}"
-        await Bus.dispatch(QueuedConversionJob(media_id=str(media.id), model_class_path=class_path))
+        await Bus.dispatch(
+            QueuedConversionJob(
+                media_id=str(media.id),
+                model_class_path=class_path,
+                generate_responsive_images=generate_responsive,
+            )
+        )
 
     # ─── conversions ───────────────────────────────────────────────────────
 
@@ -322,6 +334,7 @@ class FileAdder:
         manips: dict[str, Any] = media.manipulations or {}
         global_overrides: dict[str, Any] = dict(manips.get("*", {}))
 
+        responsive_updates: dict[str, Any] = {}
         for conversion in coll.conversions:
             if not conversion.accepts(self._mime):
                 continue
@@ -335,7 +348,19 @@ class FileAdder:
             output = await runner.run(source=self._contents, conversion=effective)
             await cdisk.put(gen.path_for_conversion(media, conversion.name), output)
             generated[conversion.name] = True
+
+            if conversion.responsive_images_enabled:
+                entry = await _generate_responsive_for_conversion(
+                    media, output, conversion.name, disk=cdisk
+                )
+                if entry:
+                    responsive_updates[conversion.name] = entry
+
         media.generated_conversions = generated
+        if responsive_updates:
+            existing_resp = dict(media.responsive_images or {})
+            existing_resp.update(responsive_updates)
+            media.responsive_images = existing_resp
 
     async def _run_responsive_images(self, media: Media, disk: Any) -> None:
         from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
@@ -362,8 +387,8 @@ class FileAdder:
 
     # ─── sanitization ──────────────────────────────────────────────────────
 
-    @classmethod
-    def sanitize_file_name(cls, name: object) -> str:
+    @staticmethod
+    def sanitize_file_name(name: object) -> str:
         """Reduce caller-provided filename to a safe basename"""
         if not isinstance(name, str):
             msg = "file_name must be a string"
@@ -389,6 +414,21 @@ class FileAdder:
             return sniffed
         guessed, _ = mimetypes.guess_type(file_name)
         return guessed or "application/octet-stream"
+
+
+async def _generate_responsive_for_conversion(
+    media: Media,
+    contents: bytes,
+    conversion_name: str,
+    *,
+    disk: Any,
+) -> dict[str, Any] | None:
+    """Generate responsive variants from a conversion's output bytes."""
+    from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
+        generate_responsive_images_for_media,
+    )
+
+    return await generate_responsive_images_for_media(media, contents, conversion_name, disk=disk)
 
 
 __all__ = ["FileAdder"]

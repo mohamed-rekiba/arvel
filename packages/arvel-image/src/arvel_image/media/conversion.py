@@ -39,6 +39,7 @@ class Conversion:
         self.name = name
         self._ops: list[_Op] = []
         self._target_format: str | None = None
+        self._responsive_images: bool = False
 
     # ─── chain ─────────────────────────────────────────────────────────────
 
@@ -68,6 +69,22 @@ class Conversion:
         self._ops.append(("format", (image_format,)))
         return self
 
+    def generate_responsive_images(self) -> Self:
+        """Generate srcset width variants from this conversion's output.
+
+        Works the same as ``MediaCollection.generate_responsive_images()`` but
+        scoped to one conversion: variants are stored under the conversion name
+        key (e.g. ``"thumb"``) in ``media.responsive_images`` so
+        ``media.get_srcset("thumb")`` returns them.
+        """
+        self._responsive_images = True
+        return self
+
+    @property
+    def responsive_images_enabled(self) -> bool:
+        """True when this conversion should generate responsive width variants."""
+        return self._responsive_images
+
     # ─── execution ─────────────────────────────────────────────────────────
 
     def with_manipulations(self, overrides: dict[str, Any]) -> Conversion:
@@ -84,6 +101,7 @@ class Conversion:
         patched = Conversion(self.name)
         patched._ops = list(self._ops)
         patched._target_format = self._target_format
+        patched._responsive_images = self._responsive_images
         w = overrides.get("width")
         h = overrides.get("height")
         fit_mode = overrides.get("fit")

@@ -92,6 +92,7 @@ class Image:
         self._ops: list[_PixelOp] = []
         self._explicit_format: str | None = None
         self._quality: int | None = None
+        self._strip_exif: bool = False
 
     @classmethod
     def load(cls, source: str | Path | IO[bytes] | bytes) -> Self:
@@ -168,6 +169,17 @@ class Image:
         self._explicit_format = _normalize_format(image_format)
         return self
 
+    def strip_exif(self) -> Self:
+        """Explicitly zero out all EXIF/XMP metadata before encoding.
+
+        Every re-encode already drops the raw EXIF block (Pillow doesn't copy
+        it forward). Call ``strip_exif()`` when you need the guarantee at the
+        API level — e.g. user-uploaded photos where GPS removal is a stated
+        privacy requirement. Safe to combine with ``optimize()``.
+        """
+        self._strip_exif = True
+        return self
+
     def optimize(self) -> Self:
         """Bake EXIF orientation into the pixels via ``exif_transpose``.
 
@@ -211,6 +223,9 @@ class Image:
         image = self._source()
         for op in self._ops:
             image = op(image)
+        if self._strip_exif:
+            image.info.pop("exif", None)
+            image.info.pop("xmp", None)
         return image
 
     def _resolve_to_bytes_target(self, image: PILImage.Image, image_format: str | None) -> str:
@@ -233,6 +248,8 @@ class Image:
         kwargs: dict[str, object] = {}
         if self._quality is not None and target in {"JPEG", "WEBP"}:
             kwargs["quality"] = self._quality
+        if self._strip_exif and target in {"JPEG", "WEBP", "PNG"}:
+            kwargs["exif"] = b""
         return kwargs
 
     def _encode_for_target(self, image: PILImage.Image, target: str) -> PILImage.Image:
