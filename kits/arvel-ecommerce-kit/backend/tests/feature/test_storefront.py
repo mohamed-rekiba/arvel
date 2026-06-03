@@ -38,7 +38,7 @@ async def app(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
     monkeypatch.setenv("DB_URL", fresh_db)
-    monkeypatch.setenv("REDIS_URL", redis_endpoint.url)
+    monkeypatch.setenv("CACHE_URL", redis_endpoint.url)
     monkeypatch.setenv("AMQP_URL", rabbitmq_endpoint.amqp_url)
     monkeypatch.setenv("S3_ENDPOINT", minio_endpoint.endpoint_url)
     monkeypatch.setenv("S3_ACCESS_KEY", minio_endpoint.access_key)
