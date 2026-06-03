@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from arvel.database.orm.morph_map import get_morph_alias
@@ -11,6 +12,15 @@ if TYPE_CHECKING:
     from arvel_image.media.model import Media
     from arvel_image.media.path_generator import PathGenerator
     from arvel_image.media.trait import HasMedia
+
+
+@dataclass
+class _ConvCtx:
+    """Execution context shared across conversions in a single ``process_one`` call."""
+
+    disk: Any
+    gen: PathGenerator
+    runner: ConversionRunner
 
 
 def resolve_path_generator() -> PathGenerator:
@@ -107,10 +117,34 @@ async def process_one(
     else:
         write_disk = read_disk
 
+    ctx = _ConvCtx(disk=write_disk, gen=gen, runner=runner)
+    generated, responsive_updates = await _run_conversion_loop(media, coll, contents, ctx)
+
+    if generated:
+        media.generated_conversions = {**(media.generated_conversions or {}), **generated}
+
+    if responsive_updates:
+        existing_resp = dict(media.responsive_images or {})
+        existing_resp.update(responsive_updates)
+        media.responsive_images = existing_resp
+
+    await _maybe_regenerate_responsive(media, contents, read_disk)
+    await media.save()
+
+
+async def _run_conversion_loop(
+    media: Media,
+    coll: Any,
+    contents: bytes,
+    ctx: _ConvCtx,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Run each conversion in ``coll`` against ``contents`` and return
+    ``(generated, responsive_updates)`` dicts."""
     manips: dict[str, Any] = media.manipulations or {}
     global_overrides: dict[str, Any] = dict(manips.get("*", {}))
-
     generated: dict[str, Any] = {}
+    responsive_updates: dict[str, Any] = {}
+
     for conv in coll.conversions:
         if not conv.accepts(media.mime_type):
             continue
@@ -119,15 +153,33 @@ async def process_one(
             **dict(manips.get(conv.name, {})),
         }
         effective = conv.with_manipulations(conv_overrides) if conv_overrides else conv
-        output = await runner.run(source=contents, conversion=effective)
-        await write_disk.put(gen.path_for_conversion(media, conv.name), output)
+        output = await ctx.runner.run(source=contents, conversion=effective)
+        await ctx.disk.put(ctx.gen.path_for_conversion(media, conv.name), output)
         generated[conv.name] = True
 
-    if generated:
-        media.generated_conversions = {**(media.generated_conversions or {}), **generated}
+        if conv.responsive_images_enabled:
+            entry = await _generate_responsive_for_conversion(
+                media, output, conv.name, disk=ctx.disk
+            )
+            if entry:
+                responsive_updates[conv.name] = entry
 
-    await _maybe_regenerate_responsive(media, contents, read_disk)
-    await media.save()
+    return generated, responsive_updates
+
+
+async def _generate_responsive_for_conversion(
+    media: Media,
+    contents: bytes,
+    conversion_name: str,
+    *,
+    disk: Any,
+) -> dict[str, Any] | None:
+    """Generate responsive variants from a conversion's output bytes."""
+    from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
+        generate_responsive_images_for_media,
+    )
+
+    return await generate_responsive_images_for_media(media, contents, conversion_name, disk=disk)
 
 
 async def _maybe_regenerate_responsive(media: Media, contents: bytes, disk: Any) -> None:

@@ -39,7 +39,9 @@ result: bytes = (
 )
 ```
 
-Key methods: `fit(mode, width, height)`, `resize(width=, height=)`, `crop(x, y, w, h)`, `quality(int)`, `format(str)`, `optimize()`, `strip_exif()`, `encode() -> bytes`.
+Key methods: `fit(mode, width, height)`, `resize(width=, height=)`, `crop(x, y, w, h)`, `quality(int)`, `format(str)`, `optimize()`, `strip_exif()`, `to_bytes() -> bytes`, `save(path)`.
+
+`strip_exif()` is belt-and-suspenders for privacy-sensitive uploads — it passes `exif=b""` to the encoder and clears EXIF/XMP from the working image before encoding. Pillow already drops the raw EXIF block on every re-encode; `strip_exif()` makes that guarantee explicit in your code.
 
 ## Public surface
 
@@ -63,9 +65,13 @@ class Product(Model, HasMedia):
             MediaCollection("images")
             .with_conversions(
                 Conversion("thumb").fit("cover", 300, 300).quality(80),
-                Conversion("og").fit("contain", 1200, 630).format("jpeg"),
+                # generate_responsive_images() on the conversion creates a
+                # "thumb" group in media.responsive_images, accessible via
+                # media.get_srcset("thumb")
+                Conversion("og").fit("contain", 1200, 630).format("jpeg")
+                    .generate_responsive_images(),
             )
-            .generate_responsive_images()   # srcset variants for original + conversions
+            .generate_responsive_images()   # srcset variants for the original too
             .register_on(self)
         )
 ```
@@ -102,6 +108,8 @@ srcset_orig  = await media.get_srcset()           # "medialibrary_original" grou
 srcset_thumb = await media.get_srcset("thumb")    # "thumb" conversion group
 placeholder  = media.get_placeholder_svg()        # tiny blurred SVG data URI
 ```
+
+When `.queued()` is combined with `.with_responsive_images()`, responsive image generation is also deferred to the worker — the upload request returns immediately and the `QueuedConversionJob` generates variants in the background.
 
 ## Manipulations
 

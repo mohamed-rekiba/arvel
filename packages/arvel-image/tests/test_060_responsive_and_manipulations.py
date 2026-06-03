@@ -391,3 +391,161 @@ async def test_regenerate_updates_responsive_images(
     # Still present after regeneration
     assert media.responsive_images
     assert len(media.responsive_images["medialibrary_original"]["urls"]) == len(first_urls)
+
+
+# ─── Gap 1: queued uploads propagate responsive image flag ────────────────────
+
+
+async def test_queued_job_carries_generate_responsive_flag(
+    engine: AsyncEngine,
+    session: AsyncSession,
+    large_jpeg_bytes: bytes,
+) -> None:
+    """_dispatch_conversion_job(generate_responsive=True) must set the job flag."""
+    import unittest.mock
+
+    from arvel.facades import Storage
+    from arvel_image.media.file_adder import FileAdder
+    from arvel_image.media.model import Media as _Media
+
+    await _create_tables_060(engine)
+    Host060 = _host_060()
+    host = await Host060.create(name="queued-resp-host")
+    adder = FileAdder(host, large_jpeg_bytes, file_name="photo.jpg")
+
+    captured_jobs: list[Any] = []
+
+    async def fake_dispatch(job: Any) -> None:
+        captured_jobs.append(job)
+
+    with Storage.fake():
+        with unittest.mock.patch("arvel.facades.bus.Bus.dispatch", side_effect=fake_dispatch):
+            m = await _Media.create(
+                model_type="Host060",
+                model_id=str(host.id),
+                collection_name="images",
+                name="photo",
+                file_name="photo.jpg",
+                disk="default",
+                size=len(large_jpeg_bytes),
+            )
+            await adder._dispatch_conversion_job(m, generate_responsive=True)
+
+    assert captured_jobs, "No job was dispatched"
+    assert captured_jobs[0].generate_responsive_images is True
+
+
+async def test_queued_job_without_responsive_flag_does_not_set_flag(
+    engine: AsyncEngine,
+    session: AsyncSession,
+    large_jpeg_bytes: bytes,
+) -> None:
+    """queued() without with_responsive_images() dispatches job with flag=False."""
+    import unittest.mock
+
+    from arvel.facades import Storage
+    from arvel_image.media.file_adder import FileAdder
+    from arvel_image.media.model import Media as _Media
+
+    await _create_tables_060(engine)
+    Host060 = _host_060()
+    host = await Host060.create(name="queued-noresp-host")
+
+    captured_jobs: list[Any] = []
+
+    async def fake_dispatch(job: Any) -> None:
+        captured_jobs.append(job)
+
+    with Storage.fake():
+        with unittest.mock.patch("arvel.facades.bus.Bus.dispatch", side_effect=fake_dispatch):
+            adder = FileAdder(host, large_jpeg_bytes, file_name="photo.jpg")
+            m = await _Media.create(
+                model_type="Host060",
+                model_id=str(host.id),
+                collection_name="images",
+                name="photo",
+                file_name="photo.jpg",
+                disk="default",
+                size=len(large_jpeg_bytes),
+            )
+            await adder._dispatch_conversion_job(m, generate_responsive=False)
+
+    assert captured_jobs
+    assert captured_jobs[0].generate_responsive_images is False
+
+
+# ─── Gap 2: conversion-level responsive images ────────────────────────────────
+
+
+async def test_conversion_generate_responsive_images_populates_srcset(
+    engine: AsyncEngine,
+    session: AsyncSession,
+    large_jpeg_bytes: bytes,
+) -> None:
+    """Conversion.generate_responsive_images() stores variants under the conversion key."""
+    from arvel.database import Model, Timestamps
+    from arvel.database.columns import id_, string
+    from arvel.facades import Storage
+    from arvel_image import HasMedia, MediaCollection
+    from arvel_image.media.conversion import Conversion
+
+    # Define a host with a conversion-level responsive images flag.
+    class HostConvResp(Model, HasMedia, Timestamps):
+        __tablename__ = "media_060_conv_resp_hosts"
+        id: int = id_()
+        name: str = string(120)
+
+        def register_media_collections(self) -> None:
+            MediaCollection("images").with_conversions(
+                Conversion("thumb").fit("cover", 300, 300).generate_responsive_images()
+            ).register_on(self)
+
+    await _create_tables_060(engine)
+    from sqlalchemy import text
+
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS media_060_conv_resp_hosts "
+                "(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, "
+                "created_at DATETIME, updated_at DATETIME)"
+            )
+        )
+
+    host = await HostConvResp.create(name="conv-resp-host")
+
+    with Storage.fake():
+        media = await host.add_media(large_jpeg_bytes, file_name="hero.jpg").to_media_collection(
+            "images"
+        )
+
+    # responsive_images must have a "thumb" key (not "medialibrary_original").
+    assert "thumb" in media.responsive_images
+    thumb_entry = media.responsive_images["thumb"]
+    assert thumb_entry.get("urls"), "thumb responsive images should have urls"
+
+    # get_srcset("thumb") must work.
+    with Storage.fake():
+        srcset = await media.get_srcset("thumb")
+    assert "w" in srcset or srcset == ""  # empty is ok for tiny images
+
+
+async def test_conversion_responsive_images_disabled_by_default(
+    engine: AsyncEngine,
+    session: AsyncSession,
+    large_jpeg_bytes: bytes,
+) -> None:
+    """Conversion without .generate_responsive_images() leaves responsive_images empty."""
+    from arvel.facades import Storage
+
+    await _create_tables_060(engine)
+    Host060 = _host_060()
+    host = await Host060.create(name="no-conv-resp-host")
+
+    with Storage.fake():
+        media = await host.add_media(large_jpeg_bytes, file_name="photo.jpg").to_media_collection(
+            "images"
+        )
+
+    # "thumb" collection has no responsive images enabled on the conversion.
+    assert "thumb" not in media.responsive_images
