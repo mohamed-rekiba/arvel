@@ -549,3 +549,121 @@ async def test_conversion_responsive_images_disabled_by_default(
 
     # "thumb" collection has no responsive images enabled on the conversion.
     assert "thumb" not in media.responsive_images
+
+
+# ─── Edge case 1: _maybe_regenerate_responsive guard ─────────────────────────
+
+
+async def test_process_one_does_not_create_original_entry_for_conversion_only_media(
+    engine: AsyncEngine,
+    session: AsyncSession,
+    large_jpeg_bytes: bytes,
+) -> None:
+    """process_one must not add medialibrary_original when only conversion-level
+    responsive images exist on the row."""
+    from arvel.database import Model, Timestamps
+    from arvel.database.columns import id_, string
+    from arvel.facades import Storage
+    from arvel_image import HasMedia, MediaCollection
+    from arvel_image.media.conversion import Conversion
+    from arvel_image.media.media_library import process_one
+
+    class HostEdge1(Model, HasMedia, Timestamps):
+        __tablename__ = "media_060_edge1_hosts"
+        id: int = id_()
+        name: str = string(120)
+
+        def register_media_collections(self) -> None:
+            MediaCollection("images").with_conversions(
+                Conversion("thumb").fit("cover", 300, 300).generate_responsive_images()
+            ).register_on(self)
+
+    await _create_tables_060(engine)
+    from sqlalchemy import text
+
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS media_060_edge1_hosts "
+                "(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, "
+                "created_at DATETIME, updated_at DATETIME)"
+            )
+        )
+
+    host = await HostEdge1.create(name="edge1-host")
+
+    with Storage.fake():
+        media = await host.add_media(large_jpeg_bytes, file_name="photo.jpg").to_media_collection(
+            "images"
+        )
+        # Only "thumb" key should be present — no "medialibrary_original".
+        assert "thumb" in media.responsive_images
+        assert "medialibrary_original" not in media.responsive_images
+
+        # Calling process_one must not inject "medialibrary_original".
+        await process_one(media, host, None, None)
+
+    assert "medialibrary_original" not in media.responsive_images
+
+
+# ─── Edge case 2: Media.copy() copies responsive variant files ────────────────
+
+
+async def test_media_copy_rewrites_responsive_image_paths(
+    engine: AsyncEngine,
+    session: AsyncSession,
+    large_jpeg_bytes: bytes,
+) -> None:
+    """copy() must copy variant files and rewrite paths to the new media ID."""
+    from arvel.facades import Storage
+
+    await _create_tables_060(engine)
+    Host060 = _host_060()
+    host_a = await Host060.create(name="copy-src-host")
+    host_b = await Host060.create(name="copy-dst-host")
+
+    with Storage.fake() as fake_disk:
+        media = await (
+            host_a.add_media(large_jpeg_bytes, file_name="hero.jpg")
+            .with_responsive_images()
+            .to_media_collection("responsive_col")
+        )
+        assert media.responsive_images, "Fixture must generate responsive images"
+
+        copied = await media.copy(host_b, collection="responsive_col")
+
+    # Paths in the copy must reference the new media ID.
+    src_id = str(media.id)
+    new_id = str(copied.id)
+    assert src_id != new_id
+
+    copied_urls = copied.responsive_images.get("medialibrary_original", {}).get("urls", [])
+    assert copied_urls, "copy() must carry over responsive image URLs"
+    for url_info in copied_urls:
+        path: str = url_info["path"]
+        assert path.startswith(f"{new_id}/"), f"Path {path!r} must start with new media ID"
+        assert not path.startswith(f"{src_id}/"), f"Path {path!r} must not use source media ID"
+
+
+async def test_media_copy_without_responsive_images_is_unchanged(
+    engine: AsyncEngine,
+    session: AsyncSession,
+    large_jpeg_bytes: bytes,
+) -> None:
+    """copy() must work fine when there are no responsive images."""
+    from arvel.facades import Storage
+
+    await _create_tables_060(engine)
+    Host060 = _host_060()
+    host_a = await Host060.create(name="copy-noresp-src")
+    host_b = await Host060.create(name="copy-noresp-dst")
+
+    with Storage.fake():
+        media = await host_a.add_media(large_jpeg_bytes, file_name="photo.jpg").to_media_collection(
+            "plain"
+        )
+        assert not media.responsive_images
+
+        copied = await media.copy(host_b, collection="plain")
+
+    assert not copied.responsive_images

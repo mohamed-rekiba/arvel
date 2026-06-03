@@ -47,6 +47,7 @@ class _PILImage(Protocol):
     def resize(self, size: tuple[int, int], resample: int) -> _PILImage: ...
     def save(self, fp: Any, *args: Any, **kwargs: Any) -> None: ...
 
+
 _MIN_WIDTH = 20
 _MIN_FILE_SIZE = 10 * 1024  # 10 KB
 _TINY_SIZE = 32  # thumbnail edge length for the SVG placeholder
@@ -223,8 +224,62 @@ async def delete_responsive_images(
                 await disk.delete(path)
 
 
+async def _copy_variant(src_path: str, new_path: str, *, disk: Any) -> bool:
+    """Copy a single responsive variant file. Returns False on any error."""
+    try:
+        contents = await disk.get(src_path)
+        await disk.put(new_path, contents)
+    except Exception:  # noqa: BLE001
+        return False
+    else:
+        return True
+
+
+async def copy_responsive_images(
+    src_responsive: dict[str, Any],
+    new_media_id: int | str,
+    *,
+    disk: Any,
+) -> dict[str, Any]:
+    """Copy responsive variant files to a new media ID's path and return
+    the rewritten ``responsive_images`` dict for the new row.
+
+    Each ``path`` in ``src_responsive`` follows the format
+    ``{src_id}/responsive-images/{filename}``. We copy the bytes to
+    ``{new_media_id}/responsive-images/{filename}`` and rewrite paths in
+    the returned dict. Files that fail to copy are silently skipped —
+    the copy is best-effort so a missing variant doesn't abort the row copy.
+    """
+    new_id_str = str(new_media_id)
+    new_responsive: dict[str, Any] = {}
+
+    for group_key, entry in src_responsive.items():
+        src_urls: list[Any] = entry.get("urls", [])
+        new_urls: list[dict[str, Any]] = []
+
+        for url_info in src_urls:
+            src_path: str = url_info.get("path", "")
+            if not src_path:
+                continue
+            # Replace leading "{src_id}/" with "{new_id}/"
+            parts = src_path.split("/", 1)
+            if len(parts) != 2:  # noqa: PLR2004
+                continue
+            new_path = f"{new_id_str}/{parts[1]}"
+            if await _copy_variant(src_path, new_path, disk=disk):
+                new_urls.append({**url_info, "path": new_path})
+
+        new_responsive[group_key] = {
+            **{k: v for k, v in entry.items() if k != "urls"},
+            "urls": new_urls,
+        }
+
+    return new_responsive
+
+
 __all__ = [
     "calculate_responsive_widths",
+    "copy_responsive_images",
     "delete_responsive_images",
     "generate_placeholder_svg",
     "generate_responsive_images_for_media",

@@ -213,10 +213,11 @@ class Media(Model, Timestamps):
         return await super().delete()
 
     async def copy(self, target: HasMedia, collection: str = "default") -> Media:
-        """Copy this media to ``target`` host in ``collection``
+        """Copy this media to ``target`` host in ``collection``.
 
-        Uses ``target.host_pk()`` for model_id
-        Copies generated conversion files and carries generated_conversions
+        Uses ``target.host_pk()`` for model_id. Copies the original file,
+        generated conversion files, and responsive image variant files.
+        All file copies are best-effort — a missing file doesn't abort the row copy.
         """
         from arvel.facades.storage import Storage  # noqa: PLC0415
 
@@ -256,6 +257,17 @@ class Media(Model, Timestamps):
                         )
                     except OSError:
                         continue
+
+        # copy responsive image variant files and rewrite paths for the new ID.
+        src_responsive: dict[str, Any] = self.responsive_images or {}
+        if src_responsive:
+            from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
+                copy_responsive_images,
+            )
+
+            new_media.responsive_images = await copy_responsive_images(
+                src_responsive, new_media.id, disk=dst_disk
+            )
 
         await new_media.save()
         return new_media

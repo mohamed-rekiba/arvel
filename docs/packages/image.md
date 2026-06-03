@@ -45,7 +45,7 @@ Key methods: `fit(mode, width, height)`, `resize(width=, height=)`, `crop(x, y, 
 
 ## Public surface
 
-`Image`, `HasMedia` (`HasMediaMixin` alias), `Media`, `MediaCollection`, `FileAdder`, `FileInfo`, `Conversion`, `ConversionRunner`, `PathGenerator`, `DefaultPathGenerator`, `MediaLibrary`, `QueuedConversionJob`, `ImageServiceProvider`, `calculate_responsive_widths`, `generate_placeholder_svg`, `generate_responsive_images_for_media`, `get_conversion_runner`, `set_conversion_runner`, `get_path_generator`, `set_path_generator`, plus the `MediaError` hierarchy and `UnsupportedFormatError`.
+`Image`, `HasMedia` (`HasMediaMixin` alias), `Media`, `MediaCollection`, `FileAdder`, `FileInfo`, `Conversion`, `ConversionRunner`, `PathGenerator`, `DefaultPathGenerator`, `MediaLibrary`, `QueuedConversionJob`, `ImageServiceProvider`, `calculate_responsive_widths`, `copy_responsive_images`, `generate_placeholder_svg`, `generate_responsive_images_for_media`, `get_conversion_runner`, `set_conversion_runner`, `get_path_generator`, `set_path_generator`, plus the `MediaError` hierarchy and `UnsupportedFormatError`.
 
 - `Image` works without booting anything — pure Pillow wrapper.
 - `HasMedia` adds a polymorphic `media` relation (a plain `MorphMany`); hosts register collections via `register_media_collections()`.
@@ -136,6 +136,8 @@ await process_one(media, host, runner, gen)  # regenerate with overrides
 - **Storage**: `Media` uses `disk` + `conversions_disk` from storage config; responsive variants share the original's disk.
 - **Queue**: `QueuedConversionJob` runs on the `media` queue; `ConversionRunner` offloads Pillow work to a worker thread.
 - **Accessors**: Override the default path generator or runner in your own provider via `set_path_generator()` / `set_conversion_runner()`.
+- **Copy**: `media.copy(target, collection)` copies the original file, all conversion derivatives, and all responsive variant files to the new media ID's path. The `responsive_images` column is rewritten to point to the new paths. Files that fail to copy are silently skipped — the row copy completes regardless.
+- **Regeneration guard**: `process_one()` only regenerates the `"medialibrary_original"` responsive group if it was previously present. Conversion-level groups (e.g. `"thumb"`) are regenerated inside the conversion loop where the conversion output bytes are available.
 
 ## MIME detection and security
 

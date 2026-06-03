@@ -59,7 +59,9 @@ class QueuedConversionJob(Job):
         gen = resolve_path_generator()
         await _process_one(media, host, runner, gen)
 
-        if self.generate_responsive_images and not media.responsive_images:
+        if self.generate_responsive_images and "medialibrary_original" not in (
+            media.responsive_images or {}
+        ):
             await _generate_responsive_for_job(media, gen)
 
 
