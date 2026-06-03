@@ -8,7 +8,7 @@ In many modern web applications, WebSockets are used to implement real-time, liv
 <a name="configuration"></a>
 ## Configuration
 
-Broadcasting is configured through `BroadcastConfig` (the `BROADCASTING_*` environment variables):
+Broadcasting reads `config/broadcasting.py` when present; the `BROADCASTING_*` environment variables are the fallback for any key the file doesn't set (see [the cascade](../core-concepts/configuration.md#the-cascade)):
 
 ```ini
 BROADCASTING_DEFAULT=redis-pubsub

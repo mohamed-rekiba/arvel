@@ -55,6 +55,12 @@ The HMAC key is derived from `APP_KEY` using HKDF-SHA256 (info `b"arvel-storage-
 5. **Expiry in plaintext**: the expiry is in the URL (not inside the HMAC input — it IS part of the
    HMAC message). An attacker cannot extend expiry without invalidating the token.
 
+> **Amendment (WI-arvel-003).** This route is one of two local-serving modes. The other is a
+> static `StaticFiles` mount at `/storage` serving the `public/storage` symlink created by
+> `storage:link` (see ADR-137). The route here (at `STORAGE_LOCAL_URL`) streams through the app and
+> supports signed temp URLs; the static mount bypasses the app for plain public assets. They
+> coexist on distinct paths unless `STORAGE_LOCAL_URL` is also `/storage`.
+
 ## Consequences
 
 - `temporary_url()` requires `APP_KEY`. The serve route's *public* path does not — public files

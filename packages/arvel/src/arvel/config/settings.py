@@ -6,8 +6,9 @@ import re
 from typing import Any, ClassVar, Self
 
 from pydantic import AliasChoices, ValidationError
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
+from arvel.config._config_file_source import ConfigFileSettingsSource
 from arvel.config.errors import ConfigError
 from arvel.config.no_prefix import NoPrefix
 
@@ -50,6 +51,28 @@ class ArvelSettings(BaseSettings):
         case_sensitive=False,
         secrets_dir=None,
     )
+
+    # Dotted path into the config-module registry. Set on subclasses that should
+    # resolve from config/*.py. A "{default}" token selects a named entry.
+    __config_path__: ClassVar[str | None] = None
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # Precedence: explicit kwargs > config/*.py > env > .env > secrets > defaults.
+        return (
+            init_settings,
+            ConfigFileSettingsSource(settings_cls),
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+        )
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)

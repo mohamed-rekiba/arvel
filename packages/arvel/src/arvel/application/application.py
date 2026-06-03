@@ -358,6 +358,7 @@ class Application:
         router = self.container.make(Router)
         router.register_with_app(fa)
         self._add_health_route(fa)
+        self._maybe_mount_public_storage(fa)
         self._maybe_add_maintenance_middleware(fa)
         # add_middleware prepends, so the LAST call is the OUTERMOST layer.
         # Desired outer→inner: Observability → Context → DeferredTask → ArvelScope.
@@ -396,6 +397,26 @@ class Application:
             ObservabilityMiddleware,
             service=config.service_name,
             log_requests=not config.log_uvicorn_access,
+        )
+
+    def _maybe_mount_public_storage(self, fa: FastAPI) -> None:
+        """Serve the `storage:link` symlink (public/storage) at /storage.
+
+        Mounted only when the link exists at boot — run `storage:link` then
+        (re)start the server. Until then the path 404s through the framework.
+        Scoped to public/storage, never the public/ parent, so the ASGI
+        entrypoint (public/asgi.py) can't be served as source. See ADR-137.
+        """
+        from starlette.staticfiles import StaticFiles
+
+        storage_dir = self.base_path() / "public" / "storage"
+        # .exists() follows the symlink, so a dangling link is treated as absent.
+        if not storage_dir.exists():
+            return
+        fa.mount(
+            "/storage",
+            StaticFiles(directory=storage_dir),
+            name="storage.public",
         )
 
     def _maybe_add_maintenance_middleware(self, fa: FastAPI) -> None:

@@ -33,6 +33,7 @@ class BroadcastConfig(ArvelSettings):
         env_prefix="BROADCASTING_",
         extra="forbid",
     )
+    __config_path__ = "broadcasting"
 
     default: BroadcastDriver = BroadcastDriver.NULL
     auth_endpoint: str = "/broadcasting/auth"

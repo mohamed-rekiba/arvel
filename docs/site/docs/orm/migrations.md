@@ -219,7 +219,7 @@ Async introspection helpers — `has_table`, `has_column`, `get_columns`, `has_v
 <a name="database-connections"></a>
 ## Database Connections
 
-Connections are configured through `DbConfig` (the `DB_*` environment variables). Set `DB_CONNECTION` to choose a driver:
+Connections read `config/database.py` — `default` picks the active connection and `connections` maps each named connection to its settings. The `DB_*` environment variables are the fallback when a key isn't in the file (see [the cascade](../core-concepts/configuration.md#the-cascade)). Set `DB_CONNECTION` to choose a driver:
 
 | `DB_CONNECTION` | Driver |
 |---|---|
@@ -240,7 +240,7 @@ DB_PASSWORD=secret
 Alternatively set a full `DB_URL`, which wins over the composed fields. The `DatabaseServiceProvider` binds the engine, session maker, and session into the [container](../core-concepts/service-container.md), and pings the database on boot.
 
 > [!NOTE]
-> The database is only wired up when a connection is configured (`DB_URL` or `DB_CONNECTION` set). The `DatabaseServiceProvider` is opt-in — add it to `bootstrap/providers.py`. See [Service Providers](../core-concepts/service-providers.md#opt-in-providers).
+> The database is only wired up when a connection is configured — `DB_URL`/`DB_CONNECTION` set, or a `config/database.py` that supplies a connection. The `DatabaseServiceProvider` is opt-in — add it to `bootstrap/providers.py`. See [Service Providers](../core-concepts/service-providers.md#opt-in-providers).
 
 <a name="seeding"></a>
 ## Seeding

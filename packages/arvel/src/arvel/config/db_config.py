@@ -52,6 +52,7 @@ class DbConfig(ArvelSettings):
     """
 
     model_config = SettingsConfigDict(env_prefix="DB_", extra="ignore")
+    __config_path__ = "database.connections.{default}"
 
     # Full URL override — reads DB_URL.
     url: str | None = None

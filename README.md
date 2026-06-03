@@ -67,13 +67,6 @@ Python 3.14+
 ## Installation
 
 ```bash
-# Recommended — bootstraps uv if needed, installs the arvel binary globally
-curl -fsSL https://arvel.dev/install.sh | bash
-```
-
-Or from PyPI:
-
-```bash
 uv tool install arvel
 # or: pipx install arvel
 ```

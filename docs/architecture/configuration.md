@@ -1,13 +1,45 @@
 # Configuration
 
-Arvel has **two** configuration systems that coexist. Knowing which is which avoids a lot of confusion when reading provider code.
+Arvel has **two** configuration systems. They used to be independent; now the
+module-based one feeds the class-based one (see [The cascade](#the-cascade) below).
 
-**Source**: `packages/arvel/src/arvel/config/` — `settings.py`, `registry.py`, `repository.py`, `no_prefix.py`, `_lookup_registry.py`, `errors.py`.
+**Source**: `packages/arvel/src/arvel/config/` — `settings.py`, `registry.py`, `repository.py`, `no_prefix.py`, `_lookup_registry.py`, `_config_file_source.py`, `errors.py`.
 
 | System | API | Backed by | Use for |
 |---|---|---|---|
-| **Class-based (typed)** | `ArvelSettings`, `@register`, `Config.of(Cls)` | container singletons | strongly-typed config sections read from env |
+| **Class-based (typed)** | `ArvelSettings`, `@register`, `Config.of(Cls)` | container singletons | strongly-typed config sections |
 | **Module-based (Laravel-style)** | `config("app.timezone")`, `lookup("db.DEFAULT")` | `_REGISTRY` dict of loaded `config/*.py` | dotted-key lookups into config modules |
+
+<a name="the-cascade"></a>
+## The cascade: config files override env
+
+A typed settings class that sets `__config_path__` resolves its values in this order — highest wins, merged **per field**:
+
+```
+explicit kwargs  >  config/*.py value  >  environment variable  >  field default
+```
+
+So:
+
+- A `config/*.py` that defines a key → that value is used.
+- A `config/*.py` that's absent (file or key) → env var, then field default.
+- A `config/*.py` that's present-but-partial → defined keys win; missing keys fall to env, then default.
+
+Config files stay self-describing — they keep `env("KEY", default)` calls — so for any key a file defines, the value is already env-resolved at load time. The field default only matters when a file or key is absent.
+
+`__config_path__` is a dotted path into the module registry. A `{default}` token selects a named entry — the file's `default` picks which `connections`/`stores`/`disks` entry maps onto the class (Laravel semantics). The active name is also surfaced on a `connection` field when the class has one.
+
+| Class | `__config_path__` | Reads |
+|---|---|---|
+| `StorageConfig` | `filesystems` | `default` |
+| `S3Config` / `LocalConfig` / … | `filesystems.disks.s3` / `.local` / … | that disk's keys |
+| `DbConfig` | `database.connections.{default}` | the active connection's keys |
+| `CacheConfig` | `cache.stores.{default}` | the active store's keys |
+| `QueueConfig` | `queue` | `default` → `connection` |
+| `SessionConfig` | `session` | flat keys |
+| `BroadcastConfig` | `broadcasting` | `default`, `auth_endpoint` |
+
+The mechanism is a pydantic-settings source (`ConfigFileSettingsSource`) inserted above the env source by `ArvelSettings.settings_customise_sources`. It returns only keys that match the model's fields; everything else falls through to env. A class without `__config_path__` is unaffected.
 
 ```mermaid
 flowchart TB
@@ -153,7 +185,9 @@ lookup("app.timezone")              # -> value, or raises ConfigKeyError
 
 `with_config_dir` uses `{base_path}/bootstrap/cache/config.json`. On boot it resets the registry; if the cache exists and loads cleanly it skips importing `config/*.py`. The `config:cache` and `optimize` CLI commands write the cache via `dump_config_cache`; cached entries deserialize into `SimpleNamespace` objects.
 
-Only the **module-based** registry is cached. Class-based `ArvelSettings` are resolved live from env on each `container.make()`.
+Only the **module-based** registry is cached. Class-based `ArvelSettings` are resolved live (config file → env → default) on each `container.make()`.
+
+`dump_config_cache` strips secret-named keys (`password`, `secret`, `token`, `credential`, `private`, bare `key`) before writing, so credentials never land in `bootstrap/cache/config.json`. Stripped keys fall back to env at load time — keep secrets in discrete keys, not embedded in connection strings, if you cache config.
 
 > **Note**: `.gitignore` lists `.config_cache`, but no code under `config/` references it — the active cache file is `bootstrap/cache/config.json`. The `.config_cache` entry looks stale.
 

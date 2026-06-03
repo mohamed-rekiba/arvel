@@ -11,7 +11,7 @@ Some data retrieval or processing tasks are CPU-intensive or take several second
 <a name="configuration"></a>
 ## Configuration
 
-Cache is configured through `CacheConfig` (the `CACHE_*` environment variables). The driver is chosen by `CACHE_CONNECTION` (there is no `CACHE_STORE`); when unset, the cache defaults to the in-memory `array` driver.
+Cache reads `config/cache.py` — `default` picks the active store and `stores` maps each named store to its settings. The `CACHE_*` environment variables are the fallback when a key isn't in the file (see [the cascade](../core-concepts/configuration.md#the-cascade)). The driver is chosen by `CACHE_CONNECTION` (there is no `CACHE_STORE`); when unset, the cache defaults to the in-memory `array` driver.
 
 ```ini
 CACHE_CONNECTION=redis

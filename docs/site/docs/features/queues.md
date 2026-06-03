@@ -8,7 +8,7 @@ While building your application, some tasks — parsing an uploaded file, sendin
 <a name="configuration"></a>
 ## Configuration
 
-Queues are configured through `QueueConfig` (the `QUEUE_*` environment variables):
+Queues read `config/queue.py` — `default` picks the active connection. The `QUEUE_*` environment variables are the fallback when a key isn't in the file (see [the cascade](../core-concepts/configuration.md#the-cascade)):
 
 ```ini
 QUEUE_CONNECTION=database

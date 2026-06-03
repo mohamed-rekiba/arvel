@@ -59,7 +59,7 @@ env("API_KEY", required=True)      # str, or LookupError if unset
 <a name="two-configuration-systems"></a>
 ## Two Configuration Systems
 
-Arvel exposes configuration two ways. They overlap on the underlying env vars but use different runtime APIs:
+Arvel exposes configuration two ways. They use different runtime APIs, but they're connected: a typed settings class can pull its values straight from your `config/*.py` files (see [the cascade](#the-cascade)).
 
 | System | API | Use it for |
 |---|---|---|
@@ -147,6 +147,25 @@ Application.configure(base_path).with_config_files([BillingConfig]).create()
 
 Each settings class derives an environment-variable prefix from its name: the trailing `Settings`/`Config` is stripped, the rest is upper-snake-cased, and a trailing underscore is added. So `BillingConfig` reads `BILLING_*` (e.g. `BILLING_STRIPE_KEY`), `DbConfig` reads `DB_*`, and `AppSettings` reads `APP_*`. Override the prefix by setting `model_config = SettingsConfigDict(env_prefix="CUSTOM_")` on the subclass. To read a bare, unprefixed variable, annotate the field with `NoPrefix`.
 
+<a name="the-cascade"></a>
+### Where Values Come From (the cascade)
+
+A settings class resolves each field from the first source that has it:
+
+```
+explicit kwargs  >  config/*.py  >  environment variable  >  field default
+```
+
+The framework's built-in sections opt into their config file by pointing at a path in the file registry — `DbConfig` reads `database.connections.{default}`, `CacheConfig` reads `cache.stores.{default}`, `StorageConfig` reads `filesystems`, and so on. The `{default}` token uses the file's `default` to pick the active named entry (the same `connections`/`stores`/`disks` shape Laravel uses).
+
+So the three cases you'd expect all hold, merged per field:
+
+- A `config/*.py` that sets a key → that value wins.
+- No config file (or the key is missing) → the env var, then the field default.
+- A partial config file → its keys win; the rest fall to env, then default.
+
+Config files stay self-describing because they keep their own `env("KEY", default)` calls — by the time a typed class reads them, the values are already env-resolved. A class that doesn't declare a config path just reads env → default as before.
+
 <a name="reading-settings"></a>
 ### Reading Settings
 
@@ -191,5 +210,7 @@ arvel config:clear      # remove the cache and reset the in-memory registry
 arvel config:show app.name   # print a single resolved value
 ```
 
-> [!NOTE]
-> Caching applies only to the `config/*.py` file registry. Typed `ArvelSettings` always read from the environment when instantiated, so they're unaffected by the config cache. Remember to re-run `config:cache` after changing a config file.
+The cache stores the `config/*.py` file registry. Typed `ArvelSettings` read that registry too (it's the top of [the cascade](#the-cascade)), so a cached config still drives them — just remember to re-run `config:cache` after changing a config file.
+
+> [!WARNING]
+> `config:cache` strips secret-named keys (`password`, `secret`, `token`, `credential`, `private`, and a bare `key`) before writing, so credentials never land in `bootstrap/cache/config.json`. Those keys fall back to the environment at load time. Keep secrets in discrete keys rather than embedded in connection strings — a URL like `postgres://user:pass@host` is not redacted.

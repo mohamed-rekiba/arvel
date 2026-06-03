@@ -98,6 +98,48 @@ class TestConfigCacheRoundTrip:
         assert load_from_cache(bad) is False
 
 
+class TestSecretRedaction:
+    """dump_config_cache must never persist credentials to disk."""
+
+    def test_secret_keys_are_stripped(self, tmp_path: Path) -> None:
+        reset()
+        register(
+            "database",
+            types.SimpleNamespace(
+                default="postgresql",
+                connections={
+                    "postgresql": {
+                        "host": "db.internal",
+                        "password": "super-secret",
+                        "username": "app",
+                    }
+                },
+            ),
+        )
+        register(
+            "filesystems",
+            types.SimpleNamespace(
+                disks={"s3": {"bucket": "media", "key": "AKIA...", "secret": "shhh"}}
+            ),
+        )
+
+        dest = tmp_path / "config.json"
+        dump_config_cache(dest)
+        raw = dest.read_text()
+        data = json.loads(raw)
+
+        pg = data["database"]["connections"]["postgresql"]
+        assert pg["host"] == "db.internal"
+        assert "password" not in pg
+        s3 = data["filesystems"]["disks"]["s3"]
+        assert s3["bucket"] == "media"
+        assert "key" not in s3
+        assert "secret" not in s3
+        # Belt and suspenders: the literal secret values never hit the file.
+        assert "super-secret" not in raw
+        assert "shhh" not in raw
+
+
 # ---------------------------------------------------------------------------
 # ApplicationBuilder cache integration
 # ---------------------------------------------------------------------------

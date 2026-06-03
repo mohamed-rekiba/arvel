@@ -14,7 +14,7 @@ import contextlib
 import json
 import types
 from pathlib import Path
-from typing import Any, TypeVar, overload
+from typing import Any, TypeVar, cast, overload
 
 T = TypeVar("T")
 
@@ -156,6 +156,35 @@ def to_jsonable(value: Any) -> Any:
     raise TypeError(f"Cannot serialize {type(value).__name__!r}")
 
 
+_SECRET_HINTS = ("password", "passwd", "secret", "token", "credential", "private")
+
+
+def _is_secret_key(name: str) -> bool:
+    """True for config keys that hold credentials and must not land in the cache."""
+    lower = name.lower()
+    return lower == "key" or any(hint in lower for hint in _SECRET_HINTS)
+
+
+def _strip_secrets(value: object) -> object:
+    """Recursively drop secret-keyed entries so they never persist to disk.
+
+    Stripped keys fall back to env at load time — secrets belong in the
+    environment, not in bootstrap/cache/config.json. URL-embedded credentials
+    (e.g. ``postgres://user:pass@host``) are NOT detected here; keep secrets in
+    discrete keys, not inside connection strings, if you cache config.
+    """
+    if isinstance(value, dict):
+        out: dict[str, object] = {}
+        for k, v in cast("dict[object, object]", value).items():
+            key = str(k)
+            if not _is_secret_key(key):
+                out[key] = _strip_secrets(v)
+        return out
+    if isinstance(value, list):
+        return [_strip_secrets(item) for item in cast("list[object]", value)]
+    return value
+
+
 def _module_to_dict(module: object) -> dict[str, Any]:
     """Return a JSON-serializable snapshot of a module's public attributes."""
     source: dict[str, Any] = {}
@@ -176,8 +205,8 @@ def dump_config_cache(dest: Path) -> int:
     Creates parent directories as needed. Skips modules with no
     JSON-serializable attributes silently.
     """
-    payload: dict[str, dict[str, Any]] = {
-        stem: _module_to_dict(module) for stem, module in _REGISTRY.items()
+    payload: dict[str, object] = {
+        stem: _strip_secrets(_module_to_dict(module)) for stem, module in _REGISTRY.items()
     }
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(payload, indent=2, sort_keys=True))

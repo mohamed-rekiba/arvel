@@ -163,8 +163,11 @@ Every `make:*` command takes a class `name` and supports `--force` to overwrite.
 
 | Command | Description | Options |
 |---|---|---|
-| `storage:link` | Symlink `public/storage` → `storage/app/public` | `--relative` |
+| `storage:link` | Symlink `public/storage` → `storage/app/public`; the framework then serves it at `/storage` | `--relative` |
 | `storage:unlink` | Remove the symlink (idempotent) | — |
+
+After `storage:link`, restart the app: it mounts `public/storage` as static files at `/storage`,
+so linked files are retrievable with no reverse proxy. See [Storage → Serving Local Files](../features/storage.md#serving-local-files).
 
 <a name="auth"></a>
 ## `auth:` Authentication
