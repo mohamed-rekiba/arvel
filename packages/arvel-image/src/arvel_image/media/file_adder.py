@@ -21,7 +21,7 @@ from arvel.facades.bus import Bus
 from arvel.facades.storage import Storage
 
 from arvel_image.media.collection import FileInfo, MediaCollection
-from arvel_image.media.conversion_runner import ConversionRunner
+from arvel_image.media.conversion_runner import get_conversion_runner
 from arvel_image.media.exceptions import (
     FileTooLargeError,
     InvalidMimeTypeError,
@@ -49,6 +49,25 @@ def resolve_path_generator() -> PathGenerator:
     return get_path_generator()
 
 
+def _sniff_image_mime(contents: bytes) -> str | None:
+    """Return the real image MIME from magic bytes, or None for non-images.
+
+    Reads only the header — Pillow decodes lazily on ``open``.
+    """
+    from io import BytesIO  # noqa: PLC0415
+
+    from PIL import Image as PILImage  # noqa: PLC0415
+
+    try:
+        with PILImage.open(BytesIO(contents)) as img:
+            fmt = img.format
+    except Exception:  # noqa: BLE001
+        return None
+    if fmt is None:
+        return None
+    return PILImage.MIME.get(fmt)
+
+
 class FileAdder:
     """Builder bound to a host model. ``await .to_media_collection(name)``
     persists, runs conversions, and returns the new :class:`Media` row.
@@ -65,12 +84,14 @@ class FileAdder:
         self._contents = bytes(contents)
         self._file_name = self.sanitize_file_name(file_name)
         self._name = PurePosixPath(self._file_name).stem
-        self._mime: str = self._detect_mime(self._file_name)
+        self._mime: str = self._detect_mime(self._file_name, self._contents)
         self._custom_props: dict[str, Any] = {}
         self._disk_override: str | None = None
         self._file_name_override: str | None = None
         self._sanitize_callback: Callable[[str], str] | None = None
         self._queue_conversions: bool = False
+        # None = inherit from collection; True = force on; False = force off
+        self._generate_responsive: bool | None = None
 
     # ─── public chain ──────────────────────────────────────────────────────
 
@@ -82,6 +103,20 @@ class FileAdder:
         pipelines that would otherwise block the upload request.
         """
         self._queue_conversions = True
+        return self
+
+    def with_responsive_images(self) -> Self:
+        """Generate responsive width variants (srcset) for this upload.
+
+        Alternatively enable for all adds to a collection via
+        ``MediaCollection.generate_responsive_images()``.
+        """
+        self._generate_responsive = True
+        return self
+
+    def without_responsive_images(self) -> Self:
+        """Opt-out of responsive image generation even when the collection enables it."""
+        self._generate_responsive = False
         return self
 
     def use_name(self, name: str) -> Self:
@@ -139,7 +174,7 @@ class FileAdder:
         )
         self._file_name = effective_file_name
         self._name = PurePosixPath(effective_file_name).stem
-        self._mime = self._detect_mime(effective_file_name)
+        self._mime = self._detect_mime(effective_file_name, self._contents)
 
         self._validate(coll, collection)
 
@@ -182,6 +217,12 @@ class FileAdder:
         gen: PathGenerator = resolve_path_generator()
         storage_disk = Storage.disk(disk_target)
 
+        # Explicit opt-in/opt-out takes precedence; collection flag is the default.
+        if self._generate_responsive is None:
+            should_generate_responsive = coll.responsive_images_enabled
+        else:
+            should_generate_responsive = self._generate_responsive
+
         try:
             await storage_disk.put(gen.path_for(media), self._contents)
 
@@ -190,6 +231,9 @@ class FileAdder:
                     await self._dispatch_conversion_job(media)
                 else:
                     await self._run_conversions(media, coll, storage_disk, gen)
+
+            if should_generate_responsive:
+                await self._run_responsive_images(media, storage_disk)
 
             await media.save()
 
@@ -263,7 +307,7 @@ class FileAdder:
         disk: Any,
         gen: PathGenerator,
     ) -> None:
-        runner = ConversionRunner()
+        runner = get_conversion_runner()
         generated: dict[str, Any] = dict(media.generated_conversions or {})
 
         # Conversion derivatives go to conversions_disk when set
@@ -275,13 +319,36 @@ class FileAdder:
         else:
             cdisk = disk
 
+        manips: dict[str, Any] = media.manipulations or {}
+        global_overrides: dict[str, Any] = dict(manips.get("*", {}))
+
         for conversion in coll.conversions:
             if not conversion.accepts(self._mime):
                 continue
-            output = await runner.run(source=self._contents, conversion=conversion)
+            conv_overrides: dict[str, Any] = {
+                **global_overrides,
+                **dict(manips.get(conversion.name, {})),
+            }
+            effective = (
+                conversion.with_manipulations(conv_overrides) if conv_overrides else conversion
+            )
+            output = await runner.run(source=self._contents, conversion=effective)
             await cdisk.put(gen.path_for_conversion(media, conversion.name), output)
             generated[conversion.name] = True
         media.generated_conversions = generated
+
+    async def _run_responsive_images(self, media: Media, disk: Any) -> None:
+        from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
+            generate_responsive_images_for_media,
+        )
+
+        entry = await generate_responsive_images_for_media(
+            media, self._contents, "medialibrary_original", disk=disk
+        )
+        if entry:
+            existing = dict(media.responsive_images or {})
+            existing["medialibrary_original"] = entry
+            media.responsive_images = existing
 
     # ─── keep_latest pruning ───────────────────────────────────────────────
 
@@ -309,8 +376,17 @@ class FileAdder:
         return cleaned
 
     @staticmethod
-    def _detect_mime(file_name: str) -> str:
-        """Best-effort mime-type detection from the filename suffix."""
+    def _detect_mime(file_name: str, contents: bytes) -> str:
+        """Detect MIME from file content, falling back to the filename suffix.
+
+        Content wins because the extension is attacker-controlled — a renamed
+        ``evil.bin`` must not pass an image-only ``accept_mime_types`` gate.
+        Pillow decodes the header to identify the real image format; non-image
+        bytes fall back to the extension guess (stdlib ``mimetypes``).
+        """
+        sniffed = _sniff_image_mime(contents)
+        if sniffed is not None:
+            return sniffed
         guessed, _ = mimetypes.guess_type(file_name)
         return guessed or "application/octet-stream"
 

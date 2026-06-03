@@ -18,6 +18,11 @@ from typing import TYPE_CHECKING, Any, Self
 if TYPE_CHECKING:
     from arvel_image.image import Image
 
+# Supported manipulation keys and the Conversion methods they map to.
+# Applied by with_manipulations() in the order below so geometry comes
+# before quality/format (matching Spatie's apply order).
+_MANIP_ORDER = ("fit", "resize", "quality", "format")
+
 # Each recorded op is a (method_name, args). Args are either positional
 # (tuple) or keyword (dict) — we keep both forms because ``Image.fit`` is
 # positional while ``Image.resize`` / ``Image.crop`` are keyword-only.
@@ -64,6 +69,33 @@ class Conversion:
         return self
 
     # ─── execution ─────────────────────────────────────────────────────────
+
+    def with_manipulations(self, overrides: dict[str, Any]) -> Conversion:
+        """Return a shallow copy of this conversion with ``overrides`` appended.
+
+        Supported keys: ``fit`` (mode string), ``width`` (int), ``height`` (int),
+        ``quality`` (int), ``format`` (str). Geometry ops are applied before
+        quality/format so they compose predictably.
+
+        The original conversion is never mutated — safe to call in a loop.
+        """
+        if not overrides:
+            return self
+        patched = Conversion(self.name)
+        patched._ops = list(self._ops)
+        patched._target_format = self._target_format
+        w = overrides.get("width")
+        h = overrides.get("height")
+        fit_mode = overrides.get("fit")
+        if fit_mode and w and h:
+            patched.fit(str(fit_mode), int(w), int(h))
+        elif w and h:
+            patched.resize(width=int(w), height=int(h))
+        if "quality" in overrides:
+            patched.quality(int(overrides["quality"]))
+        if "format" in overrides:
+            patched.format(str(overrides["format"]))
+        return patched
 
     def accepts(self, mime_type: str | None) -> bool:
         """Default mime filter: only ``image/*``. Override for richer rules."""

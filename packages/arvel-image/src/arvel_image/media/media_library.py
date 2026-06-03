@@ -43,7 +43,7 @@ class MediaLibrary:
 
          Returns the count of rows processed.
         """
-        from arvel_image.media.conversion_runner import ConversionRunner  # noqa: PLC0415
+        from arvel_image.media.conversion_runner import get_conversion_runner  # noqa: PLC0415
         from arvel_image.media.model import Media  # noqa: PLC0415
 
         query = Media.query()
@@ -55,7 +55,7 @@ class MediaLibrary:
 
         rows: list[Media] = list(await query.all())
 
-        runner = ConversionRunner()
+        runner = get_conversion_runner()
         gen = resolve_path_generator()
         processed = 0
         for media in rows:
@@ -107,14 +107,41 @@ async def process_one(
     else:
         write_disk = read_disk
 
+    manips: dict[str, Any] = media.manipulations or {}
+    global_overrides: dict[str, Any] = dict(manips.get("*", {}))
+
     generated: dict[str, Any] = {}
     for conv in coll.conversions:
         if not conv.accepts(media.mime_type):
             continue
-        output = await runner.run(source=contents, conversion=conv)
+        conv_overrides: dict[str, Any] = {
+            **global_overrides,
+            **dict(manips.get(conv.name, {})),
+        }
+        effective = conv.with_manipulations(conv_overrides) if conv_overrides else conv
+        output = await runner.run(source=contents, conversion=effective)
         await write_disk.put(gen.path_for_conversion(media, conv.name), output)
         generated[conv.name] = True
 
     if generated:
         media.generated_conversions = {**(media.generated_conversions or {}), **generated}
-        await media.save()
+
+    await _maybe_regenerate_responsive(media, contents, read_disk)
+    await media.save()
+
+
+async def _maybe_regenerate_responsive(media: Media, contents: bytes, disk: Any) -> None:
+    """Re-generate responsive variants when the media already has them."""
+    if not media.responsive_images:
+        return
+    from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
+        generate_responsive_images_for_media,
+    )
+
+    entry = await generate_responsive_images_for_media(
+        media, contents, "medialibrary_original", disk=disk
+    )
+    if entry:
+        existing = dict(media.responsive_images)
+        existing["medialibrary_original"] = entry
+        media.responsive_images = existing

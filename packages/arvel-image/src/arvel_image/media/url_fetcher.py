@@ -64,19 +64,42 @@ async def fetch_url(url: str, max_bytes: int) -> tuple[bytes, str]:
     host = parsed.hostname or ""
     _reject_private_ip(host)
 
-    async with httpx.AsyncClient(follow_redirects=False, timeout=30) as client:
-        response = await client.get(url)
-        # Redirects are intentionally not followed — a redirect to a private
-        # address would bypass the SSRF guard above. Callers must supply the
-        # final URL.
+    # Stream the body and abort as soon as we cross max_bytes, so a hostile
+    # server can't exhaust memory by sending gigabytes before we'd ever check.
+    # Redirects are intentionally not followed — a redirect to a private
+    # address would bypass the SSRF guard above. Callers must supply the
+    # final URL.
+    async with (
+        httpx.AsyncClient(follow_redirects=False, timeout=30) as client,
+        client.stream("GET", url) as response,
+    ):
         response.raise_for_status()
-        content = response.content
+        _reject_oversize_header(url, response.headers.get("content-length"), max_bytes)
 
-    if len(content) > max_bytes:
-        msg = f"Download from {url!r} exceeds max_bytes={max_bytes}"
-        raise MediaError(msg)
+        chunks: list[bytes] = []
+        total = 0
+        async for chunk in response.aiter_bytes():
+            total += len(chunk)
+            if total > max_bytes:
+                msg = f"Download from {url!r} exceeds max_bytes={max_bytes}"
+                raise MediaError(msg)
+            chunks.append(chunk)
+        content = b"".join(chunks)
 
     # Derive file_name from the URL path; fall back to "download".
     path_part = parsed.path.rstrip("/")
     derived = path_part.split("/")[-1] if path_part else "download"
     return content, derived or "download"
+
+
+def _reject_oversize_header(url: str, content_length: str | None, max_bytes: int) -> None:
+    """Fail fast when the advertised Content-Length already exceeds the cap."""
+    if content_length is None:
+        return
+    try:
+        declared = int(content_length)
+    except ValueError:
+        return
+    if declared > max_bytes:
+        msg = f"Download from {url!r} exceeds max_bytes={max_bytes}"
+        raise MediaError(msg)
