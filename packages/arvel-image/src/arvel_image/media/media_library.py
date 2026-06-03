@@ -53,7 +53,6 @@ class MediaLibrary:
 
          Returns the count of rows processed.
         """
-        from arvel_image.media.conversion_runner import get_conversion_runner  # noqa: PLC0415
         from arvel_image.media.model import Media  # noqa: PLC0415
 
         query = Media.query()
@@ -65,11 +64,9 @@ class MediaLibrary:
 
         rows: list[Media] = list(await query.all())
 
-        runner = get_conversion_runner()
-        gen = resolve_path_generator()
         processed = 0
         for media in rows:
-            await process_one(media, host, runner, gen)
+            await process_one(media, host)
             processed += 1
         return processed
 
@@ -77,11 +74,22 @@ class MediaLibrary:
 async def process_one(
     media: Media,
     host: HasMedia | None,
-    runner: ConversionRunner,
-    gen: PathGenerator,
+    runner: ConversionRunner | None = None,
+    gen: PathGenerator | None = None,
 ) -> None:
-    """Re-run conversions for a single media row. Skips quietly on errors."""
+    """Re-run conversions for a single media row. Skips quietly on errors.
+
+    ``runner`` and ``gen`` default to the active module-level singletons when
+    not supplied — callers don't need to look them up themselves.
+    """
     from arvel.facades.storage import Storage  # noqa: PLC0415
+
+    from arvel_image.media.conversion_runner import (  # noqa: PLC0415
+        get_conversion_runner,
+    )
+
+    effective_runner = runner if runner is not None else get_conversion_runner()
+    effective_gen = gen if gen is not None else resolve_path_generator()
 
     if not media.mime_type:
         return
@@ -92,7 +100,7 @@ async def process_one(
     read_disk = Storage.disk(read_disk_target)
 
     try:
-        contents = await read_disk.get(gen.path_for(media))
+        contents = await read_disk.get(effective_gen.path_for(media))
     except Exception:  # noqa: BLE001
         return
 
@@ -117,7 +125,7 @@ async def process_one(
     else:
         write_disk = read_disk
 
-    ctx = _ConvCtx(disk=write_disk, gen=gen, runner=runner)
+    ctx = _ConvCtx(disk=write_disk, gen=effective_gen, runner=effective_runner)
     generated, responsive_updates = await _run_conversion_loop(media, coll, contents, ctx)
 
     if generated:
