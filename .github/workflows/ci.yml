@@ -28,6 +28,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
       - name: ruff check (workspace)
         run: uv run ruff check
@@ -44,6 +45,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
       - name: mypy --strict
         run: uv run mypy
@@ -64,6 +66,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ matrix.python-version }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-packages --all-extras --frozen
       - name: pytest with coverage (fail-under = 90)
         run: >-
@@ -90,6 +93,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
       - name: Run smoke benchmark
         run: uv run python benchmarks/bench_foundations.py
@@ -107,6 +111,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-packages --all-extras --frozen
       - name: Pre-pull emulator images (parallel)
         run: make pull-emulators
@@ -123,6 +128,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-packages --all-extras --frozen
       - name: Run reverb benchmarks
         # Hard gate per ADR-112 (WI-017). Thresholds in bench_reverb.py are
@@ -148,6 +154,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-packages --all-extras --frozen
       - name: Run tracemalloc bench
         # WI-017 / FR-017-011. Companion to bench-reverb; same script,
@@ -172,6 +179,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
       - name: bandit (MEDIUM+ blocks; LOW allowlisted with rationale)
         # FR-017-013 / SEC-017-001. LOW findings are allowed via inline
@@ -206,6 +214,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-packages --all-extras --frozen
       - name: pip-audit
         # FR-017-014 / SEC-017-002. --skip-editable skips our own workspace
@@ -229,6 +238,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
       - name: Check contributor-docs links
         run: uv run python scripts/check_doc_links.py
@@ -252,6 +262,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-packages --all-extras --frozen
       - name: Run ecommerce-kit integration suite
         working-directory: kits/arvel-ecommerce-kit/backend
@@ -298,6 +309,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - name: Build arvel
         run: uv build --package arvel --out-dir dist/arvel
       - name: Upload distributions
