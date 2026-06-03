@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from arvel.support.env import env
 
-default: str = env("STORAGE_DEFAULT", "s3")
+default: str = env("STORAGE_DEFAULT", "local")
 
 disks: dict[str, dict[str, object]] = {
     "s3": {
