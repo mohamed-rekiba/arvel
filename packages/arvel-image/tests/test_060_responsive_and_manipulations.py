@@ -99,6 +99,7 @@ def test_calculate_responsive_widths_includes_original() -> None:
     assert all(w > 0 for w in widths)
     # Each step should be smaller than the previous
     import itertools
+
     for a, b in itertools.pairwise(widths):
         assert a > b
 
@@ -179,7 +180,6 @@ def test_with_manipulations_empty_overrides_returns_self() -> None:
 # ─── with_responsive_images() on FileAdder ────────────────────────────────────
 
 
-
 async def test_with_responsive_images_populates_column(
     engine: AsyncEngine,
     session: AsyncSession,
@@ -209,7 +209,6 @@ async def test_with_responsive_images_populates_column(
     assert orig_entry["base64svg"].startswith("data:image/svg+xml;base64,")
 
 
-
 async def test_collection_generate_responsive_images_flag(
     engine: AsyncEngine,
     session: AsyncSession,
@@ -223,13 +222,12 @@ async def test_collection_generate_responsive_images_flag(
     host = await Host060.create(name="coll-resp-host")
 
     with Storage.fake():
-        media = await host.add_media(
-            large_jpeg_bytes, file_name="auto.jpg"
-        ).to_media_collection("responsive_col")
+        media = await host.add_media(large_jpeg_bytes, file_name="auto.jpg").to_media_collection(
+            "responsive_col"
+        )
 
     assert media.responsive_images
     assert "medialibrary_original" in media.responsive_images
-
 
 
 async def test_without_responsive_images_disables_collection_flag(
@@ -254,7 +252,6 @@ async def test_without_responsive_images_disables_collection_flag(
 
 
 # ─── Media.get_srcset() / get_placeholder_svg() ───────────────────────────────
-
 
 
 async def test_get_srcset_returns_w_descriptors(
@@ -286,7 +283,6 @@ async def test_get_srcset_returns_w_descriptors(
         assert width_val > 0
 
 
-
 async def test_get_srcset_empty_when_no_responsive_images(
     engine: AsyncEngine,
     session: AsyncSession,
@@ -299,9 +295,9 @@ async def test_get_srcset_empty_when_no_responsive_images(
     host = await Host060.create(name="no-srcset-host")
 
     with Storage.fake():
-        media = await host.add_media(
-            large_jpeg_bytes, file_name="plain.jpg"
-        ).to_media_collection("plain")
+        media = await host.add_media(large_jpeg_bytes, file_name="plain.jpg").to_media_collection(
+            "plain"
+        )
         srcset = await media.get_srcset()
 
     assert srcset == ""
@@ -330,7 +326,6 @@ def test_get_placeholder_svg_is_pure_dict_access() -> None:
 # ─── Manipulations wired into to_media_collection ─────────────────────────────
 
 
-
 async def test_manipulations_applied_during_conversion(
     engine: AsyncEngine,
     session: AsyncSession,
@@ -345,9 +340,9 @@ async def test_manipulations_applied_during_conversion(
 
     with Storage.fake():
         # Add without manipulations — thumb should be 32x32.
-        media = await host.add_media(
-            large_jpeg_bytes, file_name="photo.jpg"
-        ).to_media_collection("images")
+        media = await host.add_media(large_jpeg_bytes, file_name="photo.jpg").to_media_collection(
+            "images"
+        )
 
         # Apply a manipulation that makes thumb smaller.
         media.manipulations = {"thumb": {"quality": 20}}
@@ -365,13 +360,13 @@ async def test_manipulations_applied_during_conversion(
 # ─── Responsive images regenerated on process_one ─────────────────────────────
 
 
-
 async def test_regenerate_updates_responsive_images(
     engine: AsyncEngine,
     session: AsyncSession,
     large_jpeg_bytes: bytes,
 ) -> None:
     from arvel.facades import Storage
+
     await _create_tables_060(engine)
     Host060 = _host_060()
     host = await Host060.create(name="regen-host")
