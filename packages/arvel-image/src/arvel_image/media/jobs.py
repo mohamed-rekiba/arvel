@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any
 from arvel.queue.job import Job
 from pydantic import Field
 
-from arvel_image.media.conversion_runner import get_conversion_runner
 from arvel_image.media.media_library import process_one as _process_one
 from arvel_image.media.media_library import resolve_path_generator
 from arvel_image.media.model import Media
@@ -55,13 +54,12 @@ class QueuedConversionJob(Job):
         if host is None:
             return
 
-        runner = get_conversion_runner()
-        gen = resolve_path_generator()
-        await _process_one(media, host, runner, gen)
+        await _process_one(media, host)
 
         if self.generate_responsive_images and "medialibrary_original" not in (
             media.responsive_images or {}
         ):
+            gen = resolve_path_generator()
             await _generate_responsive_for_job(media, gen)
 
 
