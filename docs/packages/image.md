@@ -78,7 +78,17 @@ class Product(Model, HasMedia):
 
 `media.generated_conversions` is a `dict[str, bool]` updated after each run. `media.has_generated_conversion("thumb")` checks it safely.
 
-Conversions are re-applied with `process_one(media, host, runner, gen)` or by dispatching `QueuedConversionJob`. Per-media overrides are stored in `media.manipulations` (see [Manipulations](#manipulations)).
+Conversions are re-applied with `process_one(media, host)` or by dispatching `QueuedConversionJob`. The optional `runner` and `gen` keyword arguments default to the module-level singletons — callers only need to supply them when overriding the defaults. Per-media overrides are stored in `media.manipulations` (see [Manipulations](#manipulations)).
+
+```python
+from arvel_image.media.media_library import process_one
+
+# Simple — module-level singletons resolve automatically.
+await process_one(media, host)
+
+# Override — supply custom runner/generator when needed.
+await process_one(media, host, runner=my_runner, gen=my_gen)
+```
 
 ## Responsive images
 
@@ -121,7 +131,7 @@ media.manipulations = {
     "thumb": {"format": "webp"},    # only thumb
 }
 await media.save()
-await process_one(media, host, runner, gen)  # regenerate with overrides
+await process_one(media, host)  # regenerate with overrides
 ```
 
 `Conversion.with_manipulations(overrides)` returns a shallow copy with the overrides appended — the original `Conversion` is never mutated. Manipulations are applied in both inline and queued conversion runs.
