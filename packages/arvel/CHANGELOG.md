@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.13.0...arvel-v0.14.0) (2026-06-03)
+
+
+### Features
+
+* **config,storage:** config-file cascade and storage:link static serving ([c4b6773](https://github.com/mohamed-rekiba/arvel/commit/c4b67730a0c4c6a4e73720f0f609fd9b4372d6fa))
+
 ## [0.13.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.12.0...arvel-v0.13.0) (2026-06-03)
 
 
