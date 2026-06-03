@@ -42,27 +42,13 @@ async def delete_product_image(product: Product, media_id: str) -> bool:
     return False
 
 
-_CONVERSIONS: tuple[str, ...] = ("thumbnail", "card", "full")
-# Conversions that produce responsive image variants (mirrors ProductMediaMixin).
-_RESPONSIVE_CONVERSIONS: tuple[str, ...] = ("card", "full")
-
-
 async def serialize_media(media: Media) -> dict[str, Any]:
-    seeded_url = media.get_custom_property("image_url")
-    has_conversion = any(media.has_generated_conversion(name) for name in _CONVERSIONS)
-    if seeded_url and not has_conversion:
-        # Seeded sample media has no file on disk; the image lives at this URL.
-        url = str(seeded_url)
-        conversions = dict.fromkeys(_CONVERSIONS, url)
-    else:
-        url = await media.get_url()
-        conversions = await _conversion_urls(media)
+    url = await media.get_url()
+    conversions = await _conversion_urls(media)
 
     ri = media.responsive_images or {}
     srcset = await media.get_srcset() if "medialibrary_original" in ri else ""
     placeholder_svg = media.get_placeholder_svg() if "medialibrary_original" in ri else ""
-
-    # Per-conversion responsive srcsets — card and full get their own srcset.
     conversion_srcsets = await _conversion_srcsets(media, ri)
 
     return {
@@ -85,17 +71,19 @@ async def serialize_media(media: Media) -> dict[str, Any]:
 
 
 async def _conversion_urls(media: Media) -> dict[str, str]:
-    urls: dict[str, str] = {}
-    for name in _CONVERSIONS:
-        urls[name] = await media.get_url(name) if media.has_generated_conversion(name) else ""
-    return urls
+    generated: dict[str, Any] = media.generated_conversions or {}
+    return {
+        name: await media.get_url(name) if generated.get(name) else ""
+        for name in generated
+    }
 
 
 async def _conversion_srcsets(media: Media, ri: dict[str, Any]) -> dict[str, str]:
-    """Return ``{conversion_name: srcset_string}`` for conversions that have responsive variants."""
+    # Iterate whatever responsive_images actually contains — no hard-coded list.
+    # "medialibrary_original" is the collection-level key, not a conversion name.
     result: dict[str, str] = {}
-    for name in _RESPONSIVE_CONVERSIONS:
-        if name in ri and media.has_generated_conversion(name):
+    for name in ri:
+        if name != "medialibrary_original" and media.has_generated_conversion(name):
             result[name] = await media.get_srcset(name)
     return result
 

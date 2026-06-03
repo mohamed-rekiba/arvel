@@ -315,7 +315,6 @@ class ProductService:
         Priority:
         1. Responsive srcset from the ``card`` conversion (width-optimised variants).
         2. Static width hints from conversion URLs if responsive wasn't generated.
-        3. Seeded ``image_url`` custom property fallback for legacy stub rows.
         """
         empty: dict[str, Any] = {"thumbnail_url": None, "image_srcset": "", "image_sizes": ""}
         if media is None:
@@ -323,10 +322,6 @@ class ProductService:
 
         has_thumb = media.has_generated_conversion("thumbnail")
         has_card = media.has_generated_conversion("card")
-
-        seeded_url = media.get_custom_property("image_url")
-        if seeded_url and not has_thumb and not has_card:
-            return {"thumbnail_url": str(seeded_url), "image_srcset": "", "image_sizes": ""}
 
         thumbnail_url: str | None = (
             await media.get_url("thumbnail") if has_thumb else await media.get_url()
