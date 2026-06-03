@@ -32,6 +32,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
       - name: bandit (low+)
         # The packaged skeleton under src/arvel/_skeleton is template code
@@ -78,6 +79,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
       - name: pip-audit (skip editable workspace members)
         # Unfixed CVEs: docs/security/dependency-exceptions.md
@@ -110,6 +112,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
       - name: Generate CycloneDX SBOM (arvel)
         run: |

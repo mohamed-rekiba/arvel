@@ -29,6 +29,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
       - name: mkdocs build --strict
         run: uv run mkdocs build --strict --site-dir _site

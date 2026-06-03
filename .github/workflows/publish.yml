@@ -76,6 +76,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          ignore-nothing-to-cache: true
 
       - name: Sync workspace
         run: uv sync --all-packages --all-extras --frozen
