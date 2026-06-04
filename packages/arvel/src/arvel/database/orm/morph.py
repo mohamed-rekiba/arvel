@@ -2,13 +2,25 @@
 
 The ``{name}_type`` column stores the owner's unqualified class name
 (e.g. ``"Post"``, not ``"app.models.Post"``).
+
+Relations must be eager-loaded via ``.with_("relation")`` before accessing them
+on a model instance. Accessing an un-loaded relation raises
+:class:`LazyLoadingError` immediately — there is no implicit DB hit on
+attribute access, matching Laravel's strict-mode behaviour.
+
+Pattern::
+
+    products = await Product.with_("media").all()
+    for product in products:
+        imgs = product.media          # list[Media] — sync, no await
+        first = product.media[0]      # direct indexing
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
 
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
@@ -28,27 +40,25 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
+class LazyLoadingError(AttributeError):
+    """Raised when a relation is accessed without prior eager loading.
+
+    Use ``.with_("relation_name")`` on the query builder before fetching.
+    """
+
+
 @dataclass(frozen=True)
 class MorphChildLink:
     """Resolved metadata for a MorphOne/MorphMany, used by the query builder.
 
     ``owner_type`` is the owning model's morph alias; ``single`` is True for
-    MorphOne (cardinality only matters to the accessor, not the SQL).
+    MorphOne (cardinality only matters to the query builder, not the descriptor).
     """
 
     related_model: type[Any]
     name: str
     owner_type: str
     single: bool
-
-
-def _owner_pk(owner: Model) -> Any:
-    """Owner primary-key value, resolved via the mapper (supports non-"id"/UUID PKs)."""
-    mapper: Mapper[Any] = cast("Mapper[Any]", sa_inspect(type(owner)))
-    pk_key = mapper.primary_key[0].key
-    if pk_key is None:
-        raise TypeError(f"{type(owner).__name__} primary key column has no key")
-    return getattr(owner, pk_key)
 
 
 def _morph_id_coercer(id_col: Any) -> Callable[[Any], Any]:
@@ -65,68 +75,16 @@ def _morph_id_coercer(id_col: Any) -> Callable[[Any], Any]:
 # ── MorphOne ──────────────────────────────────────────────────────────────────
 
 
-class MorphOneAccessor(Generic[T]):
-    """Accessor returned when accessing a MorphOne descriptor on an instance.
-
-    Awaitable: ``result = await post.image``
-    Creates: ``img = await post.image.create(url=...)``
-    """
-
-    def __init__(
-        self,
-        owner: Any,
-        related_model: type[T],
-        name: str,
-        attr_name: str | None = None,
-        *,
-        owner_type: str,
-    ) -> None:
-        self._owner = owner
-        self._related_model = related_model
-        self._name = name  # morph base name, e.g. "imageable"
-        self._attr_name = attr_name
-        self._owner_type = owner_type
-
-    # ── awaitable protocol ──────────────────────────────────────────────────
-
-    def __await__(self) -> Generator[Any, None, T | None]:
-        return self.query().__await__()
-
-    async def query(self) -> T | None:
-        if self._attr_name is not None:
-            cached = get_eager_relation(self._owner, self._attr_name)
-            if cached is not None:
-                return cast("T", cached[0]) if cached else None
-        session = get_active_session()
-        type_col = getattr(self._related_model, f"{self._name}_type")
-        id_col = getattr(self._related_model, f"{self._name}_id")
-        stmt = (
-            select(self._related_model)
-            .where(type_col == self._owner_type)
-            .where(id_col == _owner_pk(self._owner))
-            .limit(1)
-        )
-        result = await session.execute(stmt)
-        # Eloquent's morphOne returns the first match; never blows up on duplicates.
-        return result.scalars().first()
-
-    # ── factory ─────────────────────────────────────────────────────────────
-
-    async def create(self, **attrs: Any) -> T:
-        """Create a related row with discriminator columns set automatically."""
-        attrs[f"{self._name}_type"] = self._owner_type
-        attrs[f"{self._name}_id"] = _owner_pk(self._owner)
-        model: Any = self._related_model
-        return await model.create(**attrs)  # type: ignore[no-any-return]
-
-
 class MorphOne(Generic[T]):
     """Descriptor for a polymorphic one-to-one relation.
 
-    Usage::
+    Access after eager loading is sync::
 
         class Post(Model):
             image: MorphOne[Image] = MorphOne(Image, name="imageable")
+
+        post = await Post.with_("image").first()
+        img: Image | None = post.image   # sync, no await
     """
 
     def __init__(self, related_model: type[T], *, name: str) -> None:
@@ -150,73 +108,42 @@ class MorphOne(Generic[T]):
             related_model=self._related_model, name=self._name, owner_type=owner_type, single=True
         )
 
-    def __get__(
-        self, obj: object, objtype: type | None = None
-    ) -> MorphOneAccessor[T] | MorphOne[T]:
+    @overload
+    def __get__(self, obj: None, objtype: type) -> MorphOne[T]: ...
+
+    @overload
+    def __get__(self, obj: object, objtype: type | None) -> T | None: ...
+
+    def __get__(self, obj: object | None, objtype: type | None = None) -> T | None | MorphOne[T]:
         if obj is None:
             return self
-        return MorphOneAccessor(
-            owner=obj,
-            related_model=self._related_model,
-            name=self._name,
-            attr_name=self._attr_name,
-            owner_type=get_morph_alias(type(obj)),
-        )
+        if self._attr_name is None:
+            raise LazyLoadingError(
+                f"MorphOne descriptor was not assigned to a class attribute "
+                f"on {type(obj).__name__!r}."
+            )
+        cached = get_eager_relation(obj, self._attr_name)
+        if cached is None:
+            raise LazyLoadingError(
+                f"Relation {self._attr_name!r} on {type(obj).__name__!r} is not loaded. "
+                f"Use .with_({self._attr_name!r}) on the query builder."
+            )
+        return cast("T", cached[0]) if cached else None
 
 
 # ── MorphMany ─────────────────────────────────────────────────────────────────
 
 
-class MorphManyAccessor(Generic[T]):
-    """Accessor returned when accessing a MorphMany descriptor on an instance."""
-
-    def __init__(
-        self,
-        owner: Any,
-        related_model: type[T],
-        name: str,
-        attr_name: str | None = None,
-        *,
-        owner_type: str,
-    ) -> None:
-        self._owner = owner
-        self._related_model = related_model
-        self._name = name
-        self._attr_name = attr_name
-        self._owner_type = owner_type
-
-    async def all(self) -> list[T]:
-        """Return all related rows for this owner."""
-        if self._attr_name is not None:
-            cached = get_eager_relation(self._owner, self._attr_name)
-            if cached is not None:
-                return [cast("T", row) for row in cached]
-        session = get_active_session()
-        type_col = getattr(self._related_model, f"{self._name}_type")
-        id_col = getattr(self._related_model, f"{self._name}_id")
-        stmt = (
-            select(self._related_model)
-            .where(type_col == self._owner_type)
-            .where(id_col == _owner_pk(self._owner))
-        )
-        result = await session.execute(stmt)
-        return list(result.scalars())
-
-    async def create(self, **attrs: Any) -> T:
-        """Create a related row with discriminator columns set automatically."""
-        attrs[f"{self._name}_type"] = self._owner_type
-        attrs[f"{self._name}_id"] = _owner_pk(self._owner)
-        model: Any = self._related_model
-        return await model.create(**attrs)  # type: ignore[no-any-return]
-
-
 class MorphMany(Generic[T]):
     """Descriptor for a polymorphic one-to-many relation.
 
-    Usage::
+    Access after eager loading is sync::
 
         class Post(Model):
             comments: MorphMany[Comment] = MorphMany(Comment, name="commentable")
+
+        post = await Post.with_("comments").first()
+        all_comments: list[Comment] = post.comments   # sync, no await
     """
 
     def __init__(self, related_model: type[T], *, name: str) -> None:
@@ -240,18 +167,27 @@ class MorphMany(Generic[T]):
             related_model=self._related_model, name=self._name, owner_type=owner_type, single=False
         )
 
-    def __get__(
-        self, obj: object, objtype: type | None = None
-    ) -> MorphManyAccessor[T] | MorphMany[T]:
+    @overload
+    def __get__(self, obj: None, objtype: type) -> MorphMany[T]: ...
+
+    @overload
+    def __get__(self, obj: object, objtype: type | None) -> list[T]: ...
+
+    def __get__(self, obj: object | None, objtype: type | None = None) -> list[T] | MorphMany[T]:
         if obj is None:
             return self
-        return MorphManyAccessor(
-            owner=obj,
-            related_model=self._related_model,
-            name=self._name,
-            attr_name=self._attr_name,
-            owner_type=get_morph_alias(type(obj)),
-        )
+        if self._attr_name is None:
+            raise LazyLoadingError(
+                f"MorphMany descriptor was not assigned to a class attribute "
+                f"on {type(obj).__name__!r}."
+            )
+        cached = get_eager_relation(obj, self._attr_name)
+        if cached is None:
+            raise LazyLoadingError(
+                f"Relation {self._attr_name!r} on {type(obj).__name__!r} is not loaded. "
+                f"Use .with_({self._attr_name!r}) on the query builder."
+            )
+        return [cast("T", row) for row in cached]
 
 
 # ── MorphTo (inverse) ───────────────────────────────────────────────────────

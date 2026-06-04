@@ -1,15 +1,16 @@
 """Morph relations (MorphOne, MorphMany).
 
 Single-instance access, short-name discriminators, collections,
-create-via-accessor wiring, and shared polymorphic tables."""
+and shared polymorphic tables. Reads go through strict eager loading
+(``.with_("relation")``); writes go directly to the child model with
+the discriminator columns set by the caller.
+"""
 
 from __future__ import annotations
 
 from typing import Any, ClassVar
 
 from arvel.database import Model, Timestamps, column, id_, integer, string
-
-# RED: arvel.database.orm.MorphOne / MorphMany do not exist yet
 from arvel.database.orm import MorphMany, MorphOne
 from sqlalchemy import String
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +25,6 @@ class MorphImage(Model, Timestamps):
 
     id: int = id_()
     url: str = string(2048)
-    # discriminator columns — set by the descriptor, never manually
     imageable_type: str = string(255)
     imageable_id: int = integer()
 
@@ -81,7 +81,7 @@ async def _create_tables(engine: Any) -> None:
 
 
 async def test_morph_one_returns_related_instance(engine: Any, session: AsyncSession) -> None:
-    """MorphOne returns the related model instance."""
+    """MorphOne returns the related model instance after eager loading."""
     await _create_tables(engine)
     post = await MorphPost.create(title="Hello")
     img = await MorphImage.create(
@@ -90,11 +90,14 @@ async def test_morph_one_returns_related_instance(engine: Any, session: AsyncSes
         imageable_id=post.id,
     )
 
-    result = await post.image
+    loaded = await (
+        MorphPost.query().with_("image").where(MorphPost.__table__.c.id == post.id).first()
+    )
 
-    assert result is not None
-    assert result.id == img.id
-    assert result.url == img.url
+    assert loaded is not None
+    assert loaded.image is not None
+    assert loaded.image.id == img.id
+    assert loaded.image.url == img.url
 
 
 async def test_morph_one_returns_none_when_no_related(engine: Any, session: AsyncSession) -> None:
@@ -102,9 +105,12 @@ async def test_morph_one_returns_none_when_no_related(engine: Any, session: Asyn
     await _create_tables(engine)
     post = await MorphPost.create(title="No Image")
 
-    result = await post.image
+    loaded = await (
+        MorphPost.query().with_("image").where(MorphPost.__table__.c.id == post.id).first()
+    )
 
-    assert result is None
+    assert loaded is not None
+    assert loaded.image is None
 
 
 async def test_morph_one_returns_first_when_multiple_rows(
@@ -124,73 +130,35 @@ async def test_morph_one_returns_first_when_multiple_rows(
         imageable_id=post.id,
     )
 
-    result = await post.image
+    loaded = await (
+        MorphPost.query().with_("image").where(MorphPost.__table__.c.id == post.id).first()
+    )
 
-    assert result is not None
-    assert result.id == first.id
-
-
-# ───  discriminator uses short class name ──────────────────────
-
-
-async def test_morph_one_create_sets_short_class_name_discriminator(
-    engine: Any, session: AsyncSession
-) -> None:
-    """creating via MorphOne sets {name}_type to 'MorphPost' (not FQCN)."""
-    await _create_tables(engine)
-    post = await MorphPost.create(title="ADR-066 Post")
-
-    img = await post.image.create(url="https://example.com/photo.jpg")
-
-    # Reload from DB to verify stored discriminator value
-    from sqlalchemy import select
-
-    stmt = select(MorphImage).where(MorphImage.id == img.id)
-    row = (await session.execute(stmt)).scalar_one()
-    assert row.imageable_type == "MorphPost"  # short name, NOT fully-qualified
-    assert row.imageable_id == post.id
-
-
-async def test_morph_many_create_sets_short_class_name_discriminator(
-    engine: Any, session: AsyncSession
-) -> None:
-    """creating via MorphMany sets {name}_type to 'MorphPost'."""
-    await _create_tables(engine)
-    post = await MorphPost.create(title="Comment Post")
-
-    comment = await post.comments.create(body="Great post!")
-
-    from sqlalchemy import select
-
-    stmt = select(MorphComment).where(MorphComment.id == comment.id)
-    row = (await session.execute(stmt)).scalar_one()
-    assert row.commentable_type == "MorphPost"
-    assert row.commentable_id == post.id
+    assert loaded is not None
+    assert loaded.image is not None
+    assert loaded.image.id == first.id
 
 
 # ───  MorphMany yields all matching instances ──────────────────
 
 
 async def test_morph_many_yields_all_related(engine: Any, session: AsyncSession) -> None:
-    """MorphMany returns all related instances for this owner."""
+    """MorphMany returns all related instances for this owner after eager loading."""
     await _create_tables(engine)
     post = await MorphPost.create(title="Multi-Comment")
     other_post = await MorphPost.create(title="Other")
 
-    await MorphComment.create(
-        body="Comment A", commentable_type="MorphPost", commentable_id=post.id
-    )
-    await MorphComment.create(
-        body="Comment B", commentable_type="MorphPost", commentable_id=post.id
-    )
-    await MorphComment.create(
-        body="Comment C", commentable_type="MorphPost", commentable_id=other_post.id
+    await MorphComment.create(body="A", commentable_type="MorphPost", commentable_id=post.id)
+    await MorphComment.create(body="B", commentable_type="MorphPost", commentable_id=post.id)
+    await MorphComment.create(body="C", commentable_type="MorphPost", commentable_id=other_post.id)
+
+    loaded = await (
+        MorphPost.query().with_("comments").where(MorphPost.__table__.c.id == post.id).first()
     )
 
-    comments = await post.comments.all()
-
-    assert len(comments) == 2
-    assert all(c.commentable_id == post.id for c in comments)
+    assert loaded is not None
+    assert len(loaded.comments) == 2
+    assert all(c.commentable_id == post.id for c in loaded.comments)
 
 
 async def test_morph_many_returns_empty_list_when_none(engine: Any, session: AsyncSession) -> None:
@@ -198,47 +166,44 @@ async def test_morph_many_returns_empty_list_when_none(engine: Any, session: Asy
     await _create_tables(engine)
     post = await MorphPost.create(title="No Comments")
 
-    comments = await post.comments.all()
+    loaded = await (
+        MorphPost.query().with_("comments").where(MorphPost.__table__.c.id == post.id).first()
+    )
 
-    assert comments == []
-
-
-# ───  creating via morph accessor sets discriminator correctly ──
-
-
-async def test_morph_one_create_via_accessor(engine: Any, session: AsyncSession) -> None:
-    """post.image.create creates a row with correct discriminator."""
-    await _create_tables(engine)
-    post = await MorphPost.create(title="Accessor Post")
-
-    img = await post.image.create(url="https://cdn.example.com/banner.png")
-
-    assert img.id is not None
-    assert img.imageable_type == "MorphPost"
-    assert img.imageable_id == post.id
+    assert loaded is not None
+    assert loaded.comments == []
 
 
 # ───  two owner types share the same polymorphic table ──────────
 
 
 async def test_two_owners_share_polymorphic_table(engine: Any, session: AsyncSession) -> None:
-    """MorphPost and MorphVideo each have their own image row."""
+    """MorphPost and MorphVideo each see only their own image."""
     await _create_tables(engine)
     post = await MorphPost.create(title="Post with image")
     video = await MorphVideo.create(title="Video with image")
 
-    post_img = await post.image.create(url="https://example.com/post.jpg")
-    video_img = await video.image.create(url="https://example.com/video.jpg")
+    post_img = await MorphImage.create(
+        url="https://example.com/post.jpg", imageable_type="MorphPost", imageable_id=post.id
+    )
+    video_img = await MorphImage.create(
+        url="https://example.com/video.jpg", imageable_type="MorphVideo", imageable_id=video.id
+    )
 
-    # Each owner sees only its own image
-    post_result = await post.image
-    video_result = await video.image
+    loaded_post = await (
+        MorphPost.query().with_("image").where(MorphPost.__table__.c.id == post.id).first()
+    )
+    loaded_video = await (
+        MorphVideo.query().with_("image").where(MorphVideo.__table__.c.id == video.id).first()
+    )
 
-    assert post_result is not None
-    assert video_result is not None
-    assert post_result.id == post_img.id
-    assert video_result.id == video_img.id
-    assert post_result.id != video_result.id
+    assert loaded_post is not None
+    assert loaded_video is not None
+    assert loaded_post.image is not None
+    assert loaded_video.image is not None
+    assert loaded_post.image.id == post_img.id
+    assert loaded_video.image.id == video_img.id
+    assert loaded_post.image.id != loaded_video.image.id
 
 
 async def test_morph_many_resolves_non_id_primary_key(engine: Any, session: AsyncSession) -> None:
@@ -246,12 +211,20 @@ async def test_morph_many_resolves_non_id_primary_key(engine: Any, session: Asyn
     await _create_tables(engine)
     article = await MorphArticle.create(slug="intro", title="Intro")
 
-    comment = await article.comments.create(body="On a slug-keyed owner")
+    comment = await MorphComment.create(
+        body="On a slug-keyed owner",
+        commentable_type="MorphArticle",
+        commentable_id=article.slug,
+    )
 
-    assert comment.commentable_type == "MorphArticle"
-    assert comment.commentable_id == "intro"  # the slug, not a missing .id
-    fetched = await article.comments.all()
-    assert [c.id for c in fetched] == [comment.id]
+    loaded = await (
+        MorphArticle.query()
+        .with_("comments")
+        .where(MorphArticle.__table__.c.slug == "intro")
+        .first()
+    )
+    assert loaded is not None
+    assert [c.id for c in loaded.comments] == [comment.id]
 
 
 async def test_polymorphic_images_are_isolated_by_owner_type(
@@ -262,15 +235,16 @@ async def test_polymorphic_images_are_isolated_by_owner_type(
     post = await MorphPost.create(title="Post")
     await MorphVideo.create(title="Video")
 
-    # Create an image for the video with the same imageable_id as the post
-    # (edge case: both have id=1 — should not cross-pollinate)
+    # Same imageable_id as the post but different type — must not cross-pollinate.
     await MorphImage.create(
         url="https://example.com/video.jpg",
         imageable_type="MorphVideo",
-        imageable_id=post.id,  # same id, different type
+        imageable_id=post.id,
     )
 
-    post_img = await post.image
+    loaded = await (
+        MorphPost.query().with_("image").where(MorphPost.__table__.c.id == post.id).first()
+    )
 
-    # Post has no image of type MorphPost → should be None
-    assert post_img is None
+    assert loaded is not None
+    assert loaded.image is None

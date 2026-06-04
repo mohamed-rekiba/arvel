@@ -137,7 +137,7 @@ class CartService:
         # Served from the with_("product.media") eager cache — no query here.
         product = await item.product().first()
         if product is not None:
-            product_data = await self._products.product_to_storefront_with_media(product, locale)
+            product_data = self._products.product_to_storefront(product, locale)
         else:
             # Product was unpublished or deleted after being added to the cart.
             product_data = {
@@ -151,6 +151,7 @@ class CartService:
                 "thumbnail_url": None,
                 "image_srcset": "",
                 "image_sizes": "",
+                "images": [],
                 "rating": None,
                 "rating_count": None,
                 "is_new": False,

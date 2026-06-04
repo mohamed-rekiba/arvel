@@ -405,7 +405,7 @@ class Application:
         Mounted only when the link exists at boot — run `storage:link` then
         (re)start the server. Until then the path 404s through the framework.
         Scoped to public/storage, never the public/ parent, so the ASGI
-        entrypoint (public/asgi.py) can't be served as source. See ADR-137.
+        entrypoint (public/asgi.py) can't be served as source.
         """
         from starlette.staticfiles import StaticFiles
 

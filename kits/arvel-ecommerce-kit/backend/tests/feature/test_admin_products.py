@@ -39,6 +39,7 @@ def _make_jpeg(width: int = 400, height: int = 300) -> bytes:
     img.save(buf, format="JPEG", quality=85)
     return buf.getvalue()
 
+
 pytestmark = pytest.mark.integration
 
 if TYPE_CHECKING:
@@ -436,10 +437,11 @@ async def test_upload_product_image_has_responsive_srcset(
     assert upload.status_code == 201
     body = upload.json()["data"]
 
-    # conversion_srcsets carries per-conversion responsive data.
-    assert "conversion_srcsets" in body
-    card_srcset: str = body["conversion_srcsets"].get("card", "")
-    full_srcset: str = body["conversion_srcsets"].get("full", "")
+    # srcsets carries every non-empty responsive group keyed by name —
+    # per-conversion (card, full) and medialibrary_original (the original).
+    assert "srcsets" in body
+    card_srcset: str = body["srcsets"].get("card", "")
+    full_srcset: str = body["srcsets"].get("full", "")
     assert card_srcset, "card conversion should have responsive srcset"
     assert full_srcset, "full conversion should have responsive srcset"
     # srcset strings are space-separated "url Xw" pairs joined by ", "

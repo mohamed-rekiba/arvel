@@ -20,7 +20,9 @@ non-trivial and to show how the pieces fit together.
   - [Scheduler](https://arvel.dev/features/scheduling) — periodic read-model refresh via `arvel schedule:work`
   - [i18n](https://arvel.dev/features/localization) — locale negotiation middleware, JSONB translations
 - [PostgreSQL 18](https://www.postgresql.org) — JSONB columns and a materialized catalog view
-- [Redis](https://redis.io) — cache, session store, and queue backend
+- [Valkey 9](https://valkey.io) — cache, session store, and queue backend (Redis-protocol-compatible BSD-3 fork; the kit keeps the `redis` service name and `redis://` URLs)
+- [Caddy 2](https://caddyserver.com) — single-origin edge for the dev stack (frontend, `/api/*`, and `/media/*` in S3 mode)
+- [MinIO](https://min.io) — S3-compatible object store for `arvel-image` uploads (default — see [Storage](#storage-s3-default-local-opt-in))
 - [Docker Compose](https://docs.docker.com/compose/) — one command to bring up the full stack
 
 **Frontend**
@@ -49,10 +51,26 @@ make seed      # seed roles, catalog, and sample users
 
 Then open:
 
-- **Storefront (Vite dev server)**: http://localhost:8000
-- **API + built SPA fallback**: http://localhost:8001
-- **Interactive API docs**: http://localhost:8001/docs
-- **Health check**: http://localhost:8001/healthz
+- **Primary entry (Caddy edge)**: http://localhost:8002 — single origin for frontend, `/api/*`, and `/media/*`
+- **Interactive API docs**: http://localhost:8002/api/docs
+- **Caddy health**: http://localhost:8002/healthz
+
+Caddy fans requests out to the right upstream so the SPA, API, and uploaded
+assets share one origin (no CORS). The direct ports stay open for debugging
+and for local-mode media:
+
+- **Frontend (raw Vite dev server)**: http://localhost:8000
+- **Backend (raw FastAPI; also serves local-mode `/media/*` from disk)**: http://localhost:8001
+- **MinIO console**: http://localhost:9001 (`minioadmin` / `minioadmin`)
+
+> The kit defaults to `STORAGE_DEFAULT=s3` so seeded and uploaded media flow
+> through MinIO → Caddy and the SPA loads everything from `:8002`. If you flip
+> to `STORAGE_DEFAULT=local` (zero-deps fallback), media lives on the backend's
+> disk and is served at `:8001/media/<file>` — **load the SPA from `:8001` in
+> local mode**, not `:8002`, otherwise Caddy's `/media/*` proxy will look in
+> the empty MinIO bucket and return 404. The two drivers can't share `:8002`
+> because the framework's local serve and Caddy → MinIO can't both own the
+> prefix without one shadowing the other.
 
 Default admin credentials come from `.env`:
 
@@ -79,15 +97,26 @@ tarball from GitHub, verifies its checksum, and scaffolds it under your project 
 
 ## Services
 
-`docker-compose.yml` starts five services:
+`docker-compose.yml` defines the full dev stack. The core five always start
+with `make up`; MinIO + Caddy come up automatically when Caddy is launched
+(it depends on them) or you can start them explicitly with `docker compose up -d caddy`.
 
-| Service | Image | Port | Purpose |
+| Service | Image | Port (host) | Purpose |
 |---|---|---|---|
+| `caddy` | `caddy:2.11.4-alpine` | `8002` | Edge reverse proxy — single origin for frontend, `/api/*`, and `/media/*` (active in default s3 mode; dormant for `/media/*` in local mode) |
 | `backend` | `python:3.14.5-slim-bookworm` | `8001` | Arvel / FastAPI application |
 | `frontend` | `node:24.15.0-alpine3.23` | `8000` | Vite dev server with HMR |
 | `scheduler` | `python:3.14.5-slim-bookworm` | — | `arvel schedule:work` for read-model refresh |
 | `db` | `postgres:18.4-bookworm` | `5432` | Primary database |
-| `redis` | `redis:8.6.2-alpine3.23` | `6379` | Cache and queue backend |
+| `redis` | `valkey/valkey:9.1.0-alpine3.23` | `6379` | Cache and queue backend — Valkey (BSD-3, Redis-protocol-compatible) ¹ |
+| `minio` | `minio/minio:RELEASE.2025-09-07T16-13-09Z` | `9000`, `9001` | S3-compatible object store (default storage backend) |
+| `createbuckets` | `minio/mc:RELEASE.2025-08-13T08-35-41Z` | — | One-shot job — creates the bucket and sets anonymous downloads (`minio/mc` follows its own release cadence; this is its latest tag, not the same date as `minio/minio`) |
+
+¹ The service is named `redis` and `CACHE_URL` still uses the `redis://`
+scheme, because `redis://` is the wire-protocol identifier (RESP3) — both
+[Redis](https://redis.io) and [Valkey](https://valkey.io) speak it. The image
+is Valkey to keep the kit on a BSD-3 licensed cache after Redis adopted the
+RSALv2 / SSPL dual license in 2024.
 
 The backend and scheduler bind-mount the entire monorepo and run `uv sync --frozen`, so changes to
 any workspace package (`arvel`, `arvel-image`, `arvel-permission`, …) are picked up without a rebuild.
@@ -97,7 +126,6 @@ any workspace package (`arvel`, `arvel-image`, `arvel-permission`, …) are pick
 ```bash
 # Lifecycle
 make up              # start everything, then wait until all services are healthy
-make healthcheck          # wait until db, redis, backend, frontend are healthy
 make down            # stop services (keep volumes)
 make nuke            # stop services and delete all volumes
 make ps              # list running services
@@ -178,20 +206,50 @@ All configuration lives in `.env` (copied from `.env.example` by `make up`). Key
 | `APP_KEY` | (empty) | HMAC/encryption secret — generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
 | `DB_URL` | `postgresql+asyncpg://arvel:...@db:5432/arvel_ecommerce` | Database connection string |
 | `CACHE_URL` | `redis://...@redis:6379/0` | Redis URL for cache and sessions |
-| `STORAGE_DEFAULT` | `local` | Storage driver: `local` or `s3` |
+| `STORAGE_DEFAULT` | `s3` | Storage driver: `s3` (default — bundled MinIO + Caddy) or `local` (zero-deps fallback; SPA must load from `:8001`) |
 | `ADMIN_SEED_EMAIL` | `admin@example.com` | Admin user created by the seeder |
 | `ADMIN_SEED_PASSWORD` | `AdminPwd!1` | Admin password — change before sharing |
 
-### S3-compatible storage
+<a name="storage-s3-default-local-opt-in"></a>
+### Storage (S3 default, local opt-in)
 
-```env
-STORAGE_DEFAULT=s3
-STORAGE_S3_ENDPOINT=http://minio:9000
-STORAGE_S3_BUCKET=arvel-ecommerce-kit
-STORAGE_S3_ACCESS_KEY_ID=minioadmin
-STORAGE_S3_SECRET_ACCESS_KEY=minioadmin
-STORAGE_S3_REGION=us-east-1
-```
+The kit ships `STORAGE_DEFAULT=s3` so the bundled MinIO + Caddy stack works
+out of the box. The seeder writes to MinIO, the browser reads through Caddy,
+and the SPA stays on a single origin.
+
+What you get out of the box at `:8002`:
+
+- `minio` — S3 server on `minio:9000` (in-network) and the admin console on
+  [localhost:9001](http://localhost:9001) (`minioadmin` / `minioadmin`)
+- `createbuckets` — one-shot that creates the `arvel-ecommerce-kit` bucket and
+  sets anonymous-download so the browser reads assets without signing
+- `caddy` — `/media/*` rewrites `http://localhost:8002/media/<key>` →
+  `minio:9000/arvel-ecommerce-kit/<key>`, so the SPA loads images from the
+  same origin as the API
+
+The default S3 vars in `.env.example` (endpoint, bucket, key, secret, region,
+addressing style) are wired to the bundled MinIO. You only need to touch them
+when pointing at a real S3 / S3-compatible service. The `minioadmin`
+credentials are development-only — rotate `STORAGE_S3_KEY` / `STORAGE_S3_SECRET`
+before exposing the instance.
+
+#### Zero-deps fallback (`STORAGE_DEFAULT=local`)
+
+Flip to `local` if you don't want to run MinIO. The framework's local driver
+serves `/media/*` from `storage/app/` at `http://localhost:8001/media/<key>`
+via its `serve=true` route. Caddy's `/media/*` is wired to MinIO and stays
+dormant; the two drivers can't share `:8002` because each would shadow the
+other on the same prefix.
+
+**Important**: in local mode, **load the SPA from `:8001`, not `:8002`**.
+`STORAGE_LOCAL_URL=/media` is a relative URL — the browser resolves it
+against the current origin, so loading from `:8002` makes images request
+through Caddy's empty MinIO proxy and 404. The `:8001` direct-backend path
+serves both the API and the local-mode media on one origin.
+
+The `/media` prefix is shared across both drivers on purpose — the SPA's
+URL shape doesn't change when you flip drivers, only which origin it's
+loaded from.
 
 ## Deployment
 

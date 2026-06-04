@@ -1,51 +1,42 @@
-"""arvel-image — image manipulation + media-library parity for Arvel.
+"""arvel-image — image manipulation + polymorphic media for Arvel.
 
-Combines two Spatie packages:
+Two pieces:
 
-- **spatie/image v3** — :class:`Image`, a fluent Pillow wrapper for
-  resize / crop / fit / format / quality / optimize. Standalone, sync, no
-  shelling out.
-- **spatie/laravel-medialibrary v11** — a polymorphic ``media`` table
-  plus a runtime layer (``Media``, ``HasMedia``, collections, conversions,
-  file ingestion). Exposed through :class:`ImageServiceProvider`, which
-  registers the migration as publishable under the ``arvel-image`` tag.
-  The path generator and conversion runner resolve through
-  ``get_path_generator`` / ``get_conversion_runner``; override them with
-  ``set_path_generator`` / ``set_conversion_runner``.
+- :class:`Image` — fluent Pillow wrapper for resize / crop / fit / format /
+  quality / optimize. Standalone, sync, no subprocess.
+- The media subsystem (:class:`Media`, :class:`HasMedia`) — a polymorphic
+  ``media`` table plus the runtime to ingest files, run conversions, build
+  responsive variants, and serialize everything for an API.
 
-Apps that only need ``Image`` can use it directly without booting an
-Arvel application. Apps that want the media table run::
+Apps that only need ``Image`` can use it directly. Apps that want the
+media table run::
 
     arvel vendor:publish --tag=arvel-image
     arvel migrate
 
 Then add :class:`HasMedia` to a model::
 
-    class User(Model, HasMedia, Timestamps):
+    class User(HasMedia, Model, Timestamps):
         __tablename__ = "users"
-        ...
+        __media_collection__ = "avatar"
 
-        def register_media_collections(self) -> None:
-            (
-                MediaCollection("avatar", single_file=True)
-                .with_conversions(Conversion("thumb").fit("cover", 64, 64))
-                .register_on(self)
-            )
+    media = await user.add_image(bytes_, file_name="avatar.jpg")
 
-    media = await user.add_media(bytes_, file_name="avatar.jpg") \\
-        .to_media_collection("avatar")
+``user.to_dict()`` automatically includes serialized media when the
+``media`` relation is eager-loaded — no per-app serializers needed.
 """
 
 from __future__ import annotations
 
 from arvel_image.image import Image, UnsupportedFormatError
 from arvel_image.media import (
+    CollectionConfig,
     Conversion,
+    ConversionConfig,
     ConversionFailedError,
     ConversionRunner,
     DefaultPathGenerator,
     FileAdder,
-    FileInfo,
     FileTooLargeError,
     HasMedia,
     InvalidMimeTypeError,
@@ -55,10 +46,6 @@ from arvel_image.media import (
     MediaLibrary,
     PathGenerator,
     UnknownCollectionError,
-    calculate_responsive_widths,
-    copy_responsive_images,
-    generate_placeholder_svg,
-    generate_responsive_images_for_media,
     get_conversion_runner,
     get_path_generator,
     set_conversion_runner,
@@ -67,19 +54,30 @@ from arvel_image.media import (
 from arvel_image.media.jobs import QueuedConversionJob
 from arvel_image.provider import ImageServiceProvider
 
-# Ergonomic alias — HasMediaMixin and HasMedia are the same class.
-HasMediaMixin = HasMedia
+# Intentionally not re-exported at the package level — submodule paths stay
+# stable for framework-internal callers and the rare advanced user:
+#   * FileInfo                      → arvel_image.media.collection
+#   * get_collection_preset         → arvel_image.media.presets
+#   * register_collection_preset    → arvel_image.media.presets
+#   * calculate_responsive_widths,
+#     copy_responsive_images,
+#     generate_placeholder_svg,
+#     generate_responsive_images_for_media
+#                                   → arvel_image.media.responsive_image_generator
+# These were re-exported pre-1.0 only because early tests reached for them;
+# none are user-facing API. Promoting them back is the breaking change, not
+# moving them here.
 
 __all__ = [
+    "CollectionConfig",
     "Conversion",
+    "ConversionConfig",
     "ConversionFailedError",
     "ConversionRunner",
     "DefaultPathGenerator",
     "FileAdder",
-    "FileInfo",
     "FileTooLargeError",
     "HasMedia",
-    "HasMediaMixin",
     "Image",
     "ImageServiceProvider",
     "InvalidMimeTypeError",
@@ -91,10 +89,6 @@ __all__ = [
     "QueuedConversionJob",
     "UnknownCollectionError",
     "UnsupportedFormatError",
-    "calculate_responsive_widths",
-    "copy_responsive_images",
-    "generate_placeholder_svg",
-    "generate_responsive_images_for_media",
     "get_conversion_runner",
     "get_path_generator",
     "set_conversion_runner",

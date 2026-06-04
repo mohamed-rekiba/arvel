@@ -1,9 +1,12 @@
-# ADR-137 — Serve `public/storage` via a scoped StaticFiles mount
+# ADR-134 — Serve `public/storage` via a scoped StaticFiles mount
 
 **Status**: Accepted
-**Date**: 2026-06-03
-**Deciders**: Arvel core team (autonomous, WI-arvel-003)
+**Date**: 2026-06-03 (renumbered from ADR-137 in WI-arvel-003 on 2026-06-05)
+**Deciders**: Arvel core team (autonomous, original WI was WI-arvel-003-storage-link)
 **Related**: ADR-080 (LocalDriver serve=true route)
+
+> Renumbered from ADR-137 in WI-arvel-003 (2026-06-05) to close the gap left by
+> merging the seven arvel-image ADRs into a single ADR-132.
 
 ---
 

@@ -1,34 +1,42 @@
 """arvel-image configuration — media collections and conversion presets.
 
-The kit generates three conversions on every image upload:
+``ImageServiceProvider.boot`` reads ``collections`` and builds the
+``MediaCollection`` presets that models reference via ``__media_collection__``.
 
-- ``thumbnail``: 150x150 square crop, used in admin lists.
-- ``card`` : 400x300 cover crop, used on storefront cards.
-- ``full`` : 1200x900 contain fit, used on item show pages.
-
-`arvel-image` runs conversions synchronously with thread-pool offload, so the
-local kit does not need a queue worker for uploads.
+Each entry is a :class:`~arvel_image.CollectionConfig` with conversions
+nested inline — one dict is the single source of truth for a collection.
 """
 
 from __future__ import annotations
 
-from arvel.support.env import env
+from arvel_image import CollectionConfig
 
-default_disk: str = env("STORAGE_DEFAULT", "local")
+import config.filesystems as fs_cfg
 
-collections: dict[str, dict[str, object]] = {
-    "images": {
-        "disk": default_disk,
+default: str = "images"
+
+collections: dict[str, CollectionConfig] = {
+    default: {
+        "disk": fs_cfg.default,
         "max_size_bytes": 10 * 1024 * 1024,  # 10 MiB
-        "max_files_per_subject": 4,
+        "max_files": 4,
         "allowed_mimetypes": ["image/jpeg", "image/png", "image/webp", "image/gif"],
-    },
-}
-
-conversions: dict[str, dict[str, dict[str, object]]] = {
-    "images": {
-        "thumbnail": {"width": 150, "height": 150, "fit": "cover", "quality": 85},
-        "card": {"width": 400, "height": 300, "fit": "cover", "quality": 85},
-        "full": {"width": 1200, "height": 900, "fit": "contain", "quality": 90},
+        "conversions": {
+            "thumbnail": {"width": 150, "height": 150, "fit": "cover", "quality": 85},
+            "card": {
+                "width": 400,
+                "height": 300,
+                "fit": "cover",
+                "quality": 85,
+                "responsive": True,
+            },
+            "full": {
+                "width": 1200,
+                "height": 900,
+                "fit": "contain",
+                "quality": 90,
+                "responsive": True,
+            },
+        },
     },
 }

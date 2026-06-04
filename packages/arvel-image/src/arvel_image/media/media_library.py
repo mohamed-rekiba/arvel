@@ -1,4 +1,4 @@
-"""MediaLibrary service for bulk operations"""
+"""MediaLibrary service — bulk operations across a host's media."""
 
 from __future__ import annotations
 
@@ -8,6 +8,9 @@ from typing import TYPE_CHECKING, Any
 from arvel.database.orm.morph_map import get_morph_alias
 
 if TYPE_CHECKING:
+    from arvel.storage import StorageDisk
+
+    from arvel_image.media.collection import MediaCollection
     from arvel_image.media.conversion_runner import ConversionRunner
     from arvel_image.media.model import Media
     from arvel_image.media.path_generator import PathGenerator
@@ -18,7 +21,7 @@ if TYPE_CHECKING:
 class _ConvCtx:
     """Execution context shared across conversions in a single ``process_one`` call."""
 
-    disk: Any
+    disk: StorageDisk
     gen: PathGenerator
     runner: ConversionRunner
 
@@ -102,6 +105,8 @@ async def process_one(
     try:
         contents = await read_disk.get(effective_gen.path_for(media))
     except Exception:  # noqa: BLE001
+        # Source file is gone (manual cleanup, S3 lifecycle) — silently
+        # skip. Regenerate is best-effort, not transactional.
         return
 
     # Cannot resolve collection config without a host — skip conversions.
@@ -111,6 +116,8 @@ async def process_one(
     try:
         coll = host.collection_for(media.collection_name)
     except Exception:  # noqa: BLE001
+        # Host class lost the collection between rows being written and
+        # regenerate running. Skip rather than fail the bulk pass.
         return
 
     if not coll.conversions:
@@ -142,7 +149,7 @@ async def process_one(
 
 async def _run_conversion_loop(
     media: Media,
-    coll: Any,
+    coll: MediaCollection,
     contents: bytes,
     ctx: _ConvCtx,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -161,12 +168,18 @@ async def _run_conversion_loop(
             **dict(manips.get(conv.name, {})),
         }
         effective = conv.with_manipulations(conv_overrides) if conv_overrides else conv
-        output = await ctx.runner.run(source=contents, conversion=effective)
+        output = await ctx.runner.run(
+            source=contents, conversion=effective, context=f"media id={media.id}"
+        )
         await ctx.disk.put(ctx.gen.path_for_conversion(media, conv.name), output)
         generated[conv.name] = True
 
         if conv.responsive_images_enabled:
-            entry = await _generate_responsive_for_conversion(
+            from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
+                generate_responsive_images_for_media,
+            )
+
+            entry = await generate_responsive_images_for_media(
                 media, output, conv.name, disk=ctx.disk
             )
             if entry:
@@ -175,38 +188,21 @@ async def _run_conversion_loop(
     return generated, responsive_updates
 
 
-async def _generate_responsive_for_conversion(
-    media: Media,
-    contents: bytes,
-    conversion_name: str,
-    *,
-    disk: Any,
-) -> dict[str, Any] | None:
-    """Generate responsive variants from a conversion's output bytes."""
-    from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
-        generate_responsive_images_for_media,
-    )
-
-    return await generate_responsive_images_for_media(media, contents, conversion_name, disk=disk)
-
-
-async def _maybe_regenerate_responsive(media: Media, contents: bytes, disk: Any) -> None:
+async def _maybe_regenerate_responsive(media: Media, contents: bytes, disk: StorageDisk) -> None:
     """Re-generate the original's responsive variants when they were previously generated.
 
-    Only runs for the ``"medialibrary_original"`` group — conversion-level
-    groups are handled inside ``_run_conversion_loop`` where the conversion
-    output bytes are available.
+    Only runs for the ``"original"`` group — conversion-level groups are
+    handled inside ``_run_conversion_loop`` where the conversion output bytes
+    are available.
     """
-    if "medialibrary_original" not in (media.responsive_images or {}):
+    if "original" not in (media.responsive_images or {}):
         return
     from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
         generate_responsive_images_for_media,
     )
 
-    entry = await generate_responsive_images_for_media(
-        media, contents, "medialibrary_original", disk=disk
-    )
+    entry = await generate_responsive_images_for_media(media, contents, "original", disk=disk)
     if entry:
         existing = dict(media.responsive_images)
-        existing["medialibrary_original"] = entry
+        existing["original"] = entry
         media.responsive_images = existing

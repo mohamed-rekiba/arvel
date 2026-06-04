@@ -60,7 +60,9 @@ class TestResolveParent:
     async def test_resolves_post_parent(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         post = await Wi027Post.create(title="Hello")
-        comment = await post.comments.create(body="nice")
+        comment = await Wi027Comment.create(
+            body="nice", commentable_type="Wi027Post", commentable_id=post.id
+        )
         parent = await comment.commentable
         assert isinstance(parent, Wi027Post)
         assert parent.id == post.id
@@ -89,7 +91,9 @@ class TestAssociateDissociate:
     async def test_dissociate_clears_both(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         post = await Wi027Post.create(title="p")
-        comment = await post.comments.create(body="c")
+        comment = await Wi027Comment.create(
+            body="c", commentable_type="Wi027Post", commentable_id=post.id
+        )
         comment.commentable.dissociate()
         assert comment.commentable_type is None
         assert comment.commentable_id is None
@@ -104,9 +108,9 @@ class TestEagerBatching:
         post_a = await Wi027Post.create(title="A")
         post_b = await Wi027Post.create(title="B")
         video = await Wi027Video.create(name="V")
-        await post_a.comments.create(body="a1")
-        await post_b.comments.create(body="b1")
-        await video.comments.create(body="v1")
+        await Wi027Comment.create(body="a1", commentable_type="Wi027Post", commentable_id=post_a.id)
+        await Wi027Comment.create(body="b1", commentable_type="Wi027Post", commentable_id=post_b.id)
+        await Wi027Comment.create(body="v1", commentable_type="Wi027Video", commentable_id=video.id)
 
         from sqlalchemy import event
 

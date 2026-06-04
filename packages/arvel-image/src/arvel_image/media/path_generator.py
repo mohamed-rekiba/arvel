@@ -1,18 +1,15 @@
 """Path-generator protocol + default scheme.
 
-Default scheme (mirrors Spatie laravel-medialibrary v11)::
+Default scheme::
 
     {id}/{file_name}                                  # original
     {id}/conversions/{conversion}-{file_name}         # derived
 
-``PathGenerator`` is a :class:`typing.Protocol`  so any
-class with the matching shape can replace the binding without inheriting
-from a base. Use the :class:`PathGeneratorBase` ABC if you want nominal
-typing for container resolution and tooling that treats Protocols as
-abstract.
+``PathGenerator`` is a :class:`typing.Protocol`, so any class with the
+matching shape can replace the binding without inheriting from a base.
 
 Call :func:`set_path_generator` (e.g. in ``ImageServiceProvider.register``) to
-swap in a custom implementation app-wide
+swap in a custom implementation app-wide.
 """
 
 from __future__ import annotations
@@ -40,7 +37,7 @@ class PathGenerator(Protocol):
 
 
 class DefaultPathGenerator:
-    """Spatie-default layout. Stable across versions; safe for URLs."""
+    """Default layout. Stable across versions; safe for URLs."""
 
     def path_for(self, media: Media) -> str:
         return f"{media.id}/{media.file_name}"

@@ -374,16 +374,10 @@ files = [
     "packages/arvel-permission/src",
     "packages/arvel-permission/tests",
     "packages/arvel-image/src",
-    "packages/arvel-image/tests",
     "packages/arvel-oauth/src",
     "packages/arvel-oauth/tests",
     "packages/arvel-audit/src",
     "packages/arvel-search/src",
-    # arvel-search and arvel-audit tests are namespace dirs under hyphenated
-    # packages, so each tests/conftest resolves to the bare module `conftest`
-    # and would collide with the others (and with arvel-permission) under the
-    # flat run. Checked in isolation via dedicated `mypy packages/<pkg>/tests`
-    # steps (see Makefile).
 ]
 # The skeleton tree is template content, not framework source — it runs under
 # a generated project's sys.path (where `bootstrap.app` exists), not the

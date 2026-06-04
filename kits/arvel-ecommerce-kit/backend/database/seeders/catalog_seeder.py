@@ -580,17 +580,14 @@ class CatalogSeeder(EcommerceSeeder):
         On network failure: Pillow synthesises a plain JPEG so tests run offline.
         """
         from app.models.product import Product  # noqa: PLC0415
-        from app.models.product_base import IMAGES_COLLECTION  # noqa: PLC0415
 
-        product = await Product.where(Product.id == uuid.UUID(product_id)).first()
+        product = await Product.where(Product.id == uuid.UUID(product_id)).with_("media").first()
         if product is None:
             return
 
-        existing = await product.get_first_media(IMAGES_COLLECTION)
+        existing = product.first_media
         if existing is not None and existing.has_generated_conversion("thumbnail"):
             return
 
         image_bytes = await _fetch_product_image(slug)
-        await product.add_media(image_bytes, file_name=f"{slug}.jpg").to_media_collection(
-            IMAGES_COLLECTION
-        )
+        await product.add_image(image_bytes, file_name=f"{slug}.jpg")

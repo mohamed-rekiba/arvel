@@ -37,14 +37,14 @@ class TestV026StockFieldName:
     def test_stock_qty_absent_from_storefront(self) -> None:
         src = _src(_PRODUCT_SVC)
         # "stock_qty" still appears in admin helper and ORM access — ensure it's
-        # not used as a response KEY in _product_to_storefront
-        func_start = src.find("def _product_to_storefront(")
+        # not used as a response KEY in product_to_storefront
+        func_start = src.find("def product_to_storefront(")
         func_end = src.find("\n    @staticmethod", func_start + 1)
         if func_end == -1:
             func_end = src.find("\n    async def", func_start + 1)
         storefront_body = src[func_start:func_end] if func_end != -1 else src[func_start:]
         assert '"stock_qty"' not in storefront_body, (
-            "V-026 not fixed: 'stock_qty' must not be a response key in _product_to_storefront"
+            "V-026 not fixed: 'stock_qty' must not be a response key in product_to_storefront"
         )
 
 
@@ -60,14 +60,14 @@ class TestV027ShortDescriptionFieldName:
 
     def test_description_key_absent_from_storefront(self) -> None:
         src = _src(_PRODUCT_SVC)
-        func_start = src.find("def _product_to_storefront(")
+        func_start = src.find("def product_to_storefront(")
         func_end = src.find("\n    @staticmethod", func_start + 1)
         if func_end == -1:
             func_end = src.find("\n    async def", func_start + 1)
         storefront_body = src[func_start:func_end] if func_end != -1 else src[func_start:]
         assert '"description"' not in storefront_body, (
             "V-027 not fixed: 'description' key must not appear"
-            " in _product_to_storefront return dict"
+            " in product_to_storefront return dict"
         )
 
 
@@ -168,7 +168,7 @@ class TestV031CategorySlugWrapped:
 class TestV032OptionalProductCardFields:
     def _get_storefront_body(self) -> str:
         src = _src(_PRODUCT_SVC)
-        func_start = src.find("def _product_to_storefront(")
+        func_start = src.find("def product_to_storefront(")
         func_end = src.find("\n    @staticmethod", func_start + 1)
         if func_end == -1:
             func_end = src.find("\n    async def", func_start + 1)
@@ -176,32 +176,32 @@ class TestV032OptionalProductCardFields:
 
     def test_original_price_present(self) -> None:
         assert '"original_price"' in self._get_storefront_body(), (
-            "V-032 not fixed: 'original_price' missing from _product_to_storefront"
+            "V-032 not fixed: 'original_price' missing from product_to_storefront"
         )
 
     def test_thumbnail_url_present(self) -> None:
         assert '"thumbnail_url"' in self._get_storefront_body(), (
-            "V-032 not fixed: 'thumbnail_url' missing from _product_to_storefront"
+            "V-032 not fixed: 'thumbnail_url' missing from product_to_storefront"
         )
 
     def test_rating_present(self) -> None:
         assert '"rating"' in self._get_storefront_body(), (
-            "V-032 not fixed: 'rating' missing from _product_to_storefront"
+            "V-032 not fixed: 'rating' missing from product_to_storefront"
         )
 
     def test_rating_count_present(self) -> None:
         assert '"rating_count"' in self._get_storefront_body(), (
-            "V-032 not fixed: 'rating_count' missing from _product_to_storefront"
+            "V-032 not fixed: 'rating_count' missing from product_to_storefront"
         )
 
     def test_is_new_present(self) -> None:
         assert '"is_new"' in self._get_storefront_body(), (
-            "V-032 not fixed: 'is_new' missing from _product_to_storefront"
+            "V-032 not fixed: 'is_new' missing from product_to_storefront"
         )
 
     def test_is_bestseller_present(self) -> None:
         assert '"is_bestseller"' in self._get_storefront_body(), (
-            "V-032 not fixed: 'is_bestseller' missing from _product_to_storefront"
+            "V-032 not fixed: 'is_bestseller' missing from product_to_storefront"
         )
 
 

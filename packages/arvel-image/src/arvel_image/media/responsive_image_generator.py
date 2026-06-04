@@ -1,17 +1,16 @@
-"""Responsive image generation — Spatie laravel-medialibrary v11 parity.
+"""Responsive image generation.
 
-Width algorithm: FileSizeOptimizedWidthCalculator.
-Each step: ``next_width = current_width * sqrt(0.7)`` (approx 0.8367).  Since
-file size scales roughly as area (w^2), this targets ~30% reduction per step.
-Generation stops when the predicted file size drops below 10 KB or the target
-width falls below 20 px.
+Width algorithm: file-size-optimized. Each step shrinks the width by
+``sqrt(0.7)`` (≈0.8367); since file size scales roughly with area (w²),
+that targets ~30% size reduction per step. Generation stops when the
+predicted file size drops below 10 KB or the target width falls below 20 px.
 
 ``responsive_images`` column format (one key per generated group)::
 
     {
-        "medialibrary_original": {
+        "original": {
             "urls": [
-                {"path": "1/responsive-images/photo___medialibrary_original_2400_1589.jpg",
+                {"path": "1/responsive-images/photo___original_2400_1589.jpg",
                  "width": 2400, "height": 1589},
                 ...
             ],
@@ -19,8 +18,8 @@ width falls below 20 px.
         }
     }
 
-``"medialibrary_original"`` is the key used for the original file's variants.
-Conversion-level responsive images use the conversion name as the key.
+``"original"`` is the key for the original file's variants. Conversion-level
+responsive groups use the conversion name as the key (e.g. ``"card"``).
 """
 
 from __future__ import annotations
@@ -29,10 +28,38 @@ import base64
 import math
 from io import BytesIO
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, TypedDict, cast
 
 if TYPE_CHECKING:
+    from arvel.storage import StorageDisk
+
     from arvel_image.media.model import Media
+
+
+class ResponsiveImageUrl(TypedDict):
+    """One variant URL row in a ``ResponsiveImageEntry``."""
+
+    path: str
+    width: int
+    height: int
+
+
+class ResponsiveImageEntry(TypedDict):
+    """One entry in the ``responsive_images`` JSON column.
+
+    Keyed by group name in the parent dict — ``"original"`` for the original
+    file's variants, conversion name (e.g. ``"card"``) for conversion-derived
+    variants.
+    """
+
+    urls: list[ResponsiveImageUrl]
+    base64svg: str
+
+
+# Whole column shape: {group_key: ResponsiveImageEntry}. Functions that
+# accept/return the full structure use this alias; row-level functions take
+# the entry directly.
+ResponsiveImages = dict[str, ResponsiveImageEntry]
 
 
 class _PILImage(Protocol):
@@ -58,10 +85,12 @@ def calculate_responsive_widths(
     original_width: int,
     file_size: int,
 ) -> list[int]:
-    """Return widths (largest first, original included) for srcset variants.
+    """Return widths (ascending, original included) for srcset variants.
 
-    Implements Spatie's FileSizeOptimizedWidthCalculator: each step reduces the
-    predicted file size by ~30% by shrinking the width by sqrt(0.7).
+    Each step shrinks the predicted file size by ~30% by shrinking the width
+    by ``sqrt(0.7)``. The returned list is sorted ascending — srcset order is
+    semantically unordered, but ascending is what humans and most static-site
+    templating expects.
     """
     widths: list[int] = [original_width]
     current = float(original_width)
@@ -74,14 +103,14 @@ def calculate_responsive_widths(
         if est_size < _MIN_FILE_SIZE:
             break
         widths.append(w)
+    widths.sort()
     return widths
 
 
 def responsive_path(media: Media, width: int, height: int, key: str) -> str:
     """Disk-relative path for a responsive variant.
 
-    Format: ``{id}/responsive-images/{stem}___{key}_{width}_{height}.{ext}``
-    Mirrors Spatie's ``ResponsiveImage`` filename scheme exactly.
+    Format: ``{id}/responsive-images/{stem}___{key}_{width}_{height}.{ext}``.
     """
     stem = PurePosixPath(media.file_name).stem
     ext = PurePosixPath(media.file_name).suffix.lstrip(".")
@@ -92,8 +121,7 @@ def generate_placeholder_svg(source: bytes, width: int, height: int) -> str:
     """Return a ``data:image/svg+xml;base64,...`` placeholder URI.
 
     Creates a tiny (≤32 px) blurred JPEG thumbnail wrapped in an SVG
-    ``<image>`` element, base64-encoded, matching Spatie's
-    ``TinyPlaceholderGenerator``. Returns ``""`` on any error.
+    ``<image>`` element, base64-encoded. Returns ``""`` on any error.
     """
     from PIL import Image as PILImage  # noqa: PLC0415
 
@@ -109,6 +137,9 @@ def generate_placeholder_svg(source: bytes, width: int, height: int) -> str:
         resized.save(buf, format="JPEG", quality=20)
         img_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
     except Exception:  # noqa: BLE001
+        # Placeholder is best-effort. Pillow can raise UnidentifiedImageError,
+        # OSError, or codec quirks; an empty placeholder is fine — the rest
+        # of the responsive entry still works.
         return ""
 
     svg = (
@@ -129,12 +160,14 @@ async def generate_responsive_images_for_media(
     source: bytes,
     key: str,
     *,
-    disk: Any,
-) -> dict[str, Any]:
+    disk: StorageDisk,
+) -> ResponsiveImageEntry | dict[str, Any]:
     """Generate all width variants, store them on ``disk``, return the column entry.
 
-    Returns ``{}`` when the source is not a decodable image or is too small to
-    generate any variants — caller should skip updating the column in that case.
+    Returns ``{}`` (an empty dict, not a valid entry) when the source is not a
+    decodable image or is too small to generate any variants — caller should
+    skip updating the column in that case. Successful returns are a fully
+    populated :class:`ResponsiveImageEntry`.
     """
     from PIL import Image as PILImage  # noqa: PLC0415
 
@@ -143,10 +176,13 @@ async def generate_responsive_images_for_media(
             original_width, original_height = img.size
             src_format: str = img.format or "JPEG"
     except Exception:  # noqa: BLE001
+        # Not a decodable image — skip the responsive entry. Pillow's failure
+        # set is too wide (UnidentifiedImageError, OSError, codec-specific
+        # errors) to narrow usefully.
         return {}
 
     widths = calculate_responsive_widths(original_width, len(source))
-    urls: list[dict[str, Any]] = []
+    urls: list[ResponsiveImageUrl] = []
 
     for target_width in widths:
         variant = _resize_variant(source, target_width, original_width, original_height, src_format)
@@ -164,10 +200,10 @@ async def generate_responsive_images_for_media(
     if not urls:
         return {}
 
-    return {
-        "urls": urls,
-        "base64svg": generate_placeholder_svg(source, original_width, original_height),
-    }
+    return ResponsiveImageEntry(
+        urls=urls,
+        base64svg=generate_placeholder_svg(source, original_width, original_height),
+    )
 
 
 def _resize_variant(
@@ -194,14 +230,19 @@ def _resize_variant(
             resized.save(buf, format=src_format)
             return buf.getvalue(), height
     except Exception:  # noqa: BLE001
+        # A single variant failing is non-fatal — caller skips this width
+        # and keeps the others. Pillow's failure set is too wide to narrow.
         return None
 
 
-async def _put_quiet(disk: Any, path: str, data: bytes) -> bool:
+async def _put_quiet(disk: StorageDisk, path: str, data: bytes) -> bool:
     """Write ``data`` to ``path`` on ``disk``; return False on any error."""
     try:
         await disk.put(path, data)
     except Exception:  # noqa: BLE001
+        # Storage drivers raise driver-specific errors (botocore, gcs, etc.) —
+        # callers shouldn't have to depend on every backend's exception type
+        # just to retry. Return-as-bool keeps the call site clean.
         return False
     else:
         return True
@@ -210,13 +251,19 @@ async def _put_quiet(disk: Any, path: str, data: bytes) -> bool:
 async def delete_responsive_images(
     responsive: dict[str, Any],
     *,
-    disk: Any,
+    disk: StorageDisk,
 ) -> None:
-    """Best-effort delete all stored responsive variant files."""
+    """Best-effort delete all stored responsive variant files.
+
+    Param is the loose JSON-column shape rather than :class:`ResponsiveImages`
+    — older rows or hand-edited data may not match the strict schema exactly.
+    The function defends with ``.get()`` rather than isinstance gates.
+    """
     import contextlib  # noqa: PLC0415
 
     for entry in responsive.values():
-        for url_info in entry.get("urls", []):
+        src_urls: list[Any] = entry.get("urls", []) or []
+        for url_info in src_urls:
             path: str = url_info.get("path", "")
             if not path:
                 continue
@@ -224,12 +271,14 @@ async def delete_responsive_images(
                 await disk.delete(path)
 
 
-async def _copy_variant(src_path: str, new_path: str, *, disk: Any) -> bool:
+async def _copy_variant(src_path: str, new_path: str, *, disk: StorageDisk) -> bool:
     """Copy a single responsive variant file. Returns False on any error."""
     try:
         contents = await disk.get(src_path)
         await disk.put(new_path, contents)
     except Exception:  # noqa: BLE001
+        # Copy is best-effort: a missing source variant shouldn't abort the
+        # row copy. Driver-specific exceptions are too wide to enumerate.
         return False
     else:
         return True
@@ -239,8 +288,8 @@ async def copy_responsive_images(
     src_responsive: dict[str, Any],
     new_media_id: int | str,
     *,
-    disk: Any,
-) -> dict[str, Any]:
+    disk: StorageDisk,
+) -> ResponsiveImages:
     """Copy responsive variant files to a new media ID's path and return
     the rewritten ``responsive_images`` dict for the new row.
 
@@ -249,13 +298,16 @@ async def copy_responsive_images(
     ``{new_media_id}/responsive-images/{filename}`` and rewrite paths in
     the returned dict. Files that fail to copy are silently skipped —
     the copy is best-effort so a missing variant doesn't abort the row copy.
+
+    Param is the loose JSON-column shape; the return is the strict
+    :class:`ResponsiveImages` (well-formed on the new row).
     """
     new_id_str = str(new_media_id)
-    new_responsive: dict[str, Any] = {}
+    new_responsive: ResponsiveImages = {}
 
     for group_key, entry in src_responsive.items():
-        src_urls: list[Any] = entry.get("urls", [])
-        new_urls: list[dict[str, Any]] = []
+        src_urls: list[Any] = entry.get("urls", []) or []
+        new_urls: list[ResponsiveImageUrl] = []
 
         for url_info in src_urls:
             src_path: str = url_info.get("path", "")
@@ -267,17 +319,20 @@ async def copy_responsive_images(
                 continue
             new_path = f"{new_id_str}/{parts[1]}"
             if await _copy_variant(src_path, new_path, disk=disk):
-                new_urls.append({**url_info, "path": new_path})
+                width = int(url_info.get("width", 0) or 0)
+                height = int(url_info.get("height", 0) or 0)
+                new_urls.append({"path": new_path, "width": width, "height": height})
 
-        new_responsive[group_key] = {
-            **{k: v for k, v in entry.items() if k != "urls"},
-            "urls": new_urls,
-        }
+        base64svg = entry.get("base64svg", "") or ""
+        new_responsive[group_key] = {"urls": new_urls, "base64svg": base64svg}
 
     return new_responsive
 
 
 __all__ = [
+    "ResponsiveImageEntry",
+    "ResponsiveImageUrl",
+    "ResponsiveImages",
     "calculate_responsive_widths",
     "copy_responsive_images",
     "delete_responsive_images",

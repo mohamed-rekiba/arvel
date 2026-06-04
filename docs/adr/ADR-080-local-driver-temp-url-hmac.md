@@ -57,7 +57,7 @@ The HMAC key is derived from `APP_KEY` using HKDF-SHA256 (info `b"arvel-storage-
 
 > **Amendment (WI-arvel-003).** This route is one of two local-serving modes. The other is a
 > static `StaticFiles` mount at `/storage` serving the `public/storage` symlink created by
-> `storage:link` (see ADR-137). The route here (at `STORAGE_LOCAL_URL`) streams through the app and
+> `storage:link` (see ADR-134). The route here (at `STORAGE_LOCAL_URL`) streams through the app and
 > supports signed temp URLs; the static mount bypasses the app for plain public assets. They
 > coexist on distinct paths unless `STORAGE_LOCAL_URL` is also `/storage`.
 

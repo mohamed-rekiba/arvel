@@ -1,12 +1,12 @@
 [project]
 name = "arvel-image"
 version = "0.7.0" # x-release-please-version
-description = "Fluent, type-safe image manipulation for Arvel — Spatie Image v3 parity, Pillow-only."
+description = "Fluent, type-safe image manipulation and polymorphic media library for Arvel."
 readme = "README.md"
 requires-python = ">=3.14"
 license = { text = "MIT" }
 authors = [{ name = "Arvel contributors" }]
-keywords = ["arvel", "image", "pillow", "spatie", "thumbnail", "resize"]
+keywords = ["arvel", "image", "pillow", "media", "thumbnail", "resize", "upload"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

@@ -1,4 +1,4 @@
-"""Tests for medialibrary v11 parity."""
+"""Media library tests (round 1) — covers the DX-cleaned public surface."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import base64
 import io
 import uuid
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -38,7 +38,7 @@ def png_bytes() -> bytes:
     return buf.getvalue()
 
 
-# ─── Engine / session (mirrors test_media.py conftest pattern) ───────────────
+# ─── Engine / session ────────────────────────────────────────────────────────
 
 _HOST_CACHE_046: dict[str, type[Any]] = {}
 
@@ -62,8 +62,9 @@ def _host_046() -> type[Any]:
     from arvel.database.columns import id_, string
     from arvel_image import Conversion, HasMedia, MediaCollection
 
-    class Host046(Model, HasMedia, Timestamps):
+    class Host046(HasMedia, Model, Timestamps):
         __tablename__ = "media_046_hosts"
+        __media_collection__ = "gallery"
 
         id: int = id_()
         name: str = string(120)
@@ -79,15 +80,13 @@ def _host_046() -> type[Any]:
     return Host046
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# UUID auto-generation
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── UUID auto-generation ────────────────────────────────────────────────────
 
 
-async def test_uuid_is_set_after_add_media(
+async def test_uuid_is_set_after_add_image(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """FileAdder.to_media_collection() populates uuid on the row."""
+    """add_image() assigns a UUID4 on the row."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -95,11 +94,8 @@ async def test_uuid_is_set_after_add_media(
     host = await Host.create(name="alice")
 
     with Storage.fake():
-        media = await host.add_media(jpeg_bytes, file_name="photo.jpg").to_media_collection(
-            "gallery"
-        )
+        media = await host.add_image(jpeg_bytes, file_name="photo.jpg")
 
-    # Must be a valid UUID4 string — not None
     assert media.uuid is not None
     parsed = uuid.UUID(str(media.uuid))
     assert parsed.version == 4
@@ -116,17 +112,15 @@ async def test_two_media_rows_have_distinct_uuids(
     host = await Host.create(name="bob")
 
     with Storage.fake():
-        m1 = await host.add_media(jpeg_bytes, file_name="a.jpg").to_media_collection("gallery")
-        m2 = await host.add_media(jpeg_bytes, file_name="b.jpg").to_media_collection("gallery")
+        m1 = await host.add_image(jpeg_bytes, file_name="a.jpg")
+        m2 = await host.add_image(jpeg_bytes, file_name="b.jpg")
 
     assert m1.uuid is not None
     assert m2.uuid is not None
     assert m1.uuid != m2.uuid
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Atomic ingestion rollback
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── Atomic ingestion rollback ───────────────────────────────────────────────
 
 
 async def test_rollback_on_conversion_failure_deletes_row_and_file(
@@ -140,7 +134,6 @@ async def test_rollback_on_conversion_failure_deletes_row_and_file(
     await _create_tables_046(engine)
     Host = _host_046()
 
-    # Build a host with a conversion that always fails
     host = await Host.create(name="charlie")
     coll = MediaCollection("crash").with_conversions(Conversion("broken"))
 
@@ -156,9 +149,8 @@ async def test_rollback_on_conversion_failure_deletes_row_and_file(
             pytest.raises((RuntimeError, ConversionFailedError)),
             patch.object(host, "collection_for", return_value=coll),
         ):
-            await host.add_media(jpeg_bytes, file_name="photo.jpg").to_media_collection("crash")
+            await host.add_image(jpeg_bytes, file_name="photo.jpg", collection="crash")
 
-        # Row MUST have been deleted (rollback)
         from arvel.database.session import get_active_session
         from arvel_image import Media
         from sqlalchemy import select
@@ -168,15 +160,12 @@ async def test_rollback_on_conversion_failure_deletes_row_and_file(
         rows = list(result.scalars())
         assert rows == [], "orphaned Media row found after conversion failure"
 
-        # Original file MUST have been removed from storage
         assert ctx.fake.disk().files == {} or all(
             not p.startswith("") for p in ctx.fake.disk().files
         ), "orphaned file found after conversion failure"
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# conversions_disk honoured
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── conversions_disk ────────────────────────────────────────────────────────
 
 
 async def test_conversions_disk_persisted_on_row(
@@ -194,12 +183,10 @@ async def test_conversions_disk_persisted_on_row(
         .use_conversions_disk("cdn")
         .with_conversions(Conversion("thumb").fit("cover", 4, 4).format("png"))
     )
-    # MediaCollection.use_conversions_disk must exist
-    assert hasattr(coll, "conversions_disk"), "use_conversions_disk attribute not found"
+    assert hasattr(coll, "conversions_disk")
 
 
 def test_media_collection_use_conversions_disk_returns_self() -> None:
-    """use_conversions_disk is a chain method returning Self."""
     from arvel_image import MediaCollection
 
     coll = MediaCollection("x")
@@ -208,9 +195,7 @@ def test_media_collection_use_conversions_disk_returns_self() -> None:
     assert coll.conversions_disk == "cdn"
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Ordered get_media()
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── Ordered get_media() ─────────────────────────────────────────────────────
 
 
 async def test_get_media_returns_in_order_column_asc(
@@ -224,11 +209,10 @@ async def test_get_media_returns_in_order_column_asc(
     host = await Host.create(name="eve")
 
     with Storage.fake():
-        m1 = await host.add_media(jpeg_bytes, file_name="first.jpg").to_media_collection("gallery")
-        m2 = await host.add_media(jpeg_bytes, file_name="second.jpg").to_media_collection("gallery")
-        m3 = await host.add_media(jpeg_bytes, file_name="third.jpg").to_media_collection("gallery")
+        m1 = await host.add_image(jpeg_bytes, file_name="first.jpg")
+        m2 = await host.add_image(jpeg_bytes, file_name="second.jpg")
+        m3 = await host.add_image(jpeg_bytes, file_name="third.jpg")
 
-    # Manually set order_column out of insertion order
     m1.order_column = 3
     m2.order_column = 1
     m3.order_column = 2
@@ -240,40 +224,23 @@ async def test_get_media_returns_in_order_column_asc(
     sess.add(m3)
     await sess.commit()
 
-    rows = await host.get_media("gallery")
+    await host.load("media")
+    rows = host.get_media()
     assert [r.file_name for r in rows] == ["second.jpg", "third.jpg", "first.jpg"]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# -- add_media_from_url --
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── add_image with URLs ─────────────────────────────────────────────────────
 
 
-async def test_add_media_from_url_exists_on_has_media() -> None:
-    """HasMedia must expose add_media_from_url as an async method."""
-    from arvel_image import HasMedia
-
-    assert hasattr(HasMedia, "add_media_from_url"), "add_media_from_url not found on HasMedia"
-    import inspect
-
-    assert inspect.iscoroutinefunction(HasMedia.add_media_from_url), (
-        "add_media_from_url must be async"
-    )
-
-
-async def test_add_media_from_url_downloads_and_ingests(
+async def test_add_image_downloads_url_and_ingests(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """add_media_from_url fetches bytes via httpx and ingests them."""
+    """add_image('https://...') fetches bytes via the SSRF-guarded fetcher."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
     Host = _host_046()
     host = await Host.create(name="frank")
-
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.content = jpeg_bytes
 
     with (
         Storage.fake(),
@@ -283,15 +250,13 @@ async def test_add_media_from_url_downloads_and_ingests(
             return_value=(jpeg_bytes, "photo.jpg"),
         ),
     ):
-        media = await (
-            await host.add_media_from_url("https://example.com/photo.jpg", file_name="photo.jpg")
-        ).to_media_collection("gallery")
+        media = await host.add_image("https://example.com/photo.jpg")
 
     assert media.file_name == "photo.jpg"
     assert media.size == len(jpeg_bytes)
 
 
-async def test_add_media_from_url_ssrf_guard_blocks_private_ip() -> None:
+async def test_add_image_ssrf_guard_blocks_private_ip() -> None:
     """SSRF guard rejects private IP addresses."""
     from arvel_image.media.url_fetcher import fetch_url
 
@@ -299,7 +264,7 @@ async def test_add_media_from_url_ssrf_guard_blocks_private_ip() -> None:
         await fetch_url("http://192.168.1.1/secret", max_bytes=1024 * 1024)
 
 
-async def test_add_media_from_url_ssrf_guard_blocks_loopback() -> None:
+async def test_add_image_ssrf_guard_blocks_loopback() -> None:
     """SSRF guard rejects loopback addresses."""
     from arvel_image.media.url_fetcher import fetch_url
 
@@ -307,9 +272,7 @@ async def test_add_media_from_url_ssrf_guard_blocks_loopback() -> None:
         await fetch_url("http://127.0.0.1/secret", max_bytes=1024 * 1024)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# with_custom_properties() on FileAdder
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── with_custom_properties on the builder ──────────────────────────────────
 
 
 async def test_with_custom_properties_persisted_on_row(
@@ -323,10 +286,10 @@ async def test_with_custom_properties_persisted_on_row(
     host = await Host.create(name="grace")
 
     with Storage.fake():
-        media = (
-            await host.add_media(jpeg_bytes, file_name="photo.jpg")
+        media = await (
+            host.image_builder(jpeg_bytes, file_name="photo.jpg")
             .with_custom_properties({"alt": "beach", "role": "hero"})
-            .to_media_collection("gallery")
+            .save()
         )
 
     assert media.custom_properties == {"alt": "beach", "role": "hero"}
@@ -343,23 +306,20 @@ async def test_with_custom_properties_merges_on_second_call(
     host = await Host.create(name="henry")
 
     with Storage.fake():
-        media = (
-            await host.add_media(jpeg_bytes, file_name="photo.jpg")
+        media = await (
+            host.image_builder(jpeg_bytes, file_name="photo.jpg")
             .with_custom_properties({"key1": "val1"})
             .with_custom_properties({"key2": "val2"})
-            .to_media_collection("gallery")
+            .save()
         )
 
     assert media.custom_properties == {"key1": "val1", "key2": "val2"}
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Collection MIME + size validation
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── Collection MIME + size validation ──────────────────────────────────────
 
 
 def test_media_collection_accept_mime_types_returns_self() -> None:
-    """accept_mime_types is a chain method on MediaCollection."""
     from arvel_image import MediaCollection
 
     coll = MediaCollection("docs")
@@ -368,7 +328,6 @@ def test_media_collection_accept_mime_types_returns_self() -> None:
 
 
 def test_media_collection_max_file_size_returns_self() -> None:
-    """max_file_size is a chain method on MediaCollection."""
     from arvel_image import MediaCollection
 
     coll = MediaCollection("docs")
@@ -394,8 +353,7 @@ async def test_validation_rejects_wrong_mime_before_io(
             pytest.raises(Exception, match="[Mm]ime|[Tt]ype|[Ii]nvalid"),
             patch.object(host, "collection_for", return_value=coll),
         ):
-            await host.add_media(jpeg_bytes, file_name="photo.jpg").to_media_collection("pdf_only")
-        # Nothing should have been written to storage
+            await host.add_image(jpeg_bytes, file_name="photo.jpg", collection="pdf_only")
         assert ctx.fake.disk().files == {}
 
 
@@ -410,24 +368,22 @@ async def test_validation_rejects_oversized_file_before_io(
     Host = _host_046()
     host = await Host.create(name="jack")
 
-    coll = MediaCollection("tiny").max_file_size(1)  # 1 byte max
+    coll = MediaCollection("tiny").max_file_size(1)
 
     with Storage.fake() as ctx:
         with (
             pytest.raises(Exception, match="[Ss]ize|[Ll]arge|[Bb]ig"),
             patch.object(host, "collection_for", return_value=coll),
         ):
-            await host.add_media(jpeg_bytes, file_name="photo.jpg").to_media_collection("tiny")
+            await host.add_image(jpeg_bytes, file_name="photo.jpg", collection="tiny")
         assert ctx.fake.disk().files == {}
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# model_id VARCHAR for UUID host PKs
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── model_id VARCHAR for UUID host PKs ──────────────────────────────────────
 
 
 def test_media_model_id_is_string_type() -> None:
-    """Media.model_id must be a String column, not Integer."""
+    """Media.model_id must be a String column."""
     from arvel_image import Media
     from sqlalchemy import String
     from sqlalchemy.orm import class_mapper
@@ -460,9 +416,7 @@ async def test_media_model_id_stores_uuid_pk(engine: AsyncEngine, session: Async
     assert len(media.model_id) == 36
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# to_disk() override on FileAdder
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── to_disk() override on the builder ──────────────────────────────────────
 
 
 def test_file_adder_to_disk_returns_self(jpeg_bytes: bytes) -> None:
@@ -470,7 +424,6 @@ def test_file_adder_to_disk_returns_self(jpeg_bytes: bytes) -> None:
     from arvel_image.media.file_adder import FileAdder
     from arvel_image.media.trait import HasMedia
 
-    # Minimal stub host
     class _FakeHost(HasMedia):
         id = 1
 
@@ -490,58 +443,43 @@ async def test_to_disk_overrides_collection_disk(
     host = await Host.create(name="kate")
 
     with Storage.fake():
-        media = (
-            await host.add_media(jpeg_bytes, file_name="photo.jpg")
-            .to_disk("custom_disk")
-            .to_media_collection("gallery")
+        media = await (
+            host.image_builder(jpeg_bytes, file_name="photo.jpg").to_disk("custom_disk").save()
         )
 
     assert media.disk == "custom_disk"
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Fallback URL
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── Fallback URL ────────────────────────────────────────────────────────────
 
 
-async def test_get_media_url_returns_fallback_when_empty(
+async def test_image_url_returns_fallback_when_empty(
     engine: AsyncEngine, session: AsyncSession
 ) -> None:
-    """get_media_url returns fallback when collection is empty."""
+    """image_url(fallback=...) returns the fallback when the collection is empty."""
     await _create_tables_046(engine)
     Host = _host_046()
     host = await Host.create(name="liam")
+    await host.load("media")
 
-    url = await host.get_media_url("gallery", fallback="https://example.com/default.jpg")
+    url = host.image_url(fallback="https://example.com/default.jpg")
     assert url == "https://example.com/default.jpg"
 
 
-async def test_get_first_media_url_alias_exists() -> None:
-    """HasMedia.get_first_media_url is present."""
+def test_image_url_method_exists() -> None:
+    """HasMedia.image_url replaces the old get_first_media_url alias."""
     from arvel_image import HasMedia
 
-    assert hasattr(HasMedia, "get_first_media_url"), "get_first_media_url not found"
+    assert callable(getattr(HasMedia, "image_url", None))
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# -- add_media_from_base64 --
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── add_image with base64 ───────────────────────────────────────────────────
 
 
-async def test_add_media_from_base64_exists() -> None:
-    """HasMedia.add_media_from_base64 is an async method."""
-    import inspect
-
-    from arvel_image import HasMedia
-
-    assert hasattr(HasMedia, "add_media_from_base64")
-    assert inspect.iscoroutinefunction(HasMedia.add_media_from_base64)
-
-
-async def test_add_media_from_base64_decodes_and_ingests(
+async def test_add_image_decodes_base64_and_ingests(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """base64 encoded image is decoded and ingested correctly."""
+    """add_image(<base64>) decodes and ingests."""
     from arvel.facades import Storage
 
     await _create_tables_046(engine)
@@ -551,15 +489,13 @@ async def test_add_media_from_base64_decodes_and_ingests(
     encoded = base64.b64encode(jpeg_bytes).decode()
 
     with Storage.fake():
-        media = await (await host.add_media_from_base64(encoded, "photo.jpg")).to_media_collection(
-            "gallery"
-        )
+        media = await host.add_image(encoded, file_name="photo.jpg")
 
     assert media.size == len(jpeg_bytes)
     assert media.file_name == "photo.jpg"
 
 
-async def test_add_media_from_base64_strips_data_uri_prefix(
+async def test_add_image_strips_data_uri_prefix(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
     """data:image/jpeg;base64,<data> prefix is stripped before decode."""
@@ -572,33 +508,28 @@ async def test_add_media_from_base64_strips_data_uri_prefix(
     data_uri = f"data:image/jpeg;base64,{base64.b64encode(jpeg_bytes).decode()}"
 
     with Storage.fake():
-        media = await (await host.add_media_from_base64(data_uri, "photo.jpg")).to_media_collection(
-            "gallery"
-        )
+        media = await host.add_image(data_uri, file_name="photo.jpg")
 
     assert media.size == len(jpeg_bytes)
 
 
-async def test_add_media_from_base64_rejects_malformed() -> None:
-    """malformed base64 raises MediaError."""
-    from arvel_image import MediaError
-    from arvel_image.media.trait import HasMedia
+async def test_add_image_rejects_malformed_base64() -> None:
+    """malformed base64 raises MediaError when paired with a clearly-base64 input."""
+    from arvel_image import HasMedia, MediaError
 
     class _FakeHost(HasMedia):
         id = 1
 
     host = _FakeHost()
-    with pytest.raises((MediaError, Exception)):
-        await host.add_media_from_base64("not-valid-base64!!!", "bad.jpg")
+    # Use a data URI so it's unambiguously a base64 input (not a file path).
+    with pytest.raises(MediaError):
+        await host.add_image("data:image/jpeg;base64,!!not-valid!!", file_name="bad.jpg")
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# -- only_keep_latest --
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── only_keep_latest ────────────────────────────────────────────────────────
 
 
 def test_only_keep_latest_returns_self() -> None:
-    """only_keep_latest is a chain method on MediaCollection."""
     from arvel_image import MediaCollection
 
     coll = MediaCollection("photos")
@@ -631,30 +562,24 @@ async def test_only_keep_latest_prunes_oldest(
     with Storage.fake():
         for i in range(4):
             with patch.object(host, "collection_for", return_value=coll):
-                await host.add_media(jpeg_bytes, file_name=f"photo_{i}.jpg").to_media_collection(
-                    "rolling"
-                )
+                await host.add_image(jpeg_bytes, file_name=f"photo_{i}.jpg", collection="rolling")
 
-    rows = await host.get_media("rolling")
+    rows = host.media_in("rolling")
     assert len(rows) == 3
     names = {r.file_name for r in rows}
-    # The oldest (photo_0.jpg) must have been pruned
     assert "photo_0.jpg" not in names
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# move() and copy() on Media
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── move() and copy() on Media ──────────────────────────────────────────────
 
 
 async def test_media_has_move_and_copy_methods() -> None:
-    """Media exposes async move() and copy()."""
     import inspect
 
     from arvel_image import Media
 
-    assert hasattr(Media, "move"), "Media.move not found"
-    assert hasattr(Media, "copy"), "Media.copy not found"
+    assert hasattr(Media, "move")
+    assert hasattr(Media, "copy")
     assert inspect.iscoroutinefunction(Media.move)
     assert inspect.iscoroutinefunction(Media.copy)
 
@@ -671,16 +596,13 @@ async def test_media_copy_creates_new_row(
     dst_host = await Host.create(name="quinn")
 
     with Storage.fake():
-        original = await src_host.add_media(jpeg_bytes, file_name="photo.jpg").to_media_collection(
-            "gallery"
-        )
+        original = await src_host.add_image(jpeg_bytes, file_name="photo.jpg")
         copied = await original.copy(dst_host, collection="gallery")
 
     assert copied.id != original.id
     assert copied.model_id == str(dst_host.id)
 
-    # Original still exists
-    src_rows = await src_host.get_media("gallery")
+    src_rows = src_host.get_media()
     assert len(src_rows) == 1
 
 
@@ -696,33 +618,29 @@ async def test_media_move_changes_owner_and_removes_from_source(
     dst_host = await Host.create(name="sam")
 
     with Storage.fake():
-        original = await src_host.add_media(jpeg_bytes, file_name="photo.jpg").to_media_collection(
-            "gallery"
-        )
+        original = await src_host.add_image(jpeg_bytes, file_name="photo.jpg")
         moved = await original.move(dst_host, collection="gallery")
 
     assert moved.model_id == str(dst_host.id)
 
-    src_rows = await src_host.get_media("gallery")
+    await src_host.load("media")
+    src_rows = src_host.get_media()
     assert len(src_rows) == 0
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Regenerate conversions service + CLI
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── MediaLibrary regenerate ─────────────────────────────────────────────────
 
 
 def test_media_library_service_exists() -> None:
-    """MediaLibrary service class is importable."""
     from arvel_image.media.media_library import MediaLibrary
 
-    assert hasattr(MediaLibrary, "regenerate"), "MediaLibrary.regenerate not found"
+    assert hasattr(MediaLibrary, "regenerate")
 
 
 async def test_media_library_regenerate_returns_count(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
-    """regenerate() returns the count of reprocessed media rows."""
+    """regenerate(host=, collection=) returns the count of reprocessed rows."""
     from arvel.facades import Storage
     from arvel_image.media.media_library import MediaLibrary
 
@@ -731,8 +649,8 @@ async def test_media_library_regenerate_returns_count(
     host = await Host.create(name="tina")
 
     with Storage.fake():
-        await host.add_media(jpeg_bytes, file_name="p1.jpg").to_media_collection("avatar")
-        await host.add_media(jpeg_bytes, file_name="p2.jpg").to_media_collection("avatar")
+        await host.add_image(jpeg_bytes, file_name="p1.jpg", collection="avatar")
+        await host.add_image(jpeg_bytes, file_name="p2.jpg", collection="avatar")
 
         lib = MediaLibrary()
         count = await lib.regenerate(host=host, collection="avatar")
@@ -741,34 +659,26 @@ async def test_media_library_regenerate_returns_count(
     assert count >= 0
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# size column unsigned consistency
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── size column ─────────────────────────────────────────────────────────────
 
 
 def test_media_size_column_is_big_integer() -> None:
-    """Media.size uses BigInteger (unsigned for MySQL compat)."""
     from arvel_image import Media
     from sqlalchemy import BigInteger
     from sqlalchemy.orm import class_mapper
 
     mapper = class_mapper(Media)
     col = mapper.columns["size"]
-    assert isinstance(col.type, BigInteger), (
-        f"Media.size should be BigInteger, got {type(col.type).__name__}"
-    )
+    assert isinstance(col.type, BigInteger)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# -- Image.optimize --
-# ──────────────────────────────────────────────────────────────────────────────
+# ─── Image.optimize ──────────────────────────────────────────────────────────
 
 
 def test_image_optimize_exists() -> None:
-    """Image.optimize() method exists."""
     from arvel_image import Image
 
-    assert hasattr(Image, "optimize"), "Image.optimize not found"
+    assert hasattr(Image, "optimize")
 
 
 def test_image_optimize_returns_self_and_strips_exif(jpeg_bytes: bytes) -> None:
@@ -777,9 +687,8 @@ def test_image_optimize_returns_self_and_strips_exif(jpeg_bytes: bytes) -> None:
 
     img = Image.load(jpeg_bytes)
     result = img.optimize()
-    assert result is img  # chain method
+    assert result is img
 
-    # After optimize, output bytes should still be valid JPEG
     from PIL import Image as PILImage
 
     out = PILImage.open(io.BytesIO(img.to_bytes()))
@@ -787,26 +696,18 @@ def test_image_optimize_returns_self_and_strips_exif(jpeg_bytes: bytes) -> None:
 
 
 def test_image_strip_exif_encodes_with_empty_exif_block(jpeg_bytes: bytes) -> None:
-    """strip_exif() passes exif=b'' to the encoder — explicit GPS/EXIF removal.
-
-    Pillow already drops the source EXIF block on re-encode (documented in
-    Image.optimize()), so strip_exif() is belt-and-suspenders for callers who
-    need the guarantee in writing.
-    """
+    """strip_exif() passes exif=b'' to the encoder."""
     from arvel_image import Image
 
     img = Image.load(jpeg_bytes)
     img.strip_exif()
 
-    # save_kwargs must include exif=b"" for JPEG and WEBP encoders.
     assert img.save_kwargs("JPEG").get("exif") == b""
     assert img.save_kwargs("WEBP").get("exif") == b""
 
-    # Without strip_exif the key is absent (Pillow default behaviour).
     img_no_strip = Image.load(jpeg_bytes)
     assert "exif" not in img_no_strip.save_kwargs("JPEG")
 
-    # The strip flag is also cleared from image.info during build().
     built = img.build()
     assert "exif" not in built.info
 

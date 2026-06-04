@@ -34,10 +34,14 @@ const images = computed(() => product.value?.images ?? [])
 const activeImage = computed(() => images.value[activeIndex.value] ?? null)
 const hasMultiple = computed(() => images.value.length > 1)
 
-watch(slug, (s) => {
-  if (s) void fetchProductBySlug(s).catch(() => undefined)
-  activeIndex.value = 0
-}, { immediate: true })
+watch(
+  slug,
+  (s) => {
+    if (s) void fetchProductBySlug(s).catch(() => undefined)
+    activeIndex.value = 0
+  },
+  { immediate: true },
+)
 watch(product, (p) => storefrontStore.setCurrentProduct(p?.id ?? null), { immediate: true })
 onUnmounted(() => storefrontStore.setCurrentProduct(null))
 
@@ -51,8 +55,14 @@ function next(): void {
 
 function onKeydown(e: KeyboardEvent): void {
   if (!hasMultiple.value) return
-  if (e.key === 'ArrowLeft') { e.preventDefault(); prev() }
-  if (e.key === 'ArrowRight') { e.preventDefault(); next() }
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    prev()
+  }
+  if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    next()
+  }
 }
 
 function onTouchStart(e: TouchEvent): void {
@@ -116,8 +126,8 @@ async function handleAddToCart(): Promise<void> {
             <img
               v-if="activeImage"
               :key="activeIndex"
-              :src="activeImage.card_url || activeImage.url"
-              :srcset="activeImage.srcset || undefined"
+              :src="activeImage.conversions?.card || activeImage.url"
+              :srcset="activeImage.srcsets?.card || undefined"
               sizes="(min-width: 1024px) 50vw, 100vw"
               :alt="`${product.name} — ${t('product.image', 'image')} ${activeIndex + 1}`"
               class="h-full w-full object-cover"
@@ -149,7 +159,14 @@ async function handleAddToCart(): Promise<void> {
               class="absolute start-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white backdrop-blur-sm transition hover:bg-black/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
               @click="prev"
             >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+              <svg
+                class="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
@@ -160,13 +177,22 @@ async function handleAddToCart(): Promise<void> {
               class="absolute end-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white backdrop-blur-sm transition hover:bg-black/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
               @click="next"
             >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+              <svg
+                class="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </button>
 
             <!-- Counter badge -->
-            <span class="absolute bottom-3 end-3 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white tabular-nums backdrop-blur-sm">
+            <span
+              class="absolute bottom-3 end-3 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white tabular-nums backdrop-blur-sm"
+            >
               {{ activeIndex + 1 }} / {{ images.length }}
             </span>
           </template>
@@ -191,7 +217,7 @@ async function handleAddToCart(): Promise<void> {
               @click="activeIndex = i"
             >
               <img
-                :src="img.thumbnail_url || img.url"
+                :src="img.conversions?.thumbnail || img.url"
                 :alt="`${product.name} ${i + 1}`"
                 class="h-full w-full object-cover"
               />

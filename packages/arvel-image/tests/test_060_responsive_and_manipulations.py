@@ -5,8 +5,8 @@ Covers:
 - generate_placeholder_svg produces a data URI
 - with_responsive_images() populates responsive_images column
 - MediaCollection.generate_responsive_images() applies to all adds
-- Media.get_srcset() returns srcset string
-- Media.get_placeholder_svg() returns base64 SVG
+- Media.srcset() returns srcset string
+- Media.placeholder_svg() returns base64 SVG
 - media.delete() removes responsive variant files
 - manipulations: Conversion.with_manipulations() applies overrides without
   mutating the original
@@ -62,8 +62,9 @@ def _host_060() -> type[Any]:
     from arvel_image import HasMedia, MediaCollection
     from arvel_image.media.conversion import Conversion
 
-    class Host060(Model, HasMedia, Timestamps):
+    class Host060(HasMedia, Model, Timestamps):
         __tablename__ = "media_060_hosts"
+        __media_collection__ = "images"
         id: int = id_()
         name: str = string(120)
 
@@ -95,13 +96,13 @@ def test_calculate_responsive_widths_includes_original() -> None:
     from arvel_image.media.responsive_image_generator import calculate_responsive_widths
 
     widths = calculate_responsive_widths(original_width=800, file_size=200_000)
-    assert widths[0] == 800
+    # Ascending order: original is the largest (last); each next step is smaller.
+    assert widths[-1] == 800
     assert all(w > 0 for w in widths)
-    # Each step should be smaller than the previous
     import itertools
 
     for a, b in itertools.pairwise(widths):
-        assert a > b
+        assert a < b
 
 
 def test_calculate_responsive_widths_stops_on_min_file_size() -> None:
@@ -193,13 +194,13 @@ async def test_with_responsive_images_populates_column(
 
     with Storage.fake():
         media = await (
-            host.add_media(large_jpeg_bytes, file_name="photo.jpg")
+            host.image_builder(large_jpeg_bytes, file_name="photo.jpg")
             .with_responsive_images()
-            .to_media_collection("images")
+            .save()
         )
 
     assert media.responsive_images is not None
-    orig_entry = media.responsive_images.get("medialibrary_original")
+    orig_entry = media.responsive_images.get("original")
     assert orig_entry is not None
     urls = orig_entry.get("urls", [])
     assert len(urls) >= 1
@@ -222,12 +223,12 @@ async def test_collection_generate_responsive_images_flag(
     host = await Host060.create(name="coll-resp-host")
 
     with Storage.fake():
-        media = await host.add_media(large_jpeg_bytes, file_name="auto.jpg").to_media_collection(
-            "responsive_col"
+        media = await host.add_image(
+            large_jpeg_bytes, file_name="auto.jpg", collection="responsive_col"
         )
 
     assert media.responsive_images
-    assert "medialibrary_original" in media.responsive_images
+    assert "original" in media.responsive_images
 
 
 async def test_without_responsive_images_disables_collection_flag(
@@ -243,15 +244,15 @@ async def test_without_responsive_images_disables_collection_flag(
 
     with Storage.fake():
         media = await (
-            host.add_media(large_jpeg_bytes, file_name="skip.jpg")
+            host.image_builder(large_jpeg_bytes, file_name="skip.jpg")
             .without_responsive_images()
-            .to_media_collection("responsive_col")
+            .save(collection="responsive_col")
         )
 
     assert not media.responsive_images
 
 
-# ─── Media.get_srcset() / get_placeholder_svg() ───────────────────────────────
+# ─── Media.srcset() / placeholder_svg() ───────────────────────────────────────
 
 
 async def test_get_srcset_returns_w_descriptors(
@@ -267,11 +268,11 @@ async def test_get_srcset_returns_w_descriptors(
 
     with Storage.fake():
         media = await (
-            host.add_media(large_jpeg_bytes, file_name="photo.jpg")
+            host.image_builder(large_jpeg_bytes, file_name="photo.jpg")
             .with_responsive_images()
-            .to_media_collection("images")
+            .save()
         )
-        srcset = await media.get_srcset()
+        srcset = media.srcset()
 
     assert srcset  # non-empty
     parts = [p.strip() for p in srcset.split(",")]
@@ -295,31 +296,27 @@ async def test_get_srcset_empty_when_no_responsive_images(
     host = await Host060.create(name="no-srcset-host")
 
     with Storage.fake():
-        media = await host.add_media(large_jpeg_bytes, file_name="plain.jpg").to_media_collection(
-            "plain"
-        )
-        srcset = await media.get_srcset()
+        media = await host.add_image(large_jpeg_bytes, file_name="plain.jpg", collection="plain")
+        srcset = media.srcset()
 
     assert srcset == ""
 
 
-def test_get_placeholder_svg_is_pure_dict_access() -> None:
-    """get_placeholder_svg reads responsive_images without hitting the DB.
+def test_placeholder_svg_is_pure_dict_access() -> None:
+    """placeholder_svg reads responsive_images without hitting the DB.
 
     Verified here at the dict level because Media.__new__ requires a live
     SQLAlchemy session; the integration path is covered by
-    test_with_responsive_images_populates_column + get_srcset tests.
+    test_with_responsive_images_populates_column + srcset tests.
     """
-    # The implementation reads self.responsive_images[key]["base64svg"].
-    # Invoke via an anonymous object that has the expected attribute.
     from arvel_image.media import model as _mod
 
     class _Stub:
         responsive_images: dict[str, Any] | None = {
-            "medialibrary_original": {"base64svg": "data:image/svg+xml;base64,abc"}
+            "original": {"base64svg": "data:image/svg+xml;base64,abc"}
         }
 
-    result = _mod.Media.get_placeholder_svg(_Stub())  # type: ignore[arg-type]
+    result = _mod.Media.placeholder_svg(_Stub())  # type: ignore[arg-type]
     assert result == "data:image/svg+xml;base64,abc"
 
 
@@ -340,9 +337,7 @@ async def test_manipulations_applied_during_conversion(
 
     with Storage.fake():
         # Add without manipulations — thumb should be 32x32.
-        media = await host.add_media(large_jpeg_bytes, file_name="photo.jpg").to_media_collection(
-            "images"
-        )
+        media = await host.add_image(large_jpeg_bytes, file_name="photo.jpg")
 
         # Apply a manipulation that makes thumb smaller.
         media.manipulations = {"thumb": {"quality": 20}}
@@ -373,11 +368,11 @@ async def test_regenerate_updates_responsive_images(
 
     with Storage.fake():
         media = await (
-            host.add_media(large_jpeg_bytes, file_name="photo.jpg")
+            host.image_builder(large_jpeg_bytes, file_name="photo.jpg")
             .with_responsive_images()
-            .to_media_collection("images")
+            .save()
         )
-        first_urls = list(media.responsive_images["medialibrary_original"]["urls"])
+        first_urls = list(media.responsive_images["original"]["urls"])
 
         from arvel_image.media.media_library import process_one
 
@@ -385,7 +380,7 @@ async def test_regenerate_updates_responsive_images(
 
     # Still present after regeneration
     assert media.responsive_images
-    assert len(media.responsive_images["medialibrary_original"]["urls"]) == len(first_urls)
+    assert len(media.responsive_images["original"]["urls"]) == len(first_urls)
 
 
 # ─── Gap 1: queued uploads propagate responsive image flag ────────────────────
@@ -485,8 +480,9 @@ async def test_conversion_generate_responsive_images_populates_srcset(
     from arvel_image.media.conversion import Conversion
 
     # Define a host with a conversion-level responsive images flag.
-    class HostConvResp(Model, HasMedia, Timestamps):
+    class HostConvResp(HasMedia, Model, Timestamps):
         __tablename__ = "media_060_conv_resp_hosts"
+        __media_collection__ = "images"
         id: int = id_()
         name: str = string(120)
 
@@ -510,18 +506,16 @@ async def test_conversion_generate_responsive_images_populates_srcset(
     host = await HostConvResp.create(name="conv-resp-host")
 
     with Storage.fake():
-        media = await host.add_media(large_jpeg_bytes, file_name="hero.jpg").to_media_collection(
-            "images"
-        )
+        media = await host.add_image(large_jpeg_bytes, file_name="hero.jpg")
 
-    # responsive_images must have a "thumb" key (not "medialibrary_original").
+    # responsive_images must have a "thumb" key (not "original").
     assert "thumb" in media.responsive_images
     thumb_entry = media.responsive_images["thumb"]
     assert thumb_entry.get("urls"), "thumb responsive images should have urls"
 
-    # get_srcset("thumb") must work.
+    # srcset("thumb") must work.
     with Storage.fake():
-        srcset = await media.get_srcset("thumb")
+        srcset = media.srcset("thumb")
     assert "w" in srcset or srcset == ""  # empty is ok for tiny images
 
 
@@ -538,9 +532,7 @@ async def test_conversion_responsive_images_disabled_by_default(
     host = await Host060.create(name="no-conv-resp-host")
 
     with Storage.fake():
-        media = await host.add_media(large_jpeg_bytes, file_name="photo.jpg").to_media_collection(
-            "images"
-        )
+        media = await host.add_image(large_jpeg_bytes, file_name="photo.jpg")
 
     # "thumb" collection has no responsive images enabled on the conversion.
     assert "thumb" not in media.responsive_images
@@ -554,7 +546,7 @@ async def test_process_one_does_not_create_original_entry_for_conversion_only_me
     session: AsyncSession,
     large_jpeg_bytes: bytes,
 ) -> None:
-    """process_one must not add medialibrary_original when only conversion-level
+    """process_one must not add original when only conversion-level
     responsive images exist on the row."""
     from arvel.database import Model, Timestamps
     from arvel.database.columns import id_, string
@@ -563,8 +555,9 @@ async def test_process_one_does_not_create_original_entry_for_conversion_only_me
     from arvel_image.media.conversion import Conversion
     from arvel_image.media.media_library import process_one
 
-    class HostEdge1(Model, HasMedia, Timestamps):
+    class HostEdge1(HasMedia, Model, Timestamps):
         __tablename__ = "media_060_edge1_hosts"
+        __media_collection__ = "images"
         id: int = id_()
         name: str = string(120)
 
@@ -588,17 +581,15 @@ async def test_process_one_does_not_create_original_entry_for_conversion_only_me
     host = await HostEdge1.create(name="edge1-host")
 
     with Storage.fake():
-        media = await host.add_media(large_jpeg_bytes, file_name="photo.jpg").to_media_collection(
-            "images"
-        )
-        # Only "thumb" key should be present — no "medialibrary_original".
+        media = await host.add_image(large_jpeg_bytes, file_name="photo.jpg")
+        # Only "thumb" key should be present — no "original".
         assert "thumb" in media.responsive_images
-        assert "medialibrary_original" not in media.responsive_images
+        assert "original" not in media.responsive_images
 
-        # Calling process_one must not inject "medialibrary_original".
+        # Calling process_one must not inject "original".
         await process_one(media, host, None, None)
 
-    assert "medialibrary_original" not in media.responsive_images
+    assert "original" not in media.responsive_images
 
 
 # ─── Edge case 2: Media.copy() copies responsive variant files ────────────────
@@ -619,9 +610,9 @@ async def test_media_copy_rewrites_responsive_image_paths(
 
     with Storage.fake():
         media = await (
-            host_a.add_media(large_jpeg_bytes, file_name="hero.jpg")
+            host_a.image_builder(large_jpeg_bytes, file_name="hero.jpg")
             .with_responsive_images()
-            .to_media_collection("responsive_col")
+            .save(collection="responsive_col")
         )
         assert media.responsive_images, "Fixture must generate responsive images"
 
@@ -632,7 +623,7 @@ async def test_media_copy_rewrites_responsive_image_paths(
     new_id = str(copied.id)
     assert src_id != new_id
 
-    copied_urls = copied.responsive_images.get("medialibrary_original", {}).get("urls", [])
+    copied_urls = copied.responsive_images.get("original", {}).get("urls", [])
     assert copied_urls, "copy() must carry over responsive image URLs"
     for url_info in copied_urls:
         path: str = url_info["path"]
@@ -654,9 +645,7 @@ async def test_media_copy_without_responsive_images_is_unchanged(
     host_b = await Host060.create(name="copy-noresp-dst")
 
     with Storage.fake():
-        media = await host_a.add_media(large_jpeg_bytes, file_name="photo.jpg").to_media_collection(
-            "plain"
-        )
+        media = await host_a.add_image(large_jpeg_bytes, file_name="photo.jpg", collection="plain")
         assert not media.responsive_images
 
         copied = await media.copy(host_b, collection="plain")

@@ -119,7 +119,6 @@ KITS: dict[str, KitSpec] = {
         next_step_commands=(
             "make env",
             "make up",
-            "make healthcheck",
             "make migrate",
             "make seed",
         ),

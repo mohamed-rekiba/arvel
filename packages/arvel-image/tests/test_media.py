@@ -125,6 +125,70 @@ def test_conversion_apply_runs_chain_against_image(jpeg_bytes_8x8: bytes) -> Non
     assert rebuilt.format == "PNG"
 
 
+def test_conversion_to_width_preserves_aspect_ratio() -> None:
+    """Conversion.to_width delegates to Image.to_width."""
+    from io import BytesIO
+
+    from arvel_image import Image
+    from arvel_image.media import Conversion
+    from PIL import Image as PILImage
+
+    src_img = PILImage.new("RGB", (200, 100), (255, 0, 0))
+    buf = BytesIO()
+    src_img.save(buf, format="PNG")
+
+    src = Image.load(buf.getvalue())
+    conv = Conversion("narrow").to_width(50).format("png")
+    out_bytes = conv.apply(src).to_bytes()
+
+    rebuilt = PILImage.open(BytesIO(out_bytes))
+    assert rebuilt.size == (50, 25)
+
+
+def test_conversion_to_height_preserves_aspect_ratio() -> None:
+    """Conversion.to_height delegates to Image.to_height."""
+    from io import BytesIO
+
+    from arvel_image import Image
+    from arvel_image.media import Conversion
+    from PIL import Image as PILImage
+
+    src_img = PILImage.new("RGB", (200, 100), (0, 255, 0))
+    buf = BytesIO()
+    src_img.save(buf, format="PNG")
+
+    src = Image.load(buf.getvalue())
+    conv = Conversion("short").to_height(50).format("png")
+    out_bytes = conv.apply(src).to_bytes()
+
+    rebuilt = PILImage.open(BytesIO(out_bytes))
+    assert rebuilt.size == (100, 50)
+
+
+def test_media_collection_single_file_chainable() -> None:
+    """MediaCollection.single_file() works as a chainable counterpart to the kwarg."""
+    from arvel_image.media import MediaCollection
+
+    coll = MediaCollection("avatar").single_file()
+    assert coll.single_file_enabled is True
+
+    explicit_off = MediaCollection("avatar").single_file(value=False)
+    assert explicit_off.single_file_enabled is False
+
+
+def test_media_collection_single_file_method_conflicts_with_keep_latest() -> None:
+    """single_file() and only_keep_latest() are mutually exclusive — order independent."""
+    from arvel_image.media import MediaCollection
+
+    coll = MediaCollection("gallery").only_keep_latest(5)
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        coll.single_file()
+
+    coll2 = MediaCollection("gallery", single_file=True)
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        coll2.only_keep_latest(5)
+
+
 def test_media_collection_with_conversions_registers_them() -> None:
     """MediaCollection.with_conversions stores conversions."""
     from arvel_image.media import Conversion, MediaCollection
@@ -211,10 +275,11 @@ def _host_user_class() -> type[Any]:
     from arvel.database.columns import id_, string
     from arvel_image import Conversion, HasMedia, MediaCollection
 
-    class User(Model, HasMedia, Timestamps):
+    class User(HasMedia, Model, Timestamps):
         # Distinct table name avoids collision with the auth User registered
         # by packages/arvel/tests/ when the full suite runs together.
         __tablename__ = "media_test_users"
+        __media_collection__ = "avatar"
 
         id: int = id_()
         name: str = string(120)
@@ -284,7 +349,8 @@ async def test_has_media_exposes_media_morphmany(
             size=10,
         )
 
-    rows = await user.media.all()
+    await user.load("media")
+    rows = user.media
     assert len(rows) == 1
     assert rows[0].file_name == "x.jpg"
 
@@ -301,18 +367,15 @@ async def test_add_media_to_collection_round_trip(
     user = await User.create(name="alice")
 
     with Storage.fake() as ctx:
-        media = await user.add_media(jpeg_bytes_8x8, file_name="avatar.jpg").to_media_collection(
-            "avatar"
-        )
+        media = await user.add_image(jpeg_bytes_8x8, file_name="avatar.jpg")
 
         assert media.id is not None
         assert media.collection_name == "avatar"
         assert media.file_name == "avatar.jpg"
         assert media.size == len(jpeg_bytes_8x8)
 
-        # Original is on the fake disk under {id}/{file_name}
         assert ctx.fake.has_path(f"{media.id}/avatar.jpg")
-        # Conversion file is also on disk under {id}/conversions/thumb-avatar.png
+        # Conversion file goes under {id}/conversions/thumb-avatar.png
         # (format is png because the conversion declared .format("png"))
         assert any(p.startswith(f"{media.id}/conversions/thumb-") for p in ctx.fake.disk().files)
 
@@ -329,17 +392,15 @@ async def test_add_media_marks_generated_conversions(
     user = await User.create(name="alice")
 
     with Storage.fake():
-        media = await user.add_media(jpeg_bytes_8x8, file_name="avatar.jpg").to_media_collection(
-            "avatar"
-        )
+        media = await user.add_image(jpeg_bytes_8x8, file_name="avatar.jpg")
 
     assert media.generated_conversions.get("thumb") is True
 
 
-async def test_get_media_url_returns_disk_url(
+async def test_image_url_returns_disk_url(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """get_media_url proxies to the storage disk."""
+    """image_url() proxies to the storage disk."""
     from arvel.facades import Storage
 
     await _create_tables(engine)
@@ -348,10 +409,11 @@ async def test_get_media_url_returns_disk_url(
     user = await User.create(name="alice")
 
     with Storage.fake():
-        await user.add_media(jpeg_bytes_8x8, file_name="avatar.jpg").to_media_collection("avatar")
+        await user.add_image(jpeg_bytes_8x8, file_name="avatar.jpg")
+        await user.load("media")
 
-        original_url = await user.get_media_url("avatar")
-        thumb_url = await user.get_media_url("avatar", "thumb")
+        original_url = user.image_url()
+        thumb_url = user.image_url("thumb")
 
     assert original_url is not None
     assert original_url.startswith("memory:///")
@@ -360,10 +422,10 @@ async def test_get_media_url_returns_disk_url(
     assert "/conversions/thumb-" in thumb_url
 
 
-async def test_get_media_filters_by_collection(
+async def test_media_in_filters_by_collection(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """get_media returns only rows in the requested collection."""
+    """media_in() returns only rows in the requested collection."""
     from arvel.facades import Storage
 
     await _create_tables(engine)
@@ -372,20 +434,20 @@ async def test_get_media_filters_by_collection(
     user = await User.create(name="alice")
 
     with Storage.fake():
-        await user.add_media(jpeg_bytes_8x8, file_name="a.jpg").to_media_collection("avatar")
-        await user.add_media(jpeg_bytes_8x8, file_name="g1.jpg").to_media_collection("gallery")
-        await user.add_media(jpeg_bytes_8x8, file_name="g2.jpg").to_media_collection("gallery")
+        await user.add_image(jpeg_bytes_8x8, file_name="a.jpg")
+        await user.add_image(jpeg_bytes_8x8, file_name="g1.jpg", collection="gallery")
+        await user.add_image(jpeg_bytes_8x8, file_name="g2.jpg", collection="gallery")
 
-    avatar = await user.get_media("avatar")
-    gallery = await user.get_media("gallery")
+    avatar = user.get_media()
+    gallery = user.media_in("gallery")
     assert len(avatar) == 1
     assert len(gallery) == 2
 
 
-async def test_clear_media_collection_deletes_rows_and_files(
+async def test_clear_images_deletes_rows_and_files(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """clear_media_collection deletes rows and files on disk."""
+    """clear_images() deletes rows and files in __media_collection__."""
     from arvel.facades import Storage
     from arvel_image import Media
 
@@ -395,11 +457,11 @@ async def test_clear_media_collection_deletes_rows_and_files(
     user = await User.create(name="alice")
 
     with Storage.fake() as ctx:
-        m1 = await user.add_media(jpeg_bytes_8x8, file_name="a.jpg").to_media_collection("avatar")
+        m1 = await user.add_image(jpeg_bytes_8x8, file_name="a.jpg")
         m1_path = f"{m1.id}/a.jpg"
         assert ctx.fake.has_path(m1_path)
 
-        deleted = await user.clear_media_collection("avatar")
+        deleted = await user.clear_images()
 
         assert deleted == 1
         assert not ctx.fake.has_path(m1_path)
@@ -419,19 +481,15 @@ async def test_single_file_collection_replaces_previous(
     user = await User.create(name="alice")
 
     with Storage.fake() as ctx:
-        first = await user.add_media(jpeg_bytes_8x8, file_name="first.jpg").to_media_collection(
-            "avatar"
-        )
-        second = await user.add_media(jpeg_bytes_8x8, file_name="second.jpg").to_media_collection(
-            "avatar"
-        )
+        first = await user.add_image(jpeg_bytes_8x8, file_name="first.jpg")
+        second = await user.add_image(jpeg_bytes_8x8, file_name="second.jpg")
 
         # First file is gone
         assert not ctx.fake.has_path(f"{first.id}/first.jpg")
         # Second file is present
         assert ctx.fake.has_path(f"{second.id}/second.jpg")
 
-    avatars = await user.get_media("avatar")
+    avatars = user.get_media()
     assert len(avatars) == 1
     assert avatars[0].id == second.id
 
@@ -448,9 +506,7 @@ async def test_media_delete_removes_files(
     user = await User.create(name="alice")
 
     with Storage.fake() as ctx:
-        media = await user.add_media(jpeg_bytes_8x8, file_name="x.jpg").to_media_collection(
-            "avatar"
-        )
+        media = await user.add_image(jpeg_bytes_8x8, file_name="x.jpg")
         original_path = f"{media.id}/x.jpg"
         conversion_path_prefix = f"{media.id}/conversions/"
         assert ctx.fake.has_path(original_path)
@@ -474,9 +530,7 @@ async def test_media_delete_succeeds_when_file_missing(
     user = await User.create(name="alice")
 
     with Storage.fake() as ctx:
-        media = await user.add_media(jpeg_bytes_8x8, file_name="x.jpg").to_media_collection(
-            "avatar"
-        )
+        media = await user.add_image(jpeg_bytes_8x8, file_name="x.jpg")
 
         # Manually nuke the file out from under the row, simulating a stale row
         await ctx.fake.disk().delete(f"{media.id}/x.jpg")
@@ -497,10 +551,11 @@ async def test_non_image_media_skips_image_conversions(
     user = await User.create(name="alice")
 
     with Storage.fake():
-        media = await user.add_media(
+        media = await user.add_image(
             b"%PDF-1.4 fake pdf body",
             file_name="report.pdf",
-        ).to_media_collection("gallery")
+            collection="gallery",
+        )
 
     # No 'thumb' conversion ran (pdf doesn't match image/*) — even if 'gallery'
     # had no conversions, we still verify the JSON is empty / absent of a
@@ -521,8 +576,9 @@ async def test_failing_conversion_raises_and_leaves_no_partial_file(
         def apply(self, source: Any) -> Any:
             raise RuntimeError("boom")
 
-    class HostBad(Model, HasMedia, Timestamps):
+    class HostBad(HasMedia, Model, Timestamps):
         __tablename__ = "boom_hosts"
+        __media_collection__ = "avatar"
 
         id: int = id_()
         name: str = string(120)
@@ -539,7 +595,7 @@ async def test_failing_conversion_raises_and_leaves_no_partial_file(
 
     with Storage.fake() as ctx:
         with pytest.raises(ConversionFailedError):
-            await host.add_media(jpeg_bytes_8x8, file_name="x.jpg").to_media_collection("avatar")
+            await host.add_image(jpeg_bytes_8x8, file_name="x.jpg")
 
         # No conversion file should be left behind
         assert not any(

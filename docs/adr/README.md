@@ -2,7 +2,7 @@
 
 Decisions that shaped the Arvel framework and its companion packages, grouped by subsystem. Numbers are contiguous and topic-ordered; superseded and follow-up decisions have been folded into their canonical records.
 
-Last reconciled against the shipped code: 2026-06-01.
+Last reconciled: 2026-06-05. The most recent reconciliation pass (WI-arvel-003) merged the seven `arvel-image` ADRs (former 132, 133, 134, 135, 138, 139, 140) into a single ADR-132 and compact-renumbered the two framework ADRs that landed right after (former 136 → 133, former 137 → 134). Next free ADR number is **135**.
 
 ## Foundation & Project
 
@@ -224,7 +224,18 @@ Last reconciled against the shipped code: 2026-06-01.
 
 | ADR | Decision |
 |-----|----------|
-| [ADR-132](ADR-132-arvel-image-pillow-only.md) | `arvel-image` driver: Pillow only |
-| [ADR-133](ADR-133-arvel-image-medialibrary-scope.md) | `arvel-image` scope: also ship laravel-medialibrary parity |
-| [ADR-134](ADR-134-arvel-image-medialibrary-runtime.md) | `arvel-image` runtime layer: synchronous conversions and short-class polymorphism |
-| [ADR-135](ADR-135-ssrf-guard-ipaddress.md) | SSRF Guard via stdlib `ipaddress` |
+| [ADR-132](ADR-132-arvel-image.md) | `arvel-image` — full package design (Pillow driver, medialibrary parity, runtime, SSRF guard + DNS-rebinding/MIME hardening, 1.0 public-API rename + MRO guard, MinIO test fixture, aiohttp CVE pin) |
+
+The single ADR-132 file consolidates the seven decisions that previously lived as ADR-132 / 133 / 134 / 135 / 138 / 139 / 140; see its `## Subsumes` block for the original-to-section mapping. The companion [SAD-004](../architecture/SAD-004-arvel-image.md) folds in the polish-pass SAD (former SAD-004) and the post-1.0 hardening SAD (former SAD-005).
+
+## Config (post-1.0)
+
+| ADR | Decision |
+|-----|----------|
+| [ADR-133](ADR-133-config-file-settings-source.md) | Config files override env via a pydantic-settings source (renumbered from ADR-136 in WI-arvel-003) |
+
+## Storage extras (post-1.0)
+
+| ADR | Decision |
+|-----|----------|
+| [ADR-134](ADR-134-public-storage-static-mount.md) | Serve `public/storage` via a scoped StaticFiles mount (renumbered from ADR-137 in WI-arvel-003) |
