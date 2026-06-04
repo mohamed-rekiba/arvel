@@ -5,7 +5,7 @@ to an :class:`arvel_image.Image`. Each chain call (``fit``, ``resize``,
 ``crop``, ``quality``, ``format``) appends an operation; nothing runs until
 :meth:`apply` is called by the conversion runner. ``accepts(mime_type)``
 gates which sources a conversion will run against — defaults to ``image/*``
-so applying an image conversion to a PDF silently skips, matching Spatie.
+so applying an image conversion to a PDF silently skips.
 
 Subclasses can override ``apply`` for fully bespoke pipelines (handy for
 tests). The default ``apply`` walks the recorded chain in order.
@@ -19,8 +19,8 @@ if TYPE_CHECKING:
     from arvel_image.image import Image
 
 # Supported manipulation keys and the Conversion methods they map to.
-# Applied by with_manipulations() in the order below so geometry comes
-# before quality/format (matching Spatie's apply order).
+# with_manipulations() applies these in order so geometry happens before
+# quality/format.
 _MANIP_ORDER = ("fit", "resize", "quality", "format")
 
 # Each recorded op is a (method_name, args). Args are either positional
@@ -53,6 +53,16 @@ class Conversion:
         self.ops.append(("resize", {"width": width, "height": height}))
         return self
 
+    def to_width(self, pixels: int) -> Self:
+        """Resize to ``pixels`` width, preserving aspect ratio."""
+        self.ops.append(("to_width", (pixels,)))
+        return self
+
+    def to_height(self, pixels: int) -> Self:
+        """Resize to ``pixels`` height, preserving aspect ratio."""
+        self.ops.append(("to_height", (pixels,)))
+        return self
+
     def crop(self, *, left: int, top: int, width: int, height: int) -> Self:
         """Crop to ``(width, height)`` starting at ``(left, top)``."""
         self.ops.append(("crop", {"left": left, "top": top, "width": width, "height": height}))
@@ -75,7 +85,7 @@ class Conversion:
         Works the same as ``MediaCollection.generate_responsive_images()`` but
         scoped to one conversion: variants are stored under the conversion name
         key (e.g. ``"thumb"``) in ``media.responsive_images`` so
-        ``media.get_srcset("thumb")`` returns them.
+        ``media.srcset("thumb")`` returns them.
         """
         self._responsive_images = True
         return self

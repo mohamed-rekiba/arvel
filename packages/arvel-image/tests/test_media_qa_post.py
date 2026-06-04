@@ -84,8 +84,9 @@ def _isolation_host_a() -> type[Any]:
     from arvel.database.columns import id_, string
     from arvel_image import HasMedia, MediaCollection
 
-    class IsoA(Model, HasMedia, Timestamps):
+    class IsoA(HasMedia, Model, Timestamps):
         __tablename__ = "iso_a"
+        __media_collection__ = "avatar"
 
         id: int = id_()
         label: str = string(80)
@@ -109,8 +110,9 @@ def _isolation_host_b() -> type[Any]:
     from arvel.database.columns import id_, string
     from arvel_image import HasMedia, MediaCollection
 
-    class IsoB(Model, HasMedia, Timestamps):
+    class IsoB(HasMedia, Model, Timestamps):
         __tablename__ = "iso_b"
+        __media_collection__ = "gallery"
 
         id: int = id_()
         label: str = string(80)
@@ -134,8 +136,9 @@ async def test_media_delete_cascades_to_conversion_files(
     from arvel_image import Conversion, HasMedia, MediaCollection
     from arvel_image.media.path_generator import DefaultPathGenerator
 
-    class HostC(Model, HasMedia, Timestamps):
+    class HostC(HasMedia, Model, Timestamps):
         __tablename__ = "host_c"
+        __media_collection__ = "avatar"
         id: int = id_()
         name: str = string(80)
 
@@ -154,9 +157,7 @@ async def test_media_delete_cascades_to_conversion_files(
     host = await HostC.create(name="alice")
 
     with Storage.fake() as ctx:
-        media = await host.add_media(jpeg_bytes_8x8, file_name="x.jpg").to_media_collection(
-            "avatar"
-        )
+        media = await host.add_image(jpeg_bytes_8x8, file_name="x.jpg")
         gen = DefaultPathGenerator()
         original_path = gen.path_for(media)
         thumb_path = gen.path_for_conversion(media, "thumb")
@@ -217,9 +218,9 @@ async def test_collection_per_class_isolation(engine: AsyncEngine, session: Asyn
     b_gallery = b.collection_for("gallery")
 
     assert a_avatar.name == "avatar"
-    assert a_avatar.single_file is True
+    assert a_avatar.single_file_enabled is True
     assert b_gallery.name == "gallery"
-    assert b_gallery.single_file is False
+    assert b_gallery.single_file_enabled is False
 
     # B has its own registry — A's "avatar" is invisible to B.
     with pytest.raises(UnknownCollectionError):
@@ -241,8 +242,9 @@ async def test_media_get_path_and_temporary_url(
     from arvel.facades.storage import Storage
     from arvel_image import HasMedia, MediaCollection
 
-    class HostD(Model, HasMedia, Timestamps):
+    class HostD(HasMedia, Model, Timestamps):
         __tablename__ = "host_d"
+        __media_collection__ = "avatar"
         id: int = id_()
         name: str = string(80)
 
@@ -255,31 +257,30 @@ async def test_media_get_path_and_temporary_url(
     host = await HostD.create(name="alice")
 
     with Storage.fake():
-        media = await host.add_media(jpeg_bytes_8x8, file_name="avatar.jpg").to_media_collection(
-            "avatar"
-        )
+        media = await host.add_image(jpeg_bytes_8x8, file_name="avatar.jpg")
 
         # get_path
         assert media.get_path() == f"{media.id}/avatar.jpg"
         assert media.get_path("thumb") == f"{media.id}/conversions/thumb-avatar.jpg"
 
-        # get_temporary_url
-        tmp = await media.get_temporary_url(60)
+        # temporary_url
+        tmp = media.temporary_url(60)
         assert tmp.startswith("memory:///")
         assert "expiry=60" in tmp
 
 
-async def test_get_first_media_returns_first_or_none(
+async def test_first_media_returns_first_or_none(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes_8x8: bytes
 ) -> None:
-    """``get_first_media`` returns the lowest-id row or ``None``."""
+    """``first_media`` returns the lowest-id row or ``None``."""
     from arvel.database import Model, Timestamps
     from arvel.database.columns import id_, string
     from arvel.facades.storage import Storage
     from arvel_image import HasMedia, MediaCollection
 
-    class HostE(Model, HasMedia, Timestamps):
+    class HostE(HasMedia, Model, Timestamps):
         __tablename__ = "host_e"
+        __media_collection__ = "gallery"
         id: int = id_()
         name: str = string(80)
 
@@ -290,17 +291,16 @@ async def test_get_first_media_returns_first_or_none(
         await conn.run_sync(Model.metadata.create_all)
 
     host = await HostE.create(name="bob")
+    await host.load("media")
 
-    assert await host.get_first_media("gallery") is None
+    assert host.get_media() == []
 
     with Storage.fake():
-        first = await host.add_media(jpeg_bytes_8x8, file_name="a.jpg").to_media_collection(
-            "gallery"
-        )
-        await host.add_media(jpeg_bytes_8x8, file_name="b.jpg").to_media_collection("gallery")
-        await host.add_media(jpeg_bytes_8x8, file_name="c.jpg").to_media_collection("gallery")
+        first = await host.add_image(jpeg_bytes_8x8, file_name="a.jpg")
+        await host.add_image(jpeg_bytes_8x8, file_name="b.jpg")
+        await host.add_image(jpeg_bytes_8x8, file_name="c.jpg")
 
-        got = await host.get_first_media("gallery")
+        got = host.first_media
         assert got is not None
         assert got.id == first.id
 
@@ -316,8 +316,9 @@ async def test_unknown_collection_raises_when_registry_is_strict(
     from arvel.facades.storage import Storage
     from arvel_image import HasMedia, MediaCollection, UnknownCollectionError
 
-    class HostF(Model, HasMedia, Timestamps):
+    class HostF(HasMedia, Model, Timestamps):
         __tablename__ = "host_f"
+        __media_collection__ = "avatar"
         id: int = id_()
         name: str = string(80)
 
@@ -330,16 +331,16 @@ async def test_unknown_collection_raises_when_registry_is_strict(
     host = await HostF.create(name="charlie")
 
     with Storage.fake(), pytest.raises(UnknownCollectionError):
-        await host.add_media(jpeg_bytes_8x8, file_name="x.jpg").to_media_collection("nope")
+        await host.add_image(jpeg_bytes_8x8, file_name="x.jpg", collection="nope")
 
 
-async def test_add_media_accepts_filesystem_path(
+async def test_add_image_accepts_filesystem_path(
     engine: AsyncEngine,
     session: AsyncSession,
     jpeg_bytes_8x8: bytes,
     tmp_path: Any,
 ) -> None:
-    """``add_media`` accepts a path on disk; the basename
+    """``add_image`` accepts a path on disk; the basename
     becomes ``Media.file_name`` when no explicit ``file_name`` is given.
     """
     from arvel.database import Model, Timestamps
@@ -347,8 +348,9 @@ async def test_add_media_accepts_filesystem_path(
     from arvel.facades.storage import Storage
     from arvel_image import HasMedia, MediaCollection
 
-    class HostG(Model, HasMedia, Timestamps):
+    class HostG(HasMedia, Model, Timestamps):
         __tablename__ = "host_g"
+        __media_collection__ = "docs"
         id: int = id_()
         name: str = string(80)
 
@@ -364,18 +366,18 @@ async def test_add_media_accepts_filesystem_path(
     host = await HostG.create(name="dave")
 
     with Storage.fake():
-        media = await host.add_media(src).to_media_collection("docs")
+        media = await host.add_image(src)
 
     assert media.file_name == "report.jpg"
     assert media.size == len(jpeg_bytes_8x8)
 
 
-async def test_add_media_accepts_file_like_object(
+async def test_add_image_accepts_file_like_object(
     engine: AsyncEngine,
     session: AsyncSession,
     jpeg_bytes_8x8: bytes,
 ) -> None:
-    """``add_media`` accepts a file-like ``.read()`` object."""
+    """``add_image`` accepts a file-like ``.read()`` object."""
     import io as _io
 
     from arvel.database import Model, Timestamps
@@ -383,8 +385,9 @@ async def test_add_media_accepts_file_like_object(
     from arvel.facades.storage import Storage
     from arvel_image import HasMedia, MediaCollection
 
-    class HostH(Model, HasMedia, Timestamps):
+    class HostH(HasMedia, Model, Timestamps):
         __tablename__ = "host_h"
+        __media_collection__ = "docs"
         id: int = id_()
         name: str = string(80)
 
@@ -398,7 +401,7 @@ async def test_add_media_accepts_file_like_object(
     stream = _io.BytesIO(jpeg_bytes_8x8)
 
     with Storage.fake():
-        media = await host.add_media(stream, file_name="upload.jpg").to_media_collection("docs")
+        media = await host.add_image(stream, file_name="upload.jpg")
 
     assert media.file_name == "upload.jpg"
     assert media.size == len(jpeg_bytes_8x8)

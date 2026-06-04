@@ -206,29 +206,3 @@ class TestTranslatableMixinPreserved:
         assert m.name == {"en": "Shoes", "ar": "أحذية"}
 
 
-class TestLocalMediaMixinPreserved:
-    """LocalMediaMixin must still work after BaseModelMixin cleanup."""
-
-    def test_get_media_returns_empty_by_default(self) -> None:
-        from app.models.base import LocalMediaMixin
-
-        class FakeModel(LocalMediaMixin):
-            pass
-
-        m = FakeModel()
-        assert m.get_media("images") == []
-
-    def test_attach_media_adds_item(self) -> None:
-        from app.models.base import LocalMediaMixin, _MockMediaItem
-
-        class FakeFile:
-            filename = "photo.jpg"
-            content = b"..."
-
-        class FakeModel(LocalMediaMixin):
-            pass
-
-        m = FakeModel()
-        item = m.attach_media(FakeFile(), "images")
-        assert isinstance(item, _MockMediaItem)
-        assert m.get_media("images") == [item]

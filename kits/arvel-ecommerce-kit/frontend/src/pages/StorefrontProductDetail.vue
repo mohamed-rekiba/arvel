@@ -116,8 +116,8 @@ async function handleAddToCart(): Promise<void> {
             <img
               v-if="activeImage"
               :key="activeIndex"
-              :src="activeImage.card_url || activeImage.url"
-              :srcset="activeImage.srcset || undefined"
+              :src="activeImage.conversions?.card || activeImage.url"
+              :srcset="activeImage.srcsets?.card || undefined"
               sizes="(min-width: 1024px) 50vw, 100vw"
               :alt="`${product.name} — ${t('product.image', 'image')} ${activeIndex + 1}`"
               class="h-full w-full object-cover"
@@ -191,7 +191,7 @@ async function handleAddToCart(): Promise<void> {
               @click="activeIndex = i"
             >
               <img
-                :src="img.thumbnail_url || img.url"
+                :src="img.conversions?.thumbnail || img.url"
                 :alt="`${product.name} ${i + 1}`"
                 class="h-full w-full object-cover"
               />

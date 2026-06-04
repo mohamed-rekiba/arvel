@@ -6,8 +6,20 @@
  */
 
 export interface StorefrontProductImageOut {
+  id: string
+  uuid?: string | null
+  collection_name: string
+  name: string
+  file_name: string
+  mime_type?: string | null
+  size: number
+  disk: string
+  order?: number | null
+  custom_properties?: Record<string, unknown>
   url: string
-  thumbnail_url: string
-  card_url: string
-  srcset: string
+  conversions?: Record<string, string>
+  srcsets?: Record<string, string>
+  placeholder_svg?: string
+  created_at?: string | null
+  updated_at?: string | null
 }

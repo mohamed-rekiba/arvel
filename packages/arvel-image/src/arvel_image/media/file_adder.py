@@ -1,9 +1,10 @@
-"""Builder returned by :meth:`HasMedia.add_media` — terminate with
-``await fa.to_media_collection(name)``.
+"""Builder returned by :meth:`HasMedia.image_builder` — terminate with
+``await fa.save()``.
 
-Handles input sanitization , single-file collection semantics,
-MIME/size validation, UUID auto-assignment, atomic rollback, custom
-properties, per-ingestion disk override, and conversion fan-out.
+Handles input sanitization, single-file collection semantics, MIME/size
+validation, UUID auto-assignment, atomic rollback, custom properties,
+per-ingestion disk override, and conversion fan-out. The builder is for
+advanced uploads; simple ones go through :meth:`HasMedia.add_image`.
 """
 
 from __future__ import annotations
@@ -28,9 +29,13 @@ from arvel_image.media.exceptions import (
     MediaError,
 )
 from arvel_image.media.model import Media
-from arvel_image.media.trait import get_media_ordered
+from arvel_image.media.trait import query_media
+from arvel_image.media.url_fetcher import sniff_image_mime
 
 if TYPE_CHECKING:
+    from arvel.database import Model
+    from arvel.storage import StorageDisk
+
     from arvel_image.media.path_generator import PathGenerator
     from arvel_image.media.trait import HasMedia
 
@@ -49,28 +54,9 @@ def resolve_path_generator() -> PathGenerator:
     return get_path_generator()
 
 
-def _sniff_image_mime(contents: bytes) -> str | None:
-    """Return the real image MIME from magic bytes, or None for non-images.
-
-    Reads only the header — Pillow decodes lazily on ``open``.
-    """
-    from io import BytesIO  # noqa: PLC0415
-
-    from PIL import Image as PILImage  # noqa: PLC0415
-
-    try:
-        with PILImage.open(BytesIO(contents)) as img:
-            fmt = img.format
-    except Exception:  # noqa: BLE001
-        return None
-    if fmt is None:
-        return None
-    return PILImage.MIME.get(fmt)
-
-
 class FileAdder:
-    """Builder bound to a host model. ``await .to_media_collection(name)``
-    persists, runs conversions, and returns the new :class:`Media` row.
+    """Builder bound to a host model. ``await .save()`` persists, runs
+    conversions, and returns the new :class:`Media` row.
     """
 
     def __init__(
@@ -152,21 +138,20 @@ class FileAdder:
         self._sanitize_callback = callback
         return self
 
-    async def to_media_collection(
-        self, collection: str = "default", disk: str | None = None
-    ) -> Media:
+    async def save(self, *, collection: str | None = None, disk: str | None = None) -> Media:
         """Persist the original, register the row, run conversions.
 
-        Validates MIME and size before any I/O
-        Assigns a UUID4 to the row
-        Rolls back row + file on any post-creation exception
-        Honours conversions_disk when set on the collection
-        Prunes only_keep_latest after successful add
-        Auto-assigns order_column
-        ``disk`` arg overrides both .to_disk() and collection.disk
+        ``collection`` defaults to ``host.__media_collection__``. Validates
+        MIME and size before any I/O. Assigns a UUID4. Rolls back row + file
+        on any post-creation exception. Honours ``conversions_disk`` when
+        set on the collection. Prunes ``only_keep_latest`` after successful
+        add. Auto-assigns ``order_column``. The ``disk`` arg overrides both
+        ``.to_disk()`` and ``collection.disk``.
         """
         host = self._host
-        coll = host.collection_for(collection)
+        resolved_collection = collection or type(host).__media_collection__
+        coll = host.collection_for(resolved_collection)
+        collection = resolved_collection
 
         # Apply file_name override and custom sanitize callback.
         effective_file_name = self._apply_file_name_overrides(
@@ -179,16 +164,16 @@ class FileAdder:
         self._validate(coll, collection)
 
         # ── single_file cleanup ────────────────────────────────────────────
-        if coll.single_file:
-            await host.clear_media_collection(collection)
+        if coll.single_file_enabled:
+            await host.clear_media_in(collection)
 
         # ── disk resolution ────────────────────────────────────────────────
-        # to_media_collection(disk) > .to_disk() > collection.disk
+        # save(disk=...) > .to_disk() > collection.disk
         disk_label = disk or self._disk_override or coll.disk or "default"
         disk_target: str | None = None if disk_label == "default" else disk_label
 
         # ── order_column ───────────────────────────────────────
-        existing = await get_media_ordered(host, collection)
+        existing = await query_media(host, collection)
         if existing and existing[-1].order_column is not None:
             next_order: int = existing[-1].order_column + 1
         else:
@@ -242,15 +227,24 @@ class FileAdder:
             await media.save()
 
         except Exception:
+            # Broad on purpose: any failure between save() and conversions
+            # leaves a stale row + stored bytes. Roll back the row; bytes
+            # are best-effort cleaned up by the storage layer's own GC.
             try:
                 await media.delete()
             except Exception as cleanup_exc:  # noqa: BLE001
+                # Two failures in a row — log and continue raising the original.
+                # Don't shadow the original exception with a cleanup failure.
                 _log.warning("rollback: failed to delete media row %s: %s", media.id, cleanup_exc)
             raise
 
         # ── prune only_keep_latest ─────────────────────────────────────────
         if coll.keep_latest_n is not None:
             await self._prune_keep_latest(host, collection, coll.keep_latest_n)
+
+        # Keep host.media in sync so reads right after add work without
+        # an explicit `await host.load("media")`.
+        await cast("Model", host).load("media")
 
         return media
 
@@ -261,23 +255,26 @@ class FileAdder:
             and self._mime.lower() not in coll.accept_mime_types_list
         ):
             msg = (
-                f"Invalid MIME type '{self._mime}' for collection '{collection}'; "
+                f"Invalid MIME type {self._mime!r} on file {self._file_name!r} "
+                f"for collection {collection!r}; "
                 f"allowed: {coll.accept_mime_types_list}"
             )
             raise InvalidMimeTypeError(msg)
 
         if coll.max_file_size_bytes is not None and len(self._contents) > coll.max_file_size_bytes:
             msg = (
-                f"File too large: {len(self._contents)} bytes exceeds "
-                f"max_file_size={coll.max_file_size_bytes} for collection '{collection}'"
+                f"File {self._file_name!r} is too large: {len(self._contents)} bytes "
+                f"exceeds max_file_size={coll.max_file_size_bytes} "
+                f"for collection {collection!r}"
             )
             raise FileTooLargeError(msg)
 
         file_info = FileInfo(file_name=self._file_name, mime_type=self._mime)
         if not coll.check_accepts_file(file_info):
             msg = (
-                f"File '{self._file_name}' (MIME: {self._mime}) rejected by "
-                f"accepts_file callback for collection '{collection}'"
+                f"File {self._file_name!r} (MIME {self._mime!r}, "
+                f"{len(self._contents)} bytes) rejected by "
+                f"accepts_file callback for collection {collection!r}"
             )
             raise InvalidMimeTypeError(msg)
 
@@ -316,7 +313,7 @@ class FileAdder:
         self,
         media: Media,
         coll: MediaCollection,
-        disk: Any,
+        disk: StorageDisk,
         gen: PathGenerator,
     ) -> None:
         runner = get_conversion_runner()
@@ -345,12 +342,18 @@ class FileAdder:
             effective = (
                 conversion.with_manipulations(conv_overrides) if conv_overrides else conversion
             )
-            output = await runner.run(source=self._contents, conversion=effective)
+            output = await runner.run(
+                source=self._contents, conversion=effective, context=f"media id={media.id}"
+            )
             await cdisk.put(gen.path_for_conversion(media, conversion.name), output)
             generated[conversion.name] = True
 
             if conversion.responsive_images_enabled:
-                entry = await _generate_responsive_for_conversion(
+                from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
+                    generate_responsive_images_for_media,
+                )
+
+                entry = await generate_responsive_images_for_media(
                     media, output, conversion.name, disk=cdisk
                 )
                 if entry:
@@ -362,17 +365,17 @@ class FileAdder:
             existing_resp.update(responsive_updates)
             media.responsive_images = existing_resp
 
-    async def _run_responsive_images(self, media: Media, disk: Any) -> None:
+    async def _run_responsive_images(self, media: Media, disk: StorageDisk) -> None:
         from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
             generate_responsive_images_for_media,
         )
 
         entry = await generate_responsive_images_for_media(
-            media, self._contents, "medialibrary_original", disk=disk
+            media, self._contents, "original", disk=disk
         )
         if entry:
             existing = dict(media.responsive_images or {})
-            existing["medialibrary_original"] = entry
+            existing["original"] = entry
             media.responsive_images = existing
 
     # ─── keep_latest pruning ───────────────────────────────────────────────
@@ -380,7 +383,7 @@ class FileAdder:
     @staticmethod
     async def _prune_keep_latest(host: HasMedia, collection: str, n: int) -> None:
         """Delete the oldest rows from ``collection`` until at most ``n`` remain."""
-        rows = await get_media_ordered(host, collection)
+        rows = await query_media(host, collection)
         excess = rows[:-n] if n > 0 else rows
         for old in excess:
             await old.delete()
@@ -391,7 +394,7 @@ class FileAdder:
     def sanitize_file_name(name: object) -> str:
         """Reduce caller-provided filename to a safe basename"""
         if not isinstance(name, str):
-            msg = "file_name must be a string"
+            msg = f"file_name must be a string; got {type(name).__name__}"
             raise MediaError(msg)
         cleaned = _CONTROL_CHAR_RE.sub("", name)
         cleaned = PurePosixPath(cleaned).name.strip()
@@ -409,26 +412,11 @@ class FileAdder:
         Pillow decodes the header to identify the real image format; non-image
         bytes fall back to the extension guess (stdlib ``mimetypes``).
         """
-        sniffed = _sniff_image_mime(contents)
+        sniffed = sniff_image_mime(contents)
         if sniffed is not None:
             return sniffed
         guessed, _ = mimetypes.guess_type(file_name)
         return guessed or "application/octet-stream"
-
-
-async def _generate_responsive_for_conversion(
-    media: Media,
-    contents: bytes,
-    conversion_name: str,
-    *,
-    disk: Any,
-) -> dict[str, Any] | None:
-    """Generate responsive variants from a conversion's output bytes."""
-    from arvel_image.media.responsive_image_generator import (  # noqa: PLC0415
-        generate_responsive_images_for_media,
-    )
-
-    return await generate_responsive_images_for_media(media, contents, conversion_name, disk=disk)
 
 
 __all__ = ["FileAdder"]

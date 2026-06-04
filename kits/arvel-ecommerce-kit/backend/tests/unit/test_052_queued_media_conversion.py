@@ -74,21 +74,18 @@ async def test_handle_calls_process_one_with_resolved_host() -> None:
     """handle() passes both media and host to _process_one when both resolve."""
     mock_media = MagicMock()
     mock_media.model_id = "42"
+    mock_media.responsive_images = {}
     mock_host = MagicMock()
-    mock_runner = MagicMock()
-    mock_gen = MagicMock()
 
     with (
         patch("arvel_image.media.jobs.Media") as MockMedia,
         patch("arvel_image.media.jobs._resolve_host", new=AsyncMock(return_value=mock_host)),
-        patch("arvel_image.media.jobs.ConversionRunner", return_value=mock_runner),
-        patch("arvel_image.media.jobs.resolve_path_generator", return_value=mock_gen),
         patch("arvel_image.media.jobs._process_one", new=AsyncMock()) as mock_process,
     ):
         MockMedia.find = AsyncMock(return_value=mock_media)
         job = QueuedConversionJob(media_id="m1", model_class_path="app.models.Product")
         await job.handle()
-        mock_process.assert_awaited_once_with(mock_media, mock_host, mock_runner, mock_gen)
+        mock_process.assert_awaited_once_with(mock_media, mock_host)
 
 
 # ── FileAdder.queued() flag ───────────────────────────────────────────────────
@@ -123,7 +120,7 @@ async def test_file_adder_dispatches_job_when_queued() -> None:
     )
     host.collection_for = MagicMock()
     mock_coll = MagicMock()
-    mock_coll.single_file = False
+    mock_coll.single_file_enabled = False
     mock_coll.conversions = [MagicMock()]  # non-empty → triggers queued path
     mock_coll.conversions_disk = None
     mock_coll.disk = None
@@ -133,6 +130,8 @@ async def test_file_adder_dispatches_job_when_queued() -> None:
     mock_coll.check_accepts_file = MagicMock(return_value=True)
     host.collection_for.return_value = mock_coll
     host.host_pk = MagicMock(return_value="1")
+    # save() refreshes the media cache via host.load("media") at the end.
+    host.load = AsyncMock()
 
     mock_disk = MagicMock()
     mock_disk.put = AsyncMock()
@@ -143,7 +142,10 @@ async def test_file_adder_dispatches_job_when_queued() -> None:
         patch("arvel_image.media.file_adder.Media") as MockMedia,
         patch("arvel_image.media.file_adder.Storage") as MockStorage,
         patch("arvel_image.media.file_adder.resolve_path_generator", return_value=mock_gen),
-        patch("arvel_image.media.file_adder.get_media_ordered", new=AsyncMock(return_value=[])),
+        patch(
+            "arvel_image.media.file_adder.query_media",
+            new=AsyncMock(return_value=[]),
+        ),
         patch("arvel_image.media.file_adder.Bus") as MockBus,
     ):
         MockMedia.create = AsyncMock(return_value=mock_media)
@@ -153,7 +155,7 @@ async def test_file_adder_dispatches_job_when_queued() -> None:
 
         fa = FileAdder(host, b"imagedata", file_name="photo.jpg")
         fa.queued()
-        await fa.to_media_collection("images")
+        await fa.save(collection="images")
 
         MockBus.dispatch.assert_awaited_once()
         dispatched_job = MockBus.dispatch.call_args[0][0]

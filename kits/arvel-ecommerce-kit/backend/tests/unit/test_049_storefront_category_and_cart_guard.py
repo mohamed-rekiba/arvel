@@ -162,9 +162,9 @@ async def test_cart_add_item_rejects_quantity_above_catalog_stock() -> None:
 
 
 @pytest.mark.asyncio
-async def test_product_service_uses_get_media_for_images() -> None:
-    """Storefront image loading uses the framework media API (get_first_media,
-    has_generated_conversion, get_custom_property), not raw Media.query() or dict-poking."""
+async def test_product_service_reads_eager_loaded_media() -> None:
+    """Storefront serialization reads product.media directly — no extra fetches,
+    no async URL methods."""
     from app.services.product_service import ProductService
 
     published = MagicMock()
@@ -183,21 +183,38 @@ async def test_product_service_uses_get_media_for_images() -> None:
     published.vendor_id = None
     published.vendor_name = ""
     published.vendor_slug = ""
+
+    # Storefront serialization now flows through Media.to_dict() — the kit
+    # never calls url() / srcset() by hand, so the mock only needs to_dict().
     media = MagicMock()
-    media.get_custom_property = MagicMock(return_value=None)
-    media.has_generated_conversion = MagicMock(return_value=True)
-    media.get_url = AsyncMock(
-        side_effect=[
-            "/storage/media/thumb.jpg",
-            "/storage/media/card.jpg",
-            "/storage/media/full.jpg",
-        ]
+    media.to_dict = MagicMock(
+        return_value={
+            "id": "1",
+            "uuid": "u1",
+            "collection_name": "images",
+            "name": "orig",
+            "file_name": "orig.jpg",
+            "mime_type": "image/jpeg",
+            "size": 1,
+            "disk": "default",
+            "order": 1,
+            "custom_properties": {},
+            "url": "/storage/media/orig.jpg",
+            "conversions": {
+                "thumbnail": "/storage/media/thumb.jpg",
+                "card": "/storage/media/card.jpg",
+                "full": "/storage/media/full.jpg",
+            },
+            "srcsets": {},
+            "placeholder_svg": "",
+            "created_at": None,
+            "updated_at": None,
+        }
     )
-    published.get_first_media = AsyncMock(return_value=media)
+    published.media = [media]
 
     with patch("app.services.product_service.ProductCatalog") as product_catalog_cls:
         product_query = MagicMock()
-        # Mock the where -> where_json_path -> with_ media -> first chain.
         product_query.where_json_path.return_value.with_.return_value = MagicMock(
             first=AsyncMock(return_value=published)
         )
@@ -208,11 +225,8 @@ async def test_product_service_uses_get_media_for_images() -> None:
 
     assert result is not None
     assert result["thumbnail_url"] == "/storage/media/thumb.jpg"
-    assert result["image_srcset"] == (
-        "/storage/media/thumb.jpg 150w, /storage/media/card.jpg 400w, /storage/media/full.jpg 1200w"
-    )
+    # No responsive srcset → static width hint from the card conversion.
+    assert result["image_srcset"] == "/storage/media/card.jpg 400w"
     assert result["image_sizes"]
-    published.get_first_media.assert_awaited_once()
-    media.get_url.assert_any_await("thumbnail")
-    media.get_url.assert_any_await("card")
-    media.get_url.assert_any_await("full")
+    assert len(result["images"]) == 1
+    media.to_dict.assert_called_once()

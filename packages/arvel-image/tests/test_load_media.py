@@ -40,8 +40,9 @@ def _host() -> type[Any]:
     from arvel.database.columns import id_, string
     from arvel_image import HasMedia, MediaCollection
 
-    class LoadMediaHost(Model, HasMedia, Timestamps):
+    class LoadMediaHost(HasMedia, Model, Timestamps):
         __tablename__ = "load_media_hosts"
+        __media_collection__ = "gallery"
 
         id: int = id_()
         name: str = string(120)
@@ -63,8 +64,9 @@ def _view_host() -> type[Any]:
     from arvel.database.columns import id_, string
     from arvel_image import HasMedia, MediaCollection
 
-    class LoadMediaView(Model, HasMedia, Timestamps):
+    class LoadMediaView(HasMedia, Model, Timestamps):
         __tablename__ = "load_media_views"
+        __media_collection__ = "gallery"
         # Presents as "LoadMediaHost" polymorphically — reuses its media rows.
         __morph_class__ = "LoadMediaHost"
 
@@ -120,13 +122,13 @@ async def test_collection_load_serves_get_media_from_cache(
     hosts = [await host_cls.create(name=f"h{i}") for i in range(5)]
     with Storage.fake():
         for host in hosts:
-            await host.add_media(jpeg_bytes, file_name="a.jpg").to_media_collection("gallery")
+            await host.add_image(jpeg_bytes, file_name="a.jpg")
 
         await ModelCollection(hosts).load("media")
 
         with _QueryCounter(engine) as counter:
             for host in hosts:
-                media = await host.get_media("gallery")
+                media = host.get_media()
                 assert len(media) == 1
         assert counter.count == 0, "get_media must serve from the eager cache, not the DB"
 
@@ -143,7 +145,7 @@ async def test_collection_load_batches_into_a_single_query(
     hosts = [await host_cls.create(name=f"b{i}") for i in range(6)]
     with Storage.fake():
         for host in hosts:
-            await host.add_media(jpeg_bytes, file_name="a.jpg").to_media_collection("gallery")
+            await host.add_image(jpeg_bytes, file_name="a.jpg")
 
         with _QueryCounter(engine) as counter:
             await ModelCollection(hosts).load("media")
@@ -160,19 +162,19 @@ async def test_cached_reads_filter_by_collection(
     host_cls = _host()
     host = await host_cls.create(name="mixed")
     with Storage.fake():
-        await host.add_media(jpeg_bytes, file_name="g.jpg").to_media_collection("gallery")
-        await host.add_media(jpeg_bytes, file_name="d.jpg").to_media_collection("docs")
+        await host.add_image(jpeg_bytes, file_name="g.jpg")
+        await host.add_image(jpeg_bytes, file_name="d.jpg", collection="docs")
 
         await host.load("media")
         with _QueryCounter(engine) as counter:
-            gallery = await host.get_media("gallery")
-            docs = await host.get_media("docs")
+            gallery = host.get_media()
+            docs = host.media_in("docs")
         assert counter.count == 0
         assert {m.collection_name for m in gallery} == {"gallery"}
         assert {m.collection_name for m in docs} == {"docs"}
 
 
-async def test_attach_media_invalidates_eager_cache(
+async def test_add_image_invalidates_eager_cache(
     engine: AsyncEngine, session: AsyncSession, jpeg_bytes: bytes
 ) -> None:
     """Adding media after a preload must not serve a stale cached list."""
@@ -182,12 +184,12 @@ async def test_attach_media_invalidates_eager_cache(
     host_cls = _host()
     host = await host_cls.create(name="grows")
     with Storage.fake():
-        await host.add_media(jpeg_bytes, file_name="one.jpg").to_media_collection("gallery")
+        await host.add_image(jpeg_bytes, file_name="one.jpg")
         await host.load("media")
 
-        await host.attach_media(jpeg_bytes, file_name="two.jpg", collection="gallery")
-        media = await host.get_media("gallery")
-        assert len(media) == 2, "attach_media must invalidate the eager cache"
+        await host.add_image(jpeg_bytes, file_name="two.jpg")
+        media = host.get_media()
+        assert len(media) == 2, "add_image must keep the eager cache in sync"
 
 
 async def test_with_media_query_builder_feeds_get_media(
@@ -201,13 +203,13 @@ async def test_with_media_query_builder_feeds_get_media(
     hosts = [await host_cls.create(name=f"w{i}") for i in range(4)]
     with Storage.fake():
         for host in hosts:
-            await host.add_media(jpeg_bytes, file_name="a.jpg").to_media_collection("gallery")
+            await host.add_image(jpeg_bytes, file_name="a.jpg")
 
         loaded = list(await host_cls.with_("media").get())
 
         with _QueryCounter(engine) as counter:
             for host in loaded:
-                media = await host.get_media("gallery")
+                media = host.get_media()
                 assert len(media) == 1
         assert counter.count == 0, "get_media must read the .with_('media') eager cache"
 
@@ -227,7 +229,7 @@ async def test_with_media_honors_morph_class_redirect(
     view_cls = _view_host()
     with Storage.fake():
         host = await host_cls.create(name="canonical")
-        await host.add_media(jpeg_bytes, file_name="a.jpg").to_media_collection("gallery")
+        await host.add_image(jpeg_bytes, file_name="a.jpg")
         # Same id as the canonical host — the view reuses its media rows.
         view = await view_cls.create(name="view")
         assert view.id == host.id
@@ -236,7 +238,7 @@ async def test_with_media_honors_morph_class_redirect(
 
         with _QueryCounter(engine) as counter:
             for row in loaded:
-                media = await row.get_media("gallery")
+                media = row.get_media()
                 assert len(media) == 1
         assert counter.count == 0, ".with_('media') must honor __morph_class__"
 
@@ -259,9 +261,10 @@ async def test_view_model_writes_media_under_canonical_type(
         view = await view_cls.create(name="view")
         assert view.id == host.id
 
-        await view.add_media(jpeg_bytes, file_name="v.jpg").to_media_collection("gallery")
+        await view.add_image(jpeg_bytes, file_name="v.jpg")
 
         # The canonical host sees the row the view wrote.
-        canonical_media = await host.get_media("gallery")
+        await host.load("media")
+        canonical_media = host.get_media()
         assert len(canonical_media) == 1
         assert canonical_media[0].model_type == "LoadMediaHost"

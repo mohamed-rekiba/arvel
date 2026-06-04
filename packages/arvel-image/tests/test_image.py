@@ -1,4 +1,4 @@
-"""Tests for arvel-image (Spatie Image v3 parity, Pillow-only)."""
+"""Tests for arvel-image (Pillow-only fluent image transforms)."""
 
 from __future__ import annotations
 
@@ -150,6 +150,69 @@ def test_image_chain_is_reusable(png_4x4_bytes: bytes) -> None:
     assert first == second
 
 
+def test_image_to_width_preserves_aspect_ratio() -> None:
+    """to_width(px) scales width and adjusts height proportionally."""
+    from io import BytesIO
+
+    from arvel_image import Image
+    from PIL import Image as PILImage
+
+    src = PILImage.new("RGB", (200, 100), (0, 0, 255))
+    buf = BytesIO()
+    src.save(buf, format="PNG")
+
+    out_bytes = Image.load(buf.getvalue()).to_width(50).format("png").to_bytes()
+    out = PILImage.open(BytesIO(out_bytes))
+    assert out.size == (50, 25)
+
+
+def test_image_to_height_preserves_aspect_ratio() -> None:
+    """to_height(px) scales height and adjusts width proportionally."""
+    from io import BytesIO
+
+    from arvel_image import Image
+    from PIL import Image as PILImage
+
+    src = PILImage.new("RGB", (200, 100), (0, 255, 0))
+    buf = BytesIO()
+    src.save(buf, format="PNG")
+
+    out_bytes = Image.load(buf.getvalue()).to_height(50).format("png").to_bytes()
+    out = PILImage.open(BytesIO(out_bytes))
+    assert out.size == (100, 50)
+
+
+def test_image_to_width_rejects_non_positive() -> None:
+    from arvel_image import Image
+
+    src = PILImage_factory_bytes()
+    with pytest.raises(ValueError, match="width must be positive"):
+        Image.load(src).to_width(0)
+    with pytest.raises(ValueError, match="width must be positive"):
+        Image.load(src).to_width(-10)
+
+
+def test_image_to_height_rejects_non_positive() -> None:
+    from arvel_image import Image
+
+    src = PILImage_factory_bytes()
+    with pytest.raises(ValueError, match="height must be positive"):
+        Image.load(src).to_height(0)
+    with pytest.raises(ValueError, match="height must be positive"):
+        Image.load(src).to_height(-10)
+
+
+def PILImage_factory_bytes() -> bytes:
+    from io import BytesIO
+
+    from PIL import Image as PILImage
+
+    img = PILImage.new("RGB", (8, 8), (255, 0, 0))
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 def test_image_does_not_shell_out() -> None:
     """arvel_image MUST NOT import subprocess or os.system."""
     import arvel_image
@@ -219,7 +282,7 @@ async def test_vendor_publish_emits_timestamped_media_migration(tmp_path: Path) 
     published = list((tmp_path / "database" / "migrations").glob("*_create_media_table.py"))
     assert len(published) == 1
     body = published[0].read_text()
-    # Sanity: the published stub actually contains the medialibrary schema.
+    # Sanity: the published stub actually contains the media schema.
     assert '__tablename__ = "media"' in body
     assert 't.morphs("model")' in body
     assert "schema.create(__tablename__," in body
