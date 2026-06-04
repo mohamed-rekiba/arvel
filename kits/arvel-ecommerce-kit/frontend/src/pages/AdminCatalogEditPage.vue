@@ -22,6 +22,7 @@ import {
   useAdminVendorsUpdateApiAdminVendorsVendorIdPatch,
 } from '@/api/admin-vendors/admin-vendors'
 import TranslatableInput from '@/components/admin/TranslatableInput.vue'
+import { RouterLink } from 'vue-router'
 import { useToastStore } from '@/stores/toast'
 import { pickLocalized } from '@/lib/i18n'
 import {
@@ -325,6 +326,11 @@ const pageTitle = computed(() =>
     : t('admin.edit.title', { item: catalogSingular.value }),
 )
 
+// Non-empty English slug for the storefront link — only for products in edit mode.
+const storefrontSlug = computed(() =>
+  isProducts.value && !isCreate.value ? productForm.slug.en : '',
+)
+
 function handlePublishToggle(): void {
   const categoryId = props.id ?? ''
   if (categoryIsPublished.value) {
@@ -366,22 +372,35 @@ function handleSave(): void {
 
 <template>
   <div class="mx-auto max-w-2xl">
-    <div class="mb-6 flex items-center gap-4">
-      <button
-        type="button"
-        class="flex items-center gap-1 text-sm text-brand hover:underline"
-        @click="router.back()"
-      >
-        <span
-          class="material-symbols-outlined text-[18px] leading-none rtl:rotate-180"
-          aria-hidden="true"
-          >arrow_back</span
+    <div class="mb-6 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <button
+          type="button"
+          class="flex items-center gap-1 text-sm text-brand hover:underline"
+          @click="router.back()"
         >
-        {{ t('admin.edit.back') }}
-      </button>
-      <h1 class="text-2xl font-bold capitalize text-fg">
-        {{ pageTitle }}
-      </h1>
+          <span
+            class="material-symbols-outlined text-[18px] leading-none rtl:rotate-180"
+            aria-hidden="true"
+            >arrow_back</span
+          >
+          {{ t('admin.edit.back') }}
+        </button>
+        <h1 class="text-2xl font-bold capitalize text-fg">
+          {{ pageTitle }}
+        </h1>
+      </div>
+
+      <RouterLink
+        v-if="storefrontSlug"
+        :to="`/products/${storefrontSlug}`"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-fg transition hover:bg-app-bg-raised"
+      >
+        <span class="material-symbols-outlined text-[16px] leading-none" aria-hidden="true">open_in_new</span>
+        {{ t('admin.edit.view_storefront', 'View on Storefront') }}
+      </RouterLink>
     </div>
 
     <div v-if="loading" class="space-y-4">
