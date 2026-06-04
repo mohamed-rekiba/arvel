@@ -100,8 +100,21 @@ class ProductListOut(_Out):
     pagination: PaginationMeta
 
 
+class StorefrontProductImageOut(_Out):
+    url: str
+    thumbnail_url: str
+    card_url: str
+    srcset: str
+
+
+class ProductDetailCardOut(ProductCardOut):
+    """ProductCardOut extended with the full image gallery for the detail page."""
+
+    images: list[StorefrontProductImageOut]
+
+
 class ProductDetailOut(_Out):
-    data: ProductCardOut
+    data: ProductDetailCardOut
 
 
 class SearchOut(_Out):

@@ -110,7 +110,15 @@ class ProductService:
         )
         if product is None:
             return None
-        return await self.product_to_storefront_with_media(product, locale)
+
+        all_media = await product.get_media(IMAGES_COLLECTION)
+        first = all_media[0] if all_media else None
+        image_payload = await self._image_payload(first)
+        images = [await self._media_to_image_out(m) for m in all_media]
+
+        result = self._product_to_storefront(product, locale, image_payload=image_payload)
+        result["images"] = images
+        return result
 
     async def search_published(
         self,
@@ -307,6 +315,22 @@ class ProductService:
         media = await product.get_first_media(IMAGES_COLLECTION)
         image_payload = await self._image_payload(media)
         return self._product_to_storefront(product, locale, image_payload=image_payload)
+
+    @classmethod
+    async def _media_to_image_out(cls, media: Media) -> dict[str, Any]:
+        """Serialize one Media row to the storefront image gallery format."""
+        url = await media.get_url()
+        has_thumb = media.has_generated_conversion("thumbnail")
+        has_card = media.has_generated_conversion("card")
+        thumbnail_url = await media.get_url("thumbnail") if has_thumb else url
+        card_url = await media.get_url("card") if has_card else url
+        srcset = await media.get_srcset("card") if has_card else ""
+        return {
+            "url": url,
+            "thumbnail_url": thumbnail_url,
+            "card_url": card_url,
+            "srcset": srcset,
+        }
 
     @classmethod
     async def _image_payload(cls, media: Media | None) -> dict[str, Any]:
