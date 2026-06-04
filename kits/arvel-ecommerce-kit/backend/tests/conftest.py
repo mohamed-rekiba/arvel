@@ -28,8 +28,14 @@ if _BACKEND_ROOT not in sys.path:
 IMAGE_POSTGRES = "postgres:18-alpine"
 IMAGE_REDIS = "redis:7-alpine"
 IMAGE_RABBITMQ = "rabbitmq:3.13-management-alpine"
-IMAGE_MINIO = "minio/minio:RELEASE.2025-09-07T16-13-09Z"
+# minio/minio and minio/mc cut releases independently — don't assume the
+# tag date matches across the two repos. Verify both via Docker Hub before
+# bumping. See packages/arvel-image/tests/conftest.py for the matching pin.
+IMAGE_MINIO = "minio/minio:RELEASE.2025-09-07T16-13-09Z"  # web-verified 2026-06-04
 IMAGE_MAILPIT = "axllent/mailpit:v1.21"
+# FIXME: the four pins above use floating major/minor tags — violates
+# 100-coding-standards § Dependency Version Pinning. Tracked as a follow-up
+# (F-WI003-009) so the verify-WI doesn't expand again mid-flight.
 
 _POSTGRES_USER = "arvel"
 _POSTGRES_PASSWORD = "arvel"  # well-known test credential; container is local-only

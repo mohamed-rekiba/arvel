@@ -1,11 +1,10 @@
-"""arvel-image media-library runtime — Spatie ``laravel-medialibrary`` v11 parity.
+"""arvel-image media-library runtime.
 
 Public surface organized as a feature-per-file subpackage:
 
 - :class:`Media` — the polymorphic ORM row (`media` table).
-- :class:`HasMedia` — mixin that gives any host model the
-  ``media`` MorphMany plus the ``add_media`` / ``get_media`` /
-  ``clear_media_collection`` API.
+- :class:`HasMedia` — mixin that gives any host model the ``media``
+  MorphMany plus ``add_image`` / ``get_media`` / ``clear_images``.
 - :class:`MediaCollection` — declarative bucket; can be ``single_file``
   and carry a list of :class:`Conversion` instances.
 - :class:`Conversion` — declarative chain of :class:`arvel_image.Image`
@@ -14,16 +13,12 @@ Public surface organized as a feature-per-file subpackage:
   scheme for original and conversion paths on disk.
 - :class:`ConversionRunner` — synchronous executor; offloads Pillow
   work to a worker thread so it never blocks the event loop.
-- :class:`FileAdder` — builder returned by :meth:`HasMedia.add_media`.
-
-See package architecture docs for runtime-layer decisions
-(synchronous conversions, short class-name polymorphic discriminator,
-default path scheme matching Spatie verbatim).
+- :class:`FileAdder` — builder returned by :meth:`HasMedia.image_builder`.
 """
 
 from __future__ import annotations
 
-from arvel_image.media.collection import FileInfo, MediaCollection
+from arvel_image.media.collection import MediaCollection
 from arvel_image.media.conversion import Conversion
 from arvel_image.media.conversion_runner import (
     ConversionRunner,
@@ -47,21 +42,24 @@ from arvel_image.media.path_generator import (
     get_path_generator,
     set_path_generator,
 )
-from arvel_image.media.responsive_image_generator import (
-    calculate_responsive_widths,
-    copy_responsive_images,
-    generate_placeholder_svg,
-    generate_responsive_images_for_media,
-)
+from arvel_image.media.presets import CollectionConfig, ConversionConfig
 from arvel_image.media.trait import HasMedia
 
+# Intentionally not re-exported here either — reach the originals via their
+# submodule paths, which stay stable:
+#   * FileInfo                       → arvel_image.media.collection
+#   * get_collection_preset          → arvel_image.media.presets
+#   * register_collection_preset     → arvel_image.media.presets
+#   * responsive-image helpers       → arvel_image.media.responsive_image_generator
+
 __all__ = [
+    "CollectionConfig",
     "Conversion",
+    "ConversionConfig",
     "ConversionFailedError",
     "ConversionRunner",
     "DefaultPathGenerator",
     "FileAdder",
-    "FileInfo",
     "FileTooLargeError",
     "HasMedia",
     "InvalidMimeTypeError",
@@ -72,10 +70,6 @@ __all__ = [
     "PathGenerator",
     "QueuedConversionJob",
     "UnknownCollectionError",
-    "calculate_responsive_widths",
-    "copy_responsive_images",
-    "generate_placeholder_svg",
-    "generate_responsive_images_for_media",
     "get_conversion_runner",
     "get_path_generator",
     "set_conversion_runner",

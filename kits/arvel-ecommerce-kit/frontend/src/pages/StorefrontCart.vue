@@ -45,13 +45,18 @@ async function remove(itemId: string): Promise<void> {
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="!cart.cart?.items.length" class="mt-20 flex flex-col items-center gap-3 text-center">
+    <div
+      v-else-if="!cart.cart?.items.length"
+      class="mt-20 flex flex-col items-center gap-3 text-center"
+    >
       <span class="material-symbols-outlined select-none text-[56px] leading-none text-fg-faint">
         shopping_cart
       </span>
       <p class="text-fg-faint">{{ t('cart.empty', 'Your cart is empty') }}</p>
-      <RouterLink to="/products"
-        class="mt-2 rounded-xl bg-brand px-6 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover">
+      <RouterLink
+        to="/products"
+        class="mt-2 rounded-xl bg-brand px-6 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover"
+      >
         {{ t('cart.continue', 'Continue Shopping') }}
       </RouterLink>
     </div>
@@ -83,9 +88,12 @@ async function remove(itemId: string): Promise<void> {
               <tr v-for="item in cart.cart.items" :key="item.id" class="group">
                 <!-- Remove -->
                 <td class="px-4 py-4">
-                  <button type="button" :disabled="cart.loading"
+                  <button
+                    type="button"
+                    :disabled="cart.loading"
                     class="flex h-6 w-6 items-center justify-center rounded-full border border-border text-fg-muted transition hover:border-danger hover:bg-danger/10 hover:text-danger disabled:opacity-40"
-                    @click="remove(item.id)">
+                    @click="remove(item.id)"
+                  >
                     <span class="material-symbols-outlined select-none text-[14px] leading-none">
                       close
                     </span>
@@ -94,12 +102,21 @@ async function remove(itemId: string): Promise<void> {
 
                 <!-- Product -->
                 <td class="px-4 py-4">
-                  <RouterLink :to="`/products/${item.product.slug}`" class="flex items-center gap-3">
+                  <RouterLink
+                    :to="`/products/${item.product.slug}`"
+                    class="flex items-center gap-3"
+                  >
                     <div class="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-app-bg-sunken">
-                      <img v-if="item.product.thumbnail_url" :src="item.product.thumbnail_url" :alt="item.product.name"
-                        class="h-full w-full object-cover" />
+                      <img
+                        v-if="item.product.thumbnail_url"
+                        :src="item.product.thumbnail_url"
+                        :alt="item.product.name"
+                        class="h-full w-full object-cover"
+                      />
                       <div v-else class="flex h-full w-full items-center justify-center">
-                        <span class="material-symbols-outlined select-none text-[24px] leading-none text-fg-faint">
+                        <span
+                          class="material-symbols-outlined select-none text-[24px] leading-none text-fg-faint"
+                        >
                           image
                         </span>
                       </div>
@@ -121,9 +138,12 @@ async function remove(itemId: string): Promise<void> {
                 <!-- Quantity stepper -->
                 <td class="px-4 py-4">
                   <div class="flex items-center justify-center gap-2">
-                    <button type="button" :disabled="cart.loading || item.quantity <= 1"
+                    <button
+                      type="button"
+                      :disabled="cart.loading || item.quantity <= 1"
                       class="flex h-7 w-7 items-center justify-center rounded-full border border-border text-fg hover:bg-app-bg-raised disabled:opacity-40"
-                      @click="updateQty(item.id, item.quantity - 1)">
+                      @click="updateQty(item.id, item.quantity - 1)"
+                    >
                       <span class="material-symbols-outlined select-none text-[14px] leading-none">
                         remove
                       </span>
@@ -131,9 +151,12 @@ async function remove(itemId: string): Promise<void> {
                     <span class="w-8 text-center text-sm font-semibold text-fg">
                       {{ item.quantity }}
                     </span>
-                    <button type="button" :disabled="cart.loading"
+                    <button
+                      type="button"
+                      :disabled="cart.loading"
                       class="flex h-7 w-7 items-center justify-center rounded-full border border-border text-fg hover:bg-app-bg-raised disabled:opacity-40"
-                      @click="updateQty(item.id, item.quantity + 1)">
+                      @click="updateQty(item.id, item.quantity + 1)"
+                    >
                       <span class="material-symbols-outlined select-none text-[14px] leading-none">
                         add
                       </span>
@@ -152,7 +175,9 @@ async function remove(itemId: string): Promise<void> {
       </div>
 
       <!-- ── Order summary panel ─────────────────────────────────────── -->
-      <div class="mt-6 self-start rounded-xl border border-border-subtle bg-app-bg p-6 shadow-sm lg:mt-0">
+      <div
+        class="mt-6 self-start rounded-xl border border-border-subtle bg-app-bg p-6 shadow-sm lg:mt-0"
+      >
         <h2 class="text-lg font-bold text-fg">{{ t('order.summary') }}</h2>
 
         <div class="mt-5 space-y-3">
@@ -174,18 +199,24 @@ async function remove(itemId: string): Promise<void> {
           </div>
         </div>
 
-        <div class="mt-4 flex justify-between border-t border-border-subtle pt-4 text-base font-bold text-fg">
+        <div
+          class="mt-4 flex justify-between border-t border-border-subtle pt-4 text-base font-bold text-fg"
+        >
           <span>{{ t('order.total') }}</span>
           <span class="text-start w-25">{{ formatCurrency(total, currentLocale) }}</span>
         </div>
 
-        <RouterLink to="/checkout"
-          class="mt-5 block w-full rounded-xl bg-brand py-3 text-center text-sm font-semibold text-white hover:bg-brand-hover">
+        <RouterLink
+          to="/checkout"
+          class="mt-5 block w-full rounded-xl bg-brand py-3 text-center text-sm font-semibold text-white hover:bg-brand-hover"
+        >
           {{ t('cart.checkout', 'Proceed to Checkout') }}
         </RouterLink>
 
-        <RouterLink to="/products"
-          class="mt-3 block w-full rounded-xl border border-border py-2.5 text-center text-sm font-medium text-fg-muted hover:bg-app-bg-raised">
+        <RouterLink
+          to="/products"
+          class="mt-3 block w-full rounded-xl border border-border py-2.5 text-center text-sm font-medium text-fg-muted hover:bg-app-bg-raised"
+        >
           {{ t('cart.continue', 'Continue Shopping') }}
         </RouterLink>
       </div>

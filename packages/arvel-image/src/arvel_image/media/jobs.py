@@ -56,9 +56,7 @@ class QueuedConversionJob(Job):
 
         await _process_one(media, host)
 
-        if self.generate_responsive_images and "medialibrary_original" not in (
-            media.responsive_images or {}
-        ):
+        if self.generate_responsive_images and "original" not in (media.responsive_images or {}):
             gen = resolve_path_generator()
             await _generate_responsive_for_job(media, gen)
 
@@ -91,14 +89,14 @@ async def _generate_responsive_for_job(media: Media, gen: PathGenerator) -> None
     try:
         contents = await disk.get(gen.path_for(media))
     except Exception:  # noqa: BLE001
+        # Source bytes gone by the time the queued job runs — nothing to
+        # generate from. Swallow so the job doesn't retry-loop forever.
         return
 
-    entry = await generate_responsive_images_for_media(
-        media, contents, "medialibrary_original", disk=disk
-    )
+    entry = await generate_responsive_images_for_media(media, contents, "original", disk=disk)
     if entry:
         existing = dict(media.responsive_images or {})
-        existing["medialibrary_original"] = entry
+        existing["original"] = entry
         media.responsive_images = existing
         await media.save()
 

@@ -94,13 +94,10 @@ def test_storefront_serializes_locale_aware_category_fields() -> None:
     assert "category_name:" in model
     assert "category_slug:" in model
     assert 'where_json_path("slug", locale, slug)' in service
-    assert '"slug": TranslatableMixin.translate_dict(slug_data, locale)' in service
-    assert (
-        '"category_name": TranslatableMixin.translate_dict(category_name_data, locale)' in service
-    )
-    assert (
-        '"category_slug": TranslatableMixin.translate_dict(category_slug_data, locale)' in service
-    )
+    assert "tr = TranslatableMixin.translate_dict" in service
+    assert '"slug": tr(slug, locale)' in service
+    assert '"category_name": tr(cat_name, locale)' in service
+    assert '"category_slug": tr(cat_slug, locale)' in service
 
 
 def test_cart_only_adds_visible_products() -> None:

@@ -24,7 +24,7 @@ class MediaCollection:
     """Named bucket of media on a host model.
 
     - ``single_file=True`` → adding a new file deletes every previously-stored
-      media in the collection (Spatie's ``singleFile()``).
+      media in the collection.
     - ``disk`` → override the storage disk for originals in this collection.
     - ``conversions_disk`` → separate disk for conversion derivatives.
     - ``accept_mime_types([...])`` → reject files with non-matching MIME.
@@ -45,7 +45,7 @@ class MediaCollection:
             msg = "MediaCollection name must be a non-empty string"
             raise ValueError(msg)
         self.name = name
-        self.single_file = single_file
+        self.single_file_enabled = single_file
         self.disk = disk
         self.conversions: list[Conversion] = []
         self.conversions_disk: str | None = None
@@ -62,6 +62,18 @@ class MediaCollection:
     def with_conversions(self, *conversions: Conversion) -> Self:
         """Append conversions that should run for every file added here."""
         self.conversions.extend(conversions)
+        return self
+
+    def single_file(self, *, value: bool = True) -> Self:
+        """Chainable counterpart to the ``single_file=`` constructor kwarg.
+
+        Adding a new file deletes every previously-stored media in the collection.
+        Pass ``value=False`` to opt back out.
+        """
+        if value and self.keep_latest_n is not None:
+            msg = "single_file and only_keep_latest are mutually exclusive"
+            raise ValueError(msg)
+        self.single_file_enabled = value
         return self
 
     def use_disk(self, name: str) -> Self:
@@ -85,11 +97,11 @@ class MediaCollection:
         return self
 
     def only_keep_latest(self, n: int) -> Self:
-        """Prune to the most-recent ``n`` files after each add
+        """Prune to the most-recent ``n`` files after each add.
 
-        Mutually exclusive with ``single_file=True``.
+        Mutually exclusive with ``single_file=True`` / ``.single_file()``.
         """
-        if self.single_file:
+        if self.single_file_enabled:
             msg = "only_keep_latest and single_file are mutually exclusive"
             raise ValueError(msg)
         self.keep_latest_n = n

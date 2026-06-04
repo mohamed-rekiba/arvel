@@ -26,6 +26,7 @@ import uuid
 from decimal import Decimal
 from typing import Any, ClassVar
 
+import config.image as image_cfg
 from arvel.database import (
     column_attr,
     datetime,
@@ -39,42 +40,23 @@ from arvel.database import (
     tsvector,
     uuid_id,
 )
-from arvel_image import Conversion, HasMedia, MediaCollection
+from arvel_image import HasMedia
 from sqlalchemy.orm import MappedAsDataclass
 
 from app.models.base import TranslatableMixin
 from app.models.category import Category
 from app.models.vendor import Vendor
 
-IMAGES_COLLECTION = "images"
-
 
 class ProductMediaMixin(HasMedia):
-    """HasMedia subclass that registers the three standard product image conversions.
+    """HasMedia subclass for the product image collection.
 
-    ``card`` and ``full`` both generate responsive variants — the storefront
-    grid reads ``media.get_srcset("card")`` and ``get_url("thumbnail")`` for
-    each product card.  ``accept_mime_types`` enforces image-only uploads at
-    the collection level (content-sniffed by FileAdder, not just file extension).
+    Collection config (dimensions, MIME types, conversions) lives in
+    ``config/image.py``. ``AppServiceProvider`` builds the preset at boot;
+    ``HasMedia.register_media_collections`` auto-registers it from here.
     """
 
-    def register_media_collections(self) -> None:
-        (
-            MediaCollection(IMAGES_COLLECTION)
-            .accept_mime_types(["image/jpeg", "image/png", "image/webp", "image/gif"])
-            .with_conversions(
-                Conversion("thumbnail").fit("cover", 150, 150).quality(85),
-                Conversion("card")
-                .fit("cover", 400, 300)
-                .quality(85)
-                .generate_responsive_images(),
-                Conversion("full")
-                .fit("contain", 1200, 900)
-                .quality(90)
-                .generate_responsive_images(),
-            )
-            .register_on(self)
-        )
+    __media_collection__: ClassVar[str] = image_cfg.default
 
 
 class ProductBase(ProductMediaMixin, TranslatableMixin, MappedAsDataclass):
@@ -171,4 +153,4 @@ class ProductBase(ProductMediaMixin, TranslatableMixin, MappedAsDataclass):
         return string(50, nullable=False, default="draft")
 
 
-__all__ = ["IMAGES_COLLECTION", "ProductBase", "ProductMediaMixin"]
+__all__ = ["ProductBase", "ProductMediaMixin"]

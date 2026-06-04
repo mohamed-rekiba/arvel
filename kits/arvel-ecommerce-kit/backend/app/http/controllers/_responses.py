@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class _Out(BaseModel):
@@ -101,10 +101,29 @@ class ProductListOut(_Out):
 
 
 class StorefrontProductImageOut(_Out):
+    """Per-image payload — mirrors ``Media.to_dict()`` from arvel-image.
+
+    The frontend reads URLs from the ``conversions`` and ``srcsets`` dicts
+    keyed by conversion name (``thumbnail``, ``card``, ``full``, …) instead of
+    hard-coded fields. ``url`` is the original.
+    """
+
+    id: str
+    uuid: str | None = None
+    collection_name: str
+    name: str
+    file_name: str
+    mime_type: str | None = None
+    size: int
+    disk: str
+    order: int | None = None
+    custom_properties: dict[str, Any] = Field(default_factory=dict)
     url: str
-    thumbnail_url: str
-    card_url: str
-    srcset: str
+    conversions: dict[str, str] = Field(default_factory=dict)
+    srcsets: dict[str, str] = Field(default_factory=dict)
+    placeholder_svg: str = ""
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class ProductDetailCardOut(ProductCardOut):

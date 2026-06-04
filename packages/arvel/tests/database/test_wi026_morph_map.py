@@ -115,19 +115,37 @@ class TestResolveMorphClass:
 
 
 class TestWrittenTokenUsesAlias:
+    """End-to-end: the value written into ``{name}_type`` round-trips through eager loading."""
+
     async def test_create_stores_alias(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         morph_map({"post": Wi026Post})
         post = await Wi026Post.create(title="Hello")
-        img = await post.image.create(url="/a.png")
-        assert img.imageable_type == "post"
+        await Wi026Image.create(
+            url="/a.png",
+            imageable_type=get_morph_alias(Wi026Post),
+            imageable_id=post.id,
+        )
+        loaded = await (
+            Wi026Post.query().with_("image").where(Wi026Post.__table__.c.id == post.id).first()
+        )
+        assert loaded is not None
+        assert loaded.image is not None
+        assert loaded.image.imageable_type == "post"
 
     async def test_create_stores_short_name_without_map(
         self, engine: AsyncEngine, session: AsyncSession
     ) -> None:
         await _setup(engine)
         post = await Wi026Post.create(title="Hello")
-        img = await post.image.create(url="/a.png")
-        assert img.imageable_type == "Wi026Post"
-        # And the accessor reads it back through the same token.
-        assert (await post.image) is not None
+        await Wi026Image.create(
+            url="/a.png",
+            imageable_type=get_morph_alias(Wi026Post),
+            imageable_id=post.id,
+        )
+        loaded = await (
+            Wi026Post.query().with_("image").where(Wi026Post.__table__.c.id == post.id).first()
+        )
+        assert loaded is not None
+        assert loaded.image is not None
+        assert loaded.image.imageable_type == "Wi026Post"

@@ -1,168 +1,218 @@
-"""HasMedia aliases and HasMediaMixin.
-
-Covers attach_media/delete_media aliases and the HasMediaMixin re-export.
-"""
+"""HasMedia public surface — the one-method DX after the cleanup."""
 
 from __future__ import annotations
 
 import inspect
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-pytest.importorskip("arvel_image", reason="arvel_image required for WI-arvel-036 tests")
+pytest.importorskip("arvel_image", reason="arvel_image required")
 
 
-# ── HasMediaMixin export ──────────────────────────────────────────
+# ── add_image: the polymorphic upload ────────────────────────────────
 
 
-def test_has_media_mixin_is_exported() -> None:
-    """from arvel_image import HasMediaMixin resolves without error."""
-    # This import must succeed — if HasMediaMixin is not exported it raises ImportError
-    import arvel_image
-
-    assert arvel_image.HasMediaMixin is not None, "HasMediaMixin resolved to None"
-    assert arvel_image.HasMedia is not None, "HasMedia must remain exported"
-
-
-def test_has_media_mixin_is_has_media() -> None:
-    """HasMediaMixin resolves to the same class as HasMedia."""
-    from arvel_image import (
-        HasMedia,
-        HasMediaMixin,
-    )
-
-    assert HasMediaMixin is HasMedia
-
-
-# ── attach_media() exists ────────────────────────────────────────
-
-
-def test_attach_media_method_exists() -> None:
-    """HasMedia exposes attach_media()."""
+def test_add_image_method_exists() -> None:
     from arvel_image import HasMedia
 
-    assert hasattr(HasMedia, "attach_media"), "HasMedia.attach_media not found"
-    assert callable(HasMedia.attach_media)
+    assert callable(getattr(HasMedia, "add_image", None))
 
 
-def test_attach_media_accepts_collection_param() -> None:
-    """attach_media signature includes collection kwarg."""
+def test_add_image_is_a_coroutine() -> None:
     from arvel_image import HasMedia
 
-    sig = inspect.signature(HasMedia.attach_media)
-    params = set(sig.parameters.keys())
+    assert inspect.iscoroutinefunction(HasMedia.add_image)
 
+
+def test_add_image_collection_kwarg_defaults_to_none() -> None:
+    """add_image accepts optional collection= for multi-collection hosts; default = None."""
+    from arvel_image import HasMedia
+
+    params = inspect.signature(HasMedia.add_image).parameters
     assert "source" in params
-    assert "collection" in params or "file_name" in params
-
-
-def test_attach_media_is_a_coroutine() -> None:
-    """attach_media must be awaitable (returns a coroutine)."""
-    from arvel_image import HasMedia
-
-    assert inspect.iscoroutinefunction(HasMedia.attach_media), (
-        "attach_media is not a coroutine function — it must be async"
-    )
-
-
-# ── delete_media() exists ────────────────────────────────────────
-
-
-def test_delete_media_method_exists() -> None:
-    """HasMedia exposes delete_media()."""
-    from arvel_image import HasMedia
-
-    assert hasattr(HasMedia, "delete_media"), "HasMedia.delete_media not found"
-    assert callable(HasMedia.delete_media)
-
-
-def test_delete_media_is_a_coroutine() -> None:
-    """delete_media must be awaitable."""
-    from arvel_image import HasMedia
-
-    assert inspect.iscoroutinefunction(HasMedia.delete_media), (
-        "delete_media is not a coroutine function — it must be async"
-    )
-
-
-def test_delete_media_signature_has_collection_param() -> None:
-    """delete_media(collection='default') mirrors clear_media_collection."""
-    from arvel_image import HasMedia
-
-    sig = inspect.signature(HasMedia.delete_media)
-    params = sig.parameters
-
+    assert "file_name" in params
     assert "collection" in params
-    default = params["collection"].default
-    assert default == "default"
+    assert params["collection"].default is None
 
 
-# ── aliases delegate, no new logic ───────────────────────────────
+# ── image_builder: the advanced builder ──────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_delete_media_delegates_to_clear_media_collection() -> None:
-    """delete_media delegates to clear_media_collection."""
+def test_image_builder_method_exists() -> None:
     from arvel_image import HasMedia
 
-    class FakeHost(HasMedia):
-        id = 1
-        captured_collection: str = ""
-
-        async def clear_media_collection(self, collection: str = "default") -> int:
-            self.captured_collection = collection
-            return 3
-
-    host = FakeHost()
-    count = await host.delete_media("gallery")
-
-    assert count == 3
-    assert host.captured_collection == "gallery"
+    assert callable(getattr(HasMedia, "image_builder", None))
 
 
-@pytest.mark.asyncio
-async def test_attach_media_delegates_to_add_media_chain() -> None:
-    """attach_media delegates to add_media().to_media_collection()."""
+def test_image_builder_is_synchronous() -> None:
+    """image_builder returns a FileAdder synchronously; .save() is the async tail."""
     from arvel_image import HasMedia
-    from arvel_image.media.model import Media
 
-    fake_media = MagicMock(spec=Media)
-
-    class FakeHost(HasMedia):
-        id = 1
-        captured_source: Any = None
-        captured_file_name: str | None = None
-
-        def add_media(self, source: Any, *, file_name: str | None = None) -> Any:
-            self.captured_source = source
-            self.captured_file_name = file_name
-
-            adder = MagicMock()
-            adder.to_media_collection = AsyncMock(return_value=fake_media)
-            return adder
-
-    host = FakeHost()
-    result = await host.attach_media(b"data", file_name="x.jpg", collection="gallery")
-
-    assert result is fake_media
-    assert host.captured_source == b"data"
-    assert host.captured_file_name == "x.jpg"
+    assert not inspect.iscoroutinefunction(HasMedia.image_builder)
 
 
-# ── no deprecation warnings ──────────────────────────────────────
+# ── clear_images: drop the collection ────────────────────────────────
 
 
-def test_has_media_mixin_import_no_warnings() -> None:
-    """importing HasMediaMixin emits no DeprecationWarning."""
-    import warnings
+def test_clear_images_method_exists() -> None:
+    from arvel_image import HasMedia
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", DeprecationWarning)
-        try:
-            import arvel_image
+    assert callable(getattr(HasMedia, "clear_images", None))
 
-            _ = arvel_image.HasMediaMixin
-        except ImportError:
-            pytest.fail("HasMediaMixin not importable")
+
+def test_clear_images_is_a_coroutine() -> None:
+    from arvel_image import HasMedia
+
+    assert inspect.iscoroutinefunction(HasMedia.clear_images)
+
+
+def test_clear_images_takes_no_collection_param() -> None:
+    """clear_images uses __media_collection__; multi-collection callers use clear_media_in."""
+    from arvel_image import HasMedia
+
+    params = inspect.signature(HasMedia.clear_images).parameters
+    # `self` only.
+    assert list(params.keys()) == ["self"]
+
+
+# ── default collection: singular string ──────────────────────────────
+
+
+def test_media_collection_is_a_string_default() -> None:
+    from arvel_image import HasMedia
+
+    assert HasMedia.__media_collection__ == "default"
+    assert isinstance(HasMedia.__media_collection__, str)
+
+
+# ── documented public API exists ───────────────────────────────────────
+#
+# Catches doc drift: every method listed in the README method tables must
+# exist on the live class. If you rename a method, this test must change too
+# — and you'll remember to update the README in the same PR.
+
+
+def _public_methods(cls: type) -> set[str]:
+    return {n for n, _ in inspect.getmembers(cls, callable) if not n.startswith("_")}
+
+
+def test_image_documented_methods_exist() -> None:
+    """README's `Image` operations table."""
+    from arvel_image import Image
+
+    documented = {
+        "load",
+        "fit",
+        "resize",
+        "crop",
+        "to_width",
+        "to_height",
+        "format",
+        "quality",
+        "optimize",
+        "strip_exif",
+        "save",
+        "save_async",
+        "to_bytes",
+        "to_bytes_async",
+    }
+    members = _public_methods(Image)
+    missing = documented - members
+    assert not missing, f"README mentions undefined Image methods: {sorted(missing)}"
+
+
+def test_conversion_documented_methods_exist() -> None:
+    """README's `Conversion` chain methods table."""
+    from arvel_image.media import Conversion
+
+    documented = {
+        "fit",
+        "resize",
+        "crop",
+        "to_width",
+        "to_height",
+        "format",
+        "quality",
+        "generate_responsive_images",
+        "with_manipulations",
+        "accepts",
+        "apply",
+    }
+    members = _public_methods(Conversion)
+    missing = documented - members
+    assert not missing, f"README mentions undefined Conversion methods: {sorted(missing)}"
+
+
+def test_media_collection_documented_methods_exist() -> None:
+    """README's `MediaCollection` reference."""
+    from arvel_image.media import MediaCollection
+
+    documented = {
+        "with_conversions",
+        "single_file",
+        "use_disk",
+        "use_conversions_disk",
+        "accept_mime_types",
+        "max_file_size",
+        "only_keep_latest",
+        "use_fallback_url",
+        "generate_responsive_images",
+        "accepts_file",
+        "register_on",
+    }
+    members = _public_methods(MediaCollection)
+    missing = documented - members
+    assert not missing, f"README mentions undefined MediaCollection methods: {sorted(missing)}"
+
+
+def test_has_media_documented_methods_exist() -> None:
+    """README's `HasMedia` public surface."""
+    from arvel_image import HasMedia
+
+    documented = {
+        "add_image",
+        "image_builder",
+        "get_media",
+        "media_in",
+        "clear_images",
+        "clear_media_in",
+        "clear_media_in_except",
+        "image_url",
+        "collection_for",
+        "host_pk",
+        "register_media_collections",
+        "delete_preserving_media",
+        "to_dict",
+    }
+    members = _public_methods(HasMedia)
+    missing = documented - members
+    assert not missing, f"README mentions undefined HasMedia methods: {sorted(missing)}"
+
+
+def test_media_documented_methods_exist() -> None:
+    """README + docs/ Media row methods."""
+    from arvel_image import Media
+
+    documented = {
+        "url",
+        "full_url",
+        "srcset",
+        "all_srcsets",
+        "placeholder_svg",
+        "temporary_url",
+        "conversion_urls",
+        "has_generated_conversion",
+        "get_path",
+        "to_dict",
+        "delete",
+        "copy",
+        "move",
+        "has_custom_property",
+        "get_custom_property",
+        "set_custom_property",
+        "forget_custom_property",
+        "set_new_order",
+    }
+    members = _public_methods(Media)
+    missing = documented - members
+    assert not missing, f"README/docs mention undefined Media methods: {sorted(missing)}"

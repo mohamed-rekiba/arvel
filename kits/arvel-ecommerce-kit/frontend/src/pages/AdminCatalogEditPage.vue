@@ -398,7 +398,9 @@ function handleSave(): void {
         rel="noopener noreferrer"
         class="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-fg transition hover:bg-app-bg-raised"
       >
-        <span class="material-symbols-outlined text-[16px] leading-none" aria-hidden="true">open_in_new</span>
+        <span class="material-symbols-outlined text-[16px] leading-none" aria-hidden="true"
+          >open_in_new</span
+        >
         {{ t('admin.edit.view_storefront', 'View on Storefront') }}
       </RouterLink>
     </div>

@@ -1,0 +1,60 @@
+# Dev-stack edge reverse proxy. The browser talks to a single origin
+# (http://localhost:8002) and Caddy fans requests out to the right service:
+#
+#   /healthz       → Caddy itself (liveness)
+#   /api/*         → backend:8001   (FastAPI / Arvel)
+#   /media/*       → minio:9000     (S3 mode only — object storage, anonymous
+#                                    reads via createbuckets; /media is stripped
+#                                    and the bucket name is prepended)
+#   everything else → frontend:8000  (Vite dev server, HMR websocket and all)
+#
+# The /media prefix matches the kit's STORAGE_LOCAL_URL=/media convention, so
+# image URLs the SPA receives look the same regardless of driver. In LOCAL
+# mode the backend's serve=true route owns /media/* and is reached directly
+# on host port 8001 — NOT through Caddy (the Caddy edge is the recommended
+# path when MinIO is up; local mode is the lightweight fallback).
+#
+# Backend writes (signed uploads) go straight to minio:9000 inside the docker
+# network; only browser reads come through here. Caddy's reverse_proxy handles
+# the HMR websocket upgrade automatically, so Vite needs no extra config.
+#
+# Caddy directive-order trap, save your future self: inside a `handle` block,
+# `rewrite` runs BEFORE `uri strip_prefix` regardless of source order. The
+# obvious-looking `handle /media/* { uri strip_prefix /media; rewrite *
+# /arvel-ecommerce-kit{uri} }` therefore expands `{uri}` to the unstripped
+# path and ships `/arvel-ecommerce-kit/media/13/...` to MinIO → NoSuchKey
+# 404 (asks bucket arvel-ecommerce-kit for key `media/13/...` which doesn't
+# exist; real key is `13/...`). Use `handle_path`, which strips the prefix
+# BEFORE the inner directives run, or wrap the strip+rewrite in a
+# `route { ... }` block to force written order.
+#
+# Direct host ports stay open as debug escape hatches:
+#   localhost:8001 → backend (curl /healthz; local-mode media here)
+#   localhost:8000 → frontend (raw Vite dev server)
+#   localhost:9001 → MinIO console
+#
+# Not production-grade — no HTTPS, no rate limit, no caching headers.
+
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	handle /api/* {
+		reverse_proxy backend:8001
+	}
+
+	handle_path /media/* {
+		rewrite * /arvel-ecommerce-kit{uri}
+		reverse_proxy minio:9000
+	}
+
+	handle {
+		reverse_proxy frontend:8000
+	}
+}

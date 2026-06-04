@@ -55,6 +55,20 @@ class _SelectCounter:
             self.count += 1
 
 
+async def _make_comment(post: Wi028Post, body: str) -> Wi028Comment:
+    comment: Wi028Comment = await Wi028Comment.create(
+        body=body, commentable_type="Wi028Post", commentable_id=post.id
+    )
+    return comment
+
+
+async def _make_image(post: Wi028Post, url: str) -> Wi028Image:
+    image: Wi028Image = await Wi028Image.create(
+        url=url, imageable_type="Wi028Post", imageable_id=post.id
+    )
+    return image
+
+
 class TestEagerWith:
     async def test_morph_many_batches_in_one_query(
         self, engine: AsyncEngine, session: AsyncSession
@@ -62,9 +76,9 @@ class TestEagerWith:
         await _setup(engine)
         p1 = await Wi028Post.create(title="A")
         p2 = await Wi028Post.create(title="B")
-        await p1.comments.create(body="a1")
-        await p1.comments.create(body="a2")
-        await p2.comments.create(body="b1")
+        await _make_comment(p1, "a1")
+        await _make_comment(p1, "a2")
+        await _make_comment(p2, "b1")
 
         from sqlalchemy import event
 
@@ -75,7 +89,7 @@ class TestEagerWith:
             # 1 for posts + 1 batched for all comments = 2.
             assert counter.count == 2
             before = counter.count
-            counts = {p.title: len(await p.comments.all()) for p in posts}
+            counts = {p.title: len(p.comments) for p in posts}
             assert counter.count == before  # served from cache
         finally:
             event.remove(engine.sync_engine, "before_cursor_execute", counter)
@@ -84,11 +98,10 @@ class TestEagerWith:
     async def test_morph_one_eager(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         p1 = await Wi028Post.create(title="A")
-        await p1.image.create(url="/a.png")
+        await _make_image(p1, "/a.png")
         posts = await Wi028Post.query().with_("image").get()
-        img = await posts[0].image
-        assert img is not None
-        assert img.url == "/a.png"
+        assert posts[0].image is not None
+        assert posts[0].image.url == "/a.png"
 
 
 class TestWhereHas:
@@ -98,7 +111,7 @@ class TestWhereHas:
         await _setup(engine)
         p1 = await Wi028Post.create(title="has")
         await Wi028Post.create(title="none")
-        await p1.comments.create(body="hi")
+        await _make_comment(p1, "hi")
 
         titles = [p.title for p in await Wi028Post.query().where_has("comments").get()]
         assert titles == ["has"]
@@ -109,8 +122,8 @@ class TestWhereHas:
         await _setup(engine)
         p1 = await Wi028Post.create(title="match")
         p2 = await Wi028Post.create(title="other")
-        await p1.comments.create(body="keep")
-        await p2.comments.create(body="skip")
+        await _make_comment(p1, "keep")
+        await _make_comment(p2, "skip")
 
         titles = [
             p.title
@@ -124,7 +137,7 @@ class TestWhereHas:
         await _setup(engine)
         p1 = await Wi028Post.create(title="has")
         await Wi028Post.create(title="empty")
-        await p1.comments.create(body="x")
+        await _make_comment(p1, "x")
 
         titles = [p.title for p in await Wi028Post.query().doesnt_have("comments").get()]
         assert titles == ["empty"]
@@ -134,8 +147,8 @@ class TestWithCount:
     async def test_with_count_adds_column(self, engine: AsyncEngine, session: AsyncSession) -> None:
         await _setup(engine)
         p1 = await Wi028Post.create(title="A")
-        await p1.comments.create(body="a1")
-        await p1.comments.create(body="a2")
+        await _make_comment(p1, "a1")
+        await _make_comment(p1, "a2")
 
         posts = (
             await Wi028Post.query()
@@ -152,9 +165,8 @@ class TestModelLoad:
     ) -> None:
         await _setup(engine)
         p1 = await Wi028Post.create(title="A")
-        await p1.comments.create(body="a1")
+        await _make_comment(p1, "a1")
         fresh = await Wi028Post.find(p1.id)
         assert fresh is not None
         await fresh.load("comments")
-        # Accessor now reads from the cache load populated.
-        assert len(await fresh.comments.all()) == 1
+        assert len(fresh.comments) == 1

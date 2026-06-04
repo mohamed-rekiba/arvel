@@ -37,6 +37,12 @@ STORAGE_LOCAL_SERVE=true       # let the framework serve files from the local di
 > [!WARNING]
 > The cloud drivers (`s3`, `gcs`, `azure`) are partially implemented. Verify the operations you need against the driver source before relying on them in production. `local` and `memory` are complete.
 
+> [!TIP]
+> The [arvel-ecommerce-kit](../kits/ecommerce-kit.md) ships a working `s3`-driver
+> setup against a local MinIO + Caddy compose stack — copy the relevant
+> `STORAGE_S3_*` block from its `.env.example` and `docker-compose.yml` to wire up
+> S3-compatible storage in your own app.
+
 <a name="registering-the-provider"></a>
 ### Registering the Provider
 

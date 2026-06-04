@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from arvel.database import Model, QueryBuilder, SoftDeletes, Timestamps, enum
 
-from app.models.product_base import IMAGES_COLLECTION, ProductBase
+from app.models.product_base import ProductBase
 
 
 class Product(
@@ -27,4 +27,4 @@ class Product(
         return query.where(Product.status == "draft")
 
 
-__all__ = ["IMAGES_COLLECTION", "Product"]
+__all__ = ["Product"]

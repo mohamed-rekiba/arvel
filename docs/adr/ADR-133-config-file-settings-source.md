@@ -1,4 +1,7 @@
-# ADR-136: Config files override env via a pydantic-settings source
+# ADR-133: Config files override env via a pydantic-settings source
+
+> Renumbered from ADR-136 in WI-arvel-003 (2026-06-05) to close the gap left by
+> merging the seven arvel-image ADRs into a single ADR-132.
 
 **Date**: 2026-06-03
 **Status**: Accepted

@@ -15,10 +15,8 @@ from typing import Any, TypedDict
 from arvel.database import TranslatableMixin
 from arvel.database.exceptions import InvalidCursorError
 from arvel.logging.facade import Log
-from arvel_image import Media
 
 from app.models.product import Product
-from app.models.product_base import IMAGES_COLLECTION
 from app.models.product_catalog import ProductCatalog
 from app.support.labels import label
 from app.support.products_catalog import refresh_products_catalog
@@ -97,7 +95,7 @@ class ProductService:
             )
 
         return {
-            "data": [await self.product_to_storefront_with_media(p, locale) for p in page.items],
+            "data": [self.product_to_storefront(p, locale) for p in page.items],
             "pagination": {"next_cursor": page.next_cursor, "has_more": page.has_more},
         }
 
@@ -110,15 +108,7 @@ class ProductService:
         )
         if product is None:
             return None
-
-        all_media = await product.get_media(IMAGES_COLLECTION)
-        first = all_media[0] if all_media else None
-        image_payload = await self._image_payload(first)
-        images = [await self._media_to_image_out(m) for m in all_media]
-
-        result = self._product_to_storefront(product, locale, image_payload=image_payload)
-        result["images"] = images
-        return result
+        return self.product_to_storefront(product, locale)
 
     async def search_published(
         self,
@@ -136,7 +126,7 @@ class ProductService:
             .limit(limit)
             .all()
         )
-        return [await self.product_to_storefront_with_media(p, locale) for p in products]
+        return [self.product_to_storefront(p, locale) for p in products]
 
     # ─── admin list / get ─────────────────────────────────────────────────────
 
@@ -309,114 +299,57 @@ class ProductService:
 
     # ─── helpers ─────────────────────────────────────────────────────────────
 
-    async def product_to_storefront_with_media(
-        self, product: ProductCatalog, locale: str
-    ) -> dict[str, Any]:
-        media = await product.get_first_media(IMAGES_COLLECTION)
-        image_payload = await self._image_payload(media)
-        return self._product_to_storefront(product, locale, image_payload=image_payload)
+    _IMAGE_SIZES = "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
 
     @classmethod
-    async def _media_to_image_out(cls, media: Media) -> dict[str, Any]:
-        """Serialize one Media row to the storefront image gallery format."""
-        url = await media.get_url()
-        has_thumb = media.has_generated_conversion("thumbnail")
-        has_card = media.has_generated_conversion("card")
-        thumbnail_url = await media.get_url("thumbnail") if has_thumb else url
-        card_url = await media.get_url("card") if has_card else url
-        srcset = await media.get_srcset("card") if has_card else ""
-        return {
-            "url": url,
-            "thumbnail_url": thumbnail_url,
-            "card_url": card_url,
-            "srcset": srcset,
-        }
+    def product_to_storefront(cls, product: ProductCatalog, locale: str) -> dict[str, Any]:
+        # Media.to_dict() yields the full per-image payload (url, conversions,
+        # srcsets, placeholder_svg). The card-view flat fields below pluck the
+        # named conversion / srcset that the storefront card expects.
+        images = [m.to_dict() for m in product.media]
+        first = images[0] if images else None
+        thumbnail_url = (first["conversions"].get("thumbnail") or first["url"]) if first else None
+        card_srcset = first["srcsets"].get("card", "") if first else ""
+        # Without responsive variants, hint at the card-conversion width so the
+        # browser still picks a sane source for non-1x displays.
+        if first and not card_srcset:
+            card_url = first["conversions"].get("card")
+            if card_url and card_url != first["url"]:
+                card_srcset = f"{card_url} 400w"
 
-    @classmethod
-    async def _image_payload(cls, media: Media | None) -> dict[str, Any]:
-        """Build the image payload for a storefront product card.
+        tr = TranslatableMixin.translate_dict
+        name: dict[str, Any] = product.name or {}
+        slug: dict[str, Any] = product.slug or {}
+        desc: dict[str, Any] = product.description or {}
+        cat_name: dict[str, Any] = product.category_name or {}
+        cat_slug: dict[str, Any] = product.category_slug or {}
+        parent_cat_name: dict[str, Any] = product.parent_category_name or {}
+        parent_cat_slug: dict[str, Any] = product.parent_category_slug or {}
 
-        Priority:
-        1. Responsive srcset from the ``card`` conversion (width-optimised variants).
-        2. Static width hints from conversion URLs if responsive wasn't generated.
-        """
-        empty: dict[str, Any] = {"thumbnail_url": None, "image_srcset": "", "image_sizes": ""}
-        if media is None:
-            return empty
-
-        has_thumb = media.has_generated_conversion("thumbnail")
-        has_card = media.has_generated_conversion("card")
-
-        thumbnail_url: str | None = (
-            await media.get_url("thumbnail") if has_thumb else await media.get_url()
-        )
-
-        image_srcset = ""
-        if has_card:
-            # Prefer the per-conversion responsive srcset — richer width steps.
-            image_srcset = await media.get_srcset("card")
-            if not image_srcset:
-                # card exists but responsive wasn't generated — build static hints.
-                parts: list[str] = [f"{await media.get_url('card')} 400w"]
-                if media.has_generated_conversion("full"):
-                    parts.append(f"{await media.get_url('full')} 1200w")
-                image_srcset = ", ".join(parts)
-
-        return {
-            "thumbnail_url": thumbnail_url,
-            "image_srcset": image_srcset,
-            "image_sizes": "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-            if image_srcset
-            else "",
-        }
-
-    @staticmethod
-    def _product_to_storefront(
-        product: ProductCatalog,
-        locale: str,
-        *,
-        image_payload: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        name_data: dict[str, Any] = product.name or {}
-        slug_data: dict[str, Any] = product.slug or {}
-        desc_data: dict[str, Any] = product.description or {}
-        category_name_data: dict[str, Any] = product.category_name or {}
-        category_slug_data: dict[str, Any] = product.category_slug or {}
-        parent_cat_name_data: dict[str, Any] = product.parent_category_name or {}
-        parent_cat_slug_data: dict[str, Any] = product.parent_category_slug or {}
-        images = image_payload or {
-            "thumbnail_url": None,
-            "image_srcset": "",
-            "image_sizes": "",
-        }
         return {
             "id": str(product.id),
-            "name": TranslatableMixin.translate_dict(name_data, locale),
-            "slug": TranslatableMixin.translate_dict(slug_data, locale),
-            # short_description matches the ProductCard / FlashSale frontend interface
-            "short_description": TranslatableMixin.translate_dict(desc_data, locale),
+            "name": tr(name, locale),
+            "slug": tr(slug, locale),
+            "short_description": tr(desc, locale),
             "price": float(product.price or 0),
-            # stock matches ProductCard.stock — the ORM column is stock_qty
             "stock": int(product.stock_qty or 0),
-            # optional fields: not yet in DB schema, return safe defaults
             "original_price": None,
-            "thumbnail_url": images["thumbnail_url"],
-            "image_srcset": images["image_srcset"],
-            "image_sizes": images["image_sizes"],
+            "thumbnail_url": thumbnail_url,
+            "image_srcset": card_srcset,
+            "image_sizes": cls._IMAGE_SIZES if card_srcset else "",
+            "images": images,
             "rating": None,
             "rating_count": None,
             "is_new": False,
             "is_bestseller": False,
             "category_id": str(product.category_id or ""),
-            "category_name": TranslatableMixin.translate_dict(category_name_data, locale),
-            "category_slug": TranslatableMixin.translate_dict(category_slug_data, locale),
+            "category_name": tr(cat_name, locale),
+            "category_slug": tr(cat_slug, locale),
             "category_parent_id": str(product.category_parent_id)
             if product.category_parent_id
             else None,
-            "parent_category_name": TranslatableMixin.translate_dict(parent_cat_name_data, locale)
-            or None,
-            "parent_category_slug": TranslatableMixin.translate_dict(parent_cat_slug_data, locale)
-            or None,
+            "parent_category_name": tr(parent_cat_name, locale) or None,
+            "parent_category_slug": tr(parent_cat_slug, locale) or None,
             "vendor_id": str(product.vendor_id or ""),
             "vendor_name": product.vendor_name or "",
             "vendor_slug": product.vendor_slug or "",

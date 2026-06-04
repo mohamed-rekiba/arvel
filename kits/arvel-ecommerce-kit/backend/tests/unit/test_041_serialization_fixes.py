@@ -165,13 +165,13 @@ class TestV022StorefrontEnrichedResponse:
     def test_category_name_in_storefront_serializer(self) -> None:
         src = _src(_PRODUCT_SERVICE)
         assert '"category_name"' in src or "'category_name'" in src, (
-            "V-022 not fixed: 'category_name' not returned in _product_to_storefront"
+            "V-022 not fixed: 'category_name' not returned in product_to_storefront"
         )
 
     def test_vendor_name_in_storefront_serializer(self) -> None:
         src = _src(_PRODUCT_SERVICE)
         assert '"vendor_name"' in src or "'vendor_name'" in src, (
-            "V-022 not fixed: 'vendor_name' not returned in _product_to_storefront"
+            "V-022 not fixed: 'vendor_name' not returned in product_to_storefront"
         )
 
 

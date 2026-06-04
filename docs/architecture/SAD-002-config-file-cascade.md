@@ -1,7 +1,7 @@
 # SAD-002 — Config-file cascade for all services
 
 **Work Item**: WI-arvel-002 | **PRD**: `docs/prd/PRD-002-config-file-cascade.md`
-**Related ADRs**: ADR-136 (config files override env via a pydantic-settings source)
+**Related ADRs**: ADR-133 (config files override env via a pydantic-settings source)
 
 ---
 

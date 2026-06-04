@@ -1,21 +1,19 @@
-"""Create the ``media`` table — Spatie laravel-medialibrary v11 parity.
+"""Create the ``media`` table.
 
-Mirrors the schema in
-`spatie/laravel-medialibrary <https://spatie.be/docs/laravel-medialibrary/v11>`_:
-a single polymorphic ``media`` table associating files with any model
-through ``model_type`` + ``model_id``. JSON columns hold media-library
-metadata (``manipulations``, ``custom_properties``, ``generated_conversions``,
+A single polymorphic ``media`` table associating files with any model
+through ``model_type`` + ``model_id``. JSON columns hold media metadata
+(``manipulations``, ``custom_properties``, ``generated_conversions``,
 ``responsive_images``); the actual file bytes live on whichever Arvel
 storage disk the consumer configures (``disk`` / ``conversions_disk``).
 
-NOT NULL columns are marked explicitly so the stub stays faithful to
-Spatie's schema regardless of any future framework-default change.
+NOT NULL columns are marked explicitly so the stub stays stable across
+framework-default changes.
 
 Indexes:
 
 - composite ``(model_type, model_id)`` for the polymorphic lookup
   (added by ``t.morphs("model")``).
-- ``order_column`` for ``->orderBy('order_column')``-style queries.
+- ``order_column`` for ordered queries on a host's media.
 - ``uuid`` is unique so non-guessable URLs round-trip cleanly.
 """
 

@@ -1,4 +1,4 @@
-"""Polymorphic ``media`` row — Spatie laravel-medialibrary v11 parity.
+"""Polymorphic ``media`` row.
 
 Mirrors the schema in
 ``packages/arvel-image/src/arvel_image/migrations/create_media_table.py``.
@@ -23,6 +23,8 @@ from arvel.database.columns import uuid as uuid_column
 from arvel.database.orm.morph_map import get_morph_alias
 
 if TYPE_CHECKING:
+    from arvel.storage import StorageDisk
+
     from arvel_image.media.path_generator import PathGenerator
     from arvel_image.media.trait import HasMedia
 
@@ -112,25 +114,19 @@ class Media(Model, Timestamps):
         gen: PathGenerator = resolve_path_generator()
         return gen.path_for_conversion(self, conversion) if conversion else gen.path_for(self)
 
-    async def get_url(self, conversion: str | None = None) -> str:
-        """Return the storage-disk URL for the original or a conversion"""
+    def url(self, conversion: str | None = None) -> str:
+        """Storage-disk URL for the original or a conversion."""
         from arvel.facades.storage import Storage  # noqa: PLC0415
 
         path = self.get_path(conversion)
         disk_target = self.conversions_disk_target() if conversion else self.disk_target()
-        disk = Storage.disk(disk_target)
-        return disk.url(path)
+        return Storage.disk(disk_target).url(path)
 
-    async def get_full_url(self, conversion: str | None = None) -> str:
-        """Return an absolute URL for the original or a conversion
-
-        If ``get_url()`` already returns an absolute URL this is a transparent alias.
-        If it returns a path-only URL, prepends the configured app URL.
-        """
-        url = await self.get_url(conversion)
+    def full_url(self, conversion: str | None = None) -> str:
+        """Absolute URL — prepends ``app.url`` if :meth:`url` is path-only."""
+        url = self.url(conversion)
         if url.startswith(("http://", "https://")):
             return url
-        # Prepend app URL if available, otherwise return as-is.
         try:
             from arvel.config import config  # noqa: PLC0415
 
@@ -138,11 +134,13 @@ class Media(Model, Timestamps):
             if base:
                 return f"{base}/{url.lstrip('/')}"
         except Exception:  # noqa: BLE001
+            # No app context available (test harness, CLI script) — fall back
+            # to the path-only URL. Importing arvel.config can fail in many ways.
             return url
         return url
 
-    async def get_srcset(self, key: str = "medialibrary_original") -> str:
-        """Return a ``srcset`` attribute value for the responsive image group ``key``.
+    def srcset(self, key: str = "original") -> str:
+        """``srcset`` attribute value for the responsive image group ``key``.
 
         Each entry is ``{url} {width}w``. Returns ``""`` when no variants exist.
         """
@@ -163,19 +161,61 @@ class Media(Model, Timestamps):
             parts.append(f"{disk.url(path)} {width}w")
         return ", ".join(parts)
 
-    def get_placeholder_svg(self, key: str = "medialibrary_original") -> str:
-        """Return the tiny base64 SVG placeholder for ``key``, or ``""``."""
+    def placeholder_svg(self, key: str = "original") -> str:
+        """Tiny base64 SVG placeholder for ``key``, or ``""``."""
         responsive: dict[str, Any] = self.responsive_images or {}
         return str(responsive.get(key, {}).get("base64svg", ""))
 
-    async def get_temporary_url(self, expiry: int, conversion: str | None = None) -> str:
-        """Time-limited URL of the original or a conversion"""
+    def temporary_url(self, expiry: int, conversion: str | None = None) -> str:
+        """Time-limited URL of the original or a conversion."""
         from arvel.facades.storage import Storage  # noqa: PLC0415
 
         path = self.get_path(conversion)
         disk_target = self.conversions_disk_target() if conversion else self.disk_target()
-        disk = Storage.disk(disk_target)
-        return disk.temporary_url(path, expiry)
+        return Storage.disk(disk_target).temporary_url(path, expiry)
+
+    def conversion_urls(self) -> dict[str, str]:
+        """``{conversion_name: url}`` for every successfully generated conversion."""
+        generated: dict[str, Any] = self.generated_conversions or {}
+        return {name: self.url(name) for name, ok in generated.items() if ok}
+
+    def all_srcsets(self) -> dict[str, str]:
+        """``{group_key: srcset}`` for every responsive group with variants.
+
+        Includes ``"original"`` (the original-image responsive group) alongside
+        per-conversion groups like ``"card"`` / ``"full"``.
+        """
+        result: dict[str, str] = {}
+        for key in self.responsive_images or {}:
+            srcset = self.srcset(key)
+            if srcset:
+                result[key] = srcset
+        return result
+
+    def to_dict(self) -> dict[str, Any]:
+        """Frontend-ready payload — URL, every conversion URL, every srcset,
+        placeholder, metadata.
+
+        Drop-in for API responses; no caller-side ``url()`` / ``srcset()`` loops.
+        """
+        return {
+            "id": str(self.id),
+            "uuid": self.uuid,
+            "collection_name": self.collection_name,
+            "name": self.name,
+            "file_name": self.file_name,
+            "mime_type": self.mime_type,
+            "size": self.size,
+            "disk": self.disk,
+            "order": self.order_column,
+            "custom_properties": dict(self.custom_properties or {}),
+            "url": self.url(),
+            "conversions": self.conversion_urls(),
+            "srcsets": self.all_srcsets(),
+            "placeholder_svg": self.placeholder_svg(),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
 
     async def delete(self) -> Any:
         """Remove the row + best-effort cleanup of files on disk.
@@ -189,6 +229,10 @@ class Media(Model, Timestamps):
         try:
             disk = Storage.disk(self.disk_target())
         except Exception:  # noqa: BLE001
+            # Storage facade can raise UnknownDiskError, config-driven
+            # exceptions, or backend init errors — none should block the
+            # row delete. Carry on without cleanup; orphan bytes get
+            # collected by the storage layer's own GC.
             disk = None
 
         if disk is not None:
@@ -199,6 +243,8 @@ class Media(Model, Timestamps):
                     try:
                         cdisk = Storage.disk(self.conversions_disk_target())
                     except Exception:  # noqa: BLE001
+                        # Conversions disk lookup failed — fall back to the
+                        # main disk so the cleanup still tries.
                         cdisk = disk
                     await _delete_quiet(cdisk, gen.path_for_conversion(self, conv_name))
 
@@ -362,13 +408,16 @@ class Media(Model, Timestamps):
             await cls.query().where(cls.id == media_id).update({"order_column": position})
 
 
-async def _delete_quiet(disk: Any, path: str) -> None:
+async def _delete_quiet(disk: StorageDisk, path: str) -> None:
     """Delete ``path`` on ``disk``, swallowing missing-file/disk errors."""
     try:
         await disk.delete(path)
     except FileNotFoundError:
         return
     except Exception:  # noqa: BLE001
+        # Best-effort cleanup. Driver-specific failures (S3 NoSuchKey,
+        # permission denied, transient network) shouldn't propagate from
+        # a delete cascade; the storage GC catches the orphan.
         return
 
 

@@ -1,4 +1,4 @@
-"""Chainable image manipulations (Spatie Image parity, Pillow-only).
+"""Chainable image manipulations, Pillow-only.
 
 Public surface:
 
@@ -129,6 +129,32 @@ class Image:
         def _op(image: PILImage.Image) -> PILImage.Image:
             resizable = cast("_Resizable", image)
             return resizable.resize((width, height), PILImage.Resampling.LANCZOS)
+
+        self._ops.append(_op)
+        return self
+
+    def to_width(self, pixels: int) -> Self:
+        """Resize to exact ``pixels`` width, preserving aspect ratio."""
+        if pixels <= 0:
+            raise ValueError("width must be positive")
+
+        def _op(image: PILImage.Image) -> PILImage.Image:
+            target_height = max(1, round(image.height * pixels / image.width))
+            resizable = cast("_Resizable", image)
+            return resizable.resize((pixels, target_height), PILImage.Resampling.LANCZOS)
+
+        self._ops.append(_op)
+        return self
+
+    def to_height(self, pixels: int) -> Self:
+        """Resize to exact ``pixels`` height, preserving aspect ratio."""
+        if pixels <= 0:
+            raise ValueError("height must be positive")
+
+        def _op(image: PILImage.Image) -> PILImage.Image:
+            target_width = max(1, round(image.width * pixels / image.height))
+            resizable = cast("_Resizable", image)
+            return resizable.resize((target_width, pixels), PILImage.Resampling.LANCZOS)
 
         self._ops.append(_op)
         return self

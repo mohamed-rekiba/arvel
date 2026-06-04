@@ -1,9 +1,9 @@
 """Migrations shipped with arvel-image.
 
-Stub migrations for the Spatie laravel-medialibrary v11-compatible ``media``
-table. Consumers copy them into their app's ``database/migrations/``
-directory via ``arvel vendor:publish --tag=arvel-image``; the migrator
-discovers them by filesystem path, not by Python import.
+Stub migrations for the polymorphic ``media`` table. Consumers copy them
+into their app's ``database/migrations/`` directory via
+``arvel vendor:publish --tag=arvel-image``; the migrator discovers them by
+filesystem path, not by Python import.
 
 Available migrations:
 

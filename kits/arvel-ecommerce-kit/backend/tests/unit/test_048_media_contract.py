@@ -44,17 +44,22 @@ def test_kit_media_model_uses_arvel_image_media() -> None:
 def test_media_service_persists_images_and_serializes_conversions() -> None:
     src = _src(MEDIA_SERVICE)
 
-    assert "product.add_media(contents, file_name=filename).to_media_collection" in src
-    assert '"thumbnail"' in src
-    assert '"card"' in src
-    assert '"full"' in src
-    assert '"responsive_images": media.responsive_images or {}' in src
+    # Kit delegates ingestion to HasMedia.add_image (the model's __media_collection__
+    # is the default — no hard-coded collection name).
+    assert "product.add_image(contents, file_name=filename)" in src
+    # Media.to_dict() is the single source of truth for the serialized payload —
+    # the kit doesn't reach into generated_conversions / responsive_images by hand.
+    assert "media.to_dict()" in src
+    assert "generated_conversions" not in src
+    assert "responsive_images" not in src
 
 
 def test_image_config_matches_runtime_conversion_runner() -> None:
     src = _src(IMAGE_CONFIG)
 
-    assert 'env("STORAGE_DEFAULT", "local")' in src
+    # Disk comes from config.filesystems.default — single source of truth.
+    assert "import config.filesystems as fs_cfg" in src
+    assert "fs_cfg.default" in src
     assert '"thumbnail"' in src
     assert '"card"' in src
     assert '"full"' in src
@@ -78,5 +83,5 @@ def test_admin_products_controller_owns_media_handlers() -> None:
     src = _src(ADMIN_PRODUCTS_CTRL)
 
     assert "await attach_product_image(product, file)" in src
-    assert "await list_product_images(product)" in src
+    assert "list_product_images(product)" in src
     assert "await delete_product_image(product, media_id)" in src

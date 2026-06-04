@@ -1,11 +1,10 @@
 """Framework mixin behavior on kit models.
-implements those modules. Every test here fails at import time.
 
 Coverage:
 - BaseModelMixin: UUID v7 id, created_at, updated_at, deleted_at, scope_active()
 - TranslatableMixin: get_translation(), set_translation(), locale fallback to 'en'
 - User RBAC: HasRoles/HasPermissions plus has_level()
-- HasMediaMixin: attach_media(), get_media(), media collection filtering
+- HasMedia: add_image(), get_media(), __media_collection__ default
 """
 
 from __future__ import annotations
@@ -154,26 +153,30 @@ class TestModelEvents:
         assert "Product.observe(ProductObserver)" in provider_source
 
 
-# ─── HasMediaMixin ───────────────────────────────────────────────────────────────
+# ─── HasMedia ───────────────────────────────────────────────────────────────────
 
 
-class TestHasMediaMixin:
-    def test_get_media_returns_empty_list_when_no_attachments(self) -> None:
-        """HasMedia interface is available on Product — integration with arvel_image."""
-        # get_media is async (HasMedia); verify the method exists with the right name
-
+class TestHasMedia:
+    def test_get_media_method_exists_on_product(self) -> None:
+        """Product inherits get_media() from HasMedia."""
         from app.models.product import Product
 
         p = Product()
-        # Confirm the method is accessible (real call requires a live DB session)
         assert callable(getattr(p, "get_media", None))
 
-    def test_attach_media_method_exists_on_product(self) -> None:
-        """attach_media is available on Product via HasMedia trait."""
+    def test_add_image_method_exists_on_product(self) -> None:
+        """Product inherits add_image() from HasMedia."""
         from app.models.product import Product
 
         p = Product()
-        assert callable(getattr(p, "attach_media", None))
+        assert callable(getattr(p, "add_image", None))
+
+    def test_default_media_collection_is_images(self) -> None:
+        """Product's default collection comes from config.image.default."""
+        import config.image as image_cfg
+        from app.models.product import Product
+
+        assert Product.__media_collection__ == image_cfg.default
 
     def test_media_model_uses_arvel_image_media(self) -> None:
         """Product media is backed by arvel_image's persisted Media model."""
@@ -181,4 +184,4 @@ class TestHasMediaMixin:
         from arvel_image import Media as ArvelImageMedia
 
         assert Media is ArvelImageMedia
-        assert callable(getattr(Media, "get_url", None))
+        assert callable(getattr(Media, "url", None))

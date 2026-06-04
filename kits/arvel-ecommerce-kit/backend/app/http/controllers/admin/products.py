@@ -33,7 +33,7 @@ async def _product_model(product_id: str) -> Product | None:
         pid = uuid.UUID(product_id)
     except ValueError:
         return None
-    return await Product.where(Product.id == pid).first()
+    return await Product.where(Product.id == pid).with_("media").first()
 
 
 class AdminProductsController(Controller):
@@ -139,7 +139,7 @@ class AdminProductsController(Controller):
         product = await _product_model(product_id)
         if product is None:
             raise NotFoundException("Product not found.")
-        return MediaListOut.model_validate({"data": await list_product_images(product)})
+        return MediaListOut.model_validate({"data": list_product_images(product)})
 
     async def media_destroy(self, product_id: str, media_id: str, request: Request) -> Response:
         await require_permission(request, "products.update")

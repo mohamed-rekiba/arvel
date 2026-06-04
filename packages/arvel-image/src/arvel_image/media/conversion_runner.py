@@ -27,29 +27,47 @@ class ConversionRunner:
         *,
         source: bytes,
         conversion: Conversion,
+        context: str | None = None,
     ) -> bytes:
         """Decode ``source``, apply ``conversion``, and return encoded bytes.
+
+        ``context`` is an optional free-text tag (typically ``f"media id={m.id}"``)
+        appended to the error message so callers don't have to wrap the
+        exception just to add a row reference.
 
         Raises :class:`ConversionFailedError` (with the original error
         chained) on any failure during apply or encode.
         """
         try:
-            return await anyio.to_thread.run_sync(self._apply_in_thread, source, conversion)
+            return await anyio.to_thread.run_sync(
+                self._apply_in_thread, source, conversion, context
+            )
         except ConversionFailedError:
             raise
         except Exception as exc:
-            msg = f"Conversion {conversion.name!r} failed: {exc}"
-            raise ConversionFailedError(msg) from exc
+            # Broad on purpose: anyio surfaces thread-pool failures as the
+            # original exception type, which varies (cancellation, Pillow,
+            # OSError). Domain-wrap so callers only catch ConversionFailedError.
+            raise ConversionFailedError(_format_error(conversion, source, context, exc)) from exc
 
     @staticmethod
-    def _apply_in_thread(source: bytes, conversion: Conversion) -> bytes:
+    def _apply_in_thread(source: bytes, conversion: Conversion, context: str | None) -> bytes:
         try:
             image = Image.load(source)
             converted = conversion.apply(image)
             return converted.to_bytes()
         except Exception as exc:
-            msg = f"Conversion {conversion.name!r} failed: {exc}"
-            raise ConversionFailedError(msg) from exc
+            # Broad on purpose: Pillow + arvel_image.image can raise a wide
+            # set (UnidentifiedImageError, UnsupportedFormatError, OSError,
+            # ValueError); domain-wrap to keep the caller's catch list short.
+            raise ConversionFailedError(_format_error(conversion, source, context, exc)) from exc
+
+
+def _format_error(
+    conversion: Conversion, source: bytes, context: str | None, exc: BaseException
+) -> str:
+    where = f" ({context})" if context else ""
+    return f"Conversion {conversion.name!r} failed on a {len(source)}-byte source{where}: {exc}"
 
 
 # Application-scoped accessor, mirroring path_generator and auth_service: an app
