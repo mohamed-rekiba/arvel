@@ -302,6 +302,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.edit.product_media': 'Product media',
     'admin.edit.upload_image': 'Upload image',
     'admin.edit.media_failed': 'Media operation failed',
+    'admin.edit.view_storefront': 'View on Storefront',
     // admin — order detail
     'admin.order.back': 'Back to orders',
     'admin.order.customer': 'Customer',
@@ -669,6 +670,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.edit.product_media': 'وسائط المنتج',
     'admin.edit.upload_image': 'رفع صورة',
     'admin.edit.media_failed': 'فشلت عملية الوسائط',
+    'admin.edit.view_storefront': 'عرض في المتجر',
     // admin — order detail
     'admin.order.back': 'العودة إلى الطلبات',
     'admin.order.customer': 'العميل',
@@ -1037,6 +1039,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.edit.product_media': 'Ürün medyası',
     'admin.edit.upload_image': 'Görsel yükle',
     'admin.edit.media_failed': 'Medya işlemi başarısız',
+    'admin.edit.view_storefront': 'Mağazada Görüntüle',
     // admin — order detail
     'admin.order.back': 'Siparişlere dön',
     'admin.order.customer': 'Müşteri',

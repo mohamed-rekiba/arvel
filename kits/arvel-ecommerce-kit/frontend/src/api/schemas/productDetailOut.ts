@@ -4,8 +4,8 @@
  * FastAPI
  * OpenAPI spec version: 0.1.0
  */
-import type { ProductCardOut } from './productCardOut.ts'
+import type { ProductDetailCardOut } from './productDetailCardOut.ts'
 
 export interface ProductDetailOut {
-  data: ProductCardOut
+  data: ProductDetailCardOut
 }
