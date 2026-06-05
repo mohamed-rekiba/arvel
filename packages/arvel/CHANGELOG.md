@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.14.0...arvel-v0.15.0) (2026-06-05)
+
+
+### Features
+
+* **image,orm:** DX-first media API with strict eager-load morph descriptors ([0f922e9](https://github.com/mohamed-rekiba/arvel/commit/0f922e912f81c1869ac851337f328d0ca8ec3ac8))
+* **orm,image:** model-level morph class override; media via framework eager loading ([3c3d600](https://github.com/mohamed-rekiba/arvel/commit/3c3d600fa5d3f95d702cb8e69582d4893cd6591b))
+
 ## [0.14.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.13.0...arvel-v0.14.0) (2026-06-03)
 
 
