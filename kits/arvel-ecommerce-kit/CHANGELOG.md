@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.6.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.5.1...arvel-ecommerce-kit-v1.6.0) (2026-06-05)
+
+
+### Features
+
+* **arvel-image:** responsive images, manipulations, and package audit hardening ([d71a609](https://github.com/mohamed-rekiba/arvel/commit/d71a609443ddb32eeb87643d7842b3a192d398f4))
+* **ecommerce-kit:** use full arvel-image feature set E2E ([b4a634f](https://github.com/mohamed-rekiba/arvel/commit/b4a634fa588b5fd28e7adf82a088f0921c7bd919))
+* **image,orm:** DX-first media API with strict eager-load morph descriptors ([0f922e9](https://github.com/mohamed-rekiba/arvel/commit/0f922e912f81c1869ac851337f328d0ca8ec3ac8))
+* **kit:** multiple product images on detail page ([c6c2bdc](https://github.com/mohamed-rekiba/arvel/commit/c6c2bdceaf91a2057d5c65c4f1b539ed927dbd74))
+* **orm,image:** model-level morph class override; media via framework eager loading ([3c3d600](https://github.com/mohamed-rekiba/arvel/commit/3c3d600fa5d3f95d702cb8e69582d4893cd6591b))
+
+
+### Bug Fixes
+
+* **ci/gitleaks:** allowlist valkey image-tag entropy + repair renamed-test path ([3760d42](https://github.com/mohamed-rekiba/arvel/commit/3760d427fdf1c9dcb1805beaefc6577f7999f01a))
+* **ecommerce-kit/frontend:** stop cart re-render, link product, upgrade orval to 8 ([1cd32e4](https://github.com/mohamed-rekiba/arvel/commit/1cd32e4865b545696f45567961bde309d233b518))
+* **ecommerce-kit:** use os.urandom noise in _make_jpeg so responsive srcset is non-empty ([dfa13ba](https://github.com/mohamed-rekiba/arvel/commit/dfa13ba93c6f7dd41d4ea8f4a47e7c17164a3823))
+* **kit/services:** remove hard-coded conversion lists and dead seeder fallback ([8a9d967](https://github.com/mohamed-rekiba/arvel/commit/8a9d967bdf60a0c88c3187d76290ec7bde31ad31))
+
 ## [1.5.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.5.0...arvel-ecommerce-kit-v1.5.1) (2026-06-03)
 
 
