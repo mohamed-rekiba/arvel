@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.8.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-image-v0.7.0...arvel-image-v0.8.0) (2026-06-05)
+
+
+### Features
+
+* **arvel-image:** responsive images, manipulations, and package audit hardening ([d71a609](https://github.com/mohamed-rekiba/arvel/commit/d71a609443ddb32eeb87643d7842b3a192d398f4))
+* **image,orm:** DX-first media API with strict eager-load morph descriptors ([0f922e9](https://github.com/mohamed-rekiba/arvel/commit/0f922e912f81c1869ac851337f328d0ca8ec3ac8))
+* **orm,image:** model-level morph class override; media via framework eager loading ([3c3d600](https://github.com/mohamed-rekiba/arvel/commit/3c3d600fa5d3f95d702cb8e69582d4893cd6591b))
+
+
+### Bug Fixes
+
+* **arvel-image:** close three post-F5 gaps in responsive images and EXIF ([cd6f520](https://github.com/mohamed-rekiba/arvel/commit/cd6f520d520819699c5a6c434f531fe9de3f91f2))
+* **arvel-image:** close two post-gap edge cases in responsive images ([7774eca](https://github.com/mohamed-rekiba/arvel/commit/7774eca28be1bd6415435f1b34f6a962f95f064d))
+* **arvel-image:** make process_one runner/gen args optional ([04867c9](https://github.com/mohamed-rekiba/arvel/commit/04867c970e0607fccf28e36e4f74ca2e7f0d53b5))
+
+
+### Refactors
+
+* **arvel-image:** promote private methods to public API ([611b382](https://github.com/mohamed-rekiba/arvel/commit/611b3823a56cdd040b432b9304ab7254f0af8e96))
+
 ## [0.7.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-image-v0.6.1...arvel-image-v0.7.0) (2026-06-02)
 
 
