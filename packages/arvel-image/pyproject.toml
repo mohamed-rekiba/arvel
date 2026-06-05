@@ -1,6 +1,6 @@
 [project]
 name = "arvel-image"
-version = "0.7.0" # x-release-please-version
+version = "0.8.0" # x-release-please-version
 description = "Fluent, type-safe image manipulation and polymorphic media library for Arvel."
 readme = "README.md"
 requires-python = ">=3.14"
