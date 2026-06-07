@@ -12,7 +12,7 @@ The Laravel of Python — built natively on FastAPI + Pydantic + SQLAlchemy, end
 > **Status:** Pre-alpha. The public API can still change before `1.0`.
 
 Arvel is a batteries-included application framework for async Python. It layers a service container,
-typed configuration, an Eloquent-style ORM (Arvent), an HTTP stack (routing, form requests, API
+typed configuration, the Arvent ORM, an HTTP stack (routing, form requests, API
 resources, middleware), cache, sessions, storage, queues, events, broadcasting, mail, notifications,
 scheduling, and auth on top of the standard async stack — without replacing FastAPI, Pydantic, or
 SQLAlchemy.

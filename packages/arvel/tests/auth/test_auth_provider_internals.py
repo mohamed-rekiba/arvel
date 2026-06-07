@@ -20,7 +20,7 @@ def _provider() -> AuthServiceProvider:
     return AuthServiceProvider(app=Application())
 
 
-def _config_with_users(provider_driver: str = "database") -> AuthConfig:
+def _config_with_users(provider_driver: str = "arvent") -> AuthConfig:
     return AuthConfig(
         default="web",
         guards={"web": GuardConfig(driver="session", provider="users")},
@@ -38,9 +38,16 @@ class TestImportClass:
             _import_class("os.DefinitelyNotARealClass")
 
 
-def test_users_provider_returns_database_driver() -> None:
+def test_users_provider_returns_arvent_driver() -> None:
     config = _config_with_users()
     assert _users_provider(config) is config.providers["users"]
+
+
+def test_provider_config_rejects_unknown_driver_at_load_time() -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="not supported"):
+        ProviderConfig(driver="database", model=_MODEL)
 
 
 def test_validate_jwt_rejects_none_algorithm() -> None:
@@ -63,11 +70,14 @@ class TestBuildProvider:
         with pytest.raises(AuthConfigError, match="not configured"):
             _provider()._build_provider("ghost", _config_with_users())  # pyright: ignore[reportPrivateUsage]  # white-box
 
-    def test_unknown_driver(self) -> None:
+    def test_unknown_driver_bypasses_config_validation(self) -> None:
+        # _build_provider has its own guard for hand-constructed configs that
+        # skip the Pydantic validator (e.g. legacy fixtures or in-memory configs).
+        config = _config_with_users()
+        # Mutate after construction to bypass the field_validator.
+        config.providers["users"].driver = "ghost"
         with pytest.raises(AuthConfigError, match="Unknown auth provider driver"):
-            _provider()._build_provider(  # pyright: ignore[reportPrivateUsage]  # white-box
-                "users", _config_with_users(provider_driver="eloquent")
-            )
+            _provider()._build_provider("users", config)  # pyright: ignore[reportPrivateUsage]  # white-box
 
 
 class TestBuildGuard:

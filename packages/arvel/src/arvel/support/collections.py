@@ -1,7 +1,7 @@
-"""Eloquent-style ``Collection[T]`` — a typed ``list[T]`` subclass with chainable helpers.
+"""``Collection[T]`` — typed ``list[T]`` subclass with chainable helpers (Arvent).
 
 The single canonical Collection for the whole framework lives here;
-downstream layers (``arvel.database``, ``arvel.http``,...) re-export it.
+downstream layers (``arvel.database``, ``arvel.http``, ...) re-export it.
 
 Because ``Collection`` is a ``list`` subclass, ``isinstance(c, list)`` is ``True``
 and indexing, slicing, iteration, and ``len`` all work without ceremony.
@@ -18,7 +18,7 @@ U = TypeVar("U")
 
 
 class Collection(list[T], Generic[T]):
-    """Typed list subclass with chainable Eloquent-style helpers.
+    """Typed list subclass with chainable helpers (Arvent's ``Collection``).
 
     Single canonical Collection for the whole framework. ``isinstance(c, list)``
     is True; indexing, iteration, slicing, and ``len`` work without ceremony.
@@ -208,7 +208,7 @@ class Collection(list[T], Generic[T]):
 
 
 def _serialize(item: Any) -> Any:
-    """Best-effort JSON-friendly conversion: Eloquent-style ``to_dict`` first,
+    """Best-effort JSON-friendly conversion: Arvent ``to_dict`` first,
     then Pydantic ``model_dump``, otherwise the value unchanged.
     """
     if hasattr(item, "to_dict"):

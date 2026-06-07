@@ -37,7 +37,6 @@ class User(Model, Timestamps, SoftDeletes, Authenticatable, HasApiTokens):
     * ``email_verified_at``— ``None`` until the verification URL is consumed
     * ``password``         — argon2id hash; never serialised (``__hidden__``)
     * ``suspended_at``     — non-``None`` blocks login (``AccountSuspendedError``)
-    * ``remember_token``   — opaque session-cookie fallback (optional)
 
     Plus ``created_at``, ``updated_at`` (Timestamps) and ``deleted_at``
     (SoftDeletes).
@@ -53,10 +52,9 @@ class User(Model, Timestamps, SoftDeletes, Authenticatable, HasApiTokens):
         "password",
         "email_verified_at",
         "suspended_at",
-        "remember_token",
         "locale",
     ]
-    __hidden__: ClassVar[list[str] | None] = ["password", "remember_token"]
+    __hidden__: ClassVar[list[str] | None] = ["password"]
 
     id: str = field(length=36, primary_key=True, init=False, default_factory=_new_id)
     name: str
@@ -64,7 +62,6 @@ class User(Model, Timestamps, SoftDeletes, Authenticatable, HasApiTokens):
     password: str
     email_verified_at: _datetime | None = None
     suspended_at: _datetime | None = None
-    remember_token: str | None = field(length=100, default=None)
     locale: str | None = text(nullable=True, default=None)
 
     @property

@@ -199,7 +199,7 @@ class TestStory2JwtKeyAlignment:
             guards={"api": GuardConfig(driver="jwt", provider="users")},
             providers={
                 "users": ProviderConfig(
-                    driver="database",
+                    driver="arvent",
                     model="arvel.auth.models.user.User",
                 )
             },

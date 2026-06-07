@@ -3,7 +3,7 @@
 **Status**: Accepted
 **Date**: 2026-05-20
 **Supersedes**: —
-**Related**: ADR-021 (Eloquent-on-SQLA mixin), ADR-024 (Model metaclass forwarding), ADR-065 (Soft-delete global scope), ADR-010 (Two-checker suppression floor)
+**Related**: ADR-021 (Arvent-on-SQLA mixin), ADR-024 (Model metaclass forwarding), ADR-065 (Soft-delete global scope), ADR-010 (Two-checker suppression floor)
 
 ## Context
 
@@ -65,7 +65,3 @@ class Model(MappedAsDataclass, DeclarativeBase, ActiveRecord,
 - The framework's own non-`Model` declarative classes get the clean syntax by using `ModelMeta` as their metaclass: the `Timestamps`/`SoftDeletes` mixins (over `MappedAsDataclass`) and the cache store's `_CacheBase` (a standalone `DeclarativeBase`). No special-casing left.
 
 This supersedes the earlier same-day note that had helpers returning `Mapped[T]` and kept `Mapped` for relationships and framework mixins — none of that is needed now.
-
-## Status & Next Step
-
-Implemented in . See `docs/plans/2026-05-20-mapped-as-dataclass-design.md` for the full plan, test strategy, and rollout order.

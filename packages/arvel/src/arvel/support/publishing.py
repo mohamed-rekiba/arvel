@@ -123,9 +123,8 @@ def rewrite_migration_filename(
     """Return the timestamped destination path for a migration.
 
     The source basename is taken verbatim minus any leading timestamp
-    prefix (Laravel and Spatie both ship migration stubs as
-    ``create_<thing>_table.php``; we accept either ``create_xxx.py`` or
-    ``YYYY_MM_DD_HHMMSS_create_xxx.py``).
+    prefix. Stubs may be shipped as either ``create_xxx.py`` (no prefix) or
+    ``YYYY_MM_DD_HHMMSS_create_xxx.py`` (with one); both are accepted.
 
     If ``used`` is supplied, the function disambiguates against names
     already chosen this run by appending microseconds when needed —

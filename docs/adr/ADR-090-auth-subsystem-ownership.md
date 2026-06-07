@@ -111,8 +111,7 @@ error-page redirects), nothing more.
 
 ## Implementation
 
-See SAD-028 (`docs/architecture/SAD-028-arvel-auth-core.md`) §1–§4
-and design doc §3 (`docs/plans/2026-05-21-arvel-auth-core-design.md`).
+See SAD-028 (`docs/architecture/SAD-028-arvel-auth-core.md`)
 
 ## Validation
 

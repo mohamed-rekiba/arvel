@@ -1,4 +1,4 @@
-"""Eloquent-style ModelCollection.
+"""ModelCollection — Arvent's model-row collection.
 
 all/get return a ModelCollection with batch load, model_keys, PK-aware
 find/contains/only/except_/diff/intersect, to_query, fresh, make_hidden/make_visible."""

@@ -1,4 +1,4 @@
-"""Arvent — Arvel's Eloquent-style ORM built on SQLAlchemy.
+"""Arvent — Arvel's ORM, built on SQLAlchemy.
 
 Public surface frozen for 0.x. See ``docs/api/database-api.md`` for the
 full contract.

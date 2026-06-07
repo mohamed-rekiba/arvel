@@ -1,8 +1,8 @@
 """Pydantic request models for the auth HTTP layer.
 
 Apps can use these directly or subclass them to add app-specific validation.
-Pass a custom subclass to :func:`register_auth_routes` via the
-``request_classes`` parameter (coming in S25.3).
+A future ``request_classes`` parameter on :func:`register_auth_routes` will
+let apps swap the defaults; until then, subclass and re-register manually.
 """
 
 from __future__ import annotations
@@ -36,7 +36,6 @@ class LoginRequest(BaseModel):
 
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
-    remember: bool = False
 
 
 class ForgotPasswordRequest(BaseModel):

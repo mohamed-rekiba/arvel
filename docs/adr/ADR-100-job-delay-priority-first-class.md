@@ -10,8 +10,6 @@
 
 Before WI-018, `delay` was a driver-specific feature: the `database` driver carried a one-off `push_delayed(envelope, queue, delay_seconds)` method; the `sync`, `redis`, and `taskiq` drivers had no concept of delay. Priority did not exist on any driver.
 
-The brainstorm (`docs/plans/2026-05-19-queue-amqp-and-delay-priority-design.md`) framed three options:
-
 1. **Per-message metadata on `JobEnvelope` only.** App authors set delay/priority by overriding `Bus.dispatch` kwargs every time. Pro: smallest blast radius. Con: discoverability is poor; jobs that "always run with priority 7" duplicate the kwarg everywhere they're dispatched.
 2. **Per-Job-class fields, no per-dispatch override.** `class HighPriorityJob(Job): priority = 7` and that's it. Pro: declarative. Con: can't bump priority for one specific instance.
 3. **Per-Job-class fields with per-dispatch override.** Both `class HighPriorityJob(Job): priority = 7` AND `bus.dispatch(job, priority=9)` work. Override `None` means "use the field". Pro: covers both cases. Con: more API surface.

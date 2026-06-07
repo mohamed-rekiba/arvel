@@ -1,6 +1,6 @@
 # Model internals
 
-Arvent is an Eloquent-shaped ActiveRecord API on top of SQLAlchemy 2.x declarative. The clever part is the "clean syntax" — `id: int = id_()` instead of `id: Mapped[int] = mapped_column(...)`. This page explains how that works and what `Model` actually is.
+Arvent is Arvel's ActiveRecord ORM on top of SQLAlchemy 2.x declarative. The clever part is the "clean syntax" — `id: int = id_()` instead of `id: Mapped[int] = mapped_column(...)`. This page explains how that works and what `Model` actually is.
 
 **Source**: `packages/arvel/src/arvel/database/model.py`, `columns.py`, `attributes.py`.
 
@@ -20,7 +20,7 @@ Four ingredients:
 flowchart TB
     Model["Model"] --> DB["DeclarativeBase<br/>(SQLAlchemy mapping)"]
     Model --> MAD["MappedAsDataclass(kw_only=True)<br/>(typed keyword-only __init__)"]
-    Model --> AR["ActiveRecord<br/>(Eloquent CRUD + query)"]
+    Model --> AR["ActiveRecord<br/>(Arvent CRUD + query)"]
     Model --> MM["metaclass ModelMeta<br/>(clean-syntax wrapping)"]
 ```
 

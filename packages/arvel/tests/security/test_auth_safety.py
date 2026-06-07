@@ -135,7 +135,7 @@ def test_all_auth_modules_importable() -> None:
         "arvel.auth.guards.session",
         "arvel.auth.guards.jwt",
         "arvel.auth.guards.token",
-        "arvel.auth.providers.database",
+        "arvel.auth.providers.arvent",
         "arvel.auth.mixins",
         "arvel.auth.gate",
         "arvel.auth.policy",

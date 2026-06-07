@@ -1,6 +1,6 @@
 """Auth-subsystem ORM models.
 
-Eloquent-style ActiveRecord models for the framework's auth tables.
+Arvent ActiveRecord models for the framework's auth tables.
 
 ``User``, ``PasswordReset``, and ``PersonalAccessToken`` are loaded lazily
 so apps that define their own versions (with different fields, PKs, or table

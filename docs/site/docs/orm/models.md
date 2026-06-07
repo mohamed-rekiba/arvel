@@ -5,7 +5,7 @@
 
 Arvel ships with **Arvent**, an active-record ORM built on top of SQLAlchemy's async engine. Each database table has a corresponding "model" you use to interact with that table. Models let you query for data in your tables, as well as insert, update, and delete records.
 
-A model is a Python class. Its instances represent rows; its class methods build queries. Because Arvent sits on SQLAlchemy, a model is a real SQLAlchemy mapped class — you get the full power of SQLAlchemy underneath the Eloquent-shaped surface.
+A model is a Python class. Its instances represent rows; its class methods build queries. Because Arvent sits on SQLAlchemy, a model is a real SQLAlchemy mapped class — you get the full power of SQLAlchemy underneath the Arvent surface.
 
 > [!NOTE]
 > Every persistence and read method on a model — `create`, `save`, `delete`, `find`, `all`, `first` — is an `async` coroutine and must be awaited. The fluent builder methods (`where`, `order_by`, `with_`) are synchronous and return a query builder; only the terminal method touches the database.
