@@ -66,7 +66,7 @@ class JsonB(TypeDecorator[dict[str, Any]]):
         return value
 
 
-class _TsVector(TypeDecorator[str]):
+class TsVector(TypeDecorator[str]):
     """PostgreSQL TSVECTOR — degrades to TEXT on non-PG dialects (e.g. SQLite in CI)."""
 
     impl = Text
@@ -370,7 +370,7 @@ class Blueprint:
         )
 
     def big_integer(self, name: str, *, unsigned: bool = False) -> PendingColumn:
-        return self._add(PendingColumn(name=name, type_=Integer()))
+        return self._add(PendingColumn(name=name, type_=BigInteger()))
 
     def integer(self, name: str) -> PendingColumn:
         return self._add(PendingColumn(name=name, type_=Integer()))
@@ -519,7 +519,7 @@ class Blueprint:
 
     def tsvector(self, name: str) -> PendingColumn:
         """Add a TSVECTOR column (PostgreSQL). Falls back to TEXT on other dialects."""
-        return self._add(PendingColumn(name=name, type_=_TsVector()))
+        return self._add(PendingColumn(name=name, type_=TsVector()))
 
     def gin_index(self, table: str, *cols: str, name: str | None = None) -> None:
         """Add a GIN index covering the given columns (PostgreSQL-specific)."""
@@ -1015,4 +1015,13 @@ class Schema:
             alter_column(bp.table_name, col_name, **kwargs)
 
 
-__all__ = ["Blueprint", "ForeignKeyAction", "IdType", "Index", "JsonB", "PendingColumn", "Schema"]
+__all__ = [
+    "Blueprint",
+    "ForeignKeyAction",
+    "IdType",
+    "Index",
+    "JsonB",
+    "PendingColumn",
+    "Schema",
+    "TsVector",
+]

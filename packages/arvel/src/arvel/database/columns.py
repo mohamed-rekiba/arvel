@@ -64,10 +64,11 @@ from sqlalchemy import (
     Text,
     Uuid,
 )
-from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.types import TypeEngine
+
+from arvel.database.schema import JsonB, TsVector
 
 _T = TypeVar("_T")
 
@@ -690,7 +691,7 @@ def jsonb(
     """
     kw: dict[str, Any] = {"nullable": nullable}
     _apply_json_default(kw, default)
-    return mapped_column(_MutableJSONDict.as_mutable(JSONB()), **kw)
+    return mapped_column(_MutableJSONDict.as_mutable(JsonB()), **kw)
 
 
 @overload
@@ -817,4 +818,4 @@ def tsvector(*, nullable: bool = True, init: Literal[False] = False) -> Any:
 
         search_vector: str | None = tsvector()
     """
-    return mapped_column(TSVECTOR, nullable=nullable, default=None, init=init)
+    return mapped_column(TsVector, nullable=nullable, default=None, init=init)
