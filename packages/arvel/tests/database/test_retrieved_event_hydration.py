@@ -64,6 +64,31 @@ async def test_retrieved_fires_on_paginate(engine: AsyncEngine, session: AsyncSe
     assert counter.count == 2
 
 
+async def test_retrieved_fires_on_simple_paginate(
+    engine: AsyncEngine, session: AsyncSession
+) -> None:
+    counter = await _setup(engine)
+    await RevTag.create(name="a")
+    await RevTag.create(name="b")
+    await RevTag.create(name="c")
+    counter.count = 0
+    # per_page=2 fetches a +1 probe row; only the 2 displayed rows fire retrieved.
+    await RevTag.query().simple_paginate(per_page=2)
+    assert counter.count == 2
+
+
+async def test_retrieved_fires_on_cursor_paginate(
+    engine: AsyncEngine, session: AsyncSession
+) -> None:
+    counter = await _setup(engine)
+    await RevTag.create(name="a")
+    await RevTag.create(name="b")
+    await RevTag.create(name="c")
+    counter.count = 0
+    await RevTag.query().cursor_paginate(per_page=2)
+    assert counter.count == 2
+
+
 async def test_retrieved_fires_once_on_find(engine: AsyncEngine, session: AsyncSession) -> None:
     counter = await _setup(engine)
     tag = await RevTag.create(name="a")

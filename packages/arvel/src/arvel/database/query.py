@@ -2910,6 +2910,7 @@ class QueryBuilder(Generic[T]):
         rows: list[T] = cast("list[T]", list(result.scalars().all()))
         has_more = len(rows) > per_page
         page_items = rows[:per_page]
+        await self._fire_retrieved(page_items)
         await self._eager_load_async(page_items)
         return SimplePaginator(
             items=Collection(page_items),
@@ -2982,6 +2983,7 @@ class QueryBuilder(Generic[T]):
         if backward:
             rows.reverse()
         items = Collection(rows)
+        await self._fire_retrieved(list(items))
         await self._eager_load_async(list(items))
         next_cursor, prev_cursor = _boundary_cursors(
             list(items),
@@ -3739,6 +3741,7 @@ class RecursiveQueryBuilder(QueryBuilder[T]):
         session = get_active_session()
         result = await session.execute(stmt)
         rows: list[T] = list(result.scalars().all())
+        await self._fire_retrieved(rows)
         await self._eager_load_async(rows)
         return Collection(rows)
 
@@ -3750,6 +3753,7 @@ class RecursiveQueryBuilder(QueryBuilder[T]):
         stmt = select(self._model).join(full_cte, id_attr == full_cte.c[self._id_key])
         result = await get_active_session().execute(stmt)
         rows = list(result.scalars().all())
+        await self._fire_retrieved(rows)
         return assemble_forest(rows, id_key=self._id_key, parent_key=self._parent_key)
 
 
