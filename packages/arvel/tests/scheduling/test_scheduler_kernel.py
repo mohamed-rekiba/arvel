@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import pytest
@@ -396,3 +398,127 @@ class TestSchedulerProviderWiresBus:
         # it runs handle() inline, but we only care that the scheduler made
         # at least one instance.
         assert len(_RecordingJob.instances) >= 1
+
+
+class TestMaintenanceMode:
+    """Scheduler honors `inMaintenanceMode()` against the live marker."""
+
+    @pytest.mark.asyncio
+    async def test_skips_task_when_app_is_down_and_task_did_not_opt_in(
+        self,
+        cache_manager: CacheManager,
+    ) -> None:
+        from arvel.scheduling import Schedule, SchedulerKernel
+
+        class _DownMarker:
+            def is_down(self) -> bool:
+                return True
+
+        ran: list[str] = []
+
+        async def task_call() -> None:
+            ran.append("ran")
+
+        schedule = Schedule()
+        schedule.call(task_call).everyMinute().name("no-opt-in")
+
+        kernel = SchedulerKernel(
+            schedule=schedule,
+            cache_manager=cache_manager,
+            maintenance_manager=_DownMarker(),  # type: ignore[arg-type]
+        )
+        now = datetime(2026, 5, 19, 14, 30, 0, tzinfo=UTC)
+        result = await kernel.run_due_tasks(now)
+
+        outcome = next(o for o in result.outcomes if o.task_name == "no-opt-in")
+        assert outcome.skipped is True
+        assert outcome.reason == "in_maintenance_mode"
+        assert ran == []
+
+    @pytest.mark.asyncio
+    async def test_runs_task_in_maintenance_when_opted_in(
+        self,
+        cache_manager: CacheManager,
+    ) -> None:
+        from arvel.scheduling import Schedule, SchedulerKernel
+
+        class _DownMarker:
+            def is_down(self) -> bool:
+                return True
+
+        ran: list[str] = []
+
+        async def task_call() -> None:
+            ran.append("ran")
+
+        schedule = Schedule()
+        schedule.call(task_call).everyMinute().name("opted-in").inMaintenanceMode()
+
+        kernel = SchedulerKernel(
+            schedule=schedule,
+            cache_manager=cache_manager,
+            maintenance_manager=_DownMarker(),  # type: ignore[arg-type]
+        )
+        now = datetime(2026, 5, 19, 14, 30, 0, tzinfo=UTC)
+        result = await kernel.run_due_tasks(now)
+
+        outcome = next(o for o in result.outcomes if o.task_name == "opted-in")
+        assert outcome.succeeded is True
+        assert ran == ["ran"]
+
+
+class TestOutputTo:
+    """Scheduler appends task stdout/stderr to `output_to` when set."""
+
+    @pytest.mark.asyncio
+    async def test_captures_stdout_to_output_to_file(
+        self,
+        cache_manager: CacheManager,
+        tmp_path: Path,
+    ) -> None:
+        from arvel.scheduling import Schedule, SchedulerKernel
+
+        async def chatty() -> None:
+            sys.stdout.write("captured-stdout-line\n")
+
+        out_path = tmp_path / "logs" / "scheduler.log"
+        schedule = Schedule()
+        schedule.call(chatty).everyMinute().name("chatty").outputTo(out_path)
+
+        kernel = SchedulerKernel(schedule=schedule, cache_manager=cache_manager)
+        now = datetime(2026, 5, 19, 14, 30, 0, tzinfo=UTC)
+        await kernel.run_due_tasks(now)
+
+        assert out_path.exists(), "outputTo must create parents and write the file"
+        contents = out_path.read_text(encoding="utf-8")
+        assert "captured-stdout-line" in contents
+
+    @pytest.mark.asyncio
+    async def test_output_to_failure_does_not_break_task(
+        self,
+        cache_manager: CacheManager,
+        tmp_path: Path,
+    ) -> None:
+        from arvel.scheduling import Schedule, SchedulerKernel
+
+        ran: list[str] = []
+
+        async def task_call() -> None:
+            ran.append("ran")
+
+        # Point output_to at an existing FILE, then ask the kernel to treat
+        # it as a directory parent — open() will fail and we should still run.
+        a_file = tmp_path / "blocking-file"
+        a_file.write_text("not a directory")
+        unwritable = a_file / "subdir" / "out.log"
+
+        schedule = Schedule()
+        schedule.call(task_call).everyMinute().name("resilient").outputTo(unwritable)
+
+        kernel = SchedulerKernel(schedule=schedule, cache_manager=cache_manager)
+        now = datetime(2026, 5, 19, 14, 30, 0, tzinfo=UTC)
+        result = await kernel.run_due_tasks(now)
+
+        outcome = next(o for o in result.outcomes if o.task_name == "resilient")
+        assert outcome.succeeded is True
+        assert ran == ["ran"]

@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import secrets
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qs
 
-from starlette.responses import PlainTextResponse
+from starlette.responses import HTMLResponse, PlainTextResponse, Response
+
+from arvel.logging.facade import Log
 
 if TYPE_CHECKING:
     from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -31,35 +34,48 @@ class MaintenanceModeMiddleware:
     - Marker + bypass cookie matching the marker's ``secret`` → pass through.
     - Marker + ``?bypass=<secret>`` query param matching → set the bypass
       cookie and pass through.
-    - Marker + no valid bypass → respond ``503`` with optional ``Retry-After``
-      and ``Refresh`` headers.
+    - Marker + no valid bypass → respond ``503``. The body is the rendered
+      ``template`` from ``arvel down --render <path>`` if set and readable;
+      otherwise a plain-text default. ``Retry-After`` and ``Refresh`` headers
+      are added when configured.
     """
 
     def __init__(self, app: ASGIApp, manager: MaintenanceModeManager) -> None:
         self._app: ASGIApp = app
         self._manager: MaintenanceModeManager = manager
-        self._cached_state: tuple[float, bool, str | None, int | None, int | None] | None = None
+        self._cached_state: (
+            tuple[float, bool, str | None, int | None, int | None, str | None] | None
+        ) = None
 
-    def _read_state(self) -> tuple[bool, str | None, int | None, int | None]:
-        """Return (is_down, secret, retry, refresh), TTL-cached."""
+    def _read_state(
+        self,
+    ) -> tuple[bool, str | None, int | None, int | None, str | None]:
+        """Return (is_down, secret, retry, refresh, template), TTL-cached."""
         now = time.monotonic()
         if self._cached_state is not None:
-            ts, is_down, secret, retry, refresh = self._cached_state
+            ts, is_down, secret, retry, refresh, template = self._cached_state
             if now - ts < _CACHE_TTL_SECONDS:
-                return is_down, secret, retry, refresh
+                return is_down, secret, retry, refresh, template
         marker = self._manager.read_marker()
         if marker is None:
-            self._cached_state = (now, False, None, None, None)
-            return False, None, None, None
-        self._cached_state = (now, True, marker.secret, marker.retry, marker.refresh)
-        return True, marker.secret, marker.retry, marker.refresh
+            self._cached_state = (now, False, None, None, None, None)
+            return False, None, None, None, None
+        self._cached_state = (
+            now,
+            True,
+            marker.secret,
+            marker.retry,
+            marker.refresh,
+            marker.template,
+        )
+        return True, marker.secret, marker.retry, marker.refresh, marker.template
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope.get("type") != "http":
             await self._app(scope, receive, send)
             return
 
-        is_down, secret, retry, refresh = self._read_state()
+        is_down, secret, retry, refresh, template = self._read_state()
         if not is_down or secret is None:
             await self._app(scope, receive, send)
             return
@@ -73,7 +89,7 @@ class MaintenanceModeMiddleware:
             await self._send_pass_through_with_cookie(scope, receive, send, secret)
             return
 
-        await self._send_503(send, retry=retry, refresh=refresh)
+        await self._send_503(send, retry=retry, refresh=refresh, template=template)
 
     @staticmethod
     def _has_valid_cookie(scope: Scope, secret: str) -> bool:
@@ -127,22 +143,51 @@ class MaintenanceModeMiddleware:
         *,
         retry: int | None,
         refresh: int | None,
+        template: str | None,
     ) -> None:
-        headers: dict[str, str] = {}
+        headers: dict[str, str] = {"Cache-Control": "no-store"}
         if retry is not None:
             headers["Retry-After"] = str(retry)
         if refresh is not None:
             headers["Refresh"] = str(refresh)
-        response = PlainTextResponse(
-            "App is down for maintenance.",
-            status_code=503,
-            headers=headers,
-        )
+
+        rendered = self._render_template(template) if template else None
+        response: Response
+        if rendered is not None:
+            response = HTMLResponse(
+                rendered,
+                status_code=503,
+                headers=headers,
+            )
+        else:
+            response = PlainTextResponse(
+                "App is down for maintenance.",
+                status_code=503,
+                headers=headers,
+            )
         await response(
             {"type": "http"},
             _empty_receive,
             send,
         )
+
+    @staticmethod
+    def _render_template(template_path: str) -> str | None:
+        """Read the configured template file; None means 'fall back to plain text'.
+
+        The path is taken from the marker, never from request input — there's
+        no template-injection vector. A missing or unreadable file is logged
+        and downgraded to the plain-text default.
+        """
+        try:
+            return Path(template_path).read_text(encoding="utf-8")
+        except OSError as exc:
+            Log.channel("maintenance").error(
+                "maintenance.template.read_failed",
+                path=template_path,
+                error=str(exc),
+            )
+            return None
 
 
 async def _empty_receive() -> Message:
