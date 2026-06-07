@@ -158,3 +158,44 @@ class TestMailerRender:
         await mailer.send_to("override@example.com", _build_mailable(Content(text="x")))
         rendered = driver.sent[0]
         assert rendered.envelope.to == ["override@example.com"]
+
+    @pytest.mark.asyncio
+    async def test_inherits_global_from_when_envelope_omits_it(
+        self, driver: ArrayMailDriver
+    ) -> None:
+        """Laravel parity: a mailable that omits ``from`` inherits ``mail.from``."""
+        mailer = Mailer(
+            driver,
+            MailConfig(default="array", from_address="global@x.com", from_name="Global Sender"),
+        )
+
+        class _Mail(Mailable):
+            def envelope(self) -> Envelope:
+                return Envelope(to=["c@d.com"], subject="Hi")
+
+            def content(self) -> Content:
+                return Content(text="x")
+
+        await mailer.send_to("c@d.com", _Mail())
+        rendered = driver.sent[0]
+        assert rendered.envelope.from_address == "global@x.com"
+        assert rendered.envelope.from_name == "Global Sender"
+
+    @pytest.mark.asyncio
+    async def test_envelope_from_overrides_global(self, driver: ArrayMailDriver) -> None:
+        """An explicit envelope ``from`` wins over the global default."""
+        mailer = Mailer(
+            driver,
+            MailConfig(default="array", from_address="global@x.com", from_name="Global"),
+        )
+
+        class _Mail(Mailable):
+            def envelope(self) -> Envelope:
+                return Envelope(from_address="explicit@x.com", to=["c@d.com"], subject="Hi")
+
+            def content(self) -> Content:
+                return Content(text="x")
+
+        await mailer.send_to("c@d.com", _Mail())
+        rendered = driver.sent[0]
+        assert rendered.envelope.from_address == "explicit@x.com"

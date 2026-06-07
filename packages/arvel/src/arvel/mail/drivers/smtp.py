@@ -8,6 +8,7 @@ from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 from typing import Protocol, cast
 
 from arvel.mail.config import MailEncryption, SmtpConfig
@@ -53,7 +54,12 @@ class SmtpMailDriver:
 
     def _build_message(self, mail: RenderedMail) -> MIMEMultipart:
         msg = MIMEMultipart("mixed")
-        msg["From"] = mail.envelope.from_address
+        from_name = mail.envelope.from_name
+        msg["From"] = (
+            formataddr((from_name, mail.envelope.from_address))
+            if from_name
+            else mail.envelope.from_address
+        )
         msg["To"] = ", ".join(mail.envelope.to)
         msg["Subject"] = mail.envelope.subject
         if mail.envelope.cc:

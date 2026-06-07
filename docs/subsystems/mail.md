@@ -21,7 +21,7 @@ flowchart LR
 ```python
 class Mailable(ABC):
     @abstractmethod
-    def envelope(self) -> Envelope: ...     # from/to/subject/cc/bcc/reply_to/tags
+    def envelope(self) -> Envelope: ...     # to/subject (+ optional from_address/from_name/cc/bcc/reply_to/tags)
     @abstractmethod
     def content(self) -> Content: ...       # body (inline or template)
     def attachments(self) -> list[Attachment]:

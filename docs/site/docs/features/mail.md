@@ -61,8 +61,8 @@ class WelcomeMail(Mailable):
         self.user_name = user_name
 
     def envelope(self) -> Envelope:
+        # No sender set here — it inherits MAIL_FROM_ADDRESS / MAIL_FROM_NAME.
         return Envelope(
-            from_address="hello@example.com",
             to=["user@example.com"],
             subject="Welcome to Arvel!",
         )
@@ -72,12 +72,12 @@ class WelcomeMail(Mailable):
 ```
 
 > [!NOTE]
-> `Envelope` requires `from_address`, `to`, and `subject`. When you send with `Mail.to(...).send(...)`, the facade overrides the recipient, but `from_address` still has to be set (typically from `MAIL_FROM_ADDRESS`).
+> Only `to` and `subject` are required. Leave `from_address`/`from_name` unset and the mailer fills them from `MAIL_FROM_ADDRESS` / `MAIL_FROM_NAME` at render time, matching Laravel's global `from`. Set them on the `Envelope` to override per message.
 
 <a name="configuring-the-envelope"></a>
 ### Configuring the Envelope
 
-The `Envelope` carries the addressing metadata — subject, and optionally the from/to/cc/bcc fields. When you don't set a sender, the configured `MAIL_FROM_ADDRESS` / `MAIL_FROM_NAME` are used.
+The `Envelope` carries the addressing metadata — subject, recipients, and optionally `from_address`/`from_name`/cc/bcc/reply_to. When you don't set a sender, the configured `MAIL_FROM_ADDRESS` / `MAIL_FROM_NAME` are applied. A `from_name` renders as a display name in the `From` header (`"Arvel App" <hello@example.com>`).
 
 <a name="configuring-the-content"></a>
 ### Configuring the Content
