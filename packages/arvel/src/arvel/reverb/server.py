@@ -20,8 +20,6 @@ from arvel.reverb.channel_manager import ChannelManager
 from arvel.reverb.protocol import (
     build_connection_established,
     build_error,
-    build_member_added,
-    build_member_removed,
     build_pong,
     build_subscription_succeeded,
 )
@@ -212,18 +210,38 @@ class ReverbServer:
     def _cleanup_connection(self, conn: _Connection) -> None:
         """Unsubscribe from every channel; emit member_removed for presence channels."""
         for channel in list(self.channels.channels_for(conn)):
-            self.channels.unsubscribe(channel, conn)
-            presence = conn.presence.pop(channel, None)
-            if presence is not None:
-                user_id = str(presence.get("user_id", ""))
-                if user_id:
-                    self._spawn(
-                        self.channels.publish(
-                            channel,
-                            "pusher_internal:member_removed",
-                            {"user_id": user_id},
-                        ),
-                    )
+            self._unsubscribe(conn, channel)
+
+    def _unsubscribe(self, conn: _Connection, channel: str) -> None:
+        """Drop a single subscription. For presence channels, emit member_removed
+        once the connection's last membership for that user_id is gone (Pusher dedupes
+        members by user_id, so concurrent tabs of the same user only fire once)."""
+        self.channels.unsubscribe(channel, conn)
+        presence = conn.presence.pop(channel, None)
+        if presence is None:
+            return
+        user_id = str(presence.get("user_id", ""))
+        if user_id and not self._user_still_present(channel, user_id):
+            self._spawn(
+                self.channels.publish(
+                    channel,
+                    "pusher_internal:member_removed",
+                    {"user_id": user_id},
+                ),
+            )
+
+    def _user_still_present(self, channel: str, user_id: str) -> bool:
+        """True if any remaining subscriber on ``channel`` shares ``user_id``."""
+        for sub in self.channels.subscribers(channel):
+            sub_presence = getattr(sub, "presence", None)
+            if not isinstance(sub_presence, dict):
+                continue
+            member = _as_str_keyed(sub_presence).get(channel)
+            if not isinstance(member, dict):
+                continue
+            if str(_as_str_keyed(member).get("user_id", "")) == user_id:
+                return True
+        return False
 
     async def _inactivity_watchdog(self, conn: _Connection) -> None:
         """Close the connection if no traffic for ``inactivity_threshold_seconds``."""
@@ -269,7 +287,7 @@ class ReverbServer:
         if event == "pusher:unsubscribe":
             channel = _as_str_keyed(data).get("channel")
             if isinstance(channel, str):
-                self.channels.unsubscribe(channel, conn)
+                self._unsubscribe(conn, channel)
             return
 
     async def _handle_subscribe(self, conn: _Connection, data: object) -> None:
@@ -313,8 +331,16 @@ class ReverbServer:
             ):
                 await conn.send(build_error(code=4009, message="Invalid signature"))
                 return
-            if channel_raw.startswith("presence-") and cd_str:
-                presence_data = self._parse_channel_data(cd_str)
+            if channel_raw.startswith("presence-"):
+                presence_data = self._parse_channel_data(cd_str) if cd_str else None
+                # Presence channels require channel_data carrying user_id; without it
+                # the roster is meaningless. Pusher rejects rather than silently
+                # downgrading to a plain private subscription.
+                if presence_data is None or not str(presence_data.get("user_id", "")):
+                    await conn.send(
+                        build_error(code=4009, message="Presence channel_data required")
+                    )
+                    return
 
         await self._complete_subscribe(conn, channel_raw, presence_data)
 
@@ -341,13 +367,17 @@ class ReverbServer:
             )
             return
 
-        # Record member, then fan out: roster to the subscriber, member_added to others.
-        conn.presence[channel] = presence_data
         user_id = str(presence_data.get("user_id", ""))
         user_info_raw: object = presence_data.get("user_info", {})
         user_info: dict[str, object] = (
             _as_str_keyed(user_info_raw) if isinstance(user_info_raw, dict) else {}
         )
+        # Was this user_id already on the channel via another connection? Checked
+        # before recording our own membership so member_added fires once per user.
+        already_present = bool(user_id) and self._user_still_present(channel, user_id)
+
+        # Record member, then fan out: roster to the subscriber, member_added to others.
+        conn.presence[channel] = presence_data
         roster = self._build_presence_roster(channel)
         await conn.send(
             build_subscription_succeeded(
@@ -355,20 +385,13 @@ class ReverbServer:
                 presence_data=roster,
             ),
         )
-        if user_id:
+        if user_id and not already_present:
             await self.channels.publish(
                 channel,
                 "pusher_internal:member_added",
                 {"user_id": user_id, "user_info": user_info},
                 except_socket_id=conn.socket_id,
             )
-            # Pre-serialized helper, kept for symmetry / future direct sends.
-            _ = build_member_added(
-                channel=channel,
-                user_id=user_id,
-                user_info=user_info,
-            )
-            _ = build_member_removed(channel=channel, user_id=user_id)
 
     def _build_presence_roster(self, channel: str) -> dict[str, object]:
         ids: list[str] = []
@@ -383,7 +406,9 @@ class ReverbServer:
                 continue
             data = _as_str_keyed(data_obj)
             uid = str(data.get("user_id", ""))
-            if not uid:
+            # Pusher dedupes presence members by user_id — multiple tabs of the
+            # same user count once.
+            if not uid or uid in hash_:
                 continue
             ids.append(uid)
             info: object = data.get("user_info", {})

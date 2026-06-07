@@ -470,6 +470,110 @@ def test_resolve_remote_ip_without_trusted_proxies_uses_peer() -> None:
     assert ip == "203.0.113.5"
 
 
+@pytest.mark.asyncio
+async def test_presence_subscribe_without_channel_data_is_rejected() -> None:
+    """Presence channels require channel_data; valid auth alone must not subscribe."""
+    import asyncio as _asyncio
+
+    from arvel.broadcasting.config import ReverbConfig
+    from arvel.reverb.auth import sign_channel_auth
+    from arvel.reverb.server import ReverbServer
+
+    from .conftest import QueueWS
+
+    server = ReverbServer(config=ReverbConfig(app_id="x", key="k", secret="s"))
+    ws = QueueWS()
+    task = _asyncio.create_task(server.handle_connection(ws))
+    sid = await ws.wait_handshake()
+    # Sign over socket_id:channel only (no channel_data), then omit channel_data.
+    auth = sign_channel_auth(secret="s", key="k", socket_id=sid, channel="presence-room.1")
+    await ws.push(
+        json.dumps(
+            {
+                "event": "pusher:subscribe",
+                "data": {"channel": "presence-room.1", "auth": auth},
+            }
+        )
+    )
+    assert await ws.wait_for("4009"), f"Expected pusher:error 4009; got {ws.sent}"
+    assert server.channels.subscribers("presence-room.1") == []
+
+    await ws.close_input()
+    await task
+
+
+@pytest.mark.asyncio
+async def test_explicit_unsubscribe_from_presence_emits_member_removed() -> None:
+    """A client that explicitly unsubscribes from a presence channel triggers
+    member_removed for the others — same as a disconnect."""
+    import asyncio as _asyncio
+
+    from arvel.broadcasting.config import ReverbConfig
+    from arvel.reverb.server import ReverbServer
+
+    from .conftest import QueueWS
+
+    server = ReverbServer(config=ReverbConfig(app_id="x", key="k", secret="s"))
+
+    ws_a = QueueWS()
+    task_a = await _subscribe_presence(server, ws_a, "A")
+    assert await ws_a.wait_for("subscription_succeeded")
+
+    ws_b = QueueWS()
+    task_b = await _subscribe_presence(server, ws_b, "B")
+    assert await ws_b.wait_for("subscription_succeeded")
+    assert await ws_a.wait_for("member_added")
+
+    await ws_b.push(
+        json.dumps({"event": "pusher:unsubscribe", "data": {"channel": "presence-room.1"}})
+    )
+    assert await ws_a.wait_for("member_removed"), (
+        f"Expected member_removed on A after B unsubscribes; got {ws_a.sent}"
+    )
+
+    await ws_a.close_input()
+    await ws_b.close_input()
+    await _asyncio.gather(task_a, task_b)
+
+
+@pytest.mark.asyncio
+async def test_presence_roster_dedupes_by_user_id() -> None:
+    """Two connections sharing a user_id count once in the roster (Pusher parity)."""
+    import asyncio as _asyncio
+
+    from arvel.broadcasting.config import ReverbConfig
+    from arvel.reverb.server import ReverbServer
+
+    from .conftest import QueueWS
+
+    server = ReverbServer(config=ReverbConfig(app_id="x", key="k", secret="s"))
+
+    ws_a1 = QueueWS()
+    task_a1 = await _subscribe_presence(server, ws_a1, "A")
+    assert await ws_a1.wait_for("subscription_succeeded")
+
+    ws_a2 = QueueWS()
+    task_a2 = await _subscribe_presence(server, ws_a2, "A")
+    assert await ws_a2.wait_for("subscription_succeeded")
+
+    succeeded = [
+        json.loads(m)
+        for m in ws_a2.sent
+        if "subscription_succeeded" in m and "presence-room.1" in m
+    ]
+    data_field = succeeded[0]["data"]
+    data_obj = json.loads(data_field) if isinstance(data_field, str) else data_field
+    presence = data_obj["presence"]
+    assert presence["ids"] == ["A"]
+    assert presence["count"] == 1
+    # The second tab of the same user must NOT fire a duplicate member_added.
+    assert not await ws_a1.wait_for("member_added", attempts=5)
+
+    await ws_a1.close_input()
+    await ws_a2.close_input()
+    await _asyncio.gather(task_a1, task_a2)
+
+
 def test_resolve_remote_ip_with_trusted_proxy_uses_xff() -> None:
     """Stage 4b MEDIUM-3: peer in trusted_proxies → use right-most-trusted X-Forwarded-For."""
     from arvel.broadcasting.config import ReverbConfig
