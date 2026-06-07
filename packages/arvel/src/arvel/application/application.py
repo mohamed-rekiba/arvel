@@ -94,7 +94,7 @@ def _baseline_tail_providers() -> list[type[ServiceProvider]]:
     return [ConsoleServiceProvider]
 
 
-def _filter_provider_chain(
+def filter_provider_chain(
     chain: list[type[ServiceProvider]],
     required: frozenset[CliSubsystem],
     *,
@@ -293,7 +293,7 @@ class Application:
         self._provider_classes = (
             full_chain
             if required_subsystems is None
-            else _filter_provider_chain(full_chain, required_subsystems, user_classes=providers)
+            else filter_provider_chain(full_chain, required_subsystems, user_classes=providers)
         )
 
         # Instantiate providers and run the sync register() pass eagerly. This
