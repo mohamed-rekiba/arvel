@@ -38,7 +38,7 @@ def _import_class(dotted: str) -> type[Any]:
 def _users_provider(config: AuthConfig) -> ProviderConfig | None:
     """Return the first Arvent-backed provider config, or None."""
     for p in config.providers.values():
-        if p.driver == "arvent":
+        if p.driver == "database":
             return p
     return None
 
@@ -395,10 +395,10 @@ class AuthServiceProvider(ServiceProvider):
             msg = f"Auth provider '{provider_name}' is not configured."
             raise AuthConfigError(msg)
 
-        if provider_cfg.driver == "arvent":
+        if provider_cfg.driver == "database":
             parts = provider_cfg.model.rsplit(".", 1)
             mod = importlib.import_module(parts[0])
             model_class = getattr(mod, parts[1])
             return ArventUserProvider(model=model_class)
-        msg = f"Unknown auth provider driver: '{provider_cfg.driver}'. Valid drivers: 'arvent'."
+        msg = f"Unknown auth provider driver: '{provider_cfg.driver}'. Valid drivers: 'database'."
         raise AuthConfigError(msg)

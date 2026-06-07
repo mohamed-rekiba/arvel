@@ -47,7 +47,7 @@ def test_auth_config_valid_minimal_config() -> None:
     config = AuthConfig(
         default="web",
         guards={"web": GuardConfig(driver="session", provider="users")},
-        providers={"users": ProviderConfig(driver="arvent", model="app.Models.User.User")},
+        providers={"users": ProviderConfig(driver="database", model="app.Models.User.User")},
     )
     assert config.default == "web"
 
@@ -81,7 +81,7 @@ def test_auth_service_provider_raises_for_unknown_guard_driver() -> None:
     config = AuthConfig(
         default="web",
         guards={"web": GuardConfig(driver="nonexistent_driver", provider="users")},
-        providers={"users": ProviderConfig(driver="arvent", model="app.Models.User.User")},
+        providers={"users": ProviderConfig(driver="database", model="app.Models.User.User")},
     )
 
     provider = AuthServiceProvider(app=app)

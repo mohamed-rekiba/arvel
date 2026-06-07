@@ -20,7 +20,7 @@ def _provider() -> AuthServiceProvider:
     return AuthServiceProvider(app=Application())
 
 
-def _config_with_users(provider_driver: str = "arvent") -> AuthConfig:
+def _config_with_users(provider_driver: str = "database") -> AuthConfig:
     return AuthConfig(
         default="web",
         guards={"web": GuardConfig(driver="session", provider="users")},
@@ -47,7 +47,7 @@ def test_provider_config_rejects_unknown_driver_at_load_time() -> None:
     from pydantic import ValidationError
 
     with pytest.raises(ValidationError, match="not supported"):
-        ProviderConfig(driver="database", model=_MODEL)
+        ProviderConfig(driver="arvent", model=_MODEL)
 
 
 def test_validate_jwt_rejects_none_algorithm() -> None:
