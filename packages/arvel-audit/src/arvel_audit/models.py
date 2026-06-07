@@ -42,7 +42,7 @@ class AuditEntry(Model):
 
 
 class ActivityEntry(Model):
-    """One business-level activity (Spatie ActivityLog parity)."""
+    """One business-level activity record."""
 
     __tablename__ = "activity_entries"
     __table_args__ = (

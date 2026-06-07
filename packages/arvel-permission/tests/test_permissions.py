@@ -1,4 +1,4 @@
-"""Core API surface and Spatie Permission v7 parity checks."""
+"""Core API surface checks for HasRoles and HasPermissions."""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ def test_has_roles_assign_remove_sync() -> None:
 
 
 def test_has_permissions_lifecycle() -> None:
-    """HasPermissions methods exist and follow Spatie shape."""
+    """HasPermissions exposes the give/revoke/sync/has_* surface."""
     from arvel_permission import HasPermissions
 
     for method in (

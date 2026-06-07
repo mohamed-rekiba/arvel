@@ -1,12 +1,12 @@
-"""Create permission tables — Spatie Laravel Permission v7 parity.
+"""Create permission tables.
 
 Creates five tables: ``permissions``, ``roles``, ``model_has_permissions``,
 ``model_has_roles``, and ``role_has_permissions``.
 
-Both ``permissions`` and ``roles`` enforce ``UNIQUE(name, guard_name)`` and
-include timestamps. The pivot tables use composite primary keys (no surrogate id,
-no timestamps) matching Spatie's default migration, which enforces uniqueness
-at the DB level and prevents duplicate assignment.
+``permissions`` and ``roles`` enforce ``UNIQUE(name, guard_name)`` and carry
+timestamps. The pivot tables use composite primary keys (no surrogate id, no
+timestamps) — the DB itself enforces uniqueness and rejects duplicate
+assignment.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ async def up(schema: Schema) -> None:
         t.unique(["name", "guard_name"], name="roles_name_guard_unique")
 
     def _model_has_permissions(t: Blueprint) -> None:
-        # Composite PK — no surrogate id, no timestamps (matches Spatie v7 default)
+        # Composite PK across (permission_id, model_type, model_id) — DB-enforced uniqueness.
         t.integer("permission_id").primary()
         t.string("model_type", length=255).primary()
         t.string("model_id", length=36).primary()
@@ -44,7 +44,7 @@ async def up(schema: Schema) -> None:
         )
 
     def _model_has_roles(t: Blueprint) -> None:
-        # Composite PK — no surrogate id, no timestamps (matches Spatie v7 default)
+        # Composite PK across (role_id, model_type, model_id) — DB-enforced uniqueness.
         t.integer("role_id").primary()
         t.string("model_type", length=255).primary()
         t.string("model_id", length=36).primary()
@@ -55,7 +55,7 @@ async def up(schema: Schema) -> None:
         )
 
     def _role_has_permissions(t: Blueprint) -> None:
-        # Composite PK — matches Spatie v7 default and the ORM model declaration
+        # Composite PK matches the ORM model declaration in models.py.
         t.integer("permission_id").primary()
         t.integer("role_id").primary()
 

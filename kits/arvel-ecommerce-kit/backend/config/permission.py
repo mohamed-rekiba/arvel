@@ -23,6 +23,6 @@ column_names: dict[str, str] = {
 
 cache: dict[str, object] = {
     "expiration_seconds": 86400,
-    "key": "spatie.permission.cache",
+    "key": "arvel.permission.cache",
     "store": "default",
 }

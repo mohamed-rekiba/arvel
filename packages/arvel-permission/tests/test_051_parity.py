@@ -1,6 +1,6 @@
-"""Follow-on Spatie parity on the async ``MorphToMany`` core.
+"""Extended async ``MorphToMany`` behaviour: middleware, scoping, edge cases.
 
-Behavioral tests run against a real session; middleware tests use async user
+Behavioural tests run against a real session; middleware tests use async user
 stubs because the middleware awaits the checks.
 """
 

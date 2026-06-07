@@ -19,8 +19,11 @@ def test_provider_registers_install_command() -> None:
 
 
 def test_install_command_metadata() -> None:
+    from arvel.console._subsystem import CliSubsystem
+
     assert OAuthInstallCommand.name == "oauth:install"
-    assert OAuthInstallCommand.needs_application is True
+    assert OAuthInstallCommand.needs_framework() is True
+    assert CliSubsystem.USER_PROVIDERS in OAuthInstallCommand.requires
 
 
 def test_migration_defines_up_and_down() -> None:

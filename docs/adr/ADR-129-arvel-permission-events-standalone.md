@@ -5,9 +5,12 @@
 
 ## Context
 
-Spatie dispatches Laravel events on role/permission mutations. Options for arvel-permission:
-1. Integrate with Arvel's event dispatcher (requires `arvel` container at runtime).
-2. Standalone pub/sub in `events.py` (no dependency on container).
+`arvel-permission` mutates state (role assigned, permission revoked, roles
+synced, etc.) and downstream callers — audit logs, cache invalidators, ops
+dashboards — want to react. The package owns its event surface. Three options:
+
+1. Integrate with Arvel's event dispatcher (requires the `arvel` container at runtime).
+2. Standalone pub/sub in `events.py` (no dependency on the container).
 3. Callback hook attribute on the mixin.
 
 ## Decision

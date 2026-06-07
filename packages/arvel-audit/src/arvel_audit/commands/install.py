@@ -8,6 +8,7 @@ from typing import Annotated, ClassVar
 
 import typer
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.support.publishing import PublishRegistry, rewrite_migration_filename
 
@@ -19,7 +20,7 @@ class AuditInstallCommand(Command):
 
     name: ClassVar[str] = "audit:install"
     help: ClassVar[str] = "Publish arvel-audit migrations into the application"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.USER_PROVIDERS})
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

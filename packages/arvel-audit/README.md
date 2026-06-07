@@ -15,7 +15,7 @@ Two logging layers in one package:
   `AuditEntry` (old values, new values, actor) inside the same transaction. No per-model observer or
   middleware code.
 - **Activity log** — record business events ("user exported report") with the fluent `activity()`
-  API, modeled after Spatie's Laravel ActivityLog.
+  API. Attach an actor, a subject, a causer, and arbitrary properties; persist in any backend.
 
 > **Status**: Pre-alpha.
 

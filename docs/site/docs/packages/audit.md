@@ -6,7 +6,7 @@
 `arvel-audit` provides two logging layers for compliance and history:
 
 - **Audit trail** — mix `Auditable` into a model and every create/update/delete writes an `AuditEntry` in the same transaction.
-- **Activity log** — record business events with the fluent `activity()` API, modeled after Spatie's Laravel ActivityLog.
+- **Activity log** — record business events with the fluent `activity()` API. Attach actor, subject, causer, and arbitrary properties.
 
 <a name="installation"></a>
 ## Installation

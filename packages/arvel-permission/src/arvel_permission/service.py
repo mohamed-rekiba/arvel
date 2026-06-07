@@ -1,7 +1,6 @@
 """Permission registrar — find/create roles and permissions, cache lookups.
 
-The registrar mirrors Spatie's ``PermissionRegistrar`` shape but uses Python
-naming: ``register_role``, ``register_permission``, ``find_role``,
+Public surface: ``register_role``, ``register_permission``, ``find_role``,
 ``find_permission``, ``refresh_cache``.
 
 Two operating modes:

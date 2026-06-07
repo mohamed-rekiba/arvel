@@ -34,7 +34,7 @@
 > **Status**: Pre-alpha. Core subsystems ship and work today, but the public API can still change before `1.0`.
 
 Arvel brings Laravel's developer experience to async Python. You get a service container, typed
-configuration, an Eloquent-style ORM, form requests, API resources, queues, events, broadcasting,
+configuration, the Arvent ORM, form requests, API resources, queues, events, broadcasting,
 mail, notifications, cache, sessions, storage, and scheduling — all wired together on top of
 **FastAPI**, **Pydantic**, and **SQLAlchemy**. No new router. No new ORM. No bespoke DI framework.
 Just one coherent layer over the standard async stack.
@@ -45,7 +45,7 @@ Just one coherent layer over the standard async stack.
   60+ commands. One binary, no PATH gymnastics.
 - **Typed configuration** — every config object is a `pydantic-settings` `BaseSettings`.
   `Config.of(DbConfig)` returns a fully-typed instance instead of stringly-typed dict lookups.
-- **Arvent ORM** — `Model` on SQLAlchemy with Eloquent-style relations, soft deletes, scopes,
+- **Arvent ORM** — `Model` on SQLAlchemy with Arvent relations, soft deletes, scopes,
   attribute casting, a schema DSL that compiles to Alembic migrations, and a fluent query builder.
 - **Auth** — JWT, session, and token guards, `Gate` and policies, argon2/bcrypt hashing, email
   verification, and password-reset flows.
@@ -390,7 +390,7 @@ uv add "arvel[s3]"         # S3 storage driver (aioboto3)
 
 | Package | What it adds |
 |---|---|
-| [`arvel-permission`](packages/arvel-permission) | Roles and permissions — Spatie Permission parity |
+| [`arvel-permission`](packages/arvel-permission) | Roles and permissions — async-first authorization |
 | [`arvel-image`](packages/arvel-image) | Pillow-backed image transforms + a polymorphic media library |
 | [`arvel-oauth`](packages/arvel-oauth) | OAuth2/OIDC login (Google, GitHub, Microsoft, Apple, generic OIDC) |
 | [`arvel-search`](packages/arvel-search) | Scout-style full-text search (Meilisearch, Elasticsearch, database) |

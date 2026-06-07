@@ -1,8 +1,8 @@
 """Migrations shipped with arvel-permission.
 
-Stub migrations for the Spatie-style authorization tables. Consumers copy
-them into their app's ``database/migrations/`` directory; the migrator
-discovers them by filesystem path, not by Python import.
+Stub migrations for the authorization tables. Consumers copy them into their
+app's ``database/migrations/`` directory; the migrator discovers them by
+filesystem path, not by Python import.
 
 Available migrations:
 

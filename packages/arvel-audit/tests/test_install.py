@@ -20,8 +20,11 @@ def test_provider_registers_install_command() -> None:
 
 
 def test_install_command_metadata() -> None:
+    from arvel.console._subsystem import CliSubsystem
+
     assert AuditInstallCommand.name == "audit:install"
-    assert AuditInstallCommand.needs_application is True
+    assert AuditInstallCommand.needs_framework() is True
+    assert CliSubsystem.USER_PROVIDERS in AuditInstallCommand.requires
 
 
 def test_both_migrations_define_up_and_down() -> None:

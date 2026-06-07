@@ -43,14 +43,14 @@ Last reconciled: 2026-06-05. The most recent reconciliation pass (WI-arvel-003) 
 
 | ADR | Decision |
 |-----|----------|
-| [ADR-021](ADR-021-eloquent-on-sqla-mixin.md) | Eloquent layer is a mixin on SQLAlchemy, not a fork |
+| [ADR-021](ADR-021-arvent-on-sqla-mixin.md) | Arvent is a mixin on SQLAlchemy, not a fork |
 | [ADR-022](ADR-022-mapped-as-dataclass-on-model.md) | `Model` mixes in `MappedAsDataclass` for typed `__init__` |
 | [ADR-023](ADR-023-clean-model-syntax-type-inferred-columns.md) | Clean model syntax: type-inferred columns + `field()` |
 | [ADR-024](ADR-024-model-metaclass-forwarding.md) | Model Class-Level QB Forwarding via Metaclass |
 | [ADR-025](ADR-025-qb-write-ops-core.md) | QB Write Ops Use SQLAlchemy Core, Not ORM Unit-of-Work |
 | [ADR-026](ADR-026-table-query-builder-separate.md) | TableQueryBuilder Is a Separate Class |
 | [ADR-027](ADR-027-collection-list-subclass.md) | Collection[T] Is a list[T] Subclass |
-| [ADR-028](ADR-028-model-collection.md) | Eloquent-style ModelCollection |
+| [ADR-028](ADR-028-model-collection.md) | ModelCollection for Arvent model result sets |
 | [ADR-029](ADR-029-kwarg-shorthand-safe-binding.md) | Kwarg-shorthand `where(col=value)` binds parameters via `getattr`, never string SQL |
 | [ADR-030](ADR-030-where-predicate-engine.md) | WHERE Predicate Engine and Clause Polish |
 | [ADR-031](ADR-031-qb-conditional-groups-and-efficient-exists.md) | Query Builder Conditional Groups, `unless`/`tap`, and Efficient `exists` |
@@ -215,7 +215,7 @@ Last reconciled: 2026-06-05. The most recent reconciliation pass (WI-arvel-003) 
 
 | ADR | Decision |
 |-----|----------|
-| [ADR-128](ADR-128-arvel-permission-spatie-parity.md) | `arvel-permission` package, Spatie Permission parity |
+| [ADR-128](ADR-128-arvel-permission-package.md) | `arvel-permission` package: workspace member, polymorphic RBAC |
 | [ADR-129](ADR-129-arvel-permission-events-standalone.md) | arvel-permission: Standalone event system |
 | [ADR-130](ADR-130-arvel-permission-exception-hierarchy.md) | arvel-permission: UnauthorizedException as a typed exception |
 | [ADR-131](ADR-131-async-morph-to-many-permission.md) | Async MorphToMany for arvel-permission pivots |

@@ -1,4 +1,4 @@
-"""Fluent activity recorder for business events (Spatie ActivityLog parity).
+"""Fluent activity recorder for business events.
 
 await activity("exports", session=db).log("Exported Q1 report").by(user).on(report).save()
 """
