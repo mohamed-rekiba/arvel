@@ -35,7 +35,6 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // nav
     'nav.home': 'Home',
     'nav.products': 'Products',
-    'nav.specials': 'Specials',
     'nav.categories': 'Categories',
     'nav.search': 'Search',
     'nav.cart': 'Cart',
@@ -403,7 +402,6 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // nav
     'nav.home': 'الرئيسية',
     'nav.products': 'المنتجات',
-    'nav.specials': 'عروض خاصة',
     'nav.categories': 'الفئات',
     'nav.search': 'بحث',
     'nav.cart': 'عربة التسوق',
@@ -771,7 +769,6 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // nav
     'nav.home': 'Ana Sayfa',
     'nav.products': 'Ürünler',
-    'nav.specials': 'Fırsatlar',
     'nav.categories': 'Kategoriler',
     'nav.search': 'Ara',
     'nav.cart': 'Sepet',
