@@ -74,8 +74,10 @@ class TestQueueServiceProvider:
                 *,
                 queue: str,
                 failed_job_store: object | None,
+                restart_signal: object | None = None,
             ) -> None:
                 captured["failed_job_store"] = failed_job_store
+                captured["restart_signal"] = restart_signal
 
             async def drain_then_stop(self) -> None:
                 return None
@@ -93,4 +95,10 @@ class TestQueueServiceProvider:
         queue_work = next(cmd for cmd in commands if isinstance(cmd, QueueWorkCommand))
         await queue_work.run_worker(queue="default", stop_when_empty=True)
 
+        from arvel.queue.restart import QueueRestartSignal
+
         assert isinstance(captured["failed_job_store"], FailedJobStore)
+        assert isinstance(captured["restart_signal"], QueueRestartSignal), (
+            "QueueWorkCommand must pass a live QueueRestartSignal to Worker so "
+            "queue:restart can reach this worker."
+        )

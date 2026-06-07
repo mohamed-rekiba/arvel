@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from arvel.notifications.manager import NotificationManager
@@ -24,7 +24,10 @@ class Notifiable:
             return self.notification_manager
         from arvel.facades.notification import Notification as NotificationFacade
 
-        return NotificationFacade.get_manager()
+        # The facade is bound with a concrete NotificationManager in production.
+        # The Protocol return type exists so tests can bind a fake without
+        # subclassing the manager.
+        return cast("NotificationManager", NotificationFacade.get_manager())
 
     async def notify(self, notification: Notification) -> None:
         """Send the notification — queued if notification implements ShouldQueue."""

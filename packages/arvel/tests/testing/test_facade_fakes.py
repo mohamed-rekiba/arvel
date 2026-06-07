@@ -215,6 +215,80 @@ class TestStorageFake:
         assert disk(cast("StorageManagerLike", object())) is None
 
 
+class TestNotificationFake:
+    @pytest.mark.asyncio
+    async def test_fake_records_sent_notifications(self) -> None:
+        from arvel.facades.notification import Notification
+        from arvel.notifications.notification import Notification as _Notification
+
+        class WelcomeEmail(_Notification):
+            def via(self, notifiable: object) -> list[str]:
+                return ["log"]
+
+        class _User:
+            id = 42
+
+        user = _User()
+
+        with Notification.fake() as ctx:
+            await Notification.send(user, WelcomeEmail())
+            await Notification.send_now(user, WelcomeEmail())
+            assert len(ctx.fake.sent) == 2
+            Notification.assert_sent_to(user, WelcomeEmail)
+            Notification.assert_sent_to(user, WelcomeEmail, times=2)
+
+    @pytest.mark.asyncio
+    async def test_assert_failures(self) -> None:
+        from arvel.facades.notification import Notification
+        from arvel.notifications.notification import Notification as _Notification
+
+        class WelcomeEmail(_Notification):
+            def via(self, notifiable: object) -> list[str]:
+                return ["log"]
+
+        class OtherEmail(_Notification):
+            def via(self, notifiable: object) -> list[str]:
+                return ["log"]
+
+        class _User:
+            id = 1
+
+        user = _User()
+
+        with Notification.fake():
+            with pytest.raises(AssertionError, match="was not sent"):
+                Notification.assert_sent_to(user, WelcomeEmail)
+
+            Notification.assert_nothing_sent()
+
+            await Notification.send(user, WelcomeEmail())
+            Notification.assert_not_sent_to(user, OtherEmail)
+
+            with pytest.raises(AssertionError, match="was sent to"):
+                Notification.assert_not_sent_to(user, WelcomeEmail)
+            with pytest.raises(AssertionError, match="expected 5, got 1"):
+                Notification.assert_sent_to(user, WelcomeEmail, times=5)
+            with pytest.raises(AssertionError, match="1 notification"):
+                Notification.assert_nothing_sent()
+
+    def test_asserts_require_fake_context(self) -> None:
+        from arvel.facades.notification import Notification
+        from arvel.notifications.notification import Notification as _Notification
+
+        class _Boom(_Notification):
+            def via(self, notifiable: object) -> list[str]:
+                return ["log"]
+
+        Notification.reset()
+        # No manager bound at all — asserts should still fail with the same message.
+        with pytest.raises(TypeError, match="requires Notification.fake"):
+            Notification.assert_sent_to(object(), _Boom)
+        with pytest.raises(TypeError, match="requires Notification.fake"):
+            Notification.assert_not_sent_to(object(), _Boom)
+        with pytest.raises(TypeError, match="requires Notification.fake"):
+            Notification.assert_nothing_sent()
+
+
 class TestSessionFacade:
     def test_manager_not_bound_raises(self) -> None:
         from arvel.cache.exceptions import FacadeNotBoundError

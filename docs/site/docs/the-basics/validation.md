@@ -10,13 +10,13 @@ Arvel provides several approaches to validate your application's incoming data. 
 
 Validation in Arvel happens in two complementary layers, and understanding the split is the key to using it well:
 
-1. **The Pydantic layer** handles *shape and type*: which fields exist, their types, lengths, ranges, patterns, required-ness at the structural level. This runs when FastAPI parses the request body into your payload model.
-2. **The rules layer** handles checks Pydantic can't do on its own — primarily *database* checks (does this email already exist?) and *file* checks (is this an image of the right dimensions?).
+1. **The Pydantic layer** handles *shape and type* at parse time: which fields exist, their types, lengths, ranges, patterns. This runs when FastAPI parses the request body into your payload model.
+2. **The rules layer** handles checks Pydantic can't do at parse time — *database* checks (does this email already exist?), *file* checks (is this an image of the right dimensions?), *cross-field* comparisons (does `password_confirmation` match?), and rich Laravel-parity rules for apps that want their validation expressed as rule strings.
 
 A form request ties both layers together and adds an authorization check.
 
-> [!WARNING]
-> The rules layer implements a **small, specific set** of rules — see [Available Validation Rules](#available-validation-rules). Type and shape checks (string, integer, length, email format, min/max) belong on the **Pydantic payload model**, not in `rules()`. Writing `string`, `numeric`, `min:`, or `max:` in `rules()` produces an "Unknown validation rule" error rather than a check. Express those with Pydantic `Field(...)` instead.
+> [!TIP]
+> Both layers are valid choices for shape and type checks. Pydantic shines when the payload is already a typed model (FastAPI route handlers); rule strings shine when validation is dynamic or driven by config. Pick whichever fits the call site — the rules layer now covers the common Laravel rules (`string`, `integer`, `numeric`, `email`, `url`, `min`, `max`, `in`, `regex`, `confirmed`, etc.) without falling back to "Unknown validation rule".
 
 <a name="form-request-validation"></a>
 ## Form Request Validation
@@ -131,17 +131,76 @@ Reserve the [rules layer](#available-validation-rules) for what Pydantic genuine
 
 The following rules are available in the `rules()` layer. Rules are written as pipe-delimited strings (`"required|digits:6"`) or as a list (`["required", "digits:6"]`). Parameters follow a colon and are comma-separated.
 
+### Presence & emptiness
+
 | Rule | Form | Purpose |
 |---|---|---|
-| [`required`](#rule-required) | `required` | The field must be present and non-empty. |
+| [`required`](#rule-required) | `required` | Field must be present and non-empty. |
+| `nullable` | `nullable` | Marker rule that always passes; pair with others to signal "null is OK". |
+| `present` | `present` | Field key must exist in the payload, even if its value is empty/null. |
+| `filled` | `filled` | When present, the field must have a non-empty value. |
+| `prohibited` | `prohibited` | Field must be absent or empty. |
+
+### Types & format
+
+| Rule | Form | Purpose |
+|---|---|---|
+| `string` | `string` | Value must be a string. |
+| `integer` | `integer` | Value must be an integer (or numeric string). |
+| `numeric` | `numeric` | Value must be a number (or numeric string). |
+| `boolean` | `boolean` | Accepts truthy/falsy: `True/False`, `1/0`, `"yes"/"no"`, `"on"/"off"`. |
+| `accepted` | `accepted` | Value must be one of `True`, `1`, `"1"`, `"true"`, `"yes"`, `"on"` (checkbox-style). |
+| `email` | `email` | RFC-friendly email format. |
+| `url` | `url` | Value must be a URL. |
+| `uuid` | `uuid` | Value must be a valid UUID. |
+| `ip` / `ipv4` / `ipv6` | `ip` | IP address (any family / IPv4 only / IPv6 only). |
+| `json` | `json` | Value must be a valid JSON string. |
+| `alpha` | `alpha` | Letters only. |
+| `alpha_num` | `alpha_num` | Letters and digits. |
+| `alpha_dash` | `alpha_dash` | Letters, digits, `-`, `_`. |
+
+### Strings & patterns
+
+| Rule | Form | Purpose |
+|---|---|---|
 | [`digits`](#rule-digits) | `digits:n` | A string of exactly *n* digits. |
+| `regex` | `regex:pattern` | Value matches the given regex. |
+| `not_regex` | `not_regex:pattern` | Value does NOT match the regex. |
+| `starts_with` | `starts_with:foo,bar` | Value starts with one of the listed prefixes. |
+| `ends_with` | `ends_with:foo,bar` | Value ends with one of the listed suffixes. |
+| `in` | `in:foo,bar,baz` | Value is one of the listed options. |
+| `not_in` | `not_in:foo,bar,baz` | Value is none of the listed options. |
+
+### Size & range
+
+`min`, `max`, `between`, and `size` measure strings/lists/dicts by `len()` and numbers by value.
+
+| Rule | Form | Purpose |
+|---|---|---|
+| `min` | `min:n` | At least *n* (length or value). |
+| `max` | `max:n` | At most *n*. |
+| `between` | `between:a,b` | In the inclusive range `[a, b]`. |
+| `size` | `size:n` | Exactly *n*. |
+
+### Cross-field comparisons
+
+| Rule | Form | Purpose |
+|---|---|---|
+| `confirmed` | `confirmed` | A paired `<field>_confirmation` exists with the same value. |
+| `same` | `same:other` | Value equals the value at `other`. |
+| `different` | `different:other` | Value differs from the value at `other`. |
+
+### Database & files
+
+| Rule | Form | Purpose |
+|---|---|---|
 | [`exists`](#rule-exists) | `exists:table,column` | The value must exist in a database column. |
 | [`unique`](#rule-unique) | `unique:table,column,...` | The value must not already exist. |
 | [`mimes`](#rule-mimes) | `mimes:ext,...` | An uploaded file of an allowed type. |
 | [`dimensions`](#rule-dimensions) | `dimensions:key=n,...` | An image meeting size constraints. |
 
-> [!WARNING]
-> An unknown rule name doesn't raise — it adds a `"Unknown validation rule '<name>'."` detail to the error response. If you see that message, you've used a rule that isn't in this table (likely a Laravel rule that belongs on the Pydantic model).
+> [!NOTE]
+> An unknown rule name doesn't raise — it adds a `"Unknown validation rule '<name>'."` detail to the error response. Most rules are no-ops on `None` so they layer cleanly with `nullable`.
 
 <a name="rule-required"></a>
 ### required

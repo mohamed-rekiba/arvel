@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
+
+from arvel.testing.response import TestResponse
 
 if TYPE_CHECKING:
     from arvel.application import Application
@@ -66,20 +69,77 @@ class ArvelTestCase:
         user_id = getattr(user, "id", "anon")
         self.client.headers["Authorization"] = f"TestUser {user_id}"
 
-    async def refresh_database(self) -> None:
-        """Roll back and re-apply migrations against the testing DB.
+    async def get_json(
+        self,
+        uri: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+        **kwargs: Any,
+    ) -> TestResponse:
+        """GET ``uri`` with ``Accept: application/json`` and a wrapped response."""
+        merged = {"Accept": "application/json", **(headers or {})}
+        response = await self.client.get(uri, headers=merged, **kwargs)
+        return TestResponse(response)
 
-        Opt-in: only acts when the app has bound a database connection AND the
-        framework exposes a refresh_database helper. Safe no-op otherwise.
-        """
-        try:
-            import arvel.database as _db
+    async def post_json(
+        self,
+        uri: str,
+        data: object = None,
+        *,
+        headers: Mapping[str, str] | None = None,
+        **kwargs: Any,
+    ) -> TestResponse:
+        """POST ``data`` as JSON with the right headers; returns a TestResponse."""
+        merged = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            **(headers or {}),
+        }
+        response = await self.client.post(uri, json=data, headers=merged, **kwargs)
+        return TestResponse(response)
 
-            helper = getattr(_db, "refresh_database", None)
-            if helper is not None:
-                await helper()
-        except ImportError, AttributeError:
-            return
+    async def put_json(
+        self,
+        uri: str,
+        data: object = None,
+        *,
+        headers: Mapping[str, str] | None = None,
+        **kwargs: Any,
+    ) -> TestResponse:
+        merged = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            **(headers or {}),
+        }
+        response = await self.client.put(uri, json=data, headers=merged, **kwargs)
+        return TestResponse(response)
+
+    async def patch_json(
+        self,
+        uri: str,
+        data: object = None,
+        *,
+        headers: Mapping[str, str] | None = None,
+        **kwargs: Any,
+    ) -> TestResponse:
+        merged = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            **(headers or {}),
+        }
+        response = await self.client.patch(uri, json=data, headers=merged, **kwargs)
+        return TestResponse(response)
+
+    async def delete_json(
+        self,
+        uri: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+        **kwargs: Any,
+    ) -> TestResponse:
+        merged = {"Accept": "application/json", **(headers or {})}
+        response = await self.client.delete(uri, headers=merged, **kwargs)
+        return TestResponse(response)
 
 
 __all__ = ["ArvelTestCase"]

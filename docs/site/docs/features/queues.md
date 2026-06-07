@@ -94,18 +94,21 @@ from datetime import timedelta
 await Bus.dispatch(ProcessPodcast(podcast_id=1, delay=timedelta(minutes=10)))
 ```
 
-<a name="batches-and-chains"></a>
-### Batches & Chains
+<a name="dispatch-many-and-chains"></a>
+### Dispatching Many Jobs & Chains
 
-Dispatch many jobs together, or enqueue them in order:
+Fan out a batch of independent jobs with `dispatch_many` — they run in parallel as workers pick them up — or sequence them with `chain` so each one waits for the previous to finish:
 
 ```python
-await Bus.batch([ProcessPodcast(podcast_id=i) for i in range(10)])
+# Fan-out: ten jobs go on the queue; workers run them concurrently.
+await Bus.dispatch_many([ProcessPodcast(podcast_id=i) for i in range(10)])
+
+# Chain: Transcode only runs after NormalizeAudio finishes successfully.
+# If NormalizeAudio fails (after retries), Transcode is never dispatched.
 await Bus.chain([NormalizeAudio(podcast_id=1), Transcode(podcast_id=1)])
 ```
 
-> [!NOTE]
-> `Bus.chain([...])` enqueues the jobs in order — it does not wait for one to finish before the next runs or stop the chain on failure. Use it for ordered submission, not strict sequential execution.
+Chains carry their tail on the head envelope: when the worker finishes job N successfully, it dispatches job N+1; when N fails terminally, the rest of the chain is dropped. The `sync` driver runs chains inline for the same effect during tests.
 
 <a name="running-the-worker"></a>
 ## Running the Worker
@@ -116,6 +119,16 @@ For any backend other than `sync`, run a worker process to pull and execute jobs
 arvel queue:work
 arvel queue:work --queue=media       # only the media queue
 ```
+
+### Graceful restart after a deploy
+
+After a code change, running workers still hold the **old** code in memory. Trigger a clean restart with:
+
+```bash
+arvel queue:restart
+```
+
+That bumps a shared signal that every `queue:work` process checks between jobs. Workers finish whatever they're running and exit cleanly; your process manager (systemd, supervisor, k8s) brings them back up on the new code. No jobs are lost or duplicated — they go back on the queue if the worker exits mid-handle.
 
 <a name="retries-and-backoff"></a>
 ## Retries & Backoff

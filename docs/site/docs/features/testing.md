@@ -93,12 +93,14 @@ response = await self.client.get("/me")
 <a name="faking-services"></a>
 ## Faking Services
 
-Every external-facing facade ships a fake that captures activity instead of performing it, with matching assertions. `Cache` and `Storage` come from `arvel.facades`; `Mail` and `Event` are submodule facades (`WelcomeMail`, `OrderShipped`, and `ship_order` are your own app code):
+Every external-facing facade ships a fake that captures activity instead of performing it, with matching assertions. `Cache` and `Storage` come from `arvel.facades`; `Mail`, `Event`, `Bus`, and `Notification` are submodule facades (`WelcomeMail`, `OrderShipped`, `ship_order`, `SendInvoiceJob`, and `WelcomeEmail` are your own app code):
 
 ```python
 from arvel.facades import Cache, Storage
 from arvel.facades.mail import Mail
 from arvel.facades.event import Event
+from arvel.facades.bus import Bus
+from arvel.facades.notification import Notification
 
 with Cache.fake():
     await Cache.put("k", "v", ttl=60)
@@ -117,12 +119,118 @@ with Event.fake():
     Event.assert_dispatched(OrderShipped)
 ```
 
+### `Bus.fake()` — queue assertions
+
+`Bus.fake()` swaps the active queue connection with an in-memory recorder. Dispatches are captured but never execute, so handlers don't run and external systems aren't touched:
+
+```python
+from arvel.facades.bus import Bus
+
+with Bus.fake() as ctx:
+    await Bus.dispatch(SendInvoiceJob(invoice_id=42))
+    await Bus.chain([SendInvoiceJob(invoice_id=43), MarkAsPaidJob(invoice_id=43)])
+
+    Bus.assert_dispatched(SendInvoiceJob)               # at least once
+    Bus.assert_dispatched(SendInvoiceJob, times=2)      # exact count
+    Bus.assert_not_dispatched(NeverFiredJob)
+    Bus.assert_dispatched_on(SendInvoiceJob, "high")    # routed to a specific queue
+    Bus.assert_chained(SendInvoiceJob, MarkAsPaidJob)   # head + ordered tail
+
+    # Raw access to recorded pushes for ad-hoc assertions:
+    payloads = [p.envelope.payload for p in ctx.fake.pushed]
+```
+
+### `Notification.fake()` — notification assertions
+
+`Notification.fake()` swaps the bound `NotificationManager` with a recorder. Channel work (mail, broadcast, database, log) is skipped:
+
+```python
+from arvel.facades.notification import Notification
+
+with Notification.fake():
+    await user_service.welcome(user)
+
+    Notification.assert_sent_to(user, WelcomeEmail)
+    Notification.assert_sent_to(user, WelcomeEmail, times=1)
+    Notification.assert_not_sent_to(user, AccountDeletedEmail)
+
+    # Or, for "nothing happened" tests:
+    Notification.assert_nothing_sent()
+```
+
 For broadcasting, use `BroadcasterFake` directly — it records each `broadcast(...)` call and exposes `assert_broadcasted(...)` (see [Broadcasting](broadcasting.md#testing)). It's a driver-level fake, not a manager, so it isn't passed to `Broadcast.set_manager(...)`.
+
+<a name="json-http-helpers"></a>
+## JSON HTTP helpers
+
+`ArvelTestCase` ships JSON-aware request helpers that set the right `Accept` / `Content-Type` headers and wrap the response in a `TestResponse` with fluent assertions:
+
+```python
+class TestApi(ArvelTestCase):
+    async def test_create_user(self) -> None:
+        response = await self.post_json("/users", {"email": "a@b.com"})
+        response.assert_status(201).assert_json_fragment({"email": "a@b.com"})
+
+    async def test_list_users(self) -> None:
+        response = await self.get_json("/users?per_page=10")
+        response.assert_ok().assert_json_count(10, "data")
+
+    async def test_validation(self) -> None:
+        response = await self.post_json("/users", {})
+        response.assert_json_validation_errors("email", "name")
+```
+
+The helpers: `get_json`, `post_json`, `put_json`, `patch_json`, `delete_json`. Caller-supplied `headers=` merge over the defaults, so per-test overrides work without surprises.
+
+### `TestResponse` JSON assertions
+
+| Method | Purpose |
+|---|---|
+| `assert_json(expected)` | Body equals `expected` exactly |
+| `assert_exact_json(expected)` | Alias of `assert_json` (Laravel-style name) |
+| `assert_json_fragment(subset)` | Every key/value in `subset` is present at the root |
+| `assert_json_path(path, value)` | Dotted-path lookup equals `value` (e.g. `"user.id"`, `"items.0.name"`) |
+| `assert_json_missing(path)` | Dotted path is absent |
+| `assert_json_structure(shape)` | Body has the keys described by `shape`; `{"*": [...]}` applies to every list element |
+| `assert_json_count(n, path=None)` | Body (or `path`) is a list of `n` items |
+| `assert_json_validation_errors(*fields)` | 422 response carries errors for every named field — handles both FastAPI `detail` and Laravel `errors` shapes |
 
 <a name="database-testing"></a>
 ## Database Testing
 
-`ArvelTestCase.refresh_database()` rolls back and re-applies migrations against the testing database between tests.
+### `RefreshDatabase` mixin
 
-> [!WARNING]
-> `refresh_database()` is **opt-in and partial** — it only acts when the app has bound a database connection and the framework exposes a `refresh_database` helper. Otherwise it's a safe no-op. Don't assume a clean database from it alone; manage test data explicitly until the helper is fully wired.
+`RefreshDatabase` wraps every test in a database transaction and rolls it back at teardown. Whatever the test writes never persists, so tests stay isolated without dropping and re-running migrations on every method.
+
+```python
+from arvel.testing import ArvelTestCase, RefreshDatabase
+from arvel.providers import DatabaseServiceProvider
+
+class TestPosts(RefreshDatabase, ArvelTestCase):
+    providers = (DatabaseServiceProvider,)
+
+    async def test_create(self) -> None:
+        await Post.create(title="Hi")
+        rows = await Post.all()
+        assert [p.title for p in rows] == ["Hi"]
+        # The row is rolled back after this test — TestOtherStuff sees an empty table.
+```
+
+The mixin requires the app to bind an `AsyncEngine` in its container (which `DatabaseServiceProvider` does). When no engine is bound it's a no-op, so it's safe to apply to tests that don't touch the DB.
+
+Override `seed()` to populate the database before each test:
+
+```python
+class TestWithFixtures(RefreshDatabase, ArvelTestCase):
+    providers = (DatabaseServiceProvider,)
+
+    async def seed(self) -> None:
+        await User.create(email="alice@example.com", password="secret")
+        await User.create(email="bob@example.com", password="secret")
+
+    async def test_count(self) -> None:
+        assert await User.count() == 2
+```
+
+> [!NOTE]
+> Schema (tables, columns, indexes) must already exist before the mixin runs — run migrations once in your test session setup or use an in-memory engine fixture that creates them. `RefreshDatabase` only manages row-level state; it doesn't drop or recreate tables.

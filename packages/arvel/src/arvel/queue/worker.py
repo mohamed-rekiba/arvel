@@ -101,6 +101,7 @@ class Worker:
             else:
                 await job.handle()
             self._jobs_processed += 1
+            await self._dispatch_chain_successor(envelope)
         except (Exception, asyncio.CancelledError) as exc:
             if isinstance(exc, TimeoutError):
                 logger.warning(
@@ -138,6 +139,21 @@ class Worker:
                             queue=self._queue,
                             error=error_text,
                         )
+
+    async def _dispatch_chain_successor(self, envelope: JobEnvelope) -> None:
+        """Pop the next chain step (if any) and enqueue it on its target queue."""
+        if not envelope.chain:
+            return
+        next_step = envelope.chain[0]
+        successor = JobEnvelope(
+            job_class=next_step.job_class,
+            payload=next_step.payload,
+            delay=next_step.delay,
+            priority=next_step.priority,
+            chain=envelope.chain[1:],
+        )
+        conn = self._manager.connection()
+        await conn.push(successor, queue=next_step.queue)
 
 
 __all__ = ["Worker"]
