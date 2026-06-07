@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.16.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.15.0...arvel-v0.16.0) (2026-06-07)
+
+
+### Features
+
+* **cli:** needs-based subsystem bootstrap ([4e5b866](https://github.com/mohamed-rekiba/arvel/commit/4e5b866061423dd2cce99cfb7554ed50e2f1f7ff))
+* **testing:** bus/notification fakes + refresh_database + json helpers ([1f2e6ec](https://github.com/mohamed-rekiba/arvel/commit/1f2e6ec4ce44158d2fca2c869b4cec0d0c6090fa))
+
+
+### Bug Fixes
+
+* **quality:** mypy/pyright cleanup in maintenance + scheduling ([b0bb333](https://github.com/mohamed-rekiba/arvel/commit/b0bb3332944bd096617e769628bf5c56abde3b24))
+
+
+### Refactors
+
+* **arvent:** rename Eloquent → Arvent ([6d8ca4a](https://github.com/mohamed-rekiba/arvel/commit/6d8ca4a01edf359dfd3106cc4c6167b40be559b7))
+
 ## [0.15.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.14.0...arvel-v0.15.0) (2026-06-05)
 
 
