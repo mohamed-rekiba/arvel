@@ -60,6 +60,9 @@ class KitSpec:
     resolve: Callable[[], Path]
     # Printed after ``cd <project>`` in ``arvel new`` success output (no leading spaces).
     next_step_commands: tuple[str, ...] = ("uv run arvel serve",)
+    # Where the pyproject.toml lives relative to the project root. The api kit
+    # is flat ("");  the e-commerce kit nests its Python project under backend/.
+    python_project_subdir: str = ""
 
     def root(self) -> Path:
         """Return the kit's source tree, raising if it can't be located."""
@@ -117,12 +120,13 @@ KITS: dict[str, KitSpec] = {
         ),
         resolve=_ecommerce_kit_root,
         next_step_commands=(
-            "source .venv/bin/activate",
+            "source backend/.venv/bin/activate",
             "make env",
             "make up",
             "make migrate",
             "make seed",
         ),
+        python_project_subdir="backend",
     ),
 }
 
