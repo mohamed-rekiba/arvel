@@ -5,9 +5,9 @@
 
 ## Context
 
-`DefaultPathGenerator` is currently hard-coded throughout `arvel-image`. Spatie's
-`ImageServiceProvider` binds a custom `PathGenerator` in the container; the runtime resolves
-it. Our implementation ignores custom bindings, making `PathGenerator` customisation silently
+`DefaultPathGenerator` is currently hard-coded throughout `arvel-image`. Consumers expect to
+bind a custom `PathGenerator` in their service provider and have the runtime pick it up. Our
+implementation ignores custom bindings, making `PathGenerator` customisation silently
 ineffective.
 
 ## Decision

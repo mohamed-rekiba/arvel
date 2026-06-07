@@ -7,8 +7,9 @@
 <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License">
 </p>
 
-Roles and permissions for [Arvel](https://arvel.dev) — a Python port of
-[spatie/laravel-permission](https://spatie.be/docs/laravel-permission/v7/introduction) v7.
+Roles and permissions for [Arvel](https://arvel.dev). Adds `Role` and
+`Permission` models, `HasRoles` / `HasPermissions` mixins for your user model,
+route middleware, and a bridge into the authorization `Gate`.
 
 > **Status**: Pre-alpha.
 
@@ -130,9 +131,12 @@ class AppPermissionProvider(PermissionServiceProvider):
 Notable fields: `default_guard_name` (`web`), `cache_enabled` (`true`), `wildcard_enabled` (`true`),
 `events_enabled` (`false`), `cache_ttl` (`86400`).
 
-## Spatie ↔ arvel-permission
+## API at a glance
 
-| Spatie (PHP) | arvel-permission (Python) |
+The `HasRoles` and `HasPermissions` mixins expose snake_case Python
+equivalents of the camelCase methods Laravel devs are used to:
+
+| Camel-case (PHP convention) | `arvel-permission` (Python) |
 |---|---|
 | `assignRole` | `assign_role` |
 | `removeRole` | `remove_role` |

@@ -1,12 +1,12 @@
 [project]
 name = "arvel-permission"
 version = "0.6.1" # x-release-please-version
-description = "Roles and permissions for Arvel — Spatie Laravel Permission v7 parity."
+description = "Roles and permissions for Arvel — async-first authorization with HasRoles / HasPermissions mixins."
 readme = "README.md"
 requires-python = ">=3.14"
 license = { text = "MIT" }
 authors = [{ name = "Arvel contributors" }]
-keywords = ["arvel", "authorization", "permissions", "roles", "spatie"]
+keywords = ["arvel", "authorization", "permissions", "roles", "rbac"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: FastAPI",

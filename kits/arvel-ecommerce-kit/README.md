@@ -15,7 +15,7 @@ non-trivial and to show how the pieces fit together.
   - [Arvent ORM](https://arvel.dev/orm/models) — typed relations, soft deletes, scopes, query builder
   - [Auth](https://arvel.dev/features/authentication) — JWT + session guards, RBAC via `arvel-permission`
   - [`arvel-image`](https://arvel.dev/packages/image) — polymorphic media library with Pillow conversions
-  - [`arvel-permission`](https://arvel.dev/packages/permission) — roles and permissions (Spatie parity)
+  - [`arvel-permission`](https://arvel.dev/packages/permission) — roles and permissions, with route middleware
   - [Mail](https://arvel.dev/features/mail) + [Queues](https://arvel.dev/features/queues) — async jobs, SMTP mail
   - [Scheduler](https://arvel.dev/features/scheduling) — periodic read-model refresh via `arvel schedule:work`
   - [i18n](https://arvel.dev/features/localization) — locale negotiation middleware, JSONB translations

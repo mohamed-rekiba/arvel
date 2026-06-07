@@ -1,4 +1,4 @@
-"""Route middleware for arvel-permission — Spatie parity for role/permission guards.
+"""Route middleware for arvel-permission — role and permission guards.
 
 Register these via ``PermissionServiceProvider.boot()`` as named middleware:
 

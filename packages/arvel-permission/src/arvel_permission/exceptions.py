@@ -11,7 +11,7 @@ class PermissionDoesNotExistError(Exception):
     """Raised when a permission name cannot be found."""
 
 
-class UnauthorizedException(Exception):  # noqa: N818 — Spatie API parity; callers expect this exact name
+class UnauthorizedException(Exception):  # noqa: N818 — public name; widely imported, can't add `Error` suffix
     """Raised by middleware when a user lacks the required role or permission.
 
     status_code is 401 when there is no authenticated user, 403 when the user
@@ -23,6 +23,6 @@ class UnauthorizedException(Exception):  # noqa: N818 — Spatie API parity; cal
         self.status_code = status_code
 
 
-# Spatie parity aliases — Spatie raises RoleDoesNotExist / PermissionDoesNotExist
+# Shorter aliases — these are the names used everywhere else in the package.
 RoleDoesNotExist = RoleDoesNotExistError
 PermissionDoesNotExist = PermissionDoesNotExistError

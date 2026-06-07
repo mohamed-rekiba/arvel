@@ -1,7 +1,7 @@
-"""Spatie v7 parity on the async ``MorphToMany`` core.
+"""Async ``MorphToMany`` behaviour for roles and permissions.
 
 Pivots are plain Core ``Table``s; hosts grant roles/permissions through async
-accessors, so behavioral tests run against a real session.
+accessors, so behavioural tests run against a real session.
 """
 
 from __future__ import annotations

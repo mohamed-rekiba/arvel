@@ -89,8 +89,9 @@ Add a first-class `MorphToMany` async descriptor to Arvent and map the permissio
 ## Context
 
 The `model_has_roles` / `model_has_permissions` pivots are polymorphic: each row carries a
-`model_type` discriminator plus a `model_id` (`VARCHAR(36)` for Spatie compatibility). Two problems
-fell out of the original design.
+`model_type` discriminator plus a `model_id` (`VARCHAR(36)` to fit any of Arvel's standard
+PK encodings — int as digits, UUID as canonical string). Two problems fell out of the
+original design.
 
 1. **Persistence bug.** The host model wired `roles` / `permissions` as a plain `secondary`
    many-to-many whose `primaryjoin` pinned `model_type` to a constant. SQLAlchemy does **not**
@@ -153,8 +154,8 @@ PKs and `Timestamps` mixin columns. A post-release review (Finding #1, CRITICAL)
 
 1. No uniqueness constraint on `(role_id, model_id, model_type)` — duplicate assignments are
    possible through any code path that bypasses the in-memory deduplication in `assign_role`.
-2. `Timestamps` and `id` diverge from Spatie's default migration schema, breaking cross-tool
-   compatibility expectations.
+2. `Timestamps` and `id` diverge from the canonical pure-pivot schema used everywhere else
+   in the framework — keeping them invites schema drift across packages.
 3. SQLAlchemy treats tables with surrogate PKs differently in `relationship(..., secondary=...)`
    write-through operations — the composite-key form is the canonical SQLAlchemy pattern for
    pure join tables.
@@ -172,8 +173,8 @@ respectively. No `created_at` / `updated_at` columns on either table.
 **Positive**:
 - DB-level uniqueness guarantee: duplicate assignment raises `IntegrityError` regardless of
   which code path does the insert.
-- Schema matches Spatie's default migration — consuming apps porting from PHP can apply the
-  same migration tooling expectations.
+- Schema matches the standard pure-pivot shape used elsewhere in Arvel — uniform expectations
+  across the framework.
 - SQLAlchemy `relationship(..., secondary=..., viewonly=False)` works correctly with composite
   PKs for insert/delete on the join table.
 
@@ -186,8 +187,9 @@ respectively. No `created_at` / `updated_at` columns on either table.
 ## Alternatives Considered
 
 **(A) Keep surrogate PK, add `UNIQUE(role_id, model_id, model_type)` constraint** — would fix
-the data integrity issue without breaking migration. Rejected: still diverges from Spatie schema;
-adds an index that's redundant with the primary key in the composite-PK design.
+the data integrity issue without breaking migration. Rejected: still diverges from the canonical
+pure-pivot shape, and adds an index that's redundant with the primary key in the composite-PK
+design.
 
 **(B) Keep surrogate PK, enforce uniqueness in application code only** — Rejected: application-
 level deduplication is insufficient for concurrent writes. Security mitigation must be at the

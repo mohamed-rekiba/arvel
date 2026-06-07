@@ -3,7 +3,7 @@
 <a name="introduction"></a>
 ## Introduction
 
-`arvel-permission` adds roles and permissions, modeled after Spatie's Laravel Permission. It gives you `Role` and `Permission` models, `HasRoles` / `HasPermissions` mixins for your user model, route middleware, and a bridge into the authorization [`Gate`](../features/authorization.md).
+`arvel-permission` adds roles and permissions to Arvel. It gives you `Role` and `Permission` models, `HasRoles` / `HasPermissions` mixins for your user model, route middleware, and a bridge into the authorization [`Gate`](../features/authorization.md).
 
 <a name="installation"></a>
 ## Installation

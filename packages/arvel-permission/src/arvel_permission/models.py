@@ -3,8 +3,8 @@
 ``Role`` and ``Permission`` enforce ``UNIQUE(name, guard_name)`` so the same
 name can exist under multiple guards.
 
-The three pivots are plain Core ``Table``s on ``Model.metadata`` (no surrogate
-id, no timestamps — Spatie v7 schema):
+The three pivots are plain Core ``Table``s on ``Model.metadata`` with composite
+primary keys (no surrogate id, no timestamps):
 
 - ``model_has_roles`` / ``model_has_permissions`` are polymorphic. A host model
   links to them through a :class:`~arvel.database.orm.MorphToMany` accessor,

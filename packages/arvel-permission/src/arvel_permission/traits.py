@@ -1,4 +1,4 @@
-"""HasRoles and HasPermissions mixins — Spatie-shaped API, async-first.
+"""HasRoles and HasPermissions mixins — async-first authorization API.
 
 The host model declares ``roles`` / ``permissions`` as
 :class:`~arvel.database.orm.MorphToMany` accessors over the polymorphic
@@ -88,7 +88,7 @@ def _check_guard(item_guard: str, requested_guard: str | None) -> None:
 def matches_wildcard(pattern: str, ability: str) -> bool:
     """Return True if ``pattern`` is a wildcard that covers ``ability``.
 
-    Supported patterns (Spatie / Apache Shiro model):
+    Supported patterns (Apache Shiro wildcard model):
     - ``"*"`` — matches any ability string.
     - ``"resource.*"`` — matches any ``resource.{action}``.
     - ``"posts,users.create,update"`` — comma-separated OR within each segment.
@@ -155,7 +155,7 @@ async def _resolve_permission(value: Permission | str, guard: str) -> Permission
 
 
 class HasRoles:
-    """Mixin that gives a model Spatie-style role management.
+    """Mixin that gives a model role management.
 
     The host must declare ``roles`` as a ``MorphToMany[Role]`` over the
     ``model_has_roles`` pivot.
@@ -298,7 +298,7 @@ class HasRoles:
 
 
 class HasPermissions:
-    """Mixin that gives a model Spatie-style permission management.
+    """Mixin that gives a model permission management.
 
     The host must declare ``permissions`` as a ``MorphToMany[Permission]`` over
     ``model_has_permissions``. If it also mixes in ``HasRoles``, permissions
@@ -494,9 +494,9 @@ class HasPermissions:
         return result.scalars().all()
 
 
-# Spatie parity: Role manages its own permissions (Role.permissions is a
-# BelongsToMany over role_has_permissions), Permission manages its own roles.
-# Grafted here (module end) to break the models ↔ traits import cycle.
+# Role manages its own permissions (Role.permissions is a BelongsToMany over
+# role_has_permissions) and Permission manages its own roles. Grafted here
+# (module end) to break the models ↔ traits import cycle.
 _HP_METHODS = (
     "give_permission_to",
     "revoke_permission_to",

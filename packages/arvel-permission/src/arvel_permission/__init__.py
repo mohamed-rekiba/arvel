@@ -1,4 +1,4 @@
-"""arvel-permission — Spatie Laravel Permission v7 feature parity for Arvel.
+"""arvel-permission — roles and permissions for Arvel.
 
 Supplies the ``Role`` and ``Permission`` SQLAlchemy models, the ``HasRoles``
 and ``HasPermissions`` mixins, an async ``PermissionRegistrar``, and a

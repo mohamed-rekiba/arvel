@@ -1,7 +1,4 @@
-"""Permission configuration — guard defaults, table names, cache settings.
-
-Mirrors Spatie's `config/permission.php` knobs as a Pydantic settings model.
-"""
+"""Permission configuration — guard defaults, table names, cache settings."""
 
 from __future__ import annotations
 
@@ -24,7 +21,7 @@ class PermissionConfig(BaseModel):
     permission_model: type[Permission] = Field(default=Permission)
     default_guard_name: str = Field(
         default="web",
-        description="Guard name applied when none is supplied (mirrors Spatie's default).",
+        description="Guard name applied when none is supplied.",
     )
     roles_table: str = Field(default="roles")
     permissions_table: str = Field(default="permissions")

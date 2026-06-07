@@ -16,7 +16,7 @@
 
 ### Context
 
-Spatie's PHP `spatie/image` v3 supports two backends: GD and ImageMagick. We need an equivalent for Arvel. Python options:
+We need a fluent image-transform layer for Arvel — resize, crop, convert format, set quality, orient, optimise — that fits inside async request handlers without shelling out. Python options:
 
 | Driver | Pros | Cons |
 |---|---|---|
@@ -61,24 +61,24 @@ AVIF support: opportunistic. If `pillow-heif` is installed at runtime we accept 
 
 ---
 
-## § 2 — Scope: ship laravel-medialibrary parity in the same package
+## § 2 — Scope: ship the media-library layer in the same package
 
 **Originally**: ADR-133 (Date: 2026-05-21). Amends § 1.
 
 ### Context
 
-When § 1 landed, `arvel-image` was framed as a stateless Pillow wrapper — a port of [`spatie/image`](https://spatie.be/docs/image/v3) only. That covers "transform these bytes". It does **not** cover the much more common Laravel use case: *"attach this file to my model, generate thumbnails, give me a URL back."* That second workflow is [`spatie/laravel-medialibrary`](https://spatie.be/docs/laravel-medialibrary/v11) — a separate Spatie package, but most Laravel apps that pull in Spatie image work also pull in medialibrary.
+When § 1 landed, `arvel-image` was framed as a stateless Pillow wrapper — "transform these bytes". That misses the much more common application workflow: *"attach this file to my model, generate thumbnails, give me a URL back."* That second workflow needs a polymorphic `media` table, a `HasMedia` trait on host models, conversion generation, disk routing, and a `MediaLibrary` service.
 
-Splitting the port across two packages (`arvel-image` for transforms, a hypothetical `arvel-medialibrary` for the model association) gives us two PyPI extras with overlapping deps, two README mapping tables, two `vendor:publish` tags. For a parity story aimed at Laravel migrators, a single "image stuff lives here" package is closer to what they expect.
+Splitting transforms and media-library across two packages (`arvel-image` for transforms, a hypothetical `arvel-medialibrary` for the model association) gives us two PyPI extras with overlapping deps, two READMEs, two `vendor:publish` tags. One "image stuff lives here" package is closer to what consumers expect.
 
 ### Decision
 
-`arvel-image` ships **both** Spatie surfaces:
+`arvel-image` ships **both** layers:
 
 1. The fluent transform API (`arvel_image.Image`, § 1 — unchanged).
-2. A laravel-medialibrary v11-compatible `media` table plus `ImageServiceProvider` that registers it as publishable under tag `arvel-image`.
+2. A polymorphic `media` table plus `ImageServiceProvider` that registers it as publishable under tag `arvel-image`.
 
-The `media` table mirrors Spatie's v11 schema verbatim — id, polymorphic `model_type` / `model_id`, `uuid`, `collection_name`, `name`, `file_name`, `mime_type`, `disk`, `conversions_disk`, unsigned `size`, JSON columns for `manipulations` / `custom_properties` / `generated_conversions` / `responsive_images`, indexed nullable `order_column`, nullable timestamps.
+The `media` table schema: id, polymorphic `model_type` / `model_id`, `uuid`, `collection_name`, `name`, `file_name`, `mime_type`, `disk`, `conversions_disk`, unsigned `size`, JSON columns for `manipulations` / `custom_properties` / `generated_conversions` / `responsive_images`, indexed nullable `order_column`, nullable timestamps.
 
 Apps that only want the transform API still get a clean install: `from arvel_image import Image` works without booting a provider. The migration only lands in `database/migrations/` if the app explicitly runs `arvel vendor:publish --tag=arvel-image`.
 
@@ -93,22 +93,22 @@ Apps that only want the transform API still get a clean install: `from arvel_ima
 
 ### Alternatives considered
 
-- **(A) Keep `arvel-image` stateless; ship a separate `arvel-medialibrary`.** Rejected: doubles the surface area Laravel migrators have to discover.
+- **(A) Keep `arvel-image` stateless; ship a separate `arvel-medialibrary`.** Rejected: doubles the surface area consumers have to discover.
 - **(B) Bake the runtime layer in the same WI as the migration.** Rejected per `001-no-overengineering`: the runtime layer's shape (sync vs async, eager vs lazy) deserves a dedicated design pass — see § 3.
 
 ---
 
-## § 3 — Runtime layer: sync conversions, short-class polymorphism, Spatie path scheme
+## § 3 — Runtime layer: sync conversions, short-class polymorphism, default path scheme
 
 **Originally**: ADR-134 (Date: 2026-05-20), including two later merged sub-decisions (2026-05-24) on `HasMedia` aliases and `Media.model_id` type. Depends on § 1, § 2.
 
 ### Context
 
-§ 2 chose to ship laravel-medialibrary v11 parity inside `arvel-image` and shipped only the `media` table as a publishable migration. The runtime layer (the `Media` ORM model, the `HasMedia` trait, and the conversion engine) was deferred. § 3 lands that layer. Three architectural calls deserve a record:
+§ 2 chose to ship the full media-library layer inside `arvel-image` but shipped only the `media` table as a publishable migration. The runtime layer (the `Media` ORM model, the `HasMedia` trait, and the conversion engine) was deferred. § 3 lands that layer. Three architectural calls deserve a record:
 
-1. **Sync vs queued conversions.** Spatie defaults to queued (`->queued()`) and lets you opt into sync. Arvel doesn't have a Spatie-shaped queue integration in `arvel-image` and bringing one in pulls a transitive dep on `arvel.queue` for a behaviour that 80% of consumers won't see (single-file uploads, one or two conversions, a few hundred ms total).
+1. **Sync vs queued conversions.** Should `attach_media(...)` block on the conversion or hand it off to `arvel.queue`? Queueing pulls a transitive dep on `arvel.queue` for a behaviour that 80% of consumers won't see (single-file uploads, one or two conversions, a few hundred ms total).
 2. **Polymorphic discriminator value.** The `media` table's `model_type` column can store either the unqualified class name (`"User"`) or the fully-qualified name (`"app.models.User"`). Arvel's existing `MorphOne` / `MorphMany` use the unqualified name (ADR-066).
-3. **Default path scheme.** Spatie's default is `{media.id}/{file_name}` for originals and `{media.id}/conversions/{conv}-{file_name}` for conversions.
+3. **Default path scheme.** What URL layout does `attach_media` produce on the disk?
 
 ### Decision
 
@@ -116,9 +116,11 @@ Apps that only want the transform API still get a clean install: `from arvel_ima
 
 **3.2 Short class name as polymorphic discriminator.** `Media.model_type` stores `type(host).__name__` — the unqualified class name. Same convention as `MorphOne` / `MorphMany` per ADR-066. The trait can therefore reuse `MorphMany(Media, name="model")` directly.
 
-**3.3 Default path scheme matches Spatie verbatim.** `DefaultPathGenerator`:
+**3.3 Default path scheme: id-partitioned.** `DefaultPathGenerator`:
 - Original: `{media.id}/{file_name}`
 - Conversion: `{media.id}/conversions/{name}-{file_name}`
+
+This is the same layout the broader PHP ecosystem standardised on for polymorphic media tables, so URL handlers ported from PHP-shaped apps keep working.
 
 **3.4 `HasMedia` aliases and `HasMediaMixin` re-export.** Add `attach_media(source, *, file_name, collection)` as a one-call alias chaining `add_media().to_media_collection(collection)`. Add `delete_media(collection)` as an alias for `clear_media_collection(collection)`. Export `HasMediaMixin = HasMedia` from `arvel_image/__init__.py`.
 
@@ -128,7 +130,7 @@ Apps that only want the transform API still get a clean install: `from arvel_ima
 
 ✅ Sync conversions keep the package stand-alone — apps that don't use `arvel.queue` still get the full media-library API.
 ✅ Short-class polymorphism lets the trait reuse the existing `MorphMany` accessor.
-✅ Default path scheme matches Spatie verbatim — Laravel migrators don't have to rewrite their URL handlers.
+✅ Default path scheme is `{media.id}/...` — apps porting from PHP-shaped media tables don't have to rewrite their URL handlers.
 ✅ `attach_media` is more ergonomic — single call vs. `add_media().to_media_collection()` chain.
 ✅ `model_id: String(36)` supports UUID-PK host models without breaking integer-PK hosts.
 
