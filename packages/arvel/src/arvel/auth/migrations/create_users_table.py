@@ -24,7 +24,6 @@ async def up(schema: Schema) -> None:
         t.datetime("email_verified_at").nullable()
         t.string("password", length=255)
         t.datetime("suspended_at").nullable()
-        t.string("remember_token", length=100).nullable()
         t.soft_deletes()
         t.timestamps()
 

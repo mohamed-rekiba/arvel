@@ -1,7 +1,7 @@
-"""Eloquent-style ``ModelCollection`` — a ``Collection`` of model instances.
+"""``ModelCollection`` — a ``Collection`` of Arvent model instances.
 
-Returned by ``QueryBuilder.all()``/``get()`` for model rows. Adds the PK-aware and
-relation-aware helpers Eloquent puts on ``Eloquent\\Collection``: batch ``load``,
+Returned by ``QueryBuilder.all()``/``get()`` for model rows. Adds the PK-aware
+and relation-aware helpers that belong on a model-row collection: batch ``load``,
 ``model_keys``, key-based ``find``/``contains``/``only``/``except_``/``diff``/``intersect``,
 ``to_query``, ``fresh``, and ``make_hidden``/``make_visible``.
 """

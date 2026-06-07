@@ -114,12 +114,12 @@ The token guard authenticates a hashed personal-access token from a bearer heade
 <a name="user-providers"></a>
 ## User Providers
 
-The only built-in provider is the **database provider**, which looks users up against a model. It finds users by primary key (`by_id`) and by a username field (`by_credentials`, default `email`):
+The only built-in provider is the **arvent provider**, which looks users up against an Arvent model. It finds users by primary key (`by_id`) and by a username field (`by_credentials`, default `email`):
 
 ```python
 # config/auth.py (published by `arvel auth:install`)
 providers = {
-    "users": {"driver": "database", "model": "app.models.user.User"},
+    "users": {"driver": "arvent", "model": "app.models.user.User"},
 }
 ```
 
@@ -198,7 +198,7 @@ With [`AuthServiceProvider` registered](#registering-the-provider) and `config.r
 These are backed by `AuthService` (register/login/refresh/logout/me), `PasswordService` (forgot/reset), and `EmailVerificationService`. Access tokens are JWTs; refresh tokens are opaque, stored as SHA-256 digests in a `refresh_tokens` table and rotated on use.
 
 > [!NOTE]
-> "Remember me" is not implemented. `LoginRequest` accepts a `remember` flag and the `User` model has a `remember_token` column, but no guard or flow uses them.
+> "Remember me" is not implemented. The framework deliberately omits the `LoginRequest.remember` flag and the `users.remember_token` column until a full session-guard remember-me flow ships (token rotation, hashed storage, scoped cookies).
 
 Run `arvel auth:install` to publish the auth config, views, route stub, and migrations.
 

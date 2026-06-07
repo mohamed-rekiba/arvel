@@ -1,4 +1,4 @@
-"""DatabaseUserProvider — ORM-backed UserResolver."""
+"""ArventUserProvider — ORM-backed UserResolver."""
 
 from __future__ import annotations
 
@@ -9,10 +9,12 @@ from sqlalchemy import select
 from arvel.database.session import get_active_session
 
 
-class DatabaseUserProvider:
-    """Resolves users from an ORM Model class.
+class ArventUserProvider:
+    """Resolves users from an Arvent model class.
 
-    Resolves users from the database.
+    Arvent is Arvel's ORM (the Eloquent-equivalent layer on top of SQLAlchemy).
+    This provider resolves whichever `Model` subclass the app configures as the
+    user model.
     """
 
     def __init__(

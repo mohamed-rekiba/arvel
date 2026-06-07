@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from arvel.auth.config import AuthConfig, GuardConfig, ProviderConfig
 from arvel.auth.exceptions import AuthConfigError
@@ -14,7 +14,8 @@ from arvel.auth.guards.jwt import JwtGuard
 from arvel.auth.guards.session import SessionGuard
 from arvel.auth.guards.token import TokenGuard
 from arvel.auth.manager import AuthManager
-from arvel.auth.providers.database import DatabaseUserProvider
+from arvel.auth.providers.arvent import ArventUserProvider
+from arvel.console._subsystem import CliSubsystem
 from arvel.providers.service_provider import ServiceProvider
 
 _MIN_JWT_SECRET_LENGTH = 32
@@ -35,14 +36,17 @@ def _import_class(dotted: str) -> type[Any]:
 
 
 def _users_provider(config: AuthConfig) -> ProviderConfig | None:
-    """Return the first provider config with driver ``eloquent`` or ``database``."""
+    """Return the first Arvent-backed provider config, or None."""
     for p in config.providers.values():
-        if p.driver in ("eloquent", "database"):
+        if p.driver == "arvent":
             return p
     return None
 
 
 class AuthServiceProvider(ServiceProvider):
+    # Closure pulls in DATABASE automatically (the Arvent provider needs it).
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.AUTH
+
     def commands(self) -> list[Any]:
         from arvel.auth.commands import AuthInstallCommand  # noqa: PLC0415
 
@@ -391,10 +395,10 @@ class AuthServiceProvider(ServiceProvider):
             msg = f"Auth provider '{provider_name}' is not configured."
             raise AuthConfigError(msg)
 
-        if provider_cfg.driver == "database":
+        if provider_cfg.driver == "arvent":
             parts = provider_cfg.model.rsplit(".", 1)
             mod = importlib.import_module(parts[0])
             model_class = getattr(mod, parts[1])
-            return DatabaseUserProvider(model=model_class)
-        msg = f"Unknown auth provider driver: '{provider_cfg.driver}'."
+            return ArventUserProvider(model=model_class)
+        msg = f"Unknown auth provider driver: '{provider_cfg.driver}'. Valid drivers: 'arvent'."
         raise AuthConfigError(msg)

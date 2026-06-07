@@ -9,6 +9,7 @@ from typing import Annotated, ClassVar
 import typer
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.support.publishing import PublishRegistry, rewrite_migration_filename
 
@@ -25,7 +26,11 @@ class AuthInstallCommand(Command):
 
     name: ClassVar[str] = "auth:install"
     help: ClassVar[str] = "Publish auth scaffolding (config, views, routes, migrations)"
-    needs_application: ClassVar[bool] = True
+    # AuthServiceProvider registers its publishables in boot(); user-provider
+    # boot is required to populate the PublishRegistry.
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.AUTH, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

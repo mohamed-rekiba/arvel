@@ -1,5 +1,5 @@
 """
-DatabaseUserProvider + Authenticatable + HasApiTokens mixins.
+ArventUserProvider + Authenticatable + HasApiTokens mixins.
 """
 
 from __future__ import annotations
@@ -31,12 +31,12 @@ class _UserC(Model):
     password_hash: str = string(255)
 
 
-# DatabaseUserProvider.by_id
+# ArventUserProvider.by_id
 
 
 @pytest.mark.asyncio
-async def test_database_provider_by_id_returns_model_instance(engine: Any, session: Any) -> None:
-    from arvel.auth.providers.database import DatabaseUserProvider
+async def test_arvent_provider_by_id_returns_model_instance(engine: Any, session: Any) -> None:
+    from arvel.auth.providers.arvent import ArventUserProvider
 
     async with engine.begin() as conn:
         await conn.run_sync(_UserA.metadata.create_all)
@@ -45,32 +45,30 @@ async def test_database_provider_by_id_returns_model_instance(engine: Any, sessi
     session.add(u)
     await session.flush()
 
-    provider = DatabaseUserProvider(model=_UserA)
+    provider = ArventUserProvider(model=_UserA)
     found = await provider.by_id(str(u.id))
     assert found is not None
     assert found.email == "a@example.com"
 
 
 @pytest.mark.asyncio
-async def test_database_provider_by_id_returns_none_for_missing_id(
-    engine: Any, session: Any
-) -> None:
-    from arvel.auth.providers.database import DatabaseUserProvider
+async def test_arvent_provider_by_id_returns_none_for_missing_id(engine: Any, session: Any) -> None:
+    from arvel.auth.providers.arvent import ArventUserProvider
 
     async with engine.begin() as conn:
         await conn.run_sync(_UserB.metadata.create_all)
 
-    provider = DatabaseUserProvider(model=_UserB)
+    provider = ArventUserProvider(model=_UserB)
     result = await provider.by_id("99999")
     assert result is None
 
 
-# DatabaseUserProvider.by_credentials
+# ArventUserProvider.by_credentials
 
 
 @pytest.mark.asyncio
-async def test_database_provider_by_credentials_finds_by_email(engine: Any, session: Any) -> None:
-    from arvel.auth.providers.database import DatabaseUserProvider
+async def test_arvent_provider_by_credentials_finds_by_email(engine: Any, session: Any) -> None:
+    from arvel.auth.providers.arvent import ArventUserProvider
 
     async with engine.begin() as conn:
         await conn.run_sync(_UserC.metadata.create_all)
@@ -79,7 +77,7 @@ async def test_database_provider_by_credentials_finds_by_email(engine: Any, sess
     session.add(u)
     await session.flush()
 
-    provider = DatabaseUserProvider(model=_UserC, username_field="email")
+    provider = ArventUserProvider(model=_UserC, username_field="email")
     found = await provider.by_credentials({"email": "b@example.com"})
     assert found is not None
     assert found.email == "b@example.com"

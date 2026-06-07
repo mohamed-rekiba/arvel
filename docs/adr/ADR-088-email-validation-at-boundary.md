@@ -3,7 +3,7 @@
 **Status**: Accepted
 **Date**: 2026-05-20
 **Supersedes**: —
-**Related**: ADR-021 (Eloquent-on-SQLA mixin), ADR-056 (`PydanticType` for value-object columns), ADR-022 (`MappedAsDataclass` for typed `__init__`)
+**Related**: ADR-021 (Arvent-on-SQLA mixin), ADR-056 (`PydanticType` for value-object columns), ADR-022 (`MappedAsDataclass` for typed `__init__`)
 
 ## Context
 

@@ -1,10 +1,10 @@
-# ADR-028: Eloquent-style ModelCollection
+# ADR-028: ModelCollection for Arvent model result sets
 
 Status: Accepted (delivered WI-arvel-037)
 
 Epic 006 Story 8. `QueryBuilder.all()`/`get()` now return a `ModelCollection` — a
-`Collection` subclass with the PK- and relation-aware helpers Eloquent puts on its
-`Eloquent\Collection`.
+`Collection` subclass with the PK- and relation-aware helpers Arvent needs for
+model rows (the same helpers Laravel ships on `Eloquent\Collection`).
 
 ## Context
 

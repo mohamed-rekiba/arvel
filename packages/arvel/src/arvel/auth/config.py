@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -11,6 +13,8 @@ class GuardConfig(BaseModel):
 
 
 class ProviderConfig(BaseModel):
+    VALID_DRIVERS: ClassVar[frozenset[str]] = frozenset({"arvent"})
+
     driver: str
     model: str
     """Dotted import path to the User model, e.g. ``app.models.user.User``."""
@@ -23,6 +27,15 @@ class ProviderConfig(BaseModel):
 
     Defaults to ``arvel.auth.http.resources.UserResource``.
     """
+
+    @field_validator("driver")
+    @classmethod
+    def driver_must_be_valid(cls, v: str) -> str:
+        if v not in cls.VALID_DRIVERS:
+            valid = ", ".join(sorted(cls.VALID_DRIVERS))
+            msg = f"Auth provider driver '{v}' is not supported. Valid drivers: {valid}."
+            raise ValueError(msg)
+        return v
 
 
 class HashConfig(BaseModel):

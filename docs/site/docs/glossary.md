@@ -11,7 +11,7 @@ Recurring terms in Arvel and these docs.
 | **Binding / resolve** | "Bind" registers how to build a type; "resolve" (`make` / `amake`) produces an instance. |
 | **Scope** | A binding's lifetime: singleton (one per app), scoped (one per request), or transient (new each time). |
 | **ASGI** | Asynchronous Server Gateway Interface — the Python async web server contract. Arvel produces an ASGI app you serve with uvicorn. |
-| **Arvent** | Arvel's Eloquent-style ORM: active-record models on top of SQLAlchemy. See [models](orm/models.md). |
+| **Arvent** | Arvel's ORM — active-record models on top of SQLAlchemy. See [models](orm/models.md). |
 | **Model** | An Arvent class mapped to a table, with CRUD, relationships, and a query builder. |
 | **Query builder** | The fluent API (`where`, `order_by`, `get`, …) for building SQL without writing it. See [query builder](orm/query-builder.md). |
 | **Migration** | A versioned schema change, written with the `Schema`/`Blueprint` DSL. See [migrations](orm/migrations.md). |

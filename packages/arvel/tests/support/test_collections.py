@@ -1,4 +1,4 @@
-"""``Collection[T]`` — the single canonical Eloquent-style collection.
+"""``Collection[T]`` — the single canonical Arvent collection.
 
 every behavioural surface of ``arvel.support.Collection``. The database
 layer re-exports the same class; integration wiring is asserted in

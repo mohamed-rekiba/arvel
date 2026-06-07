@@ -14,11 +14,9 @@ class User(Model):
     id: int = id_()
     name: str = string(255)
     age: int | None = integer(nullable=True, default=None)
-```
 
-The 2026-05-31 design pass (`docs/plans/2026-05-31-clean-model-syntax-design.md`) targeted the SQLModel-shaped look, where the Python type drives the column and a helper is only needed for what a type can't express:
+# OR
 
-```python
 class User(Model):
     id: int | None = field(default=None, primary_key=True)
     name: str
@@ -78,7 +76,3 @@ Three changes, all in `arvel/database` (implemented in commit `ea0eccc`):
 
 - `packages/arvel/tests/database/test_clean_model_syntax.py` exercises each form (column type, nullability, default, PK, FK, unique, index, `__init__` signature, round-trip persistence) and doubles as the mypy/pyright strict sample.
 - The architecture guard `test_arvel_model_module_has_no_untyped_mapped_columns` keeps inference routed through `_inferred_column(...)` rather than a literal `mapped_column(` in the model body.
-
-## Status & Next Step
-
-Implemented in commit `ea0eccc`. All framework, package, and demo models plus test fixtures are converted to the clean form. See `docs/plans/2026-05-31-clean-model-syntax-design.md` for the full plan and test strategy.

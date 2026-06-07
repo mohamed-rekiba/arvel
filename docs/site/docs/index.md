@@ -106,7 +106,7 @@ No magic strings, no untyped dicts. A route is an `async def`, a model is a type
     flights = await Flight.all()
     ```
 
-    Arvent is an Eloquent-shaped active-record ORM on top of SQLAlchemy's async engine — relationships, casts, scopes, and a fluent query builder included.
+    Arvent is Arvel's active-record ORM on top of SQLAlchemy's async engine — relationships, casts, scopes, and a fluent query builder included.
 
 === "Validate"
 

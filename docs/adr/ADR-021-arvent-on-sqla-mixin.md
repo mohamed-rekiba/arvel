@@ -1,4 +1,4 @@
-# ADR-021 — Eloquent layer is a mixin on SQLAlchemy, not a fork
+# ADR-021 — Arvent is a mixin on SQLAlchemy, not a fork
 
 **Status**: Accepted
 **Date**: 2026-05-17
@@ -15,7 +15,7 @@ were considered:
 |---|---|---|
 | A. Custom ORM (Masonite-style) | Total control over DX | Years of work to match SQLA's edge cases (identity map, unit of work, autoflush, polymorphic loading, etc.) |
 | B. Light wrapper around SQLA Core (Uvicore-style) | Type-safe; less magic | Loses ActiveRecord ergonomics; falls back to data-mapper everywhere |
-| C. **Mixin on SQLA 2.0 `DeclarativeBase`** | Eloquent DX for free + SQLA's maturity; no schema fork | Some Eloquent idioms (lazy-load-by-default) don't translate — we steer users toward eager-loading instead |
+| C. **Mixin on SQLA 2.0 `DeclarativeBase`** | Eloquent-grade DX for free + SQLA's maturity; no schema fork | Some Laravel idioms (lazy-load-by-default) don't translate — we steer users toward eager-loading instead |
 
 ## Decision
 

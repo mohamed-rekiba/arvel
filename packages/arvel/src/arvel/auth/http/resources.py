@@ -29,8 +29,8 @@ class UserResource(BaseModel):
 
     ``model_config`` uses ``from_attributes=True`` so ``model_validate(user_orm_row)``
     works without an explicit ``model_dump()`` call on the ORM instance.
-    Sensitive fields (``password``, ``remember_token``) are never declared
-    here — they're absent by construction.
+    Sensitive fields (``password``) are never declared here — they're absent
+    by construction.
     """
 
     model_config = ConfigDict(from_attributes=True, frozen=True, extra="ignore")

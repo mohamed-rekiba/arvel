@@ -1,6 +1,6 @@
 # Relationships
 
-Arvent supports the full Eloquent relation set. Internally there are two declaration styles and three eager-load strategies. This page is about the mechanics — how relations are discovered, how they build queries, and how eager loading avoids N+1. For the public API, see the user guide.
+Arvent supports the full Laravel-Eloquent relation set. Internally there are two declaration styles and three eager-load strategies. This page is about the mechanics — how relations are discovered, how they build queries, and how eager loading avoids N+1. For the public API, see the user guide.
 
 **Source**: `packages/arvel/src/arvel/database/orm/` (`relations.py`, `belongs_to_many.py`, `morph.py`, `morph_to_many.py`, `morph_map.py`, `_eager.py`), `tree.py`, and the discovery in `query.py`.
 

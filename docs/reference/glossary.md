@@ -18,7 +18,7 @@ One term per concept, as used throughout these docs.
 | **Manager** | A driver factory for a subsystem (`CacheManager`, `QueueManager`, …). Selects a driver from config and caches it. |
 | **Driver / store / disk / engine** | A concrete backend implementing a subsystem's `Protocol` (e.g. cache store, storage disk, search engine). |
 | **Model** | Arvent ORM base — SQLAlchemy `DeclarativeBase` + `MappedAsDataclass` + `ActiveRecord` + the `ModelMeta` metaclass for clean syntax. |
-| **ActiveRecord** | The Eloquent-style CRUD/query surface mixed into `Model`. |
+| **ActiveRecord** | Arvent's CRUD/query surface mixed into `Model`. |
 | **QueryBuilder** | Immutable, fluent builder producing a SQLAlchemy `Select`; runs against the active-session `ContextVar`. |
 | **Blueprint / Schema** | The migration DSL. `Schema.create/table` drives a `Blueprint` that emits Alembic ops. |
 | **Migrator** | Runs `async def up/down` migrations over the Alembic `op` proxy. |

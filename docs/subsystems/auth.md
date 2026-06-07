@@ -56,7 +56,7 @@ class Guard(ABC):
 | `JwtGuard` | `Authorization: Bearer` JWT → `sub` claim → resolver | no |
 | `TokenGuard` | bearer personal access token → SHA-256 → DB | no — `can(ability)` against token abilities |
 
-Guards look users up through a `UserResolver` (`by_id`, `by_credentials`); the built-in `DatabaseUserProvider` resolves against a model. The HTTP `Authenticate` middleware drives a guard and sets `request.state.user` — see [middleware](../http/middleware.md).
+Guards look users up through a `UserResolver` (`by_id`, `by_credentials`); the built-in `ArventUserProvider` (driver `"arvent"`) resolves against an Arvent model. The HTTP `Authenticate` middleware drives a guard and sets `request.state.user` — see [middleware](../http/middleware.md).
 
 > **Note**: `TokenGuard` doesn't inherit the `Guard` ABC (no `login`/`logout`) but is still stored in the manager's guard map.
 

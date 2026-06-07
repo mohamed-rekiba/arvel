@@ -2,7 +2,7 @@
 
 Backs the ``refresh_tokens`` table (see
 ``arvel/auth/migrations/create_refresh_tokens_table.py``). Brokers call the
-model directly — no repository, no raw SQL. Standard Eloquent flow:
+model directly — no repository, no raw SQL. Standard Arvent flow:
 
     plain = generate_refresh_token()
     await RefreshToken.create(

@@ -1604,9 +1604,9 @@ class Model(
     Combines SQLAlchemy ``DeclarativeBase`` with ``MappedAsDataclass``
     (``kw_only=True``) so every concrete subclass gets a typed, keyword-only
     ``__init__`` derived from its ``Mapped[T]`` column annotations. The
-    :class:`ActiveRecord` mixin provides the Eloquent-style class and instance
-    API. The :class:`ModelMeta` metaclass forwards unknown class-level
-    attribute lookups to ``cls.query()``.
+    :class:`ActiveRecord` mixin provides Arvent's class and instance API.
+    The :class:`ModelMeta` metaclass forwards unknown class-level attribute
+    lookups to ``cls.query()``.
 
     Rules for model authors:
     - Annotate columns with the plain Python type: ``name: str = string(100)``,
