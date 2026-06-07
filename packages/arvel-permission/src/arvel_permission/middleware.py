@@ -34,6 +34,12 @@ def _split(value: str) -> list[str]:
     return [p.strip() for p in value.split("|")]
 
 
+def _current_user(request: Any) -> Any | None:
+    # Arvel attaches the authenticated user to request.state.user (see
+    # OptionalAuthenticate / CanMiddleware) — not Starlette's request.user.
+    return getattr(getattr(request, "state", None), "user", None)
+
+
 async def _any(
     check: Callable[..., Awaitable[bool]],
     values: list[str],
@@ -57,12 +63,12 @@ class RoleMiddleware:
         self._roles = _split(role)
         self._guard = guard
 
-    async def __call__(
+    async def handle(
         self,
         request: Any,
         call_next: Callable[..., Awaitable[Any]],
     ) -> Any:
-        user = getattr(request, "user", None)
+        user = _current_user(request)
         if user is None:
             raise UnauthorizedException(status_code=401)
         check = getattr(user, "has_role", None)
@@ -82,12 +88,12 @@ class PermissionMiddleware:
         self._permissions = _split(permission)
         self._guard = guard
 
-    async def __call__(
+    async def handle(
         self,
         request: Any,
         call_next: Callable[..., Awaitable[Any]],
     ) -> Any:
-        user = getattr(request, "user", None)
+        user = _current_user(request)
         if user is None:
             raise UnauthorizedException(status_code=401)
         check = getattr(user, "has_permission_to", None)
@@ -106,12 +112,12 @@ class RoleOrPermissionMiddleware:
         self._values = _split(role_or_permission)
         self._guard = guard
 
-    async def __call__(
+    async def handle(
         self,
         request: Any,
         call_next: Callable[..., Awaitable[Any]],
     ) -> Any:
-        user = getattr(request, "user", None)
+        user = _current_user(request)
         if user is None:
             raise UnauthorizedException(status_code=401)
         has_role = getattr(user, "has_role", None)

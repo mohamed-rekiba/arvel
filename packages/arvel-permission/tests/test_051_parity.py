@@ -135,12 +135,15 @@ async def test_role_middleware_forwards_guard_to_has_role() -> None:
             captured["guard"] = guard
             return False
 
-    class _Request:
+    class _State:
         user = _User()
+
+    class _Request:
+        state = _State()
 
     mw = RoleMiddleware("admin", guard="api")
     with pytest.raises(UnauthorizedException):
-        await mw(_Request(), call_next=_passthrough)
+        await mw.handle(_Request(), call_next=_passthrough)
     assert captured["guard"] == "api"
 
 
@@ -156,12 +159,15 @@ async def test_permission_middleware_forwards_guard() -> None:
             captured["guard"] = guard
             return False
 
-    class _Request:
+    class _State:
         user = _User()
+
+    class _Request:
+        state = _State()
 
     mw = PermissionMiddleware("edit", guard="api")
     with pytest.raises(UnauthorizedException):
-        await mw(_Request(), call_next=_passthrough)
+        await mw.handle(_Request(), call_next=_passthrough)
     assert captured["guard"] == "api"
 
 
@@ -182,11 +188,14 @@ async def test_role_middleware_pipe_or_grants_on_second_match() -> None:
         sentinel.append("ok")
         return "ok"
 
-    class _Request:
+    class _State:
         user = _User()
 
+    class _Request:
+        state = _State()
+
     mw = RoleMiddleware("admin|manager")
-    await mw(_Request(), call_next=_next)
+    await mw.handle(_Request(), call_next=_next)
     assert sentinel
 
 
@@ -204,11 +213,14 @@ async def test_permission_middleware_pipe_or_grants_on_first_match() -> None:
         sentinel.append("ok")
         return "ok"
 
-    class _Request:
+    class _State:
         user = _User()
 
+    class _Request:
+        state = _State()
+
     mw = PermissionMiddleware("publish|edit")
-    await mw(_Request(), call_next=_next)
+    await mw.handle(_Request(), call_next=_next)
     assert sentinel
 
 
@@ -221,12 +233,15 @@ async def test_role_middleware_pipe_or_denies_when_none_match() -> None:
         async def has_role(self, role: str, *, guard: str | None = None) -> bool:
             return False
 
-    class _Request:
+    class _State:
         user = _User()
+
+    class _Request:
+        state = _State()
 
     mw = RoleMiddleware("admin|manager")
     with pytest.raises(UnauthorizedException) as exc_info:
-        await mw(_Request(), call_next=_passthrough)
+        await mw.handle(_Request(), call_next=_passthrough)
     assert exc_info.value.status_code == 403
 
 
@@ -330,12 +345,15 @@ async def test_role_middleware_raises_unauthorized_on_deny() -> None:
         async def has_role(self, role: str, *, guard: str | None = None) -> bool:
             return False
 
-    class _Request:
+    class _State:
         user = _User()
+
+    class _Request:
+        state = _State()
 
     mw = RoleMiddleware("admin")
     with pytest.raises(UnauthorizedException):
-        await mw(_Request(), call_next=_passthrough)
+        await mw.handle(_Request(), call_next=_passthrough)
 
 
 @pytest.mark.asyncio
@@ -347,12 +365,15 @@ async def test_permission_middleware_raises_unauthorized_on_deny() -> None:
         async def has_permission_to(self, perm: str, *, guard: str | None = None) -> bool:
             return False
 
-    class _Request:
+    class _State:
         user = _User()
+
+    class _Request:
+        state = _State()
 
     mw = PermissionMiddleware("edit")
     with pytest.raises(UnauthorizedException):
-        await mw(_Request(), call_next=_passthrough)
+        await mw.handle(_Request(), call_next=_passthrough)
 
 
 @pytest.mark.asyncio
@@ -360,12 +381,15 @@ async def test_no_user_raises_unauthorized_with_401() -> None:
     from arvel_permission.exceptions import UnauthorizedException
     from arvel_permission.middleware import RoleMiddleware
 
-    class _Request:
+    class _State:
         user = None
+
+    class _Request:
+        state = _State()
 
     mw = RoleMiddleware("admin")
     with pytest.raises(UnauthorizedException) as exc_info:
-        await mw(_Request(), call_next=_passthrough)
+        await mw.handle(_Request(), call_next=_passthrough)
     assert exc_info.value.status_code == 401
 
 
