@@ -16,7 +16,7 @@ flowchart LR
     Conn --> DDL["DDL on the database"]
 ```
 
-The design rule (per ADR-044): the DSL **never** produces raw SQL. Each `Blueprint` collects `Column` and constraint objects, then hands them to Alembic via `op.create_table` / `op.add_column`.
+The design rule (per ADR-006 § 1): the DSL **never** produces raw SQL. Each `Blueprint` collects `Column` and constraint objects, then hands them to Alembic via `op.create_table` / `op.add_column`.
 
 ## The `Schema` facade
 

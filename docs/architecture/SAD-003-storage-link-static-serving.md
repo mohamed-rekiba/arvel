@@ -2,7 +2,7 @@
 
 **WI**: WI-arvel-003
 **Status**: Accepted
-**Related**: ADR-134 (this decision), ADR-080 (serve=true route)
+**Related**: ADR-022 (this decision), ADR-009 § 4 (serve=true route)
 
 ## Overview
 

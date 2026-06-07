@@ -6,7 +6,7 @@
 
 **Status**: Approved.
 
-> **Adapted artifact.** The schema's `planning-sa` stage canonically produces a full SAD with system design, technology choices, threat model, and OpenAPI spec. The two WIs this document subsumes were both polish/hardening passes on an existing Python library — no greenfield architecture, no OpenAPI (arvel-image is a library, not an HTTP API), no schema changes (beyond the additive `model_id` widening recorded in ADR-132 § 3.5). What this document covers: every architectural decision the package's two 1.x WIs depended on, plus what *doesn't* change.
+> **Adapted artifact.** The schema's `planning-sa` stage canonically produces a full SAD with system design, technology choices, threat model, and OpenAPI spec. The two WIs this document subsumes were both polish/hardening passes on an existing Python library — no greenfield architecture, no OpenAPI (arvel-image is a library, not an HTTP API), no schema changes (beyond the additive `model_id` widening recorded in ADR-020 § 3.5). What this document covers: every architectural decision the package's two 1.x WIs depended on, plus what *doesn't* change.
 
 ---
 
@@ -15,18 +15,18 @@
 | Concern | Status | Why |
 |---|---|---|
 | Public package layout (`arvel_image.*`, `arvel_image.media.*`) | Unchanged | WI-arvel-001 renames affected privacy (`_` prefix) and `__all__` membership, not module structure |
-| `Media` SQLAlchemy model | Unchanged | Polymorphic `media` table stays as-is; no columns added or dropped (the `model_id` type was widened in ADR-132 § 3.5 before 1.0 and is stable since) |
+| `Media` SQLAlchemy model | Unchanged | Polymorphic `media` table stays as-is; no columns added or dropped (the `model_id` type was widened in ADR-020 § 3.5 before 1.0 and is stable since) |
 | `HasMedia` mixin's contract | Unchanged in shape | `add_image`, `get_media`, `first_media`, `last_media`, `image_url`, `media_in`, `clear_*`, `to_dict` keep their signatures |
 | Service provider boot | Unchanged | `ImageServiceProvider` keeps the same register/boot/shutdown contract |
 | Persistence model | Unchanged | Still polymorphic morph-id-as-string, eager-loaded via `.with_("media")` / `.load("media")` |
 | Pillow integration | Unchanged | `Image` fluent API and `ConversionRunner` worker-thread offload model stay |
-| DB schema | Unchanged in WI-arvel-001 and WI-arvel-002 | See `WI-arvel-001-no-schema-change.md`, `WI-arvel-002-no-schema-change.md`. The 1.0-era `model_id` widening is recorded in ADR-132 § 3.5. |
+| DB schema | Unchanged in WI-arvel-001 and WI-arvel-002 | See `WI-arvel-001-no-schema-change.md`, `WI-arvel-002-no-schema-change.md`. The 1.0-era `model_id` widening is recorded in ADR-020 § 3.5. |
 
 ---
 
 ## Part A — WI-arvel-001 1.0 polish pass
 
-Three decisions drove the polish epic's structural changes. Each is recorded in ADR-132 (sections 5, 6, 7).
+Three decisions drove the polish epic's structural changes. Each is recorded in ADR-020 (sections 5, 6, 7).
 
 ### A.1 — Public-API rename approach
 
@@ -34,7 +34,7 @@ Three decisions drove the polish epic's structural changes. Each is recorded in 
 
 **Approach.** Rename internal symbols with a leading `_` and remove from `__all__`. Cross-package callers (kit, tests) update accordingly. No deprecation shim — `no-backward-compatibility.mdc` permits direct rename.
 
-**Mechanism.** Story 2 in the WI-arvel-001 backlog. Cataloged in **ADR-132 § 5**.
+**Mechanism.** Story 2 in the WI-arvel-001 backlog. Cataloged in **ADR-020 § 5**.
 
 ### A.2 — MRO guard on `HasMedia`
 
@@ -42,7 +42,7 @@ Three decisions drove the polish epic's structural changes. Each is recorded in 
 
 **Approach.** `HasMedia.__init_subclass__` validates MRO at class definition time, raises `TypeError` with class name + correct order when violated.
 
-**Mechanism.** Story 5. Cataloged in **ADR-132 § 6**.
+**Mechanism.** Story 5. Cataloged in **ADR-020 § 6**.
 
 ### A.3 — SSRF guard scope tightening
 
@@ -50,7 +50,7 @@ Three decisions drove the polish epic's structural changes. Each is recorded in 
 
 **Approach.** Close the DNS-rebinding window by overriding `Host:` and SNI to the validated IP. Add a Pillow-based MIME sniff cross-check before accepting a URL-sourced byte stream into a MIME-restricted collection.
 
-**Mechanism.** Stories 7 + 8. Cataloged in **ADR-132 § 7** (which refines the original SSRF guard recorded in **ADR-132 § 4**).
+**Mechanism.** Stories 7 + 8. Cataloged in **ADR-020 § 7** (which refines the original SSRF guard recorded in **ADR-020 § 4**).
 
 ### Threat model delta (WI-arvel-001)
 
@@ -82,7 +82,7 @@ Two architecture-touching decisions from the post-1.0 hardening bundle. Stories 
 
 **Decision**: **Option C** (copy-paste). Promote to Option A if a third caller appears. Per `001-no-overengineering.mdc`'s Rule of Three — one current caller (the kit) plus one new caller (arvel-image tests) is **two**. Bounded duplication, benign drift mode, trivially reversible.
 
-→ Cataloged in **ADR-132 § 8**.
+→ Cataloged in **ADR-020 § 8**.
 
 ### B.2 — `aiohttp` CVE pin scope (Story 4)
 
@@ -98,7 +98,7 @@ Two architecture-touching decisions from the post-1.0 hardening bundle. Stories 
 
 **Decision**: **Option B**. Owner identified via `uv tree | rg aiohttp -B 5` as the `arvel` core package (`queue` + `s3` extras). Pin lives in `packages/arvel/pyproject.toml`.
 
-→ Cataloged in **ADR-132 § 9**.
+→ Cataloged in **ADR-020 § 9**.
 
 ### B.3 — `requires_emulator` marker scope (Story 3)
 

@@ -122,7 +122,7 @@ flowchart LR
 - `RedisBroadcaster` publishes to `arvel.broadcasting.*`; Reverb's `RedisBus` listens on `arvel.reverb.broadcast`. They're **different channels** and not bridged in framework code. For cross-process fan-out you wire `RedisBus` (or publish to the channel Reverb subscribes to) yourself.
 - `BroadcastServiceProvider` is not a baseline provider — add it to `bootstrap/providers.py`. It binds the manager and facade and ships the `reverb:start` command.
 
-> `TODO/QUESTION:` ADR-108 describes Reverb subscribing to `arvel.broadcasting.*`, but the code uses a separate `arvel.reverb.broadcast` channel via `RedisBus`. Which is the intended contract?
+> `TODO/QUESTION:` ADR-013 § 4 describes Reverb subscribing to `arvel.broadcasting.*`, but the code uses a separate `arvel.reverb.broadcast` channel via `RedisBus`. Which is the intended contract?
 
 ## See also
 
