@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.1...arvel-ecommerce-kit-v1.7.2) (2026-06-07)
+
+
+### Refactors
+
+* **ecommerce-kit:** move .env.example and pyproject into backend ([0e8c137](https://github.com/mohamed-rekiba/arvel/commit/0e8c1375b8fd7dd96cdf9fab7613a117366de843))
+
 ## [1.7.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.0...arvel-ecommerce-kit-v1.7.1) (2026-06-07)
 
 

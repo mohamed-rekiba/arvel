@@ -5,5 +5,5 @@
   "packages/arvel-oauth": "0.6.1",
   "packages/arvel-search": "0.6.0",
   "packages/arvel-audit": "0.6.1",
-  "kits/arvel-ecommerce-kit": "1.7.1"
+  "kits/arvel-ecommerce-kit": "1.7.2"
 }
