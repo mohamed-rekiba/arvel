@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
+
+_MIN_JWT_SECRET_LENGTH = 32
 
 
 class GuardConfig(BaseModel):
@@ -46,11 +48,26 @@ class HashConfig(BaseModel):
 class JwtConfig(BaseModel):
     """JWT access-token settings."""
 
-    secret: str = Field(default="", min_length=32)
+    secret: str = ""
     algorithm: str = "HS256"
     ttl_seconds: int = 900
     issuer: str = ""
     audience: str = ""
+
+    @field_validator("secret")
+    @classmethod
+    def secret_long_enough(cls, v: str) -> str:
+        # Default-empty (no jwt config at all) skips this — Pydantic doesn't
+        # validate defaults — so AuthServiceProvider can raise its own boot
+        # error. An explicit short/empty secret in config/auth.py lands here.
+        if len(v) < _MIN_JWT_SECRET_LENGTH:
+            msg = (
+                f"jwt.secret must be at least {_MIN_JWT_SECRET_LENGTH} characters. "
+                "Set APP_KEY (or JWT_SECRET) in your .env and make sure it's loaded; "
+                "generate one with `arvel key:generate`."
+            )
+            raise ValueError(msg)
+        return v
 
 
 class RefreshConfig(BaseModel):
