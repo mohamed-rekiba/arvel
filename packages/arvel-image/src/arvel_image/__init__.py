@@ -28,7 +28,7 @@ Then add :class:`HasMedia` to a model::
 
 from __future__ import annotations
 
-from arvel_image.image import Image, UnsupportedFormatError
+from arvel_image.image import Image, UnsupportedFormatError, set_max_pixels
 from arvel_image.media import (
     CollectionConfig,
     Conversion,
@@ -92,5 +92,6 @@ __all__ = [
     "get_conversion_runner",
     "get_path_generator",
     "set_conversion_runner",
+    "set_max_pixels",
     "set_path_generator",
 ]

@@ -283,3 +283,39 @@ async def test_vendor_publish_emits_timestamped_media_migration(tmp_path: Path) 
     assert '__tablename__ = "media"' in body
     assert 't.morphs("model")' in body
     assert "schema.create(__tablename__," in body
+
+
+def test_decompression_bomb_guard_enabled_by_default() -> None:
+    """Importing arvel-image pins Pillow's bomb ceiling to ~178 MP."""
+    from PIL import Image as PILImage
+
+    assert PILImage.MAX_IMAGE_PIXELS == 178_956_970
+
+
+def test_set_max_pixels_rejects_oversized_decode() -> None:
+    """A tightened ceiling makes oversized images fail to decode."""
+    from arvel_image import Image, set_max_pixels
+    from PIL import Image as PILImage
+
+    buf = io.BytesIO()
+    PILImage.new("RGB", (64, 64), (0, 0, 0)).save(buf, format="PNG")  # 4096 px
+    data = buf.getvalue()
+
+    try:
+        set_max_pixels(100)  # 64*64 = 4096 > 2*100 -> raises on open
+        with pytest.raises(PILImage.DecompressionBombError):
+            Image.load(data).to_bytes()
+    finally:
+        set_max_pixels(178_956_970)
+
+
+def test_set_max_pixels_none_disables_guard() -> None:
+    """``None`` turns the ceiling off (Pillow semantics)."""
+    from arvel_image import set_max_pixels
+    from PIL import Image as PILImage
+
+    try:
+        set_max_pixels(None)
+        assert PILImage.MAX_IMAGE_PIXELS is None
+    finally:
+        set_max_pixels(178_956_970)
