@@ -1,14 +1,14 @@
 """schedule:work + schedule:list CLI commands.
 
-Both commands need the user's :class:`arvel.scheduling.Schedule` — the one
-populated by ``app/console/kernel.py::Kernel.schedule`` — and a working
-:class:`arvel.scheduling.SchedulerKernel`. They opt into framework DI
-(``needs_application = True``) so the entrypoint bootstraps the framework
-:class:`arvel.application.Application` before dispatch and binds it to
-``self.app``. The handle methods then resolve ``Schedule`` and
-``SchedulerKernel`` from the container; if the user has not registered either,
-the command exits with a clear "no scheduler bound" error rather than silently
-building an empty schedule.
+Both commands need the user's :class:`arvel.scheduling.Schedule` (populated by
+``app/console/kernel.py::Kernel.schedule``) and a working
+:class:`arvel.scheduling.SchedulerKernel`. They declare
+``requires = {SCHEDULER, USER_PROVIDERS}`` so the entrypoint boots the
+scheduler subsystem and the user's providers, then binds the resulting
+``Application`` to ``self.app``. The handle methods resolve ``Schedule`` and
+``SchedulerKernel`` from the container; if the user has not registered
+either, the command exits with a clear "no scheduler bound" error rather than
+silently building an empty schedule.
 """
 
 from __future__ import annotations
@@ -20,18 +20,24 @@ import typer
 
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 
 if TYPE_CHECKING:
     from arvel.scheduling import Schedule, SchedulerKernel
 
 
+_SCHEDULER_BIND_MSG = (
+    "schedule command requires a bound framework Application "
+    "(add CliSubsystem.SCHEDULER to requires)"
+)
+
+
 def _resolve_schedule(cmd: Command) -> Schedule:
     from arvel.scheduling import Schedule
 
     if cmd.app is None:
-        msg = "schedule command requires a bound framework Application (needs_application=True)"
-        raise RuntimeError(msg)
+        raise RuntimeError(_SCHEDULER_BIND_MSG)
     return cmd.app.container.make(Schedule)
 
 
@@ -39,15 +45,16 @@ def resolve_kernel(cmd: Command) -> SchedulerKernel:
     from arvel.scheduling import SchedulerKernel
 
     if cmd.app is None:
-        msg = "schedule command requires a bound framework Application (needs_application=True)"
-        raise RuntimeError(msg)
+        raise RuntimeError(_SCHEDULER_BIND_MSG)
     return cmd.app.container.make(SchedulerKernel)
 
 
 class ScheduleWorkCommand(Command):
     name: ClassVar[str] = "schedule:work"
     help: ClassVar[str] = "Run the scheduler dispatch loop (foreground)."
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.SCHEDULER, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self
@@ -80,7 +87,9 @@ class ScheduleWorkCommand(Command):
 class ScheduleListCommand(Command):
     name: ClassVar[str] = "schedule:list"
     help: ClassVar[str] = "List registered scheduled tasks."
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.SCHEDULER, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

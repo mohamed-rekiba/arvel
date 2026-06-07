@@ -375,9 +375,9 @@ class TestReplLoopLifecycle:
 
     def test_shell_owns_process_and_self_bootstraps(self) -> None:
         # owns_process routes the command outside the entrypoint's asyncio.run;
-        # needs_application is False because the command boots itself.
+        # needs_framework() is False because the command boots itself.
         assert ShellCommand.owns_process is True
-        assert ShellCommand.needs_application is False
+        assert ShellCommand.needs_framework() is False
 
     def test_run_repl_runs_query_on_repl_loop_without_nested_run(
         self, db_env: Path, monkeypatch: pytest.MonkeyPatch

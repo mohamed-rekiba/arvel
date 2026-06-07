@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from arvel.config import DbConfig
+from arvel.console._subsystem import CliSubsystem
 from arvel.database.db import DB
 from arvel.database.exceptions import DatabaseConnectionError
 from arvel.database.schema import Schema
@@ -48,7 +49,12 @@ class DatabaseServiceProvider(ServiceProvider):
     ``config/database.py`` is present, ``enabled`` is ``False`` and ``boot()``
     skips the connection ping. This lets pure API-gateway apps run without a
     database.
+
+    Tagged ``CliSubsystem.DATABASE`` so the needs-based CLI bootstrap can
+    boot it only when a command actually needs the database (e.g. ``migrate``).
     """
+
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.DATABASE
 
     def register(self) -> None:
         c = self.app.container

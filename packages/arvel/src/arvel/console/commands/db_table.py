@@ -9,6 +9,7 @@ import typer
 from sqlalchemy import inspect
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Argument as _Argument
 from arvel.console.commands.migrate import resolve_engine
 
@@ -19,7 +20,9 @@ if TYPE_CHECKING:
 class DbTableCommand(Command):
     name: ClassVar[str] = "db:table"
     help: ClassVar[str] = "Print columns and indexes for a table"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.DATABASE, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

@@ -2,9 +2,11 @@
 
 The framework ``arvel.application.Application`` is the kernel that owns the DI
 container and provider lifecycle. CLI commands that need DI (queue, scheduler,
-shell,...) opt in by declaring ``needs_application: ClassVar[bool] = True`` on
-their ``Command`` subclass; the entrypoint then walks up from cwd to discover the
-user's ``bootstrap/app.py``, imports it, and calls ``create_application``.
+shell, ...) opt in by declaring ``requires`` (a frozenset of ``CliSubsystem``)
+on their ``Command`` subclass; the entrypoint then walks up from cwd to
+discover the user's ``bootstrap/app.py``, imports it, and calls
+``create_application`` — passing the resolved subsystem closure so the app
+only boots the providers the command actually needs.
 
 Discovery walks ``_MAX_ANCESTOR_DEPTH = 4`` parent directories of the start path
 (cwd by default), which covers the common ``apps/<name>/<sub>/...`` layouts
@@ -14,6 +16,7 @@ without ever wandering across filesystem roots.
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import logging
 import sys
 from pathlib import Path
@@ -21,6 +24,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from arvel.application import Application
+    from arvel.console._subsystem import CliSubsystem
 
 _log = logging.getLogger("arvel.console.bootstrap")
 
@@ -44,8 +48,19 @@ def find_project_root(start: Path | None = None) -> Path | None:
     return None
 
 
-def bootstrap_framework_application(base_path: Path | None = None) -> Application | None:
+def bootstrap_framework_application(
+    base_path: Path | None = None,
+    *,
+    required_subsystems: frozenset[CliSubsystem] | None = None,
+) -> Application | None:
     """Import the user's ``bootstrap/app.py`` and return its ``create_application()`` result.
+
+    ``required_subsystems`` is the transitive closure of CLI subsystems the
+    invoking command needs (see ``arvel.console._subsystem.closure``). When
+    supplied and the user's factory accepts a ``required_subsystems`` kwarg,
+    we forward it so the application boots only the matching providers. The
+    parameter is optional — older bootstrap files that don't accept it stay
+    backward-compatible (full chain boots).
 
     Returns ``None`` when:
     - no project root is found anywhere along the ancestor chain, or
@@ -81,7 +96,24 @@ def bootstrap_framework_application(base_path: Path | None = None) -> Applicatio
         )
         return None
 
-    return factory()  # type: ignore[no-any-return]
+    return _call_factory(factory, required_subsystems)
+
+
+def _call_factory(
+    factory: object,
+    required_subsystems: frozenset[CliSubsystem] | None,
+) -> Application | None:
+    if required_subsystems is None:
+        return factory()  # type: ignore[no-any-return,operator]
+
+    try:
+        sig = inspect.signature(factory)  # type: ignore[arg-type]
+    except TypeError, ValueError:
+        return factory()  # type: ignore[no-any-return,operator]
+
+    if "required_subsystems" in sig.parameters:
+        return factory(required_subsystems=required_subsystems)  # type: ignore[no-any-return,operator]
+    return factory()  # type: ignore[no-any-return,operator]
 
 
 __all__ = ["bootstrap_framework_application", "find_project_root"]

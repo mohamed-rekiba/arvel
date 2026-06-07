@@ -331,9 +331,11 @@ class TestOpenApiExportCommand:
         assert cmd.name == "openapi:export"
 
     def test_needs_application_true(self) -> None:
+        from arvel.console._subsystem import CliSubsystem
         from arvel.console.commands.openapi_export import OpenApiExportCommand
 
-        assert OpenApiExportCommand.needs_application is True
+        assert OpenApiExportCommand.needs_framework() is True
+        assert CliSubsystem.HTTP in OpenApiExportCommand.requires
 
     def test_stdout_flag_prints_json(
         self, capsys: pytest.CaptureFixture[str], tmp_path: Path
@@ -358,7 +360,69 @@ class TestOpenApiExportCommand:
         parsed = json.loads(result.output)
         assert parsed["openapi"] == "3.1.0"
 
-    def test_rejects_path_traversal(self, tmp_path: Path) -> None:
+    def test_accepts_path_outside_project(self, tmp_path: Path, monkeypatch: Any) -> None:
+        """``--output`` accepts any writable path — no project-root jail.
+
+        Real-world use case: a Makefile in a sibling repo runs
+        ``arvel openapi:export -o ../frontend/openapi.yaml``.
+        """
+        from arvel.console.commands.openapi_export import OpenApiExportCommand
+
+        spec: dict[str, Any] = {"openapi": "3.1.0", "info": {"title": "T", "version": "1"}}
+        cmd = OpenApiExportCommand()
+        app = MagicMock()
+        app.into_asgi.return_value.openapi.return_value = spec
+        app.base_path.return_value = tmp_path
+        cmd.app = app
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        sibling = tmp_path / "frontend"
+        sibling.mkdir()
+        monkeypatch.chdir(project_root)
+
+        import typer
+        from typer.testing import CliRunner
+
+        typer_app = typer.Typer()
+        cmd.register(typer_app)
+        runner = CliRunner()
+        result = runner.invoke(
+            typer_app,
+            ["--output", "../frontend/openapi.json", "--format", "json"],
+        )
+        assert result.exit_code == 0
+        assert (sibling / "openapi.json").is_file()
+
+    def test_status_message_goes_to_stderr_not_stdout(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        """Status writes to stderr so stdout stays clean for piping."""
+        from arvel.console.commands.openapi_export import OpenApiExportCommand
+
+        spec: dict[str, Any] = {"openapi": "3.1.0", "info": {"title": "T", "version": "1"}}
+        cmd = OpenApiExportCommand()
+        app = MagicMock()
+        app.into_asgi.return_value.openapi.return_value = spec
+        app.base_path.return_value = tmp_path
+        cmd.app = app
+        monkeypatch.chdir(tmp_path)
+
+        import typer
+        from typer.testing import CliRunner
+
+        typer_app = typer.Typer()
+        cmd.register(typer_app)
+        runner = CliRunner()
+        result = runner.invoke(typer_app, ["--output", "openapi.json", "--format", "json"])
+        assert result.exit_code == 0
+        # Click 8.4 separates stderr from stdout by default; status text must
+        # not appear on stdout (which downstream tools may capture as data).
+        assert "OpenAPI spec written to" not in result.stdout
+        assert "OpenAPI spec written to" in result.stderr
+
+    def test_output_dash_acts_like_stdout(self, tmp_path: Path) -> None:
+        """``--output -`` is POSIX sugar for ``--stdout``."""
         from arvel.console.commands.openapi_export import OpenApiExportCommand
 
         spec: dict[str, Any] = {"openapi": "3.1.0", "info": {"title": "T", "version": "1"}}
@@ -374,10 +438,12 @@ class TestOpenApiExportCommand:
         typer_app = typer.Typer()
         cmd.register(typer_app)
         runner = CliRunner()
-        result = runner.invoke(typer_app, ["--output", "../../../etc/passwd", "--format", "json"])
-        assert result.exit_code != 0
+        result = runner.invoke(typer_app, ["--output", "-", "--format", "json"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["openapi"] == "3.1.0"
 
-    def test_writes_yaml_file_by_default(self, tmp_path: Path) -> None:
+    def test_writes_yaml_file_by_default(self, tmp_path: Path, monkeypatch: Any) -> None:
         from arvel.console.commands.openapi_export import OpenApiExportCommand
 
         spec: dict[str, Any] = {"openapi": "3.1.0", "info": {"title": "T", "version": "1"}}
@@ -386,6 +452,8 @@ class TestOpenApiExportCommand:
         app.into_asgi.return_value.openapi.return_value = spec
         app.base_path.return_value = tmp_path
         cmd.app = app
+        # Relative paths resolve against CWD now (no project-root jail).
+        monkeypatch.chdir(tmp_path)
 
         import typer
         from typer.testing import CliRunner
@@ -432,9 +500,11 @@ class TestOpenApiValidateCommand:
         assert cmd.name == "openapi:validate"
 
     def test_needs_application_true(self) -> None:
+        from arvel.console._subsystem import CliSubsystem
         from arvel.console.commands.openapi_validate import OpenApiValidateCommand
 
-        assert OpenApiValidateCommand.needs_application is True
+        assert OpenApiValidateCommand.needs_framework() is True
+        assert CliSubsystem.HTTP in OpenApiValidateCommand.requires
 
     def test_exits_2_when_openapi_spec_validator_missing(self) -> None:
         from arvel.console.commands.openapi_validate import OpenApiValidateCommand

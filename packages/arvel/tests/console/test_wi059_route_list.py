@@ -364,10 +364,13 @@ class TestBackwardCompat:
     """The existing -009-* tests in test_ops_commands.py still hold."""
 
     def test_command_name_and_help_unchanged(self) -> None:
+        from arvel.console._subsystem import CliSubsystem
+
         cmd = RouteListCommand()
         assert cmd.name == "route:list"
         assert cmd.help  # something descriptive
-        assert cmd.needs_application is True
+        assert cmd.needs_framework() is True
+        assert CliSubsystem.HTTP in cmd.requires
 
     def test_registers_under_route_list_name(self) -> None:
         app = _app(RouteListCommand())

@@ -8,6 +8,7 @@ from typing import Annotated, ClassVar
 import typer
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.container.errors import BindingResolutionError
 from arvel.queue.manager import QueueManager
@@ -16,7 +17,10 @@ from arvel.queue.manager import QueueManager
 class QueueClearCommand(Command):
     name: ClassVar[str] = "queue:clear"
     help: ClassVar[str] = "Remove all pending jobs from a queue"
-    needs_application: ClassVar[bool] = True
+    # QUEUE closure pulls in DATABASE; USER_PROVIDERS for user-defined queue connections.
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.QUEUE, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

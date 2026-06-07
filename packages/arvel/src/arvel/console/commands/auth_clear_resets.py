@@ -10,6 +10,7 @@ from sqlalchemy import MetaData, Table, delete, text
 from sqlalchemy import inspect as sa_inspect
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console.commands.migrate import resolve_engine
 
 if TYPE_CHECKING:
@@ -19,7 +20,9 @@ if TYPE_CHECKING:
 class AuthClearResetsCommand(Command):
     name: ClassVar[str] = "auth:clear-resets"
     help: ClassVar[str] = "Delete expired password_reset_tokens rows"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.AUTH}  # AUTH closure pulls in DATABASE
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

@@ -18,6 +18,7 @@ from arvel.application.errors import (
     ShutdownError,
 )
 from arvel.config.registry import register
+from arvel.console._subsystem import FOUNDATION_SUBSYSTEMS, CliSubsystem
 from arvel.container import Container
 
 if TYPE_CHECKING:
@@ -91,6 +92,59 @@ def _baseline_tail_providers() -> list[type[ServiceProvider]]:
     from arvel.console.providers.console_service_provider import ConsoleServiceProvider
 
     return [ConsoleServiceProvider]
+
+
+def _filter_provider_chain(
+    chain: list[type[ServiceProvider]],
+    required: frozenset[CliSubsystem],
+    *,
+    user_classes: list[type[ServiceProvider]],
+) -> list[type[ServiceProvider]]:
+    """Drop providers whose subsystem isn't in ``required``.
+
+    Rules:
+
+    - Providers tagged with a subsystem in ``required`` are kept.
+    - Providers with ``subsystem is None`` AND in the baseline tail are always
+      kept (Console must run to register provider commands).
+    - Providers with ``subsystem is None`` AND in the baseline head are kept
+      only if their implicit subsystem is in ``required``. The four foundation
+      providers (Config/Log/Lang/Context) are always implicitly required via
+      :data:`FOUNDATION_SUBSYSTEMS`.
+    - Providers with ``subsystem is None`` AND NOT in the baseline head/tail
+      are treated as user providers — kept iff ``USER_PROVIDERS`` is in
+      ``required``. This matches the design: user providers from
+      ``bootstrap/providers.py`` opt in collectively.
+
+    Order is preserved.
+    """
+    user_set = set(user_classes)
+    tail_set = set(_baseline_tail_providers())
+    out: list[type[ServiceProvider]] = []
+    include_user = CliSubsystem.USER_PROVIDERS in required
+    for provider_cls in chain:
+        sub = provider_cls.subsystem
+        if sub is None:
+            if provider_cls in tail_set:
+                out.append(provider_cls)
+                continue
+            # An untagged user provider (no explicit subsystem) — bucket as USER_PROVIDERS.
+            if provider_cls in user_set:
+                if include_user:
+                    out.append(provider_cls)
+                continue
+            # Untagged framework provider — defensive: only Console should be here.
+            out.append(provider_cls)
+            continue
+        if sub in required:
+            out.append(provider_cls)
+            continue
+        # User provider that happens to tag itself with a known subsystem is kept
+        # iff USER_PROVIDERS was requested OR its own subsystem was requested.
+        # (Already covered by the `sub in required` branch above.)
+        if include_user and provider_cls in user_set:
+            out.append(provider_cls)
+    return out
 
 
 class Application:
@@ -231,10 +285,16 @@ class Application:
         base_path: Path,
         environment: str,
         providers: list[type[ServiceProvider]],
+        required_subsystems: frozenset[CliSubsystem] | None = None,
     ) -> None:
         self._base_path = base_path
         self._environment = environment
-        self._provider_classes = self._resolve_provider_chain(providers)
+        full_chain = self._resolve_provider_chain(providers)
+        self._provider_classes = (
+            full_chain
+            if required_subsystems is None
+            else _filter_provider_chain(full_chain, required_subsystems, user_classes=providers)
+        )
 
         # Instantiate providers and run the sync register() pass eagerly. This
         # makes all container bindings available the moment .create() returns,
@@ -473,6 +533,20 @@ class ApplicationBuilder:
         self._config_classes: list[type[ArvelSettings]] = []
         self._config_dir: Path | None = None
         self._routing_paths: dict[str, Path] = {}
+        self._required_subsystems: frozenset[CliSubsystem] | None = None
+
+    def with_required_subsystems(self, subsystems: frozenset[CliSubsystem]) -> Self:
+        """Boot only providers whose subsystem is in ``subsystems`` (plus foundation).
+
+        Used by the CLI entrypoint to skip cold-boot cost for commands that
+        don't need the full provider chain (``arvel make:controller``
+        bootstraps Config+Log+Lang+Context only; ``arvel migrate`` adds
+        Database; etc.).
+
+        ``None`` (the default) keeps the legacy behavior of booting everything.
+        """
+        self._required_subsystems = frozenset(subsystems) | FOUNDATION_SUBSYSTEMS
+        return self
 
     def with_providers(self, providers: list[type[ServiceProvider]] | Path | str) -> Self:
         if isinstance(providers, list):
@@ -554,6 +628,7 @@ class ApplicationBuilder:
             base_path=self._base_path,
             environment=self._resolve_environment(),
             providers=list(self._providers),
+            required_subsystems=self._required_subsystems,
         )
         return app
 

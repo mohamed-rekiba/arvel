@@ -9,17 +9,19 @@ from typing import Annotated, ClassVar, Literal
 import typer
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 
 
-def _safe_output_path(raw: str, project_root: Path) -> Path:
-    """Resolve *raw* relative to *project_root* and reject path traversal."""
-    resolved = (project_root / raw).resolve()
-    try:
-        resolved.relative_to(project_root.resolve())
-    except ValueError as exc:
-        raise typer.BadParameter(f"--output path escapes the project root: {raw!r}") from exc
-    return resolved
+def _resolve_output_path(raw: str) -> Path:
+    """Resolve ``--output`` against CWD; accept absolute paths verbatim.
+
+    No project-root jail — callers writing into a sibling frontend
+    (``--output ../frontend/openapi.yaml``) shouldn't have to fight the CLI.
+    Use the OS for path safety.
+    """
+    candidate = Path(raw).expanduser()
+    return candidate if candidate.is_absolute() else (Path.cwd() / candidate).resolve()
 
 
 class OpenApiExportCommand(Command):
@@ -27,7 +29,10 @@ class OpenApiExportCommand(Command):
 
     name: ClassVar[str] = "openapi:export"
     help: ClassVar[str] = "Export the OpenAPI spec to a file (YAML or JSON)."
-    needs_application: ClassVar[bool] = True
+    # HTTP for the Router/exception handler; USER_PROVIDERS for user-defined routes.
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.HTTP, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self
@@ -35,7 +40,13 @@ class OpenApiExportCommand(Command):
         def _callback(
             output: Annotated[
                 str,
-                _Option("--output", "-o", help="Output path (relative to project root)."),
+                _Option(
+                    "--output",
+                    "-o",
+                    help=(
+                        "Output path (resolved against CWD; absolute paths allowed; '-' = stdout)."
+                    ),
+                ),
             ] = "docs/api/openapi.yaml",
             fmt: Annotated[
                 Literal["yaml", "json"],
@@ -68,19 +79,17 @@ class OpenApiExportCommand(Command):
                     raise typer.Exit(code=2) from exc
                 text = yaml.safe_dump(spec, sort_keys=False, allow_unicode=True)
 
-            if stdout:
+            if stdout or output == "-":
                 typer.echo(text, nl=False)
                 return
 
-            base: Path = (
-                cmd_self.app.base_path()
-                if callable(getattr(cmd_self.app, "base_path", None))
-                else Path.cwd()
-            )
-            out_path = _safe_output_path(output, base)
+            out_path = _resolve_output_path(output)
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_text(text, encoding="utf-8")
-            typer.echo(f"OpenAPI spec written to {out_path}")
+            # Status text goes to stderr so the file path is human-visible
+            # without ever contaminating stdout (which a future `--stdout`
+            # invocation streams the spec to).
+            typer.echo(f"OpenAPI spec written to {out_path}", err=True)
 
         app.command(name=self.name, help=self.help)(_callback)
 

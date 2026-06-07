@@ -30,6 +30,7 @@ from typing import Any, ClassVar
 from unittest.mock import MagicMock, patch
 
 import pytest
+from arvel.console._subsystem import CliSubsystem
 
 # ─────────────────────────────────────────────────────────────────────────────
 # — arvel.console.bootstrap module
@@ -132,27 +133,43 @@ class TestBootstrapModule:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# — Command.needs_application opt-in marker
+# — Command.requires opt-in marker (replaces the legacy needs_application bool)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class TestNeedsApplicationMarker:
-    def test_command_class_default_needs_application_false(self) -> None:
+class TestRequiresMarker:
+    def test_command_class_default_requires_empty(self) -> None:
         from arvel.console import Command
 
-        assert Command.needs_application is False
+        assert Command.requires == frozenset()
+        assert Command.requires_project_context is False
+        assert Command.needs_framework() is False
 
-    def test_command_subclass_can_opt_in(self) -> None:
+    def test_command_subclass_can_opt_in_via_requires(self) -> None:
         from arvel.console import Command
+        from arvel.console._subsystem import CliSubsystem
 
         class _NeedsApp(Command):
             name: ClassVar[str] = "needs-app"
-            needs_application: ClassVar[bool] = True
+            requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.DATABASE})
 
             def handle(self, ctx: Any) -> int:
                 return 0
 
-        assert _NeedsApp.needs_application is True
+        assert _NeedsApp.needs_framework() is True
+        assert CliSubsystem.DATABASE in _NeedsApp.requires
+
+    def test_requires_project_context_implies_framework(self) -> None:
+        from arvel.console import Command
+
+        class _NeedsRoot(Command):
+            name: ClassVar[str] = "needs-root"
+            requires_project_context: ClassVar[bool] = True
+
+            def handle(self, ctx: Any) -> int:
+                return 0
+
+        assert _NeedsRoot.needs_framework() is True
 
     def test_command_app_attribute_default_none(self) -> None:
         from arvel.console import Command
@@ -252,7 +269,7 @@ class TestCommandCall:
 
         class _Caller(Command):
             name: ClassVar[str] = "caller"
-            needs_application: ClassVar[bool] = True
+            requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.CONFIG})
 
             def handle(self, ctx: Context) -> int:
                 return self.call("target")
@@ -281,7 +298,7 @@ class TestCommandCall:
 
         class _Caller(Command):
             name: ClassVar[str] = "caller"
-            needs_application: ClassVar[bool] = True
+            requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.CONFIG})
 
             def handle(self, ctx: Context) -> int:
                 return self.call_silently("loud")
@@ -317,7 +334,7 @@ class TestKeyRotateHonestDeferral:
         err = capsys.readouterr().err
         assert code == 2
         assert "not yet implemented" in err.lower()
-        assert "FB-022-002" in err
+        assert "workaround" in err.lower()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -666,15 +683,17 @@ class TestInProjectBootstrap:
 
 class TestSchedulerHonoursUserApp:
     def test_schedule_list_command_opts_into_application(self) -> None:
-        """+ : command declares needs_application=True."""
+        """schedule:list declares the SCHEDULER subsystem."""
         from arvel.console.commands.schedule_commands import ScheduleListCommand
 
-        assert ScheduleListCommand.needs_application is True
+        assert ScheduleListCommand.needs_framework() is True
+        assert CliSubsystem.SCHEDULER in ScheduleListCommand.requires
 
     def test_schedule_work_command_opts_into_application(self) -> None:
         from arvel.console.commands.schedule_commands import ScheduleWorkCommand
 
-        assert ScheduleWorkCommand.needs_application is True
+        assert ScheduleWorkCommand.needs_framework() is True
+        assert CliSubsystem.SCHEDULER in ScheduleWorkCommand.requires
 
     def test_schedule_list_resolves_user_schedule_when_app_bound(
         self, capsys: pytest.CaptureFixture[str]
@@ -801,10 +820,10 @@ class TestShellNamespace:
 
         # shell drives its own event loop (IPython autoawait + prompt_toolkit
         # both call asyncio.run), so it must run outside the entrypoint's
-        # asyncio.run wrapper and bootstrap the framework itself rather than
-        # relying on the entrypoint's needs_application DI.
+        # asyncio.run wrapper and bootstrap the framework itself — the
+        # entrypoint must not pre-boot anything for it.
         assert ShellCommand.owns_process is True
-        assert ShellCommand.needs_application is False
+        assert ShellCommand.needs_framework() is False
 
     def test_bootstrap_app_includes_app_and_container(self) -> None:
         from arvel.console.commands.shell import ShellCommand
@@ -996,7 +1015,8 @@ class TestRouteListResolution:
     def test_route_list_command_opts_into_application(self) -> None:
         from arvel.console.commands.route_list import RouteListCommand
 
-        assert RouteListCommand.needs_application is True
+        assert RouteListCommand.needs_framework() is True
+        assert CliSubsystem.HTTP in RouteListCommand.requires
 
     def test_register_callback_prints_no_routes_when_empty(self) -> None:
         import typer

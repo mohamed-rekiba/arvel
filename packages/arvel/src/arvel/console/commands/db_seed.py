@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.console.commands.migrate import BootstrapFailedError, build_migrator, resolve_engine
 from arvel.database import Seeder
@@ -145,7 +146,10 @@ async def run_seeder_for_app(app: object, seeder_name: str = "DatabaseSeeder") -
 class DbSeedCommand(Command):
     name: ClassVar[str] = "db:seed"
     help: ClassVar[str] = "Run database seeders"
-    needs_application: ClassVar[bool] = True
+    # USER_PROVIDERS so user seeder modules are importable.
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.DATABASE, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

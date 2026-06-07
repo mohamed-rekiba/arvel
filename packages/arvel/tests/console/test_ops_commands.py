@@ -118,7 +118,9 @@ def test_key_rotate_exits_2_outside_production_with_deferral_message(
         ["key:rotate", "--old-key", "AAAA", "--new-key", "BBBB"],
     )
     assert result.exit_code == 2
-    assert "FB-022-002" in (result.stderr or result.output)
+    output = result.stderr or result.output
+    assert "not yet implemented" in output.lower()
+    assert "workaround" in output.lower()
 
 
 # ─── about ───────────────────────────────────

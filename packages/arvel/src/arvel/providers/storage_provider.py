@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar
 
+from arvel.console._subsystem import CliSubsystem
 from arvel.providers.service_provider import ServiceProvider
 
 if TYPE_CHECKING:
@@ -17,6 +18,8 @@ _T = TypeVar("_T")
 
 class StorageServiceProvider(ServiceProvider):
     """Binds StorageManager to the container and wires the Storage facade."""
+
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.STORAGE
 
     def register(self) -> None:
         from arvel.config.storage_config import (
@@ -56,7 +59,7 @@ class StorageServiceProvider(ServiceProvider):
         Storage.bind(c)
 
         # Routes must be registered in register(), not boot(): Router.register_with_app()
-        # runs synchronously during create_asgi(), before the async boot pass (see ADR-080).
+        # runs synchronously during create_asgi(), before the async boot pass.
         self._register_serve_route(manager, config, local_config, app_key)
 
     def _register_serve_route(

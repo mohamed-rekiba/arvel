@@ -12,6 +12,7 @@ import typer
 from arvel.config import ConfigKeyError, lookup
 from arvel.config._lookup_registry import dump_config_cache, reset
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Argument as _Argument
 from arvel.console._t import Option as _Option
 from arvel.console.commands.vendor_publish import VendorPublishCommand
@@ -49,7 +50,8 @@ class ConfigShowCommand(Command):
 class ConfigPublishCommand(Command):
     name: ClassVar[str] = "config:publish"
     help: ClassVar[str] = "Publish package config files into the app"
-    needs_application: ClassVar[bool] = True
+    # Publishables come from providers' register() pass.
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.USER_PROVIDERS})
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self
@@ -87,7 +89,9 @@ class ConfigPublishCommand(Command):
 class ConfigCacheCommand(Command):
     name: ClassVar[str] = "config:cache"
     help: ClassVar[str] = "Serialize the loaded config registry to bootstrap/cache/config.json."
-    needs_application: ClassVar[bool] = True
+    # Needs project context to write bootstrap/cache/config.json under base_path,
+    # but no full provider boot — Config is foundation, already loaded.
+    requires_project_context: ClassVar[bool] = True
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

@@ -6,9 +6,9 @@ zero-argument commands. For commands that need typed CLI flags, override
 :meth:`Command.register` and drive Typer directly (see
 ``docs/site/docs/artisan.md`` § "Writing your own commands").
 
-Set ``needs_application = True`` to opt into framework DI — ``self.app``
-is then the booted ``Application`` and you can resolve services from
-its container.
+Declare ``requires`` to opt into framework DI — the entrypoint then boots
+the listed subsystems and binds the resulting ``Application`` to
+``self.app`` so you can resolve services from its container.
 """
 
 from __future__ import annotations
@@ -31,11 +31,16 @@ from typing import ClassVar
 
 from arvel.console import Command, Context
 
+# Declare framework subsystems this command needs. The entrypoint then boots
+# only those providers and binds the application to self.app. Leave empty for
+# pure-CLI commands that don't touch the framework.
+# from arvel.console._subsystem import CliSubsystem
+
 
 class {title}(Command):
     name: ClassVar[str] = "{cli_name}"
     help: ClassVar[str] = "{help_text}"
-    needs_application: ClassVar[bool] = False
+    # requires: ClassVar[frozenset[CliSubsystem]] = frozenset({{CliSubsystem.CONFIG}})
 
     def handle(self, ctx: Context) -> int:
         ctx.info("Running {cli_name}...")

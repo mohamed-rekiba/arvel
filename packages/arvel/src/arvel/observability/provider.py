@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import opentelemetry._logs._internal as _logs_internal
 import opentelemetry.metrics._internal as _metrics_internal
 import opentelemetry.trace as _trace_mod
@@ -10,12 +12,15 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 
+from arvel.console._subsystem import CliSubsystem
 from arvel.observability.config import ObservabilityConfig
 from arvel.providers.service_provider import ServiceProvider
 
 
 class ObservabilityServiceProvider(ServiceProvider):
     """Registers ObservabilityConfig and boots the OTel SDK on app start."""
+
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.OBSERVABILITY
 
     def register(self) -> None:
         c = self.container

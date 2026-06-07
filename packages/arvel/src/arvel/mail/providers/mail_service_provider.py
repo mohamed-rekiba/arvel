@@ -14,8 +14,9 @@ mail wiring without writing a custom provider.
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
+from arvel.console._subsystem import CliSubsystem
 from arvel.mail.config import MailConfig
 from arvel.mail.mailer import Mailer
 from arvel.providers.service_provider import ServiceProvider
@@ -23,6 +24,8 @@ from arvel.providers.service_provider import ServiceProvider
 
 class MailServiceProvider(ServiceProvider):
     """Registers Mailer singleton and wires the Mail facade."""
+
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.MAIL
 
     def register(self) -> None:
         mailer = _build_mailer()

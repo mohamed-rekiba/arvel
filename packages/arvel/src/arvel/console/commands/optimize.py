@@ -9,6 +9,7 @@ import typer
 
 from arvel.config._lookup_registry import dump_config_cache, reset
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console.commands.config_commands import CONFIG_CACHE_REL
 from arvel.support.view import clear_bytecode_cache, reset_cache, warm_bytecode_cache
 
@@ -18,7 +19,7 @@ _CONFIG_CACHE_REL = CONFIG_CACHE_REL
 class OptimizeCommand(Command):
     name: ClassVar[str] = "optimize"
     help: ClassVar[str] = "Pre-compile config and view caches for production."
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.USER_PROVIDERS})
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

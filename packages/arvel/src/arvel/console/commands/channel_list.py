@@ -9,13 +9,16 @@ import typer
 from arvel.broadcasting.exceptions import BroadcastDriverError
 from arvel.broadcasting.manager import BroadcastManager
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.container.errors import BindingResolutionError
 
 
 class ChannelListCommand(Command):
     name: ClassVar[str] = "channel:list"
     help: ClassVar[str] = "List registered broadcasting channels"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.BROADCAST, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, ClassVar
 
 import typer
 
+from arvel.console._subsystem import CliSubsystem
+
 if TYPE_CHECKING:
     from arvel.application import Application as FrameworkApplication
 
@@ -59,19 +61,31 @@ class Command:
     """Abstract base for all Arvel console commands.
 
     Simple commands override ``handle(ctx)``.
-    Commands with typed CLI arguments override ``_register(app)`` instead.
+    Commands with typed CLI arguments override ``register(app)`` instead.
 
-    Subclasses opt into framework DI by setting ``needs_application = True``.
-    The entrypoint sees that marker, bootstraps the user's
-    ``bootstrap/app.py`` (see :mod:`arvel.console.bootstrap`), and assigns
-    the resulting :class:`arvel.application.Application` to ``self.app`` before
-    dispatching. Commands that don't opt in still work — they just won't have
-    container access (``self.app is None``).
+    Subclasses opt into framework DI by listing the subsystems they need on
+    :attr:`requires`. The CLI entrypoint computes the transitive closure of
+    those subsystems and boots only the matching providers, then binds the
+    resulting :class:`arvel.application.Application` to ``self.app``. Commands
+    with an empty ``requires`` and ``requires_project_context = False`` skip
+    framework bootstrap entirely (``self.app is None``) — that's the fast
+    path for pure generators like ``make:controller`` and ``new``.
     """
 
     name: ClassVar[str]
     help: ClassVar[str] = ""
-    needs_application: ClassVar[bool] = False
+
+    #: Subsystems this command needs. The entrypoint computes ``closure(requires)
+    #: | FOUNDATION_SUBSYSTEMS`` and boots exactly those providers. Empty =
+    #: foundation-only (no provider boot at all when ``requires_project_context``
+    #: is also False).
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset()
+
+    #: Set True for commands that need ``Application.base_path`` and the project
+    #: layout but no provider boot — e.g. ``serve`` (uvicorn re-imports the ASGI
+    #: app and boots it via lifespan, so we just need to know where the project
+    #: lives).
+    requires_project_context: ClassVar[bool] = False
 
     #: The command takes over the process and manages its own event loop
     #: (e.g. ``serve`` → uvicorn, which calls ``asyncio.run`` internally). The
@@ -80,9 +94,15 @@ class Command:
     #: event loop".
     owns_process: ClassVar[bool] = False
 
-    #: Bound by the entrypoint when ``needs_application`` is True and a project
-    #: root is discoverable. ``None`` otherwise.
+    #: Bound by the entrypoint when ``requires`` is non-empty (or
+    #: ``requires_project_context`` is True) AND a project root is
+    #: discoverable. ``None`` otherwise.
     app: FrameworkApplication | None = None
+
+    @classmethod
+    def needs_framework(cls) -> bool:
+        """Derived signal: does this command trigger a framework bootstrap?"""
+        return bool(cls.requires) or cls.requires_project_context
 
     def register(self, app: typer.Typer) -> None:
         """Register this command with the Typer app. Default: no-arg callback."""
@@ -104,7 +124,7 @@ class Command:
         """Invoke another registered command in-process and return its exit code.
 
         Requires a bound framework Application (``self.app``) — typically set
-        by the entrypoint when ``needs_application=True``. Use ``call_silently``
+        by the entrypoint when ``requires`` is non-empty. Use ``call_silently``
         to suppress stdout from the invoked command.
         """
         return self._invoke_via_console(name, args, silent=False)
@@ -117,7 +137,7 @@ class Command:
         if self.app is None:
             msg = (
                 f"Command.call({name!r}) requires a bound framework Application; "
-                f"set needs_application = True on {type(self).__name__}."
+                f"add the subsystems you need to {type(self).__name__}.requires."
             )
             raise RuntimeError(msg)
         console_app: Application = self.app.container.make(Application)

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import ClassVar
 
+from arvel.console._subsystem import CliSubsystem
 from arvel.http.exceptions import ExceptionTranslator, HttpExceptionHandler
 from arvel.http.ratelimit import InMemoryStore, RateLimiterStore
 from arvel.maintenance import MaintenanceModeManager
@@ -13,6 +15,8 @@ from arvel.routing import Router
 
 class HttpServiceProvider(ServiceProvider):
     """Bind every HTTP-layer service the rest of the framework expects."""
+
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.HTTP
 
     def register(self) -> None:
         c = self.app.container
