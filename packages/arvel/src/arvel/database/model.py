@@ -1340,8 +1340,22 @@ class ActiveRecord(QueryMixin):
 
     async def load_missing(self, *relations: str) -> None:
         """Load each relation only if not already populated on this instance."""
+        from arvel.database.orm._eager import get_eager_relation
+        from arvel.database.query import is_async_relation
+
         state = sqla_inspect(self)
-        to_load = [r for r in relations if r in (state.unloaded if state else set())]
+        unloaded: set[str] = set(state.unloaded) if state is not None else set()
+        to_load: list[str] = []
+        for rel in relations:
+            head = rel.partition(".")[0]
+            # Async descriptor relations (BelongsToMany / MorphToMany / MorphOne /
+            # MorphMany) live in the eager cache, never in SA's `unloaded`; check the
+            # cache so e.g. load_missing("roles") isn't a silent no-op.
+            if is_async_relation(type(self), rel):
+                if get_eager_relation(self, head) is None:
+                    to_load.append(rel)
+            elif head in unloaded:
+                to_load.append(rel)
         if to_load:
             await self.load(*to_load)
 
