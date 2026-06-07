@@ -165,6 +165,33 @@ def test_more_column_types_compile() -> None:
         assert expected in column_names
 
 
+def test_blueprint_big_integer_emits_bigint() -> None:
+    """t.big_integer must produce BIGINT, not INTEGER.
+
+    The model-layer big_integer() already maps to BigInteger; this is the
+    migration-layer mirror. When it silently emitted INTEGER, columns like
+    media.size and sessions.user_id were 32-bit on Postgres/MySQL — drifting
+    from their BIGINT models and overflowing past ~2.1B.
+    """
+    from sqlalchemy import BigInteger, Integer
+
+    rec = _Rec()
+
+    def build(t: Blueprint) -> None:
+        t.id()
+        t.big_integer("counter")
+        t.integer("small")
+
+    Schema.create("bigints", build, executor=rec)
+    create_call = next(c for c in rec.calls if c[0] == "create_table")
+    cols = {c.name: c for c in create_call[1][1:] if hasattr(c, "name")}
+    assert isinstance(cols["counter"].type, BigInteger)
+    # Regular integer stays 32-bit (BigInteger subclasses Integer, so check the
+    # negative case explicitly to prove they're distinct).
+    assert not isinstance(cols["small"].type, BigInteger)
+    assert isinstance(cols["small"].type, Integer)
+
+
 def test_foreign_id_on_delete() -> None:
     rec = _Rec()
 
