@@ -32,7 +32,6 @@ class CacheConfig(ArvelSettings):
        - ``CACHE_PASSWORD``    Redis password (default: empty)
        - ``CACHE_DATABASE``    Redis DB index (default: 0)
        - ``CACHE_PREFIX``      key prefix (default: ``arvel_cache``)
-       - ``CACHE_TTL``         default TTL in seconds (default: 3600)
        - ``CACHE_FILE_PATH``   path for file store (default: ``storage/framework/cache``)
        - ``CACHE_GC_PROBABILITY`` file store GC % (default: 2)
 
@@ -63,7 +62,6 @@ class CacheConfig(ArvelSettings):
     database: int = 0
     # General options.
     prefix: str = "arvel_cache"
-    ttl: int = 3600
     # File store options.
     file_path: str = "storage/framework/cache"
     gc_probability: int = 2

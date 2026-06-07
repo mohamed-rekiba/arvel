@@ -37,7 +37,7 @@ class TestRedisStoreOps:
         # Unique prefix per test keeps the session-scoped container clean
         # between tests without paying for a FLUSHDB round-trip.
         prefix = f"cache-int-{id(self)}"
-        store = RedisStore(redis=client, prefix=prefix, ttl=3600)
+        store = RedisStore(redis=client, prefix=prefix)
         try:
             yield store
         finally:
