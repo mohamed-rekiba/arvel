@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.0...arvel-ecommerce-kit-v1.7.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* **storefront:** remove dead "Specials" nav link ([1d1ecb3](https://github.com/mohamed-rekiba/arvel/commit/1d1ecb3c8365e0dbc40a705cad7b7fd4ffc6a78c))
+
 ## [1.7.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.6.0...arvel-ecommerce-kit-v1.7.0) (2026-06-07)
 
 
