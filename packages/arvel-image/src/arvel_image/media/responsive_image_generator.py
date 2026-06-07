@@ -30,6 +30,8 @@ from io import BytesIO
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any, Protocol, TypedDict, cast
 
+import anyio.to_thread
+
 if TYPE_CHECKING:
     from arvel.storage import StorageDisk
 
@@ -168,24 +170,22 @@ async def generate_responsive_images_for_media(
     decodable image or is too small to generate any variants — caller should
     skip updating the column in that case. Successful returns are a fully
     populated :class:`ResponsiveImageEntry`.
-    """
-    from PIL import Image as PILImage  # noqa: PLC0415
 
-    try:
-        with PILImage.open(BytesIO(source)) as img:
-            original_width, original_height = img.size
-            src_format: str = img.format or "JPEG"
-    except Exception:  # noqa: BLE001
-        # Not a decodable image — skip the responsive entry. Pillow's failure
-        # set is too wide (UnidentifiedImageError, OSError, codec-specific
-        # errors) to narrow usefully.
+    Pillow is CPU-bound; every decode/resize/encode is offloaded to a worker
+    thread so this stays non-blocking when run inline during an upload.
+    """
+    dims = await anyio.to_thread.run_sync(_read_dimensions, source)
+    if dims is None:
         return {}
+    original_width, original_height, src_format = dims
 
     widths = calculate_responsive_widths(original_width, len(source))
     urls: list[ResponsiveImageUrl] = []
 
     for target_width in widths:
-        variant = _resize_variant(source, target_width, original_width, original_height, src_format)
+        variant = await anyio.to_thread.run_sync(
+            _resize_variant, source, target_width, original_width, original_height, src_format
+        )
         if variant is None:
             continue
         variant_bytes, height = variant
@@ -200,10 +200,25 @@ async def generate_responsive_images_for_media(
     if not urls:
         return {}
 
-    return ResponsiveImageEntry(
-        urls=urls,
-        base64svg=generate_placeholder_svg(source, original_width, original_height),
+    base64svg = await anyio.to_thread.run_sync(
+        generate_placeholder_svg, source, original_width, original_height
     )
+    return ResponsiveImageEntry(urls=urls, base64svg=base64svg)
+
+
+def _read_dimensions(source: bytes) -> tuple[int, int, str] | None:
+    """Return ``(width, height, format)`` for ``source``, or ``None`` if undecodable."""
+    from PIL import Image as PILImage  # noqa: PLC0415
+
+    try:
+        with PILImage.open(BytesIO(source)) as img:
+            width, height = img.size
+            return width, height, img.format or "JPEG"
+    except Exception:  # noqa: BLE001
+        # Not a decodable image — caller skips the responsive entry. Pillow's
+        # failure set is too wide (UnidentifiedImageError, OSError,
+        # codec-specific errors) to narrow usefully.
+        return None
 
 
 def _resize_variant(
