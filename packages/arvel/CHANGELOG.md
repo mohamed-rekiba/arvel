@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.16.0...arvel-v0.16.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* **auth:** keep "database" as the canonical provider driver string ([9fd03f6](https://github.com/mohamed-rekiba/arvel/commit/9fd03f681a3ffb8cff04da88be84e90cc4a674e4))
+
 ## [0.16.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.15.0...arvel-v0.16.0) (2026-06-07)
 
 
