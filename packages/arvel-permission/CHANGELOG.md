@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.6.1...arvel-permission-v0.6.2) (2026-06-07)
+
+
+### Documentation
+
+* **spatie:** remove third-party Spatie references ([8ac870e](https://github.com/mohamed-rekiba/arvel/commit/8ac870ee10dd0cf6d980d3b8d267daa65a5270c4))
+
 ## [0.6.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.6.0...arvel-permission-v0.6.1) (2026-06-02)
 
 
