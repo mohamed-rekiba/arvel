@@ -63,3 +63,28 @@ def test_malformed_file_raises(lang_path: Path) -> None:
 
     with pytest.raises(TranslationFileMalformedError):
         loader.load("en", "bad")
+
+
+def test_traversal_locale_does_not_execute_outside_file(tmp_path: Path) -> None:
+    """A ``..`` locale must not escape resources/lang to exec a planted file."""
+    from arvel.i18n.exceptions import TranslationFileMissingError
+    from arvel.i18n.loader import PythonFileLoader
+
+    base = tmp_path / "app"
+    (base / "resources" / "lang").mkdir(parents=True)
+    # Planted next to the app root, reachable via ../ from resources/lang.
+    evil = tmp_path / "evil.py"
+    evil.write_text("raise RuntimeError('lang loader executed an outside file')\n")
+
+    loader = PythonFileLoader(base_path=base)
+    with pytest.raises(TranslationFileMissingError):
+        loader.load("../../..", "evil")
+
+
+def test_json_loader_rejects_separator_in_locale(tmp_path: Path) -> None:
+    from arvel.i18n.exceptions import TranslationFileMissingError
+    from arvel.i18n.loader import JsonFileLoader
+
+    loader = JsonFileLoader(base_path=tmp_path)
+    with pytest.raises(TranslationFileMissingError):
+        loader.load("../secrets", "messages")
