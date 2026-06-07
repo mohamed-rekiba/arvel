@@ -18,7 +18,6 @@ CACHE_CONNECTION=redis
 CACHE_HOST=127.0.0.1
 CACHE_PORT=6379
 CACHE_PREFIX=arvel_cache
-CACHE_TTL=3600
 ```
 
 <a name="drivers"></a>
@@ -36,7 +35,7 @@ CACHE_TTL=3600
 > The `database` cache store currently hardcodes an in-memory SQLite URL — it is not yet wired to your application database. Use `redis` or `file` for shared, persistent caching.
 
 > [!NOTE]
-> TTLs are always **integer seconds**, not `timedelta`. On `put`, a `None` TTL means "store forever" for most stores (the Redis store falls back to the configured default TTL when `ttl is None`).
+> TTLs are always **integer seconds**, not `timedelta`. On `put`, a `None` TTL means "store forever" across every store (matching Laravel, where `Cache::put($key, $val, null)` is equivalent to `forever`). Use a positive TTL to set an expiry.
 
 <a name="registering-the-provider"></a>
 ### Registering the Provider

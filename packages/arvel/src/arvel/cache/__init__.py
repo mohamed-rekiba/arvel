@@ -81,7 +81,7 @@ class CacheManager:
                         password=getattr(self._config, "password", None) or None,
                     ),
                 )
-            return RedisStore(redis=client, prefix=self._config.prefix, ttl=self._config.ttl)
+            return RedisStore(redis=client, prefix=self._config.prefix)
         if driver == CacheDriver.DATABASE:
             from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 

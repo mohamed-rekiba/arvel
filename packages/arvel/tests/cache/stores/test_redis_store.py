@@ -17,7 +17,7 @@ async def store() -> RedisStore:
     import fakeredis.aioredis  # type: ignore[import-untyped]
 
     redis = fakeredis.aioredis.FakeRedis()
-    return RedisStore(redis=redis, prefix="test", ttl=3600)
+    return RedisStore(redis=redis, prefix="test")
 
 
 class TestRedisStoreBasicOps:
@@ -53,6 +53,16 @@ class TestRedisStoreBasicOps:
         await store.forever("eternal", "yes")
         result = await store.get("eternal")
         assert result == "yes"
+
+    @pytest.mark.asyncio
+    async def test_put_none_ttl_means_forever(self) -> None:
+        """ttl=None must store without expiry (CacheStore contract), not a default."""
+        import fakeredis.aioredis  # type: ignore[import-untyped]
+
+        redis = fakeredis.aioredis.FakeRedis()
+        store = RedisStore(redis=redis, prefix="test")
+        await store.put("no_expiry", "v", ttl=None)
+        assert await redis.ttl("test:no_expiry") == -1  # -1 = key exists, no TTL
 
     @pytest.mark.asyncio
     async def test_data_types_preserved(self, store: RedisStore) -> None:

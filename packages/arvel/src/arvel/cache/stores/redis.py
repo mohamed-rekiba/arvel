@@ -28,10 +28,9 @@ class RedisStore:
     Requires ``arvel[redis]``: ``pip install "arvel[redis]"``.
     """
 
-    def __init__(self, redis: RedisConn, prefix: str, ttl: int = 3600) -> None:
+    def __init__(self, redis: RedisConn, prefix: str) -> None:
         self._redis = redis
         self._prefix = prefix
-        self._default_ttl = ttl
 
     def _key(self, key: str) -> str:
         return f"{self._prefix}:{key}"
@@ -43,12 +42,13 @@ class RedisStore:
         return json.loads(raw.decode())
 
     async def put(self, key: str, value: Any, ttl: int | None = None) -> None:
-        effective_ttl = ttl if ttl is not None else self._default_ttl
         serialized = self._serialize(value)
-        if effective_ttl == 0:
+        # CacheStore contract: ttl=None means forever. SETEX rejects a
+        # non-positive expiry, so ttl<=0 also stores without expiry.
+        if ttl is None or ttl <= 0:
             await self._redis.set(self._key(key), serialized)
         else:
-            await self._redis.setex(self._key(key), effective_ttl, serialized)
+            await self._redis.setex(self._key(key), ttl, serialized)
 
     async def get(self, key: str, default: Any = None) -> Any | None:
         raw = await self._redis.get(self._key(key))
