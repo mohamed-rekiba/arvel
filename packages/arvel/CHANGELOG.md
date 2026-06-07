@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.17.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.17.0...arvel-v0.17.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* **cache:** redis put(ttl=None) stores forever, drop CACHE_TTL default ([3edcca7](https://github.com/mohamed-rekiba/arvel/commit/3edcca77eb0a14425052ef0f7c2183c240c2a738))
+* **console:** run uv sync in the kit's python project dir ([1aea97a](https://github.com/mohamed-rekiba/arvel/commit/1aea97a3aad327612129d7a6d0dcc4f8e74b5ba3))
+* **database:** bind json key in where_json_path to prevent SQL injection ([1137b21](https://github.com/mohamed-rekiba/arvel/commit/1137b21e8ce43ba5361f266abeff5bf25c75481a))
+* **i18n:** block path traversal in translation loaders ([ae74bb4](https://github.com/mohamed-rekiba/arvel/commit/ae74bb411f139f2e4e38414ec832683e6e1daaae))
+* **session:** hash file-session id to block path traversal ([8c79e82](https://github.com/mohamed-rekiba/arvel/commit/8c79e82d2932c1769e9f687abd41e05abf1f616a))
+
 ## [0.17.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.16.1...arvel-v0.17.0) (2026-06-07)
 
 
