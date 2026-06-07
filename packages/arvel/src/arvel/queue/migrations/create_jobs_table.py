@@ -3,10 +3,18 @@
 Schema decisions:
 
 - ``payload`` is TEXT (JSON-encoded JobEnvelope); no binary data.
-- ``available_at`` is the wall-clock time the job is eligible for pickup —
-  enables atomic compare-and-set for delayed jobs.
+- ``available_at`` / ``created_at`` are Unix epoch *seconds*. The driver
+  writes and compares epochs (integers), so these are integer columns, not
+  wall-clock timestamps — matching Laravel's jobs table. ``big_integer``
+  (BIGINT) keeps them 2038-safe.
+- ``priority`` drives the worker's ``ORDER BY priority DESC, available_at ASC``
+  pop. It's part of the pop index so the planner orders from the index instead
+  of sorting the ready set on every claim.
 - ``queue`` lets a single table serve multiple logical queues.
-- ``(queue, available_at)`` index is the hot path for the worker poll.
+
+Columns mirror ``arvel.queue.drivers.database.JobRow`` exactly — the driver
+is the source of truth, so publishing this migration yields a schema the
+driver can actually read and write.
 """
 
 from __future__ import annotations
@@ -23,10 +31,11 @@ async def up(schema: Schema) -> None:
         t.id(id_type=IdType.BIGINT)
         t.string("queue", length=255)
         t.long_text("payload")
-        t.tiny_integer("attempts").default(0)
-        t.datetime("available_at").nullable()
-        t.datetime("created_at").use_current()
-        t.index(["queue", "available_at"], name="jobs_queue_available_idx")
+        t.tiny_integer("attempts").default(0).nullable(value=False)
+        t.big_integer("available_at").nullable(value=False)
+        t.big_integer("created_at").nullable(value=False)
+        t.integer("priority").default(0).nullable(value=False)
+        t.index(["queue", "priority", "available_at"], name="jobs_queue_priority_available_idx")
 
     schema.create(__tablename__, _table)
 

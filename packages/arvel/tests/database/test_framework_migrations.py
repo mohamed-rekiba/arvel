@@ -69,5 +69,9 @@ async def test_framework_migrations_define_expected_tables() -> None:
         assert recorder.created[table_name]
 
     assert {"email", "password"}.issubset(recorder.created["users"])
-    assert {"queue", "payload", "attempts"}.issubset(recorder.created["jobs"])
+    # These mirror arvel.queue.drivers.database.JobRow — the driver writes
+    # priority + BIGINT epochs, so the published migration must define them.
+    assert {"queue", "payload", "attempts", "available_at", "created_at", "priority"}.issubset(
+        recorder.created["jobs"]
+    )
     assert {"id", "type", "data"}.issubset(recorder.created["notifications"])

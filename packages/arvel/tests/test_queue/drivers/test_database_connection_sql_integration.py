@@ -21,6 +21,7 @@ from arvel.queue.job import Job
 from sqlalchemy import (
     BigInteger,
     Column,
+    Index,
     Integer,
     MetaData,
     String,
@@ -73,13 +74,13 @@ async def _create_jobs_table(engine: AsyncEngine) -> None:
         "jobs",
         md,
         Column("id", BigInteger, primary_key=True, autoincrement=True),
-        Column("queue", String(255), nullable=False, index=True),
+        Column("queue", String(255), nullable=False),
         Column("payload", Text, nullable=False),
         Column("attempts", Integer, nullable=False, default=0),
         Column("available_at", BigInteger, nullable=False),
         Column("created_at", BigInteger, nullable=False),
-        # : priority column added by .
         Column("priority", Integer, nullable=False, default=0),
+        Index("jobs_queue_priority_available_idx", "queue", "priority", "available_at"),
     )
     async with engine.begin() as conn:
         await conn.execute(text("DROP TABLE IF EXISTS jobs"))

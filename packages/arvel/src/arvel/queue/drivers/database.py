@@ -11,7 +11,7 @@ import time
 from math import ceil
 from typing import Any
 
-from sqlalchemy import Column, Integer, String, Text, delete, select
+from sqlalchemy import BigInteger, Column, Index, Integer, String, Text, delete, select
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -40,14 +40,25 @@ class JobRow(_Base):
 
     __tablename__ = "jobs"
 
+    # Integer (not BigInteger) so SQLite treats it as the autoincrementing
+    # rowid alias; reads a BIGINT id from the migration-built table fine.
     id: Any = Column(Integer, primary_key=True, autoincrement=True)
-    queue: Any = Column(String(255), nullable=False, index=True)
+    queue: Any = Column(String(255), nullable=False)
     payload: Any = Column(Text, nullable=False)
     attempts: Any = Column(Integer, nullable=False, default=0)
-    available_at: Any = Column(Integer, nullable=False)
-    created_at: Any = Column(Integer, nullable=False)
-    # : priority gate for pop ORDER BY.
+    # Unix epoch seconds. BIGINT, not INTEGER — 32-bit caps out in 2038.
+    available_at: Any = Column(BigInteger, nullable=False)
+    created_at: Any = Column(BigInteger, nullable=False)
     priority: Any = Column(Integer, nullable=False, default=0)
+
+    # Pop claims one row with WHERE queue=? AND available_at<=now
+    # ORDER BY priority DESC, available_at ASC. Putting priority before
+    # available_at lets the planner serve the ordering from the index instead
+    # of sorting the whole ready set on every claim. Also covers the queue-only
+    # filters used by size()/clear() via the leading column.
+    __table_args__ = (
+        Index("jobs_queue_priority_available_idx", "queue", "priority", "available_at"),
+    )
 
 
 def build_pop_statement(*, queue: str, now: int) -> Select[tuple[JobRow]]:
