@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-image-v0.8.0...arvel-image-v0.8.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* **image:** enforce decompression-bomb guard and add set_max_pixels ([d04c461](https://github.com/mohamed-rekiba/arvel/commit/d04c4611d8a5425774761ff03eba072b9f7096fc))
+
+
+### Performance
+
+* **image:** offload responsive Pillow work to a worker thread ([2967ebd](https://github.com/mohamed-rekiba/arvel/commit/2967ebd171afad8c647830d1e40458dbf0fdc4a4))
+
 ## [0.8.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-image-v0.7.0...arvel-image-v0.8.0) (2026-06-05)
 
 
