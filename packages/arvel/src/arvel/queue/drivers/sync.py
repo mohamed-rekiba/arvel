@@ -1,7 +1,9 @@
 """Sync driver — executes jobs inline in the calling coroutine.
 
- honours ``envelope.delay`` via ``asyncio.sleep`` before executing
-``handle``. Priority is a documented no-op (single in-flight job).
+Honours ``envelope.delay`` via ``asyncio.sleep`` before executing ``handle``.
+Priority is a documented no-op (single in-flight job). Chain successors run
+inline too — a chain link that raises ends the chain right there, which
+matches the worker's DLQ-driven stop-on-failure semantics.
 """
 
 from __future__ import annotations
@@ -20,6 +22,14 @@ class SyncConnection:
             await asyncio.sleep(envelope.delay)
         job = deserialize_job(envelope)
         await job.handle()
+        for step in envelope.chain:
+            successor = JobEnvelope(
+                job_class=step.job_class,
+                payload=step.payload,
+                delay=step.delay,
+                priority=step.priority,
+            )
+            await self.push(successor, queue=step.queue)
 
     async def pop_blocking(
         self, queue: str = "default", timeout: float = 3.0

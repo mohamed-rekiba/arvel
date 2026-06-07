@@ -7,12 +7,14 @@ import pytest
 
 class TestArvelTestCase:
     def test_class_exists_and_exposes_expected_protocol(self) -> None:
-        from arvel.testing import ArvelTestCase
+        from arvel.testing import ArvelTestCase, RefreshDatabase
 
         assert hasattr(ArvelTestCase, "asyncSetUp")
         assert hasattr(ArvelTestCase, "asyncTearDown")
         assert hasattr(ArvelTestCase, "acting_as")
-        assert hasattr(ArvelTestCase, "refresh_database")
+        # RefreshDatabase is a separate mixin — mix into ArvelTestCase to opt in.
+        assert hasattr(RefreshDatabase, "seed")
+        assert hasattr(RefreshDatabase, "asyncSetUp")
 
     @pytest.mark.asyncio
     async def test_setup_creates_app_and_client(self) -> None:

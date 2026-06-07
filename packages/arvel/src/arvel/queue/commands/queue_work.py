@@ -21,6 +21,7 @@ from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
 from arvel.console._t import Option as _Option
 from arvel.queue.manager import QueueManager
+from arvel.queue.restart import QueueRestartSignal
 from arvel.queue.worker import Worker
 
 
@@ -33,9 +34,13 @@ class QueueWorkCommand(Command):
         manager: QueueManager,
         *,
         failed_job_store: object | None = None,
+        restart_signal: QueueRestartSignal | None = None,
     ) -> None:
         self._manager = manager
         self._failed_job_store = failed_job_store
+        # Default to the framework's cache-backed signal so `queue:restart`
+        # actually reaches workers without callers wiring it explicitly.
+        self._restart_signal = restart_signal or QueueRestartSignal()
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self
@@ -72,7 +77,12 @@ class QueueWorkCommand(Command):
         with contextlib.suppress(NotImplementedError, RuntimeError):
             loop.add_signal_handler(signal.SIGTERM, _sigterm_handler)
 
-        worker = Worker(self._manager, queue=queue, failed_job_store=self._failed_job_store)
+        worker = Worker(
+            self._manager,
+            queue=queue,
+            failed_job_store=self._failed_job_store,
+            restart_signal=self._restart_signal,
+        )
         if stop_when_empty:
             await worker.drain_then_stop()
             return

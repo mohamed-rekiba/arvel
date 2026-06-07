@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
+import json as _json
 import re
-from collections.abc import Awaitable, Callable, Mapping
-from typing import Any
+import uuid as _uuid
+from collections.abc import Awaitable, Callable, Mapping, Sized
+from typing import Any, cast
 
 from sqlalchemy import column, select
 from sqlalchemy.sql import TableClause
@@ -20,6 +23,7 @@ _EXCEPT_VALUE_INDEX = 2
 _EXCEPT_COLUMN_INDEX = 3
 _JPEG_MARKER_BYTE = 0xFF
 _MIN_PNG_BYTES = 24
+_BETWEEN_PARAM_COUNT = 2
 _MIN_JPEG_SEGMENT_LENGTH = 2
 _JPEG_SOI = 0xD8
 _JPEG_EOI = 0xD9
@@ -305,11 +309,632 @@ async def rule_dimensions(
     return _dimension_violation(field, width, height, constraints)
 
 
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
+_URL_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+\-.]*://[^\s]+$")
+_ALPHA_RE = re.compile(r"^[A-Za-z]+$")
+_ALPHA_NUM_RE = re.compile(r"^[A-Za-z0-9]+$")
+_ALPHA_DASH_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
+
+_TRUTHY = frozenset({True, "1", "true", "True", "TRUE", "yes", "Yes", "YES", "on", "On", "ON"})
+_FALSY = frozenset({False, "0", "false", "False", "FALSE", "no", "No", "NO", "off", "Off", "OFF"})
+_ACCEPTED = frozenset({True, "1", "true", "yes", "on"})
+
+
+def _measure(value: object) -> float | None:
+    """How big is a value? len() for strings/lists/dicts; the value itself for numbers."""
+    if isinstance(value, bool):
+        return float(int(value))
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        return float(len(value))
+    if isinstance(value, (list, tuple, dict, set)):
+        sized = cast("Sized", value)
+        return float(len(sized))
+    return None
+
+
+def rule_nullable(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = field, value, params, data, request
+    return None  # always passes; presence-only marker for other rules
+
+
+def rule_present(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = value, params, request
+    if field not in data:
+        return f"The {field} field must be present."
+    return None
+
+
+def rule_filled(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, request
+    if field not in data:
+        return None
+    if value is None or _is_empty_value(value):
+        return f"The {field} field must have a value."
+    return None
+
+
+def rule_prohibited(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, request
+    if field in data and value is not None and not _is_empty_value(value):
+        return f"The {field} field is prohibited."
+    return None
+
+
+def rule_string(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None or isinstance(value, str):
+        return None
+    return f"The {field} must be a string."
+
+
+def rule_integer(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return f"The {field} must be an integer."
+    if isinstance(value, int):
+        return None
+    if isinstance(value, str):
+        try:
+            int(value)
+        except ValueError:
+            pass
+        else:
+            return None
+    return f"The {field} must be an integer."
+
+
+def rule_numeric(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return f"The {field} must be a number."
+    if isinstance(value, (int, float)):
+        return None
+    if isinstance(value, str):
+        try:
+            float(value)
+        except ValueError:
+            pass
+        else:
+            return None
+    return f"The {field} must be a number."
+
+
+def rule_boolean(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if value in _TRUTHY or value in _FALSY:
+        return None
+    return f"The {field} field must be true or false."
+
+
+def rule_accepted(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value in _ACCEPTED:
+        return None
+    return f"The {field} must be accepted."
+
+
+def rule_email(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, str) and _EMAIL_RE.match(value):
+        return None
+    return f"The {field} must be a valid email address."
+
+
+def rule_url(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, str) and _URL_RE.match(value):
+        return None
+    return f"The {field} must be a valid URL."
+
+
+def rule_uuid(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            _uuid.UUID(value)
+        except ValueError:
+            pass
+        else:
+            return None
+    return f"The {field} must be a valid UUID."
+
+
+def rule_ip(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            ipaddress.ip_address(value)
+        except ValueError:
+            pass
+        else:
+            return None
+    return f"The {field} must be a valid IP address."
+
+
+def rule_ipv4(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            ipaddress.IPv4Address(value)
+        except ValueError:
+            pass
+        else:
+            return None
+    return f"The {field} must be a valid IPv4 address."
+
+
+def rule_ipv6(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            ipaddress.IPv6Address(value)
+        except ValueError:
+            pass
+        else:
+            return None
+    return f"The {field} must be a valid IPv6 address."
+
+
+def rule_json(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            _json.loads(value)
+        except ValueError, TypeError:
+            pass
+        else:
+            return None
+    return f"The {field} must be a valid JSON string."
+
+
+def rule_alpha(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, str) and _ALPHA_RE.match(value):
+        return None
+    return f"The {field} must only contain letters."
+
+
+def rule_alpha_num(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, str) and _ALPHA_NUM_RE.match(value):
+        return None
+    return f"The {field} must only contain letters and numbers."
+
+
+def rule_alpha_dash(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if isinstance(value, str) and _ALPHA_DASH_RE.match(value):
+        return None
+    return f"The {field} must only contain letters, numbers, dashes and underscores."
+
+
+def rule_regex(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = data, request
+    if value is None:
+        return None
+    if not params:
+        return f"The {field} rule regex requires a pattern."
+    pattern = ",".join(params)  # rejoin in case the pattern contains commas
+    try:
+        compiled = re.compile(pattern)
+    except re.error:
+        return f"The {field} rule regex pattern is invalid."
+    if isinstance(value, str) and compiled.search(value):
+        return None
+    return f"The {field} format is invalid."
+
+
+def rule_not_regex(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = data, request
+    if value is None:
+        return None
+    if not params:
+        return f"The {field} rule not_regex requires a pattern."
+    pattern = ",".join(params)
+    try:
+        compiled = re.compile(pattern)
+    except re.error:
+        return f"The {field} rule not_regex pattern is invalid."
+    if isinstance(value, str) and not compiled.search(value):
+        return None
+    return f"The {field} format is invalid."
+
+
+def rule_starts_with(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = data, request
+    if value is None:
+        return None
+    if not params:
+        return f"The {field} rule starts_with requires at least one prefix."
+    if isinstance(value, str) and any(value.startswith(p) for p in params):
+        return None
+    joined = ", ".join(params)
+    return f"The {field} must start with one of: {joined}."
+
+
+def rule_ends_with(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = data, request
+    if value is None:
+        return None
+    if not params:
+        return f"The {field} rule ends_with requires at least one suffix."
+    if isinstance(value, str) and any(value.endswith(p) for p in params):
+        return None
+    joined = ", ".join(params)
+    return f"The {field} must end with one of: {joined}."
+
+
+def rule_in(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = data, request
+    if value is None:
+        return None
+    str_value = str(value)
+    if str_value in params:
+        return None
+    joined = ", ".join(params)
+    return f"The selected {field} is invalid. Allowed: {joined}."
+
+
+def rule_not_in(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = data, request
+    if value is None:
+        return None
+    str_value = str(value)
+    if str_value not in params:
+        return None
+    return f"The selected {field} is invalid."
+
+
+def rule_min(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = data, request
+    if value is None:
+        return None
+    if not params:
+        return f"The {field} rule min requires a limit."
+    try:
+        limit = float(params[0])
+    except ValueError:
+        return f"The {field} rule min limit must be numeric."
+    actual = _measure(value)
+    if actual is None or actual >= limit:
+        return None
+    return f"The {field} must be at least {params[0]}."
+
+
+def rule_max(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = data, request
+    if value is None:
+        return None
+    if not params:
+        return f"The {field} rule max requires a limit."
+    try:
+        limit = float(params[0])
+    except ValueError:
+        return f"The {field} rule max limit must be numeric."
+    actual = _measure(value)
+    if actual is None or actual <= limit:
+        return None
+    return f"The {field} may not be greater than {params[0]}."
+
+
+def rule_between(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = data, request
+    if value is None:
+        return None
+    if len(params) < _BETWEEN_PARAM_COUNT:
+        return f"The {field} rule between requires min and max."
+    try:
+        low = float(params[0])
+        high = float(params[1])
+    except ValueError:
+        return f"The {field} rule between limits must be numeric."
+    actual = _measure(value)
+    if actual is None or low <= actual <= high:
+        return None
+    return f"The {field} must be between {params[0]} and {params[1]}."
+
+
+def rule_size(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = data, request
+    if value is None:
+        return None
+    if not params:
+        return f"The {field} rule size requires a limit."
+    try:
+        expected = float(params[0])
+    except ValueError:
+        return f"The {field} rule size limit must be numeric."
+    actual = _measure(value)
+    if actual is None or actual == expected:
+        return None
+    return f"The {field} must be size {params[0]}."
+
+
+def rule_confirmed(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, request
+    confirmation_key = f"{field}_confirmation"
+    if data.get(confirmation_key) == value:
+        return None
+    return f"The {field} confirmation does not match."
+
+
+def rule_same(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    if not params:
+        return f"The {field} rule same requires a field name."
+    other = params[0]
+    if data.get(other) == value:
+        return None
+    return f"The {field} and {other} must match."
+
+
+def rule_different(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    if not params:
+        return f"The {field} rule different requires a field name."
+    other = params[0]
+    if data.get(other) != value:
+        return None
+    return f"The {field} and {other} must be different."
+
+
 RULE_HANDLERS: dict[str, RuleHandler] = {
+    "accepted": rule_accepted,
+    "alpha": rule_alpha,
+    "alpha_dash": rule_alpha_dash,
+    "alpha_num": rule_alpha_num,
+    "between": rule_between,
+    "boolean": rule_boolean,
+    "confirmed": rule_confirmed,
+    "different": rule_different,
     "digits": rule_digits,
     "dimensions": rule_dimensions,
+    "email": rule_email,
+    "ends_with": rule_ends_with,
     "exists": rule_exists,
+    "filled": rule_filled,
+    "in": rule_in,
+    "integer": rule_integer,
+    "ip": rule_ip,
+    "ipv4": rule_ipv4,
+    "ipv6": rule_ipv6,
+    "json": rule_json,
+    "max": rule_max,
     "mimes": rule_mimes,
+    "min": rule_min,
+    "not_in": rule_not_in,
+    "not_regex": rule_not_regex,
+    "nullable": rule_nullable,
+    "numeric": rule_numeric,
+    "present": rule_present,
+    "prohibited": rule_prohibited,
+    "regex": rule_regex,
     "required": rule_required,
+    "same": rule_same,
+    "size": rule_size,
+    "starts_with": rule_starts_with,
+    "string": rule_string,
     "unique": rule_unique,
+    "url": rule_url,
+    "uuid": rule_uuid,
 }

@@ -88,6 +88,24 @@ schedule.call(generate_report).everyFiveMinutes().withoutOverlapping()
 
 For multi-server deployments, `onOneServer()` ensures only one server runs a given task per tick.
 
+## Maintenance Mode & Output Capture
+
+By default, the scheduler skips every task while the app is in [maintenance mode](maintenance-mode.md) — the outcome appears as `in_maintenance_mode` in the scheduler log. If a task must still run during downtime (backups, log rotation), opt it in:
+
+```python
+task = schedule.call(rotate_logs).hourly()
+task.in_maintenance_mode = True
+```
+
+To capture a task's stdout and stderr to a file (for example, when shelling out to a CLI tool that prints to the console), set `output_to`:
+
+```python
+task = schedule.exec("backup.sh").daily_at("02:30")
+task.output_to = "storage/logs/backup.log"
+```
+
+The file is opened in append mode, so each run appends to it. Failures to open the file are logged but don't stop the task — your scheduler stays running.
+
 <a name="running-the-scheduler"></a>
 ## Running the Scheduler
 

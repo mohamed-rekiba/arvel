@@ -29,6 +29,7 @@ SESSION_FILES_PATH=storage/framework/sessions
 | `file` | Files on disk | Server-side, good for local dev |
 | `redis` | Redis | Requires `arvel[redis]` |
 | `database` | A `sessions` table | Ship the bundled migration |
+| `array` | An in-process dict | **Test-only**; resets per process, leaves no on-disk state |
 
 <a name="enabling-sessions"></a>
 ### Enabling Sessions
