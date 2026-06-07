@@ -31,7 +31,7 @@ class CacheFakeContext:
         # ARRAY driver is purely in-memory; file_path is unused by it but the
         # config object requires *some* value. Keep the default to avoid a
         # B108 false positive on a hardcoded /tmp path.
-        cfg = CacheConfig(connection=CacheDriver.ARRAY, prefix="test:", ttl=0)
+        cfg = CacheConfig(connection=CacheDriver.ARRAY, prefix="test:")
         Cache.manager = CacheManager(cfg)
         return self
 

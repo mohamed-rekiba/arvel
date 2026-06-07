@@ -27,7 +27,6 @@ async def cache_manager() -> CacheManager:
     cfg = CacheConfig(
         connection=CacheDriver.ARRAY,
         prefix="test:",
-        ttl=0,
         file_path=tempfile.gettempdir(),
     )
     return CacheManager(cfg)

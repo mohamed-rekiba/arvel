@@ -18,7 +18,7 @@ def _make_array_store() -> CacheStore:
     from arvel.config.cache_config import CacheConfig, CacheDriver
 
     cfg = CacheConfig(
-        connection=CacheDriver.ARRAY, prefix="signal-test:", ttl=0, file_path=tempfile.gettempdir()
+        connection=CacheDriver.ARRAY, prefix="signal-test:", file_path=tempfile.gettempdir()
     )
     return CacheManager(cfg).store(None)
 
