@@ -321,7 +321,7 @@ wheels = [
 
 [[package]]
 name = "arvel"
-version = "0.17.0"
+version = "0.17.1"
 source = { editable = "packages/arvel" }
 dependencies = [
     { name = "aiohttp" },
