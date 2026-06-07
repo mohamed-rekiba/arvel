@@ -1730,19 +1730,23 @@ class QueryBuilder(Generic[T]):
     ) -> Self:
         """Filter on a JSONB column path using PostgreSQL's ``->>`` operator.
 
-        Emits ``column->>'path' = :value``. PostgreSQL-only; ``path`` must be a
+        Emits ``column ->> :key = :value``. PostgreSQL-only; ``path`` must be a
         string key (not a nested dot-path — use ``where_raw`` for those).
-        Both ``column`` and ``path`` are developer-supplied identifiers, not
-        user input, so interpolation into the SQL template is safe.
+        ``path`` is bound as a parameter, so it's safe to pass user input (e.g.
+        a request locale). ``column`` is a SQL identifier and can't be bound —
+        keep it developer-supplied.
 
         Example::
 
             Product.where_json_path("slug", "en", slug_value)
-            # → WHERE slug->>'en' = :__json_path_val__
+            # → WHERE slug ->> :__json_path_key__ = :__json_path_val__
         """
+        from sqlalchemy import String, bindparam
+
         col_name: str = column if isinstance(column, str) else column.key
-        sql = text(f"{col_name}->>'{path}' = :__json_path_val__").bindparams(
-            __json_path_val__=value
+        sql = text(f"{col_name} ->> :__json_path_key__ = :__json_path_val__").bindparams(
+            bindparam("__json_path_key__", path, type_=String()),
+            __json_path_val__=value,
         )
         return self._and(sql)
 
