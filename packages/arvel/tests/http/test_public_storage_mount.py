@@ -1,13 +1,4 @@
-"""Static serving for storage:link (WI-arvel-003, PRD-003).
-
-RTM — acceptance criterion -> test:
-  AC-1 linked file 200      -> test_serves_file_under_public_storage
-  AC-1 via symlink 200      -> test_serves_through_storage_link_symlink
-  AC-2 API 404 unaffected   -> test_non_storage_path_uses_framework_404
-  AC-3 missing file 404     -> test_missing_file_404
-  AC-4 boot-safe no link    -> test_boots_without_link / test_no_public_dir_skips_mount
-  AC-5 traversal blocked    -> test_traversal_blocked
-"""
+"""Static serving for `storage:link` mounted under /storage."""
 
 from __future__ import annotations
 

@@ -36,7 +36,7 @@ def test_no_bare_nosec_comments() -> None:
                 continue
             offenders.append((path.relative_to(SRC_ROOT.parent.parent), n, line.strip()))
     assert not offenders, (
-        "FR-017-015: every '# nosec' must be '# nosec B###: <rationale>' "
+        "every '# nosec' must be '# nosec B###: <rationale>' "
         "(or '# nosec[B###]: <rationale>'). Offenders:\n"
         + "\n".join(f"  {p}:{n} -> {ln}" for p, n, ln in offenders)
     )

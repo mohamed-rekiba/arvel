@@ -71,7 +71,6 @@ class TestBasicTranslation:
     """Translator.get returns the translation."""
 
     def test_get_returns_english(self, translator: Translator) -> None:
-        # Note: AC1 expects literal string when no replacement happens
         assert translator.get("messages.welcome", replace={"name": "Alice"}) == "Welcome, Alice!"
 
     def test_set_locale_changes_language(self, translator: Translator) -> None:

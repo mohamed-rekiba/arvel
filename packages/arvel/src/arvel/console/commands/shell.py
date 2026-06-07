@@ -86,8 +86,8 @@ class ShellCommand(Command):
                 _Option("--dry-run", help="Validate shell bootstrap without launching REPL"),
             ] = False,
         ) -> None:
-            # --dry-run must NOT bootstrap the app (SEC-005-002): it's a cheap
-            # "does the command wire up" check, safe to run anywhere.
+            # --dry-run must NOT bootstrap the app — it's a cheap "does the
+            # command wire up" check that must stay safe to run anywhere.
             if dry_run:
                 typer.echo("Shell ready (dry run).")
                 return

@@ -34,8 +34,8 @@ def _as_list(value: object) -> list[object]:
 
 
 def test_release_workflow_exists() -> None:
-    assert RELEASE_YML.exists(), f"FR-017-021: {RELEASE_YML} must exist"
-    assert PUBLISH_YML.exists(), f"FR-017-021: {PUBLISH_YML} must exist"
+    assert RELEASE_YML.exists(), f"missing release workflow: {RELEASE_YML}"
+    assert PUBLISH_YML.exists(), f"missing publish workflow: {PUBLISH_YML}"
 
 
 def test_release_workflow_triggers_on_version_tag() -> None:
@@ -45,7 +45,7 @@ def test_release_workflow_triggers_on_version_tag() -> None:
     push = _as_dict(on.get("push", {}))
     tags = _as_list(push.get("tags", []))
     assert any("v" in str(t) for t in tags), (
-        "FR-017-021: publish workflow must trigger on push to <package>-v*.*.* tags"
+        "publish workflow must trigger on push to <package>-v*.*.* tags"
     )
 
 
@@ -77,10 +77,7 @@ def test_release_workflow_fails_closed() -> None:
                 if code.startswith(("echo ", 'echo "', "echo '")):
                     continue
                 assert "twine upload" not in code, (
-                    f"SEC-017-004: {job_name}.{step.get('name', '?')} must not "
-                    f"execute 'twine upload': {code!r}"
+                    f"{job_name}.{step.get('name', '?')} must not execute 'twine upload': {code!r}"
                 )
 
-    assert "twine check" in raw, (
-        "FR-017-021: publish.yml must run 'twine check' as a dry-run validation"
-    )
+    assert "twine check" in raw, "publish.yml must run 'twine check' as a dry-run validation"

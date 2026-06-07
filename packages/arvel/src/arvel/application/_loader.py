@@ -89,8 +89,8 @@ def load_module_from_path(path: Path, module_name: str) -> ModuleType:
         sys.modules.pop(module_name, None)
         sys.path[:] = sys_path_before
         raise SysPathMutationError(
-            f"Module {module_name!r} loaded from {path} mutated sys.path "
-            f"(NFR-004-004 violation). User code must not append/insert to sys.path.",
+            f"Module {module_name!r} loaded from {path} mutated sys.path. "
+            "User code must not append/insert to sys.path.",
         )
 
     _module_cache[cache_key] = module

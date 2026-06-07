@@ -19,7 +19,7 @@ Usage::
  # versioner.versioned_key(...) now returns a different key.
 
 Each ``CacheVersioner`` instance is scoped to a prefix so two versioners
-with different prefixes don't interfere (AC-18).
+with different prefixes don't interfere.
 """
 
 from __future__ import annotations

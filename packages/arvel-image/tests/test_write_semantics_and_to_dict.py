@@ -1,25 +1,19 @@
-"""Stories 9 + 10 gap-closing tests.
+"""Collection write semantics + ``to_dict`` behavior.
 
-Story 9 (collection write semantics) already had most ACs covered by
-test_046 and test_050; this file closes the two gaps:
+Covers:
 
-  AC4 — ConversionFailedError message must name the conversion *and* the
-        source media id (plus chain the wrapped exception).
-  AC5 — accept_mime_types rejection must short-circuit BEFORE any bytes
-        hit storage (not just "before save").
+- ``ConversionFailedError`` names the conversion *and* the source media id
+  (and chains the wrapped exception).
+- ``accept_mime_types`` rejection short-circuits BEFORE any bytes hit storage.
+- ``to_dict()`` on a host without eager-loaded media has no ``media`` key and
+  fires zero DB queries during serialization.
+- ``to_dict()`` after ``.with_("media")`` exposes the eager-loaded rows.
+- Multi-collection host's ``to_dict()`` shows only its own collection.
+- ``Media.copy`` / ``Media.move`` across hosts with different ``__morph_class__``
+  write the new row's ``model_type`` as the *destination's* morph class.
 
-Story 10 (to_dict + multi-collection + cross-morph copy/move) is mostly
-new ground:
-
-  AC1 — to_dict() on a host without eager-loaded media has no `media` key
-        and fires zero DB queries during serialization.
-  AC2 — to_dict() after `.with_("media")` exposes the eager-loaded rows.
-  AC3 — Multi-collection host's to_dict() shows only its own collection.
-  AC5 — Media.copy / Media.move across hosts with different `__morph_class__`
-        write the new row's model_type as the *destination's* morph class.
-
-(AC4 — `__morph_class__` honored on read+write — is covered by
-test_load_media.py and not duplicated here.)
+(``__morph_class__`` honored on read+write is covered by ``test_load_media.py``
+and not duplicated here.)
 """
 
 from __future__ import annotations
@@ -166,7 +160,7 @@ async def _create_tables(engine: AsyncEngine) -> None:
         await conn.run_sync(Model.metadata.create_all)
 
 
-# ─── Story 9 AC4 — ConversionFailedError names the media id ─────────────────
+# ─── ConversionFailedError names the media id ────────────────────────────────
 
 
 async def test_conversion_failure_error_names_conversion_and_media_id(
@@ -245,7 +239,7 @@ async def test_conversion_runner_without_context_omits_parenthetical(
     assert "12-byte source" in msg
 
 
-# ─── Story 9 AC5 — MIME rejection short-circuits BEFORE disk write ──────────
+# ─── MIME rejection short-circuits BEFORE disk write ────────────────────────
 
 
 async def test_invalid_mime_rejected_before_any_disk_write(
@@ -274,7 +268,7 @@ async def test_invalid_mime_rejected_before_any_disk_write(
         )
 
 
-# ─── Story 10 AC1+AC2 — to_dict() honors eager-load presence ────────────────
+# ─── to_dict() honors eager-load presence ────────────────────────────────────
 
 
 async def test_to_dict_without_eager_load_omits_media_key(
@@ -358,7 +352,7 @@ async def test_to_dict_with_eager_load_serializes_media(
         assert file_names == {"a.jpg", "b.jpg"}
 
 
-# ─── Story 10 AC3 — multi-collection bleed protection ───────────────────────
+# ─── multi-collection bleed protection ───────────────────────────────────────
 
 
 async def test_to_dict_filters_to_own_collection_only(
@@ -416,7 +410,7 @@ async def test_media_in_callable_filter_branch(
         assert all(isinstance(m, Media) for m in filtered)
 
 
-# ─── Story 10 AC5 — copy / move across __morph_class__ writes correct type ──
+# ─── copy / move across __morph_class__ writes correct type ─────────────────
 
 
 async def test_media_copy_across_morph_class_uses_target_morph_alias(

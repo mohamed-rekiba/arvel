@@ -7,10 +7,7 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip(
-    "arvel_image",
-    reason="WI-arvel-025 Stage 3b creates this package",
-)
+pytest.importorskip("arvel_image", reason="arvel-image package not installed")
 pytest.importorskip("PIL", reason="arvel-image depends on Pillow")
 
 

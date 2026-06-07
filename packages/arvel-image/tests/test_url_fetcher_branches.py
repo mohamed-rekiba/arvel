@@ -1,14 +1,14 @@
-"""Branch coverage for url_fetcher.py — Story 2 (Track D).
+"""Branch coverage for url_fetcher.py.
 
-Targets the 10 lines flagged missing by the WI-arvel-001 final coverage report:
-- 32-33: _safe_url's urlparse ValueError fallback
-- 36-39: _safe_url's userinfo-stripping happy path
-- 76-81: fetch_url's httpx ImportError branch
-- 180:   sniff_image_mime's `if fmt is None` branch
+Pins the missing branches surfaced by the coverage report:
+- 32-33: ``_safe_url``'s urlparse ValueError fallback
+- 36-39: ``_safe_url``'s userinfo-stripping happy path
+- 76-81: ``fetch_url``'s httpx ImportError branch
+- 180:   ``sniff_image_mime``'s ``if fmt is None`` branch
 
-Security focus: the userinfo-stripping tests are the security pin for the
-iter-5 credential-leak fix. They MUST assert that the credential does not
-appear in the returned string, not just that the URL is "different".
+Security focus: the userinfo-stripping tests are the credential-leak guard.
+They MUST assert that the credential does not appear in the returned string,
+not just that the URL is "different".
 """
 
 from __future__ import annotations

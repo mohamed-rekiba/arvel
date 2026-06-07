@@ -2,10 +2,10 @@
 
 Hosts two unrelated, workspace-wide concerns:
 
-1. The FB-010 per-module coverage gate — reads
-   ``[tool.coverage.arvel_per_module]`` from the workspace ``pyproject.toml``
-   and, after pytest-cov has finished collecting, fails the run if any listed
-   module's line coverage falls below its declared floor.
+1. The per-module coverage gate — reads ``[tool.coverage.arvel_per_module]``
+   from the workspace ``pyproject.toml`` and, after pytest-cov has finished
+   collecting, fails the run if any listed module's line coverage falls below
+   its declared floor.
 
 2. Shared ORM fixtures (``engine`` / ``session_maker`` / ``session``) for the
    in-memory async-SQLite + bound-session pattern used by every package's
@@ -110,7 +110,7 @@ def pytest_terminal_summary(
         return
 
     failures: list[str] = []
-    terminalreporter.section("Per-module coverage gates (FB-010 / ADR-011)")
+    terminalreporter.section("Per-module coverage gates")
     for module_dotted, floor in sorted(floors.items()):
         actual = _module_coverage_percent(cov, module_dotted)
         if actual is None:
@@ -125,7 +125,7 @@ def pytest_terminal_summary(
 
     if failures:
         terminalreporter.write_line("")
-        terminalreporter.write_line("FAIL: per-module coverage gates not met (FB-010):")
+        terminalreporter.write_line("FAIL: per-module coverage gates not met:")
         for f in failures:
             terminalreporter.write_line(f"  - {f}")
         _PENDING_FAILURE = True

@@ -1,7 +1,9 @@
-"""Smoke benchmarks for WI-arvel-001 NFRs.
+"""Smoke benchmarks for the foundations layer.
 
-NFR-001-001  Application boot ≤ 50 ms (empty provider set, p95).
-NFR-001-002  Container.make on a singleton ≤ 1 µs (cached, p95).
+Budgets:
+
+- Application boot ≤ 50 ms (empty provider set, p95).
+- ``Container.make`` on a singleton ≤ 1 µs (cached, p95).
 
 Run: ``uv run python benchmarks/bench_foundations.py``
 """

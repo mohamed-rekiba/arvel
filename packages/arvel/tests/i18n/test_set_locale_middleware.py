@@ -101,7 +101,7 @@ def test_user_locale_wins_over_header() -> None:
     assert response.text == "ar"
 
 
-# AC-04b: No user → header wins
+# No user → header wins
 
 
 def test_no_user_header_wins() -> None:
@@ -110,7 +110,7 @@ def test_no_user_header_wins() -> None:
     assert response.text == "es"
 
 
-# AC-03b: No header, no user → default
+# No header, no user → default
 
 
 def test_default_locale_when_no_header() -> None:

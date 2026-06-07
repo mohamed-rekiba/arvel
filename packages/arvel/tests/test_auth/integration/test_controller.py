@@ -1,8 +1,8 @@
 """End-to-end HTTP roundtrip tests for AuthController.
-Each test maps to a PRD-028 acceptance criterion and exercises the full
-HTTP path — request schema → controller → service → repo → response.
-The app uses an in-memory SQLite database via ``engine``/``session`` from
-the workspace root conftest.
+
+Exercises the full HTTP path — request schema → controller → service → repo →
+response. The app uses an in-memory SQLite database via ``engine``/``session``
+from the workspace root conftest.
 """
 
 from __future__ import annotations

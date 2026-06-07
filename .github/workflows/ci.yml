@@ -131,10 +131,10 @@ jobs:
           ignore-nothing-to-cache: true
       - run: uv sync --all-packages --all-extras --frozen
       - name: Run reverb benchmarks
-        # Hard gate per ADR-112 (WI-017). Thresholds in bench_reverb.py are
-        # the code-internal NFR contract; gate values are 1.5× observed p99.
-        # Re-calibrate via benchmarks/scripts/calibrate_bench_reverb.py if
-        # flakes appear; never reintroduce continue-on-error.
+        # Hard gate. Thresholds in bench_reverb.py are the code-internal NFR
+        # contract; gate values are 1.5× observed p99. Re-calibrate via
+        # benchmarks/scripts/calibrate_bench_reverb.py if flakes appear;
+        # never reintroduce continue-on-error.
         run: uv run python benchmarks/bench_reverb.py | tee bench-reverb-output.txt
       - name: Upload bench output
         if: always()
@@ -157,9 +157,9 @@ jobs:
           ignore-nothing-to-cache: true
       - run: uv sync --all-packages --all-extras --frozen
       - name: Run tracemalloc bench
-        # WI-017 / FR-017-011. Companion to bench-reverb; same script,
-        # but the tracemalloc gate (96 MiB heap budget) catches sub-page
-        # regressions that ru_maxrss can miss.
+        # Companion to bench-reverb; same script, but the tracemalloc gate
+        # (96 MiB heap budget) catches sub-page regressions that ru_maxrss
+        # can miss.
         run: uv run python benchmarks/bench_reverb.py | tee bench-tracemalloc-output.txt
       - name: Upload tracemalloc bench output
         if: always()
@@ -182,11 +182,10 @@ jobs:
           ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
       - name: bandit (MEDIUM+ blocks; LOW allowlisted with rationale)
-        # FR-017-013 / SEC-017-001. LOW findings are allowed via inline
-        # `# nosec[B###]: rationale`; MEDIUM+ MUST be fixed or surfaced
-        # by review. The packaged skeleton (template code rendered into
-        # freshly-scaffolded user projects) is excluded — it belongs to
-        # user code, not Arvel runtime.
+        # LOW findings are allowed via inline `# nosec[B###]: rationale`;
+        # MEDIUM+ MUST be fixed or surfaced by review. The packaged skeleton
+        # (template code rendered into freshly-scaffolded user projects) is
+        # excluded — it belongs to user code, not Arvel runtime.
         run: |
           uv run bandit \
             -r packages/arvel/src \
@@ -217,12 +216,11 @@ jobs:
           ignore-nothing-to-cache: true
       - run: uv sync --all-packages --all-extras --frozen
       - name: pip-audit
-        # FR-017-014 / SEC-017-002. --skip-editable skips our own workspace
-        # package (arvel), which is always editable in this monorepo;
-        # --strict + --skip-editable is mutually exclusive, so the gate is
-        # the exit code (non-zero on any unfixed CVE in a third-party dep).
-        # Findings with no available fix go to
-        # docs/security/dependency-exceptions.md with a re-eval date.
+        # --skip-editable skips our own workspace package (arvel), which is
+        # always editable in this monorepo; --strict + --skip-editable is
+        # mutually exclusive, so the gate is the exit code (non-zero on any
+        # unfixed CVE in a third-party dep). Findings with no available fix
+        # go to docs/security/dependency-exceptions.md with a re-eval date.
         run: >-
           uv run pip-audit --skip-editable
           --ignore-vuln PYSEC-2026-89

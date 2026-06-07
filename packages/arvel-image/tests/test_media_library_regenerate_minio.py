@@ -1,4 +1,4 @@
-"""MediaLibrary.regenerate() integration test against MinIO — Story 3 (Track F).
+"""MediaLibrary.regenerate() integration test against MinIO.
 
 Closes the unit-mock gap on the only path that touches a real S3 driver.
 Unit tests use ``Storage.fake()`` (in-memory); this exercises the wire
@@ -151,7 +151,7 @@ def _make_s3_manager(endpoint: _MinioEndpointLike, bucket: str) -> Any:
     return StorageManager(config=storage_config, s3_config=s3_config)
 
 
-# ─── Story 3 AC2 — basic round-trip ──────────────────────────────────────────
+# ─── basic round-trip ────────────────────────────────────────────────────────
 
 
 async def test_regenerate_round_trips_through_minio(
@@ -196,7 +196,7 @@ async def test_regenerate_round_trips_through_minio(
         Storage.swap_manager(previous)
 
 
-# ─── Story 3 AC3 — regenerate fills in newly-added conversions ───────────────
+# ─── regenerate fills in newly-added conversions ─────────────────────────────
 
 
 async def test_regenerate_creates_newly_added_conversion(
@@ -245,7 +245,7 @@ async def test_regenerate_creates_newly_added_conversion(
         _restore_host_f_registration()
 
 
-# ─── Story 3 AC4 — idempotency under repeated regeneration ───────────────────
+# ─── idempotency under repeated regeneration ─────────────────────────────────
 
 
 async def test_regenerate_is_idempotent(
@@ -283,7 +283,7 @@ async def test_regenerate_is_idempotent(
         Storage.swap_manager(previous)
 
 
-# ─── Story 3 AC5 — survives missing source bytes ─────────────────────────────
+# ─── survives missing source bytes ───────────────────────────────────────────
 
 
 async def test_regenerate_skips_when_source_is_missing(

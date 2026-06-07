@@ -1,15 +1,4 @@
-"""Framework-level local file serving (WI-arvel-001, PRD-001).
-
-RTM — acceptance criterion → test:
-  AC-1 public 200            -> test_serves_public_file
-  AC-2 missing 404           -> test_missing_file_404
-  AC-3 traversal 404         -> test_traversal_attempts_404
-  AC-4 serve=false no route  -> test_serve_disabled_registers_no_route
-  AC-5 absolute url no route -> test_absolute_url_registers_no_route
-  AC-6 valid signed 200      -> test_valid_signed_url_served
-  AC-7 tampered/expired 403  -> test_tampered_token_403 / test_expired_token_403
-  AC-8 temp-url round trip   -> test_temporary_url_round_trips
-"""
+"""Framework-level local file serving."""
 
 from __future__ import annotations
 

@@ -4,10 +4,9 @@ Inherits engine/session fixtures from the workspace-root conftest.py — only
 defines fixtures that are specific to arvel-image's integration suite.
 
 MinIO fixtures are copied from ``kits/arvel-ecommerce-kit/backend/tests/
-conftest.py`` per ADR-132 § 8 (Rule of Three — two callers is premature
-abstraction). If a third caller appears or this fixture grows significantly,
-extract to ``arvel.testing.s3`` in a follow-up WI. Keep this file's MinIO
-image pin in sync with the kit's.
+conftest.py`` (Rule of Three — two callers is premature abstraction). If a
+third caller appears or this fixture grows significantly, extract to
+``arvel.testing.s3``. Keep this file's MinIO image pin in sync with the kit's.
 """
 
 from __future__ import annotations
@@ -21,11 +20,11 @@ from typing import Any
 
 import pytest
 
-# Keep this pin in sync with kits/arvel-ecommerce-kit/backend/tests/conftest.py
-# per ADR-132 § 8. Bump via web search before each WI cadence — verify the
-# exact tag exists on Docker Hub (`docker manifest inspect <image>`) before
-# committing. Don't assume minio/minio and minio/mc share the same RELEASE
-# date; they cut releases independently.
+# Keep this pin in sync with kits/arvel-ecommerce-kit/backend/tests/conftest.py.
+# Bump via web search — verify the exact tag exists on Docker Hub
+# (`docker manifest inspect <image>`) before committing. Don't assume
+# minio/minio and minio/mc share the same RELEASE date; they cut releases
+# independently.
 IMAGE_MINIO = "minio/minio:RELEASE.2025-09-07T16-13-09Z"  # web-verified 2026-06-04
 
 _MINIO_ROOT_USER = "minioadmin"

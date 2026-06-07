@@ -1,8 +1,4 @@
-"""HTTP exception hierarchy + central handler.
-
-See ``docs/api/http-api.md`` for the contract and ``docs/architecture/SAD-002-http-layer.md``
-§Components/Exceptions for the design.
-"""
+"""HTTP exception hierarchy + central handler."""
 
 from __future__ import annotations
 

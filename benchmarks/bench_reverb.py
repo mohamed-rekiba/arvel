@@ -1,15 +1,18 @@
-"""Performance + memory benchmarks for the Reverb broadcasting subsystem (WI-arvel-014).
+"""Performance + memory benchmarks for the Reverb broadcasting subsystem.
 
-NFR-013-001  publish-to-subscribe local fan-out p99 latency ≤ 5 ms
-NFR-013-003  resident memory ≤ 64 MiB for 1000 connections / 100 channels
+Budgets:
+
+- publish-to-subscribe local fan-out p99 latency ≤ 5 ms
+- resident memory ≤ 64 MiB for 1000 connections / 100 channels
 
 Run: ``uv run python benchmarks/bench_reverb.py``
 
 Exits 0 on PASS for all three budgets (publish p99, RSS delta, tracemalloc
 heap delta), 1 on FAIL. The CI ``bench-reverb`` and ``bench-tracemalloc``
-jobs are hard gates per ADR-112.
+jobs are hard gates.
 
 Memory unit notes:
+
 - ``resource.getrusage(RUSAGE_SELF).ru_maxrss`` returns kilobytes on Linux
   and bytes on macOS/BSD. ``_ru_maxrss_to_mib`` normalises both to MiB.
 - ``tracemalloc`` reports Python-heap allocations in bytes; portable across
@@ -29,15 +32,14 @@ import tracemalloc
 from arvel.broadcasting.config import ReverbConfig
 from arvel.reverb.server import ReverbServer
 
-NFR_PUBLISH_P99_MS = 5.0  # NFR-013-001
-NFR_MEMORY_MIB = 64  # NFR-013-003
-NFR_CONNECTIONS = 1000  # NFR-013-003 scenario
-NFR_CHANNELS = 100  # NFR-013-003 scenario
+NFR_PUBLISH_P99_MS = 5.0
+NFR_MEMORY_MIB = 64
+NFR_CONNECTIONS = 1000
+NFR_CHANNELS = 100
 
-# WI-017 / FR-017-010: byte-granular Python-heap budget for the same scenario.
-# Initial conservative ceiling — looser than NFR_MEMORY_MIB because tracemalloc
-# captures heap-only allocations not the OS-level RSS picture. Calibrated in
-# ADR-112.
+# Byte-granular Python-heap budget for the same scenario. Conservative
+# ceiling — looser than NFR_MEMORY_MIB because tracemalloc captures heap-only
+# allocations, not the OS-level RSS picture.
 TRACEMALLOC_BUDGET_MIB = 96
 
 
@@ -87,10 +89,10 @@ def _ru_maxrss_to_mib(ru_maxrss: int) -> float:
 def bench_resident_memory(connections: int = NFR_CONNECTIONS, channels: int = NFR_CHANNELS) -> int:
     """Return the *incremental* ru_maxrss cost (raw units) of N subs across M channels.
 
-    NFR-013-003 sets the 64 MiB budget for the broadcasting subsystem's marginal
-    memory cost, not the absolute process size (which includes the Python runtime
-    and all of arvel's imports). We sample ru_maxrss before allocating the server
-    + subscribers, again after, and return the non-negative delta.
+    The 64 MiB budget covers the broadcasting subsystem's marginal memory cost,
+    not the absolute process size (which includes the Python runtime and all of
+    arvel's imports). We sample ru_maxrss before allocating the server +
+    subscribers, again after, and return the non-negative delta.
     """
     before = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     server = ReverbServer(config=ReverbConfig(app_id="b", key="b", secret="b"))  # noqa: S106 — benchmark fixture, not a credential
@@ -110,10 +112,9 @@ def bench_resident_memory_tracemalloc(
 ) -> int:
     """Return the *incremental* Python-heap cost in bytes for N subs / M channels.
 
-    FB-014-002 / FR-017-010: companion to bench_resident_memory(). Uses
-    tracemalloc to capture byte-granular Python-heap allocations attributable
-    to building the broadcasting state, instead of the page-granular RSS
-    high-water mark.
+    Companion to ``bench_resident_memory()``. Uses tracemalloc to capture
+    byte-granular Python-heap allocations attributable to building the
+    broadcasting state, instead of the page-granular RSS high-water mark.
 
     Returns the absolute delta in bytes; the caller converts to MiB.
     """
