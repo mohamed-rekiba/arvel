@@ -46,8 +46,12 @@ changelog once shipped.
 - Maintenance `--render` template — `arvel down --render path/to/page.html` now
   serves that page as HTML, falling back to plain text on read errors
 - Array session store — `SESSION_DRIVER=array` is registered, useful for tests
-- Auth provider name — `arvent` is the canonical (and only) driver; config
-  validation rejects unknown drivers at load time with a clear error
+- Auth provider name — `database` is the canonical (and only) driver string;
+  `ProviderConfig.driver` rejects unknown values at config load time with a
+  clear `"Valid drivers: 'database'."` error. The implementation class
+  (`ArventUserProvider`, in `arvel.auth.providers.arvent`) is wired to that
+  string — the class name reflects the underlying Arvent ORM, the driver
+  string stays generic to match the kit + stub scaffolding.
 - Auth dead-field cleanup — removed inert `LoginRequest.remember` field and
   `users.remember_token` column (proper remember-me will ship as a designed
   feature, not an inert placeholder)

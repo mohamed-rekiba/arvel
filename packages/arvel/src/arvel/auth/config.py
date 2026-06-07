@@ -13,7 +13,7 @@ class GuardConfig(BaseModel):
 
 
 class ProviderConfig(BaseModel):
-    VALID_DRIVERS: ClassVar[frozenset[str]] = frozenset({"arvent"})
+    VALID_DRIVERS: ClassVar[frozenset[str]] = frozenset({"database"})
 
     driver: str
     model: str

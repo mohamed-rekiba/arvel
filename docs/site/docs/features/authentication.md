@@ -119,7 +119,7 @@ The only built-in provider is the **arvent provider**, which looks users up agai
 ```python
 # config/auth.py (published by `arvel auth:install`)
 providers = {
-    "users": {"driver": "arvent", "model": "app.models.user.User"},
+    "users": {"driver": "database", "model": "app.models.user.User"},
 }
 ```
 
