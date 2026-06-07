@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.6.2...arvel-permission-v0.6.3) (2026-06-07)
+
+
+### Bug Fixes
+
+* **permission:** make role/permission middleware work with Arvel pipeline ([a46519a](https://github.com/mohamed-rekiba/arvel/commit/a46519ac6458889e3b27bbe2b82555d92595629b))
+
 ## [0.6.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.6.1...arvel-permission-v0.6.2) (2026-06-07)
 
 
