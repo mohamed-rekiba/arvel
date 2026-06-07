@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.17.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.17.1...arvel-v0.17.2) (2026-06-07)
+
+
+### Bug Fixes
+
+* **cache:** drop stale ttl arg from CacheConfig calls ([56d8b6d](https://github.com/mohamed-rekiba/arvel/commit/56d8b6db2d2d202b73c62fb81bc8da82abfde2e1))
+* **database:** use dialect-aware JsonB/TsVector in column helpers ([12f4cc3](https://github.com/mohamed-rekiba/arvel/commit/12f4cc3fbae8e61f088f26a0232f039a29fc93bf))
+* **queue:** give each job envelope a unique id ([c68d8c7](https://github.com/mohamed-rekiba/arvel/commit/c68d8c7bb098b373f2cc2c3062820a403a5dbcf7))
+* **queue:** preserve FIFO within priority in redis driver ([971d539](https://github.com/mohamed-rekiba/arvel/commit/971d53919edd4837d09bf2bca9c192834f358ebd))
+* **queue:** store jobs epochs as BIGINT and index pop by priority ([d93c26b](https://github.com/mohamed-rekiba/arvel/commit/d93c26bfc44b64c67103642958a652323eb532f6))
+
 ## [0.17.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.17.0...arvel-v0.17.1) (2026-06-07)
 
 
