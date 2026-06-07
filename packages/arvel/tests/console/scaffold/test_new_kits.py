@@ -31,7 +31,11 @@ def runner() -> CliRunner:
 
 
 def _local_ecommerce_kit(kit_src: Path) -> KitSpec:
-    """Minimal e-commerce kit tree with the real kit's post-scaffold hints."""
+    """Real e-commerce kit spec with its source pointed at a local fixture tree.
+
+    Carries the kit's actual overrides (sync args, finalize hook) so the
+    localization runs exactly as it would in production.
+    """
     base = KITS["ecommerce"]
     return KitSpec(
         name=base.name,
@@ -39,6 +43,9 @@ def _local_ecommerce_kit(kit_src: Path) -> KitSpec:
         resolve=lambda: kit_src,
         next_step_commands=base.next_step_commands,
         python_project_subdir=base.python_project_subdir,
+        uses_template_tokens=base.uses_template_tokens,
+        sync_args=base.sync_args,
+        finalize=base.finalize,
     )
 
 
@@ -58,6 +65,24 @@ def test_kits_registry_is_typed() -> None:
 def test_default_kit_is_api() -> None:
     assert DEFAULT_KIT == "api"
     assert DEFAULT_KIT in KITS
+
+
+def test_kits_declare_their_own_process_not_special_cased_by_name() -> None:
+    """Per-kit behaviour lives on the spec, so `new` stays kit-agnostic."""
+    api = KITS["api"]
+    ecommerce = KITS["ecommerce"]
+
+    # The bundled api skeleton is token-templated; the prebuilt kit is verbatim.
+    assert api.uses_template_tokens is True
+    assert ecommerce.uses_template_tokens is False
+
+    # Sync flags are data, not a name branch in the command.
+    assert api.sync_args == ("sync",)
+    assert ecommerce.sync_args == ("sync", "--all-extras", "--dev")
+
+    # The api kit needs no post-render surgery; the e-commerce kit localizes itself.
+    assert api.finalize is None
+    assert ecommerce.finalize is not None
 
 
 def test_available_kits_returns_registered_names() -> None:

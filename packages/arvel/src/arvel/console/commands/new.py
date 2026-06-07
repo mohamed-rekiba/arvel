@@ -16,7 +16,6 @@ Pipeline:
 6. Print next-steps. for the templating contract.
 """
 
-import re
 import shutil
 
 # Only invoked with the resolved `uv` binary and a static argv (`uv sync …`).
@@ -35,6 +34,7 @@ from arvel.console._scaffold import (
     InvalidProjectName,
     KitSpec,
     KitUnavailableError,
+    ScaffoldContext,
     UnknownKitError,
     format_kit_listing,
     resolve_kit,
@@ -139,7 +139,6 @@ def _print_next_steps(
     *,
     no_install: bool,
     kit_spec: KitSpec,
-    sync_args: Sequence[str] = ("sync",),
 ) -> None:
     typer.echo("")
     typer.echo(f"Created {name}/ from the {kit_spec.name!r} kit.")
@@ -147,7 +146,7 @@ def _print_next_steps(
     typer.echo("Next steps:")
     typer.echo(f"  cd {name}")
     if no_install:
-        sync_cmd = "uv " + " ".join(sync_args)
+        sync_cmd = "uv " + " ".join(kit_spec.sync_args)
         subdir = kit_spec.python_project_subdir
         typer.echo(f"  (cd {subdir} && {sync_cmd})" if subdir else f"  {sync_cmd}")
     for command in kit_spec.next_step_commands:
@@ -220,13 +219,6 @@ def _stage_and_promote(kit_root: Path, opts: _StageOptions) -> None:
             shutil.rmtree(staging_parent, ignore_errors=True)
 
 
-def _uv_sync_args(kit: str) -> tuple[str, ...]:
-    """The api skeleton has no extras; the e-commerce kit pulls many + a dev group."""
-    if kit == DEFAULT_KIT:
-        return ("sync",)
-    return ("sync", "--all-extras", "--dev")
-
-
 def _run_uv_sync(target: Path, args: Sequence[str]) -> None:
     uv_bin = shutil.which("uv")
     command = "uv " + " ".join(args)
@@ -248,80 +240,6 @@ def _run_uv_sync(target: Path, args: Sequence[str]) -> None:
         raise typer.Exit(code=1) from exc
 
 
-# uv workspace plumbing that only works inside the Arvel monorepo. The kit
-# ships these so its own tests resolve `arvel` locally; in a scaffolded project
-# they make `uv sync` fail ("references a workspace … but is not a member").
-_MONOREPO_TOML_TABLES: tuple[str, ...] = ("tool.uv.sources", "tool.uv")
-
-
-def _strip_toml_table(text: str, header: str) -> str:
-    """Drop a whole ``[header]`` table — its body runs to the next table or EOF."""
-    pattern = rf"(?ms)^\[{re.escape(header)}\][^\n]*\n.*?(?=^\[|\Z)"
-    return re.sub(pattern, "", text)
-
-
-def _localize_scaffolded_pyproject(project_root: Path, project: str, kit: str) -> None:
-    """Turn the kit's copied pyproject into a standalone project's pyproject.
-
-    The api skeleton substitutes ``{{project_name}}`` tokens; the e-commerce kit
-    is copied verbatim, so its monorepo identity is rewritten here — the project
-    name, and the workspace-only ``[tool.uv]`` / ``[tool.uv.sources]`` tables
-    that otherwise break ``uv sync`` outside the Arvel checkout. ``project`` is
-    validated against PROJECT_NAME_REGEX, so it's safe to inline. ``project_root``
-    is the dir holding the pyproject (``backend/`` for the e-commerce kit).
-    """
-    if kit == DEFAULT_KIT:
-        return
-    pyproject = project_root / "pyproject.toml"
-    if not pyproject.is_file():
-        return
-    original = pyproject.read_text(encoding="utf-8")
-    text = re.sub(
-        r'(?m)^name\s*=\s*"arvel-ecommerce-kit"',
-        f'name = "{project}"',
-        original,
-        count=1,
-    )
-    for header in _MONOREPO_TOML_TABLES:
-        text = _strip_toml_table(text, header)
-    text = text.rstrip() + "\n"
-    if text != original:
-        pyproject.write_text(text, encoding="utf-8")
-
-
-# The kit's docker-compose.yml is authored for the monorepo: it bind-mounts the
-# repo root (`../..`), syncs the whole uv workspace from `/workspace` (the repo
-# root holds the workspace pyproject), then works out of
-# `kits/arvel-ecommerce-kit/backend`. A scaffolded project has none of that —
-# the only `pyproject.toml` sits in `backend/` and `arvel` comes from PyPI. So
-# `uv sync` has to run from `/workspace/backend`, not `/workspace`, or it errors
-# with "No pyproject.toml found". Rewrite every monorepo path accordingly. The
-# trailing `cd /workspace/backend` is then a harmless no-op (sync already left us
-# there), which keeps the rewrite a set of independent string swaps.
-_COMPOSE_MONOREPO_REWRITES: tuple[tuple[str, str], ...] = (
-    ("/workspace/kits/arvel-ecommerce-kit/backend", "/workspace/backend"),
-    ("cd /workspace &&", "cd /workspace/backend &&"),
-    ("cd kits/arvel-ecommerce-kit/backend", "cd /workspace/backend"),
-    ("../..:/workspace", ".:/workspace"),
-    ("uv sync --frozen --all-packages", "uv sync --frozen"),
-)
-
-
-def _localize_scaffolded_compose(target: Path, kit: str) -> None:
-    """Rewrite the kit's monorepo docker-compose.yml for the standalone project."""
-    if kit == DEFAULT_KIT:
-        return
-    compose = target / "docker-compose.yml"
-    if not compose.is_file():
-        return
-    original = compose.read_text(encoding="utf-8")
-    text = original
-    for monorepo, standalone in _COMPOSE_MONOREPO_REWRITES:
-        text = text.replace(monorepo, standalone)
-    if text != original:
-        compose.write_text(text, encoding="utf-8")
-
-
 def _scaffold(
     name: str,
     *,
@@ -329,7 +247,12 @@ def _scaffold(
     python: str | None,
     kit: str = DEFAULT_KIT,
 ) -> None:
-    """Inner driver shared by the Typer callback and tests."""
+    """Inner driver shared by the Typer callback and tests.
+
+    One kit-agnostic pipeline: render the skeleton, let the kit finalize itself,
+    optionally sync, print next steps. Per-kit differences live on the KitSpec
+    (templating, sync args, finalize hook) — not in branches here.
+    """
     validated = _validate_name(name)
     kit_spec = _resolve_kit_or_exit(kit)
     kit_root = _resolve_kit_root_or_exit(kit_spec)
@@ -343,9 +266,6 @@ def _scaffold(
         "python_version": python or DEFAULT_PYTHON_VERSION,
     }
 
-    # Only the default ``api`` kit uses ``_dot_*`` / ``*.tmpl`` / ``{{token}}``
-    # filename conventions. External kits may ship pre-rendered trees.
-    apply_template = kit_spec.name == DEFAULT_KIT
     _stage_and_promote(
         kit_root,
         _StageOptions(
@@ -353,21 +273,26 @@ def _scaffold(
             target=target,
             validated=validated,
             tokens=tokens,
-            apply_template=apply_template,
+            apply_template=kit_spec.uses_template_tokens,
         ),
     )
 
     # The e-commerce kit nests its Python project under backend/; the api kit is flat.
     python_project_dir = target / kit_spec.python_project_subdir
 
-    _localize_scaffolded_pyproject(python_project_dir, validated, kit_spec.name)
-    _localize_scaffolded_compose(target, kit_spec.name)
+    if kit_spec.finalize is not None:
+        kit_spec.finalize(
+            ScaffoldContext(
+                target=target,
+                project_name=validated,
+                python_project_dir=python_project_dir,
+            )
+        )
 
-    sync_args = _uv_sync_args(kit_spec.name)
     if not no_install:
-        _run_uv_sync(python_project_dir, sync_args)
+        _run_uv_sync(python_project_dir, kit_spec.sync_args)
 
-    _print_next_steps(validated, no_install=no_install, kit_spec=kit_spec, sync_args=sync_args)
+    _print_next_steps(validated, no_install=no_install, kit_spec=kit_spec)
 
 
 def _new_callback(

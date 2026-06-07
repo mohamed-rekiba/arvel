@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import importlib.resources
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from arvel.console._scaffold.context import ScaffoldContext
+from arvel.console._scaffold.ecommerce_kit import finalize_ecommerce_project
 
 __all__ = [
     "DEFAULT_KIT",
@@ -13,6 +16,7 @@ __all__ = [
     "KitDownloadError",
     "KitSpec",
     "KitUnavailableError",
+    "ScaffoldContext",
     "UnknownKitError",
     "available_kits",
     "format_kit_listing",
@@ -53,7 +57,12 @@ class KitDownloadError(KitUnavailableError):
 
 @dataclass(frozen=True)
 class KitSpec:
-    """One starter kit's metadata + lazy source-tree resolver."""
+    """One starter kit's metadata + how it overrides the default ``new`` process.
+
+    The ``new`` command runs a single kit-agnostic pipeline (render → finalize →
+    sync → next steps). A kit declares its differences here rather than the
+    command special-casing it by name.
+    """
 
     name: str
     description: str
@@ -63,6 +72,13 @@ class KitSpec:
     # Where the pyproject.toml lives relative to the project root. The api kit
     # is flat ("");  the e-commerce kit nests its Python project under backend/.
     python_project_subdir: str = ""
+    # Run {{token}} substitution + _dot_/.tmpl filename conventions. The bundled
+    # api skeleton uses them; pre-rendered external kits copy verbatim.
+    uses_template_tokens: bool = False
+    # Args passed to `uv sync` after scaffolding.
+    sync_args: tuple[str, ...] = ("sync",)
+    # Kit-specific post-render step (e.g. strip monorepo plumbing). None = nothing to do.
+    finalize: Callable[[ScaffoldContext], None] | None = field(default=None)
 
     def root(self) -> Path:
         """Return the kit's source tree, raising if it can't be located."""
@@ -110,6 +126,7 @@ KITS: dict[str, KitSpec] = {
         name="api",
         description="API-only Arvel project from the framework's bundled skeleton (default)",
         resolve=_api_kit_root,
+        uses_template_tokens=True,
     ),
     "ecommerce": KitSpec(
         name="ecommerce",
@@ -127,6 +144,8 @@ KITS: dict[str, KitSpec] = {
             "make seed",
         ),
         python_project_subdir="backend",
+        sync_args=("sync", "--all-extras", "--dev"),
+        finalize=finalize_ecommerce_project,
     ),
 }
 
