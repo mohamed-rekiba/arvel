@@ -296,5 +296,9 @@ def test_new_ecommerce_localizes_docker_compose(
         assert "--all-packages" not in compose
         # Standalone paths in its place.
         assert "working_dir: /workspace/backend" in compose
-        assert "cd backend" in compose
         assert "- .:/workspace" in compose
+        # The scaffolded pyproject only exists in backend/, so `uv sync` must run
+        # there — `cd /workspace` (repo root in the monorepo) has none and errors
+        # with "No pyproject.toml found". This is the regression guard.
+        assert "cd /workspace &&" not in compose
+        assert "cd /workspace/backend &&\n      uv sync --frozen" in compose
