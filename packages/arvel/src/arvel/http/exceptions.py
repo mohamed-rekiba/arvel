@@ -162,7 +162,7 @@ class HttpExceptionHandler:
 
         return _handle_translated
 
-    async def _handle_unexpected(self, request: Request, exc: Exception) -> JSONResponse:
+    def _log_unexpected(self, request: Request, exc: Exception) -> None:
         # exc carries the traceback; the OTel logger records it. Active Context
         # (request_id, user_id, tenant_id) is merged by the logger itself.
         Log.error(
@@ -172,6 +172,9 @@ class HttpExceptionHandler:
             path=request.url.path,
             method=request.method,
         )
+
+    async def _handle_unexpected(self, request: Request, exc: Exception) -> JSONResponse:
+        self._log_unexpected(request, exc)
         server_error = ServerErrorException("Something went wrong")
         return JSONResponse(
             status_code=500,
