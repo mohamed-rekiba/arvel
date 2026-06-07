@@ -84,9 +84,14 @@ class Mailer:
         if body_text is None:
             body_text = ""
 
-        if override_to:
-            from dataclasses import replace
+        # Inherit the global mail.from when the mailable didn't set one (Laravel parity).
+        from_address = env.from_address or self._config.from_address
+        from_name = env.from_name if env.from_name is not None else (self._config.from_name or None)
 
+        from dataclasses import replace
+
+        env = replace(env, from_address=from_address, from_name=from_name)
+        if override_to:
             env = replace(env, to=override_to)
 
         return RenderedMail(

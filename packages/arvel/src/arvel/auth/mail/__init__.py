@@ -14,11 +14,10 @@ from arvel.mail.mailable import Mailable
 class VerifyEmailMailable(Mailable):
     """sent after registration to confirm the user's email address."""
 
-    def __init__(
-        self, *, user_email: str, verify_url: str, from_address: str = "noreply@arvel.app"
-    ) -> None:
+    def __init__(self, *, user_email: str, verify_url: str, from_address: str = "") -> None:
         self.user_email = user_email
         self.verify_url = verify_url
+        # Empty → inherit the app's global mail.from at render time.
         self.from_address = from_address
 
     def envelope(self) -> Envelope:
@@ -45,11 +44,12 @@ class PasswordResetMailable(Mailable):
         user_email: str,
         reset_url: str,
         ttl_minutes: int = 60,
-        from_address: str = "noreply@arvel.app",
+        from_address: str = "",
     ) -> None:
         self.user_email = user_email
         self.reset_url = reset_url
         self.ttl_minutes = ttl_minutes
+        # Empty → inherit the app's global mail.from at render time.
         self.from_address = from_address
 
     def envelope(self) -> Envelope:

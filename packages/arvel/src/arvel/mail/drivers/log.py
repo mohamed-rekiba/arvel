@@ -17,6 +17,7 @@ class LogMailDriver:
                 "mail_sent",
                 driver="log",
                 from_address=mail.envelope.from_address,
+                from_name=mail.envelope.from_name,
                 to=mail.envelope.to,
                 subject=mail.envelope.subject,
                 attachments=len(mail.attachments),
