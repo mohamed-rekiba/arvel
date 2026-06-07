@@ -165,16 +165,6 @@ async function handleLogout(): Promise<void> {
             >
               {{ t('nav.products', 'Products') }}
             </RouterLink>
-            <RouterLink
-              to="/search"
-              class="text-sm font-medium text-white/70 transition hover:text-white"
-              :class="{
-                'text-white font-semibold underline decoration-accent underline-offset-4':
-                  route.name === 'search',
-              }"
-            >
-              {{ t('nav.specials', 'Specials') }}
-            </RouterLink>
           </nav>
 
           <div class="flex-1" />
