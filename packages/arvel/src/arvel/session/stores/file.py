@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -19,7 +20,10 @@ class FileSessionStore:
         self.lifetime = lifetime
 
     def _session_file(self, session_id: str) -> Path:
-        return self._path / f"{session_id}.session"
+        # Hash the id so a tampered cookie (e.g. "../../etc/passwd") can't escape
+        # the session dir. The id is client-controlled; mirrors the file cache store.
+        hashed = hashlib.sha256(session_id.encode()).hexdigest()
+        return self._path / f"{hashed}.session"
 
     async def read(self, session_id: str) -> dict[str, Any]:
         file = self._session_file(session_id)
