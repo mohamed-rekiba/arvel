@@ -10,7 +10,7 @@ authors = [{ name = "Arvel contributors" }]
 dependencies = []
 
 [tool.uv.workspace]
-members = ["packages/*", "kits/*"]
+members = ["packages/*", "kits/*/backend"]
 
 [tool.uv.sources]
 arvel = { workspace = true }

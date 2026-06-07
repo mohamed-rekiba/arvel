@@ -44,7 +44,7 @@ on the host — the backend and scheduler containers `uv sync` the workspace on 
 git clone https://github.com/mohamed-rekiba/arvel.git
 cd arvel/kits/arvel-ecommerce-kit
 
-make up        # copies .env from .env.example, starts services, waits for health
+make up        # copies backend/.env from backend/.env.example, starts services, waits for health
 make migrate   # run pending migrations
 make seed      # seed roles, catalog, and sample users
 ```
@@ -72,7 +72,7 @@ and for local-mode media:
 > because the framework's local serve and Caddy → MinIO can't both own the
 > prefix without one shadowing the other.
 
-Default admin credentials come from `.env`:
+Default admin credentials come from `backend/.env`:
 
 ```
 ADMIN_SEED_EMAIL=admin@example.com
@@ -156,6 +156,8 @@ The backend follows the canonical Arvel project layout:
 
 ```
 backend/
+├── .env.example             # config template (make env copies to backend/.env)
+├── pyproject.toml           # backend deps + uv workspace member
 ├── app/
 │   ├── http/
 │   │   ├── controllers/    # admin + storefront controllers
@@ -199,7 +201,7 @@ PostgreSQL and Redis — no mocking at the infrastructure layer.
 
 ## Configuration
 
-All configuration lives in `.env` (copied from `.env.example` by `make up`). Key variables:
+All configuration lives in `backend/.env` (copied from `backend/.env.example` by `make up`). Key variables:
 
 | Variable | Default | Description |
 |---|---|---|
@@ -227,7 +229,7 @@ What you get out of the box at `:8002`:
   `minio:9000/arvel-ecommerce-kit/<key>`, so the SPA loads images from the
   same origin as the API
 
-The default S3 vars in `.env.example` (endpoint, bucket, key, secret, region,
+The default S3 vars in `backend/.env.example` (endpoint, bucket, key, secret, region,
 addressing style) are wired to the bundled MinIO. You only need to touch them
 when pointing at a real S3 / S3-compatible service. The `minioadmin`
 credentials are development-only — rotate `STORAGE_S3_KEY` / `STORAGE_S3_SECRET`

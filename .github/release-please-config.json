@@ -82,7 +82,8 @@
     "kits/arvel-ecommerce-kit": {
       "component": "arvel-ecommerce-kit",
       "package-name": "arvel-ecommerce-kit",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": ["backend/pyproject.toml"]
     }
   }
 }
