@@ -192,7 +192,7 @@ async def test_refresh_rotates_token(
     event_fake: EventFake,
     setup_db: AsyncSession,
 ) -> None:
-    """refresh deletes old hash, stores new hash, returns new pair."""
+    """refresh revokes the old row (keeps it for reuse detection), stores a new hash."""
     await _seed_verified_user(auth_service)
     _u, first = await auth_service.login(email="alice@example.com", password="S3cret-pw!")
 
@@ -201,9 +201,32 @@ async def test_refresh_rotates_token(
     assert second.access_token != first.access_token
     assert second.refresh_token != first.refresh_token
     old_digest = hash_refresh_token(first.refresh_token)
-    assert await RefreshToken.where(token_hash=old_digest).first() is None
+    old_row = await RefreshToken.where(token_hash=old_digest).first()
+    assert old_row is not None  # kept, not deleted
+    assert old_row.revoked_at is not None
+    assert not old_row.is_active
     new_digest = hash_refresh_token(second.refresh_token)
-    assert await RefreshToken.where(token_hash=new_digest).first() is not None
+    new_row = await RefreshToken.where(token_hash=new_digest).first()
+    assert new_row is not None
+    assert new_row.is_active
+
+
+@pytest.mark.asyncio
+async def test_refresh_replay_revokes_token_family(
+    auth_service: AuthService,
+    event_fake: EventFake,
+    setup_db: AsyncSession,
+) -> None:
+    """Replaying an already-rotated token is treated as theft: kill the family."""
+    user = await _seed_verified_user(auth_service)
+    _u, first = await auth_service.login(email=user.email, password="S3cret-pw!")
+    await auth_service.refresh(refresh_token=first.refresh_token)  # first is now revoked
+
+    with pytest.raises(TokenReuseDetectedError):
+        await auth_service.refresh(refresh_token=first.refresh_token)
+
+    assert await RefreshToken.where(user_id=str(user.id)).first() is None
+    EventFacade.assert_dispatched(TokenReuseDetected, times=1)
 
 
 @pytest.mark.asyncio

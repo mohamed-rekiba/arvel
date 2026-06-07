@@ -183,8 +183,13 @@ class AuthService:
     async def refresh(self, *, refresh_token: str) -> tuple[Any, TokenPair]:
         """Rotate a refresh token and mint a new access JWT.
 
+        Rotation revokes the presented row rather than deleting it, so replaying
+        an already-rotated token is detectable theft: the whole token family is
+        revoked and TokenReuseDetectedError is raised.
+
         Raises:
-            InvalidCredentialsError: token unknown / expired / row removed.
+            InvalidCredentialsError: token unknown / expired / user gone.
+            TokenReuseDetectedError: a previously rotated token was replayed.
         """
         user_cls = self._user_cls
         digest = hash_refresh_token(refresh_token)
@@ -196,21 +201,31 @@ class AuthService:
                 Log.debug("auth.refresh.rejected", reason="unknown_token")
                 msg = "refresh token unknown"
                 raise InvalidCredentialsError(msg)
-
-            if row.is_expired:
-                await row.delete()
-                Log.debug("auth.refresh.rejected", reason="expired_token")
-                msg = "refresh token expired"
-                raise InvalidCredentialsError(msg)
-
+            replayed = row.revoked_at is not None
+            expired = row.is_expired
             user_id_str = row.user_id
-            await row.delete()
+            if not replayed and not expired:
+                row.revoked_at = _now()
+                await row.save()
 
-            user = await user_cls.find(_coerce_pk(user_id_str))
-            if user is None:
-                Log.debug("auth.refresh.rejected", reason="user_gone")
-                msg = "user no longer exists"
-                raise InvalidCredentialsError(msg)
+        if replayed:
+            Log.debug("auth.refresh.rejected", reason="token_reuse")
+            await self.revoke_family(user_id=user_id_str)  # raises when rows remain
+            msg = "refresh token reuse detected"
+            raise InvalidCredentialsError(msg)
+
+        if expired:
+            async with DB.transaction():
+                await RefreshToken.where(token_hash=digest).delete()
+            Log.debug("auth.refresh.rejected", reason="expired_token")
+            msg = "refresh token expired"
+            raise InvalidCredentialsError(msg)
+
+        user = await user_cls.find(_coerce_pk(user_id_str))
+        if user is None:
+            Log.debug("auth.refresh.rejected", reason="user_gone")
+            msg = "user no longer exists"
+            raise InvalidCredentialsError(msg)
 
         tokens = await self._issue_pair(user_id=user_id_str)
         Log.debug("auth.refreshed", user_id=user_id_str)
