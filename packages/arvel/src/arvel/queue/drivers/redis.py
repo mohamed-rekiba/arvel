@@ -5,8 +5,11 @@ honours both ``envelope.delay`` and ``envelope.priority`` natively:
 
 - ``<queue_key>:<queue>:scheduled`` ZSET (score = ``available_at_ms``) holds
  envelopes that are not yet due.
-- ``<queue_key>:<queue>:ready`` ZSET (score = ``-priority``) holds envelopes
- that are due now; the lowest-scored entry is the highest-priority one.
+- ``<queue_key>:<queue>:ready`` ZSET holds envelopes that are due now. The
+ score is ``-priority * _PRIORITY_SCALE + enqueue_ms`` so ``ZPOPMIN`` returns
+ the highest priority first and, within one priority, the earliest enqueued
+ (FIFO). ``_PRIORITY_SCALE`` is wider than any millisecond timestamp, so
+ priority always dominates the time tiebreaker.
 - An atomic Lua script (``promote_and_pop.lua``) moves due-now entries
  from ``:scheduled`` into ``:ready`` and ``ZPOPMIN``s one in a single
  round trip — guaranteeing no double-dispatch under concurrent workers.
@@ -25,6 +28,13 @@ from arvel.queue.drivers._redis_lua import PROMOTE_AND_POP_LUA
 from arvel.queue.envelope import JobEnvelope
 
 logger = Log.channel(__name__)
+
+# Each priority band is this many score units wide. A band must be wider than
+# any millisecond timestamp it carries so priority always outranks the time
+# tiebreaker. 1e13 ms ≈ year 2286, and max score (priority 9) stays ~9.2e13 —
+# well under float64's exact-integer ceiling (2^53), so ms diffs stay exact.
+# Mirrored in promote_and_pop.lua; keep both in sync.
+_PRIORITY_SCALE = 10**13
 
 
 class RedisQueueConn(Protocol):
@@ -49,6 +59,9 @@ class RedisConnection:
         self._config = config
         self._redis: RedisQueueConn | None = None
         self._script_sha: str | None = None
+        # Strictly increasing per-process tiebreaker. Rapid pushes can land in
+        # the same millisecond; bumping past the last value keeps them FIFO.
+        self._last_ready_ms = 0
 
     def _client(self) -> RedisQueueConn:
         if self._redis is None:
@@ -77,12 +90,19 @@ class RedisConnection:
 
     async def push(self, envelope: JobEnvelope, queue: str = "default") -> None:
         member = envelope.to_json()
+        now_ms = int(time.time() * 1000)
         if envelope.delay > 0:
-            available_at_ms = int(time.time() * 1000) + envelope.delay * 1000
+            available_at_ms = now_ms + envelope.delay * 1000
             await self._client().zadd(self._scheduled_key(queue), {member: available_at_ms})
         else:
-            # Score is -priority so ZPOPMIN returns highest-priority first.
-            await self._client().zadd(self._ready_key(queue), {member: -envelope.priority})
+            score = self._ready_score(envelope.priority, now_ms)
+            await self._client().zadd(self._ready_key(queue), {member: score})
+
+    def _ready_score(self, priority: int, now_ms: int) -> int:
+        """Composite ready-set score: priority first, enqueue time as tiebreaker."""
+        enqueue_ms = max(now_ms, self._last_ready_ms + 1)
+        self._last_ready_ms = enqueue_ms
+        return -priority * _PRIORITY_SCALE + enqueue_ms
 
     async def pop_blocking(
         self, queue: str = "default", timeout: float = 3.0
