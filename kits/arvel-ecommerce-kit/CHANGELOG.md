@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.6.0...arvel-ecommerce-kit-v1.7.0) (2026-06-07)
+
+
+### Features
+
+* **cli:** needs-based subsystem bootstrap ([4e5b866](https://github.com/mohamed-rekiba/arvel/commit/4e5b866061423dd2cce99cfb7554ed50e2f1f7ff))
+
+
+### Documentation
+
+* **spatie:** remove third-party Spatie references ([8ac870e](https://github.com/mohamed-rekiba/arvel/commit/8ac870ee10dd0cf6d980d3b8d267daa65a5270c4))
+
 ## [1.6.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.5.1...arvel-ecommerce-kit-v1.6.0) (2026-06-05)
 
 
