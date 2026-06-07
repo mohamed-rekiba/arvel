@@ -8,6 +8,7 @@ from typing import Annotated, ClassVar
 import typer
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.container.errors import BindingResolutionError
 from arvel.queue.manager import QueueManager
@@ -16,7 +17,9 @@ from arvel.queue.manager import QueueManager
 class QueuePruneFailedCommand(Command):
     name: ClassVar[str] = "queue:prune-failed"
     help: ClassVar[str] = "Delete failed jobs older than --hours"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.QUEUE, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar
+
+from arvel.console._subsystem import CliSubsystem
 
 if TYPE_CHECKING:
     from arvel.application import Application
@@ -16,6 +18,12 @@ _T = TypeVar("_T")
 
 class ServiceProvider:
     """Bootstrap unit. Subclass to register bindings and run boot/shutdown logic."""
+
+    #: CLI subsystem this provider serves. ``None`` = foundation (always loaded).
+    #: User providers loaded from ``bootstrap/providers.py`` get
+    #: :data:`~arvel.console._subsystem.CliSubsystem.USER_PROVIDERS` assigned by
+    #: the loader if they leave this as ``None``.
+    subsystem: ClassVar[CliSubsystem | None] = None
 
     app: Application
     container: Container

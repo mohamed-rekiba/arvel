@@ -25,6 +25,7 @@ from typing import Annotated, ClassVar
 import typer
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.support.publishing import (
     Publishable,
@@ -36,7 +37,9 @@ from arvel.support.publishing import (
 class VendorPublishCommand(Command):
     name: ClassVar[str] = "vendor:publish"
     help: ClassVar[str] = "Publish package files (migrations, config, assets) into the app"
-    needs_application: ClassVar[bool] = True
+    # PublishRegistry is populated during the user's provider boot(), so we
+    # need the full user provider chain — not just config/foundation.
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.USER_PROVIDERS})
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

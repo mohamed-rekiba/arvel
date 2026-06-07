@@ -8,6 +8,7 @@ import typer
 
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.console.commands.migrate import (
     BootstrapFailedError,
@@ -32,7 +33,9 @@ def _is_production_blocked() -> bool:
 class MigrateRefreshCommand(Command):
     name: ClassVar[str] = "migrate:refresh"
     help: ClassVar[str] = "Roll back every migration, then re-run them"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.DATABASE, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

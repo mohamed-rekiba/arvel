@@ -7,6 +7,7 @@ from typing import ClassVar
 import typer
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.container.errors import BindingResolutionError
 from arvel.events.dispatcher import EventDispatcher
 
@@ -14,7 +15,9 @@ from arvel.events.dispatcher import EventDispatcher
 class EventListCommand(Command):
     name: ClassVar[str] = "event:list"
     help: ClassVar[str] = "List registered events and their listeners"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.EVENTS, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

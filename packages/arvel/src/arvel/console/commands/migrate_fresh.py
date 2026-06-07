@@ -8,6 +8,7 @@ import typer
 
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.console.commands.db_seed import run_seeder_for_app
 from arvel.console.commands.migrate import (
@@ -40,7 +41,10 @@ async def invoke_db_seed(seeder: str | None = None, *, app: object) -> None:
 class MigrateFreshCommand(Command):
     name: ClassVar[str] = "migrate:fresh"
     help: ClassVar[str] = "Drop all tables and re-run every migration"
-    needs_application: ClassVar[bool] = True
+    # USER_PROVIDERS pulls in user seeders/models when --seed is passed.
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.DATABASE, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

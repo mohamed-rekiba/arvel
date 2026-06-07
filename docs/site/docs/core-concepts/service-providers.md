@@ -77,6 +77,7 @@ async def shutdown(self) -> None:
 |---|---|
 | `self.app` | The `Application`. |
 | `self.container` | The root [container](service-container.md). |
+| `subsystem` | `ClassVar[CliSubsystem \| None]`. Tags the provider for the [needs-based CLI bootstrap](../cli/commands.md#needs-based-bootstrap). Baseline framework providers set this explicitly; user providers leave it `None` and behave as the `USER_PROVIDERS` bucket. |
 | `register()` | Sync. Register container bindings only. |
 | `boot()` | Async. Startup wiring after all providers register. |
 | `shutdown()` | Async. Teardown, reverse order. |
@@ -114,6 +115,28 @@ class AppServiceProvider(ServiceProvider):
 ```
 
 You may return command **classes** (instantiated with no arguments) or pre-built command **instances** (useful when a command needs injected dependencies). See [CLI Commands](../cli/commands.md).
+
+Provider-contributed commands only register when the framework actually boots the provider. With the needs-based bootstrap, that means the dispatched command's `requires` must include the subsystem your provider serves (or `USER_PROVIDERS` for user-app providers). Declare what your command needs:
+
+```python
+from typing import ClassVar
+
+from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
+
+
+class SyncInventoryCommand(Command):
+    name: ClassVar[str] = "inventory:sync"
+    help: ClassVar[str] = "Sync inventory with the warehouse API"
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.DATABASE, CliSubsystem.USER_PROVIDERS}
+    )
+
+    def handle(self, ctx: Context) -> int:
+        ...
+```
+
+Most user-app commands need `USER_PROVIDERS` so the provider that registered them actually runs. Add `DATABASE`, `QUEUE`, or whichever subsystems your handler touches — the bootstrap computes the transitive closure for you (`QUEUE` already pulls in `DATABASE`).
 
 <a name="publishing-assets"></a>
 ## Publishing Assets

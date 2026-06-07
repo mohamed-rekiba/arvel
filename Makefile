@@ -114,11 +114,18 @@ clean:  ## Remove build / cache artifacts
 	rm -rf dist build site _site .ruff_cache .pyright .pytest_cache .playwright-mcp htmlcov bootstrap .coverage* coverage.xml
 	find . \( -name "__pycache__" -o -name ".mypy_cache" -o -name ".benchmarks" -o -name "dist" \) -type d -prune -exec rm -rf {} +
 
+.PHONY: no-process-artifacts
+no-process-artifacts:  ## Fail if source code references process artifacts (WI-NNN, FB-NNN, ADR-NNN, Story N)
+	@! rg -n --type=py -g '!**/_skeleton/**' \
+		'(WI-[a-zA-Z0-9]+-?\d*|FB-\d+|Story [0-9]+|sprint [0-9]+|Sprint [0-9]+|S\d{1,2}\.\d+|ADR-\d{3,})' \
+		packages/*/src \
+		|| (echo "Process-artifact reference found in source (banned by humanize-comments.mdc)." && exit 1)
+
 .PHONY: ci
-ci: lint format-check typecheck coverage docs  ## Run the full CI gate locally
+ci: lint format-check typecheck no-process-artifacts coverage docs  ## Run the full CI gate locally
 
 .PHONY: pre-commit
-pre-commit: lint format-check typecheck security  ## Run the full CI gate locally
+pre-commit: lint format-check typecheck no-process-artifacts security  ## Run the full CI gate locally
 	# Skip no-commit-to-branch here: this target is a CI gate, not a commit.
 	# The hook still fires on actual `git commit` to block writes to main/master.
 	SKIP=no-commit-to-branch uv run pre-commit run --all-files

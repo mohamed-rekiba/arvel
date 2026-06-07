@@ -8,11 +8,16 @@ context layer (between logging and the database), and so ``ContextMiddleware`` /
 
 from __future__ import annotations
 
+from typing import ClassVar
+
+from arvel.console._subsystem import CliSubsystem
 from arvel.providers.service_provider import ServiceProvider
 
 
 class ContextServiceProvider(ServiceProvider):
     """Marker provider for the request-context layer."""
+
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.CONTEXT
 
 
 __all__ = ["ContextServiceProvider"]

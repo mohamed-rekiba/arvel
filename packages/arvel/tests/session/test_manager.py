@@ -28,6 +28,13 @@ def test_session_manager_creates_cookie_store() -> None:
     assert isinstance(manager.store(), CookieStore)
 
 
+def test_session_manager_creates_array_store_for_tests() -> None:
+    from arvel.session.stores.array import ArraySessionStore
+
+    manager = SessionManager(SessionConfig(driver="array"))
+    assert isinstance(manager.store(), ArraySessionStore)
+
+
 def test_session_manager_rejects_unknown_driver() -> None:
     manager = SessionManager(SessionConfig(driver="unknown"))
 

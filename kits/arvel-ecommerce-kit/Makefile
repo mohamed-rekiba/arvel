@@ -38,7 +38,7 @@ build-frontend:
 	$(FRONTEND_RUN) sh -lc "npm ci --no-audit --no-fund && npm run build"
 
 api-generate:
-	$(BACKEND) arvel openapi:export --stdout --format yaml > frontend/openapi.yaml
+	$(BACKEND) arvel openapi:export --output ../frontend/openapi.yaml --format yaml
 	$(FRONTEND) npm run api:generate
 
 test-backend:

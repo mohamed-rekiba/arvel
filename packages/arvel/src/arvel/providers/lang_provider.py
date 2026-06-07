@@ -12,8 +12,9 @@ defaulting to ``"en"`` when not configured.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
+from arvel.console._subsystem import CliSubsystem
 from arvel.providers.service_provider import ServiceProvider
 
 if TYPE_CHECKING:
@@ -46,6 +47,8 @@ def _has_json_catalogs(base: Path) -> bool:
 
 class LangServiceProvider(ServiceProvider):
     """Wires the Translator service and module-level __() helper."""
+
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.LANG
 
     def register(self) -> None:
         from arvel.i18n import JsonFileLoader, PythonFileLoader, Translator

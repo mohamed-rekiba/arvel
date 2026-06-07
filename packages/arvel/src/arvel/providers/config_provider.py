@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import os
 import warnings
+from typing import ClassVar
 
 from arvel.config.errors import ConfigError
 from arvel.config.registry import registered_configs
 from arvel.config.repository import Config
 from arvel.config.settings import ArvelSettings
+from arvel.console._subsystem import CliSubsystem
 from arvel.providers.service_provider import ServiceProvider
 
 
@@ -40,6 +42,8 @@ def _warn_unmatched(cls: type[ArvelSettings]) -> None:
 
 
 class ConfigServiceProvider(ServiceProvider):
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.CONFIG
+
     def register(self) -> None:
         Config.bind(self.app.container)
         for cls in registered_configs():

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
+from arvel.console._subsystem import CliSubsystem
 from arvel.logging.facade import Log
 from arvel.providers.service_provider import ServiceProvider
 
@@ -18,10 +19,13 @@ logger = Log.channel(__name__)
 class SchedulerServiceProvider(ServiceProvider):
     """Binds Schedule + SchedulerKernel; auto-discovers app/Console/Kernel.py::schedule()."""
 
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.SCHEDULER
+
     def register(self) -> None:
         from typing import Any
 
         from arvel.cache import CacheManager
+        from arvel.maintenance.manager import MaintenanceModeManager
         from arvel.scheduling import Schedule, SchedulerKernel
 
         c = self.app.container
@@ -35,6 +39,9 @@ class SchedulerServiceProvider(ServiceProvider):
             from arvel.scheduling import SchedulerHooks
 
             cache_manager = c.make(CacheManager) if c.bound(CacheManager) else None
+            maintenance_manager = (
+                c.make(MaintenanceModeManager) if c.bound(MaintenanceModeManager) else None
+            )
 
             # Wire Schedule.job() to actually dispatch via Bus
             # when the queue subsystem is registered. Apps without the queue
@@ -71,6 +78,7 @@ class SchedulerServiceProvider(ServiceProvider):
                     dispatch_job=dispatch_job_cb,
                     run_command=run_command_cb,
                 ),
+                maintenance_manager=maintenance_manager,
             )
 
         c.singleton(Schedule, _schedule_factory)

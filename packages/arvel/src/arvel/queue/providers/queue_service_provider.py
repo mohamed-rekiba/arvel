@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
+from arvel.console._subsystem import CliSubsystem
 from arvel.providers.service_provider import ServiceProvider
 
 if TYPE_CHECKING:
@@ -17,7 +18,11 @@ class QueueServiceProvider(ServiceProvider):
     """Registers QueueManager, Bus, FailedJobStore, and binds the Bus facade.
 
     ``app`` may be an ``Application`` or a bare ``Container`` (used in tests).
+    Tagged ``CliSubsystem.QUEUE``; the closure pulls in ``DATABASE``
+    automatically for DB-backed drivers.
     """
+
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.QUEUE
 
     def register(self) -> None:
         from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker

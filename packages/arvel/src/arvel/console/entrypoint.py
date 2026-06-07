@@ -40,6 +40,7 @@ from arvel.console import Application, Command
 from arvel.console._async import get_pending_task
 from arvel.console._command_meta import COMMAND_HELP
 from arvel.console._loader import discover_commands, entry_point_names, load_command
+from arvel.console._subsystem import CliSubsystem, closure
 from arvel.console.bootstrap import (
     bootstrap_framework_application,
     find_project_root,
@@ -214,11 +215,11 @@ def _provider_commands(framework_app: FrameworkApplication) -> dict[str, Command
     return out
 
 
-def _bind_app_to_needs_application_commands(
+def _bind_framework_to_commands(
     framework_app: FrameworkApplication, commands_by_name: dict[str, Command]
 ) -> None:
     for cmd in commands_by_name.values():
-        if cmd.needs_application:
+        if cmd.needs_framework():
             cmd.app = framework_app
 
 
@@ -240,7 +241,7 @@ def _select_in_project_commands(
         cmd = provider_cmds.get(command)
         if cmd is None:
             cmd = load_command(command)
-            if cmd is not None and framework_app is not None and cmd.needs_application:
+            if cmd is not None and framework_app is not None and cmd.needs_framework():
                 cmd.app = framework_app
         if cmd is not None:
             return {cmd.name: cmd}
@@ -248,8 +249,27 @@ def _select_in_project_commands(
     commands_by_name: dict[str, Command] = {c.name: c for c in discover_commands()}
     commands_by_name.update(provider_cmds)  # provider binding wins on name collision
     if framework_app is not None:
-        _bind_app_to_needs_application_commands(framework_app, commands_by_name)
+        _bind_framework_to_commands(framework_app, commands_by_name)
     return commands_by_name
+
+
+def _required_subsystems_for(command: str | None) -> frozenset[CliSubsystem] | None:
+    """Compute the subsystem closure for ``command`` without instantiating it.
+
+    Returns ``None`` when ``command`` is unknown or has no resolvable class —
+    the caller treats that as "boot the full chain" so help/listing paths keep
+    working. Returns the empty frozenset for commands declaring no subsystems
+    (foundation-only providers will still load).
+    """
+    if command is None:
+        return None
+    cmd = load_command(command)
+    if cmd is None:
+        return None
+    cls = type(cmd)
+    if not cls.needs_framework():
+        return frozenset()
+    return closure(cls.requires)
 
 
 async def async_main(project_root: Path, command: str | None) -> None:
@@ -260,8 +280,8 @@ async def async_main(project_root: Path, command: str | None) -> None:
     Typer reads from ``sys.argv``; ``command`` is the resolved name (or None) used
     to load only what dispatch needs.
     """
-    # Inside a project: always boot so provider commands are available.
-    framework_app = bootstrap_framework_application(project_root)
+    required = _required_subsystems_for(command)
+    framework_app = bootstrap_framework_application(project_root, required_subsystems=required)
     provider_cmds: dict[str, Command] = {}
     if framework_app is not None:
         await framework_app.boot()

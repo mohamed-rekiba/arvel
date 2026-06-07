@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
+from arvel.console._subsystem import CliSubsystem
 from arvel.providers.service_provider import ServiceProvider
 
 if TYPE_CHECKING:
@@ -12,6 +13,8 @@ if TYPE_CHECKING:
 
 class BroadcastServiceProvider(ServiceProvider):
     """Binds BroadcastManager and wires the Broadcast facade."""
+
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.BROADCAST
 
     def register(self) -> None:
         from arvel.broadcasting import BroadcastConfig, BroadcastManager

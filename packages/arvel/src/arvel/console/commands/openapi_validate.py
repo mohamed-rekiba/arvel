@@ -10,6 +10,7 @@ from typing import Annotated, ClassVar
 import typer
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 
 
@@ -18,7 +19,9 @@ class OpenApiValidateCommand(Command):
 
     name: ClassVar[str] = "openapi:validate"
     help: ClassVar[str] = "Validate the OpenAPI spec against the OpenAPI 3.x schema."
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.HTTP, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

@@ -14,6 +14,19 @@ arvel <command> --help
 > [!NOTE]
 > Most commands need a project — they look for `bootstrap/app.py` in the current directory tree. The exceptions that run anywhere: `about`, `key:generate`, `new`, and any `make:*` command, plus `--help` / `--version`.
 
+### Needs-based bootstrap
+
+Every command declares which **subsystems** it touches (`Command.requires`). The CLI computes the transitive closure of those subsystems and asks the user's `bootstrap/app.py::create_application(required_subsystems=...)` to boot only those providers. The four foundation subsystems — `CONFIG`, `LOG`, `LANG`, `CONTEXT` — are always loaded; everything else (`DATABASE`, `HTTP`, `QUEUE`, `MAIL`, `CACHE`, `STORAGE`, `BROADCAST`, `AUTH`, `EVENTS`, `SCHEDULER`, `USER_PROVIDERS`) only boots when something asks for it.
+
+In practice this means:
+
+- `arvel make:controller Foo` boots nothing — no database, no HTTP stack, no user providers.
+- `arvel migrate` boots `Database` plus foundation. No queue, no mail, no scheduler.
+- `arvel queue:work` boots `Queue → Database` plus the user's `bootstrap/providers.py` (`USER_PROVIDERS`) so your custom jobs are registered.
+- `arvel openapi:export` boots `HTTP` plus `USER_PROVIDERS` so every registered route appears in the spec.
+
+Plug-in commands (`auth:install`, `oauth:install`, `audit:install`, `reverb:start`) only register when their provider is in the closure. `--help` outside of a project still works because no closure is computed.
+
 Some commands only register when their provider is installed: most `queue:*` commands need `QueueServiceProvider` (`queue:restart` is always available, but `queue:clear` and `queue:prune-failed` still need a booted app with the queue manager bound), `auth:install` needs `AuthServiceProvider`, and `reverb:start` needs the `[broadcasting]` extra.
 
 <a name="top-level"></a>
@@ -190,8 +203,16 @@ so linked files are retrievable with no reverse proxy. See [Storage → Serving 
 
 | Command | Description | Options |
 |---|---|---|
-| `openapi:export` | Export the OpenAPI spec to a file | `--output` / `-o` (`docs/api/openapi.yaml`), `--format` / `-f` (`yaml`\|`json`), `--stdout` |
+| `openapi:export` | Export the OpenAPI spec to a file | `--output` / `-o` (`docs/api/openapi.yaml`; absolute paths allowed; `-` = stdout), `--format` / `-f` (`yaml`\|`json`), `--stdout` |
 | `openapi:validate` | Validate a spec against OpenAPI 3.x | `--spec` (defaults to the live app spec) |
+
+`--output` accepts any path the calling user can write to: absolute (`/tmp/spec.yaml`), sibling (`../frontend/openapi.yaml`), or POSIX `-` for stdout (equivalent to `--stdout`). Relative paths resolve against the current working directory — the same rule `git`, `make`, and `cp` use, not the project root. Parent directories are created on demand. Status messages (`OpenAPI spec written to ...`) go to **stderr** so you can pipe stdout into another tool:
+
+```bash
+arvel openapi:export --output - --format json | jq '.info'
+arvel openapi:export --stdout > captured.yaml
+arvel openapi:export --output ../frontend/openapi.yaml --no-banner
+```
 
 <a name="events"></a>
 ## `channel:` / `event:` / `reverb:` Events & Broadcasting

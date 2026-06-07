@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
+from arvel.console._subsystem import CliSubsystem
 from arvel.providers.service_provider import ServiceProvider
 
 if TYPE_CHECKING:
@@ -13,6 +14,9 @@ if TYPE_CHECKING:
 
 class SessionServiceProvider(ServiceProvider):
     """Binds SessionManager to the container and wires the Session facade."""
+
+    # Sessions are part of the HTTP request lifecycle — same subsystem as Router.
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.HTTP
 
     def register(self) -> None:
         from arvel.config.session_config import SessionConfig

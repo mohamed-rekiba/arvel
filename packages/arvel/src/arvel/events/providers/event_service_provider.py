@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
+from arvel.console._subsystem import CliSubsystem
 from arvel.events.dispatcher import EventDispatcher
 from arvel.providers.service_provider import ServiceProvider
 
 
 class EventServiceProvider(ServiceProvider):
     """Registers the EventDispatcher singleton and wires the Event facade."""
+
+    subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.EVENTS
 
     def register(self) -> None:
         dispatcher = EventDispatcher(container=self.container)

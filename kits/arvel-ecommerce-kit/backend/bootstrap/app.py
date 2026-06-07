@@ -21,13 +21,17 @@ from app.http.controllers._responses import (
 from app.http.middleware import CsrfDoubleSubmitMiddleware
 
 if TYPE_CHECKING:
+    from arvel.console._subsystem import CliSubsystem
     from fastapi import FastAPI
 
 
-def create_application() -> Application:
+def create_application(
+    *,
+    required_subsystems: frozenset[CliSubsystem] | None = None,
+) -> Application:
     """Build the e-commerce application from the canonical layout."""
     routes_dir = _BASE_PATH / "routes"
-    return (
+    builder = (
         Application.configure(_BASE_PATH)
         .with_config_dir(_BASE_PATH / "config")
         .with_providers(_BASE_PATH / "bootstrap" / "providers.py")
@@ -36,8 +40,10 @@ def create_application() -> Application:
             api=routes_dir / "api.py",
             console=routes_dir / "console.py",
         )
-        .create()
     )
+    if required_subsystems is not None:
+        builder = builder.with_required_subsystems(required_subsystems)
+    return builder.create()
 
 
 def create_asgi(app: Application) -> FastAPI:

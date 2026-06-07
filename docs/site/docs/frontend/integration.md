@@ -19,8 +19,13 @@ Arvel builds an OpenAPI 3.x document from your routes, [form requests](../the-ba
 # Write the spec to docs/api/openapi.yaml (the default path)
 arvel openapi:export
 
-# Pick a format, or stream it to stdout for a build pipeline
+# Write directly to a sibling project — relative paths resolve against the
+# current working directory, absolute paths are accepted, status goes to stderr.
+arvel openapi:export --output ../frontend/openapi.yaml --format yaml
+
+# Or stream it to stdout for a build pipeline (--output - is the POSIX-style alias).
 arvel openapi:export --format yaml --stdout > frontend/openapi.yaml
+arvel openapi:export --output - --format yaml | tee frontend/openapi.yaml
 
 # Validate the live app's spec against the OpenAPI 3.x schema
 arvel openapi:validate
@@ -108,7 +113,7 @@ Regenerate whenever the spec changes. The kit wraps both steps in one `make` tar
 
 ```makefile
 api-generate:
-	$(BACKEND) arvel openapi:export --stdout --format yaml > frontend/openapi.yaml
+	$(BACKEND) arvel openapi:export --output ../frontend/openapi.yaml --format yaml
 	$(FRONTEND) npm run api:generate
 ```
 

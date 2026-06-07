@@ -9,13 +9,16 @@ from typing import ClassVar
 import typer
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console.commands.schedule_commands import resolve_kernel
 
 
 class ScheduleRunCommand(Command):
     name: ClassVar[str] = "schedule:run"
     help: ClassVar[str] = "Alias for `schedule:work --once` — run the scheduler once and exit."
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.SCHEDULER, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

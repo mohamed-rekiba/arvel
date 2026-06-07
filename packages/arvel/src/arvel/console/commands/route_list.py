@@ -24,6 +24,7 @@ from typing import Annotated, Any, ClassVar
 import typer
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.routing import Router, RouteSpec
 
@@ -96,7 +97,9 @@ def _print_table(routes: list[RouteSpec]) -> None:
 class RouteListCommand(Command):
     name: ClassVar[str] = "route:list"
     help: ClassVar[str] = "List all registered routes (method, URI, name, action, middleware)"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.HTTP, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

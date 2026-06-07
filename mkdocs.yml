@@ -219,6 +219,7 @@ nav:
       - Task Scheduling: features/scheduling.md
       - Localization: features/localization.md
       - Logging: features/logging.md
+      - Maintenance Mode: features/maintenance-mode.md
       - Testing: features/testing.md
   - Frontend:
       - Frontend Integration: frontend/integration.md

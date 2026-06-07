@@ -25,6 +25,13 @@ class SessionManager:
 
     def _create(self, driver: str) -> SessionStore:
         match driver:
+            case "array":
+                # Test-only. Loses all sessions on process exit; never use in
+                # production. Registered so config('session.driver', 'array')
+                # produces a real in-memory store instead of raising.
+                from arvel.session.stores.array import ArraySessionStore
+
+                return ArraySessionStore(lifetime=self._config.lifetime)
             case "cookie":
                 from arvel.session.stores.cookie import CookieStore
 

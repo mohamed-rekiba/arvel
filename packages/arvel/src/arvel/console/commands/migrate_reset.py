@@ -8,6 +8,7 @@ import typer
 
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
+from arvel.console._subsystem import CliSubsystem
 from arvel.console.commands.migrate import (
     BootstrapFailedError,
     build_migrator,
@@ -21,7 +22,7 @@ from arvel.database.migrator import (
 class MigrateResetCommand(Command):
     name: ClassVar[str] = "migrate:reset"
     help: ClassVar[str] = "Roll back every applied migration in reverse order"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.DATABASE})
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

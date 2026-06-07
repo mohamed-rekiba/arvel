@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.database.health import DatabaseUnavailableError, check_database_connection
 from arvel.database.migrator import (
@@ -75,7 +76,7 @@ def build_migrator(app: object) -> Migrator:
 class MigrateCommand(Command):
     name: ClassVar[str] = "migrate"
     help: ClassVar[str] = "Run pending database migrations"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.DATABASE})
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self
@@ -130,7 +131,7 @@ class MigrateCommand(Command):
 class MigrateRollbackCommand(Command):
     name: ClassVar[str] = "migrate:rollback"
     help: ClassVar[str] = "Roll back the last batch of migrations"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.DATABASE})
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self
@@ -176,7 +177,7 @@ class MigrateRollbackCommand(Command):
 class MigrateStatusCommand(Command):
     name: ClassVar[str] = "migrate:status"
     help: ClassVar[str] = "Show migration status"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.DATABASE})
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

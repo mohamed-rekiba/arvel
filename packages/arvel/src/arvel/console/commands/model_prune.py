@@ -8,13 +8,16 @@ import typer
 
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
+from arvel.console._subsystem import CliSubsystem
 from arvel.database.model import Model, Prunable
 
 
 class ModelPruneCommand(Command):
     name: ClassVar[str] = "model:prune"
     help: ClassVar[str] = "Delete stale rows for all Prunable models."
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.DATABASE, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self

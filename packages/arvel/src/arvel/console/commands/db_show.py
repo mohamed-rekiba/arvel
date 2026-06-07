@@ -10,6 +10,7 @@ import typer
 from sqlalchemy import inspect
 
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem
 from arvel.console.commands.migrate import resolve_engine
 
 if TYPE_CHECKING:
@@ -26,7 +27,9 @@ class DatabaseInfo:
 class DbShowCommand(Command):
     name: ClassVar[str] = "db:show"
     help: ClassVar[str] = "Print database connection and table summary"
-    needs_application: ClassVar[bool] = True
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.DATABASE, CliSubsystem.USER_PROVIDERS}
+    )
 
     def register(self, app: typer.Typer) -> None:
         cmd_self = self
