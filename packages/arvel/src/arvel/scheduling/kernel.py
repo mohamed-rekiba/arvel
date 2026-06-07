@@ -11,15 +11,20 @@ existing apps that only use ``Schedule.call(...)`` are unaffected.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
+import io
+import sys
 import traceback
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Generator
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from arvel.cache import CacheManager
+    from arvel.maintenance.manager import MaintenanceModeManager
     from arvel.scheduling.schedule import Schedule
     from arvel.scheduling.scheduled_task import ScheduledTask
 
@@ -29,6 +34,31 @@ DispatchJob = Callable[[Any], Awaitable[None]]
 
 RunCommand = Callable[[str], Awaitable[int] | int]
 """Hook invoked for ``Schedule.command("name")``. Receives the command name."""
+
+
+class _Tee(io.TextIOBase):
+    """Write to two text streams at once. Used by ``outputTo`` redirection.
+
+    The secondary stream may be closed before the GC finalises this tee (e.g.
+    when the redirect block exits before stdout's own buffer is drained). All
+    secondary I/O is best-effort and swallows both ``OSError`` and
+    ``ValueError`` (the latter is what closed-file flushes raise).
+    """
+
+    def __init__(self, primary: Any, secondary: Any) -> None:
+        self._primary = primary
+        self._secondary = secondary
+
+    def write(self, s: str) -> int:
+        with contextlib.suppress(OSError, ValueError):
+            self._secondary.write(s)
+        return int(self._primary.write(s))
+
+    def flush(self) -> None:
+        with contextlib.suppress(OSError, ValueError):
+            self._secondary.flush()
+        with contextlib.suppress(OSError, ValueError):
+            self._primary.flush()
 
 
 @dataclass(frozen=True)
@@ -84,12 +114,14 @@ class SchedulerKernel:
         *,
         max_concurrency: int = 16,
         hooks: SchedulerHooks | None = None,
+        maintenance_manager: MaintenanceModeManager | None = None,
     ) -> None:
         self.schedule = schedule
         self._cache = cache_manager
         self._sem = asyncio.Semaphore(max_concurrency)
         self.hooks = hooks or SchedulerHooks()
         self.consecutive_failures = 0
+        self._maintenance_manager = maintenance_manager
 
     async def run_due_tasks(self, now: datetime) -> SchedulerRunResult:
         """Evaluate registered tasks against ``now`` and dispatch the due ones.
@@ -195,22 +227,28 @@ class SchedulerKernel:
                 await self._invoke(task, outcomes)
 
     async def _invoke(self, task: ScheduledTask, outcomes: list[TaskOutcome]) -> None:
+        # Laravel parity: `.inMaintenanceMode()` opts a task IN to running while
+        # the app is down. Tasks that DIDN'T opt in are skipped in maintenance.
+        if self._app_in_maintenance() and not task.in_maintenance_mode:
+            outcomes.append(TaskOutcome.skip(task.name, "in_maintenance_mode"))
+            return
         try:
             if task.callback is None:
                 outcomes.append(TaskOutcome.skip(task.name, "no_callback"))
                 return
-            if task.callback_kind == "call":
-                await self._invoke_call(task)
-            elif task.callback_kind == "job":
-                skip_reason = await self._invoke_job(task)
-                if skip_reason is not None:
-                    outcomes.append(TaskOutcome.skip(task.name, skip_reason))
-                    return
-            elif task.callback_kind == "command":
-                skip_reason = await self._invoke_command(task)
-                if skip_reason is not None:
-                    outcomes.append(TaskOutcome.skip(task.name, skip_reason))
-                    return
+            with self._capture_output(task.output_to):
+                if task.callback_kind == "call":
+                    await self._invoke_call(task)
+                elif task.callback_kind == "job":
+                    skip_reason = await self._invoke_job(task)
+                    if skip_reason is not None:
+                        outcomes.append(TaskOutcome.skip(task.name, skip_reason))
+                        return
+                elif task.callback_kind == "command":
+                    skip_reason = await self._invoke_command(task)
+                    if skip_reason is not None:
+                        outcomes.append(TaskOutcome.skip(task.name, skip_reason))
+                        return
             outcomes.append(TaskOutcome.success(task.name))
         except Exception as e:
             from arvel.logging.facade import Log
@@ -222,6 +260,56 @@ class SchedulerKernel:
                 traceback=traceback.format_exc(),
             )
             outcomes.append(TaskOutcome.failure(task.name, reason=str(e)))
+
+    def _app_in_maintenance(self) -> bool:
+        if self._maintenance_manager is None:
+            return False
+        try:
+            return self._maintenance_manager.is_down()
+        except Exception:
+            # Best-effort: never let a maintenance-marker read failure crash
+            # the scheduler. Log and treat as "not in maintenance".
+            from arvel.logging.facade import Log
+
+            Log.channel("scheduler").warning(
+                "scheduler.maintenance_check_failed",
+                error_type="MaintenanceManagerError",
+            )
+            return False
+
+    @contextlib.contextmanager
+    def _capture_output(self, path: Path | None) -> Generator[None]:
+        """Tee stdout/stderr to ``path`` for the duration of the block.
+
+        Best-effort — if the file can't be opened we log a warning and let the
+        task run with normal stdio. A successful task whose output redirect
+        fails is still a success.
+        """
+        if path is None:
+            yield
+            return
+        target = Path(path)
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            sink = target.open("a", encoding="utf-8")
+        except OSError as exc:
+            from arvel.logging.facade import Log
+
+            Log.channel("scheduler").warning(
+                "scheduler.output_to.open_failed",
+                path=str(target),
+                error=str(exc),
+            )
+            yield
+            return
+        tee_out = _Tee(sys.stdout, sink)
+        tee_err = _Tee(sys.stderr, sink)
+        with contextlib.redirect_stdout(tee_out), contextlib.redirect_stderr(tee_err):
+            try:
+                yield
+            finally:
+                sink.flush()
+                sink.close()
 
     async def _invoke_call(self, task: ScheduledTask) -> None:
         callback = task.callback

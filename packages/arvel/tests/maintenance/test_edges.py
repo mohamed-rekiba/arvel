@@ -18,6 +18,7 @@ class _Send503(Protocol):
         *,
         retry: int | None,
         refresh: int | None,
+        template: str | None,
     ) -> Awaitable[None]: ...
 
 
@@ -96,10 +97,52 @@ async def test_maintenance_middleware_sends_503_headers() -> None:
         messages.append(message)
 
     middleware = object.__new__(middleware_module.MaintenanceModeMiddleware)
-    await send_503(middleware, send, retry=30, refresh=60)
+    await send_503(middleware, send, retry=30, refresh=60, template=None)
 
     assert await empty_receive() == {"type": "http.disconnect"}
     assert messages[0]["type"] == "http.response.start"
     headers = dict(cast("list[tuple[bytes, bytes]]", messages[0]["headers"]))
     assert headers[b"retry-after"] == b"30"
     assert headers[b"refresh"] == b"60"
+    assert headers[b"cache-control"] == b"no-store"
+
+
+async def test_maintenance_middleware_renders_template_when_set(tmp_path: Path) -> None:
+    """`--render <path>` swaps the plain-text body for the rendered template."""
+    send_503 = cast(
+        "_Send503",
+        object.__getattribute__(middleware_module.MaintenanceModeMiddleware, "_send_503"),
+    )
+    template_path = tmp_path / "down.html"
+    template_path.write_text("<h1>Custom maintenance page</h1>", encoding="utf-8")
+
+    bodies: list[bytes] = []
+
+    async def send(message: dict[str, object]) -> None:
+        if message["type"] == "http.response.body":
+            bodies.append(cast("bytes", message.get("body", b"")))
+
+    middleware = object.__new__(middleware_module.MaintenanceModeMiddleware)
+    await send_503(middleware, send, retry=None, refresh=None, template=str(template_path))
+
+    assert any(b"Custom maintenance page" in body for body in bodies)
+
+
+async def test_maintenance_middleware_falls_back_when_template_missing(tmp_path: Path) -> None:
+    """A configured template that can't be read is logged and downgraded to plain text."""
+    send_503 = cast(
+        "_Send503",
+        object.__getattribute__(middleware_module.MaintenanceModeMiddleware, "_send_503"),
+    )
+    missing = tmp_path / "does-not-exist.html"
+
+    bodies: list[bytes] = []
+
+    async def send(message: dict[str, object]) -> None:
+        if message["type"] == "http.response.body":
+            bodies.append(cast("bytes", message.get("body", b"")))
+
+    middleware = object.__new__(middleware_module.MaintenanceModeMiddleware)
+    await send_503(middleware, send, retry=None, refresh=None, template=str(missing))
+
+    assert any(b"App is down for maintenance." in body for body in bodies)
