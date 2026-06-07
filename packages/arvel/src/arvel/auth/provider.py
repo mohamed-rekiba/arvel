@@ -197,7 +197,11 @@ class AuthServiceProvider(ServiceProvider):
     def _validate_jwt_config(config: AuthConfig) -> None:
         secret_length = len(config.jwt.secret)
         if secret_length < _MIN_JWT_SECRET_LENGTH:
-            msg = "jwt.secret must be at least 32 characters"
+            msg = (
+                "jwt.secret must be at least 32 characters. "
+                "Set APP_KEY (or JWT_SECRET) in your .env and make sure it's loaded; "
+                "generate one with `arvel key:generate`."
+            )
             raise AuthConfigError(msg)
         if config.jwt.algorithm.lower() == "none":
             msg = "jwt.algorithm must not be 'none'"

@@ -527,6 +527,7 @@ class ApplicationBuilder:
 
     def __init__(self, base_path: Path) -> None:
         self._base_path: Path = base_path
+        self._env_file: Path | None = None
         self._providers: list[type[ServiceProvider]] = []
         self._providers_path: Path | None = None
         self._environment: str | None = None
@@ -595,6 +596,16 @@ class ApplicationBuilder:
             self._routing_paths["console"] = Path(console) if isinstance(console, str) else console
         return self
 
+    def with_env_file(self, path: Path | str) -> Self:
+        """Load ``.env`` from ``path`` instead of the default ``base_path/.env``.
+
+        For monorepo layouts where the app lives in a subdir (e.g. ``backend/``)
+        but the ``.env`` is at the repo root, shared with docker-compose and the
+        frontend. Loaded at create() time, before config modules run.
+        """
+        self._env_file = Path(path) if isinstance(path, str) else path
+        return self
+
     def with_config_dir(self, path: Path | str) -> Self:
         """Discover and load every ``.py`` config file in ``path`` at register() time.
 
@@ -644,15 +655,18 @@ class ApplicationBuilder:
         return _env("APP_ENV", "production").lower()
 
     def _load_dotenv(self) -> None:
-        """Load ``.env`` from base_path into os.environ (does not override existing vars).
+        """Load the ``.env`` into os.environ (does not override existing vars).
 
-        This ensures env() calls inside config/*.py see the same values that
-        pydantic-settings would read later when instantiating ArvelSettings subclasses.
+        Defaults to ``base_path/.env``. Monorepo kits keep a stack-wide ``.env``
+        at the repo root (shared with docker-compose and the frontend) while the
+        app lives in a subdir — those point at it explicitly via
+        :meth:`with_env_file`. os.environ values always win, so docker (env
+        injected by compose) is unaffected either way.
         """
         from dotenv import load_dotenv
 
-        dotenv_path = self._base_path / ".env"
-        if dotenv_path.exists():
+        dotenv_path = self._env_file if self._env_file is not None else self._base_path / ".env"
+        if dotenv_path.is_file():
             load_dotenv(dotenv_path, override=False)
 
     def _load_config_dir(self) -> None:

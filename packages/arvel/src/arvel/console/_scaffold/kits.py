@@ -117,6 +117,7 @@ KITS: dict[str, KitSpec] = {
         ),
         resolve=_ecommerce_kit_root,
         next_step_commands=(
+            "source .venv/bin/activate",
             "make env",
             "make up",
             "make migrate",
