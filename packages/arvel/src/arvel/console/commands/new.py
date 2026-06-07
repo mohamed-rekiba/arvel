@@ -290,14 +290,18 @@ def _localize_scaffolded_pyproject(project_root: Path, project: str, kit: str) -
 
 
 # The kit's docker-compose.yml is authored for the monorepo: it bind-mounts the
-# repo root (`../..`), works out of `kits/arvel-ecommerce-kit/backend`, and syncs
-# the whole uv workspace (`--all-packages`) so `arvel` resolves from source. A
-# scaffolded project has none of that — `pyproject.toml` and `backend/` sit at the
-# project root and `arvel` comes from PyPI. Rewrite the monorepo paths so
-# `docker compose up` works in the generated project.
+# repo root (`../..`), syncs the whole uv workspace from `/workspace` (the repo
+# root holds the workspace pyproject), then works out of
+# `kits/arvel-ecommerce-kit/backend`. A scaffolded project has none of that —
+# the only `pyproject.toml` sits in `backend/` and `arvel` comes from PyPI. So
+# `uv sync` has to run from `/workspace/backend`, not `/workspace`, or it errors
+# with "No pyproject.toml found". Rewrite every monorepo path accordingly. The
+# trailing `cd /workspace/backend` is then a harmless no-op (sync already left us
+# there), which keeps the rewrite a set of independent string swaps.
 _COMPOSE_MONOREPO_REWRITES: tuple[tuple[str, str], ...] = (
     ("/workspace/kits/arvel-ecommerce-kit/backend", "/workspace/backend"),
-    ("cd kits/arvel-ecommerce-kit/backend", "cd backend"),
+    ("cd /workspace &&", "cd /workspace/backend &&"),
+    ("cd kits/arvel-ecommerce-kit/backend", "cd /workspace/backend"),
     ("../..:/workspace", ".:/workspace"),
     ("uv sync --frozen --all-packages", "uv sync --frozen"),
 )
