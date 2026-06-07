@@ -38,17 +38,19 @@ PACKAGE_PUBLIC: frozenset[str] = frozenset(
         "get_conversion_runner",
         "get_path_generator",
         "set_conversion_runner",
+        "set_max_pixels",
         "set_path_generator",
     },
 )
 
-# Media subpackage mirrors PACKAGE_PUBLIC minus the four names that live
-# elsewhere: Image + UnsupportedFormatError come from arvel_image.image,
+# Media subpackage mirrors PACKAGE_PUBLIC minus the names that live elsewhere:
+# Image + UnsupportedFormatError + set_max_pixels come from arvel_image.image,
 # and ImageServiceProvider from arvel_image.provider.
 MEDIA_PUBLIC: frozenset[str] = PACKAGE_PUBLIC - {
     "Image",
     "ImageServiceProvider",
     "UnsupportedFormatError",
+    "set_max_pixels",
 }
 
 # Demoted in iter 7 — submodule paths stay stable for framework-internal callers.

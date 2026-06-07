@@ -43,9 +43,20 @@ Key methods: `fit(mode, width, height)`, `resize(width=, height=)`, `crop(left=,
 
 The chain is lazy — argument validation runs eagerly so mistakes fail fast, but decode/transform/encode only run on the terminal.
 
+### Decompression-bomb guard
+
+Importing `arvel_image` pins Pillow's `MAX_IMAGE_PIXELS` to ~178 MP, so a crafted image can't exhaust memory on decode. Anything past the ceiling warns; past 2x it, Pillow raises `DecompressionBombError`. Tighten or loosen it for your workload:
+
+```python
+from arvel_image import set_max_pixels
+
+set_max_pixels(50_000_000)  # stricter
+set_max_pixels(None)        # off — only if you fully trust the source
+```
+
 ## Public surface
 
-`Image`, `HasMedia`, `Media`, `MediaCollection`, `FileAdder`, `FileInfo`, `Conversion`, `ConversionRunner`, `PathGenerator`, `DefaultPathGenerator`, `MediaLibrary`, `QueuedConversionJob`, `ImageServiceProvider`, `calculate_responsive_widths`, `copy_responsive_images`, `generate_placeholder_svg`, `generate_responsive_images_for_media`, `get_conversion_runner`, `set_conversion_runner`, `get_path_generator`, `set_path_generator`, plus the `MediaError` hierarchy and `UnsupportedFormatError`.
+`Image`, `set_max_pixels`, `HasMedia`, `Media`, `MediaCollection`, `FileAdder`, `FileInfo`, `Conversion`, `ConversionRunner`, `PathGenerator`, `DefaultPathGenerator`, `MediaLibrary`, `QueuedConversionJob`, `ImageServiceProvider`, `calculate_responsive_widths`, `copy_responsive_images`, `generate_placeholder_svg`, `generate_responsive_images_for_media`, `get_conversion_runner`, `set_conversion_runner`, `get_path_generator`, `set_path_generator`, plus the `MediaError` hierarchy and `UnsupportedFormatError`.
 
 - `Image` works without booting anything — pure Pillow wrapper.
 - `HasMedia` adds a polymorphic `media` relation (a plain `MorphMany`); hosts declare one default collection via `__media_collection__` and an optional `register_media_collections()` for advanced setups.

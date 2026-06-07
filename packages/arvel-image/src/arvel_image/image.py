@@ -52,6 +52,20 @@ _FitMode = str  # "cover" | "contain"
 _MIN_QUALITY = 1
 _MAX_QUALITY = 100
 
+# Decompression-bomb ceiling. Pillow ships this same default, but a dependency
+# bump could change it under us — pinning it here keeps the limit auditable and
+# guarantees the guard is on regardless of Pillow's defaults. Pillow warns past
+# this and raises DecompressionBombError past 2x it, on every open() below.
+_DEFAULT_MAX_PIXELS = 178_956_970  # ~178 MP
+
+
+def set_max_pixels(max_pixels: int | None) -> None:
+    """Set the decompression-bomb pixel ceiling. ``None`` disables the check."""
+    PILImage.MAX_IMAGE_PIXELS = max_pixels
+
+
+set_max_pixels(_DEFAULT_MAX_PIXELS)
+
 
 class UnsupportedFormatError(ValueError):
     """Raised when an unsupported output format is requested."""
