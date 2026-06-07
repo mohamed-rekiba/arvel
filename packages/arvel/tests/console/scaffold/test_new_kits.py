@@ -38,6 +38,7 @@ def _local_ecommerce_kit(kit_src: Path) -> KitSpec:
         description=base.description,
         resolve=lambda: kit_src,
         next_step_commands=base.next_step_commands,
+        python_project_subdir=base.python_project_subdir,
     )
 
 
@@ -187,10 +188,12 @@ def test_new_ecommerce_renames_project_and_uses_kit_sync(
     from arvel.console._scaffold import kits as kits_module
 
     kit_src = tmp_path / "kit-src"
-    kit_src.mkdir()
-    # Mirrors the real kit: monorepo name + uv workspace plumbing that must be
-    # stripped so the scaffolded project syncs outside the Arvel checkout.
-    (kit_src / "pyproject.toml").write_text(
+    backend = kit_src / "backend"
+    backend.mkdir(parents=True)
+    # Mirrors the real kit: the Python project nests under backend/, with the
+    # monorepo name + uv workspace plumbing that must be stripped so the
+    # scaffolded project syncs outside the Arvel checkout.
+    (backend / "pyproject.toml").write_text(
         "[project]\n"
         'name = "arvel-ecommerce-kit"\n'
         'version = "1.0.0"\n'
@@ -210,7 +213,7 @@ def test_new_ecommerce_renames_project_and_uses_kit_sync(
         result = runner.invoke(app, ["new", "my-shop", "--kit", "ecommerce", "--no-install"])
         assert result.exit_code == 0, result.stderr
         project = Path(iso_cwd) / "my-shop"
-        pyproject = (project / "pyproject.toml").read_text(encoding="utf-8")
+        pyproject = (project / "backend" / "pyproject.toml").read_text(encoding="utf-8")
         assert 'name = "my-shop"' in pyproject
         assert "arvel-ecommerce-kit" not in pyproject
         # Workspace-only plumbing is gone; the dep stays so PyPI resolution works.
@@ -218,7 +221,8 @@ def test_new_ecommerce_renames_project_and_uses_kit_sync(
         assert "workspace = true" not in pyproject
         assert "package = false" not in pyproject
         assert "arvel[postgres]>=1.0.0" in pyproject
-        assert "uv sync --all-extras --dev" in result.stdout
+        # The pyproject lives in backend/, so the manual sync is scoped there.
+        assert "(cd backend && uv sync --all-extras --dev)" in result.stdout
 
 
 def test_new_ecommerce_next_steps_use_make_not_arvel_serve(
@@ -228,8 +232,9 @@ def test_new_ecommerce_next_steps_use_make_not_arvel_serve(
     from arvel.console._scaffold import kits as kits_module
 
     kit_src = tmp_path / "kit-src"
-    kit_src.mkdir()
-    (kit_src / "pyproject.toml").write_text(
+    backend = kit_src / "backend"
+    backend.mkdir(parents=True)
+    (backend / "pyproject.toml").write_text(
         '[project]\nname = "arvel-ecommerce-kit"\nversion = "1.0.0"\n'
         'dependencies = ["arvel[postgres]"]\n',
         encoding="utf-8",
@@ -241,6 +246,8 @@ def test_new_ecommerce_next_steps_use_make_not_arvel_serve(
     with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app, ["new", "my-shop", "--kit", "ecommerce", "--no-install"])
         assert result.exit_code == 0, result.stderr
+        # The host venv lands in backend/, where the pyproject is.
+        assert "source backend/.venv/bin/activate" in result.stdout
         assert "make up" in result.stdout
         assert "make migrate" in result.stdout
         assert "make seed" in result.stdout
@@ -254,8 +261,9 @@ def test_new_ecommerce_localizes_docker_compose(
     from arvel.console._scaffold import kits as kits_module
 
     kit_src = tmp_path / "kit-src"
-    kit_src.mkdir()
-    (kit_src / "pyproject.toml").write_text(
+    backend = kit_src / "backend"
+    backend.mkdir(parents=True)
+    (backend / "pyproject.toml").write_text(
         '[project]\nname = "arvel-ecommerce-kit"\nversion = "1.0.0"\n'
         'dependencies = ["arvel[postgres]"]\n',
         encoding="utf-8",

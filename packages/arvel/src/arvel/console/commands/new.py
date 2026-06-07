@@ -147,7 +147,9 @@ def _print_next_steps(
     typer.echo("Next steps:")
     typer.echo(f"  cd {name}")
     if no_install:
-        typer.echo("  " + "uv " + " ".join(sync_args))
+        sync_cmd = "uv " + " ".join(sync_args)
+        subdir = kit_spec.python_project_subdir
+        typer.echo(f"  (cd {subdir} && {sync_cmd})" if subdir else f"  {sync_cmd}")
     for command in kit_spec.next_step_commands:
         typer.echo(f"  {command}")
     typer.echo("")
@@ -258,18 +260,19 @@ def _strip_toml_table(text: str, header: str) -> str:
     return re.sub(pattern, "", text)
 
 
-def _localize_scaffolded_pyproject(target: Path, project: str, kit: str) -> None:
+def _localize_scaffolded_pyproject(project_root: Path, project: str, kit: str) -> None:
     """Turn the kit's copied pyproject into a standalone project's pyproject.
 
     The api skeleton substitutes ``{{project_name}}`` tokens; the e-commerce kit
     is copied verbatim, so its monorepo identity is rewritten here — the project
     name, and the workspace-only ``[tool.uv]`` / ``[tool.uv.sources]`` tables
     that otherwise break ``uv sync`` outside the Arvel checkout. ``project`` is
-    validated against PROJECT_NAME_REGEX, so it's safe to inline.
+    validated against PROJECT_NAME_REGEX, so it's safe to inline. ``project_root``
+    is the dir holding the pyproject (``backend/`` for the e-commerce kit).
     """
     if kit == DEFAULT_KIT:
         return
-    pyproject = target / "pyproject.toml"
+    pyproject = project_root / "pyproject.toml"
     if not pyproject.is_file():
         return
     original = pyproject.read_text(encoding="utf-8")
@@ -350,12 +353,15 @@ def _scaffold(
         ),
     )
 
-    _localize_scaffolded_pyproject(target, validated, kit_spec.name)
+    # The e-commerce kit nests its Python project under backend/; the api kit is flat.
+    python_project_dir = target / kit_spec.python_project_subdir
+
+    _localize_scaffolded_pyproject(python_project_dir, validated, kit_spec.name)
     _localize_scaffolded_compose(target, kit_spec.name)
 
     sync_args = _uv_sync_args(kit_spec.name)
     if not no_install:
-        _run_uv_sync(target, sync_args)
+        _run_uv_sync(python_project_dir, sync_args)
 
     _print_next_steps(validated, no_install=no_install, kit_spec=kit_spec, sync_args=sync_args)
 
