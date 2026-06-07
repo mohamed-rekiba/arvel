@@ -1,15 +1,13 @@
 """RFC 7807 problem-details exception handler.
 
-Every error response follows RFC 7807. The handler reads the problem-type
-base URI from ``config/app.py`` (key ``"app.url"``), defaulting to
-``http://localhost`` when no config file is present.
-
-Wire it as the application exception handler in your provider::
+Opt-in: the framework default is the plain ``HttpExceptionHandler`` (error-bag
+envelope). Swap in RFC 7807 by overriding the binding in a provider::
 
     c.singleton(HttpExceptionHandler, ProblemDetailsHandler)
 
-The handler is registered as the ``HttpServiceProvider`` default so that all
-Arvel applications get RFC 7807 out of the box without any custom provider.
+Every error response then follows RFC 7807. The handler reads the problem-type
+base URI from ``config/app.py`` (key ``"app.url"``), defaulting to
+``http://localhost`` when no config file is present.
 """
 
 from __future__ import annotations
@@ -70,6 +68,9 @@ class ProblemDetailsHandler(HttpExceptionHandler):
         app.add_exception_handler(RequestValidationError, self.handle_validation_problem)
         for exc_type, translator in self._translators.items():
             app.add_exception_handler(exc_type, self._make_problem_handler(translator))
+        # Catch-all so unhandled errors still render problem+json (and never leak a
+        # traceback) instead of falling through to Starlette's default handler.
+        app.add_exception_handler(Exception, self.handle_unexpected_problem)
 
     def _make_problem_handler(
         self, translator: ExceptionTranslator
@@ -97,6 +98,20 @@ class ProblemDetailsHandler(HttpExceptionHandler):
             status_code=exc.status_code,
             content=body,
             headers=headers,
+            media_type="application/problem+json",
+        )
+
+    async def handle_unexpected_problem(self, request: Request, exc: Exception) -> JSONResponse:
+        self._log_unexpected(request, exc)
+        body = self._problem_body(
+            code="INTERNAL_ERROR",
+            title="Something went wrong",
+            status=500,
+            detail="Something went wrong",
+        )
+        return JSONResponse(
+            status_code=500,
+            content=body,
             media_type="application/problem+json",
         )
 

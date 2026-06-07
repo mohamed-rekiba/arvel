@@ -52,6 +52,29 @@ def test_validation_problem_renders_field_errors() -> None:
     assert {"loc", "msg", "type"}.issubset(body["detail"][0])
 
 
+def test_unhandled_exception_renders_problem_json_without_leak() -> None:
+    app = FastAPI()
+    ProblemDetailsHandler().register(app)
+
+    @app.get("/kaboom")
+    async def kaboom() -> None:
+        raise ValueError("internal secret detail")
+
+    assert kaboom is not None
+    # raise_server_exceptions=False: Starlette re-raises after our handler responds.
+    client = cast("httpx.Client", TestClient(app, raise_server_exceptions=False))
+    response = client.get("/kaboom")
+
+    assert response.status_code == 500
+    assert response.headers["content-type"].startswith("application/problem+json")
+    body = response.json()
+    assert body["status"] == 500
+    assert body["type"].endswith("/problems/internal-error")
+    # Generic message only — the underlying error text never reaches the client.
+    assert "internal secret detail" not in response.text
+    assert "Traceback" not in response.text
+
+
 def test_problem_details_sets_retry_after_for_throttle() -> None:
     app = FastAPI()
 
