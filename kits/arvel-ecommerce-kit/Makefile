@@ -1,4 +1,8 @@
-COMPOSE := docker compose
+# --env-file points compose's ${VAR} interpolation at backend/.env, the same
+# file the services inject via env_file. Keeps container ports/passwords and the
+# app's own config reading from one source. compose errors if it's missing, so
+# every lifecycle target below depends on `env`.
+COMPOSE := docker compose --env-file backend/.env
 BACKEND := $(COMPOSE) exec backend
 FRONTEND := $(COMPOSE) exec frontend
 FRONTEND_RUN := $(COMPOSE) run --rm --no-deps frontend
@@ -6,21 +10,21 @@ FRONTEND_RUN := $(COMPOSE) run --rm --no-deps frontend
 .PHONY: env up down nuke ps logs migrate migrate-fresh seed build-frontend api-generate test-backend test-frontend test shell-backend shell-frontend
 
 env:
-	test -f .env || cp .env.example .env
+	test -f backend/.env || cp backend/.env.example backend/.env
 
 up: env
 	$(COMPOSE) up -d --wait
 
-down:
+down: env
 	$(COMPOSE) down
 
-nuke:
+nuke: env
 	$(COMPOSE) down -v --remove-orphans || true
 
-ps:
+ps: env
 	$(COMPOSE) ps
 
-logs:
+logs: env
 	$(COMPOSE) logs -f backend frontend scheduler db redis
 
 migrate:
@@ -29,7 +33,7 @@ migrate:
 migrate-fresh:
 	$(BACKEND) arvel migrate:fresh
 
-seed:
+seed: env
 	$(BACKEND) arvel db:seed
 	$(COMPOSE) rm -sf scheduler || true
 	$(COMPOSE) up -d scheduler

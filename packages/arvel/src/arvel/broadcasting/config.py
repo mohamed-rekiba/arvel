@@ -29,9 +29,13 @@ class BroadcastConfig(ArvelSettings):
     - ``BROADCASTING_AUTH_ENDPOINT``  (default: ``/broadcasting/auth``)
     """
 
+    # match_prefix is required with extra="forbid": a shared .env at the CWD
+    # carries unrelated keys (APP_KEY, DB_*, ...) that would otherwise trip the
+    # forbid check on every load.
     model_config = SettingsConfigDict(
         env_prefix="BROADCASTING_",
         extra="forbid",
+        dotenv_filtering="match_prefix",
     )
     __config_path__ = "broadcasting"
 
@@ -58,6 +62,7 @@ class ReverbConfig(ArvelSettings):
     model_config = SettingsConfigDict(
         env_prefix="REVERB_",
         extra="forbid",
+        dotenv_filtering="match_prefix",
     )
 
     app_id: str
