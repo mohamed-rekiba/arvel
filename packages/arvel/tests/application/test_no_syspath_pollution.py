@@ -1,10 +1,8 @@
-""": no ``sys.path`` mutation during file loading.
+"""No ``sys.path`` mutation during file loading.
 
 Snapshots ``sys.path`` around every public entry point that triggers file
-loading. The invariant survives across Red → Green: today every call
-raises ``NotImplementedError`` before any mutation could happen; once
-Stage 3b implements the bodies, the loader's load-time assertion (per
-Loader contract also runs, and these tests verify it from the outside.
+loading. The loader also raises at load time if user code mutates it; these
+tests verify the invariant from the outside.
 """
 
 from __future__ import annotations
@@ -17,7 +15,7 @@ from arvel.application._loader import NAMESPACE_PREFIX, load_module_from_path
 
 
 def _assert_unchanged(snapshot: list[str]) -> None:
-    assert sys.path == snapshot, "sys.path was mutated by a loader call (NFR-004-004 violation)"
+    assert sys.path == snapshot, "sys.path was mutated by a loader call"
 
 
 def test_load_module_from_path_does_not_mutate_sys_path(tmp_path: Path) -> None:

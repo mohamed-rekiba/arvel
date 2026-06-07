@@ -1,13 +1,13 @@
 """CLI built-ins via arvel.commands entry-points.
 
 Tests for:
- pyproject.toml declares [project.entry-points."arvel.commands"]
- Entry-points list covers all 24 expected built-ins + reverb:start
- console.entrypoint.get_commands collapses to discover_commands
- arvel --help displays the same 24 commands (regression guard)
- Queue commands stay OUT of the entry-points group
- discover_commands tolerates ImportError from individual entry-points
- Discovery test pins expected names so future removal fails CI
+- pyproject.toml declares [project.entry-points."arvel.commands"]
+- Entry-points list covers every expected built-in + reverb:start
+- console.entrypoint.get_commands collapses to discover_commands
+- `arvel --help` displays the same set of commands (regression guard)
+- Queue commands stay OUT of the entry-points group
+- discover_commands tolerates ImportError from individual entry-points
+- Discovery test pins expected names so future removal fails CI
 """
 
 from __future__ import annotations
@@ -42,11 +42,11 @@ def entry_points_table(pyproject_data: dict[str, Any]) -> dict[str, str]:
     return eps.get("arvel.commands", {})
 
 
-# ─── / : pyproject declares all expected entry-points ──────
+# ─── pyproject declares all expected entry-points ─────────────────────────────
 
 
 EXPECTED_BUILTINS = {
-    # make:* generators ( core + additions)
+    # make:* generators
     "make:controller",
     "make:model",
     "make:service",
@@ -72,7 +72,7 @@ EXPECTED_BUILTINS = {
     # publishing — replaces the old per-table make:<feature>-table commands
     "vendor:publish",
     "config:publish",
-    # migrate family ( + )
+    # migrate family
     "migrate",
     "migrate:rollback",
     "migrate:status",
@@ -98,7 +98,7 @@ EXPECTED_BUILTINS = {
     "test",
     "down",
     "up",
-    # queue ops (entry-point safe — DI-required ones still live in )
+    # queue ops (entry-point safe — DI-required ones live in the queue provider)
     "queue:restart",
     "queue:clear",
     "queue:prune-failed",
@@ -156,11 +156,11 @@ def test_queue_commands_are_not_declared_as_entry_points(
     """queue commands need DI; they must NOT be declared as entry-points."""
     assert command_name not in entry_points_table, (
         f'Queue command {command_name!r} must NOT be in [project.entry-points."arvel.commands"] '
-        "— it needs DI and is intentionally deferred to WI-arvel-021."
+        "— it needs DI and is registered through the queue provider instead."
     )
 
 
-# ─── : get_commands() collapses to discover_commands() ──────────────
+# ─── get_commands() collapses to discover_commands() ─────────────────────────
 
 
 def test_entrypoint_get_commands_returns_only_discover_commands_result() -> None:
@@ -192,11 +192,11 @@ def test_entrypoint_get_commands_returns_only_discover_commands_result() -> None
         )
 
 
-# ─── : arvel --help discovers all expected built-ins via entry-points
+# ─── arvel --help discovers all expected built-ins via entry-points ──────────
 
 
 def test_discover_commands_finds_all_expected_builtins_against_installed_wheel() -> None:
-    """+ : at runtime, the installed wheel exposes every expected command."""
+    """At runtime, the installed wheel exposes every expected command."""
     eps = importlib.metadata.entry_points(group="arvel.commands")
     discovered_names = {ep.name for ep in eps}
 
@@ -224,13 +224,13 @@ def test_get_commands_returns_at_least_core_builtins_at_runtime() -> None:
     )
 
 
-# ─── D: ImportError-tolerant entry-point loader ─────────────────────
+# ─── ImportError-tolerant entry-point loader ─────────────────────────────────
 
 
 def test_discover_commands_skips_entry_point_that_raises_importerror(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """D: a single ImportError-raising entry-point must NOT abort discovery."""
+    """A single ImportError-raising entry-point must NOT abort discovery."""
 
     broken_ep = MagicMock()
     broken_ep.name = "broken:cmd"

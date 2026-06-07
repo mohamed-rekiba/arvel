@@ -1,11 +1,10 @@
-"""Branch coverage for responsive_image_generator.py — Story 1 (Track E).
+"""Branch coverage for responsive_image_generator.py.
 
-Targets the 30 lines flagged missing by the WI-arvel-001 final coverage report
-(178-182, 190, 196, 201, 222-235, 242-246, 262-271, 279-282, 315, 319). Each
-test names the branch it pins so the link from coverage gap to test is visible.
+Pins the missing branches surfaced by the coverage report. Each test names the
+branch it covers so the link from coverage gap to test is visible.
 
-Fakes are minimal — implements the StorageDisk Protocol just enough for the
-function under test. No SQLAlchemy, no host model — these are unit tests
+Fakes are minimal — they implement the StorageDisk Protocol just enough for
+the function under test. No SQLAlchemy, no host model — these are unit tests
 against the module-level functions.
 """
 
@@ -110,7 +109,7 @@ def _jpeg(width: int, height: int) -> bytes:
     return buf.getvalue()
 
 
-# ─── Story 1 AC2 / AC8 — main entry rejection paths ──────────────────────────
+# ─── main entry rejection paths ──────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -169,7 +168,7 @@ async def test_empty_widths_returns_empty_dict(
     assert disk.files == {}
 
 
-# ─── Story 1 AC3 / AC4 — per-width skip paths ────────────────────────────────
+# ─── per-width skip paths ────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -268,7 +267,7 @@ async def test_resize_exception_propagates_as_none_then_continue(
     assert all(u["width"] == 800 for u in result["urls"])
 
 
-# ─── Story 1 AC5 — _copy_variant exception branch ────────────────────────────
+# ─── _copy_variant exception branch ──────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -319,7 +318,7 @@ async def test_copy_variant_happy_path_writes_to_new_path() -> None:
     assert disk.files[new_url["path"]] == b"fake-image-bytes"
 
 
-# ─── Story 1 AC6 — delete_responsive_images defensive paths ──────────────────
+# ─── delete_responsive_images defensive paths ────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -390,7 +389,7 @@ async def test_delete_suppresses_disk_errors() -> None:
     await delete_responsive_images(responsive, disk=disk)
 
 
-# ─── Story 1 — copy_responsive_images defensive paths (L315, L319) ───────────
+# ─── copy_responsive_images defensive paths ──────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -467,7 +466,7 @@ async def test_copy_defaults_missing_base64svg_to_empty_string() -> None:
     assert result["original"]["base64svg"] == ""
 
 
-# ─── Story 1 — defensive width/height coercion (line 322-323) ────────────────
+# ─── defensive width/height coercion ─────────────────────────────────────────
 
 
 @pytest.mark.asyncio

@@ -33,7 +33,7 @@ class TestV001ExceptSyntax:
         src = _routes_src()
         # Python 2 form — bare comma between exception types without parens
         assert "except OSError, RuntimeError:" not in src, (
-            "V-001 not fixed: Python 2 except tuple syntax still present in routes/api.py"
+            "Python 2 except tuple syntax still present in routes/api.py"
         )
 
     def test_correct_except_tuple_catches_runtime_error(self) -> None:
@@ -58,7 +58,7 @@ class TestV001ExceptSyntax:
         # The entire broken block was removed — neither the Python 2 nor Python 3 form exists.
         # Confirming the Python 2 form is absent is sufficient.
         assert "_HAS_IMAGE_MANAGER = True" not in src, (
-            "V-001 not fully fixed: conditional ImageManager block still present"
+            "conditional ImageManager block still present"
         )
 
 
@@ -71,17 +71,13 @@ class TestV002GuardName:
     def test_no_guard_name_web_in_role_lookup(self) -> None:
         src = _routes_src()
         # guard_name="web" anywhere in routes is wrong — all data uses "api"
-        assert 'guard_name="web"' not in src, (
-            "V-002 not fixed: guard_name='web' still present in routes/api.py"
-        )
+        assert 'guard_name="web"' not in src, "guard_name='web' still present in routes/api.py"
 
     def test_role_lookup_uses_api_guard(self) -> None:
         users_ctrl = (
             ROUTES_FILE.parent.parent / "app" / "http" / "controllers" / "admin" / "users.py"
         ).read_text()
-        assert 'guard_name="api"' in users_ctrl, (
-            "V-002 not fixed: guard_name='api' not found in admin/users.py"
-        )
+        assert 'guard_name="api"' in users_ctrl, "guard_name='api' not found in admin/users.py"
 
 
 # ─── ProductService.create() must not use raw SQL ─────────────────────
@@ -93,27 +89,23 @@ class TestV003CreateUsesOrm:
     def test_create_does_not_use_db_statement(self) -> None:
         src = _product_svc_src()
         # Check that DB.statement / DB.select are not used anywhere in the file
-        assert "await DB.statement" not in src, (
-            "V-003 not fixed: DB.statement still called in product_service.py"
-        )
+        assert "await DB.statement" not in src, "DB.statement still called in product_service.py"
 
     def test_create_does_not_use_db_select(self) -> None:
         src = _product_svc_src()
-        assert "await DB.select" not in src, (
-            "V-003 not fixed: DB.select still called in product_service.py"
-        )
+        assert "await DB.select" not in src, "DB.select still called in product_service.py"
 
     def test_db_not_imported_in_product_service(self) -> None:
         src = _product_svc_src()
         assert "from arvel.database.db import DB" not in src, (
-            "V-003/NFR-004 not fixed: DB is still imported in product_service.py"
+            "DB is still imported in product_service.py"
         )
 
     def test_uuid7_not_called_manually_in_service(self) -> None:
         src = _product_svc_src()
         # uuid7 should not be imported for manual ID generation
         assert "from app.models.base import uuid7" not in src, (
-            "V-003 not fixed: uuid7 still imported in product_service.py"
+            "uuid7 still imported in product_service.py"
         )
 
     @pytest.mark.asyncio
@@ -165,27 +157,23 @@ class TestV004WriteMethodsUseOrm:
 
     def test_no_raw_update_sql_in_product_service(self) -> None:
         src = _product_svc_src()
-        assert "UPDATE products" not in src, (
-            "V-004 not fixed: raw UPDATE products SQL still in product_service.py"
-        )
+        assert "UPDATE products" not in src, "raw UPDATE products SQL still in product_service.py"
 
     def test_no_raw_delete_sql_in_product_service(self) -> None:
         src = _product_svc_src()
         assert "DELETE FROM products" not in src, (
-            "V-004 not fixed: raw DELETE FROM products SQL still in product_service.py"
+            "raw DELETE FROM products SQL still in product_service.py"
         )
 
     def test_no_cast_products_status_sql(self) -> None:
         src = _product_svc_src()
         assert "CAST(:status AS products_status)" not in src, (
-            "V-004 not fixed: CAST(:status AS products_status) still in product_service.py"
+            "CAST(:status AS products_status) still in product_service.py"
         )
 
     def test_no_cast_jsonb_sql(self) -> None:
         src = _product_svc_src()
-        assert "CAST(:name AS jsonb)" not in src, (
-            "V-004 not fixed: CAST(:name AS jsonb) still in product_service.py"
-        )
+        assert "CAST(:name AS jsonb)" not in src, "CAST(:name AS jsonb) still in product_service.py"
 
     @pytest.mark.asyncio
     async def test_publish_sets_status_via_orm(self) -> None:
@@ -239,20 +227,18 @@ class TestV005ReadMethodsUseOrm:
 
     def test_no_raw_select_in_product_service(self) -> None:
         src = _product_svc_src()
-        assert "SELECT id::text" not in src, (
-            "V-005 not fixed: raw SELECT still in product_service.py"
-        )
+        assert "SELECT id::text" not in src, "raw SELECT still in product_service.py"
 
     def test_no_admin_get_sql_constants(self) -> None:
         src = _product_svc_src()
         assert "_ADMIN_GET_SQL" not in src, (
-            "V-005 not fixed: _ADMIN_GET_SQL class constant still in product_service.py"
+            "_ADMIN_GET_SQL class constant still in product_service.py"
         )
 
     def test_row_to_admin_product_replaced(self) -> None:
         src = _product_svc_src()
         assert "_row_to_admin_product" not in src, (
-            "V-005 not fixed: _row_to_admin_product still present; use _product_to_admin instead"
+            "_row_to_admin_product still present; use _product_to_admin instead"
         )
 
 
@@ -265,14 +251,14 @@ class TestV006StockMethodsClean:
     def test_no_select_stock_qty_raw_sql(self) -> None:
         src = _product_svc_src()
         assert "SELECT stock_qty FROM products" not in src, (
-            "V-006 not fixed: raw SELECT stock_qty still in product_service.py"
+            "raw SELECT stock_qty still in product_service.py"
         )
 
     def test_decrement_stock_removed(self) -> None:
         from app.services.product_service import ProductService
 
         assert not hasattr(ProductService, "decrement_stock"), (
-            "V-006 not fixed: decrement_stock still exists on ProductService"
+            "decrement_stock still exists on ProductService"
         )
 
 
@@ -286,13 +272,13 @@ class TestV007DeadCodeRemoved:
         from app.services.product_service import ProductService
 
         assert not hasattr(ProductService, "_row_to_storefront_product"), (
-            "V-007 not fixed: _row_to_storefront_product still exists on ProductService"
+            "_row_to_storefront_product still exists on ProductService"
         )
 
     def test_row_to_storefront_not_in_source(self) -> None:
         src = _product_svc_src()
         assert "_row_to_storefront_product" not in src, (
-            "V-007 not fixed: _row_to_storefront_product still in product_service.py source"
+            "_row_to_storefront_product still in product_service.py source"
         )
 
 
@@ -304,27 +290,23 @@ class TestV008UserLifecycleEndpoints:
 
     def test_suspend_route_exists(self) -> None:
         src = _routes_src()
-        assert "/suspend" in src, "V-008 not fixed: no /suspend route in routes/api.py"
+        assert "/suspend" in src, "no /suspend route in routes/api.py"
 
     def test_unsuspend_route_exists(self) -> None:
         src = _routes_src()
-        assert "/unsuspend" in src, "V-008 not fixed: no /unsuspend route in routes/api.py"
+        assert "/unsuspend" in src, "no /unsuspend route in routes/api.py"
 
     def test_user_restore_route_exists(self) -> None:
         src = _routes_src()
         # User restore is inside with Route.group(prefix="/users", ...) so the path
         # "/{user_id}/restore" appears in routes/api.py
-        assert "/{user_id}/restore" in src, (
-            "V-008 not fixed: no user restore route in routes/api.py"
-        )
+        assert "/{user_id}/restore" in src, "no user restore route in routes/api.py"
 
     def test_suspend_requires_users_manage_permission(self) -> None:
         users_ctrl = (
             ROUTES_FILE.parent.parent / "app" / "http" / "controllers" / "admin" / "users.py"
         ).read_text()
-        assert '"users.manage"' in users_ctrl, (
-            "V-008 not fixed: users.manage permission check missing"
-        )
+        assert '"users.manage"' in users_ctrl, "users.manage permission check missing"
 
 
 # ─── Revoke permission endpoint exists ─────────────────────────────────
@@ -336,7 +318,7 @@ class TestV009RevokePermissionEndpoint:
     def test_revoke_permission_route_exists(self) -> None:
         src = _routes_src()
         assert "revoke_permission" in src or ("/permissions/" in src and "DELETE" in src), (
-            "V-009 not fixed: no revoke-permission route in routes/api.py"
+            "no revoke-permission route in routes/api.py"
         )
 
     def test_revoke_permission_to_called(self) -> None:
@@ -344,16 +326,14 @@ class TestV009RevokePermissionEndpoint:
             ROUTES_FILE.parent.parent / "app" / "http" / "controllers" / "admin" / "users.py"
         ).read_text()
         assert "revoke_permission_to" in users_ctrl, (
-            "V-009 not fixed: revoke_permission_to not called in admin/users.py"
+            "revoke_permission_to not called in admin/users.py"
         )
 
     def test_revoke_permission_requires_roles_manage(self) -> None:
         users_ctrl = (
             ROUTES_FILE.parent.parent / "app" / "http" / "controllers" / "admin" / "users.py"
         ).read_text()
-        assert '"roles.manage"' in users_ctrl, (
-            "V-009 not fixed: roles.manage permission check missing"
-        )
+        assert '"roles.manage"' in users_ctrl, "roles.manage permission check missing"
 
 
 # ─── Materialized view refresh uses ORM helper ────────────────────────
@@ -365,7 +345,7 @@ class TestV010RefreshViewConsistency:
     def test_no_raw_refresh_sql_in_routes(self) -> None:
         src = _routes_src()
         assert 'DB.statement("REFRESH MATERIALIZED VIEW products_catalog")' not in src, (
-            "V-010 not fixed: raw DB.statement REFRESH still in routes/api.py"
+            "raw DB.statement REFRESH still in routes/api.py"
         )
 
     def test_refresh_view_called_via_controllers(self) -> None:
@@ -377,5 +357,5 @@ class TestV010RefreshViewConsistency:
             Path(__file__).parents[2] / "app" / "http" / "controllers" / "admin" / "products.py"
         ).read_text()
         assert "refresh_catalog" in products_ctrl, (
-            "V-010 not fixed: catalog refresh endpoint missing from admin products controller"
+            "catalog refresh endpoint missing from admin products controller"
         )

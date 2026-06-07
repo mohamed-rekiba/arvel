@@ -98,7 +98,7 @@ class TestLevelMethodsDeleted:
         api_src = (Path(__file__).resolve().parents[2] / "routes" / "api.py").read_text()
         assert "_get_user_level" not in api_src, (
             "_get_user_level still exists in routes/api.py — it queries roles.level "
-            "which was deleted in WI-arvel-036"
+            "which no longer exists on the role schema"
         )
 
     def test_no_require_level_in_routes(self) -> None:

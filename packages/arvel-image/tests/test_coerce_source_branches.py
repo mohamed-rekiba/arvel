@@ -1,15 +1,15 @@
-"""Exhaustive coverage for `HasMedia.coerce_source` and its helpers.
+"""Exhaustive coverage for ``HasMedia.coerce_source`` and its helpers.
 
-Story 8 pins every branch the polymorphic `add_image(source, ...)` dispatcher
-walks. Most branches are pure functions — no DB, no storage, no Pillow. The
-async dispatcher itself is tested by calling it on a bare `HasMedia` stub.
+Pins every branch the polymorphic ``add_image(source, ...)`` dispatcher walks.
+Most branches are pure functions — no DB, no storage, no Pillow. The async
+dispatcher itself is tested by calling it on a bare ``HasMedia`` stub.
 
-Acceptance criteria coverage:
+What it covers:
 
-- AC1 — every accepted source: `TestAcceptedSources::*`
-- AC2 — every rejection path: `TestRejectionPaths::*`
-- AC3 — branch coverage on trait.py / helpers (verified by report after merge)
-- Security A05 (scheme allowlist): `test_unsupported_scheme_rejected_*`
+- Every accepted source: ``TestAcceptedSources::*``
+- Every rejection path: ``TestRejectionPaths::*``
+- Branch coverage on ``trait.py`` / helpers (verified by report after merge)
+- Scheme allowlist (OWASP A05): ``test_unsupported_scheme_rejected_*``
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ def sample_file(tmp_path: Path, sample_bytes: bytes) -> Path:
     return p
 
 
-# ─── AC1: every accepted source returns (bytes, file_name) ──────────────────
+# ─── every accepted source returns (bytes, file_name) ───────────────────────
 
 
 class TestAcceptedSources:
@@ -129,7 +129,7 @@ class TestAcceptedSources:
         assert name == "stream.jpg"
 
 
-# ─── AC2: every rejection path raises a typed error with substring match ────
+# ─── every rejection path raises a typed error with substring match ─────────
 
 
 class TestRejectionPaths:
@@ -275,7 +275,7 @@ class TestDecodeBase64:
         payload = base64.b64encode(raw).decode()
         with pytest.raises(FileTooLargeError) as exc:
             decode_base64(payload, file_name="x.bin", max_bytes=50)
-        # Per Story 3 — error names both the actual and configured caps.
+        # Error names both the actual and configured caps.
         assert "200 bytes" in str(exc.value)
         assert "max_bytes=50" in str(exc.value)
 

@@ -2,17 +2,14 @@
 
 Two purposes:
 
-1.  Story 8 (coverage extension) — exercise every branch of the existing
-    `reject_private_ip` guard. The general `test_url_fetcher.py` suite
-    bypasses the guard via a fixture for ergonomic happy-path testing;
-    these tests hit the guard directly with controlled `socket.getaddrinfo`
-    results to confirm every IP-class rejection actually triggers.
-
-2.  Story 7 (RED — fails against current code) — content-type cross-check.
-    Today's `fetch_url` trusts the `Content-Type` header. When a collection
-    declares accepted MIME types and the response bytes don't match the
-    claimed image format, the fetcher should raise
-    `InvalidMimeTypeError`. Currently it doesn't.
+1. Exercise every branch of the existing ``reject_private_ip`` guard. The
+   general ``test_url_fetcher.py`` suite bypasses the guard via a fixture
+   for ergonomic happy-path testing; these tests hit the guard directly
+   with controlled ``socket.getaddrinfo`` results to confirm every
+   IP-class rejection actually triggers.
+2. Pin the content-type cross-check: when a collection declares accepted
+   MIME types and the response bytes don't match the claimed image
+   format, ``fetch_url`` must raise ``InvalidMimeTypeError``.
 """
 
 from __future__ import annotations
@@ -105,7 +102,7 @@ def _stub_getaddrinfo(monkeypatch: pytest.MonkeyPatch, ip: str, family: int = 2)
     monkeypatch.setattr(_socket, "getaddrinfo", _fake)
 
 
-# ── Story 8 coverage extension: reject_private_ip branches ─────────────────
+# ── reject_private_ip branches ─────────────────────────────────────────────
 
 
 def test_reject_private_ip_raises_when_resolution_fails(
@@ -199,38 +196,31 @@ def test_reject_private_ip_allows_public_ipv6(monkeypatch: pytest.MonkeyPatch) -
     reject_private_ip("dns.google")
 
 
-# ── Story 7 RED tests: MIME cross-check ────────────────────────────────────
+# ── MIME cross-check ───────────────────────────────────────────────────────
 #
-# These fail against current code. They drive the Story 7 implementation:
-# fetch_url should accept an optional `expected_mime_prefix` parameter and
-# raise InvalidMimeTypeError when the response body's first bytes don't
+# ``fetch_url`` accepts an optional ``expected_mime_prefix`` parameter and
+# raises ``InvalidMimeTypeError`` when the response body's first bytes don't
 # match the declared image type. Pillow's format-detect on the first ~512
-# bytes is the intended sniff implementation.
+# bytes is the sniff implementation.
 
 
 @pytest.mark.asyncio
 async def test_fetch_url_rejects_mime_mismatch_when_collection_constrains_type(
     mock_httpx_stream: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A response served as image/jpeg whose bytes are not a JPEG raises.
-
-    Currently fails — fetch_url has no MIME cross-check. Story 7 adds the
-    optional `expected_mime_prefix` kwarg + Pillow-based byte sniffing.
-    """
+    """A response served as image/jpeg whose bytes are not a JPEG raises."""
     _stub_getaddrinfo(monkeypatch, "93.184.216.34")
     mock_httpx_stream["headers"] = {"content-type": "image/jpeg"}
     # Plain ASCII — definitely not a JPEG
     mock_httpx_stream["chunks"] = [b"not a real jpeg payload, just text"]
 
-    # Kwarg via **dict keeps mypy clean. RED today: TypeError propagates
-    # because the kwarg doesn't exist. GREEN after Story 7: kwarg is consumed,
-    # bytes are sniffed, InvalidMimeTypeError is raised and caught here.
-    story_7_kwargs: dict[str, str] = {"expected_mime_prefix": "image/"}
+    # Kwarg via **dict keeps mypy clean.
+    extra_kwargs: dict[str, str] = {"expected_mime_prefix": "image/"}
     with pytest.raises(InvalidMimeTypeError, match="image/jpeg"):
         await fetch_url(
             "https://example.com/photo.jpg",
             max_bytes=1024,
-            **story_7_kwargs,
+            **extra_kwargs,
         )
 
 
@@ -238,11 +228,7 @@ async def test_fetch_url_rejects_mime_mismatch_when_collection_constrains_type(
 async def test_fetch_url_accepts_matching_mime_when_bytes_match_header(
     mock_httpx_stream: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An image/png header + actual PNG bytes pass the MIME cross-check.
-
-    Currently fails (no kwarg). Story 7 implementation: when bytes parse as
-    the claimed format, fetch_url returns normally.
-    """
+    """An image/png header + actual PNG bytes pass the MIME cross-check."""
     import io as _io
 
     from PIL import Image as _PILImage
@@ -255,30 +241,24 @@ async def test_fetch_url_accepts_matching_mime_when_bytes_match_header(
     mock_httpx_stream["headers"] = {"content-type": "image/png"}
     mock_httpx_stream["chunks"] = [png_bytes]
 
-    # Today: TypeError (kwarg doesn't exist) — that IS the RED failure.
-    # After Story 7: kwarg accepted, bytes pass MIME sniff, function returns normally.
-    story_7_kwargs: dict[str, str] = {"expected_mime_prefix": "image/"}
+    extra_kwargs: dict[str, str] = {"expected_mime_prefix": "image/"}
     content, name = await fetch_url(
         "https://example.com/picture.png",
         max_bytes=4096,
-        **story_7_kwargs,
+        **extra_kwargs,
     )
     assert content == png_bytes
     assert name == "picture.png"
 
 
-# ── Story 7 RED test: opt-out (no kwarg = current behavior preserved) ───────
+# ── opt-out: no kwarg = header-only trust ──────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_fetch_url_skips_mime_check_when_no_expectation_given(
     mock_httpx_stream: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Without `expected_mime_prefix`, fetch_url's behavior is unchanged.
-
-    Ensures Story 7 is additive — callers that don't pass the new kwarg get
-    today's semantics (header-only trust).
-    """
+    """Without ``expected_mime_prefix``, fetch_url trusts the header only."""
     _stub_getaddrinfo(monkeypatch, "93.184.216.34")
     mock_httpx_stream["headers"] = {"content-type": "image/jpeg"}
     mock_httpx_stream["chunks"] = [b"not a jpeg"]

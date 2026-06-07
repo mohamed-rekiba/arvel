@@ -16,7 +16,7 @@ def _load_extras() -> dict[str, list[str]]:
 
 def test_all_extra_exists() -> None:
     extras = _load_extras()
-    assert "all" in extras, "FR-017-004: arvel[all] extra must exist in pyproject.toml"
+    assert "all" in extras, "arvel[all] extra must exist in pyproject.toml"
 
 
 def test_all_extra_unions_every_other_extra() -> None:
@@ -24,8 +24,7 @@ def test_all_extra_unions_every_other_extra() -> None:
     other_extra_names = sorted(name for name in extras if name != "all")
     assert other_extra_names, "expected at least one non-'all' extra to exist"
     all_entry = extras["all"]
-    msg = "FR-017-004: arvel[all] should reference itself via one combined entry"
-    assert len(all_entry) == 1, msg
+    assert len(all_entry) == 1, "arvel[all] should reference itself via one combined entry"
     entry = all_entry[0]
     for name in other_extra_names:
         matches = (
@@ -34,4 +33,4 @@ def test_all_extra_unions_every_other_extra() -> None:
             or f"[{name}" in entry
             or name in entry
         )
-        assert matches, f"FR-017-004: arvel[all] must include extra '{name}' (got: {entry!r})"
+        assert matches, f"arvel[all] must include extra '{name}' (got: {entry!r})"

@@ -11,7 +11,7 @@ def test_tracemalloc_function_exists() -> None:
     module = importlib.import_module("benchmarks.bench_reverb")
     fn = getattr(module, "bench_resident_memory_tracemalloc", None)
     assert callable(fn), (
-        "FR-017-010: benchmarks/bench_reverb.py must define bench_resident_memory_tracemalloc()"
+        "benchmarks/bench_reverb.py must define bench_resident_memory_tracemalloc()"
     )
 
 
@@ -29,5 +29,5 @@ def test_tracemalloc_bench_uses_tracemalloc() -> None:
     fn = module.bench_resident_memory_tracemalloc
     source = inspect.getsource(fn)
     assert "tracemalloc" in source, (
-        "FR-017-010: bench_resident_memory_tracemalloc() must use the tracemalloc module"
+        "bench_resident_memory_tracemalloc() must use the tracemalloc module"
     )

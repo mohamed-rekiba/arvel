@@ -42,7 +42,7 @@ class TestNotificationManager:
 
     @pytest.mark.asyncio
     async def test_channel_error_does_not_propagate(self) -> None:
-        """SEC-009-05: channel errors must not propagate to caller."""
+        """Channel errors must not propagate to the caller."""
         from unittest.mock import AsyncMock, MagicMock
 
         from arvel.notifications.channels.mail_channel import MailChannel

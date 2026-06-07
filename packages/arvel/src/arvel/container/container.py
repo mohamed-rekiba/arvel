@@ -1,8 +1,4 @@
-"""Auto-wiring DI container with scopes, contextual bindings, tagging, and extensions.
-
-Public surface frozen in ``docs/api/foundations-api.md``. Resolution algorithm in
-``docs/architecture/SAD-001-foundations.md`` §2.1.
-"""
+"""Auto-wiring DI container with scopes, contextual bindings, tagging, and extensions."""
 
 from __future__ import annotations
 

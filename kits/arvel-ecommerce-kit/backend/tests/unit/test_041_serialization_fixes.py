@@ -28,32 +28,32 @@ class TestV017ProductAdminDatetimes:
     def test_published_at_isoformat_in_product_to_admin(self) -> None:
         src = _src(_PRODUCT_SERVICE)
         assert "product.published_at.isoformat()" in src, (
-            "V-017 not fixed: product.published_at.isoformat() call missing in _product_to_admin"
+            "product.published_at.isoformat() call missing in _product_to_admin"
         )
 
     def test_created_at_isoformat_in_product_to_admin(self) -> None:
         src = _src(_PRODUCT_SERVICE)
         assert "product.created_at.isoformat()" in src, (
-            "V-017 not fixed: product.created_at.isoformat() call missing in _product_to_admin"
+            "product.created_at.isoformat() call missing in _product_to_admin"
         )
 
     def test_updated_at_isoformat_in_product_to_admin(self) -> None:
         src = _src(_PRODUCT_SERVICE)
         assert "product.updated_at.isoformat()" in src, (
-            "V-017 not fixed: product.updated_at.isoformat() call missing in _product_to_admin"
+            "product.updated_at.isoformat() call missing in _product_to_admin"
         )
 
     def test_product_to_admin_null_guard_for_timestamps(self) -> None:
         src = _src(_PRODUCT_SERVICE)
         # Null guards must be present (pattern: field.isoformat() if field else None)
         assert "product.published_at.isoformat() if product.published_at else None" in src, (
-            "V-017 not fixed: null guard missing for published_at in _product_to_admin"
+            "null guard missing for published_at in _product_to_admin"
         )
         assert "product.created_at.isoformat() if product.created_at else None" in src, (
-            "V-017 not fixed: null guard missing for created_at in _product_to_admin"
+            "null guard missing for created_at in _product_to_admin"
         )
         assert "product.updated_at.isoformat() if product.updated_at else None" in src, (
-            "V-017 not fixed: null guard missing for updated_at in _product_to_admin"
+            "null guard missing for updated_at in _product_to_admin"
         )
 
 
@@ -63,51 +63,37 @@ class TestV017ProductAdminDatetimes:
 class TestV018ProductCatalogColumns:
     def test_category_name_column_declared(self) -> None:
         src = _src(_PUBLISHED_PRODUCT)
-        assert "category_name" in src, (
-            "V-018 not fixed: 'category_name' column missing from ProductCatalog"
-        )
+        assert "category_name" in src, "'category_name' column missing from ProductCatalog"
 
     def test_category_slug_column_declared(self) -> None:
         src = _src(_PUBLISHED_PRODUCT)
-        assert "category_slug" in src, (
-            "V-018 not fixed: 'category_slug' column missing from ProductCatalog"
-        )
+        assert "category_slug" in src, "'category_slug' column missing from ProductCatalog"
 
     def test_vendor_name_column_declared(self) -> None:
         src = _src(_PUBLISHED_PRODUCT)
-        assert "vendor_name" in src, (
-            "V-018 not fixed: 'vendor_name' column missing from ProductCatalog"
-        )
+        assert "vendor_name" in src, "'vendor_name' column missing from ProductCatalog"
 
     def test_vendor_slug_column_declared(self) -> None:
         src = _src(_PUBLISHED_PRODUCT)
-        assert "vendor_slug" in src, (
-            "V-018 not fixed: 'vendor_slug' column missing from ProductCatalog"
-        )
+        assert "vendor_slug" in src, "'vendor_slug' column missing from ProductCatalog"
 
     def test_description_column_declared(self) -> None:
         src = _src(_PUBLISHED_PRODUCT)
-        assert "description" in src, (
-            "V-018 not fixed: 'description' column missing from ProductCatalog"
-        )
+        assert "description" in src, "'description' column missing from ProductCatalog"
 
     def test_created_at_column_declared(self) -> None:
         src = _src(_PUBLISHED_PRODUCT)
-        assert "created_at" in src, (
-            "V-018 not fixed: 'created_at' column missing from ProductCatalog"
-        )
+        assert "created_at" in src, "'created_at' column missing from ProductCatalog"
 
     def test_updated_at_column_declared(self) -> None:
         src = _src(_PUBLISHED_PRODUCT)
-        assert "updated_at" in src, (
-            "V-018 not fixed: 'updated_at' column missing from ProductCatalog"
-        )
+        assert "updated_at" in src, "'updated_at' column missing from ProductCatalog"
 
     def test_all_new_columns_are_mapped(self) -> None:
         src = _src(_PUBLISHED_PRODUCT)
         for col in ("category_name", "category_slug", "vendor_name", "vendor_slug"):
             # After plain annotations are used (no Mapped[T] on left side)
-            assert col in src, f"V-018 not fixed: '{col}' column missing from ProductCatalog"
+            assert col in src, f"'{col}' column missing from ProductCatalog"
 
 
 # ─── TOCTOU stock race closed with row lock ───────────────────────────
@@ -117,14 +103,12 @@ class TestV019StockRaceGapComment:
     def test_checkout_uses_lock_for_update(self) -> None:
         src = _src(_ORDER_SERVICE)
         assert "lock_for_update()" in src, (
-            "V-019 not fixed: checkout does not lock the product row before stock checks"
+            "checkout does not lock the product row before stock checks"
         )
 
     def test_g003_gap_comment_removed_after_fix(self) -> None:
         src = _src(_ORDER_SERVICE)
-        assert "G-003" not in src, (
-            "V-019 stale: G-003 framework gap comment remains after row locking shipped"
-        )
+        assert "G-003" not in src, "G-003 framework gap comment remains after row locking shipped"
 
 
 # ─── Vendor published_at serialization ────────────────────────────────
@@ -135,14 +119,14 @@ class TestV020VendorPublishedAt:
         vendor_svc = _BACKEND / "app" / "services" / "vendor_service.py"
         src = _src(vendor_svc)
         assert "vendor.published_at.isoformat()" in src, (
-            "V-020 not fixed: vendor.published_at.isoformat() missing in vendor_service.py"
+            "vendor.published_at.isoformat() missing in vendor_service.py"
         )
 
     def test_vendor_published_at_has_null_guard(self) -> None:
         vendor_svc = _BACKEND / "app" / "services" / "vendor_service.py"
         src = _src(vendor_svc)
         assert "vendor.published_at.isoformat() if vendor.published_at else None" in src, (
-            "V-020 not fixed: null guard missing for vendor published_at in vendor_service.py"
+            "null guard missing for vendor published_at in vendor_service.py"
         )
 
 
@@ -154,7 +138,7 @@ class TestV021RegisterException:
         auth_ctrl = _BACKEND / "app" / "http" / "controllers" / "auth.py"
         src = _src(auth_ctrl)
         assert "except Exception" not in src, (
-            "V-021 not fixed: broad 'except Exception' still present in auth controller"
+            "broad 'except Exception' still present in auth controller"
         )
 
 
@@ -165,13 +149,13 @@ class TestV022StorefrontEnrichedResponse:
     def test_category_name_in_storefront_serializer(self) -> None:
         src = _src(_PRODUCT_SERVICE)
         assert '"category_name"' in src or "'category_name'" in src, (
-            "V-022 not fixed: 'category_name' not returned in product_to_storefront"
+            "'category_name' not returned in product_to_storefront"
         )
 
     def test_vendor_name_in_storefront_serializer(self) -> None:
         src = _src(_PRODUCT_SERVICE)
         assert '"vendor_name"' in src or "'vendor_name'" in src, (
-            "V-022 not fixed: 'vendor_name' not returned in product_to_storefront"
+            "'vendor_name' not returned in product_to_storefront"
         )
 
 
@@ -183,7 +167,7 @@ class TestV023CartMissingProduct:
         src = _src(_CART_SERVICE)
         # The silent Decimal(0) fallback must be gone
         assert "Decimal(0)" not in src or ("product is None" in src and "raise" in src), (
-            "V-023 not fixed: add_item still falls back to Decimal(0) for missing product"
+            "add_item still falls back to Decimal(0) for missing product"
         )
 
     def test_cart_add_item_raises_on_missing_product(self) -> None:
@@ -192,9 +176,7 @@ class TestV023CartMissingProduct:
         assert add_item_idx != -1, "add_item not found in cart_service"
         next_def = src.find("async def ", add_item_idx + 1)
         add_item_body = src[add_item_idx:next_def] if next_def != -1 else src[add_item_idx:]
-        assert "raise" in add_item_body, (
-            "V-023 not fixed: add_item does not raise when product is missing"
-        )
+        assert "raise" in add_item_body, "add_item does not raise when product is missing"
 
 
 # ─── admin_list_orders / admin_get_order consistency ──────────────────
@@ -207,9 +189,7 @@ class TestV024AdminOrderTrashedConsistency:
         assert list_idx != -1, "admin_list_orders not found"
         next_def = src.find("async def ", list_idx + 1)
         list_body = src[list_idx:next_def] if next_def != -1 else src[list_idx:]
-        assert "with_trashed" in list_body, (
-            "V-024 not fixed: admin_list_orders does not use with_trashed()"
-        )
+        assert "with_trashed" in list_body, "admin_list_orders does not use with_trashed()"
 
 
 # ─── migration sequence gap documented ────────────────────────────────

@@ -12,7 +12,7 @@ from test_notifications.helpers import FakeUser  # type: ignore[import-not-found
 
 @pytest.mark.asyncio
 async def test_broadcast_channel_routes_to_broadcaster() -> None:
-    """AC1: real BroadcastChannel calls Broadcast.driver().broadcast."""
+    """Real BroadcastChannel calls Broadcast.driver().broadcast."""
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.manager import BroadcastManager
     from arvel.facades.broadcast import Broadcast
@@ -60,7 +60,7 @@ async def test_broadcast_channel_routes_to_broadcaster() -> None:
 
 @pytest.mark.asyncio
 async def test_broadcast_channel_skips_when_no_via_data() -> None:
-    """AC2: if to_broadcast not implemented, channel is a no-op (no broadcast call)."""
+    """If to_broadcast is not implemented, the channel is a no-op (no broadcast call)."""
     from arvel.broadcasting.config import BroadcastConfig, BroadcastDriver
     from arvel.broadcasting.manager import BroadcastManager
     from arvel.facades.broadcast import Broadcast

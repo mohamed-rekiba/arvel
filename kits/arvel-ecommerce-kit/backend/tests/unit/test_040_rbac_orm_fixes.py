@@ -39,14 +39,14 @@ class TestV011GuardName:
     def test_user_model_has_api_default_guard(self) -> None:
         src = _src(USER_MODEL_FILE)
         assert "default_guard_name" in src and '= "api"' in src, (
-            "V-011 not fixed: default_guard_name set to 'api' not found in user.py — "
+            "default_guard_name set to 'api' not found in user.py — "
             "all has_permission_to(str) checks silently fail with guard_name='web'"
         )
 
     def test_user_model_no_web_default_guard(self) -> None:
         src = _src(USER_MODEL_FILE)
         has_web = "default_guard_name" in src and '= "web"' in src
-        assert not has_web, "V-011 not fixed: default_guard_name='web' still present in user.py"
+        assert not has_web, "default_guard_name='web' still present in user.py"
 
 
 # ─── bootstrap.py must use the shared refresh helper ───────────────────
@@ -58,19 +58,19 @@ class TestV012BootstrapRefresh:
     def test_bootstrap_no_raw_refresh_statement(self) -> None:
         src = _src(BOOTSTRAP_FILE)
         assert 'DB.statement("REFRESH MATERIALIZED VIEW products_catalog")' not in src, (
-            "V-012 not fixed: raw DB.statement REFRESH still in app/bootstrap.py"
+            "raw DB.statement REFRESH still in app/bootstrap.py"
         )
 
     def test_bootstrap_uses_refresh_view_orm(self) -> None:
         src = _src(BOOTSTRAP_FILE)
         assert "refresh_products_catalog" in src, (
-            "V-012 not fixed: shared refresh helper not called in app/bootstrap.py"
+            "shared refresh helper not called in app/bootstrap.py"
         )
 
     def test_bootstrap_imports_published_product(self) -> None:
         src = _src(BOOTSTRAP_FILE)
         assert "refresh_products_catalog" in src, (
-            "V-012 not fixed: shared refresh helper not imported in app/bootstrap.py"
+            "shared refresh helper not imported in app/bootstrap.py"
         )
 
 
@@ -86,11 +86,11 @@ class TestV013DatetimeSerialization:
         for line in lines:
             if '"created_at"' in line and "created_at" in line:
                 assert "isoformat" in line, (
-                    f"V-013 not fixed: created_at in UserService._format_user "
+                    f"created_at in UserService._format_user "
                     f"is not serialised with .isoformat() on the same line:\n  {line.strip()}"
                 )
                 return
-        pytest.fail("V-013: '\"created_at\"' key not found in user_service.py")
+        pytest.fail("'\"created_at\"' key not found in user_service.py")
 
     def test_order_service_created_at_isoformat(self) -> None:
         src = _src(ORDER_SVC_FILE)
@@ -99,11 +99,11 @@ class TestV013DatetimeSerialization:
         for line in lines:
             if '"created_at"' in line and "order.created_at" in line:
                 assert "isoformat" in line, (
-                    f"V-013 not fixed: created_at in OrderService._format_order "
+                    f"created_at in OrderService._format_order "
                     f"is not serialised with .isoformat() on the same line:\n  {line.strip()}"
                 )
                 return
-        pytest.fail("V-013: '\"created_at\": order.created_at' not found in order_service.py")
+        pytest.fail("'\"created_at\": order.created_at' not found in order_service.py")
 
 
 # ─── where_raw JSONB calls documented as framework gap ─────────────────
@@ -120,7 +120,7 @@ class TestV014JsonbGapDocumented:
                 # Gap comment must appear within 3 lines above
                 preceding = "\n".join(lines[max(0, i - 3) : i + 1])
                 assert "gap" in preceding.lower() or "G-001" in preceding, (
-                    f"V-014 not fixed: where_raw JSONB slug call at line {i + 1} "
+                    f"where_raw JSONB slug call at line {i + 1} "
                     f"has no framework gap comment. Preceding context:\n{preceding}"
                 )
 
@@ -148,12 +148,10 @@ class TestV016CartItemDelete:
     def test_cart_service_no_force_delete(self) -> None:
         src = _src(CART_SVC_FILE)
         assert "force_delete" not in src, (
-            "V-016 not fixed: force_delete() still present in cart_service.py — "
+            "force_delete() still present in cart_service.py — "
             "CartItem has no SoftDeletes, use delete() instead"
         )
 
     def test_cart_service_uses_delete(self) -> None:
         src = _src(CART_SVC_FILE)
-        assert "await item.delete()" in src, (
-            "V-016 not fixed: await item.delete() not found in cart_service.py"
-        )
+        assert "await item.delete()" in src, "await item.delete() not found in cart_service.py"

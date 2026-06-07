@@ -38,39 +38,37 @@ def test_bench_reverb_is_hard_gate() -> None:
     job = jobs["bench-reverb"]
     if isinstance(job.get("continue-on-error"), bool):
         assert job["continue-on-error"] is False, (
-            "FR-017-007: bench-reverb job must NOT have continue-on-error: true"
+            "bench-reverb job must NOT have continue-on-error: true"
         )
     for step in _all_steps(job):
         assert step.get("continue-on-error") is not True, (
-            f"FR-017-007: step {step.get('name')!r} in bench-reverb must NOT be advisory"
+            f"step {step.get('name')!r} in bench-reverb must NOT be advisory"
         )
 
 
 def test_bench_tracemalloc_job_exists() -> None:
-    """a bench-tracemalloc CI job must exist."""
+    """A bench-tracemalloc CI job must exist."""
     jobs = _ci()
-    assert "bench-tracemalloc" in jobs, "FR-017-011: ci.yml must define a 'bench-tracemalloc' job"
+    assert "bench-tracemalloc" in jobs, "ci.yml must define a 'bench-tracemalloc' job"
     job = jobs["bench-tracemalloc"]
-    assert job.get("continue-on-error") is not True, (
-        "FR-017-011: bench-tracemalloc must be a hard gate"
-    )
+    assert job.get("continue-on-error") is not True, "bench-tracemalloc must be a hard gate"
 
 
 def test_sast_job_exists() -> None:
-    """a 'sast' job running bandit must exist."""
+    """A 'sast' job running bandit must exist."""
     jobs = _ci()
-    assert "sast" in jobs, "FR-017-013: ci.yml must define a 'sast' job"
+    assert "sast" in jobs, "ci.yml must define a 'sast' job"
     job = jobs["sast"]
     has_bandit = any("bandit" in (s.get("run", "") + s.get("name", "")) for s in _all_steps(job))
-    assert has_bandit, "FR-017-013: 'sast' job must invoke bandit"
+    assert has_bandit, "'sast' job must invoke bandit"
 
 
 def test_sca_job_exists() -> None:
-    """a 'sca' job running pip-audit must exist."""
+    """A 'sca' job running pip-audit must exist."""
     jobs = _ci()
-    assert "sca" in jobs, "FR-017-014: ci.yml must define a 'sca' job"
+    assert "sca" in jobs, "ci.yml must define a 'sca' job"
     job = jobs["sca"]
     has_pip_audit = any(
         "pip-audit" in (s.get("run", "") + s.get("name", "")) for s in _all_steps(job)
     )
-    assert has_pip_audit, "FR-017-014: 'sca' job must invoke pip-audit"
+    assert has_pip_audit, "'sca' job must invoke pip-audit"

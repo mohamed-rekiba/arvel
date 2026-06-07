@@ -77,7 +77,7 @@ def test_csp_not_overwritten_when_handler_sets_it() -> None:
     assert response.headers["content-security-policy"] == custom_csp
 
 
-# AC-09b: Custom csp constructor param used
+# Custom csp constructor param used
 
 
 def test_custom_csp_via_constructor() -> None:

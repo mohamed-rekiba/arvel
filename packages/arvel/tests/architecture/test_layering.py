@@ -68,7 +68,7 @@ def test_http_does_not_import_database() -> None:
         if hits:
             violations.append(f"{module} imports {sorted(hits)}")
     assert not violations, (
-        "Forbidden http→database imports (ADR-016 exempts only "
+        "Forbidden http→database imports (only these modules are exempt: "
         f"{sorted(ALLOWED_HTTP_TO_DATABASE_IMPORTS)}):\n  " + "\n  ".join(violations)
     )
 

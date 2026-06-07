@@ -6,13 +6,14 @@ This keeps the backend authoritative: edit a string in
 on its next conditional request without a build step.
 
 Design decisions:
+
 - Catalogs are read from flat ``{locales_dir}/{locale}.json`` files.
 - An ``asyncio.Lock`` per locale prevents duplicate file reads under
- concurrent cold-cache requests (AC-14).
+  concurrent cold-cache requests.
 - ETags are SHA-256 of the raw file bytes (first 16 hex chars) — stable
- across restarts when the file hasn't changed.
+  across restarts when the file hasn't changed.
 - Unknown locales return 404 without enumerating which locales exist
- (no information disclosure, AC-13).
+  (no information disclosure).
 """
 
 from __future__ import annotations

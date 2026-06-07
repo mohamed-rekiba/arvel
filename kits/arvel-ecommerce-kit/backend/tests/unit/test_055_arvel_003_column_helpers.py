@@ -62,8 +62,8 @@ def test_decimal_kit_models_use_it() -> None:
     """Kit numeric money columns use decimal()."""
     for fname in ["cart_item.py", "order_item.py", "order.py"]:
         src = _src(KIT / "app/models" / fname)
-        assert "decimal(" in src, f"FR-001 FAIL: {fname} does not use decimal()"
-        assert "Numeric" not in src, f"FR-001 FAIL: {fname} still has raw Numeric"
+        assert "decimal(" in src, f"{fname} does not use decimal()"
+        assert "Numeric" not in src, f"{fname} still has raw Numeric"
 
 
 # ─── jsonb() ──────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ def test_jsonb_kit_models_use_it() -> None:
     """Kit JSONB columns use jsonb()."""
     for fname in ["category.py"]:
         src = _src(KIT / "app/models" / fname)
-        assert "jsonb(" in src, f"FR-002 FAIL: {fname} does not use jsonb()"
+        assert "jsonb(" in src, f"{fname} does not use jsonb()"
 
 
 # ─── enum() ──────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ def test_enum_kit_models_use_it() -> None:
     """Kit status/theme columns use enum()."""
     for fname in ["user.py", "order.py", "category.py", "vendor.py"]:
         src = _src(KIT / "app/models" / fname)
-        assert "enum(" in src, f"FR-003 FAIL: {fname} does not use enum()"
+        assert "enum(" in src, f"{fname} does not use enum()"
 
 
 # ─── foreign_uuid() ───────────────────────────────────────────────────
@@ -136,7 +136,7 @@ def test_foreign_uuid_kit_models_use_it() -> None:
     """Kit UUID FK columns use foreign_uuid()."""
     for fname in ["cart_item.py", "order_item.py"]:
         src = _src(KIT / "app/models" / fname)
-        assert "foreign_uuid(" in src, f"FR-004 FAIL: {fname} does not use foreign_uuid()"
+        assert "foreign_uuid(" in src, f"{fname} does not use foreign_uuid()"
 
 
 # ─── uuid() exported ──────────────────────────────────────────────────
@@ -261,11 +261,11 @@ def test_services_use_only_trashed() -> None:
     """services use only_trashed() instead of with_trashed().where_not_null."""
     for fname in ["category_service.py", "vendor_service.py"]:
         src = _src(KIT / "app/services" / fname)
-        assert "only_trashed()" in src, f"NFR-003 FAIL: {fname} doesn't use only_trashed()"
+        assert "only_trashed()" in src, f"{fname} doesn't use only_trashed()"
         assert (
             ".where_not_null" not in src
             or "deleted_at" not in src.split(".where_not_null")[0].split("\n")[-1]
-        ), f"NFR-003 FAIL: {fname} still uses with_trashed().where_not_null pattern"
+        ), f"{fname} still uses with_trashed().where_not_null pattern"
 
 
 # ─── TranslatableMixin.translate_dict() ───────────────────────────────
@@ -310,9 +310,5 @@ def test_no_raw_db_scalar_in_app() -> None:
         if "seeder" in py_file.name or "__pycache__" in str(py_file):
             continue
         src = py_file.read_text()
-        assert "DB.scalar(" not in src, (
-            f"NFR-004 FAIL: raw DB.scalar found in {py_file.relative_to(KIT)}"
-        )
-        assert 'DB.table("roles")' not in src, (
-            f"NFR-004 FAIL: raw DB.table found in {py_file.relative_to(KIT)}"
-        )
+        assert "DB.scalar(" not in src, f"raw DB.scalar found in {py_file.relative_to(KIT)}"
+        assert 'DB.table("roles")' not in src, f"raw DB.table found in {py_file.relative_to(KIT)}"
