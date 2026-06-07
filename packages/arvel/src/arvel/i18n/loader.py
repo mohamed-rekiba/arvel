@@ -32,6 +32,20 @@ from arvel.i18n.exceptions import (
 TranslationValue = str | dict[str, "TranslationValue"]
 
 
+def _guard_segments(locale: str, namespace: str) -> None:
+    """Block path traversal before locale/namespace hit the filesystem.
+
+    ``locale`` can reach here from user input (e.g. an app calling
+    ``__(key, locale=request_value)`` without an allowlist), and the Python
+    loader would ``exec_module`` whatever the path resolves to. A ``..`` or
+    separator means the value isn't a real locale/namespace — treat it as a
+    miss so the translator just falls back to the key.
+    """
+    for segment in (locale, namespace):
+        if not segment or ".." in segment or "\x00" in segment or "/" in segment or "\\" in segment:
+            raise TranslationFileMissingError(locale, namespace)
+
+
 @runtime_checkable
 class TranslationLoader(Protocol):
     """Adapter protocol. Implement to add gettext / DB / JSON backends."""
@@ -49,6 +63,7 @@ class PythonFileLoader:
         self._base = base_path
 
     def load(self, locale: str, namespace: str) -> dict[str, TranslationValue]:
+        _guard_segments(locale, namespace)
         target = self._base / "resources" / "lang" / locale / f"{namespace}.py"
         if not target.exists():
             raise TranslationFileMissingError(locale, namespace)
@@ -83,6 +98,7 @@ class JsonFileLoader:
         self._base = base_path
 
     def load(self, locale: str, namespace: str) -> dict[str, TranslationValue]:
+        _guard_segments(locale, namespace)
         nested = self._base / "resources" / "lang" / locale / f"{namespace}.json"
         single = self._base / "resources" / "lang" / f"{locale}.json"
 
