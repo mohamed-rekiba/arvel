@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.17.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.16.1...arvel-v0.17.0) (2026-06-07)
+
+
+### Features
+
+* **application:** add support for custom .env file path and enhance JWT secret validation ([7e023f5](https://github.com/mohamed-rekiba/arvel/commit/7e023f5d153067cb18c26cdaceffbad59d5c0c65))
+
+
+### Bug Fixes
+
+* **auth:** detect refresh-token reuse and revoke the family ([e76eedd](https://github.com/mohamed-rekiba/arvel/commit/e76eedd897a0e5b464bdd0a01eef1f981718835b))
+* **database:** fire retrieved on all read paths; load_missing detects async relations ([d5cfccd](https://github.com/mohamed-rekiba/arvel/commit/d5cfccdf38c3adb0c45ae9ed0710344ecd59f14d))
+* **http:** render RFC 7807 problem+json for unhandled errors ([7aba9b7](https://github.com/mohamed-rekiba/arvel/commit/7aba9b79a2d591c85fcb405fec8775ff3af7bf5e))
+
+
+### Refactors
+
+* **ecommerce-kit:** move .env.example and pyproject into backend ([0e8c137](https://github.com/mohamed-rekiba/arvel/commit/0e8c1375b8fd7dd96cdf9fab7613a117366de843))
+
 ## [0.16.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.16.0...arvel-v0.16.1) (2026-06-07)
 
 
