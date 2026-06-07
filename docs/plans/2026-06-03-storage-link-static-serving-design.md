@@ -35,7 +35,7 @@ Two independent local-serving modes, both kept:
 
 | Mode | Path | Mechanism | When |
 |---|---|---|---|
-| `serve=true` route (ADR-080) | `STORAGE_LOCAL_URL` | App streams via `disk.get()`, HMAC temp URLs | Default; works everywhere, no symlink |
+| `serve=true` route (ADR-009 § 4) | `STORAGE_LOCAL_URL` | App streams via `disk.get()`, HMAC temp URLs | Default; works everywhere, no symlink |
 | `storage:link` + static mount (this WI) | `/storage` | Starlette serves files from disk, bypassing app | Run the command; web-server-grade static serving |
 
 They don't collide unless `STORAGE_LOCAL_URL` is also `/storage`. To make `Storage.url()` resolve to the static path, set `STORAGE_LOCAL_URL=/storage`.

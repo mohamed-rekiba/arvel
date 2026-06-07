@@ -1,7 +1,7 @@
 # SAD-001 — Framework-level local file serving
 
 **Work Item**: WI-arvel-001 | **PRD**: `docs/prd/PRD-001-local-storage-serving.md`
-**Related ADRs**: ADR-080 (amended — HMAC temp URLs + route in `register()`)
+**Related ADRs**: ADR-009 § 4 (amended — HMAC temp URLs + route in `register()`)
 
 ---
 
@@ -21,7 +21,7 @@ Make the framework serve the URLs the `local` driver already mints, the way Lara
 
 ## Serve route
 
-Registered in `StorageServiceProvider.register()` (not `boot()` — see ADR-080 amendment) via the
+Registered in `StorageServiceProvider.register()` (not `boot()` — see ADR-009 § 4 amendment) via the
 `Route` facade, mirroring `AuthServiceProvider._mount_routes`:
 
 ```
