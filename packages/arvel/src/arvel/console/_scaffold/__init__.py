@@ -6,6 +6,7 @@ Not a public API. Re-exported here only so call-sites inside
 
 from __future__ import annotations
 
+from arvel.console._scaffold.context import ScaffoldContext
 from arvel.console._scaffold.kits import (
     DEFAULT_KIT,
     KITS,
@@ -41,6 +42,7 @@ __all__ = [
     "KitDownloadError",
     "KitSpec",
     "KitUnavailableError",
+    "ScaffoldContext",
     "UnknownKitError",
     "UnknownTemplateToken",
     "available_kits",
