@@ -9,6 +9,7 @@ failed link ends the chain.
 from __future__ import annotations
 
 import json
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, TypeGuard, cast
 
@@ -62,6 +63,10 @@ class JobEnvelope:
 
     job_class: str
     payload: dict[str, Any]
+    # Per-dispatch identity. The Redis driver uses the envelope JSON as a ZSET
+    # member, so without a unique id two identical jobs would collapse into one
+    # and one would be silently dropped. Also gives every job a stable handle.
+    id: str = field(default_factory=lambda: uuid.uuid4().hex)
     attempts: int = 0
     delay: int = 0
     priority: int = 0
@@ -70,6 +75,7 @@ class JobEnvelope:
     def to_json(self) -> str:
         return json.dumps(
             {
+                "id": self.id,
                 "job_class": self.job_class,
                 "payload": self.payload,
                 "attempts": self.attempts,
@@ -99,9 +105,11 @@ class JobEnvelope:
                 for step in raw_chain
                 if isinstance(step, dict)
             ]
+        raw_id = data.get("id")
         return cls(
             job_class=str(data["job_class"]),
             payload=payload,
+            id=str(raw_id) if raw_id is not None else uuid.uuid4().hex,
             attempts=int(data.get("attempts", 0)),
             delay=int(data.get("delay", 0)),
             priority=int(data.get("priority", 0)),

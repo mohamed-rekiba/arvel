@@ -37,6 +37,27 @@ class TestJobEnvelope:
             JobEnvelope.from_json(json_with_non_dict_payload)
 
 
+class TestJobEnvelopeId:
+    """Each envelope carries a unique id so identical jobs don't collapse."""
+
+    def test_two_envelopes_for_same_job_have_distinct_ids(self) -> None:
+        a = JobEnvelope(job_class="myapp.jobs.Foo", payload={"x": 1})
+        b = JobEnvelope(job_class="myapp.jobs.Foo", payload={"x": 1})
+        assert a.id != b.id
+        # The Redis driver keys on the JSON; distinct ids keep members distinct.
+        assert a.to_json() != b.to_json()
+
+    def test_id_round_trips(self) -> None:
+        env = JobEnvelope(job_class="Foo", payload={})
+        restored = JobEnvelope.from_json(env.to_json())
+        assert restored.id == env.id
+
+    def test_missing_id_gets_generated(self) -> None:
+        raw = json.dumps({"job_class": "Foo", "payload": {}})
+        env = JobEnvelope.from_json(raw)
+        assert env.id
+
+
 class TestJobEnvelopeAttempts:
     """JobEnvelope carries an attempts counter."""
 
