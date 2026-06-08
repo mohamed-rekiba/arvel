@@ -285,3 +285,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 19 (logging) hardening WI. Spec: docs/pipeline/specs/WI-arvel-019-log-redaction-substring.md"
+  - id: "WI-arvel-020"
+    name: "Collection.intersect/diff must compare by value, not object identity"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T14:50:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 20 (support helpers) hardening WI. Spec: docs/pipeline/specs/WI-arvel-020-collection-value-equality.md"

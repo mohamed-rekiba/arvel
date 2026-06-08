@@ -178,12 +178,12 @@ class Collection(list[T], Generic[T]):
     # ── set operations ───────────────────────────────────────────────────────
 
     def intersect(self, other: list[T]) -> Collection[T]:
-        other_ids = {id(x) for x in other}
-        return Collection(item for item in self if id(item) in other_ids)
+        # Value equality (==), like only/except_ — not identity. Works for
+        # unhashable members (dicts, models) and value-equal-but-distinct objects.
+        return Collection(item for item in self if item in other)
 
     def diff(self, other: list[T]) -> Collection[T]:
-        other_ids = {id(x) for x in other}
-        return Collection(item for item in self if id(item) not in other_ids)
+        return Collection(item for item in self if item not in other)
 
     def only(self, *values: T) -> Collection[T]:
         # `in` compares by ==, so this works for unhashable members too.
