@@ -210,3 +210,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 14 (console/CLI) hardening WI. Spec: docs/pipeline/specs/WI-arvel-014-cli-single-event-loop.md"
+  - id: "WI-arvel-015"
+    name: "Encrypter.decrypt_string must raise DecryptionError for any malformed payload (no binascii.Error leak)"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T12:40:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 15 (encryption) hardening WI. Spec: docs/pipeline/specs/WI-arvel-015-decrypt-error-contract.md"

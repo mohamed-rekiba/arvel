@@ -51,7 +51,11 @@ class Encrypter:
         return base64.b64encode(_VERSION + iv + ct).decode("ascii")
 
     def decrypt_string(self, payload: str) -> str:
-        raw = base64.b64decode(payload)
+        try:
+            # binascii.Error subclasses ValueError; bad base64 must not leak.
+            raw = base64.b64decode(payload)
+        except ValueError as exc:
+            raise DecryptionError("Malformed encrypter payload (not valid base64).") from exc
         if raw[:1] != _VERSION:
             raise DecryptionError("Unrecognised encrypter wire-format version.")
         iv, ct = raw[1 : 1 + _IV_BYTES], raw[1 + _IV_BYTES :]
