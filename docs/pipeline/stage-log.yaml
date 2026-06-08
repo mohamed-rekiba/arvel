@@ -776,3 +776,42 @@ events:
       clean, pyright 0 errors, ruff check + ruff format clean. configuration.md states dict segments
       are key-only. URL-embedded-credential redaction and config() array-set form deferred.
     timestamp: "2026-06-08T14:22:00Z"
+  - work_item: "WI-arvel-019"
+    stage: "research"
+    event: "enter"
+    result: "pass"
+    note: >-
+      Module 19 (logging). C1 confirmed via repro: _redact used exact key matching, so common
+      credential field names (access_token/refresh_token/client_secret/api_secret/db_password/
+      proxy_authorization) leaked to logs despite the redaction layer. Inconsistent with
+      config._is_secret_key (substring). Attribute precedence, with_context/channel, exc_info
+      capture verified correct.
+    artifacts:
+      - ".context/research/019-logging.md"
+      - "docs/pipeline/specs/WI-arvel-019-log-redaction-substring.md"
+    timestamp: "2026-06-08T14:30:00Z"
+  - work_item: "WI-arvel-019"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      otel_logger._redact now matches secret hints by substring (mirrors config._is_secret_key);
+      a field is redacted when any configured hint is a substring of its lowercased name. Fail-closed,
+      tunable via LOG_REDACT_FIELDS. New tests/observability/test_wi_019_log_redaction.py (8 cases via
+      the public Log facade + FakeObservability). No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/logging/otel_logger.py"
+      - "packages/arvel/tests/observability/test_wi_019_log_redaction.py"
+      - "docs/site/docs/features/logging.md"
+    timestamp: "2026-06-08T14:38:00Z"
+  - work_item: "WI-arvel-019"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Observability + context suites 146 passed; full arvel suite 4372 passed, 0 failures; mypy
+      --strict clean, pyright 0 errors, ruff check + ruff format clean. logging.md documents
+      substring redaction + LOG_REDACT_FIELDS. Nested-dict redaction and log-level default
+      divergence deferred (documented).
+    timestamp: "2026-06-08T14:42:00Z"

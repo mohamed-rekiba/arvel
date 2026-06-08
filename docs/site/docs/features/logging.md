@@ -77,6 +77,24 @@ from arvel.facades import Log
 logger = Log.channel(__name__)
 ```
 
+<a name="redacting-secrets"></a>
+## Redacting Secrets
+
+Context fields whose names look like credentials are replaced with `[REDACTED]` before a record is emitted, so secrets never land in your logs. Matching is by **substring** — a hint like `token` also redacts `access_token`, `refresh_token`, and the like:
+
+```python
+Log.info("oauth.exchange", access_token="...", user_id=7)
+# -> access_token=[REDACTED], user_id=7
+```
+
+The default hints are `password`, `token`, `secret`, `authorization`, `api_key`, and `private_key`. Override them with the `LOG_REDACT_FIELDS` env var (comma-separated):
+
+```dotenv
+LOG_REDACT_FIELDS=password,token,secret,pin,ssn
+```
+
+Redaction is shallow — it matches top-level context keys. Don't nest secrets inside a dict you pass as a single field.
+
 <a name="configuration"></a>
 ## Configuration
 
