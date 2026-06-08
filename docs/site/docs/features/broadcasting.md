@@ -59,6 +59,9 @@ class OrderShipped(Event, ShouldBroadcast):
         return {"order_id": self.order_id}
 ```
 
+> [!NOTE]
+> If you don't override `broadcast_with`, the default uses the event's JSON dump (`model_dump(mode="json")` for `BaseModel`/`Event` events). That keeps rich fields like `datetime`, `UUID`, and `Decimal` JSON-safe — the drivers serialize the payload as JSON, so a raw Python dump would fail to send.
+
 <a name="broadcasting-from-an-event"></a>
 ### Broadcasting From an Event
 

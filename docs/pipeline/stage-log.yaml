@@ -472,3 +472,42 @@ events:
       destroys the old record on response (Laravel migrate(true)). Cookie-driver integration,
       invalidate(), and flash shadowing tracked as deferred.
     timestamp: "2026-06-08T10:50:00Z"
+  - work_item: "WI-arvel-012"
+    stage: "planning"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 12 (broadcasting) deep-research: C1 = ShouldBroadcast.broadcast_with() returns
+      model_dump() (python mode), so datetime/UUID/Decimal stay Python objects; every real driver
+      json.dumps the payload and raises BroadcastDriverError. Reproduced with an OrderShipped event
+      (UUID/Decimal/datetime). Reverb WS/auth already Stage-4b hardened. Auth presence/private
+      discriminator (by return-type not channel name), toOthers(), and Pusher auto-build deferred.
+      Spec: WI-arvel-012-broadcast-payload-json-safe.md.
+    artifacts:
+      - ".context/research/012-broadcasting.md"
+      - "docs/pipeline/specs/WI-arvel-012-broadcast-payload-json-safe.md"
+    timestamp: "2026-06-08T10:55:00Z"
+  - work_item: "WI-arvel-012"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      should_broadcast.py: broadcast_with() now calls model_dump(mode="json") so the default payload
+      is JSON-safe (datetime→ISO, UUID→str, Decimal→str); still routed through _as_payload_mapping.
+      New test: rich-type event yields json.dumps-able payload; plain-int test unchanged. No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/broadcasting/should_broadcast.py"
+      - "packages/arvel/tests/broadcasting/test_should_broadcast.py"
+      - "docs/site/docs/features/broadcasting.md"
+    timestamp: "2026-06-08T11:05:00Z"
+  - work_item: "WI-arvel-012"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Broadcasting suite = 91 passed; full arvel suite = 4304 passed (3 deselected), no regression;
+      mypy --strict + pyright + ruff clean on changed files. Docs broadcasting.md notes the default
+      uses model_dump(mode="json"). Auth discriminator, toOthers(), Pusher auto-build deferred.
+    timestamp: "2026-06-08T11:15:00Z"
