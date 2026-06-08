@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.20.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.6...arvel-v0.20.0) (2026-06-08)
+
+
+### Features
+
+* **cli:** show boot spinner during framework startup ([522d16a](https://github.com/mohamed-rekiba/arvel/commit/522d16a8ed8ff0bc92c13685ff25054037b3e4ce))
+
+
+### Bug Fixes
+
+* **routing:** drop redundant list[Any] cast that broke the mypy gate ([6cb078b](https://github.com/mohamed-rekiba/arvel/commit/6cb078b0243d6cb61263b7578bcadcc6268e6247))
+* **routing:** honour __hidden__ when a route returns a raw model ([acf2e10](https://github.com/mohamed-rekiba/arvel/commit/acf2e10b33099ff51e33d8c18073b31dbbe7bd5c))
+* **security:** stop non-ASCII tokens from crashing constant-time guards into 500 ([3809496](https://github.com/mohamed-rekiba/arvel/commit/380949669caca464acda19749246ba56bf056381))
+
 ## [0.19.6](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.5...arvel-v0.19.6) (2026-06-08)
 
 
