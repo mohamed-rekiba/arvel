@@ -17,6 +17,21 @@ arvel <command> --help
 > [!NOTE]
 > The CLI runs every command on **one** event loop that the entrypoint owns. In a custom command, don't call `asyncio.run()` inside your Typer callback — it nests on the running loop and crashes with "asyncio.run() cannot be called from a running event loop". Hand your coroutine to `arvel.console.schedule_async(...)` instead; the entrypoint awaits it on the same loop (and turns a `typer.Exit(code)` raised inside it into the process exit code). Commands that drive their own loop — `serve` (uvicorn), `shell` (IPython) — opt out with `owns_process = True`.
 
+### Global install and the project virtualenv
+
+You can install `arvel` globally (`uv tool install arvel`, `pipx install arvel`) and run it from anywhere inside a project — no need to activate the virtualenv first.
+
+When you invoke a global `arvel` inside a project, it finds the project's `.venv` and re-execs itself onto that interpreter before running anything. From there the command runs with the **project-pinned** arvel and the project's installed extras — exactly as if you'd run `source .venv/bin/activate` first. So `arvel --version` from inside a project reports the project's version, not the global one.
+
+The handoff is skipped (the current interpreter runs as-is) when:
+
+- you're already on the project's `.venv` interpreter (activated, or running `.venv/bin/arvel` directly),
+- there's no `.venv` at the project root,
+- you're outside a project, or
+- you set `ARVEL_NO_REEXEC=1` to opt out.
+
+If the project's `.venv` doesn't have arvel installed, the handoff is skipped and the command runs on the current interpreter (which will report a clear import error). Install the project's deps (`uv pip install -e .`) to fix it.
+
 ### Needs-based bootstrap
 
 Every command declares which **subsystems** it touches (`Command.requires`). The CLI computes the transitive closure of those subsystems and asks the user's `bootstrap/app.py::create_application(required_subsystems=...)` to boot only those providers. The four foundation subsystems — `CONFIG`, `LOG`, `LANG`, `CONTEXT` — are always loaded; everything else (`DATABASE`, `HTTP`, `QUEUE`, `MAIL`, `CACHE`, `STORAGE`, `BROADCAST`, `AUTH`, `EVENTS`, `SCHEDULER`, `USER_PROVIDERS`) only boots when something asks for it.

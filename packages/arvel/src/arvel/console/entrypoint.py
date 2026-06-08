@@ -41,6 +41,7 @@ from arvel.console._async import get_pending_task
 from arvel.console._command_meta import COMMAND_HELP
 from arvel.console._loader import discover_commands, entry_point_names, load_command
 from arvel.console._subsystem import CliSubsystem, closure
+from arvel.console._venv import maybe_reexec_into_project_venv
 from arvel.console.bootstrap import (
     bootstrap_framework_application,
     find_project_root,
@@ -324,6 +325,12 @@ async def async_main(project_root: Path, command: str | None) -> None:
 
 def main() -> None:
     argv = sys.argv
+
+    # Hand off to the project's .venv interpreter before anything else (incl. the
+    # banner) so the whole run uses the project-pinned arvel + its deps. Never
+    # returns when a re-exec happens; otherwise we're already on the right one.
+    maybe_reexec_into_project_venv(argv)
+
     _print_banner(argv)
 
     # `--no-banner` is ours, not Typer's — strip it so dispatch doesn't choke.
