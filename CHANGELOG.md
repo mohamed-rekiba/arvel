@@ -124,16 +124,18 @@ changelog once shipped.
   `VerifyCsrf` also reads the `_token` field of urlencoded form posts (Laravel's
   token-source order). `http/exceptions.py`, `http/_middleware_core.py`,
   `auth/middleware/csrf_double_submit.py` + `test_csrf*`
+- TrustProxies request middleware — `TrustProxiesMiddleware` honors
+  `X-Forwarded-For/-Proto/-Host` only when the TCP peer is a configured trusted
+  proxy, so behind a load balancer `request.client.host` (and the throttle key
+  that reads it), the scheme, and the host all reflect the real client.
+  Configured via `TRUSTED_PROXIES` (CSV of IPs/CIDRs, or `*` to trust all);
+  mounted as the outermost layer only when set. `http/config.py`,
+  `http/middleware/trust_proxies.py` + `test_trust_proxies`
 
-**Remaining priority gaps** (triaged 2026-06-09 against the codebase — see
+All bucket-3 feature-parity gaps triaged on 2026-06-09 (see
 `.context/research/043-feature-gap-bucket3-triage.md` and
-[`docs/backlog/043-epic-feature-gap-bucket3-triage.md`](docs/backlog/043-epic-feature-gap-bucket3-triage.md)):
-
-- `TrustProxies` request middleware — trusted-proxy client-IP resolution exists
-  for observability/reverb (`observability/forwarded.py`) but not on the app
-  request path, so behind a load balancer `request.client.host` (and the
-  throttle key that reads it) sees the proxy, not the real client. Medium
-  impact, **own WI — security path.**
+[`docs/backlog/043-epic-feature-gap-bucket3-triage.md`](docs/backlog/043-epic-feature-gap-bucket3-triage.md))
+are now closed.
 
 **Deliberately not implemented:**
 

@@ -465,9 +465,10 @@ class Application:
         self._maybe_mount_public_storage(fa)
         self._maybe_add_maintenance_middleware(fa)
         # add_middleware prepends, so the LAST call is the OUTERMOST layer.
-        # Desired outer→inner: Observability → Context → DeferredTask → ArvelScope.
+        # Desired outer→inner: TrustProxies → Observability → Context → DeferredTask → ArvelScope.
         fa.add_middleware(ArvelScopeMiddleware, container=self.container)
         self._maybe_add_observability_middleware(fa)
+        self._maybe_add_trust_proxies_middleware(fa)
         return fa
 
     def _add_health_route(self, fa: FastAPI) -> None:
@@ -507,6 +508,20 @@ class Application:
             service=config.service_name,
             log_requests=not config.log_uvicorn_access,
         )
+
+    def _maybe_add_trust_proxies_middleware(self, fa: FastAPI) -> None:
+        """Mount TrustProxies as the outermost layer when TRUSTED_PROXIES is set."""
+        from arvel.container.errors import BindingResolutionError
+        from arvel.http.config import HttpConfig
+        from arvel.http.middleware.trust_proxies import TrustProxiesMiddleware
+
+        try:
+            config = self.container.make(HttpConfig)
+        except BindingResolutionError:
+            config = HttpConfig.from_environment()
+        if not config.trusted_proxies:
+            return
+        fa.add_middleware(TrustProxiesMiddleware, trusted_proxies=config.trusted_proxies)
 
     def _maybe_mount_public_storage(self, fa: FastAPI) -> None:
         """Serve the `storage:link` symlink (public/storage) at /storage.
