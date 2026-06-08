@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import ipaddress
 from collections.abc import Callable
 
 from fastapi import FastAPI, Request, Response
+
+from arvel.observability.forwarded import ip_in_cidrs, resolve_client_ip
 
 _prometheus_available: bool = False
 _prometheus_content_type: str = "text/plain; version=0.0.4"
@@ -22,47 +23,33 @@ except ImportError:
     pass
 
 
-def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    if request.client:
-        return request.client.host
-    return "127.0.0.1"
-
-
-def _is_allowed(ip: str, allowed_cidrs: list[str]) -> bool:
-    try:
-        addr = ipaddress.ip_address(ip)
-    except ValueError:
-        return False
-    for cidr in allowed_cidrs:
-        try:
-            if addr in ipaddress.ip_network(cidr, strict=False):
-                return True
-        except ValueError:
-            continue
-    return False
-
-
 def add_metrics_route(
     app: FastAPI,
     *,
     path: str = "/_metrics",
     allowed_cidrs: list[str] | None = None,
+    trusted_proxies: list[str] | None = None,
 ) -> None:
     """Register a Prometheus text-format metrics endpoint at ``path``.
 
-    Access is restricted to IPs in ``allowed_cidrs``. Defaults to loopback only.
+    Access is restricted to IPs in ``allowed_cidrs`` (loopback by default). The
+    client IP is the TCP peer; ``X-Forwarded-For`` is honored only when the peer
+    is in ``trusted_proxies``, otherwise a spoofed header could pass the guard.
     """
     if allowed_cidrs is None:
         allowed_cidrs = ["127.0.0.1/32", "::1/128"]
 
     _cidrs = list(allowed_cidrs)
+    _trusted = list(trusted_proxies or [])
 
     async def metrics_endpoint(request: Request) -> Response:
-        ip = _client_ip(request)
-        if not _is_allowed(ip, _cidrs):
+        peer = request.client.host if request.client else "127.0.0.1"
+        ip = resolve_client_ip(
+            peer_ip=peer,
+            forwarded_for=request.headers.get("X-Forwarded-For"),
+            trusted_proxies=_trusted,
+        )
+        if not ip_in_cidrs(ip, _cidrs):
             return Response(content="Forbidden", status_code=403)
 
         if _prometheus_available and _prometheus_generate_latest is not None:

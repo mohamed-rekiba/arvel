@@ -1160,6 +1160,50 @@ events:
       errors, ruff check + ruff format clean. permission.md documents the query helpers and that they honor
       morph_map/__morph_class__.
     timestamp: "2026-06-08T19:10:00Z"
+  - work_item: "WI-arvel-030"
+    stage: "qa-post"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 30 (observability + bootstrap health). C1 (A01): add_metrics_route and add_health_route resolved
+      the client IP from the first X-Forwarded-For value unconditionally, so a spoofed header (e.g.
+      X-Forwarded-For: 127.0.0.1 for metrics' loopback default, or an allowlisted IP for HEALTH_ALLOWED_CIDRS)
+      bypassed the CIDR guard and exposed internal telemetry / per-service health+exception detail. reverb
+      already had the correct trusted-proxy model (resolve_remote_ip). The existing test
+      test_metrics_route_allows_forwarded_clients_and_bad_cidrs asserted the insecure 200. throttle_login keys
+      on the real peer (scope["client"]) — already safe.
+    timestamp: "2026-06-08T20:20:00Z"
+  - work_item: "WI-arvel-030"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Added shared arvel/observability/forwarded.py (resolve_client_ip + ip_in_cidrs) mirroring reverb: XFF
+      honored only when the TCP peer is a configured trusted proxy (right-most-untrusted hop), else the peer is
+      the client. Both routes use it; new ObservabilityConfig.trusted_proxies (OBSERVABILITY_TRUSTED_PROXIES,
+      default []), trusted_proxies param on both registrars, threaded into _add_health_route. Rewrote the
+      insecure metrics test, added health spoof regression + resolver unit tests.
+    artifacts:
+      - "packages/arvel/src/arvel/observability/forwarded.py"
+      - "packages/arvel/src/arvel/observability/metrics_route.py"
+      - "packages/arvel/src/arvel/observability/config.py"
+      - "packages/arvel/src/arvel/health.py"
+      - "packages/arvel/src/arvel/application/application.py"
+      - "packages/arvel/tests/observability/test_forwarded_ip.py"
+      - "packages/arvel/tests/observability/test_metrics_route.py"
+      - "packages/arvel/tests/services/test_health_endpoint.py"
+    timestamp: "2026-06-08T20:28:00Z"
+  - work_item: "WI-arvel-030"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      observability + health suites green (1 pre-existing cwd-dependent failure in test_wi_030_config skeleton,
+      unrelated — fails on clean tree too); mypy + uv run pyright 0 errors, ruff check + format clean. Spoofed
+      XFF can no longer bypass either guard; trusted-proxy deployments still resolve the real client.
+    timestamp: "2026-06-08T20:32:00Z"
   - work_item: "WI-arvel-029"
     stage: "qa-post"
     event: "enter"
