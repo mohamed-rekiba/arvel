@@ -522,7 +522,7 @@ requires-dist = [
     { name = "taskiq-aio-pika", marker = "extra == 'queue-amqp'", specifier = ">=0.6.0" },
     { name = "taskiq-redis", marker = "extra == 'queue-redis'", specifier = ">=1.2.2" },
     { name = "typer", specifier = ">=0.26.4" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.48.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.49.0" },
     { name = "websockets", marker = "extra == 'broadcasting'", specifier = ">=16.0" },
 ]
 provides-extras = ["bcrypt", "redis", "postgres", "mysql", "sqlite", "queue", "queue-redis", "queue-amqp", "mail", "s3", "gcs", "azure", "jwt", "broadcasting", "shell", "openapi", "permission", "image", "image-heif", "oauth", "search", "audit", "dev", "all"]
