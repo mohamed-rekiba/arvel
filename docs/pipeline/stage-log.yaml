@@ -926,3 +926,40 @@ events:
       clean, uv run pyright 0 errors, ruff check + ruff format clean. No user-facing context doc page
       (facades.md mention is generic) — repository docstring is the source of truth.
     timestamp: "2026-06-08T15:45:00Z"
+  - work_item: "WI-arvel-023"
+    stage: "qa-post"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 23 (application kernel). C1 confirmed by inspection: Application.shutdown() drained
+      services best-effort but providers fail-fast — first provider.shutdown() to raise re-raised
+      immediately, stranding every provider after it in reverse order. DatabaseServiceProvider
+      (engine.dispose) sits after Scheduler/Http/user/Console in that order, so any earlier failure
+      leaks the connection pool on graceful shutdown. C2: raise preceded _booted=False, leaving the
+      app marked booted. Boot stays correctly fail-fast (BootError); only teardown was wrong.
+    timestamp: "2026-06-08T15:50:00Z"
+  - work_item: "WI-arvel-023"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      shutdown() now drains every provider in reverse, logs each failure (provider.shutdown_failed),
+      sets _booted=False unconditionally, then re-raises ShutdownError for the first failing provider
+      (public API preserved). Mirrors the services loop above it. Added test_wi_023_shutdown_drains.py
+      (2 cases: no-strand of later teardowns + booted cleared on failure); existing
+      test_shutdown_error_wraps_provider_failure still green.
+    artifacts:
+      - "packages/arvel/src/arvel/application/application.py"
+      - "packages/arvel/tests/application/test_wi_023_shutdown_drains.py"
+    timestamp: "2026-06-08T15:56:00Z"
+  - work_item: "WI-arvel-023"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      application + qa_post edge cases 95 passed (incl. 2 new); full arvel suite 4416 passed, 0
+      failures; mypy --strict clean, uv run pyright 0 errors, ruff check + ruff format clean. No
+      user-facing doc page (lifecycle is internal) — spec + shutdown docstring are the source of truth.
+    timestamp: "2026-06-08T16:00:00Z"

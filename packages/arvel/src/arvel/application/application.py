@@ -354,21 +354,33 @@ class Application:
     async def shutdown(self) -> None:
         if not self._booted:
             return
+        from arvel.logging.facade import Log
+
         # Disconnect services first (reverse registration). A failing disconnect
         # is logged, not raised, so the remaining services still tear down.
         for service in reversed(self._services):
             try:
                 await service.disconnect()
             except Exception as exc:  # noqa: BLE001 — one bad disconnect must not strand the rest
-                from arvel.logging.facade import Log
-
                 Log.error("service.disconnect_failed", exc=exc, service=service.name)
+
+        # Shut down providers in reverse. Drain every one even if a teardown
+        # raises — otherwise a failing provider strands the ones after it (e.g.
+        # the DB provider never disposes its engine -> leaked pool). Surface the
+        # first failure once all have run, so shutdown is both complete and loud.
+        first_failure: tuple[type[ServiceProvider], BaseException] | None = None
         for inst in reversed(self._provider_instances):
             try:
                 await inst.shutdown()
-            except Exception as exc:
-                raise ShutdownError(type(inst), exc) from exc
+            except Exception as exc:  # noqa: BLE001 — drain the rest; first failure re-raised below
+                Log.error("provider.shutdown_failed", exc=exc, provider=type(inst).__qualname__)
+                if first_failure is None:
+                    first_failure = (type(inst), exc)
+
         self._booted = False
+        if first_failure is not None:
+            provider_cls, original = first_failure
+            raise ShutdownError(provider_cls, original) from original
 
     def into_asgi(
         self,
