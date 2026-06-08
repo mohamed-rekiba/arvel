@@ -390,13 +390,21 @@ class TestReplLoopLifecycle:
         import arvel.console.commands.shell as shell_mod
 
         framework_app = _build_app(db_env)
-        monkeypatch.setattr(shell_mod, "find_project_root", lambda *_a, **_k: db_env)
-        monkeypatch.setattr(
-            shell_mod, "bootstrap_framework_application", lambda *_a, **_k: framework_app
-        )
+
+        def _fake_root(*_a: object, **_k: object) -> Path:
+            return db_env
+
+        def _fake_bootstrap(*_a: object, **_k: object) -> object:
+            return framework_app
+
+        def _no_launch(_ns: object) -> None:
+            return None
+
+        monkeypatch.setattr(shell_mod, "find_project_root", _fake_root)
+        monkeypatch.setattr(shell_mod, "bootstrap_framework_application", _fake_bootstrap)
 
         cmd = ShellCommand()
-        monkeypatch.setattr(cmd, "_launch_repl", lambda _ns: None)
+        monkeypatch.setattr(cmd, "_launch_repl", _no_launch)
         cmd.run_repl()
 
         assert framework_app.probe_connections() is False

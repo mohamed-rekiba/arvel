@@ -43,9 +43,7 @@ async def test_where_comparison_operator(engine: AsyncEngine, session: AsyncSess
     assert [r.age for r in rows] == [30, 40]
 
 
-async def test_where_string_form_chains_as_and(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_where_string_form_chains_as_and(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
     rows = (
         await Person.where("email", "ilike", "%example.com")
@@ -75,9 +73,7 @@ async def test_where_single_string_raises(engine: AsyncEngine, session: AsyncSes
         Person.where("email")
 
 
-async def test_where_expression_form_unaffected(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_where_expression_form_unaffected(engine: AsyncEngine, session: AsyncSession) -> None:
     await _seed(engine)
     rows = await Person.where(Person.age == 25).get()
     assert [r.email for r in rows] == ["jane@example.com"]
