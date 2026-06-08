@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, Self
 from typing import cast as typing_cast
 
+from arvel.database.orm.morph_map import get_morph_alias
 from arvel.database.session import get_active_session
 from sqlalchemy import Integer, Table, cast, select
 from sqlalchemy.sql.elements import ColumnElement
@@ -267,7 +268,7 @@ class HasRoles:
             .where(
                 _column(Role, "name") == role_name,
                 _column(Role, "guard_name") == guard,
-                model_has_roles.c.model_type == cls.__name__,
+                model_has_roles.c.model_type == get_morph_alias(cls),
             )
         )
         result = await session.execute(select(cls).where(pk.in_(subq)))
@@ -290,7 +291,7 @@ class HasRoles:
             .where(
                 _column(Role, "name") == role_name,
                 _column(Role, "guard_name") == guard,
-                model_has_roles.c.model_type == cls.__name__,
+                model_has_roles.c.model_type == get_morph_alias(cls),
             )
         )
         result = await session.execute(select(cls).where(~pk.in_(subq)))
@@ -464,7 +465,7 @@ class HasPermissions:
             .where(
                 _column(Permission, "name") == perm_name,
                 _column(Permission, "guard_name") == guard,
-                model_has_permissions.c.model_type == cls.__name__,
+                model_has_permissions.c.model_type == get_morph_alias(cls),
             )
         )
         result = await session.execute(select(cls).where(pk.in_(subq)))
@@ -487,7 +488,7 @@ class HasPermissions:
             .where(
                 _column(Permission, "name") == perm_name,
                 _column(Permission, "guard_name") == guard,
-                model_has_permissions.c.model_type == cls.__name__,
+                model_has_permissions.c.model_type == get_morph_alias(cls),
             )
         )
         result = await session.execute(select(cls).where(~pk.in_(subq)))

@@ -76,6 +76,18 @@ Other methods: `remove_role`, `sync_roles`, `has_all_roles`, `has_level`, `revok
 
 Permissions resolve through roles automatically — `has_permission_to` is true if the user has the permission directly **or** via any assigned role.
 
+### Querying models by role or permission
+
+Class-level helpers return every instance that does (or doesn't) hold a role or permission:
+
+```python
+admins   = await User.query_with_role("admin", session=session)
+others   = await User.query_without_role("admin", session=session)
+editors  = await User.query_with_permission("posts.edit", session=session)
+```
+
+These match on the same morph token the pivot stores, so they work whether you rely on the short-class-name default or register a `morph_map`/`__morph_class__` alias. (`query_without_*` is the complement — it returns the rows that don't hold the grant.)
+
 > [!WARNING]
 > `give_permission_to`, `revoke_permission_to`, `assign_role`, and `remove_role` are
 > primitives — they do **not** check the acting user's own authority. An admin endpoint

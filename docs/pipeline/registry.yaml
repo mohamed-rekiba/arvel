@@ -405,3 +405,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 27 (arvel-oauth / Socialite parity) hardening WI. Spec: docs/pipeline/specs/WI-arvel-027-oauth-microsoft-email-verified.md"
+  - id: "WI-arvel-028"
+    name: "Role/permission query helpers must match the morph-alias discriminator (not cls.__name__)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T19:00:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 28 (arvel-permission / Spatie parity) hardening WI. Spec: docs/pipeline/specs/WI-arvel-028-permission-query-morph-alias.md"
