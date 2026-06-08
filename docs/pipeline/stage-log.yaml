@@ -1744,3 +1744,40 @@ events:
       ruff clean on optimize.py; tests/console/test_optimize.py 5 passed (route:cache/event:cache substrings still
       present in output). Documentation-and-decision change; no behavioral regression.
     timestamp: "2026-06-09T02:33:00Z"
+  - work_item: "WI-arvel-047"
+    stage: "execution"
+    event: "implement"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Http facade + Http.fake (WI-043 feature gap, high impact). arvel/http/client.py: PendingRequest fluent builder
+      (with_headers/with_token/with_basic_auth/accept/accept_json/as_form/timeout/base_url) + async verbs
+      (get/head/post/put/patch/delete) over httpx2; Response wrapper with predicates (ok/successful/redirect/failed/
+      client_error/server_error, HTTP-range constants for PLR2004) + json/body/header/headers/raise_for_status;
+      OutboundRequest frozen dataclass (groups the call so the fake's handle stays under PLR0913); FakeTransport
+      runtime_checkable Protocol + _active_fake ContextVar (typed Token[FakeTransport|None]) for test isolation.
+      arvel/facades/http.py: stateless Http classmethod facade. arvel/testing/fakes/http.py: HttpFake records
+      RecordedRequest and returns glob-matched FakeResponse stubs (scheme-insensitive match, empty-200 default so a
+      fake never leaks to the network), HttpFakeContext context manager (__enter__ yields the fake), plus
+      Http.fake/response/recorded/assert_sent/assert_not_sent/assert_sent_count/assert_nothing_sent. Re-exported from
+      arvel.facades. JSON stub body cast to Any at the httpx boundary (object branch, no Unknown generics).
+    artifacts:
+      - "packages/arvel/src/arvel/http/client.py"
+      - "packages/arvel/src/arvel/facades/http.py"
+      - "packages/arvel/src/arvel/facades/__init__.py"
+      - "packages/arvel/src/arvel/testing/fakes/http.py"
+      - "packages/arvel/tests/http/test_wi047_http_facade.py"
+      - "docs/site/docs/features/http-client.md"
+      - "mkdocs.yml"
+      - "CHANGELOG.md"
+    timestamp: "2026-06-09T02:48:00Z"
+  - work_item: "WI-arvel-047"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1073 files); uv run pyright 0 errors, 0 warnings; http suite
+      227 passed (incl. 18 new: Response predicates, base_url join/absolute via the fake's recorded URL, fake basics
+      no-stub/json-stub/pattern-match+default-fallback, request recording method/url/data/headers, assert_* helpers);
+      mkdocs build --strict clean.
+    timestamp: "2026-06-09T02:50:00Z"
