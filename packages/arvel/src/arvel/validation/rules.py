@@ -10,14 +10,17 @@ import uuid as _uuid
 from collections.abc import Awaitable, Callable, Mapping, Sized
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import column, select
 from sqlalchemy.sql import TableClause
 from sqlalchemy.sql import table as sqla_table
 from sqlalchemy.sql.elements import ColumnClause
 
-from arvel.database.session import get_active_session
+from arvel.database.session import NoActiveSessionError, get_active_session
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _TABLE_COLUMN_COUNT = 2
@@ -68,9 +71,23 @@ def _table_clause(table_name: str, *column_names: str) -> TableClause:
     return sqla_table(table_name, *columns)
 
 
-async def _matching_row_exists(table: str, column: str, value: object) -> bool:
+def _session_for_rule(rule: str) -> AsyncSession:
+    # exists/unique need a DB session. Without one, the raw NoActiveSessionError
+    # surfaces as an opaque 500 — turn it into an actionable message instead.
+    try:
+        return get_active_session()
+    except NoActiveSessionError as exc:
+        msg = (
+            f"The {rule!r} validation rule needs an active database session. "
+            "Validate inside a request served through the DatabaseTransaction "
+            "middleware, or wrap the call in 'async with DB.transaction():'."
+        )
+        raise RuntimeError(msg) from exc
+
+
+async def _matching_row_exists(table: str, column: str, value: object, *, rule: str) -> bool:
     tbl = _table_clause(table, column)
-    session = get_active_session()
+    session = _session_for_rule(rule)
     stmt = select(1).select_from(tbl).where(tbl.c[column] == value).limit(1)
     return (await session.execute(stmt)).first() is not None
 
@@ -79,11 +96,13 @@ async def _conflicting_row_exists(
     table: str,
     column: str,
     value: object,
-    except_column: str,
-    except_value: object,
+    except_: tuple[str, object],
+    *,
+    rule: str,
 ) -> bool:
+    except_column, except_value = except_
     tbl = _table_clause(table, column, except_column)
-    session = get_active_session()
+    session = _session_for_rule(rule)
     stmt = (
         select(1)
         .select_from(tbl)
@@ -191,7 +210,7 @@ async def rule_exists(
     if len(params) < _TABLE_COLUMN_COUNT:
         return f"The {field} rule exists requires table and column."
     table, column = params[0], params[1]
-    if not await _matching_row_exists(table, column, value):
+    if not await _matching_row_exists(table, column, value, rule="exists"):
         return f"The selected {field} is invalid."
     return None
 
@@ -213,9 +232,11 @@ async def rule_unique(
     except_column = params[_EXCEPT_COLUMN_INDEX] if len(params) > _EXCEPT_COLUMN_INDEX else "id"
     _validate_identifier(except_column, "column")
     conflict = (
-        await _conflicting_row_exists(table, column, value, except_column, except_value)
+        await _conflicting_row_exists(
+            table, column, value, (except_column, except_value), rule="unique"
+        )
         if except_value is not None
-        else await _matching_row_exists(table, column, value)
+        else await _matching_row_exists(table, column, value, rule="unique")
     )
     if conflict:
         return f"The {field} has already been taken."

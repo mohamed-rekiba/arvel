@@ -1781,3 +1781,31 @@ events:
       no-stub/json-stub/pattern-match+default-fallback, request recording method/url/data/headers, assert_* helpers);
       mkdocs build --strict clean.
     timestamp: "2026-06-09T02:50:00Z"
+  - work_item: "deferred-F6-val"
+    stage: "execution"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Deferred F6-val (from WI-004 validation review). exists/unique called get_active_session() directly, so running
+      them without a bound session (a console command/job, or a route outside the DatabaseTransaction middleware) let a
+      bare NoActiveSessionError escape the validator and render as the opaque generic 500 ("Something went wrong") with
+      a log that never mentioned validation. Added _session_for_rule(rule) in validation/rules.py: catches
+      NoActiveSessionError and re-raises a RuntimeError that names the rule and tells the dev to wrap the call in
+      'async with DB.transaction():'. Stays a 500 (missing session is server misconfiguration, never client input) but
+      the diagnostics are now actionable. _conflicting_row_exists grouped its except (column, value) into a tuple to
+      stay under PLR0913. Docs note in the-basics/validation.md expanded. Tests: test_wi074 TestDbRulesWithoutSession
+      (exists + unique each raise the actionable error with no session).
+    artifacts:
+      - "packages/arvel/src/arvel/validation/rules.py"
+      - "packages/arvel/tests/validation/test_wi074_validation_rules.py"
+      - "docs/site/docs/the-basics/validation.md"
+    timestamp: "2026-06-09T03:05:00Z"
+  - work_item: "deferred-F6-val"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff clean; uv run mypy 0 issues (1073 files); uv run pyright 0/0; validation suite 132 + wi074 26 passed
+      (2 new no-session cases); mkdocs build --strict clean.
+    timestamp: "2026-06-09T03:06:00Z"

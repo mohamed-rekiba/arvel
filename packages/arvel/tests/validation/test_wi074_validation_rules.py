@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import httpx2 as httpx
+import pytest
 from arvel.database import Model, id_, string
 from arvel.http.exceptions import HttpExceptionHandler
 from arvel.http.requests import FormRequest
@@ -115,6 +116,20 @@ class TestUniqueRule:
             {"email": f"unique:wi074_posts,email,{post.id},id"}
         )
         assert details == []
+
+
+class TestDbRulesWithoutSession:
+    """exists/unique need a DB session; without one, raise an actionable error."""
+
+    async def test_exists_without_session_raises_actionable_error(self) -> None:
+        with pytest.raises(RuntimeError, match="'exists'.*active database session"):
+            await Validator({"post_id": 1}).validate({"post_id": "exists:wi074_posts,id"})
+
+    async def test_unique_without_session_raises_actionable_error(self) -> None:
+        with pytest.raises(RuntimeError, match="'unique'.*active database session"):
+            await Validator({"email": "a@example.com"}).validate(
+                {"email": "unique:wi074_posts,email"}
+            )
 
 
 class TestMimesRule:

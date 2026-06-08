@@ -272,7 +272,7 @@ The field under validation must exist in the given database table and column. Bo
 This runs an async query against the active database session. A `None` value is skipped.
 
 > [!NOTE]
-> `exists` (and `unique`) need an active database session, which the normal request path provides. They check a single `column == value` equality — there's no support for additional `WHERE` conditions.
+> `exists` (and `unique`) need an active database session, which the normal request path provides. They check a single `column == value` equality — there's no support for additional `WHERE` conditions. Run them outside a request (a console command or job) and you'll get a clear error telling you to wrap the call in `async with DB.transaction():`.
 
 <a name="rule-unique"></a>
 ### unique:_table_,_column_,_except_,_except_column_
