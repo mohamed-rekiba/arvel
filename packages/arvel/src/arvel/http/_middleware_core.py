@@ -9,7 +9,11 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
-from arvel.http.exceptions import HttpException, ThrottleException, UnauthenticatedException
+from arvel.http.exceptions import (
+    CsrfMismatchException,
+    ThrottleException,
+    UnauthenticatedException,
+)
 from arvel.http.ratelimit import InMemoryStore, RateLimiterStore
 from arvel.support.secure_compare import constant_time_equals
 
@@ -154,13 +158,36 @@ def _bind_user_to_context(user: object) -> None:
 _CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _CSRF_SESSION_KEY = "_csrf_token"
 _CSRF_HEADER = "X-CSRF-Token"
+_XSRF_HEADER = "X-XSRF-TOKEN"
+_CSRF_FIELD = "_token"
+_FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
 
 
-class CsrfMismatchException(HttpException):
-    """Raised by ``VerifyCsrf`` on a missing or mismatched token."""
+async def _submitted_csrf_token(request: Any) -> str | None:
+    """Token from the request, in Laravel's order: header, XSRF header, _token field.
 
-    status_code = 419
-    code = "CSRF_MISMATCH"
+    The ``_token`` form field is read only for urlencoded posts — we don't buffer
+    JSON or multipart (upload) bodies just to look for a token that lives in a header.
+    """
+    headers = getattr(request, "headers", None)
+    if headers is not None:
+        for name in (_CSRF_HEADER, _XSRF_HEADER):
+            value = headers.get(name)
+            if value:
+                return str(value)
+        content_type = (headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    else:
+        content_type = ""
+
+    if content_type == _FORM_CONTENT_TYPE:
+        # Annotated Any so pyright doesn't collapse the callable() guard to `object`.
+        form_getter: Any = getattr(request, "form", None)
+        if form_getter is not None:
+            form: Any = await form_getter()
+            field = form.get(_CSRF_FIELD)
+            if field:
+                return str(field)
+    return None
 
 
 class VerifyCsrf:
@@ -188,7 +215,7 @@ class VerifyCsrf:
         else:
             session = {}
         token: Any = session.get(_CSRF_SESSION_KEY)
-        sent = request.headers.get(_CSRF_HEADER) if hasattr(request, "headers") else None
+        sent = await _submitted_csrf_token(request)
 
         if not token or not sent or not constant_time_equals(str(token), str(sent)):
             raise CsrfMismatchException("CSRF token mismatch.")

@@ -51,18 +51,31 @@ async def test_matching_cookie_and_header_passes() -> None:
 
 
 @pytest.mark.asyncio
-async def test_missing_header_returns_403() -> None:
+async def test_matching_cookie_and_xsrf_alias_header_passes() -> None:
+    """The X-XSRF-TOKEN alias header is accepted alongside X-CSRF-TOKEN."""
+    app = _make_app()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        client.cookies.set("_csrf", "my-csrf-token")
+        response = await client.post(
+            "/api/auth/refresh",
+            headers={"X-XSRF-TOKEN": "my-csrf-token"},
+        )
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_missing_header_returns_419() -> None:
     app = _make_app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.cookies.set("_csrf", "my-csrf-token")
         response = await client.post("/api/auth/refresh")
-    assert response.status_code == 403
+    assert response.status_code == 419
     data = response.json()
     assert data["error"]["code"] == "CSRF_MISMATCH"
 
 
 @pytest.mark.asyncio
-async def test_mismatched_header_returns_403() -> None:
+async def test_mismatched_header_returns_419() -> None:
     app = _make_app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.cookies.set("_csrf", "token-A")
@@ -70,7 +83,7 @@ async def test_mismatched_header_returns_403() -> None:
             "/api/auth/refresh",
             headers={"X-CSRF-TOKEN": "token-B"},
         )
-    assert response.status_code == 403
+    assert response.status_code == 419
 
 
 @pytest.mark.asyncio
@@ -85,8 +98,8 @@ async def test_exempt_paths_skip_check() -> None:
 
 @pytest.mark.asyncio
 async def test_problemdetailshandler_sees_exception() -> None:
-    """Closes — CsrfMismatchException is a concrete exception class."""
+    """CsrfMismatchException is the shared concrete exception class (419)."""
     exc = CsrfMismatchException("CSRF token mismatch.")
-    assert exc.status_code == 403
+    assert exc.status_code == 419
     assert exc.code == "CSRF_MISMATCH"
     assert "CSRF_MISMATCH" in exc.to_dict()["error"]["code"]

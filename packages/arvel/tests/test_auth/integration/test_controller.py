@@ -270,7 +270,7 @@ async def test_refresh_200_rotates_cookie(
 
 
 @pytest.mark.asyncio
-async def test_refresh_403_on_csrf_mismatch(
+async def test_refresh_419_on_csrf_mismatch(
     setup_db: AsyncSession,
     test_app: FastAPI,
     event_fake: EventFake,
@@ -285,7 +285,7 @@ async def test_refresh_403_on_csrf_mismatch(
 
     async with AsyncClient(transport=ASGITransport(app=csrf_app), base_url="http://test") as c:
         r = await c.post("/api/auth/refresh")
-    assert r.status_code == 403
+    assert r.status_code == 419
 
 
 @pytest.mark.asyncio

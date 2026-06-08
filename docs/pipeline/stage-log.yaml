@@ -1854,3 +1854,30 @@ events:
       ruff clean; mypy 0 issues; pyright 0/0; auth suite 184 passed (1 new white-box regression:
       bind controller -> mount -> rebind -> register handler answers the rebound controller).
     timestamp: "2026-06-09T03:41:00Z"
+  - work_item: "WI-arvel-050"
+    stage: "execution"
+    event: "fix"
+    result: "pass"
+    gate: "user-approval"
+    note: >-
+      Feature gap (WI-043, high-risk security path). Consolidated the two CSRF middlewares: one shared
+      CsrfMismatchException (419, CSRF_MISMATCH) in arvel.http.exceptions imported by both VerifyCsrf (session)
+      and CsrfDoubleSubmitMiddleware (cookie); the cookie check moved 403->419 (Laravel TokenMismatchException
+      parity). Both accept the X-XSRF-TOKEN header alias; VerifyCsrf also reads the _token field of urlencoded
+      form posts (Laravel source order: header, XSRF header, _token), without buffering JSON/multipart bodies.
+      TrustProxies (general request-path IP resolution) split out as its own WI.
+    artifacts:
+      - "packages/arvel/src/arvel/http/exceptions.py"
+      - "packages/arvel/src/arvel/http/_middleware_core.py"
+      - "packages/arvel/src/arvel/auth/middleware/csrf_double_submit.py"
+      - "docs/pipeline/specs/WI-arvel-050-csrf-consolidation.md"
+    timestamp: "2026-06-09T03:55:00Z"
+  - work_item: "WI-arvel-050"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff clean; uv run mypy 0 issues; uv run pyright 0/0; http + auth + test_auth + security suites 528 passed
+      (new: X-XSRF-TOKEN alias on both middlewares, _token urlencoded form field on VerifyCsrf, JSON body not
+      buffered, cookie check 403->419); mkdocs build --strict clean.
+    timestamp: "2026-06-09T03:56:00Z"
