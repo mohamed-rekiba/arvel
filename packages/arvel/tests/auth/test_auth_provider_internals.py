@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from arvel.application.application import Application
 from arvel.auth.config import AuthConfig, GuardConfig, JwtConfig, ProviderConfig
 from arvel.auth.exceptions import AuthConfigError
 from arvel.auth.guards.session import SessionGuard
+from arvel.auth.http.controller import AuthController
 from arvel.auth.provider import (
     AuthServiceProvider,
     _import_class,  # pyright: ignore[reportPrivateUsage]  # white-box: dotted-path importer
     _users_provider,  # pyright: ignore[reportPrivateUsage]  # white-box: provider lookup
 )
+from arvel.routing import Router
 
 _MODEL = "arvel.database.model.Model"
 
@@ -90,3 +94,34 @@ class TestBuildGuard:
             GuardConfig(driver="session", provider="users"), _config_with_users()
         )
         assert isinstance(guard, SessionGuard)
+
+
+class TestMountedRoutesResolvePerRequest:
+    """Handlers must resolve AuthController from the container each call, not at boot."""
+
+    async def test_register_route_honors_rebound_controller(self) -> None:
+        provider = _provider()
+        container = provider.container
+
+        seen: list[str] = []
+
+        class _SpyController:
+            def __init__(self, tag: str) -> None:
+                self._tag = tag
+
+            async def register(self, payload: object) -> str:
+                _ = payload
+                seen.append(self._tag)
+                return self._tag
+
+        # Bind a controller, mount, then rebind. A boot-captured handler would still
+        # answer "boot"; per-request resolution must answer "rebound".
+        container.instance(AuthController, cast("AuthController", _SpyController("boot")))
+        provider._mount_routes(_config_with_users())  # pyright: ignore[reportPrivateUsage]  # white-box: drives route mounting
+        container.instance(AuthController, cast("AuthController", _SpyController("rebound")))
+
+        spec = next(s for s in Router.singleton().routes() if s.name == "auth.register")
+        result = await spec.handler(payload=object())
+
+        assert result == "rebound"
+        assert seen == ["rebound"]
