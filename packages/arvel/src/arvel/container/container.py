@@ -417,6 +417,44 @@ class Container:
                 reason=f"constructor signature mismatch: {exc}",
             ) from exc
 
+    async def _ainstantiate(
+        self,
+        abstract: type[T],
+        overrides: dict[str, object],
+        requestor: type,
+        *,
+        path: tuple[type, ...] = (),
+    ) -> T:
+        # Async twin of _instantiate: each constructor dep goes through _aresolve
+        # so a transitive async-bound dependency resolves instead of raising.
+        hints = init_hints(abstract)
+        kwargs: dict[str, Any] = {}
+        for name, dep_type in hints.items():
+            if name in overrides:
+                kwargs[name] = overrides[name]
+                continue
+            try:
+                kwargs[name] = await self._aresolve(
+                    dep_type,
+                    overrides={},
+                    path=(*path, abstract),
+                    requestor=requestor,
+                )
+            except BindingResolutionError as exc:
+                if isinstance(exc, CircularDependencyError):
+                    raise
+                raise BindingResolutionError(
+                    (*path, abstract, dep_type),
+                    reason=f"required by {abstract.__qualname__}.__init__",
+                ) from exc
+        try:
+            return abstract(**kwargs)
+        except TypeError as exc:
+            raise BindingResolutionError(
+                (*path, abstract),
+                reason=f"constructor signature mismatch: {exc}",
+            ) from exc
+
     def _invoke(
         self,
         concrete: Concrete | object,
@@ -457,6 +495,16 @@ class Container:
         path: tuple[type, ...],
         requestor: type | None,
     ) -> T:
+        if not isinstance(abstract, type):  # pyright: ignore[reportUnnecessaryIsInstance]
+            origin = get_origin(abstract)  # type: ignore[unreachable]
+            if origin is None or not isinstance(origin, type):
+                msg = f"amake() requires a type, got {type(abstract).__name__!r}."
+                raise TypeError(msg)
+            abstract = origin
+
+        if abstract in path:
+            raise CircularDependencyError((*path, abstract))
+
         if abstract in self._instances:
             return cast("T", self._instances[abstract])
 
@@ -467,18 +515,29 @@ class Container:
                 async_call: Any = contextual
                 instance = await async_call()
                 return cast("T", self._apply_extensions(abstract, instance))
+            if is_concrete_class(contextual):
+                instance = await self._ainstantiate(
+                    cast("type[Any]", contextual), {}, abstract, path=path
+                )
+                return cast("T", self._apply_extensions(abstract, instance))
             return cast("T", self._invoke(contextual, abstract, path, allow_async=True))
 
         binding = self._find_binding(abstract)
         if binding is None:
-            # Auto-wire sync; abstract classes still rejected.
-            return self._resolve(
-                abstract,
-                overrides=overrides,
-                path=path,
-                requestor=requestor,
-                allow_async=True,
-            )
+            if inspect.isabstract(abstract):
+                raise BindingResolutionError(
+                    (*path, abstract),
+                    reason="abstract not bound and not a concrete class",
+                )
+            if abstract.__init__ is object.__init__:
+                raise BindingResolutionError(
+                    (*path, abstract),
+                    reason=(
+                        f"{abstract.__qualname__} has no explicit __init__ "
+                        f"and is not bound; call container.bind({abstract.__qualname__}, ...)"
+                    ),
+                )
+            return await self._ainstantiate(abstract, overrides, abstract, path=path)
 
         if binding.scope is Scope.SINGLETON and abstract in self._singletons:
             return cast("T", self._singletons[abstract])
@@ -490,7 +549,7 @@ class Container:
             instance = await async_factory()
         elif is_concrete_class(binding.concrete):
             concrete_cls: type[Any] = binding.concrete  # type: ignore[assignment]
-            instance = self._instantiate(concrete_cls, overrides, abstract, path=path)
+            instance = await self._ainstantiate(concrete_cls, overrides, abstract, path=path)
         else:
             sync_factory: Any = binding.concrete
             instance = sync_factory()

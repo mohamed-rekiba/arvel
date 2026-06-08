@@ -694,3 +694,48 @@ events:
       clean. Docs authentication.md notes Hash.check/needs_rehash are algorithm-aware and imported
       Laravel $2y$ hashes verify and auto-upgrade. HashConfig wiring + make(**kwargs) deferred.
     timestamp: "2026-06-08T13:25:00Z"
+  - work_item: "WI-arvel-017"
+    stage: "planning"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 17 (container/DI) audit. C1 confirmed via repro: _aresolve delegated auto-wiring and
+      concrete-class bindings to the sync _instantiate (allow_async=False), so amake(Service) raised
+      BindingResolutionError wrapping AsyncBindingError as soon as a transitive dep was bound to an
+      async factory (Service->Repo->Db, Db async-bound). amake's whole purpose (async resolution at
+      any depth) only worked when the async binding was the root. C2 coupled: the async path had no
+      cycle guard (sync _resolve has one), so cyclic async graphs hit RecursionError instead of
+      CircularDependencyError. AsyncSession TRANSIENT-vs-scoped + alias()/extend() deferred. Spec:
+      WI-arvel-017-async-deep-resolution.md.
+    artifacts:
+      - ".context/research/017-container.md"
+      - "docs/pipeline/specs/WI-arvel-017-async-deep-resolution.md"
+    timestamp: "2026-06-08T13:45:00Z"
+  - work_item: "WI-arvel-017"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      container.py: added _ainstantiate (async twin of _instantiate; each constructor dep resolved via
+      await _aresolve, threading path). _aresolve now strips generic-alias origins, guards
+      `if abstract in path: raise CircularDependencyError`, and routes the auto-wire fallback, the
+      concrete-class binding branch, and the contextual concrete-class branch through _ainstantiate.
+      Sync make, async factories (no-arg), and scope/singleton caching unchanged. New
+      tests/container/test_wi_017_async_deep_resolution.py (5 cases). No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/container/container.py"
+      - "packages/arvel/tests/container/test_wi_017_async_deep_resolution.py"
+      - "docs/site/docs/core-concepts/service-container.md"
+    timestamp: "2026-06-08T14:00:00Z"
+  - work_item: "WI-arvel-017"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Container suite 44 passed (5 new async deep-resolution tests + 39 existing); full arvel suite
+      green; mypy --strict (1047 files) + pyright (0 errors) + ruff check + ruff format clean. Docs
+      service-container.md states amake resolves async bindings at any depth and sync make still
+      rejects them. AsyncSession scope + alias()/extend() deferred.
+    timestamp: "2026-06-08T14:05:00Z"
