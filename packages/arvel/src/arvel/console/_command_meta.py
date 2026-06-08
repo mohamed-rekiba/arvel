@@ -6,7 +6,7 @@ from __future__ import annotations
 
 COMMAND_HELP: dict[str, str] = {
     "about": "Display arvel framework information",
-    "auth:clear-resets": "Delete expired password_reset_tokens rows",
+    "auth:clear-resets": "Delete expired password_resets rows",
     "cache:clear": "Flush all items from the cache",
     "cache:forget": "Remove a specific key from the cache",
     "channel:list": "List registered broadcasting channels",

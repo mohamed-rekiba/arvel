@@ -75,3 +75,22 @@ async def test_framework_migrations_define_expected_tables() -> None:
         recorder.created["jobs"]
     )
     assert {"id", "type", "data"}.issubset(recorder.created["notifications"])
+
+    # The ORM is the source of truth — every column the model reads/writes must
+    # exist in the published migration, or the feature breaks at runtime even
+    # though model-metadata-backed unit tests pass. Guards the password_resets
+    # token_hash drift (migration said "token", model writes "token_hash").
+    from arvel.auth.models.password_reset import PasswordReset
+    from arvel.auth.models.personal_access_token import PersonalAccessToken
+    from arvel.auth.models.refresh_token import RefreshToken
+
+    for model, table in (
+        (PasswordReset, "password_resets"),
+        (PersonalAccessToken, "personal_access_tokens"),
+        (RefreshToken, "refresh_tokens"),
+    ):
+        model_cols = {c.name for c in model.__table__.columns}
+        assert model_cols.issubset(set(recorder.created[table])), (
+            f"{table}: model columns {model_cols} not covered by migration "
+            f"{recorder.created[table]}"
+        )
