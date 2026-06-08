@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-search-v0.6.1...arvel-search-v0.6.2) (2026-06-08)
+
+
+### Bug Fixes
+
+* **search:** render Meilisearch filters by value type ([e04f87f](https://github.com/mohamed-rekiba/arvel/commit/e04f87f9ab8e6cac9c3cc8247a20327681a5c84c))
+
 ## [0.6.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-search-v0.6.0...arvel-search-v0.6.1) (2026-06-08)
 
 
