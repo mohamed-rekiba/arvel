@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.4](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.3...arvel-v0.19.4) (2026-06-08)
+
+
+### Bug Fixes
+
+* **shell:** scope REPL boot to non-HTTP subsystems ([a760508](https://github.com/mohamed-rekiba/arvel/commit/a76050826c8f67d99bc5d5c8d95797e1a16b0205))
+
 ## [0.19.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.2...arvel-v0.19.3) (2026-06-08)
 
 
