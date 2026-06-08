@@ -3,7 +3,7 @@ services:
     image: python:3.14.5-slim-bookworm
     working_dir: /workspace/kits/arvel-ecommerce-kit/backend
     env_file:
-      - path: backend/.env
+      - path: backend/.env.docker
         required: false
     environment:
       UV_PROJECT_ENVIRONMENT: /workspace/.venv
@@ -13,7 +13,7 @@ services:
     command: >
       bash -c "pip install --no-cache-dir --root-user-action=ignore uv==0.11.16 &&
       cd /workspace &&
-      uv sync --frozen --all-packages --all-extras --no-dev &&
+      uv sync --all-packages --all-extras &&
       cd kits/arvel-ecommerce-kit/backend &&
       arvel serve --host 0.0.0.0 --port 8001 --reload"
     ports:
@@ -42,7 +42,7 @@ services:
     image: node:24.15.0-alpine3.23
     working_dir: /app
     env_file:
-      - path: backend/.env
+      - path: backend/.env.docker
         required: false
     environment:
       VITE_DEV_PROXY_TARGET: http://backend:8001
@@ -73,7 +73,7 @@ services:
     image: python:3.14.5-slim-bookworm
     working_dir: /workspace/kits/arvel-ecommerce-kit/backend
     env_file:
-      - path: backend/.env
+      - path: backend/.env.docker
         required: false
     environment:
       UV_PROJECT_ENVIRONMENT: /workspace/.venv
