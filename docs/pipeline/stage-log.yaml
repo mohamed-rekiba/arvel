@@ -1001,3 +1001,38 @@ events:
       pyright 0 errors/warnings, ruff check clean. Doc note added to docs/site/docs/cli/commands.md
       (shell/tinker connect lazily; serve/migrate keep eager fail-fast).
     timestamp: "2026-06-08T16:30:00Z"
+  - work_item: "WI-arvel-025"
+    stage: "qa-pre"
+    event: "enter"
+    result: "pass"
+    note: >-
+      Reported from the shell: Model.where("email", "x") and where("email", "ilike", "x") raised
+      SQLAlchemy ArgumentError ("'email' should be explicitly declared as text('email')").
+      QueryBuilder.where only handled expression/callable/kwargs forms — bare strings fell through
+      to and_() and got coerced as raw SQL. or_where shared the gap via _or_terms. _apply_operator
+      + _WHERE_ANY_OPS already existed (used by having/where_any) but were never wired into where.
+    timestamp: "2026-06-08T16:45:00Z"
+  - work_item: "WI-arvel-025"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Added _string_clause_predicate: when clauses[0] is a str, parse where(col, value) →
+      col == value and where(col, op, value) → _apply_operator (unknown op → ValueError; lone
+      string → TypeError). where and _or_terms consult it; expression/group/kwargs paths unchanged.
+      Added test_wi_025_where_string_operator.py (8 cases: implicit eq, operator, comparison, AND
+      chain, or_where, bad operator, lone string, expression-form regression).
+    artifacts:
+      - "packages/arvel/src/arvel/database/query.py"
+      - "packages/arvel/tests/database/test_wi_025_where_string_operator.py"
+    timestamp: "2026-06-08T16:52:00Z"
+  - work_item: "WI-arvel-025"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Full database suite 1151 passed, 0 failures; mypy (1057 files) clean, pyright 0
+      errors/warnings, ruff check clean. Updated docs/site/docs/orm/query-builder.md — replaced the
+      stale "three-arg string form not supported" WARNING with the now-supported forms.
+    timestamp: "2026-06-08T16:56:00Z"

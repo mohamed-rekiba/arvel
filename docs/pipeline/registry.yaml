@@ -360,3 +360,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 24 (application kernel / console shell) hardening WI. Spec: docs/pipeline/specs/WI-arvel-024-shell-lazy-database-boot.md"
+  - id: "WI-arvel-025"
+    name: "Model where() must accept Laravel's string column/operator/value form"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T16:45:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 25 (ORM query builder) hardening WI. Spec: docs/pipeline/specs/WI-arvel-025-where-string-operator-form.md"
