@@ -159,6 +159,8 @@ async def dashboard(request: Request) -> dict[str, Any]:
 
 Related middleware: `OptionalAuthenticate` (non-blocking — sets the user when present), `GuestMiddleware` (redirects authenticated users away from guest-only pages), `VerifiedMiddleware` (requires a verified email), and `CanMiddleware` (a [gate](authorization.md) check).
 
+`VerifiedMiddleware` distinguishes the two failure cases: no authenticated user is a **401** (log in first), while a logged-in user whose email isn't verified is a **403** (re-authenticating won't help — they have to verify their email).
+
 <a name="password-hashing"></a>
 ## Password Hashing
 

@@ -82,8 +82,9 @@ async def test_verified_middleware_allows_verified_user() -> None:
 
 
 @pytest.mark.asyncio
-async def test_verified_middleware_blocks_unverified_user() -> None:
-    from arvel.auth.exceptions import UnauthenticatedException
+async def test_verified_middleware_blocks_unverified_user_with_403() -> None:
+    """A logged-in but unverified user is a 403 (authorization), not a 401."""
+    from arvel.auth.exceptions import AuthorizationException
     from arvel.auth.middleware.verified import VerifiedMiddleware
 
     class UnverifiedUser:
@@ -92,8 +93,23 @@ async def test_verified_middleware_blocks_unverified_user() -> None:
     mw = VerifiedMiddleware()
     request = _FakeRequest(user=UnverifiedUser())
 
-    with pytest.raises((UnauthenticatedException, Exception)):
+    with pytest.raises(AuthorizationException) as exc_info:
         await mw.handle(request, _call_next)
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_verified_middleware_rejects_unauthenticated_with_401() -> None:
+    """No user at all is a 401 — log in first."""
+    from arvel.auth.exceptions import UnauthenticatedException
+    from arvel.auth.middleware.verified import VerifiedMiddleware
+
+    mw = VerifiedMiddleware()
+    request = _FakeRequest(user=None)
+
+    with pytest.raises(UnauthenticatedException) as exc_info:
+        await mw.handle(request, _call_next)
+    assert exc_info.value.status_code == 401
 
 
 # CanMiddleware enforces gate ability

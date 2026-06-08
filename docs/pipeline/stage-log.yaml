@@ -1529,3 +1529,28 @@ events:
       ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; events suite
       32 passed (30 existing + 2 new enqueue/inline cases).
     timestamp: "2026-06-09T00:14:00Z"
+  - work_item: "WI-arvel-040"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      HTTP middleware stack audit. Cors, security headers, method spoof, throttle (fixed-window), database transaction
+      (commit 2xx/3xx, rollback on error, after-commit on success), signed, both CSRF middlewares, forwarded-IP guards
+      reviewed sound (prior WIs). Defect: VerifiedMiddleware raised UnauthenticatedException (401) for BOTH no-user and
+      logged-in-but-unverified; the latter is a 403 authorization failure (re-auth won't help — must verify email), per
+      Laravel EnsureEmailIsVerified. Split: None -> 401; unverified -> AuthorizationException (403). http_provider
+      translators already map auth.AuthorizationException -> HTTP 403.
+    artifacts:
+      - "packages/arvel/src/arvel/auth/middleware/verified.py"
+      - "packages/arvel/tests/auth/test_middleware.py"
+      - "docs/site/docs/features/authentication.md"
+    timestamp: "2026-06-09T00:32:00Z"
+  - work_item: "WI-arvel-040"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; auth suites
+      254 passed (incl. 1 tightened + 1 new verified-middleware case).
+    timestamp: "2026-06-09T00:34:00Z"
