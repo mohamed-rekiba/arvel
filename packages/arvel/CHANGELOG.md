@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.17.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.17.2...arvel-v0.17.3) (2026-06-08)
+
+
+### Bug Fixes
+
+* **console:** run scaffolded compose uv sync from backend/ ([1ae311a](https://github.com/mohamed-rekiba/arvel/commit/1ae311a285373c09b8b3c341239583735d2e1ee2))
+* **mail:** apply global mail.from and render from_name ([f158fb0](https://github.com/mohamed-rekiba/arvel/commit/f158fb08b182d0c9f241ad509b6c832c572da67f))
+* **reverb:** correct presence channel protocol semantics ([865f2d6](https://github.com/mohamed-rekiba/arvel/commit/865f2d684254350e8966e1c0dd4002ed0cae84dd))
+
+
+### Refactors
+
+* **console:** make arvel new kit-agnostic with per-kit finalize hook ([bc8e3a6](https://github.com/mohamed-rekiba/arvel/commit/bc8e3a62375da4752b94b95c5934097d864dfd15))
+
 ## [0.17.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.17.1...arvel-v0.17.2) (2026-06-07)
 
 
