@@ -675,3 +675,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Feature gap (WI-043 #4 remainder, last validation-parity item). Validator now expands dotted/wildcard field keys into concrete (path,value,present) targets via resolve_targets: address.city nested objects, items.*.id list wildcards, dict wildcards, explicit indices. Wildcards iterate only existing entries (missing collection -> no errors); non-wildcard nested paths always validate; errors key by concrete path; nested presence rules get a path-scoped data view; messages key by wildcard or concrete path. Backward-compatible (flat fields unchanged, zero-copy). Spec: docs/pipeline/specs/WI-arvel-045-nested-wildcard-validation.md"
+  - id: "WI-arvel-046"
+    name: "response() / redirect() HTTP helpers"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-09T02:15:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Feature gap (WI-043). New arvel/http/responses.py: response() factory (json/text/make/no_content builders), redirect(to), to_route(name, **params) via routing.route, back(request) via Referer, and Redirect.with_(request, **values) flashing into request.state.session before redirect (no-op without session middleware). Re-exported from arvel.http. Handlers already return Starlette responses directly; this adds the discoverable Laravel-style helpers plus redirect-with-flash. Spec: docs/pipeline/specs/WI-arvel-046-response-redirect-helpers.md"
