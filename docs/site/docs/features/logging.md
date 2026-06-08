@@ -93,7 +93,14 @@ The default hints are `password`, `token`, `secret`, `authorization`, `api_key`,
 LOG_REDACT_FIELDS=password,token,secret,pin,ssn
 ```
 
-Redaction is shallow — it matches top-level context keys. Don't nest secrets inside a dict you pass as a single field.
+Redaction recurses — it reaches secret-named keys nested in dicts and lists at any depth, so passing a whole payload as one field is still safe:
+
+```python
+Log.info("login", payload={"password": "...", "user": "alice"})
+# -> payload={'password': '[REDACTED]', 'user': 'alice'}
+```
+
+Exception text captured via `exc=` (the message and stack trace) is logged as-is — it isn't key/value context, so keep secrets out of exception messages.
 
 <a name="configuration"></a>
 ## Configuration

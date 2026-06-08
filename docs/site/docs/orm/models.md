@@ -525,6 +525,16 @@ class User(Model, Timestamps):
 > [!NOTE]
 > `to_dict()` serializes **columns only** — relationships are not included. To embed related data, load it and use `to_pydantic(schema)` with the relation named in the schema, or shape the output with an [API resource](../the-basics/resources.md), which is the recommended approach for HTTP responses.
 
+Returning a model (or a list of models) straight from a route applies `__hidden__`/`__visible__` too — the response layer runs the same serialization, so a bare `return user` won't leak `password_hash`:
+
+```python
+@Route.get("/users/{id}")
+async def show(id: int) -> User:
+    return await User.find_or_fail(id)   # password_hash dropped automatically
+```
+
+This only kicks in when the route has no explicit `response_model`. If you annotate one, your schema decides the shape — declare a schema that omits sensitive fields.
+
 <a name="read-only-models"></a>
 ## Read-Only Models
 

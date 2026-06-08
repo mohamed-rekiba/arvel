@@ -480,3 +480,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 32 (ORM serialization boundary) hardening WI. Spec: docs/pipeline/specs/WI-arvel-032-raw-model-hidden-leak.md"
+  - id: "WI-arvel-033"
+    name: "Log redaction must recurse into nested dicts/lists (nested secrets leak)"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "confidential"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T22:10:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 33 (logging) hardening WI — follow-up to WI-019's deferred nested-dict redaction. Spec: docs/pipeline/specs/WI-arvel-033-log-redaction-nested.md"
