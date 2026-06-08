@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import sys
 import traceback
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from opentelemetry import trace as otel_trace
 from opentelemetry._logs import LogRecord as OtelLogRecord
@@ -54,11 +54,24 @@ def _redact(attrs: dict[str, Any]) -> dict[str, Any]:
     def is_secret(key: str) -> bool:
         # Substring, not exact: a field named "token" should also redact
         # "access_token", "refresh_token", "client_secret", "db_password", etc.
-        # Mirrors config._is_secret_key so secret detection is consistent.
         lower = key.lower()
         return any(hint in lower for hint in redact_set)
 
-    return {k: "[REDACTED]" if is_secret(k) else v for k, v in attrs.items()}
+    # Recurse into nested dicts/lists so a secret stays redacted regardless of
+    # nesting depth — log.info("login", payload={"password": ...}) would leak
+    # otherwise, since the top-level key ("payload") isn't itself a secret.
+    # Mirrors config._strip_secrets (which drops; here we mask).
+    def scrub(value: object) -> object:
+        if isinstance(value, dict):
+            items = cast("dict[object, object]", value)
+            return {
+                str(k): "[REDACTED]" if is_secret(str(k)) else scrub(v) for k, v in items.items()
+            }
+        if isinstance(value, list):
+            return [scrub(item) for item in cast("list[object]", value)]
+        return value
+
+    return cast("dict[str, Any]", scrub(attrs))
 
 
 def _inject_request_context(attrs: dict[str, Any]) -> None:
