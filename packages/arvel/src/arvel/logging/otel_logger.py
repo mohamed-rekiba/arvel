@@ -50,7 +50,15 @@ def _get_redact_set() -> frozenset[str]:
 
 def _redact(attrs: dict[str, Any]) -> dict[str, Any]:
     redact_set = _get_redact_set()
-    return {k: "[REDACTED]" if k.lower() in redact_set else v for k, v in attrs.items()}
+
+    def is_secret(key: str) -> bool:
+        # Substring, not exact: a field named "token" should also redact
+        # "access_token", "refresh_token", "client_secret", "db_password", etc.
+        # Mirrors config._is_secret_key so secret detection is consistent.
+        lower = key.lower()
+        return any(hint in lower for hint in redact_set)
+
+    return {k: "[REDACTED]" if is_secret(k) else v for k, v in attrs.items()}
 
 
 def _inject_request_context(attrs: dict[str, Any]) -> None:
