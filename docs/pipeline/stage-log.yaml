@@ -815,3 +815,39 @@ events:
       substring redaction + LOG_REDACT_FIELDS. Nested-dict redaction and log-level default
       divergence deferred (documented).
     timestamp: "2026-06-08T14:42:00Z"
+  - work_item: "WI-arvel-020"
+    stage: "research"
+    event: "enter"
+    result: "pass"
+    note: >-
+      Module 20 (support: Str/Arr/Collection). C1 confirmed via repro: Collection.intersect/diff
+      compared by id() not value, so value-equal dicts/models/runtime-strings never matched;
+      inconsistent with only/except_ (which use ==) and Laravel. Str.limit rtrim, slug @->at, and
+      Arr numeric-index traversal noted as minor parity, deferred.
+    artifacts:
+      - ".context/research/020-support.md"
+      - "docs/pipeline/specs/WI-arvel-020-collection-value-equality.md"
+    timestamp: "2026-06-08T14:50:00Z"
+  - work_item: "WI-arvel-020"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Collection.intersect/diff now match by value (item in other / not in other), consistent with
+      only/except_ and Laravel; works for unhashable members. New
+      tests/support/test_wi_020_collection_value_equality.py (7 cases). Existing object()-based
+      identity tests still pass. No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/support/collections.py"
+      - "packages/arvel/tests/support/test_wi_020_collection_value_equality.py"
+    timestamp: "2026-06-08T14:56:00Z"
+  - work_item: "WI-arvel-020"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Support suite 245 passed (48 collection incl. 7 new); full arvel suite 4379 passed, 0 failures;
+      mypy --strict clean, uv run pyright 0 errors, ruff check + ruff format clean. Docstrings state
+      value-equality. No user-facing Collection-helper doc page exists; docstring is the source of truth.
+    timestamp: "2026-06-08T15:00:00Z"
