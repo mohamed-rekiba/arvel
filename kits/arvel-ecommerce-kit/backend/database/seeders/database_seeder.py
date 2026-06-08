@@ -9,7 +9,7 @@ Runs the kit's seeders in dependency order:
 
 from __future__ import annotations
 
-from app.support.products_catalog import refresh_products_catalog
+from app.support.products_catalog import refresh_products_catalog_now
 from arvel.database import DatabaseSeeder as _BaseDatabaseSeeder
 from database.seeders.catalog_seeder import CatalogSeeder
 from database.seeders.roles_and_permissions_seeder import RolesAndPermissionsSeeder
@@ -22,4 +22,4 @@ class DatabaseSeeder(_BaseDatabaseSeeder):
         await RolesAndPermissionsSeeder().run()
         await CatalogSeeder().run()
         await SampleUsersSeeder().run()
-        await refresh_products_catalog()
+        await refresh_products_catalog_now()
