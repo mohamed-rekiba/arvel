@@ -645,7 +645,7 @@ requires-dist = [
 
 [[package]]
 name = "arvel-search"
-version = "0.6.1"
+version = "0.6.2"
 source = { editable = "packages/arvel-search" }
 dependencies = [
     { name = "arvel" },
