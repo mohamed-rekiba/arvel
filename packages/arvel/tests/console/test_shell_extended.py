@@ -374,10 +374,15 @@ class TestReplLoopLifecycle:
     """
 
     def test_shell_owns_process_and_self_bootstraps(self) -> None:
-        # owns_process routes the command outside the entrypoint's asyncio.run;
-        # needs_framework() is False because the command boots itself.
+        from arvel.console._subsystem import CliSubsystem
+
+        # owns_process routes the command outside the entrypoint's asyncio.run,
+        # so the shell boots itself. It declares the REPL subsystems it needs
+        # (needs_framework() is therefore True) but deliberately omits HTTP so
+        # routes never load.
         assert ShellCommand.owns_process is True
-        assert ShellCommand.needs_framework() is False
+        assert ShellCommand.needs_framework() is True
+        assert CliSubsystem.HTTP not in ShellCommand.requires
 
     def test_run_repl_boots_without_connection_probe(
         self, db_env: Path, monkeypatch: pytest.MonkeyPatch
@@ -408,6 +413,41 @@ class TestReplLoopLifecycle:
         cmd.run_repl()
 
         assert framework_app.probe_connections() is False
+
+    def test_run_repl_scopes_boot_to_non_http_subsystems(
+        self, db_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """REPL boots app subsystems but not HTTP, so routes never load (no list spam)."""
+        import arvel.console.commands.shell as shell_mod
+        from arvel.console._subsystem import CliSubsystem
+
+        framework_app = _build_app(db_env)
+        captured: dict[str, Any] = {}
+
+        def _fake_root(*_a: object, **_k: object) -> Path:
+            return db_env
+
+        def _capture_bootstrap(
+            base_path: object = None, *, required_subsystems: object = None
+        ) -> Application:
+            captured["required_subsystems"] = required_subsystems
+            return framework_app
+
+        def _no_launch(_ns: object) -> None:
+            return None
+
+        monkeypatch.setattr(shell_mod, "find_project_root", _fake_root)
+        monkeypatch.setattr(shell_mod, "bootstrap_framework_application", _capture_bootstrap)
+
+        cmd = ShellCommand()
+        monkeypatch.setattr(cmd, "_launch_repl", _no_launch)
+        cmd.run_repl()
+
+        required = captured["required_subsystems"]
+        assert required is not None
+        assert CliSubsystem.HTTP not in required
+        assert CliSubsystem.SCHEDULER not in required
+        assert CliSubsystem.DATABASE in required
 
     def test_run_repl_runs_query_on_repl_loop_without_nested_run(
         self, db_env: Path, monkeypatch: pytest.MonkeyPatch

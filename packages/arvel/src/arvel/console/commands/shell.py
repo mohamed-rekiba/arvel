@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from arvel.application.errors import EnvironmentNotSetError
 from arvel.console import Command, Context
+from arvel.console._subsystem import CliSubsystem, closure
 from arvel.console._t import Option as _Option
 from arvel.console.bootstrap import bootstrap_framework_application, find_project_root
 from arvel.container.errors import BindingResolutionError
@@ -71,6 +72,25 @@ class ShellCommand(Command):
     # the one the user's `await Model.find()` runs on.
     owns_process: ClassVar[bool] = True
 
+    # Boot the app subsystems whose facades the REPL exposes — but not HTTP.
+    # HTTP would load routes/web.py + routes/api.py just to register them (then
+    # dump the whole table at DEBUG), which a REPL never serves. Sessions ride
+    # the HTTP subsystem too and are request-scoped, so they're moot here.
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {
+            CliSubsystem.DATABASE,
+            CliSubsystem.CACHE,
+            CliSubsystem.MAIL,
+            CliSubsystem.STORAGE,
+            CliSubsystem.BROADCAST,
+            CliSubsystem.AUTH,
+            CliSubsystem.EVENTS,
+            CliSubsystem.QUEUE,
+            CliSubsystem.OBSERVABILITY,
+            CliSubsystem.USER_PROVIDERS,
+        }
+    )
+
     def __init__(self) -> None:
         super().__init__()
         self._active_session: AsyncSession | None = None
@@ -108,7 +128,11 @@ class ShellCommand(Command):
         """
         project_root = find_project_root()
         framework_app = (
-            bootstrap_framework_application(project_root) if project_root is not None else None
+            bootstrap_framework_application(
+                project_root, required_subsystems=closure(self.requires)
+            )
+            if project_root is not None
+            else None
         )
 
         if framework_app is None:
