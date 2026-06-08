@@ -166,7 +166,7 @@ class TestSeederRoleLevels:
         seeder = (
             base / "backend" / "database" / "seeders" / "roles_and_permissions_seeder.py"
         ).read_text()
-        env_example = (base / ".env.example").read_text()
+        env_example = (base / "backend" / ".env.example").read_text()
         readme = (base / "README.md").read_text()
 
         assert 'os.environ.get("ADMIN_SEED_EMAIL", "admin@example.com")' in seeder

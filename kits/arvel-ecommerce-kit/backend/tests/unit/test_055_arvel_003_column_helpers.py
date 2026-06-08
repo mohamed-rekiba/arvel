@@ -23,6 +23,7 @@ from pathlib import Path
 
 _ROOT = Path(__file__).parents[5]
 ARVEL_COLS = _ROOT / "packages" / "arvel" / "src" / "arvel" / "database" / "columns.py"
+ARVEL_SCHEMA = _ROOT / "packages" / "arvel" / "src" / "arvel" / "database" / "schema.py"
 ARVEL_MIXINS = _ROOT / "packages" / "arvel" / "src" / "arvel" / "database" / "mixins.py"
 ARVEL_PERM_MODELS = (
     _ROOT / "packages" / "arvel-permission" / "src" / "arvel_permission" / "models.py"
@@ -82,9 +83,11 @@ def test_jsonb_function_signature() -> None:
 
 
 def test_jsonb_uses_postgresql_jsonb() -> None:
-    """jsonb() uses dialects.postgresql.JSONB."""
-    src = _src(ARVEL_COLS)
-    assert "JSONB" in src and "postgresql" in src
+    """jsonb() routes through JsonB, which binds to dialects.postgresql.JSONB."""
+    cols = _src(ARVEL_COLS)
+    assert "JsonB" in cols, "jsonb() should use the JsonB type"
+    schema = _src(ARVEL_SCHEMA)
+    assert "from sqlalchemy.dialects.postgresql import JSONB" in schema
 
 
 def test_jsonb_kit_models_use_it() -> None:
