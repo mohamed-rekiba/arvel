@@ -78,13 +78,13 @@ def test_verify_channel_auth_rejects_tampered_signature() -> None:
 
 
 def test_verify_channel_auth_uses_compare_digest() -> None:
-    """implementation uses hmac.compare_digest (no early-return on mismatch)."""
+    """implementation uses a timing-safe compare (no early-return on mismatch)."""
     import inspect
 
     from arvel.reverb import auth as auth_module
 
     source = inspect.getsource(auth_module)
-    assert "compare_digest" in source, "verify_channel_auth must use hmac.compare_digest"
+    assert "constant_time_equals" in source, "verify_channel_auth must use constant_time_equals"
 
 
 def test_verify_channel_auth_rejects_mismatched_key() -> None:

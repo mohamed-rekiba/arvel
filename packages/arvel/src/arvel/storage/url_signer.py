@@ -11,6 +11,8 @@ from urllib.parse import urlencode
 from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
+from arvel.support.secure_compare import constant_time_equals
+
 
 class TemporaryUrlSigner:
     """Signs and verifies temporary storage URLs using HMAC-SHA256.
@@ -50,7 +52,7 @@ class TemporaryUrlSigner:
         if time.time() > exp:
             return False
         expected = self._hmac(path, expires)
-        return hmac.compare_digest(expected, token)
+        return constant_time_equals(expected, token)
 
 
 __all__ = ["TemporaryUrlSigner"]

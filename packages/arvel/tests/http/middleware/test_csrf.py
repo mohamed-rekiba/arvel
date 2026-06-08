@@ -136,10 +136,10 @@ def test_csrf_except_paths_bypasses_check() -> None:
 
 
 def test_csrf_uses_constant_time_comparison() -> None:
-    """Inspect the source for `secrets.compare_digest` usage — ."""
+    """Inspect the source for the timing-safe `constant_time_equals` primitive."""
     import inspect
 
     from arvel.http.middleware import VerifyCsrf
 
     src = inspect.getsource(VerifyCsrf)
-    assert "compare_digest" in src, "VerifyCsrf must use secrets.compare_digest"
+    assert "constant_time_equals" in src, "VerifyCsrf must use constant_time_equals"

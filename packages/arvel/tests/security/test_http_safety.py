@@ -25,7 +25,7 @@ def test_cors_rejects_wildcard_with_credentials() -> None:
 def test_csrf_uses_constant_time_compare() -> None:
     from arvel.http.middleware import VerifyCsrf
 
-    assert "compare_digest" in inspect.getsource(VerifyCsrf)
+    assert "constant_time_equals" in inspect.getsource(VerifyCsrf)
 
 
 def test_jwt_guard_rejects_alg_none() -> None:

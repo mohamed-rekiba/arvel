@@ -1244,3 +1244,53 @@ events:
       auth + console + migration suites 984 passed; mypy + uv run pyright 0 errors, ruff check + format clean
       on changed files. Drift guard now prevents the migration/model column mismatch from recurring.
     timestamp: "2026-06-08T19:30:00Z"
+  - work_item: "WI-arvel-031"
+    stage: "qa-post"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 31 (URL signing + token-comparison guards). C1 (A10): hmac/secrets.compare_digest raises TypeError
+      on non-ASCII str, so six guards comparing an attacker-controlled str token crash into a 500 instead of the
+      fail-closed reject — has_valid_signature (?signature=), VerifyCsrf (X-CSRF-TOKEN), csrf_double_submit (cookie/
+      header), maintenance bypass (cookie/?bypass=), url_signer.verify (?token=), reverb verify_channel_auth (auth).
+      Repro: URL.has_valid_signature(req("signature=caf%C3%A9")) -> TypeError; ASCII bogus sig -> False. Cookie store
+      and token abilities compare bytes — safe; EmailVerificationService uses itsdangerous — safe.
+    timestamp: "2026-06-08T21:00:00Z"
+  - work_item: "WI-arvel-031"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Added arvel/support/secure_compare.py::constant_time_equals(a, b) comparing UTF-8 bytes via
+      hmac.compare_digest — timing-safe, returns False on non-ASCII instead of raising (matches PHP hash_equals).
+      Routed all six sites through it; removed now-unused import secrets from the CSRF/maintenance modules. Added a
+      secure_compare unit suite + signed-URL non-ASCII 403 regression; updated source-introspection guards in
+      reverb/csrf/storage/broadcasting/security suites to assert constant_time_equals.
+    artifacts:
+      - "packages/arvel/src/arvel/support/secure_compare.py"
+      - "packages/arvel/src/arvel/routing.py"
+      - "packages/arvel/src/arvel/http/_middleware_core.py"
+      - "packages/arvel/src/arvel/auth/middleware/csrf_double_submit.py"
+      - "packages/arvel/src/arvel/maintenance/middleware.py"
+      - "packages/arvel/src/arvel/storage/url_signer.py"
+      - "packages/arvel/src/arvel/reverb/auth.py"
+      - "packages/arvel/tests/support/test_secure_compare.py"
+      - "packages/arvel/tests/routing/test_wi053_routing_polish.py"
+      - "packages/arvel/tests/broadcasting/test_security.py"
+      - "packages/arvel/tests/storage/test_temporary_urls.py"
+      - "packages/arvel/tests/reverb/test_auth.py"
+      - "packages/arvel/tests/http/middleware/test_csrf.py"
+      - "packages/arvel/tests/security/test_http_safety.py"
+    timestamp: "2026-06-08T21:08:00Z"
+  - work_item: "WI-arvel-031"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean on changed files; uv run mypy 0 issues (1062 files); uv run pyright 0 errors.
+      Affected suites green (support/routing/csrf/maintenance/storage/reverb/broadcasting/security). Two pre-existing
+      suite failures unrelated and out of scope: test_nosec_annotations (bare # nosec codes in untouched
+      console/_venv.py) and test_wi_030_config (cwd-dependent skeleton path, flagged in WI-arvel-030).
+    timestamp: "2026-06-08T21:12:00Z"
