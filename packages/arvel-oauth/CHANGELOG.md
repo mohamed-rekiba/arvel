@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-oauth-v0.6.2...arvel-oauth-v0.6.3) (2026-06-08)
+
+
+### Bug Fixes
+
+* **oauth:** default Microsoft email_verified to false when claim absent ([2ed3e50](https://github.com/mohamed-rekiba/arvel/commit/2ed3e508513badaf2b0569f29035f4bcac7545d5))
+
 ## [0.6.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-oauth-v0.6.1...arvel-oauth-v0.6.2) (2026-06-08)
 
 

@@ -1,6 +1,6 @@
 [project]
 name = "arvel-oauth"
-version = "0.6.2" # x-release-please-version
+version = "0.6.3" # x-release-please-version
 description = "OAuth2/OIDC login for Arvel — Google, GitHub, Microsoft, Apple, and generic OIDC."
 readme = "README.md"
 requires-python = ">=3.14"
