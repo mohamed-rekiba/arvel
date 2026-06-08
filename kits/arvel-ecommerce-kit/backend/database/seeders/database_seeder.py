@@ -11,10 +11,11 @@ from __future__ import annotations
 
 from app.support.products_catalog import refresh_products_catalog_now
 from arvel.database import DatabaseSeeder as _BaseDatabaseSeeder
+from arvel.database.db import DB
 from database.seeders.catalog_seeder import CatalogSeeder
 from database.seeders.roles_and_permissions_seeder import RolesAndPermissionsSeeder
 from database.seeders.sample_users_seeder import SampleUsersSeeder
-from arvel.database.db import DB
+
 
 class DatabaseSeeder(_BaseDatabaseSeeder):
     async def run(self) -> None:
