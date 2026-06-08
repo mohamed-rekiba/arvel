@@ -390,3 +390,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 26 (arvel-search / Scout parity) hardening WI. Spec: docs/pipeline/specs/WI-arvel-026-meilisearch-filter-typing.md"
+  - id: "WI-arvel-027"
+    name: "Microsoft OAuth provider must not treat an absent email_verified claim as verified"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "confidential"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T18:40:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 27 (arvel-oauth / Socialite parity) hardening WI. Spec: docs/pipeline/specs/WI-arvel-027-oauth-microsoft-email-verified.md"

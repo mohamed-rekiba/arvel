@@ -15,6 +15,7 @@ from arvel_oauth.providers import (
     AppleProvider,
     GitHubProvider,
     GoogleProvider,
+    MicrosoftProvider,
 )
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import (
@@ -122,6 +123,40 @@ async def test_github_uses_emails_api_when_profile_email_private() -> None:
     assert user.email == "octo@github.com"
     assert user.email_verified is True
     assert user.name == "octocat"
+
+
+def _microsoft(handler: object) -> MicrosoftProvider:
+    return MicrosoftProvider(
+        client_id="mid",
+        client_secret="msecret",
+        redirect_uri="https://app.test/auth/microsoft/callback",
+        http_client=mock_client(handler),  # type: ignore[arg-type]
+    )
+
+
+async def test_microsoft_email_unverified_when_claim_absent() -> None:
+    # Entra omits email_verified; an absent claim must not be read as verified,
+    # or the linker would auto-attach to an existing user on an unproven email.
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"sub": "m-1", "email": "victim@example.com", "name": "Mallory"},
+        )
+
+    user = await _microsoft(handler).get_user(OAuthToken(access_token="at"))
+    assert user.email == "victim@example.com"
+    assert user.email_verified is False
+
+
+async def test_microsoft_honours_explicit_email_verified_claim() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"sub": "m-2", "email": "real@example.com", "email_verified": True},
+        )
+
+    user = await _microsoft(handler).get_user(OAuthToken(access_token="at"))
+    assert user.email_verified is True
 
 
 def test_apple_client_secret_is_signed_jwt() -> None:

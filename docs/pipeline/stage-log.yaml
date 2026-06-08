@@ -1083,3 +1083,40 @@ events:
       arvel-search suite 61 passed (2 new); mypy --strict clean, uv run pyright 0 errors, ruff check +
       ruff format clean. search.md notes where filters keep their type and strings are escaped.
     timestamp: "2026-06-08T17:15:00Z"
+  - work_item: "WI-arvel-027"
+    stage: "qa-post"
+    event: "review"
+    result: "pass"
+    note: >-
+      Module 27 (arvel-oauth). C1 confirmed via repro: MicrosoftProvider.get_user set
+      email_verified=bool(data.get("email_verified", email is not None)) — defaults True whenever any
+      email is present. Entra /oidc/userinfo omits the claim and its email/preferred_username isn't
+      guaranteed verified (guest/MSA/federated), so every Microsoft login read as verified. The linker
+      (_resolve_user/_create_user) only attaches to / adopts an existing user's email when verified, to
+      stop unverified-claim takeover; OAuthUser.email_verified defaults False. Google/OIDC default False,
+      Apple verifies id_token via JWKS — Microsoft was the outlier. GitHub /user.email (GitHub-constrained
+      to verified public emails) and non-constant-time state compare reviewed, no change.
+    timestamp: "2026-06-08T18:40:00Z"
+  - work_item: "WI-arvel-027"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      MicrosoftProvider now defaults email_verified to False when the claim is absent (matches Google/OIDC
+      and the DTO/linker contract); explicit email_verified:true still honoured. Added 2 tests
+      (absent-claim -> unverified; explicit-claim -> honoured). arvel-oauth suite 38 passed.
+    artifacts:
+      - "packages/arvel-oauth/src/arvel_oauth/providers/microsoft.py"
+      - "packages/arvel-oauth/tests/test_providers.py"
+      - "docs/site/docs/packages/oauth.md"
+    timestamp: "2026-06-08T18:46:00Z"
+  - work_item: "WI-arvel-027"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      arvel-oauth suite 38 passed (2 new); mypy (-p arvel_oauth, 23 files) clean, uv run pyright 0 errors,
+      ruff check + ruff format clean. oauth.md documents the linker email-verification contract and
+      Microsoft's conservative default.
+    timestamp: "2026-06-08T18:50:00Z"
