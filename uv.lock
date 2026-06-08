@@ -496,7 +496,7 @@ requires-dist = [
     { name = "ipython", marker = "extra == 'shell'", specifier = ">=9.14.0" },
     { name = "itsdangerous", specifier = ">=2.2.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.2.1" },
+    { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.2.2" },
     { name = "msgspec", specifier = ">=0.21.1" },
     { name = "openapi-spec-validator", marker = "extra == 'openapi'", specifier = ">=0.9.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.42.1" },
