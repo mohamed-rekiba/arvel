@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.19.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.18.1...arvel-v0.19.0) (2026-06-08)
+
+
+### Features
+
+* **cli:** auto re-exec global arvel into project .venv ([f5ff312](https://github.com/mohamed-rekiba/arvel/commit/f5ff312142dd8e3a19f00873a9352a396bddf4ac))
+
+
+### Bug Fixes
+
+* **application:** drain every provider on shutdown even when one fails ([4b43806](https://github.com/mohamed-rekiba/arvel/commit/4b438068f450678bca9856b839acccce31f6e8b6))
+* **context:** round-trip hidden data through dehydrate/hydrate ([ab7dea1](https://github.com/mohamed-rekiba/arvel/commit/ab7dea17a98a307fd50115469f3e9395aef48784))
+* **i18n:** select plural form by locale rule, not raw count ([f61a4a0](https://github.com/mohamed-rekiba/arvel/commit/f61a4a05d5363c9df04718613b2449f254a921ce))
+
 ## [0.18.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.18.0...arvel-v0.18.1) (2026-06-08)
 
 

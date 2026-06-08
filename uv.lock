@@ -321,7 +321,7 @@ wheels = [
 
 [[package]]
 name = "arvel"
-version = "0.18.1"
+version = "0.19.0"
 source = { editable = "packages/arvel" }
 dependencies = [
     { name = "aiohttp" },
@@ -558,6 +558,7 @@ dependencies = [
 dev = [
     { name = "arvel", extra = ["shell"] },
     { name = "faker" },
+    { name = "httpx2" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -571,6 +572,7 @@ requires-dist = [{ name = "arvel", extras = ["postgres", "redis", "queue", "queu
 dev = [
     { name = "arvel", extras = ["shell"], editable = "packages/arvel" },
     { name = "faker", specifier = ">=40.19.1" },
+    { name = "httpx2", specifier = ">=2.3.0" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
