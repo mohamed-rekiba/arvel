@@ -600,3 +600,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 40 (HTTP/auth middleware stack) — stack audited sound; VerifiedMiddleware now splits None->401 and unverified->403 (was 401 for both). Spec: docs/pipeline/specs/WI-arvel-040-verified-middleware-status.md"
+  - id: "WI-arvel-041"
+    name: "Malformed pagination cursor surfaces as a 500 instead of a 400"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-09T00:45:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 41 (ORM pagination) — paginators audited sound; InvalidCursorError now translates to 400 BadRequest with a fixed message (was an un-translated 500 that risked leaking base64/JSON decode internals). Spec: docs/pipeline/specs/WI-arvel-041-invalid-cursor-error-handling.md"

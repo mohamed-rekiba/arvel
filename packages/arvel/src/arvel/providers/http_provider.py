@@ -40,6 +40,7 @@ def default_translators() -> Mapping[type[Exception], ExceptionTranslator]:
     """
     from arvel.http.exceptions import (
         AuthorizationException,
+        BadRequestException,
         NotFoundException,
         UnauthenticatedException,
     )
@@ -47,11 +48,16 @@ def default_translators() -> Mapping[type[Exception], ExceptionTranslator]:
     translators: dict[type[Exception], ExceptionTranslator] = {}
 
     try:
-        from arvel.database.exceptions import ModelNotFoundError
+        from arvel.database.exceptions import InvalidCursorError, ModelNotFoundError
     except ImportError:
         pass
     else:
         translators[ModelNotFoundError] = lambda exc: NotFoundException(str(exc))
+        # A malformed ?cursor= is bad client input, not a server fault — 400, not 500.
+        # Use a fixed message so the base64/JSON decode internals don't leak.
+        translators[InvalidCursorError] = lambda _exc: BadRequestException(
+            "Invalid pagination cursor."
+        )
 
     try:
         from arvel.auth.exceptions import (
