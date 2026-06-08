@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.1...arvel-v0.19.2) (2026-06-08)
+
+
+### Bug Fixes
+
+* **orm:** accept Laravel string forms in Model.where/or_where ([571aaa2](https://github.com/mohamed-rekiba/arvel/commit/571aaa284bdc4e1f40ddfa14b6c035ada95f515e))
+
 ## [0.19.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.0...arvel-v0.19.1) (2026-06-08)
 
 
