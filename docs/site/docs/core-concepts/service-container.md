@@ -105,6 +105,8 @@ result = container.call(ReportBuilder, "build")
 result = await container.acall(ReportBuilder, "build_async")
 ```
 
+`amake` resolves async bindings **at any depth** — auto-wiring a class whose constructor needs an async-bound dependency (directly or transitively) works, as long as you start the resolution with `amake`/`acall`. The synchronous `make` still raises `AsyncBindingError` the moment it meets an async binding anywhere in the graph.
+
 Check container state with `bound(abstract)` and `resolved(abstract)`.
 
 > [!NOTE]
