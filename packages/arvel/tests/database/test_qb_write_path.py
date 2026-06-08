@@ -93,7 +93,7 @@ async def test_insert_using_from_select(engine: AsyncEngine, session: AsyncSessi
     await WSource.create(label="from-source-1")
     await WSource.create(label="from-source-2")
 
-    affected = await WDest.insert_using(["name"], WSource.query().select("label"))
+    affected = await WDest.insert_using(["name"], WSource.select("label"))
     assert affected == 2
 
     names = sorted(d.name for d in await WDest.all())

@@ -102,7 +102,7 @@ class TestMorphToManyEagerLoad:
 
         probe = _PivotProbe(engine, "el_taggables")
         try:
-            posts = await ElPost.query().with_("tags").order_by("id").all()
+            posts = await ElPost.with_("tags").order_by("id").all()
             # Accessor reads must hit the cache — zero extra pivot SELECTs.
             loaded = {p.title: sorted(t.name for t in await p.tags.all()) for p in posts}
         finally:
@@ -124,7 +124,7 @@ class TestMorphToManyEagerLoad:
 
         probe = _PivotProbe(engine, "el_taggables")
         try:
-            posts = await ElPost.query().order_by("id").all()
+            posts = await ElPost.order_by("id").all()
             for p in posts:
                 await p.tags.all()
         finally:
@@ -140,7 +140,7 @@ class TestMorphToManyEagerLoad:
         blue = await ElTag.create(name="blue")
         await post.tags.attach(red.id)
 
-        loaded = (await ElPost.query().with_("tags").all())[0]
+        loaded = (await ElPost.with_("tags").all())[0]
         assert [t.name for t in await loaded.tags.all()] == ["red"]
         await loaded.tags.attach(blue.id)
         assert sorted(t.name for t in await loaded.tags.all()) == ["blue", "red"]
@@ -153,7 +153,7 @@ class TestMorphToManyEagerLoad:
         await post.tags.attach(red.id)
         await post.tags.attach(blue.id)
 
-        loaded = (await ElPost.query().with_("tags").all())[0]
+        loaded = (await ElPost.with_("tags").all())[0]
         assert sorted(t.name for t in await loaded.tags.all()) == ["blue", "red"]
         await loaded.tags.detach(blue.id)
         assert [t.name for t in await loaded.tags.all()] == ["red"]
@@ -168,9 +168,7 @@ class TestMorphToManyEagerLoad:
         await post.tags.attach(red.id)
         await post.tags.attach(blue.id)
 
-        loaded = (
-            await ElPost.query().with_({"tags": lambda qb: qb.where(ElTag.name == "red")}).all()
-        )[0]
+        loaded = (await ElPost.with_({"tags": lambda qb: qb.where(ElTag.name == "red")}).all())[0]
         assert [t.name for t in await loaded.tags.all()] == ["red"]
 
     async def test_chunk_eager_loads_per_batch(
@@ -190,7 +188,7 @@ class TestMorphToManyEagerLoad:
                 for post in batch:
                     seen.extend(t.name for t in await post.tags.all())
 
-            await ElPost.query().with_("tags").order_by("id").chunk(2, _collect)
+            await ElPost.with_("tags").order_by("id").chunk(2, _collect)
         finally:
             probe.remove(engine)
 
@@ -210,7 +208,7 @@ class TestMorphToManyEagerLoad:
         seen: list[str] = []
         probe = _PivotProbe(engine, "el_taggables")
         try:
-            async for post in ElPost.query().with_("tags").order_by("id").lazy(chunk_size=2):
+            async for post in ElPost.with_("tags").order_by("id").lazy(chunk_size=2):
                 seen.extend(t.name for t in await post.tags.all())
         finally:
             probe.remove(engine)
@@ -236,7 +234,7 @@ class TestBelongsToManyEagerLoad:
 
         probe = _PivotProbe(engine, "el_post_topic")
         try:
-            posts = await ElPost.query().with_("topics").order_by("id").all()
+            posts = await ElPost.with_("topics").order_by("id").all()
             loaded = {p.title: sorted(t.name for t in await p.topics.all()) for p in posts}
         finally:
             probe.remove(engine)
@@ -256,7 +254,7 @@ class TestBelongsToManyEagerLoad:
 
         probe = _PivotProbe(engine, "el_post_topic")
         try:
-            posts = await ElPost.query().order_by("id").all()
+            posts = await ElPost.order_by("id").all()
             for p in posts:
                 await p.topics.all()
         finally:

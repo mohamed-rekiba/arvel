@@ -182,8 +182,8 @@ async def test_shared_lock_first_and_sole(engine: Any, session: AsyncSession) ->
 async def test_update_or_create_updates_existing_model(engine: Any, session: AsyncSession) -> None:
     await _setup(engine)
 
-    created = await Bag.query().update_or_create({"name": "upserted"}, {"qty": 1})
-    updated = await Bag.query().update_or_create({"name": "upserted"}, {"qty": 7})
+    created = await Bag.update_or_create({"name": "upserted"}, {"qty": 1})
+    updated = await Bag.update_or_create({"name": "upserted"}, {"qty": 7})
 
     assert updated.id == created.id
     assert updated.qty == 7

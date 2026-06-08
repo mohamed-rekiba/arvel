@@ -45,7 +45,7 @@ async def test_boolean_over_int_not_dirty_when_semantically_equal(
 ) -> None:
     await _setup(engine)
     t = await Toggle.create(active=True, amount="1.00", meta={"a": 1})
-    reloaded = await Toggle.query().where(Toggle.id == t.id).first()
+    reloaded = await Toggle.where(Toggle.id == t.id).first()
     assert reloaded is not None
     # committed raw is 1 (int); assigning the bool back must not read as dirty.
     reloaded.active = True
@@ -67,7 +67,7 @@ async def test_boolean_actually_changed_is_dirty(
 async def test_decimal_string_not_dirty(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     t = await Toggle.create(active=True, amount="10.50", meta={"a": 1})
-    reloaded = await Toggle.query().where(Toggle.id == t.id).first()
+    reloaded = await Toggle.where(Toggle.id == t.id).first()
     assert reloaded is not None
     reloaded.amount = "10.5"  # same value, different string
     assert reloaded.is_dirty("amount") is False
@@ -76,7 +76,7 @@ async def test_decimal_string_not_dirty(engine: AsyncEngine, session: AsyncSessi
 async def test_reserialized_json_not_dirty(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     t = await Toggle.create(active=True, amount="1.00", meta={"a": 1, "b": 2})
-    reloaded = await Toggle.query().where(Toggle.id == t.id).first()
+    reloaded = await Toggle.where(Toggle.id == t.id).first()
     assert reloaded is not None
     # Different key order serializes to a different string but the same dict.
     reloaded.meta = {"b": 2, "a": 1}
@@ -90,7 +90,7 @@ async def test_get_raw_original_returns_precast_value(
 ) -> None:
     await _setup(engine)
     t = await Toggle.create(active=True, amount="1.00", meta={"a": 1})
-    reloaded = await Toggle.query().where(Toggle.id == t.id).first()
+    reloaded = await Toggle.where(Toggle.id == t.id).first()
     assert reloaded is not None
     reloaded.active = False
     assert reloaded.get_raw_original("active") == 1  # stored int, pre-cast
@@ -99,7 +99,7 @@ async def test_get_raw_original_returns_precast_value(
 async def test_get_original_returns_cast_value(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     t = await Toggle.create(active=True, amount="1.00", meta={"a": 1})
-    reloaded = await Toggle.query().where(Toggle.id == t.id).first()
+    reloaded = await Toggle.where(Toggle.id == t.id).first()
     assert reloaded is not None
     reloaded.active = False
     assert reloaded.get_original("active") is True  # cast value, not raw 1
@@ -109,7 +109,7 @@ async def test_get_original_returns_cast_value(engine: AsyncEngine, session: Asy
 async def test_original_is_equivalent_direct(engine: AsyncEngine, session: AsyncSession) -> None:
     await _setup(engine)
     t = await Toggle.create(active=True, amount="1.00", meta={"a": 1})
-    reloaded = await Toggle.query().where(Toggle.id == t.id).first()
+    reloaded = await Toggle.where(Toggle.id == t.id).first()
     assert reloaded is not None
     reloaded.active = "1"
     assert reloaded.original_is_equivalent("active") is True

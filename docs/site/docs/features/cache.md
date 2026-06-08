@@ -75,7 +75,7 @@ await Cache.forever("key", "value")        # explicitly no expiry
 ```python
 async def compute() -> dict[str, int]:
     # expensive work you don't want to repeat on every request
-    return {"total": await Order.query().count()}
+    return {"total": await Order.count()}
 
 stats = await Cache.remember("order_stats", ttl=300, callback=compute)
 ```

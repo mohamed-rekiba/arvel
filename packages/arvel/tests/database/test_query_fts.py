@@ -87,7 +87,7 @@ def test_where_full_text_chains_with_where() -> None:
 
 def test_where_full_text_on_query_builder_directly() -> None:
     """QueryBuilder.where_full_text mirrors the same behaviour as the classmethod."""
-    sql = FtsPost.query().where_full_text(_SV, "python").to_sql(dialect="postgresql")
+    sql = FtsPost.where_full_text(_SV, "python").to_sql(dialect="postgresql")
     assert "@@" in sql
     assert "plainto_tsquery" in sql
 
@@ -149,7 +149,7 @@ def test_order_by_relevance_with_where_full_text() -> None:
 
 def test_order_by_relevance_on_query_builder_directly() -> None:
     """QueryBuilder.order_by_relevance works when invoked on the builder directly."""
-    sql = FtsPost.query().order_by_relevance(_SV, "python").to_sql(dialect="postgresql")
+    sql = FtsPost.order_by_relevance(_SV, "python").to_sql(dialect="postgresql")
     assert "ts_rank" in sql
 
 

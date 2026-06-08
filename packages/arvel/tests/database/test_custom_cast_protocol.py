@@ -89,7 +89,7 @@ async def test_custom_cast_roundtrips_through_db(
     await _create_tables(engine)
     doc = Doc(meta={"k": "v"}, code="abc", price="3.5", flag="1")
     await doc.save()
-    fresh = await Doc.query().first()
+    fresh = await Doc.first()
     assert fresh is not None
     assert fresh.meta == {"k": "v"}
     assert fresh.code == "ABC"

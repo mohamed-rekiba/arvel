@@ -77,7 +77,7 @@ class TestAddGlobalScopeCallable:
 
         _Tenant.add_global_scope("tenant_filter", _only_t1)
 
-        rows = await _Tenant.query().without_global_scope("tenant_filter").all()
+        rows = await _Tenant.without_global_scope("tenant_filter").all()
         assert sorted(r.name for r in rows) == ["a", "b"]
         _clear_global_scopes(_Tenant)
 
@@ -199,7 +199,7 @@ class TestSoftDeleteScope:
         n1.deleted_at = datetime.now(UTC)
         await n1.save()
 
-        rows = await _Note.query().with_trashed().all()
+        rows = await _Note.with_trashed().all()
         assert sorted(r.body for r in rows) == ["a", "b"]
 
 

@@ -126,9 +126,7 @@ class TestWrittenTokenUsesAlias:
             imageable_type=get_morph_alias(Wi026Post),
             imageable_id=post.id,
         )
-        loaded = await (
-            Wi026Post.query().with_("image").where(Wi026Post.__table__.c.id == post.id).first()
-        )
+        loaded = await Wi026Post.with_("image").where(Wi026Post.__table__.c.id == post.id).first()
         assert loaded is not None
         assert loaded.image is not None
         assert loaded.image.imageable_type == "post"
@@ -143,9 +141,7 @@ class TestWrittenTokenUsesAlias:
             imageable_type=get_morph_alias(Wi026Post),
             imageable_id=post.id,
         )
-        loaded = await (
-            Wi026Post.query().with_("image").where(Wi026Post.__table__.c.id == post.id).first()
-        )
+        loaded = await Wi026Post.with_("image").where(Wi026Post.__table__.c.id == post.id).first()
         assert loaded is not None
         assert loaded.image is not None
         assert loaded.image.imageable_type == "Wi026Post"

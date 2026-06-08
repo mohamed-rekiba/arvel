@@ -99,7 +99,7 @@ class TestQueryBuilderScopeChain:
         await _setup(engine)
         await _Post.create(title="A", status="active")
         await _Post.create(title="B", status="draft")
-        rows = await _Post.query().active().all()
+        rows = await _Post.active().all()
         assert [r.title for r in rows] == ["A"]
 
     async def test_unknown_scope_on_qb_raises(self, engine: Any, session: AsyncSession) -> None:

@@ -284,7 +284,7 @@ def test_all_helpers_are_exported_from_arvel_database() -> None:
 
 
 def test_query_mixin_builder_shortcuts_return_query_builders() -> None:
-    other = _Account.query().where(_Account.name == "Other")
+    other = _Account.where(_Account.name == "Other")
     cte = select(_Account).cte("accounts_cte")
 
     assert _Account.with_count("transactions") is not None

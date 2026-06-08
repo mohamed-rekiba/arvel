@@ -89,7 +89,7 @@ class TestEagerAggregates:
         await _setup(engine)
         with_c = await _seed_post("has", [1])
         without_c = await Wi034Post.create(title="none")
-        rows = await Wi034Post.query().with_exists("comments").get()
+        rows = await Wi034Post.with_exists("comments").get()
         by_id = {r.id: r for r in rows}
         assert bool(by_id[with_c.id].comments_exists) is True
         assert bool(by_id[without_c.id].comments_exists) is False

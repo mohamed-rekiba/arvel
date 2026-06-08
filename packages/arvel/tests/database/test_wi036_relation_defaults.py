@@ -115,7 +115,7 @@ class TestEagerControl:
         counter = _SelectCounter()
         event.listen(engine.sync_engine, "before_cursor_execute", counter)
         try:
-            await Wi036User.query().with_("posts").without("posts").get()
+            await Wi036User.with_("posts").without("posts").get()
             assert counter.count == 1  # only the users query, no selectin for posts
         finally:
             event.remove(engine.sync_engine, "before_cursor_execute", counter)
@@ -130,7 +130,7 @@ class TestEagerControl:
         counter = _SelectCounter()
         event.listen(engine.sync_engine, "before_cursor_execute", counter)
         try:
-            await Wi036User.query().with_("posts").with_only("posts").get()
+            await Wi036User.with_("posts").with_only("posts").get()
             assert counter.count == 2  # users + posts selectin (single load, not doubled)
         finally:
             event.remove(engine.sync_engine, "before_cursor_execute", counter)
@@ -144,7 +144,7 @@ class TestEagerControl:
         counter = _SelectCounter()
         event.listen(engine.sync_engine, "before_cursor_execute", counter)
         try:
-            users = await Wi036User.query().with_("posts").get()
+            users = await Wi036User.with_("posts").get()
             assert counter.count == 2
             before = counter.count
             _ = [p.title for p in users[0].posts]
@@ -162,7 +162,7 @@ class TestPush:
         await Wi036Post.create(title="a", user_id=user.id)
         session.expire_all()
 
-        loaded = await Wi036User.query().with_("posts").first()
+        loaded = await Wi036User.with_("posts").first()
         assert loaded is not None
         loaded.name = "renamed"
         loaded.posts[0].title = "edited"
@@ -170,7 +170,7 @@ class TestPush:
 
         await loaded.refresh()
         assert loaded.name == "renamed"
-        fresh_post = await Wi036Post.query().where(Wi036Post.__table__.c.user_id == user.id).first()
+        fresh_post = await Wi036Post.where(Wi036Post.__table__.c.user_id == user.id).first()
         assert fresh_post is not None and fresh_post.title == "edited"
 
     async def test_push_skips_unloaded_relations(
@@ -198,7 +198,7 @@ class TestPush:
         await Wi036Post.create(title="a", user_id=user.id)
         session.expire_all()
 
-        loaded = await Wi036User.query().with_("posts").first()
+        loaded = await Wi036User.with_("posts").first()
         assert loaded is not None
         # Wire the inverse so user.posts[0].author is the same loaded user — a cycle.
         loaded.posts[0].author = loaded

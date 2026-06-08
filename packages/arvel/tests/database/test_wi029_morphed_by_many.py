@@ -148,7 +148,7 @@ class TestInverseEager:
         counter = _SelectCounter()
         event.listen(engine.sync_engine, "before_cursor_execute", counter)
         try:
-            tags = await Wi029Tag.query().with_("posts").get()
+            tags = await Wi029Tag.with_("posts").get()
             assert counter.count == 2  # 1 for tags + 1 batched for posts
             before = counter.count
             grouped = {t.name: sorted(p.title for p in await t.posts.all()) for t in tags}
@@ -166,7 +166,7 @@ class TestInverseRelationQueries:
         post = await Wi029Post.create(title="p")
         await t1.posts.attach(post.id)
 
-        names = [t.name for t in await Wi029Tag.query().where_has("posts").get()]
+        names = [t.name for t in await Wi029Tag.where_has("posts").get()]
         assert names == ["has"]
 
     async def test_with_count(self, engine: AsyncEngine, session: AsyncSession) -> None:

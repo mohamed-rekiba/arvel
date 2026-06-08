@@ -125,7 +125,7 @@ class TestMorphToManyExistence:
         rows = await MtmPost.where_has("tags").all()
         assert [r.title for r in rows] == ["tagged"]
 
-        counted: list[Any] = await MtmPost.query().with_count("tags").order_by("id").all()
+        counted: list[Any] = await MtmPost.with_count("tags").order_by("id").all()
         by_title = {r.title: r.tags_count for r in counted}
         assert by_title == {"tagged": 1, "bare": 0}
 
@@ -134,4 +134,4 @@ class TestMorphToManyExistence:
     ) -> None:
         await _setup(engine)
         with pytest.raises(UnknownRelationError):
-            await MtmPost.query().with_count("nope").all()
+            await MtmPost.with_count("nope").all()

@@ -57,7 +57,7 @@ async def test_when_loaded_returns_eager_pivot(engine: AsyncEngine, session: Asy
     await post.tags.attach(red.id)
     await post.tags.attach(blue.id)
 
-    loaded = (await Wi005Post.query().with_("tags").all())[0]
+    loaded = (await Wi005Post.with_("tags").all())[0]
     body = Wi005PostResource(loaded).to_dict(None)
 
     assert "tags" in body
@@ -72,7 +72,7 @@ async def test_when_loaded_absent_without_eager_load(
     await post.tags.attach((await Wi005Tag.create(name="red")).id)
 
     # No with_("tags") → relation not hydrated → key stripped, no lazy load.
-    fresh = await Wi005Post.query().where(Wi005Post.id == post.id).first()
+    fresh = await Wi005Post.where(Wi005Post.id == post.id).first()
     assert fresh is not None
     body = Wi005PostResource(fresh).to_dict(None)
     assert "tags" not in body

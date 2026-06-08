@@ -227,13 +227,13 @@ In addition to retrieving all rows matching a query, you can fetch single record
 ```python
 flight = await Flight.find(1)                       # by primary key, or None
 flight = await Flight.where(active=True).first()     # first match, or None
-flight = await Flight.query().first_where(name="LA") # shorthand
+flight = await Flight.first_where(name="LA")         # shorthand
 ```
 
 `pluck`, `value`, and aggregates pull single columns or scalars:
 
 ```python
-names = await Flight.query().pluck("name")          # list of one column
+names = await Flight.pluck("name")                  # list of one column
 total = await Flight.where(active=True).count()
 ```
 
@@ -329,12 +329,12 @@ with Flight.unguarded():
 Get-or-create patterns are available on the query builder:
 
 ```python
-flight = await Flight.query().first_or_create(
+flight = await Flight.first_or_create(
     {"name": "London to Paris"},          # match attributes
     {"destination": "Paris"},             # extra values if creating
 )
 
-flight = await Flight.query().update_or_create(
+flight = await Flight.update_or_create(
     {"departure": "LHR", "destination": "CDG"},
     {"price": Decimal("99.00")},
 )
