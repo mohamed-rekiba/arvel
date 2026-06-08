@@ -1365,3 +1365,39 @@ events:
       Observability + log-binding suites green (141 passed); the lone failure is the pre-existing cwd-dependent
       test_wi_030_config (flagged since WI-arvel-030), unrelated and out of scope.
     timestamp: "2026-06-08T22:22:00Z"
+  - work_item: "WI-arvel-034"
+    stage: "qa-post"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 34 (cache rate limiter). C1 (correctness/parity): Cache.rate_limiter().attempt reset the cache TTL on every
+      hit (put ttl=decay), so the window slid forward with traffic — contradicting its own docstring ("resets after decay
+      seconds from the first hit") and Laravel's fixed-window RateLimiter (Cache::add timer + atomic increment). A capped
+      key stayed capped relative to the last allowed hit; remaining() never recovered under steady traffic. The Throttle
+      middleware store (http/ratelimit, Redis INCR) was already correct — this is the cache-facade limiter only.
+    timestamp: "2026-06-08T22:50:00Z"
+  - work_item: "WI-arvel-034"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Store the window as {"hits", "reset_at"} and preserve the original expiry — increments use only the remaining TTL,
+      never a fresh decay. Typed _window() helper (returns (hits, reset_at) for a live window, else None) shared by
+      attempt/remaining; dict value round-trips through every store. Added 2 clock-driven tests (fixed-window non-sliding;
+      remaining resets after the window) with no real-time sleeps. Cross-process atomicity left as a documented limitation
+      (CacheStore has no atomic increment/add; same stance as lock()/remember()) — Throttle/Redis INCR is the race-free path.
+    artifacts:
+      - "packages/arvel/src/arvel/cache/rate_limiter.py"
+      - "packages/arvel/tests/cache/test_rate_limiter.py"
+      - "docs/site/docs/features/cache.md"
+    timestamp: "2026-06-08T22:56:00Z"
+  - work_item: "WI-arvel-034"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings. Cache + throttle +
+      auth-security + auth-manager suites green (190 passed; warnings are the pre-existing process-local lock notices).
+    timestamp: "2026-06-08T23:02:00Z"

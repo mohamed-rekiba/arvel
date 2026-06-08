@@ -133,6 +133,10 @@ else:
     remaining = await limiter.remaining("send-mail:user:1", max_attempts=5)
 ```
 
+The window is **fixed**: it's anchored to the first hit and `decay` seconds later the counter resets. Hits within the window don't push the expiry out. Call `reset(key)` to clear it early.
+
+> The counter's read-modify-write isn't atomic, so under heavy concurrency a few requests can slip past the limit. For distributed, race-free HTTP throttling use the [`Throttle`](../the-basics/middleware.md#throttle-rate-limiting) middleware with the Redis store — it counts with an atomic `INCR`.
+
 <a name="testing"></a>
 ## Testing
 
