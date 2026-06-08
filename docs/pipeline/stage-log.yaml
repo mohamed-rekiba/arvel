@@ -1579,3 +1579,29 @@ events:
       ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; pagination suite
       82 passed; HTTP-translator file 11 passed (incl. 2 new cursor cases).
     timestamp: "2026-06-09T00:50:00Z"
+  - work_item: "WI-arvel-042"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      DB transactions/connections audit. DB.transaction (savepoint reentrancy, outermost owns the after-commit queue,
+      fires after closing the session + resetting the active-session contextvar), transactional (deadlock/serialization
+      retry only), imperative begin/commit/rollback stack, autocommit (independent AUTOCOMMIT connection), pretend
+      (rollback), raw bound-param SQL reviewed sound. Defect: DatabaseTransaction middleware fired after-commit callbacks
+      in the else branch INSIDE the async-with session block — after COMMIT but before reset_active_session — so a
+      callback's ORM write opened a fresh implicit txn on the about-to-close session and was silently discarded (A10),
+      diverging from DB.transaction(). Fix: track committed, fire callbacks after the session is closed+unbound; rollback
+      paths (4xx/5xx/exception) skip them.
+    artifacts:
+      - "packages/arvel/src/arvel/http/middleware/database_transaction.py"
+      - "packages/arvel/tests/http/test_database_transaction_middleware.py"
+    timestamp: "2026-06-09T01:10:00Z"
+  - work_item: "WI-arvel-042"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; txn middleware +
+      db edge/imperative 42 passed (incl. 2 new); full http + database suites 1348 passed.
+    timestamp: "2026-06-09T01:12:00Z"

@@ -57,21 +57,29 @@ class DatabaseTransaction:
         maker: async_sessionmaker[AsyncSession],
         callbacks: list[Callable[[], Awaitable[Any]]],
     ) -> Any:
+        committed = False
+        response: Any = None
         async with maker() as session:
             token = set_active_session(session)
-            response: Any = None
             try:
                 async with session.begin():
                     response = await call_next(request)
                     _raise_if_error(response)
+                committed = True
             except _ResponseRollback as r:
                 return r.response
-            else:
-                for cb in callbacks:
-                    await cb()
-                return response
             finally:
                 reset_active_session(token)
+
+        # Fire after-commit callbacks once the session is closed and unbound —
+        # same as DB.transaction(). If they ran while the committed session was
+        # still active, a callback's ORM write would open a fresh implicit
+        # transaction that's never committed and gets discarded on close. With
+        # no active session, a callback that touches the DB opens its own.
+        if committed:
+            for cb in callbacks:
+                await cb()
+        return response
 
     def _resolve_maker(self, request: Any) -> async_sessionmaker[AsyncSession]:
         if self._explicit_maker is not None:

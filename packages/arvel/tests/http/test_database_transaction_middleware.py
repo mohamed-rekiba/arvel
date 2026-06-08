@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from arvel.database import Model, id_, string
-from arvel.database.session import get_active_session
+from arvel.database.session import get_active_session, get_optional_session
 from arvel.http.middleware.database_transaction import DatabaseTransaction
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -191,3 +191,50 @@ async def test_middleware_rolls_back_on_5xx_response(
         async with use_session(s):
             rows = await TxModel.all()
             assert not any(r.label == "server-error-path" for r in rows)
+
+
+async def test_after_commit_callbacks_run_with_no_active_session(
+    tx_session_maker: async_sessionmaker[AsyncSession],
+) -> None:
+    # Parity with DB.transaction(): callbacks fire after the session is closed
+    # and unbound, so a callback can't accidentally write into the just-committed
+    # (and about-to-close) session.
+    from arvel.database.db import DB
+
+    seen: list[Any] = []
+
+    async def handler(_: object) -> _Response:
+        DB.after_commit(lambda: _record(seen))
+        return _Response(200)
+
+    resp = await mw_with(tx_session_maker).handle(_DummyRequest(), handler)
+    assert resp.status_code == 200
+    assert seen == [None]  # callback ran; active session was None when it did
+
+
+async def test_after_commit_callbacks_skipped_on_rollback(
+    tx_session_maker: async_sessionmaker[AsyncSession],
+) -> None:
+    from arvel.database.db import DB
+
+    ran: list[int] = []
+
+    async def handler(_: object) -> _Response:
+        DB.after_commit(lambda: _append(ran, 1))
+        return _Response(400)
+
+    resp = await mw_with(tx_session_maker).handle(_DummyRequest(), handler)
+    assert resp.status_code == 400
+    assert ran == []  # rolled back → callbacks must not fire
+
+
+def mw_with(maker: async_sessionmaker[AsyncSession]) -> DatabaseTransaction:
+    return DatabaseTransaction(session_maker=maker)
+
+
+async def _record(sink: list[Any]) -> None:
+    sink.append(get_optional_session())
+
+
+async def _append(sink: list[int], value: int) -> None:
+    sink.append(value)
