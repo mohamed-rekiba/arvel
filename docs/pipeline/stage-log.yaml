@@ -1710,3 +1710,37 @@ events:
       209 passed (incl. 12 new: response builders, redirect status/location, with_ session flash + no-session no-op,
       back via Referer/fallback, to_route named-route URL); mkdocs build --strict clean.
     timestamp: "2026-06-09T02:22:00Z"
+  - work_item: "WI-arvel-049"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Verification-only — STORAGE_LOCAL_SERVE already implemented + committed in a prior session
+      (providers/storage_provider.py, config/storage_config.py). Ran tests/storage/test_serve_route.py: 10 passed
+      (serve route, traversal protection, signed/temporary URLs, disabled/absolute-url skip). CHANGELOG triage entry
+      moved from 'remaining gaps' to 'landed'. No code change.
+    timestamp: "2026-06-09T02:26:00Z"
+  - work_item: "WI-arvel-048"
+    stage: "execution"
+    event: "decision"
+    result: "wont-do"
+    note: >-
+      route:cache / route:clear resolved as N/A for Python. Traced the routing model: handlers and event listeners are
+      live callables stored on RouteSpec (not Laravel string actions), so a route/event cache can't be both correct
+      and useful — pickling callables is a code-exec risk and breaks across changes; storing module:qualname can't
+      round-trip closures, decorated handlers, or dynamically-mounted controllers; and you must import the modules
+      anyway (already .pyc-cached) to get the callables. Updated optimize to report route:cache/event:cache as 'n/a on
+      Python' (was 'pending serializer'); removed the gap from the CHANGELOG roadmap and added a 'deliberately not
+      implemented' note. No route:clear (no artifact to clear). Decision doc: .context/research/048-route-cache-decision.md.
+    artifacts:
+      - "packages/arvel/src/arvel/console/commands/optimize.py"
+      - "CHANGELOG.md"
+    timestamp: "2026-06-09T02:32:00Z"
+  - work_item: "WI-arvel-048"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff clean on optimize.py; tests/console/test_optimize.py 5 passed (route:cache/event:cache substrings still
+      present in output). Documentation-and-decision change; no behavioral regression.
+    timestamp: "2026-06-09T02:33:00Z"

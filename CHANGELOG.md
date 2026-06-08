@@ -115,12 +115,18 @@ changelog once shipped.
 
 - Outbound HTTP — first-party `Http::` facade + `Http::fake` (currently apps
   call `httpx` directly). High impact, large effort.
-- Route caching — `route:cache` / `route:clear` (`optimize` already stubs it
-  pending a `RouteCollection` serializer). Medium impact, medium-large effort.
 - HTTP security hardening — consolidate the two CSRF middlewares (session 419 /
   cookie 403), accept `X-XSRF-TOKEN` + form `_token`, and add a general
   `TrustProxies` request middleware (trusted-proxy IP resolution exists for
   observability/reverb but not on the app request path). Medium impact, **high
   risk — security path, own WI with gates.**
+
+**Deliberately not implemented:**
+
+- Route / event caching (`route:cache`, `event:cache`) — not applicable on
+  Python. Laravel can serialize string actions (`Controller@method`); Arvel
+  routes and listeners are live callables that can't be safely serialized, and
+  importing them is already `.pyc`-cached, so a cache buys nothing. `optimize`
+  now reports these as n/a. See `.context/research/048-route-cache-decision.md`.
 
 > The headline goal before `1.0` is a public-API review and stability pass.
