@@ -150,3 +150,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 10 (mail) hardening WI. Spec: docs/pipeline/specs/WI-arvel-010-smtp-path-attachments.md"
+  - id: "WI-arvel-011"
+    name: "Session regeneration must destroy the old store record (fixation hygiene)"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T10:30:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 11 (session) hardening WI. Spec: docs/pipeline/specs/WI-arvel-011-session-regenerate-destroy.md"

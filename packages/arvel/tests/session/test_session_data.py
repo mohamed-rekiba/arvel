@@ -50,6 +50,22 @@ class TestSessionDataRegenerate:
         session_with_data.regenerate()
         assert session_with_data.get("user_id") == 42
 
+    def test_regenerate_queues_old_id_for_destruction(
+        self, session_with_data: SessionData
+    ) -> None:
+        old_id = session_with_data.get_id()
+        session_with_data.regenerate()
+        assert session_with_data.drain_pending_destroy() == [old_id]
+
+    def test_drain_pending_destroy_is_one_shot(self, empty_session: SessionData) -> None:
+        empty_session.regenerate()
+        assert len(empty_session.drain_pending_destroy()) == 1
+        assert empty_session.drain_pending_destroy() == []
+
+    def test_pending_destroy_not_serialized(self, session_with_data: SessionData) -> None:
+        session_with_data.regenerate()
+        assert "_pending_destroy" not in session_with_data.to_dict()
+
 
 class TestSessionDataSerialization:
     def test_to_dict_and_from_dict(self, session_with_data: SessionData) -> None:

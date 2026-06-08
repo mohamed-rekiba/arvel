@@ -108,3 +108,5 @@ Regenerate the session id after authentication to prevent session fixation:
 ```python
 session.regenerate()
 ```
+
+`regenerate()` rotates to a fresh id **and** destroys the old record in the store when the response finishes — the pre-login session can't outlive the rotation. This matches Laravel's `migrate(true)`. `SessionGuard.login()` calls it for you, so a returning visitor who logs in won't leave their guest session readable in the backend.

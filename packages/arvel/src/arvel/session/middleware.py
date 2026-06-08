@@ -72,6 +72,10 @@ class StartSession:
             elif message["type"] == "http.response.body" and not message.get("more_body", False):
                 await send(message)
                 await self._store.write(session.get_id(), session.to_dict(), self._lifetime)
+                # Drop any session ids rotated out by regenerate() so the old
+                # record can't outlive the new one (session-fixation hygiene).
+                for old_id in session.drain_pending_destroy():
+                    await self._store.destroy(old_id)
                 return
             await send(message)
 
