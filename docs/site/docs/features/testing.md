@@ -13,7 +13,7 @@ There are two entry points: a context manager for quick, functional tests, and a
 <a name="using-create_test_app"></a>
 ### Using create_test_app
 
-`create_test_app` boots an `Application`, yields an `httpx.AsyncClient` wired to it over ASGI, and shuts down on exit — even if the test raises:
+`create_test_app` boots an `Application`, yields an `httpx2.AsyncClient` wired to it over ASGI, and shuts down on exit — even if the test raises:
 
 ```python
 from arvel.testing import create_test_app
@@ -45,7 +45,7 @@ class TestPosts(ArvelTestCase):
 <a name="testing-http-requests"></a>
 ## Testing HTTP Requests
 
-The client is a standard `httpx.AsyncClient`, so all the usual verbs work:
+The client is a standard `httpx2.AsyncClient`, so all the usual verbs work:
 
 ```python
 response = await client.post("/posts", json={"title": "Hello"})

@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any, cast
 
-import httpx
+import httpx2 as httpx
 import pytest
 
 

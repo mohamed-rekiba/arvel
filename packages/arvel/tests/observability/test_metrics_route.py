@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import httpx
+import httpx2 as httpx
 from arvel.observability.metrics_route import add_metrics_route
 from fastapi import FastAPI
 

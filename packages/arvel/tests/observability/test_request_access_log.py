@@ -33,7 +33,7 @@ def _app(*, log_requests: bool) -> FastAPI:
 
 async def _records(app: FastAPI, path: str, body: str = "http.request") -> list[CapturedLogRecord]:
     from arvel.testing.observability import FakeObservability
-    from httpx import ASGITransport, AsyncClient
+    from httpx2 import ASGITransport, AsyncClient
 
     with FakeObservability() as obs:
         async with AsyncClient(

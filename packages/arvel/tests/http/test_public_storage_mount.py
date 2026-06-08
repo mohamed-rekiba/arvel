@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-import httpx
+import httpx2 as httpx
 import pytest
 from starlette.testclient import TestClient
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-import httpx
+import httpx2 as httpx
 import pytest
 from arvel.http.controller import Controller
 from arvel.routing import Route, Router, RouteSpec

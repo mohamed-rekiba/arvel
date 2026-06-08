@@ -7,7 +7,7 @@ import zlib
 from dataclasses import dataclass
 from typing import Any, cast
 
-import httpx
+import httpx2 as httpx
 from arvel.database import Model, id_, string
 from arvel.http.exceptions import HttpExceptionHandler
 from arvel.http.requests import FormRequest

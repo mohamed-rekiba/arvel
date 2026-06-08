@@ -6,7 +6,7 @@ import json
 import time
 from urllib.parse import parse_qs, urlparse
 
-import httpx
+import httpx2 as httpx
 import jwt
 import pytest
 from arvel_oauth.dtos import OAuthToken

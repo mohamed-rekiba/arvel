@@ -22,7 +22,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-import httpx
+import httpx2 as httpx
 import typer
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 

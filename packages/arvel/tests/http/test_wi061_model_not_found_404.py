@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import cast
 
-import httpx
+import httpx2 as httpx
 from arvel.database.exceptions import ModelNotFoundError, ORMError
 from arvel.http.exceptions import (
     ExceptionTranslator,

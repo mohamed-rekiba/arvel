@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 from urllib.parse import parse_qs, urlparse
 
-import httpx
+import httpx2 as httpx
 import pytest
 from starlette.testclient import TestClient
 

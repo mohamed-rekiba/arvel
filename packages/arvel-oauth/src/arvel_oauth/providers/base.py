@@ -13,7 +13,7 @@ from contextlib import AbstractAsyncContextManager
 from typing import cast
 from urllib.parse import urlencode
 
-import httpx
+import httpx2 as httpx
 
 from arvel_oauth.dtos import OAuthToken, OAuthUser
 from arvel_oauth.exceptions import OAuthExchangeError

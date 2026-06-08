@@ -24,7 +24,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Protocol, runtime_checkable
 
-import httpx
+import httpx2 as httpx
 from starlette.types import ASGIApp
 
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import cast
 
-import httpx
+import httpx2 as httpx
 from starlette.responses import Response
 from starlette.testclient import TestClient
 from starlette.types import ASGIApp, Receive, Scope, Send

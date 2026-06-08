@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, cast
 
-import httpx
+import httpx2 as httpx
 from arvel.database import Paginator
 from arvel.http import JsonResource, ResourceResponse
 from starlette.requests import Request

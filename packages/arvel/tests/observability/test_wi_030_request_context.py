@@ -9,7 +9,7 @@ import pytest
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
-    from httpx import AsyncClient
+    from httpx2 import AsyncClient
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ def app() -> FastAPI:
 
 @pytest.fixture
 def client(app: FastAPI) -> AsyncClient:
-    from httpx import ASGITransport, AsyncClient
+    from httpx2 import ASGITransport, AsyncClient
 
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
@@ -130,7 +130,7 @@ class TestContextIsolation:
     @pytest.mark.asyncio
     async def test_concurrent_requests_have_isolated_context(self, app: FastAPI) -> None:
         from arvel.testing.observability import FakeObservability
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         # Send two concurrent requests — each should get a different request_id
         with FakeObservability():

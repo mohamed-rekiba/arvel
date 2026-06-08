@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
-import httpx
+import httpx2 as httpx
 import pytest
 import pytest_asyncio
 from arvel.database import Model, id_, string

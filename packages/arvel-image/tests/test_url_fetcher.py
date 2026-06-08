@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any, Self
 
-import httpx
+import httpx2 as httpx
 import pytest
 from arvel_image.media.exceptions import MediaError
 from arvel_image.media.url_fetcher import fetch_url

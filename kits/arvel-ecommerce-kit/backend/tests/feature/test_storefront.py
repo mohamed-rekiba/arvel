@@ -62,7 +62,7 @@ async def app(
 async def client(app: Any) -> Any:
     import importlib
 
-    httpx: Any = importlib.import_module("httpx")
+    httpx: Any = importlib.import_module("httpx2")
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="https://test") as c:
         yield c

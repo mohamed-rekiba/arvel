@@ -43,7 +43,7 @@ class TestExceptionLogging:
     @pytest.mark.asyncio
     async def test_5xx_exception_logged_at_error_level(self, exception_app: FastAPI) -> None:
         from arvel.testing.observability import FakeObservability
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         with FakeObservability() as obs:
             async with AsyncClient(
@@ -60,7 +60,7 @@ class TestExceptionLogging:
     @pytest.mark.asyncio
     async def test_5xx_span_marked_error(self, exception_app: FastAPI) -> None:
         from arvel.testing.observability import FakeObservability
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
         from opentelemetry.trace import StatusCode
 
         with FakeObservability() as obs:
@@ -78,7 +78,7 @@ class TestExceptionLogging:
     @pytest.mark.asyncio
     async def test_4xx_exception_not_logged_at_error_level(self, exception_app: FastAPI) -> None:
         from arvel.testing.observability import FakeObservability
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         with FakeObservability() as obs:
             async with AsyncClient(
@@ -97,7 +97,7 @@ class TestExceptionLogging:
     @pytest.mark.asyncio
     async def test_5xx_log_contains_request_id(self, exception_app: FastAPI) -> None:
         from arvel.testing.observability import FakeObservability
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         with FakeObservability() as obs:
             async with AsyncClient(
@@ -113,7 +113,7 @@ class TestExceptionLogging:
     @pytest.mark.asyncio
     async def test_5xx_exception_log_has_traceback(self, exception_app: FastAPI) -> None:
         from arvel.testing.observability import FakeObservability
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         with FakeObservability() as obs:
             async with AsyncClient(

@@ -12,7 +12,7 @@ import json as jsonlib
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, cast
 
-import httpx
+import httpx2 as httpx
 
 from arvel_search.dtos import SearchResult
 from arvel_search.engine import Engine

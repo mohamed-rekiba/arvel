@@ -37,7 +37,7 @@ class _HttpClient(Protocol):
 
 
 def _default_client_factory() -> _HttpClient:
-    import httpx
+    import httpx2 as httpx
 
     # httpx.AsyncClient.post accepts a superset of our Protocol signature; the
     # narrow cast keeps the boundary type-safe for callers.

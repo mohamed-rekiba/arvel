@@ -11,7 +11,7 @@ import tarfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import httpx
+import httpx2 as httpx
 import pytest
 from arvel.console._scaffold import remote_kit
 from arvel.console._scaffold.kits import KitDownloadError
