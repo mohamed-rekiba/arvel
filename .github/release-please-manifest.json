@@ -2,7 +2,7 @@
   "packages/arvel": "0.17.3",
   "packages/arvel-permission": "0.6.3",
   "packages/arvel-image": "0.8.1",
-  "packages/arvel-oauth": "0.6.1",
+  "packages/arvel-oauth": "0.6.2",
   "packages/arvel-search": "0.6.0",
   "packages/arvel-audit": "0.6.1",
   "kits/arvel-ecommerce-kit": "1.7.2"
