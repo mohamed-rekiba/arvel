@@ -40,6 +40,7 @@ from arvel.console import Application, Command
 from arvel.console._async import get_pending_task
 from arvel.console._command_meta import COMMAND_HELP
 from arvel.console._loader import discover_commands, entry_point_names, load_command
+from arvel.console._spinner import boot_spinner
 from arvel.console._subsystem import CliSubsystem, closure
 from arvel.console._venv import maybe_reexec_into_project_venv
 from arvel.console.bootstrap import (
@@ -282,11 +283,12 @@ async def async_main(project_root: Path, command: str | None) -> None:
     to load only what dispatch needs.
     """
     required = _required_subsystems_for(command)
-    framework_app = bootstrap_framework_application(project_root, required_subsystems=required)
     provider_cmds: dict[str, Command] = {}
-    if framework_app is not None:
-        await framework_app.boot()
-        provider_cmds = _provider_commands(framework_app)
+    with boot_spinner(f"Booting {command or 'arvel'}\u2026"):
+        framework_app = bootstrap_framework_application(project_root, required_subsystems=required)
+        if framework_app is not None:
+            await framework_app.boot()
+            provider_cmds = _provider_commands(framework_app)
 
     commands_by_name = _select_in_project_commands(command, framework_app, provider_cmds)
 
@@ -334,7 +336,9 @@ def main() -> None:
     _print_banner(argv)
 
     # `--no-banner` is ours, not Typer's — strip it so dispatch doesn't choke.
+    # Propagate it via the env the spinner reads, since it's gone by async_main.
     if "--no-banner" in argv:
+        os.environ["ARVEL_NO_BANNER"] = "1"
         argv[:] = [arg for arg in argv if arg != "--no-banner"]
 
     if any(flag in argv for flag in ("--version", "-V")):
