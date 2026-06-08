@@ -375,3 +375,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 25 (ORM query builder) hardening WI. Spec: docs/pipeline/specs/WI-arvel-025-where-string-operator-form.md"
+  - id: "WI-arvel-026"
+    name: "Meilisearch filters must render by value type (numbers/booleans bare, strings escaped)"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T17:05:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 26 (arvel-search / Scout parity) hardening WI. Spec: docs/pipeline/specs/WI-arvel-026-meilisearch-filter-typing.md"

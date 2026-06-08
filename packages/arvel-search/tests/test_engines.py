@@ -106,6 +106,50 @@ class TestMeilisearchEngine:
         assert captured["primaryKey"] == "id"
         assert captured["body"] == [{"id": "1", "title": "x"}]
 
+    async def test_filter_values_render_by_type(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["body"] = json.loads(request.content)
+            return httpx.Response(200, json={"hits": [], "estimatedTotalHits": 0})
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://meili")
+        engine = MeilisearchEngine("http://meili", http_client=client)
+        async with client:
+            await engine.search(
+                SearchQuery(
+                    index="products",
+                    query="shoe",
+                    # bool before int: True is an int subclass, must not render as 1.
+                    filters={"price": 100, "active": True, "size": 4.5, "note": None},
+                )
+            )
+
+        # Numbers/booleans go in bare so they match numeric/boolean fields;
+        # quoting them would turn it into a string match that returns nothing.
+        assert captured["body"]["filter"] == [
+            "price = 100",
+            "active = true",
+            "size = 4.5",
+            "note IS NULL",
+        ]
+
+    async def test_filter_string_value_is_escaped(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["body"] = json.loads(request.content)
+            return httpx.Response(200, json={"hits": [], "estimatedTotalHits": 0})
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://meili")
+        engine = MeilisearchEngine("http://meili", http_client=client)
+        async with client:
+            await engine.search(SearchQuery(index="products", query="", filters={"name": 'a"b\\c'}))
+
+        # The embedded quote and backslash are escaped so a request-supplied
+        # value can't break out of the filter expression.
+        assert captured["body"]["filter"] == ['name = "a\\"b\\\\c"']
+
 
 def _es_transport(captured: dict[str, Any]) -> httpx.MockTransport:
     def handler(request: httpx.Request) -> httpx.Response:
