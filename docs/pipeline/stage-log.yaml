@@ -1425,3 +1425,28 @@ events:
       ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; WI-054 routing
       suite 5 passed (top-level model/list/non-model/pydantic + new nested-dict case).
     timestamp: "2026-06-08T23:12:00Z"
+  - work_item: "WI-arvel-036"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Gate.allows() resolved a policy straight to its ability method, skipping the policy before() filter Laravel runs
+      first (True grants all, False denies all, None falls through) — an A01 gap: a banned-user global deny or admin
+      global grant in a policy was silently dropped. Policy.check() had the same omission. Added the before() short-circuit
+      to both (sync/async, getattr+callable so non-method attrs aren't invoked); order is gate-before -> policy-before ->
+      ability method. Confirmed semantics against /laravel/docs 13.x authorization.md. 6 new gate tests.
+    artifacts:
+      - "packages/arvel/src/arvel/auth/gate.py"
+      - "packages/arvel/src/arvel/auth/policy.py"
+      - "packages/arvel/tests/auth/test_gate.py"
+      - "docs/site/docs/features/authorization.md"
+    timestamp: "2026-06-08T23:22:00Z"
+  - work_item: "WI-arvel-036"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; gate suite
+      14 passed (8 existing + 6 new policy-before cases).
+    timestamp: "2026-06-08T23:24:00Z"

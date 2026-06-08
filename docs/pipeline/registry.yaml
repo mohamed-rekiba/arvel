@@ -525,3 +525,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 35 (routing) — security follow-up to WI-032. Recurse the response normalizer so nested models honour __hidden__. Spec: docs/pipeline/specs/WI-arvel-035-nested-model-hidden-leak.md"
+  - id: "WI-arvel-036"
+    name: "Gate ignores policy before() filters (broken access control)"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T23:15:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 36 (auth) — Gate/Policy now run policy before() filters (True grants all / False denies all / None falls through). Spec: docs/pipeline/specs/WI-arvel-036-policy-before-filter.md"
