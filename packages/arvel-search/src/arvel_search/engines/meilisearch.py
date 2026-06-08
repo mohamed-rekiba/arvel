@@ -22,6 +22,25 @@ if TYPE_CHECKING:
     from arvel_search.dtos import SearchQuery
 
 
+def _filter_clause(value: object) -> str:
+    """Render a filter value the way Meilisearch expects, by type.
+
+    Numbers and booleans go in bare (`= 100`, `= true`) so they match numeric and
+    boolean fields — quoting them turns the comparison into a string match that
+    silently returns nothing. Strings are quoted with `"` / `\\` escaped, so a
+    value carrying a quote can't break out of the expression (filters often come
+    straight from request params). `None` becomes `IS NULL`.
+    """
+    if value is None:
+        return "IS NULL"
+    if isinstance(value, bool):
+        return f"= {'true' if value else 'false'}"
+    if isinstance(value, (int, float)):
+        return f"= {value}"
+    escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
+    return f'= "{escaped}"'
+
+
 class MeilisearchEngine(Engine):
     """Index and query documents through a Meilisearch server."""
 
@@ -66,7 +85,9 @@ class MeilisearchEngine(Engine):
         if query.limit is not None:
             body["limit"] = query.limit
         if query.filters:
-            body["filter"] = [f'{name} = "{value}"' for name, value in query.filters.items()]
+            body["filter"] = [
+                f"{name} {_filter_clause(value)}" for name, value in query.filters.items()
+            ]
 
         path = f"/indexes/{query.index}/search"
         async with self._client() as client:

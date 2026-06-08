@@ -1047,3 +1047,39 @@ events:
       errors/warnings, ruff check clean. Updated docs/site/docs/orm/query-builder.md — replaced the
       stale "three-arg string form not supported" WARNING with the now-supported forms.
     timestamp: "2026-06-08T16:56:00Z"
+  - work_item: "WI-arvel-026"
+    stage: "qa-post"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 26 (arvel-search). C1 confirmed via repro: MeilisearchEngine.search built filters as
+      f'{name} = "{value}"' for every value. where("price",100)->'price = "100"' (string compare vs
+      numeric field, matches nothing), where("active",True)->'active = "True"' (Python-cased + quoted
+      vs Meilisearch bare 'true'), where("name",'a"b')->'name = "a"b"' (unescaped quote breaks/rewrites
+      the expression; filters come from request params). Laravel Scout emits numbers/booleans bare.
+      Elasticsearch engine is correct (native types in a term query) — Meilisearch-only.
+    timestamp: "2026-06-08T17:05:00Z"
+  - work_item: "WI-arvel-026"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Added _filter_clause(value): None->IS NULL; bool->'= true'/'= false' (checked before int, a bool
+      subclass); int/float->'= <value>' bare; else->'= "<escaped>"' with \\ and " escaped. search()
+      now renders filters via it. Added 2 Meilisearch tests (typed values render bare; string value
+      escaped). search suite 61 passed.
+    artifacts:
+      - "packages/arvel-search/src/arvel_search/engines/meilisearch.py"
+      - "packages/arvel-search/tests/test_engines.py"
+      - "docs/site/docs/packages/search.md"
+    timestamp: "2026-06-08T17:11:00Z"
+  - work_item: "WI-arvel-026"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      arvel-search suite 61 passed (2 new); mypy --strict clean, uv run pyright 0 errors, ruff check +
+      ruff format clean. search.md notes where filters keep their type and strings are escaped.
+    timestamp: "2026-06-08T17:15:00Z"

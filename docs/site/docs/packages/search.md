@@ -57,7 +57,7 @@ total = await Article.search("python").count()
 page = await Article.search("python").paginate(per_page=15, page=1)
 ```
 
-The builder supports `where(column, value)`, `limit`, `offset`, and the terminal methods above.
+The builder supports `where(column, value)`, `limit`, `offset`, and the terminal methods above. `where` filters keep their type on the server engines: numbers and booleans filter numeric/boolean fields (not stringified), and string values are quoted and escaped so a request-supplied value can't alter the filter expression.
 
 <a name="drivers"></a>
 ## Drivers
