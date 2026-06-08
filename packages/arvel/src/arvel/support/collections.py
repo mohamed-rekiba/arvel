@@ -9,9 +9,12 @@ and indexing, slicing, iteration, and ``len`` all work without ceremony.
 
 from __future__ import annotations
 
+import datetime as _dt
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from decimal import Decimal
 from typing import Any, Generic, TypeVar, cast
+from uuid import UUID
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -198,7 +201,9 @@ class Collection(list[T], Generic[T]):
     # ── serialisation ────────────────────────────────────────────────────────
 
     def to_json(self, **json_kwargs: Any) -> str:
-        return json.dumps([_serialize(item) for item in self], **json_kwargs)
+        # datetime/Decimal/UUID/bytes land as JSON-safe values, matching
+        # Model.to_json and framework HTTP responses.
+        return json.dumps(_serialize(self), **json_kwargs)
 
     def to_array(self) -> list[T]:
         return list(self)
@@ -208,13 +213,30 @@ class Collection(list[T], Generic[T]):
 
 
 def _serialize(item: Any) -> Any:
-    """Best-effort JSON-friendly conversion: Arvent ``to_dict`` first,
-    then Pydantic ``model_dump``, otherwise the value unchanged.
-    """
-    if hasattr(item, "to_dict"):
-        return item.to_dict()
+    if isinstance(item, Mapping):
+        item_map = cast("Mapping[object, object]", item)
+        return {k: _serialize(v) for k, v in item_map.items()}
+    if isinstance(item, (list, tuple, set)):
+        item_seq = cast("list[object] | tuple[object, ...] | set[object]", item)
+        return [_serialize(v) for v in item_seq]
     if hasattr(item, "model_dump"):
-        return item.model_dump()
+        return item.model_dump(mode="json")
+    if hasattr(item, "to_dict"):
+        return _serialize(item.to_dict())
+    return _serialize_scalar(item)
+
+
+def _serialize_scalar(item: Any) -> Any:
+    # SQLAlchemy models hand back raw scalars via to_dict(); json.dumps chokes
+    # on these, so coerce the same set Model.to_json round-trips.
+    if isinstance(item, (_dt.datetime, _dt.date, _dt.time)):
+        return item.isoformat()
+    if isinstance(item, Decimal):
+        return float(item)
+    if isinstance(item, UUID):
+        return str(item)
+    if isinstance(item, (bytes, bytearray)):
+        return bytes(item).decode("utf-8", "replace")
     return item
 
 
