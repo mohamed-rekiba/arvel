@@ -1450,3 +1450,27 @@ events:
       ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; gate suite
       14 passed (8 existing + 6 new policy-before cases).
     timestamp: "2026-06-08T23:24:00Z"
+  - work_item: "WI-arvel-037"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Migrations audit. Migrator core (per-migration tx, batch/rollback/reset, fresh drop order, sync/async bridge,
+      non-destructive discovery) reviewed sound — no change. Defect: migrate pre-flights with check_database_connection
+      and exits 2 on DatabaseUnavailableError, but migrate:fresh/migrate:refresh skipped it and their except clauses
+      didn't catch it, so a down DB dumped a raw traceback and exited 1 (A10). Added the pre-flight check + exit-2 handler
+      to both destructive commands. 2 new parametrized tests (monkeypatched health check -> exit 2 + friendly message).
+    artifacts:
+      - "packages/arvel/src/arvel/console/commands/migrate_fresh.py"
+      - "packages/arvel/src/arvel/console/commands/migrate_refresh.py"
+      - "packages/arvel/tests/console/test_migrate_reset_family.py"
+    timestamp: "2026-06-08T23:36:00Z"
+  - work_item: "WI-arvel-037"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; reset-family
+      suite 11 passed (9 existing + 2 new DB-unavailable cases).
+    timestamp: "2026-06-08T23:38:00Z"

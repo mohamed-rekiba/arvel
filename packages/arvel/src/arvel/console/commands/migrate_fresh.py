@@ -14,7 +14,9 @@ from arvel.console.commands.db_seed import run_seeder_for_app
 from arvel.console.commands.migrate import (
     BootstrapFailedError,
     build_migrator,
+    resolve_engine,
 )
+from arvel.database.health import DatabaseUnavailableError, check_database_connection
 from arvel.database.migrator import (
     MigrationFailedError,
     MigrationFileInvalidError,
@@ -68,6 +70,9 @@ class MigrateFreshCommand(Command):
             async def _run() -> None:
                 try:
                     applied = await cmd_self._run(seed=seed, seeder=seeder or None)
+                except DatabaseUnavailableError as exc:
+                    typer.echo(f"arvel: database is not available — {exc}", err=True)
+                    raise typer.Exit(code=2) from exc
                 except MigrationFailedError as exc:
                     typer.echo(
                         f"arvel: migration failed: {exc.name} — "
@@ -97,6 +102,7 @@ class MigrateFreshCommand(Command):
         raise NotImplementedError
 
     async def _run(self, *, seed: bool, seeder: str | None) -> list[str]:
+        await check_database_connection(resolve_engine(self.app))
         migrator = build_migrator(self.app)
         await migrator.drop_all()
         await migrator.ensure_table()
