@@ -58,7 +58,7 @@ class TestNestedWhereHas:
         await Wi033Post.create(title="p2", user_id=u_none.id)  # post, but no comments
         await Wi033Comment.create(body="hi", post_id=p1.id)
 
-        names = [u.name for u in await Wi033User.query().where_has("posts.comments").get()]
+        names = [u.name for u in await Wi033User.where_has("posts.comments").get()]
         assert names == ["has"]
 
     async def test_nested_with_leaf_constraint(
@@ -230,3 +230,85 @@ class TestWhereBelongsTo:
         await Wi033Post.create(title="t", user_id=author.id)
         rows = await Wi033Post.query().where_belongs_to(author, "author").get()
         assert [p.title for p in rows] == ["t"]
+
+
+class TestModelShortcutParity:
+    """QueryMixin classmethods mirror the full QueryBuilder relationship surface — no .query()."""
+
+    async def test_where_has_operator_count(
+        self, engine: AsyncEngine, session: AsyncSession
+    ) -> None:
+        await _setup(engine)
+        few = await Wi033Post.create(title="few")
+        many = await Wi033Post.create(title="many")
+        await Wi033Comment.create(body="a", post_id=few.id)
+        for i in range(3):
+            await Wi033Comment.create(body=f"m{i}", post_id=many.id)
+
+        titles = [p.title for p in await Wi033Post.where_has("comments", None, ">=", 3).get()]
+        assert titles == ["many"]
+
+    async def test_doesnt_have_with_constraint(
+        self, engine: AsyncEngine, session: AsyncSession
+    ) -> None:
+        await _setup(engine)
+        spam_only = await Wi033Post.create(title="spam_only")
+        ham = await Wi033Post.create(title="ham")
+        await Wi033Comment.create(body="s", post_id=spam_only.id, spam=True)
+        await Wi033Comment.create(body="h", post_id=ham.id, spam=False)
+
+        rows = await Wi033Post.doesnt_have(
+            "comments",
+            lambda q: q.where(Wi033Comment.__table__.c.spam == False),  # noqa: E712
+        ).get()
+        assert {p.title for p in rows} == {"spam_only"}
+
+    async def test_where_belongs_to(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        author = await Wi033User.create(name="author")
+        other = await Wi033User.create(name="other")
+        await Wi033Post.create(title="mine", user_id=author.id)
+        await Wi033Post.create(title="theirs", user_id=other.id)
+
+        rows = await Wi033Post.where_belongs_to(author).get()
+        assert [p.title for p in rows] == ["mine"]
+
+    async def test_with_where_has(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        p = await Wi033Post.create(title="p")
+        await Wi033Post.create(title="empty")
+        await Wi033Comment.create(body="keep", post_id=p.id, spam=False)
+        await Wi033Comment.create(body="drop", post_id=p.id, spam=True)
+
+        session.expire_all()
+        rows = await Wi033Post.with_where_has(
+            "comments",
+            lambda q: q.where(Wi033Comment.__table__.c.spam == False),  # noqa: E712
+        ).get()
+        assert [r.title for r in rows] == ["p"]
+        assert [c.body for c in rows[0].comments] == ["keep"]
+
+    async def test_or_where_has(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        commented = await Wi033Post.create(title="commented")
+        await Wi033Post.create(title="special")
+        await Wi033Comment.create(body="x", post_id=commented.id)
+
+        rows = await (
+            Wi033Post.where(Wi033Post.__table__.c.title == "special").or_where_has("comments").get()
+        )
+        assert {p.title for p in rows} == {"commented", "special"}
+
+    async def test_or_where_relation(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        p1 = await Wi033Post.create(title="p1")
+        p2 = await Wi033Post.create(title="p2")
+        await Wi033Comment.create(body="keeper", post_id=p1.id)
+        await Wi033Comment.create(body="other", post_id=p2.id)
+
+        rows = await (
+            Wi033Post.where(Wi033Post.__table__.c.title == "nope")
+            .or_where_relation("comments", "body", "keeper")
+            .get()
+        )
+        assert {p.title for p in rows} == {"p1"}

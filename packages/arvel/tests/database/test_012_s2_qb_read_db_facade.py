@@ -257,7 +257,7 @@ async def test_keyset_paginate_malformed_cursor_raises(
         await AuthorS2.create(name=f"kc{i}", score=i)
 
     with pytest.raises(InvalidCursorError):
-        await AuthorS2.query().cursor_paginate(
+        await AuthorS2.cursor_paginate(
             per_page=2, cursor="@@bad@@", keyset=["score DESC", "id ASC"]
         )
 
@@ -278,7 +278,7 @@ async def test_keyset_paginate_desc_walks_forward_without_overlap(
     seen: list[int] = []
     cursor: str | None = None
     for _ in range(5):  # 9 rows / 2 per page → at most 5 pages
-        page = await AuthorS2.query().cursor_paginate(per_page=2, cursor=cursor, keyset=keyset)
+        page = await AuthorS2.cursor_paginate(per_page=2, cursor=cursor, keyset=keyset)
         seen.extend(a.score for a in page.items)
         if page.next_cursor is None:
             break
@@ -301,7 +301,7 @@ async def test_keyset_paginate_handles_tied_leading_column(
     seen_ids: list[int] = []
     cursor: str | None = None
     for _ in range(4):
-        page = await AuthorS2.query().cursor_paginate(per_page=2, cursor=cursor, keyset=keyset)
+        page = await AuthorS2.cursor_paginate(per_page=2, cursor=cursor, keyset=keyset)
         seen_ids.extend(a.id for a in page.items)
         if page.next_cursor is None:
             break

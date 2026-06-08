@@ -53,7 +53,7 @@ class TestType:
     ) -> None:
         await _setup(engine)
         await Wi037User.create(name="a")
-        assert isinstance(await Wi037User.query().get(), ModelCollection)
+        assert isinstance(await Wi037User.get(), ModelCollection)
         assert isinstance(await Wi037User.all(), ModelCollection)
 
 
@@ -64,7 +64,7 @@ class TestModelKeys:
         await _setup(engine)
         a = await Wi037User.create(name="a")
         b = await Wi037User.create(name="b")
-        users = await Wi037User.query().order_by("id").get()
+        users = await Wi037User.order_by("id").get()
 
         assert users.model_keys() == [a.id, b.id]
         assert users.find(b.id) is not None
@@ -87,12 +87,12 @@ class TestSetOps:
         a = await Wi037User.create(name="a")
         b = await Wi037User.create(name="b")
         c = await Wi037User.create(name="c")
-        users = await Wi037User.query().order_by("id").get()
+        users = await Wi037User.order_by("id").get()
 
         assert users.only(a.id, c.id).model_keys() == [a.id, c.id]
         assert users.except_(b.id).model_keys() == [a.id, c.id]
 
-        subset = await Wi037User.query().where(Wi037User.__table__.c.id == b.id).get()
+        subset = await Wi037User.where(Wi037User.__table__.c.id == b.id).get()
         assert users.diff(subset).model_keys() == [a.id, c.id]
         assert users.intersect(subset).model_keys() == [b.id]
 
@@ -106,7 +106,7 @@ class TestLoad:
         await Wi037Post.create(title="p2", user_id=u2.id)
         session.expire_all()
 
-        users = await Wi037User.query().order_by("id").get()
+        users = await Wi037User.order_by("id").get()
 
         counter = _SelectCounter()
         event.listen(engine.sync_engine, "before_cursor_execute", counter)
@@ -142,7 +142,7 @@ class TestLoadMissing:
         await Wi037Post.create(title="p1", user_id=u1.id)
         session.expire_all()
 
-        users = await Wi037User.query().with_("posts").get()
+        users = await Wi037User.with_("posts").get()
 
         counter = _SelectCounter()
         event.listen(engine.sync_engine, "before_cursor_execute", counter)
@@ -172,7 +172,7 @@ class TestToQueryAndFresh:
         await _setup(engine)
         a = await Wi037User.create(name="a")
         await Wi037User.create(name="b")
-        only_a = await Wi037User.query().where(Wi037User.__table__.c.id == a.id).get()
+        only_a = await Wi037User.where(Wi037User.__table__.c.id == a.id).get()
 
         count = await only_a.to_query().count()
         assert count == 1
@@ -190,9 +190,9 @@ class TestToQueryAndFresh:
         await _setup(engine)
         a = await Wi037User.create(name="a")
         b = await Wi037User.create(name="b")
-        users = await Wi037User.query().order_by("id").get()
+        users = await Wi037User.order_by("id").get()
 
-        await Wi037User.query().where(Wi037User.__table__.c.id == a.id).update({"name": "renamed"})
+        await Wi037User.where(Wi037User.__table__.c.id == a.id).update({"name": "renamed"})
 
         fresh = await users.fresh()
         assert fresh.model_keys() == [a.id, b.id]

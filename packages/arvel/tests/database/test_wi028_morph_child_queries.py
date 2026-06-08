@@ -85,7 +85,7 @@ class TestEagerWith:
         counter = _SelectCounter()
         event.listen(engine.sync_engine, "before_cursor_execute", counter)
         try:
-            posts = await Wi028Post.query().with_("comments").get()
+            posts = await Wi028Post.with_("comments").get()
             # 1 for posts + 1 batched for all comments = 2.
             assert counter.count == 2
             before = counter.count
@@ -99,7 +99,7 @@ class TestEagerWith:
         await _setup(engine)
         p1 = await Wi028Post.create(title="A")
         await _make_image(p1, "/a.png")
-        posts = await Wi028Post.query().with_("image").get()
+        posts = await Wi028Post.with_("image").get()
         assert posts[0].image is not None
         assert posts[0].image.url == "/a.png"
 
@@ -113,7 +113,7 @@ class TestWhereHas:
         await Wi028Post.create(title="none")
         await _make_comment(p1, "hi")
 
-        titles = [p.title for p in await Wi028Post.query().where_has("comments").get()]
+        titles = [p.title for p in await Wi028Post.where_has("comments").get()]
         assert titles == ["has"]
 
     async def test_where_has_with_constraint(
@@ -139,7 +139,7 @@ class TestWhereHas:
         await Wi028Post.create(title="empty")
         await _make_comment(p1, "x")
 
-        titles = [p.title for p in await Wi028Post.query().doesnt_have("comments").get()]
+        titles = [p.title for p in await Wi028Post.doesnt_have("comments").get()]
         assert titles == ["empty"]
 
 

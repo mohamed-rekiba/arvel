@@ -53,7 +53,7 @@ async def test_or_where_callback_groups_and_within_or(engine: Any, session: Asyn
 
     # or_where ORs its own terms; a group callback is one such term:
     # tag == "y" OR (qty == 9 AND tag == "x")  → beta, gamma
-    rows = await Gadget.query().or_where(Gadget.tag == "y", _and_group).order_by("name").all()
+    rows = await Gadget.or_where(Gadget.tag == "y", _and_group).order_by("name").all()
     assert [r.name for r in rows] == ["beta", "gamma"]
 
 
@@ -76,9 +76,7 @@ async def test_unless_runs_callback_when_condition_falsy(
     engine: Any, session: AsyncSession
 ) -> None:
     await _seed(engine)
-    rows = await (
-        Gadget.query().unless(False, lambda q: q.where(Gadget.tag == "x")).order_by("name").all()
-    )
+    rows = await Gadget.unless(False, lambda q: q.where(Gadget.tag == "x")).order_by("name").all()
     assert [r.name for r in rows] == ["alpha", "gamma"]
 
 

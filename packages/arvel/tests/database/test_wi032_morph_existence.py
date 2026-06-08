@@ -163,3 +163,37 @@ class TestWhereMorphRelation:
             .get()
         )
         assert {r.body for r in rows} == {"k"}
+
+
+class TestMorphModelShortcuts:
+    """QueryMixin classmethods expose the morph helpers directly on the model — no .query()."""
+
+    async def test_where_has_morph(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        post = await Wi032Post.create(title="p")
+        video = await Wi032Video.create(name="v")
+        await _comment_on("on-post", post)
+        await _comment_on("on-video", video)
+
+        rows = await Wi032Comment.where_has_morph("commentable", [Wi032Post]).get()
+        assert {r.body for r in rows} == {"on-post"}
+
+    async def test_has_morph(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        post = await Wi032Post.create(title="p")
+        await _comment_on("x", post)
+
+        rows = await Wi032Comment.has_morph("commentable", [Wi032Post], ">=", 1).get()
+        assert {r.body for r in rows} == {"x"}
+
+    async def test_where_morph_relation(self, engine: AsyncEngine, session: AsyncSession) -> None:
+        await _setup(engine)
+        keep = await Wi032Post.create(title="keep")
+        drop = await Wi032Post.create(title="drop")
+        await _comment_on("k", keep)
+        await _comment_on("d", drop)
+
+        rows = await Wi032Comment.where_morph_relation(
+            "commentable", [Wi032Post], "title", "keep"
+        ).get()
+        assert {r.body for r in rows} == {"k"}

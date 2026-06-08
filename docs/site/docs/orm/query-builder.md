@@ -37,7 +37,7 @@ items = await (
 ```python
 items = await Item.where(is_active=True).get()
 first = await Item.where(is_active=True).first()
-names = await Item.query().pluck("name")
+names = await Item.pluck("name")
 ```
 
 <a name="aggregates"></a>
@@ -45,8 +45,8 @@ names = await Item.query().pluck("name")
 
 ```python
 total = await Item.where(is_active=True).count()
-revenue = await Item.query().sum("price")     # empty result → 0
-top = await Item.query().max("price")
+revenue = await Item.sum("price")     # empty result → 0
+top = await Item.max("price")
 exists = await Item.where(sku="ABC").exists()
 none = await Item.where(sku="ABC").doesnt_exist()
 ```
@@ -212,11 +212,11 @@ For large datasets, skip the `COUNT`:
 
 ```python
 # next/prev only, no total — lighter
-page = await Item.query().simple_paginate(per_page=15)
+page = await Item.simple_paginate(per_page=15)
 page.has_more
 
 # keyset cursor pagination — best for deep, stable scrolling
-page = await Item.query().cursor_paginate(per_page=15, cursor=token)
+page = await Item.cursor_paginate(per_page=15, cursor=token)
 page.next_cursor
 page.prev_cursor
 ```
@@ -230,14 +230,14 @@ To process large result sets without loading everything into memory:
 
 ```python
 # iterate one row at a time
-async for item in Item.query().lazy():
+async for item in Item.lazy():
     ...
 
 # process in batches; return False from the callback to stop early
-await Item.query().chunk(500, process_batch)
+await Item.chunk(500, process_batch)
 
 # stable when the callback mutates rows that would shift offsets
-await Item.query().chunk_by_id(500, process_batch)
+await Item.chunk_by_id(500, process_batch)
 ```
 
 <a name="bulk-writes"></a>
@@ -247,9 +247,9 @@ The builder runs set-based writes that bypass per-row model events:
 
 ```python
 await Item.where(is_active=False).update({"is_active": True})
-await Item.query().insert([{...}, {...}])
-new_id = await Item.query().insert_get_id({...})
-await Item.query().upsert(rows, unique_by=["sku"], update=["price"])
+await Item.insert([{...}, {...}])
+new_id = await Item.insert_get_id({...})
+await Item.upsert(rows, unique_by=["sku"], update=["price"])
 await Item.where(...).increment("views")
 await Item.where(...).decrement("stock", 2)
 await Item.where(...).delete()        # soft delete if SoftDeletes, else hard
@@ -292,8 +292,8 @@ Global scopes apply to every query for a model — this is exactly how soft dele
 ```python
 Post.add_global_scope("tenant", lambda q: q.where(tenant_id=current_tenant()))
 
-await Post.query().without_global_scope("tenant").get()
-await Post.query().without_global_scopes().get()
+await Post.without_global_scope("tenant").get()
+await Post.without_global_scopes().get()
 ```
 
 <a name="collections"></a>

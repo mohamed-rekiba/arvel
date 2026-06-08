@@ -117,7 +117,7 @@ class TestEagerBatching:
         counter = _SelectCounter()
         event.listen(engine.sync_engine, "before_cursor_execute", counter)
         try:
-            comments = await Wi027Comment.query().with_("commentable").get()
+            comments = await Wi027Comment.with_("commentable").get()
             # 1 query for comments + 1 per distinct parent type (Post, Video) = 3.
             assert counter.count == 3
             # Accessing the parent reads from cache — no further queries.

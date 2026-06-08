@@ -139,7 +139,7 @@ async def test_stream_rejects_tree_eager_load(engine: AsyncEngine, session: Asyn
     await SgNode.create(name="root", parent_id=None)
 
     with pytest.raises(EagerLoadNotStreamableError) as exc:
-        async for _ in SgNode.query().with_tree("descendants").stream():
+        async for _ in SgNode.with_tree("descendants").stream():
             pass
 
     assert exc.value.relations == ["descendants"]
@@ -173,7 +173,7 @@ async def test_stream_without_eager_loads_yields_all_rows(
     for i in range(1, 6):
         await SgOwner.create(name=f"o{i}")
 
-    ids = [o.id async for o in SgOwner.query().order_by("id").stream(batch_size=2)]
+    ids = [o.id async for o in SgOwner.order_by("id").stream(batch_size=2)]
     assert ids == [1, 2, 3, 4, 5]
 
 

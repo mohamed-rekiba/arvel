@@ -129,7 +129,7 @@ class TestDescriptorEager:
         counter = _SelectCounter()
         event.listen(engine.sync_engine, "before_cursor_execute", counter)
         try:
-            posts = await Wi030Post.query().with_("latest_comment").get()
+            posts = await Wi030Post.with_("latest_comment").get()
             # 1 for posts + 1 grouped subquery for the latest comments = 2.
             assert counter.count == 2
             before = counter.count
@@ -149,7 +149,7 @@ class TestDescriptorEager:
         await _comment(p1, "old", 0)
         await _comment(p1, "new", 90)
 
-        posts = await Wi030Post.query().with_("oldest_comment").get()
+        posts = await Wi030Post.with_("oldest_comment").get()
         oldest = await posts[0].oldest_comment
         assert oldest is not None
         assert oldest.body == "old"

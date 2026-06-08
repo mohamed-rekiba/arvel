@@ -97,7 +97,7 @@ class TestSoftDeleteScopeInRelationCounts:
         gone = await Comment.create(body="b", blog_id=blog.id)
         await gone.delete()
 
-        rows = await Blog.query().with_count("comments").all()
+        rows = await Blog.with_count("comments").all()
         row: Any = rows[0]
         assert row.comments_count == 1
 
@@ -112,7 +112,7 @@ class TestSoftDeleteScopeInRelationCounts:
         await tb.labels.attach(dead.id)
         await dead.delete()
 
-        rows = await TaggedBlog.query().with_count("labels").all()
+        rows = await TaggedBlog.with_count("labels").all()
         row: Any = rows[0]
         assert row.labels_count == 1
 
@@ -146,7 +146,7 @@ class TestSoftDeleteScopeInEagerLoads:
         await dead.delete()
 
         session.expire_all()
-        rows = await TaggedBlog.query().with_("labels").all()
+        rows = await TaggedBlog.with_("labels").all()
         loaded = next(b for b in rows if b.id == tb.id)
         labels = await loaded.labels.all()
         assert sorted(label.name for label in labels) == ["live"]
@@ -186,4 +186,4 @@ class TestWithCountUnknownRelation:
     ) -> None:
         await _setup(engine)
         with pytest.raises(UnknownRelationError):
-            await Blog.query().with_count("nope").all()
+            await Blog.with_count("nope").all()

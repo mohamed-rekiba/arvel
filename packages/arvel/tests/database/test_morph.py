@@ -90,9 +90,7 @@ async def test_morph_one_returns_related_instance(engine: Any, session: AsyncSes
         imageable_id=post.id,
     )
 
-    loaded = await (
-        MorphPost.query().with_("image").where(MorphPost.__table__.c.id == post.id).first()
-    )
+    loaded = await MorphPost.with_("image").where(MorphPost.__table__.c.id == post.id).first()
 
     assert loaded is not None
     assert loaded.image is not None
@@ -105,9 +103,7 @@ async def test_morph_one_returns_none_when_no_related(engine: Any, session: Asyn
     await _create_tables(engine)
     post = await MorphPost.create(title="No Image")
 
-    loaded = await (
-        MorphPost.query().with_("image").where(MorphPost.__table__.c.id == post.id).first()
-    )
+    loaded = await MorphPost.with_("image").where(MorphPost.__table__.c.id == post.id).first()
 
     assert loaded is not None
     assert loaded.image is None
@@ -130,9 +126,7 @@ async def test_morph_one_returns_first_when_multiple_rows(
         imageable_id=post.id,
     )
 
-    loaded = await (
-        MorphPost.query().with_("image").where(MorphPost.__table__.c.id == post.id).first()
-    )
+    loaded = await MorphPost.with_("image").where(MorphPost.__table__.c.id == post.id).first()
 
     assert loaded is not None
     assert loaded.image is not None
@@ -152,9 +146,7 @@ async def test_morph_many_yields_all_related(engine: Any, session: AsyncSession)
     await MorphComment.create(body="B", commentable_type="MorphPost", commentable_id=post.id)
     await MorphComment.create(body="C", commentable_type="MorphPost", commentable_id=other_post.id)
 
-    loaded = await (
-        MorphPost.query().with_("comments").where(MorphPost.__table__.c.id == post.id).first()
-    )
+    loaded = await MorphPost.with_("comments").where(MorphPost.__table__.c.id == post.id).first()
 
     assert loaded is not None
     assert len(loaded.comments) == 2
@@ -166,9 +158,7 @@ async def test_morph_many_returns_empty_list_when_none(engine: Any, session: Asy
     await _create_tables(engine)
     post = await MorphPost.create(title="No Comments")
 
-    loaded = await (
-        MorphPost.query().with_("comments").where(MorphPost.__table__.c.id == post.id).first()
-    )
+    loaded = await MorphPost.with_("comments").where(MorphPost.__table__.c.id == post.id).first()
 
     assert loaded is not None
     assert loaded.comments == []
@@ -190,11 +180,9 @@ async def test_two_owners_share_polymorphic_table(engine: Any, session: AsyncSes
         url="https://example.com/video.jpg", imageable_type="MorphVideo", imageable_id=video.id
     )
 
-    loaded_post = await (
-        MorphPost.query().with_("image").where(MorphPost.__table__.c.id == post.id).first()
-    )
+    loaded_post = await MorphPost.with_("image").where(MorphPost.__table__.c.id == post.id).first()
     loaded_video = await (
-        MorphVideo.query().with_("image").where(MorphVideo.__table__.c.id == video.id).first()
+        MorphVideo.with_("image").where(MorphVideo.__table__.c.id == video.id).first()
     )
 
     assert loaded_post is not None
@@ -242,9 +230,7 @@ async def test_polymorphic_images_are_isolated_by_owner_type(
         imageable_id=post.id,
     )
 
-    loaded = await (
-        MorphPost.query().with_("image").where(MorphPost.__table__.c.id == post.id).first()
-    )
+    loaded = await MorphPost.with_("image").where(MorphPost.__table__.c.id == post.id).first()
 
     assert loaded is not None
     assert loaded.image is None

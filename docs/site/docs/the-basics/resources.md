@@ -104,7 +104,7 @@ Pass a [paginator](../orm/query-builder.md#pagination) instead of a list, and th
 ```python
 @Route.get("/api/users", name="users.index")
 async def index(request: Request):
-    users = await User.query().paginate(per_page=20)
+    users = await User.paginate(per_page=20)
     return UserResource.collection(users).response(request)
 ```
 

@@ -23,6 +23,8 @@ if TYPE_CHECKING:
         SimplePaginator,
     )
 
+    _MorphConstraint = Callable[[QueryBuilder[Any], type[Any]], QueryBuilder[Any]]
+
 
 class QueryMixin:
     """Typed class-level query shortcuts.
@@ -227,20 +229,90 @@ class QueryMixin:
         cls,
         relation: str | Any,
         constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+        operator: str = ">=",
+        count: int = 1,
     ) -> QueryBuilder[Self]:
-        return cls.query().where_has(relation, constraint)
+        return cls.query().where_has(relation, constraint, operator, count)
 
     @classmethod
-    def doesnt_have(cls, relation: str | Any) -> QueryBuilder[Self]:
-        return cls.query().doesnt_have(relation)
+    def or_where_has(
+        cls,
+        relation: str | Any,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+        operator: str = ">=",
+        count: int = 1,
+    ) -> QueryBuilder[Self]:
+        return cls.query().or_where_has(relation, constraint, operator, count)
+
+    @classmethod
+    def with_where_has(
+        cls,
+        relation: str | Any,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().with_where_has(relation, constraint)
+
+    @classmethod
+    def doesnt_have(
+        cls,
+        relation: str | Any,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().doesnt_have(relation, constraint)
+
+    @classmethod
+    def or_doesnt_have(
+        cls,
+        relation: str | Any,
+        constraint: Callable[[QueryBuilder[Any]], QueryBuilder[Any]] | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().or_doesnt_have(relation, constraint)
 
     @classmethod
     def where_relation(cls, relation: str | Any, column: str, value: Any) -> QueryBuilder[Self]:
         return cls.query().where_relation(relation, column, value)
 
     @classmethod
+    def or_where_relation(cls, relation: str | Any, column: str, value: Any) -> QueryBuilder[Self]:
+        return cls.query().or_where_relation(relation, column, value)
+
+    @classmethod
     def has(cls, relation: str | Any, operator: str = ">=", count: int = 1) -> QueryBuilder[Self]:
         return cls.query().has(relation, operator, count)
+
+    @classmethod
+    def where_belongs_to(cls, parent: Any, relation: str | None = None) -> QueryBuilder[Self]:
+        return cls.query().where_belongs_to(parent, relation)
+
+    @classmethod
+    def where_has_morph(
+        cls,
+        relation: str | Any,
+        types: Sequence[type[Any]],
+        constraint: _MorphConstraint | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().where_has_morph(relation, types, constraint)
+
+    @classmethod
+    def has_morph(
+        cls,
+        relation: str | Any,
+        types: Sequence[type[Any]],
+        operator: str = ">=",
+        count: int = 1,
+        constraint: _MorphConstraint | None = None,
+    ) -> QueryBuilder[Self]:
+        return cls.query().has_morph(relation, types, operator, count, constraint)
+
+    @classmethod
+    def where_morph_relation(
+        cls,
+        relation: str | Any,
+        types: Sequence[type[Any]],
+        column: str,
+        value: Any,
+    ) -> QueryBuilder[Self]:
+        return cls.query().where_morph_relation(relation, types, column, value)
 
     @classmethod
     def where_pivot(cls, column: str, value: Any) -> QueryBuilder[Self]:

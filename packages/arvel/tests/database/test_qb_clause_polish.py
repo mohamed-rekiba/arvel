@@ -80,7 +80,7 @@ async def test_having_operator_form(engine: AsyncEngine, session: AsyncSession) 
     await _seed(engine)
     from sqlalchemy import func
 
-    rows = await Widget.query().group_by("tag").having(func.count(), ">", 1).select("tag").all()
+    rows = await Widget.group_by("tag").having(func.count(), ">", 1).select("tag").all()
 
     def _tag(row: object) -> object:
         if isinstance(row, dict):
