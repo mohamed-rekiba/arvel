@@ -215,3 +215,49 @@ That last command scaffolds `PostController`, the `Post` model, `PostObserver`, 
 
 > [!NOTE]
 > The generated resource actions raise `NotImplementedError` until you fill them in — they're stubs, not working endpoints.
+
+<a name="responses-and-redirects"></a>
+## Responses & Redirects
+
+A handler can return a `dict`, a list, a Pydantic model, or any Starlette `Response` and it just works. For the cases where you want to set a status, build a redirect, or flash to the session, Arvel ships Laravel-style `response()` and `redirect()` helpers.
+
+<a name="the-response-helper"></a>
+### The `response()` Helper
+
+`response()` returns a builder for the common shapes:
+
+```python
+from arvel.http import response
+
+response().json({"id": 1}, status=201)        # JSONResponse
+response().text("pong")                          # text/plain
+response().make(b"raw bytes", headers={"X-K": "v"})
+response().no_content()                           # 204, empty body
+```
+
+<a name="redirects"></a>
+### Redirects
+
+`redirect()` builds a redirect response. Point it at a path, a named route, or send the user back where they came from:
+
+```python
+from arvel.http import back, redirect, to_route
+
+redirect("/dashboard")                  # 302 to a path
+redirect("/dashboard", status=301)      # permanent
+to_route("users.show", id=7)            # resolves the named route -> /users/7
+back(request, fallback="/")             # uses the Referer header
+```
+
+<a name="redirects-with-flashed-session-data"></a>
+### Redirecting With Flashed Session Data
+
+Chain `.with_(request, ...)` to flash values into the session before redirecting. They're readable on the **next** request — the usual post-action pattern. This needs the [session middleware](../features/session.md) active on the route; without it, `.with_()` is a no-op.
+
+```python
+async def store(self, form: StorePostRequest, request: Request) -> Redirect:
+    await Post.create(**form.validated().model_dump())
+    return redirect("/posts").with_(request, status="Post created!")
+```
+
+On the next request, read it back with `request.state.session.get("status")`.

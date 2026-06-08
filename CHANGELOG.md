@@ -94,6 +94,10 @@ changelog once shipped.
   always validate; messages key by wildcard or concrete path. Completes the
   validation parity backlog. `validation/validator.py` (`resolve_targets`) +
   `test_wi045_*`
+- Response/redirect helpers — `response().json/text/make/no_content`,
+  `redirect(to)`, `to_route(name, **params)`, `back(request)`, and
+  `redirect(...).with_(request, key=value)` to flash into the session before
+  redirecting. `http/responses.py` + `test_wi046_*`
 - Needs-based CLI bootstrap — each command declares its `requires` subsystems
   (`CliSubsystem`) and only those service providers boot; non-HTTP commands skip
   route loading and the registered-routes banner
@@ -106,8 +110,6 @@ changelog once shipped.
 
 - Outbound HTTP — first-party `Http::` facade + `Http::fake` (currently apps
   call `httpx` directly). High impact, large effort.
-- HTTP response facades — `response()` (JSON/text/no-content builders) and
-  `redirect()` (with session flash). Medium impact, medium effort.
 - Route caching — `route:cache` / `route:clear` (`optimize` already stubs it
   pending a `RouteCollection` serializer). Medium impact, medium-large effort.
 - HTTP security hardening — consolidate the two CSRF middlewares (session 419 /

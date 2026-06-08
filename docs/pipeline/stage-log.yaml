@@ -1682,3 +1682,31 @@ events:
       suite 132 passed (incl. 19 new: resolve_targets unit cases, wildcard/nested/explicit-index validation,
       path-aware presence, wildcard+concrete message overrides, backward-compat).
     timestamp: "2026-06-09T02:07:00Z"
+  - work_item: "WI-arvel-046"
+    stage: "execution"
+    event: "implement"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      response()/redirect() helpers (WI-043 feature gap). New arvel/http/responses.py: a ResponseFactory exposed via
+      response() with json/text/make/no_content builders; redirect(to, status, headers) returning a Redirect
+      (RedirectResponse subclass); to_route(name, **params) that resolves a named route via routing.route; back(request,
+      fallback) reading the Referer header; and Redirect.with_(request, **values) which flashes into
+      request.state.session (chainable, no-op when session middleware isn't active). Re-exported from arvel.http.
+      routing imported lazily inside to_route to avoid an import cycle.
+    artifacts:
+      - "packages/arvel/src/arvel/http/responses.py"
+      - "packages/arvel/src/arvel/http/__init__.py"
+      - "packages/arvel/tests/http/test_wi046_response_redirect.py"
+      - "docs/site/docs/the-basics/controllers.md"
+      - "CHANGELOG.md"
+    timestamp: "2026-06-09T02:20:00Z"
+  - work_item: "WI-arvel-046"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1069 files); uv run pyright 0 errors, 0 warnings; http suite
+      209 passed (incl. 12 new: response builders, redirect status/location, with_ session flash + no-session no-op,
+      back via Referer/fallback, to_route named-route URL); mkdocs build --strict clean.
+    timestamp: "2026-06-09T02:22:00Z"
