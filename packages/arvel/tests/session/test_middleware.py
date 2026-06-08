@@ -51,6 +51,39 @@ class TestStartSessionMiddleware:
         response = client.get("/")
         assert "arvel_session" in response.cookies or "Set-Cookie" in response.headers
 
+    def test_regenerate_destroys_old_store_record(self) -> None:
+        """A returning visitor who logs in must not leave the pre-login session
+        readable in the backend — regenerate() rotates and destroys the old id."""
+        store = ArraySessionStore(lifetime=120)
+
+        async def guest(request: Request) -> Response:
+            session: SessionData = request.state.session
+            session.put("cart", ["item-1"])
+            return Response(session.get_id())
+
+        async def login(request: Request) -> Response:
+            session = cast("SessionData", request.state.session)
+            old_id = session.get_id()
+            session.regenerate()
+            session.put("_auth_id", "u1")
+            return Response(f"{old_id}|{session.get_id()}")
+
+        app = Starlette(
+            routes=[Route("/guest", guest), Route("/login", login)],
+            middleware=[Middleware(StartSession, store=store, lifetime=120)],
+        )
+        client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
+
+        guest_id = client.get("/guest").text
+        old_id, new_id = client.get("/login").text.split("|")
+
+        assert old_id == guest_id
+        assert old_id != new_id
+        # Old record is gone; only the authenticated session remains.
+        assert old_id not in store._store
+        assert new_id in store._store
+        assert store._store[new_id][0].get("_auth_id") == "u1"
+
     def test_accessing_session_without_middleware_raises(self) -> None:
         """Accessing request.state.session without StartSession gives a clear error."""
 

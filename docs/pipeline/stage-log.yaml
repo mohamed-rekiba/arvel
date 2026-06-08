@@ -428,3 +428,47 @@ events:
       notes path is read, Content-Type from mime, and one of path/data required. C2/H/parity gaps
       and the kit template-publish gap tracked as deferred.
     timestamp: "2026-06-08T10:25:00Z"
+  - work_item: "WI-arvel-011"
+    stage: "planning"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 11 (session) deep-research: C1 = SessionData.regenerate() rotates the id but never
+      destroys the old store record, and StartSession has no destroy call — so a returning visitor's
+      pre-login session stays valid after login (contradicts the "prevent fixation" comment; Laravel
+      uses migrate(true)). Reproduced: guest cart under id A survives login→B. except A,B PEP 758
+      syntax ruled out (requires-python>=3.14). Cookie-driver/StartSession integration, invalidate(),
+      and flash get() shadowing deferred. Spec: WI-arvel-011-session-regenerate-destroy.md.
+    artifacts:
+      - ".context/research/011-sessions.md"
+      - "docs/pipeline/specs/WI-arvel-011-session-regenerate-destroy.md"
+    timestamp: "2026-06-08T10:30:00Z"
+  - work_item: "WI-arvel-011"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      data.py: regenerate() queues the old id in a non-serialized _pending_destroy list;
+      drain_pending_destroy() returns+clears; __init__/from_dict init the list. middleware.py:
+      StartSession destroys each drained id after writing the rotated session. New tests: regenerate
+      queues old id, drain is one-shot, queue not serialized, and middleware integration destroys the
+      old record. No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/session/data.py"
+      - "packages/arvel/src/arvel/session/middleware.py"
+      - "packages/arvel/tests/session/test_session_data.py"
+      - "packages/arvel/tests/session/test_middleware.py"
+      - "docs/site/docs/features/session.md"
+    timestamp: "2026-06-08T10:40:00Z"
+  - work_item: "WI-arvel-011"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Full arvel suite = 4303 passed (3 deselected), no regression; session + auth-safety 80 passed;
+      mypy --strict + pyright + ruff clean on the session module. Docs session.md notes regenerate()
+      destroys the old record on response (Laravel migrate(true)). Cookie-driver integration,
+      invalidate(), and flash shadowing tracked as deferred.
+    timestamp: "2026-06-08T10:50:00Z"

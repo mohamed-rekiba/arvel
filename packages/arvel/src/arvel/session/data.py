@@ -19,6 +19,9 @@ class SessionData:
 
     def __init__(self, data: dict[str, Any]) -> None:
         self._data = dict(data)
+        # Old ids queued by regenerate() for the middleware to destroy in the
+        # store. Kept off _data so it never gets serialized.
+        self._pending_destroy: list[str] = []
         if _SESSION_ID not in self._data:
             self._data[_SESSION_ID] = uuid.uuid7().hex
 
@@ -57,7 +60,19 @@ class SessionData:
         return str(self._data.get(_SESSION_ID, ""))
 
     def regenerate(self) -> None:
+        # Queue the old id for destruction so the backend record can't outlive the
+        # rotation — mirrors Laravel's migrate(true). Prevents the pre-login session
+        # from lingering after login.
+        old_id = self._data.get(_SESSION_ID)
+        if isinstance(old_id, str) and old_id:
+            self._pending_destroy.append(old_id)
         self._data[_SESSION_ID] = uuid.uuid7().hex
+
+    def drain_pending_destroy(self) -> list[str]:
+        """Return ids queued by regenerate() and clear the queue."""
+        ids = self._pending_destroy
+        self._pending_destroy = []
+        return ids
 
     # ── Flash operations ──────────────────────────────────────────────────────
 
@@ -100,6 +115,7 @@ class SessionData:
     def from_dict(cls, data: dict[str, Any]) -> SessionData:
         instance = cls.__new__(cls)
         instance._data = dict(data)
+        instance._pending_destroy = []
         return instance
 
 
