@@ -117,6 +117,69 @@ class TestSoftDeleteScopeInRelationCounts:
         assert row.labels_count == 1
 
 
+class TestSoftDeleteScopeInEagerLoads:
+    """Eager with_() honours the related soft-delete scope, like Laravel and with_count."""
+
+    async def test_eager_with_excludes_trashed_sa_relationship(
+        self, engine: AsyncEngine, session: AsyncSession
+    ) -> None:
+        await _setup(engine)
+        blog = await Blog.create(name="kept")
+        await Comment.create(body="live", blog_id=blog.id)
+        gone = await Comment.create(body="gone", blog_id=blog.id)
+        await gone.delete()
+
+        session.expire_all()
+        rows = await Blog.with_("comments").all()
+        loaded = next(b for b in rows if b.id == blog.id)
+        assert sorted(c.body for c in loaded.comments) == ["live"]
+
+    async def test_eager_with_excludes_trashed_pivot_target(
+        self, engine: AsyncEngine, session: AsyncSession
+    ) -> None:
+        await _setup(engine)
+        tb = await TaggedBlog.create(name="t")
+        live = await Label.create(name="live")
+        dead = await Label.create(name="dead")
+        await tb.labels.attach(live.id)
+        await tb.labels.attach(dead.id)
+        await dead.delete()
+
+        session.expire_all()
+        rows = await TaggedBlog.query().with_("labels").all()
+        loaded = next(b for b in rows if b.id == tb.id)
+        labels = await loaded.labels.all()
+        assert sorted(label.name for label in labels) == ["live"]
+
+    async def test_eager_with_trashed_constraint_includes_trashed(
+        self, engine: AsyncEngine, session: AsyncSession
+    ) -> None:
+        await _setup(engine)
+        blog = await Blog.create(name="kept")
+        await Comment.create(body="live", blog_id=blog.id)
+        gone = await Comment.create(body="gone", blog_id=blog.id)
+        await gone.delete()
+
+        session.expire_all()
+        rows = await Blog.with_({"comments": lambda q: q.with_trashed()}).all()
+        loaded = next(b for b in rows if b.id == blog.id)
+        assert sorted(c.body for c in loaded.comments) == ["gone", "live"]
+
+    async def test_lazy_pivot_excludes_trashed_target(
+        self, engine: AsyncEngine, session: AsyncSession
+    ) -> None:
+        await _setup(engine)
+        tb = await TaggedBlog.create(name="t")
+        live = await Label.create(name="live")
+        dead = await Label.create(name="dead")
+        await tb.labels.attach(live.id)
+        await tb.labels.attach(dead.id)
+        await dead.delete()
+
+        labels = await tb.labels.all()
+        assert sorted(label.name for label in labels) == ["live"]
+
+
 class TestWithCountUnknownRelation:
     async def test_raises_for_unknown_relation(
         self, engine: AsyncEngine, session: AsyncSession

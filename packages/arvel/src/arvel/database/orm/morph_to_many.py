@@ -34,6 +34,14 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
+def _related_global_scope(related_model: type[Any]) -> Any:
+    """Related model's global-scope predicate (soft-delete `deleted_at IS NULL`), or None."""
+    # Deferred import: query.py imports the orm package, so this can't be top-level.
+    from arvel.database.query import QueryBuilder
+
+    return QueryBuilder(related_model, select(related_model)).apply_global_scopes().whereclause
+
+
 @dataclass(frozen=True)
 class MorphToManyLink:
     """Pivot metadata for query-builder existence subqueries.
@@ -119,6 +127,9 @@ class MorphToManyAccessor(Generic[T]):
             .where(type_pred)
             .where(id_pred)
         )
+        scope_where = _related_global_scope(self._related_model)
+        if scope_where is not None:
+            stmt = stmt.where(scope_where)
         result = await session.execute(stmt)
         for row in result.scalars():
             yield row
@@ -246,6 +257,9 @@ class MorphToManyAccessor(Generic[T]):
             .where(id_pred)
             .where(self._table.c[column] == value)
         )
+        scope_where = _related_global_scope(self._related_model)
+        if scope_where is not None:
+            stmt = stmt.where(scope_where)
         result = await session.execute(stmt)
         return list(result.scalars())
 
@@ -438,6 +452,9 @@ class MorphedByManyAccessor(Generic[T]):
             .where(owner_pred)
             .where(type_pred)
         )
+        scope_where = _related_global_scope(self._related_model)
+        if scope_where is not None:
+            stmt = stmt.where(scope_where)
         result = await session.execute(stmt)
         for row in result.scalars():
             yield row
