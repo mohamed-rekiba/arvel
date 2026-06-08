@@ -675,7 +675,9 @@ def _coerce_models_in_result(result: Any) -> Any:
     if isinstance(result, _Model):
         return result.to_dict()
     if isinstance(result, list):
-        items: list[Any] = cast("list[Any]", result)
+        # cast to list[object] (not list[Any]): keeps pyright's element type known
+        # without mypy flagging a redundant cast off its own list[Any] narrowing.
+        items: list[object] = cast("list[object]", result)
         if any(isinstance(item, _Model) for item in items):
             return [item.to_dict() if isinstance(item, _Model) else item for item in items]
         return items

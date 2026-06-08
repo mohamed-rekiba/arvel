@@ -21,7 +21,7 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
 
 _FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 _ANSI_DIM = "\033[2m"
@@ -35,7 +35,7 @@ def _suppressed() -> bool:
 
 
 @contextlib.contextmanager
-def boot_spinner(message: str) -> Iterator[None]:
+def boot_spinner(message: str) -> Generator[None]:
     """Animate a spinner on stderr until the block exits (success or error)."""
     if _suppressed():
         yield
