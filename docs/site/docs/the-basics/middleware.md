@@ -208,6 +208,24 @@ app.add_middleware(
 
 Arvel ships several ASGI middleware you can add to the stack, including `SecurityHeadersMiddleware` (HSTS, CSP, and friends) and `MethodSpoofMiddleware` (turns a `POST` with a `_method` field into `PUT`/`PATCH`/`DELETE`). The framework also installs request-scope, [context](../features/logging.md), deferred-task, and observability middleware automatically when the app boots.
 
+<a name="trusting-proxies"></a>
+### Trusting Proxies
+
+Behind a load balancer or reverse proxy, the TCP peer your app sees is the *proxy* — not the real client. The real client IP, the original scheme (the proxy usually terminates TLS), and the public host arrive in the `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` headers.
+
+Set `TRUSTED_PROXIES` to opt in. When the peer matches, `TrustProxiesMiddleware` rewrites the request so `request.client.host` (and the rate-limit key that reads it), the scheme, and the host all reflect the real client — for every downstream middleware and handler:
+
+```bash
+# CSV of proxy IPs / CIDRs
+TRUSTED_PROXIES=10.0.0.0/8,192.168.0.0/16
+
+# Or trust every peer — only when the LB is the sole ingress and the app
+# port is firewalled off from direct access.
+TRUSTED_PROXIES=*
+```
+
+These headers are client-controlled, so they're honored **only** when the TCP peer is a trusted proxy — otherwise anyone could spoof their IP, scheme, or host. With `TRUSTED_PROXIES` unset (the default), forwarded headers are ignored and the middleware isn't mounted at all.
+
 <a name="generating-middleware"></a>
 ## Generating Middleware
 

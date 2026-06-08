@@ -750,3 +750,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Feature gap (WI-043, high-risk security path). The session VerifyCsrf and the cookie CsrfDoubleSubmitMiddleware defined two separate CsrfMismatchException classes with divergent status codes (419 vs 403, same code). Consolidated to one shared CsrfMismatchException (419, Laravel TokenMismatchException parity) in arvel.http.exceptions; both middlewares import it (cookie check moved 403->419). Both now accept the X-XSRF-TOKEN header alias; VerifyCsrf also reads the _token field of urlencoded form posts (Laravel token-source order: header, XSRF header, _token), without buffering JSON/multipart bodies. TrustProxies (general request-path IP resolution) split out as its own WI. Spec: docs/pipeline/specs/WI-arvel-050-csrf-consolidation.md"
+  - id: "WI-arvel-051"
+    name: "TrustProxies — general request-path X-Forwarded-* resolution"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "confidential"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-09T04:20:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Feature gap (WI-043, split out of WI-050; security path). Trusted-proxy forwarded-header resolution existed only for observability/reverb (observability/forwarded.py), not the app request path — so behind a load balancer request.client.host (and the Throttle key that reads it), the scheme, and the host all saw the proxy. Added TrustProxiesMiddleware (http/middleware/trust_proxies.py): when the TCP peer matches TRUSTED_PROXIES it rewrites scope client (XFF, reusing resolve_client_ip; leftmost entry for '*'), scheme (X-Forwarded-Proto, ws/wss for websocket), and Host (X-Forwarded-Host). New HttpConfig.trusted_proxies reads bare TRUSTED_PROXIES (NoPrefix, CSV; '*' trusts all -> 0.0.0.0/0 + ::/0). Bound in HttpServiceProvider; mounted as the OUTERMOST layer in Application ASGI assembly only when set (default off = fail-safe, headers ignored). Untrusted peer -> scope untouched. Also fixed a latent WI-050 re-export gap (CsrfMismatchException imported via _middleware_core which doesn't __all__-export it; now imported from arvel.http.exceptions). Spec: docs/pipeline/specs/WI-arvel-051-trust-proxies.md"

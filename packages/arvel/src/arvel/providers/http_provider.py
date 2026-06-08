@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import ClassVar
 
 from arvel.console._subsystem import CliSubsystem
+from arvel.http.config import HttpConfig
 from arvel.http.exceptions import ExceptionTranslator, HttpExceptionHandler
 from arvel.http.ratelimit import InMemoryStore, RateLimiterStore
 from arvel.maintenance import MaintenanceModeManager
@@ -27,6 +28,7 @@ class HttpServiceProvider(ServiceProvider):
         )
         c.singleton(RateLimiterStore, InMemoryStore)
         c.singleton(MaintenanceModeManager, lambda: MaintenanceModeManager())
+        c.singleton(HttpConfig, lambda: HttpConfig.from_environment())
 
 
 def default_translators() -> Mapping[type[Exception], ExceptionTranslator]:

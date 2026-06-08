@@ -1905,3 +1905,35 @@ events:
       listener proves get_permissions_via_roles and has_permission_to each hit role_has_permissions exactly once
       for a 3-role user — was 3 with the old loop).
     timestamp: "2026-06-09T04:11:00Z"
+  - work_item: "WI-arvel-051"
+    stage: "execution"
+    event: "fix"
+    result: "pass"
+    gate: "user-approval"
+    note: >-
+      Feature gap (WI-043, split out of WI-050; security path). Trusted-proxy X-Forwarded-* resolution existed only
+      for observability/reverb (observability/forwarded.py), not the app request path — so behind a load balancer
+      request.client.host (and the Throttle key that reads it), the scheme, and the host all saw the proxy. Added
+      TrustProxiesMiddleware (outermost ASGI layer): when the TCP peer matches TRUSTED_PROXIES it rewrites scope
+      client (XFF via resolve_client_ip; leftmost entry for '*'), scheme (X-Forwarded-Proto; ws/wss for websocket),
+      and Host (X-Forwarded-Host). New HttpConfig.trusted_proxies reads bare TRUSTED_PROXIES (NoPrefix, CSV; '*' ->
+      0.0.0.0/0 + ::/0). Bound in HttpServiceProvider; mounted only when set (default off = fail-safe). Untrusted
+      peer leaves the scope untouched. Folded in: fixed a latent WI-050 re-export (CsrfMismatchException imported
+      via _middleware_core which doesn't __all__-export it; now from arvel.http.exceptions).
+    artifacts:
+      - "packages/arvel/src/arvel/http/config.py"
+      - "packages/arvel/src/arvel/http/middleware/trust_proxies.py"
+      - "packages/arvel/src/arvel/providers/http_provider.py"
+      - "packages/arvel/src/arvel/application/application.py"
+      - "docs/pipeline/specs/WI-arvel-051-trust-proxies.md"
+    timestamp: "2026-06-09T04:35:00Z"
+  - work_item: "WI-arvel-051"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff clean; uv run mypy 0 issues (450 files); uv run pyright 0/0; http + application + auth + test_auth suites
+      pass (new test_trust_proxies.py, 14 cases: untrusted peer untouched; client-IP/scheme/host rewrite behind a
+      trusted peer; '*' leftmost pick; no-XFF keeps peer; invalid proto ignored; lifespan passthrough; ws https->wss;
+      import identity; TRUSTED_PROXIES CSV + empty default); mkdocs build --strict clean.
+    timestamp: "2026-06-09T04:36:00Z"

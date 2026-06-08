@@ -13,14 +13,15 @@ from arvel.http._middleware_core import (
     Authenticate,
     CallNext,
     Cors,
-    CsrfMismatchException,
     Middleware,
     Throttle,
     VerifyCsrf,
 )
+from arvel.http.exceptions import CsrfMismatchException
 from arvel.http.middleware.method_spoof import MethodSpoofMiddleware
 from arvel.http.middleware.security_headers import SecurityHeadersMiddleware
 from arvel.http.middleware.signed import SignedMiddleware
+from arvel.http.middleware.trust_proxies import TrustProxiesMiddleware
 
 __all__ = [
     "Authenticate",
@@ -32,5 +33,6 @@ __all__ = [
     "SecurityHeadersMiddleware",
     "SignedMiddleware",
     "Throttle",
+    "TrustProxiesMiddleware",
     "VerifyCsrf",
 ]
