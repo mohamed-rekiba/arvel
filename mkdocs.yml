@@ -211,6 +211,7 @@ nav:
       - Cache: features/cache.md
       - Session: features/session.md
       - File Storage: features/storage.md
+      - HTTP Client: features/http-client.md
       - Mail: features/mail.md
       - Notifications: features/notifications.md
       - Events: features/events.md

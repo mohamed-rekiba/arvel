@@ -98,6 +98,15 @@ changelog once shipped.
   `redirect(to)`, `to_route(name, **params)`, `back(request)`, and
   `redirect(...).with_(request, key=value)` to flash into the session before
   redirecting. `http/responses.py` + `test_wi046_*`
+- Outbound HTTP — first-party `Http` facade over `httpx` with a fluent
+  `PendingRequest` builder (`with_headers/with_token/with_basic_auth/accept_json/
+  as_form/timeout/base_url`), verb methods (`get/head/post/put/patch/delete`),
+  and a predicate-rich `Response` (`ok/successful/redirect/failed/client_error/
+  server_error/json/body/header`). `Http.fake({pattern: Http.response(...)})`
+  records and stubs requests (glob match, empty-200 default so tests never hit
+  the network) with `recorded()`, `assert_sent`, `assert_not_sent`,
+  `assert_sent_count`, `assert_nothing_sent`. `http/client.py`,
+  `facades/http.py`, `testing/fakes/http.py` + `test_wi047_*`
 - Framework-level local file serving — `STORAGE_LOCAL_SERVE` registers a route at
   `STORAGE_LOCAL_URL` that serves files from the local disk (Laravel `serve =>
   true` parity), with path-traversal protection and signed/temporary-URL support.
@@ -113,8 +122,6 @@ changelog once shipped.
 `.context/research/043-feature-gap-bucket3-triage.md` and
 [`docs/backlog/043-epic-feature-gap-bucket3-triage.md`](docs/backlog/043-epic-feature-gap-bucket3-triage.md)):
 
-- Outbound HTTP — first-party `Http::` facade + `Http::fake` (currently apps
-  call `httpx` directly). High impact, large effort.
 - HTTP security hardening — consolidate the two CSRF middlewares (session 419 /
   cookie 403), accept `X-XSRF-TOKEN` + form `_token`, and add a general
   `TrustProxies` request middleware (trusted-proxy IP resolution exists for

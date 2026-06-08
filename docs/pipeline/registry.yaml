@@ -690,6 +690,21 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Feature gap (WI-043). New arvel/http/responses.py: response() factory (json/text/make/no_content builders), redirect(to), to_route(name, **params) via routing.route, back(request) via Referer, and Redirect.with_(request, **values) flashing into request.state.session before redirect (no-op without session middleware). Re-exported from arvel.http. Handlers already return Starlette responses directly; this adds the discoverable Laravel-style helpers plus redirect-with-flash. Spec: docs/pipeline/specs/WI-arvel-046-response-redirect-helpers.md"
+  - id: "WI-arvel-047"
+    name: "Http facade + Http.fake (outbound HTTP client)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-09T02:45:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Feature gap (WI-043, high impact/large effort). First-party outbound HTTP over httpx2. arvel/http/client.py: PendingRequest fluent builder (with_headers/with_token/with_basic_auth/accept/accept_json/as_form/timeout/base_url), async verbs (get/head/post/put/patch/delete), Response wrapper with predicates (ok/successful/redirect/failed/client_error/server_error) + json/body/header/headers/raise_for_status, OutboundRequest dataclass, FakeTransport Protocol + _active_fake ContextVar for test isolation. arvel/facades/http.py: stateless Http facade. arvel/testing/fakes/http.py: HttpFake records RecordedRequest + glob-matched FakeResponse stubs (empty-200 default so tests never hit the network), HttpFakeContext context manager, Http.fake/response/recorded/assert_sent/assert_not_sent/assert_sent_count/assert_nothing_sent. Re-exported from arvel.facades. Spec: docs/pipeline/specs/WI-arvel-047-http-facade.md"
   - id: "WI-arvel-049"
     name: "STORAGE_LOCAL_SERVE local file serving"
     complexity: "L2"
