@@ -13,13 +13,13 @@ Each check is bounded by a 5s timeout; a timeout reports ``unhealthy`` with
 from __future__ import annotations
 
 import asyncio
-import ipaddress
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from arvel.application import Application
+from arvel.observability.forwarded import ip_in_cidrs, resolve_client_ip
 from arvel.services import HealthResult, HealthStatus
 
 if TYPE_CHECKING:
@@ -32,29 +32,13 @@ _HTTP_FORBIDDEN = 403
 _HTTP_UNAVAILABLE = 503
 
 
-def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    if request.client:
-        return request.client.host
-    return "127.0.0.1"
-
-
-def _is_allowed(ip: str, allowed_cidrs: list[str]) -> bool:
-    if not allowed_cidrs:
-        return True
-    try:
-        addr = ipaddress.ip_address(ip)
-    except ValueError:
-        return False
-    for cidr in allowed_cidrs:
-        try:
-            if addr in ipaddress.ip_network(cidr, strict=False):
-                return True
-        except ValueError:
-            continue
-    return False
+def _resolve_ip(request: Request, trusted_proxies: list[str]) -> str:
+    peer = request.client.host if request.client else "127.0.0.1"
+    return resolve_client_ip(
+        peer_ip=peer,
+        forwarded_for=request.headers.get("X-Forwarded-For"),
+        trusted_proxies=trusted_proxies,
+    )
 
 
 async def _check_one(service: BaseService) -> tuple[str, HealthResult]:
@@ -82,12 +66,20 @@ def add_health_route(
     container: Container,
     path: str = "/_health",
     allowed_cidrs: list[str] | None = None,
+    trusted_proxies: list[str] | None = None,
 ) -> None:
-    """Register the aggregated health endpoint at ``path``."""
+    """Register the aggregated health endpoint at ``path``.
+
+    No ``allowed_cidrs`` means open (LB/k8s probes reach it from arbitrary IPs).
+    When configured, the client IP is the TCP peer; ``X-Forwarded-For`` is honored
+    only when the peer is in ``trusted_proxies`` so a spoofed header can't bypass
+    the guard.
+    """
     cidrs = list(allowed_cidrs or [])
+    trusted = list(trusted_proxies or [])
 
     async def health_endpoint(request: Request) -> JSONResponse:
-        if not _is_allowed(_client_ip(request), cidrs):
+        if cidrs and not ip_in_cidrs(_resolve_ip(request, trusted), cidrs):
             return JSONResponse({"detail": "Forbidden"}, status_code=_HTTP_FORBIDDEN)
 
         services = _resolve_services(container)

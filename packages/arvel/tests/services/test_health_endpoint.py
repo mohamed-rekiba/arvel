@@ -148,3 +148,18 @@ def test_cidr_restriction_returns_403(tmp_path: Path, monkeypatch: pytest.Monkey
         response = client.get("/_health", headers={"X-Forwarded-For": "8.8.8.8"})
 
     assert response.status_code == 403
+
+
+def test_forwarded_header_cannot_spoof_cidr_guard(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # XFF claims an allowlisted IP, but the peer isn't a trusted proxy — the guard
+    # must use the real peer and reject. Without the fix this returned 200.
+    monkeypatch.setenv("HEALTH_ALLOWED_CIDRS", "10.0.0.0/8")
+    app = _app(tmp_path)
+    app.register_service(_Static("db", HealthResult(HealthStatus.healthy)))
+
+    with cast("httpx.Client", TestClient(app.into_asgi())) as client:
+        response = client.get("/_health", headers={"X-Forwarded-For": "10.0.0.1"})
+
+    assert response.status_code == 403

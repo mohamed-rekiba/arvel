@@ -61,6 +61,13 @@ class ObservabilityConfig(BaseSettings):
         alias="HEALTH_ALLOWED_CIDRS",
     )
 
+    # Peers from which X-Forwarded-For is honored for the /_health and /_metrics
+    # CIDR guards. Empty = never trust the header (the TCP peer is the client).
+    trusted_proxies: Annotated[list[str], NoDecode] = Field(
+        default_factory=list,
+        alias="OBSERVABILITY_TRUSTED_PROXIES",
+    )
+
     db_slow_query_ms: int = Field(default=200, alias="DB_SLOW_QUERY_MS")
     db_query_log_enabled: bool = Field(default=True, alias="DB_QUERY_LOG_ENABLED")
 
@@ -68,6 +75,7 @@ class ObservabilityConfig(BaseSettings):
         "log_redact_fields",
         "metrics_allowed_cidrs",
         "health_allowed_cidrs",
+        "trusted_proxies",
         mode="before",
     )
     @classmethod

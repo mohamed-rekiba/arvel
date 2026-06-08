@@ -479,7 +479,12 @@ class Application:
             config = self.container.make(ObservabilityConfig)
         except BindingResolutionError:
             config = ObservabilityConfig()
-        add_health_route(fa, container=self.container, allowed_cidrs=config.health_allowed_cidrs)
+        add_health_route(
+            fa,
+            container=self.container,
+            allowed_cidrs=config.health_allowed_cidrs,
+            trusted_proxies=config.trusted_proxies,
+        )
 
     def _maybe_add_observability_middleware(self, fa: FastAPI) -> None:
         """Mount the context + observability middleware unless explicitly disabled."""
