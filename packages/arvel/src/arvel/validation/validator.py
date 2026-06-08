@@ -84,8 +84,12 @@ class Validator:
                 else expand_rule_expressions(field_rules)
             )
             value = self._data.get(field)
+            # `bail` stops this field at its first failure (Laravel semantics).
+            stop_on_first = any(parse_rule_expression(expr)[0] == "bail" for expr in expressions)
             for expression in expressions:
                 rule_name, params = parse_rule_expression(expression)
+                if rule_name == "bail":
+                    continue
                 handler = RULE_HANDLERS.get(rule_name)
                 if handler is None:
                     issue = f"Unknown validation rule {rule_name!r}."
@@ -105,4 +109,6 @@ class Validator:
                 if label != field and label not in issue:
                     issue = issue.replace(field, label, 1)
                 details.append({"field": field, "issue": issue})
+                if stop_on_first:
+                    break
         return details

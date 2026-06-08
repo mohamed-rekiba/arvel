@@ -140,6 +140,20 @@ The following rules are available in the `rules()` layer. Rules are written as p
 | `present` | `present` | Field key must exist in the payload, even if its value is empty/null. |
 | `filled` | `filled` | When present, the field must have a non-empty value. |
 | `prohibited` | `prohibited` | Field must be absent or empty. |
+| [`bail`](#rule-bail) | `bail` | Stop running rules for this field at the first failure. |
+
+### Conditional presence
+
+These make a field required based on the value or presence of other fields. They only fail when the trigger condition holds **and** the field is empty.
+
+| Rule | Form | Purpose |
+|---|---|---|
+| `required_if` | `required_if:other,val,...` | Required when `other` equals one of the listed values. |
+| `required_unless` | `required_unless:other,val,...` | Required unless `other` equals one of the listed values. |
+| `required_with` | `required_with:f1,f2,...` | Required when **any** of the listed fields are present. |
+| `required_with_all` | `required_with_all:f1,f2,...` | Required when **all** of the listed fields are present. |
+| `required_without` | `required_without:f1,f2,...` | Required when **any** of the listed fields are missing. |
+| `required_without_all` | `required_without_all:f1,f2,...` | Required when **all** of the listed fields are missing. |
 
 ### Types & format
 
@@ -182,6 +196,19 @@ The following rules are available in the `rules()` layer. Rules are written as p
 | `between` | `between:a,b` | In the inclusive range `[a, b]`. |
 | `size` | `size:n` | Exactly *n*. |
 
+### Dates
+
+Date rules accept ISO-8601 strings (`2026-01-15`, `2026-01-15T10:30:00`) and `date`/`datetime` objects. The bound for `before`/`after` can be a literal date, another field name, or `today`/`now`. Naive values are read as UTC so comparisons are consistent.
+
+| Rule | Form | Purpose |
+|---|---|---|
+| `date` | `date` | Value parses as a date. |
+| `date_format` | `date_format:%d/%m/%Y` | Value matches the given `strptime` format. |
+| `before` | `before:2026-06-01` | Date is before the bound. |
+| `after` | `after:start_date` | Date is after the bound (here, the `start_date` field). |
+| `before_or_equal` | `before_or_equal:today` | Date is on or before the bound. |
+| `after_or_equal` | `after_or_equal:today` | Date is on or after the bound. |
+
 ### Cross-field comparisons
 
 | Rule | Form | Purpose |
@@ -210,6 +237,17 @@ The field under validation must be present and not "empty". A value is empty whe
 ```python
 {"name": "required"}
 ```
+
+<a name="rule-bail"></a>
+### bail
+
+Stop running the rest of a field's rules after the first one fails. Put it first in the chain. Without `bail`, every rule runs and you get every failure for that field; with it, you get just the first.
+
+```python
+{"code": "bail|integer|min:5"}
+```
+
+`bail` only affects the field it appears on, and it never produces an error itself.
 
 <a name="rule-digits"></a>
 ### digits:_n_
@@ -305,6 +343,47 @@ class StorePaymentRequest(FormRequest[StorePaymentPayload]):
 ```
 
 The `card_number` rules only run when `payment_method` is `"card"`.
+
+<a name="rule-builders"></a>
+## Rule Builders
+
+`Rule` provides typed helpers that build rule-expression strings, so you don't have to hand-format the comma-joined parameters. They slot straight into the same `rules()` dict:
+
+```python
+from arvel.validation import Rule
+
+
+def rules(self) -> dict[str, str | list[str]]:
+    return {
+        "role": Rule.in_("admin", "editor", "viewer"),
+        "email": Rule.unique("users", "email", ignore=self.user_id),
+        "author_id": Rule.exists("users", "id"),
+        "card_number": ["required", Rule.required_if("payment", "card")],
+    }
+```
+
+Available builders: `Rule.in_`, `Rule.not_in`, `Rule.exists`, `Rule.unique`, `Rule.required_if`, `Rule.required_unless`. Values are comma-joined, so a value containing a comma isn't supported — reach for a [custom rule](#custom-rules) in that case.
+
+<a name="custom-rules"></a>
+## Custom Rules
+
+Register your own rule once at startup and use it by name anywhere. A rule handler takes `(field, value, params, data, request)` and returns an error message on failure or `None` on success — sync or async:
+
+```python
+from arvel.validation import register_rule
+
+
+def rule_even(field, value, params, data, request):
+    if isinstance(value, int) and value % 2 == 0:
+        return None
+    return f"The {field} must be even."
+
+
+register_rule("even", rule_even)
+
+# Now usable like any built-in:
+{"quantity": "required|integer|even"}
+```
 
 <a name="customizing-messages-and-attributes"></a>
 ## Customizing Messages and Attributes

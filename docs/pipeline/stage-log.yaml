@@ -1620,3 +1620,35 @@ events:
       - "CHANGELOG.md"
       - "docs/backlog/043-epic-feature-gap-bucket3-triage.md"
     timestamp: "2026-06-09T01:30:00Z"
+  - work_item: "WI-arvel-044"
+    stage: "execution"
+    event: "implement"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Validation parity round 2 (WI-043 gap #4, recommended first — additive, low risk). Existing rules layer
+      reviewed (sometimes/Rule.sometimes conditional already shipped). Added: bail (validator stops a field at its
+      first failure; the bail token never errors), conditional presence (required_if, required_unless, required_with,
+      required_with_all, required_without, required_without_all — fail only when the trigger holds and the field is
+      empty), date rules (date, date_format:FMT, before/after/before_or_equal/after_or_equal with literal | field-ref |
+      today/now bounds; naive values normalized to UTC so comparisons are consistent and tz-safe), register_rule() to
+      add custom handlers, and Rule builders (in_, not_in, exists, unique, required_if, required_unless) that emit rule
+      strings. Wildcard/nested (items.*.id) deferred — it changes the validator's field-iteration model (own WI).
+    artifacts:
+      - "packages/arvel/src/arvel/validation/rules.py"
+      - "packages/arvel/src/arvel/validation/validator.py"
+      - "packages/arvel/src/arvel/validation/rule.py"
+      - "packages/arvel/src/arvel/validation/__init__.py"
+      - "packages/arvel/tests/validation/test_wi044_validation_parity.py"
+      - "docs/site/docs/the-basics/validation.md"
+      - "CHANGELOG.md"
+    timestamp: "2026-06-09T01:50:00Z"
+  - work_item: "WI-arvel-044"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1066 files); uv run pyright 0 errors, 0 warnings; validation
+      suite 113 passed (incl. 27 new across bail, conditional presence, dates, custom registration, Rule builders);
+      mkdocs build --strict clean.
+    timestamp: "2026-06-09T01:52:00Z"

@@ -73,13 +73,21 @@ changelog once shipped.
   (with `{"*": [...]}` list wildcard), `assert_json_count`,
   `assert_json_validation_errors` (handles both FastAPI `detail` and Laravel
   `errors` shapes)
-- Laravel-parity validation rules — 32 new rules in the `rules()` layer:
+- Laravel-parity validation rules — 32 rules in the `rules()` layer:
   presence/emptiness (`nullable`, `present`, `filled`, `prohibited`), types
   (`string`, `integer`, `numeric`, `boolean`, `accepted`), formats (`email`,
   `url`, `uuid`, `ip`, `ipv4`, `ipv6`, `json`), strings (`alpha`, `alpha_num`,
   `alpha_dash`, `regex`, `not_regex`, `starts_with`, `ends_with`, `in`,
   `not_in`), size/range (`min`, `max`, `between`, `size`), comparisons
   (`confirmed`, `same`, `different`)
+- Validation parity round 2 — `bail` (stop a field at the first failure),
+  conditional presence (`required_if`, `required_unless`, `required_with`,
+  `required_with_all`, `required_without`, `required_without_all`), dates
+  (`date`, `date_format`, `before`, `after`, `before_or_equal`,
+  `after_or_equal`), `register_rule()` for custom rules, and `Rule` builders
+  (`in_`, `not_in`, `exists`, `unique`, `required_if`, `required_unless`) —
+  `validation/rules.py`, `validation/rule.py`, `validation/validator.py` +
+  `test_wi044_*`
 - Needs-based CLI bootstrap — each command declares its `requires` subsystems
   (`CliSubsystem`) and only those service providers boot; non-HTTP commands skip
   route loading and the registered-routes banner
@@ -96,9 +104,11 @@ changelog once shipped.
   `redirect()` (with session flash). Medium impact, medium effort.
 - Route caching — `route:cache` / `route:clear` (`optimize` already stubs it
   pending a `RouteCollection` serializer). Medium impact, medium-large effort.
-- More validation rules — `date`, `bail`, conditional (`required_if`/`sometimes`),
-  nested/wildcard (`items.*.id`), custom rule registration, and `Rule.in_()` /
-  `Rule.unique()` builders. Medium impact, low risk, incremental.
+- Nested/wildcard validation — array-of-objects rules like `items.*.id`. The
+  rest of the validation parity backlog (`date`, `bail`, `required_if`,
+  custom rules, `Rule` builders) landed; wildcard field expansion remains
+  because it changes the validator's field-iteration model. Medium impact,
+  medium effort — own WI.
 - HTTP security hardening — consolidate the two CSRF middlewares (session 419 /
   cookie 403), accept `X-XSRF-TOKEN` + form `_token`, and add a general
   `TrustProxies` request middleware (trusted-proxy IP resolution exists for

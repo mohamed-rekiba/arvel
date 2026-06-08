@@ -645,3 +645,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Bucket-3 triage — verified CHANGELOG Unreleased gaps against the code: needs-based CLI bootstrap + openapi:export --output FILE already landed (moved out of remaining); ranked the 6 genuine remaining gaps by impact/effort/risk (recommend validation rules first, Http facade biggest win, CSRF/TrustProxies own gated WI). CHANGELOG de-staled. Research: .context/research/043-feature-gap-bucket3-triage.md; epic: docs/backlog/043-epic-feature-gap-bucket3-triage.md"
+  - id: "WI-arvel-044"
+    name: "Validation parity round 2 — bail, conditional presence, dates, custom rules, Rule builders"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-09T01:45:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Feature gap (WI-043 #4, recommended first). Added bail (stop-at-first-failure per field), conditional presence (required_if/unless/with/with_all/without/without_all), date rules (date/date_format/before/after/before_or_equal/after_or_equal, UTC-normalized), register_rule() for custom rules, and Rule builders (in_/not_in/exists/unique/required_if/required_unless). Wildcard/nested (items.*.id) deferred — changes field-iteration model. Spec: docs/pipeline/specs/WI-arvel-044-validation-parity-round-2.md"

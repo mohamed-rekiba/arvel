@@ -8,6 +8,8 @@ import json as _json
 import re
 import uuid as _uuid
 from collections.abc import Awaitable, Callable, Mapping, Sized
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from typing import Any, cast
 
 from sqlalchemy import column, select
@@ -898,14 +900,272 @@ def rule_different(
     return f"The {field} and {other} must be different."
 
 
+def _is_present(data: Mapping[str, object], key: str) -> bool:
+    """True when ``key`` is in the payload with a non-empty value (Laravel's notion)."""
+    if key not in data:
+        return False
+    other = data[key]
+    return other is not None and not _is_empty_value(other)
+
+
+def _required_failure(field: str, value: object) -> str | None:
+    if value is None or _is_empty_value(value):
+        return f"The {field} field is required."
+    return None
+
+
+def rule_required_if(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    if len(params) < _TABLE_COLUMN_COUNT:
+        return f"The {field} rule required_if requires another field and at least one value."
+    other, expected = params[0], params[1:]
+    if str(data.get(other)) in expected:
+        return _required_failure(field, value)
+    return None
+
+
+def rule_required_unless(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    if len(params) < _TABLE_COLUMN_COUNT:
+        return f"The {field} rule required_unless requires another field and at least one value."
+    other, expected = params[0], params[1:]
+    if str(data.get(other)) not in expected:
+        return _required_failure(field, value)
+    return None
+
+
+def rule_required_with(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    if not params:
+        return f"The {field} rule required_with requires at least one field."
+    if any(_is_present(data, other) for other in params):
+        return _required_failure(field, value)
+    return None
+
+
+def rule_required_with_all(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    if not params:
+        return f"The {field} rule required_with_all requires at least one field."
+    if all(_is_present(data, other) for other in params):
+        return _required_failure(field, value)
+    return None
+
+
+def rule_required_without(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    if not params:
+        return f"The {field} rule required_without requires at least one field."
+    if any(not _is_present(data, other) for other in params):
+        return _required_failure(field, value)
+    return None
+
+
+def rule_required_without_all(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    if not params:
+        return f"The {field} rule required_without_all requires at least one field."
+    if all(not _is_present(data, other) for other in params):
+        return _required_failure(field, value)
+    return None
+
+
+def _coerce_date(value: object) -> datetime | None:
+    """Best-effort parse to a UTC-aware datetime; None when it isn't a date.
+
+    Naive inputs are read as UTC so every comparison is between aware datetimes
+    (consistent ordering, and the linter stays happy about tz handling).
+    """
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    if isinstance(value, date):
+        return datetime(value.year, value.month, value.day, tzinfo=UTC)
+    if isinstance(value, str):
+        text = value.strip()
+        if text in {"today", "now"}:
+            return datetime.now(tz=UTC)
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+    return None
+
+
+def _resolve_date_param(raw: str, data: Mapping[str, object]) -> datetime | None:
+    """A date bound is either a literal (``2026-01-01``/``today``) or another field name."""
+    if raw in data:
+        resolved = _coerce_date(data[raw])
+        if resolved is not None:
+            return resolved
+    return _coerce_date(raw)
+
+
+def rule_date(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = params, data, request
+    if value is None:
+        return None
+    if _coerce_date(value) is not None:
+        return None
+    return f"The {field} is not a valid date."
+
+
+def rule_date_format(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = data, request
+    if value is None:
+        return None
+    if not params:
+        return f"The {field} rule date_format requires a format."
+    fmt = params[0]
+    if isinstance(value, str):
+        try:
+            datetime.strptime(value, fmt).replace(tzinfo=UTC)
+        except ValueError:
+            pass
+        else:
+            return None
+    return f"The {field} does not match the format {fmt}."
+
+
+@dataclass(frozen=True, slots=True)
+class _DateCmp:
+    rule: str
+    compare: Callable[[datetime, datetime], bool]
+    message: str
+
+
+def _date_comparison(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    spec: _DateCmp,
+) -> str | None:
+    if value is None:
+        return None
+    if not params:
+        return f"The {field} rule {spec.rule} requires a date."
+    actual = _coerce_date(value)
+    bound = _resolve_date_param(params[0], data)
+    if actual is None or bound is None:
+        return f"The {field} is not a valid date."
+    if spec.compare(actual, bound):
+        return None
+    return f"The {field} must be {spec.message} {params[0]}."
+
+
+_BEFORE = _DateCmp("before", lambda a, b: a < b, "before")
+_AFTER = _DateCmp("after", lambda a, b: a > b, "after")
+_BEFORE_OR_EQUAL = _DateCmp("before_or_equal", lambda a, b: a <= b, "before or equal to")
+_AFTER_OR_EQUAL = _DateCmp("after_or_equal", lambda a, b: a >= b, "after or equal to")
+
+
+def rule_before(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    return _date_comparison(field, value, params, data, _BEFORE)
+
+
+def rule_after(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    return _date_comparison(field, value, params, data, _AFTER)
+
+
+def rule_before_or_equal(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    return _date_comparison(field, value, params, data, _BEFORE_OR_EQUAL)
+
+
+def rule_after_or_equal(
+    field: str,
+    value: object,
+    params: list[str],
+    data: Mapping[str, object],
+    request: Any | None,
+) -> str | None:
+    _ = request
+    return _date_comparison(field, value, params, data, _AFTER_OR_EQUAL)
+
+
 RULE_HANDLERS: dict[str, RuleHandler] = {
     "accepted": rule_accepted,
+    "after": rule_after,
+    "after_or_equal": rule_after_or_equal,
     "alpha": rule_alpha,
     "alpha_dash": rule_alpha_dash,
     "alpha_num": rule_alpha_num,
+    "before": rule_before,
+    "before_or_equal": rule_before_or_equal,
     "between": rule_between,
     "boolean": rule_boolean,
     "confirmed": rule_confirmed,
+    "date": rule_date,
+    "date_format": rule_date_format,
     "different": rule_different,
     "digits": rule_digits,
     "dimensions": rule_dimensions,
@@ -930,6 +1190,12 @@ RULE_HANDLERS: dict[str, RuleHandler] = {
     "prohibited": rule_prohibited,
     "regex": rule_regex,
     "required": rule_required,
+    "required_if": rule_required_if,
+    "required_unless": rule_required_unless,
+    "required_with": rule_required_with,
+    "required_with_all": rule_required_with_all,
+    "required_without": rule_required_without,
+    "required_without_all": rule_required_without_all,
     "same": rule_same,
     "size": rule_size,
     "starts_with": rule_starts_with,
@@ -938,3 +1204,12 @@ RULE_HANDLERS: dict[str, RuleHandler] = {
     "url": rule_url,
     "uuid": rule_uuid,
 }
+
+
+def register_rule(name: str, handler: RuleHandler) -> None:
+    """Register a custom validation rule under ``name`` (overwrites an existing one).
+
+    The handler takes ``(field, value, params, data, request)`` and returns an
+    error message string on failure or ``None`` on success — sync or async.
+    """
+    RULE_HANDLERS[name] = handler
