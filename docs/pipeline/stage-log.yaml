@@ -960,9 +960,20 @@ events:
     result: "pass"
     note: >-
       application + qa_post edge cases 95 passed (incl. 2 new); full arvel suite 4416 passed, 0
-      failures; mypy --strict clean, uv run pyright 0 errors, ruff check + ruff format clean. No
-      user-facing doc page (lifecycle is internal) — spec + shutdown docstring are the source of truth.
+      failures; mypy --strict clean, uv run pyright 0 errors, ruff check + ruff format clean.
     timestamp: "2026-06-08T16:00:00Z"
+  - work_item: "WI-arvel-023"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Doc follow-up: core-concepts/lifecycle.md Shutdown section now states teardown is best-effort
+      (every provider.shutdown() runs even if an earlier one raises; first failure re-raised as
+      ShutdownError after all have run; app always left un-booted). ShutdownError table row clarified.
+    artifacts:
+      - "docs/site/docs/core-concepts/lifecycle.md"
+    timestamp: "2026-06-08T16:08:00Z"
   - work_item: "WI-arvel-024"
     stage: "qa-pre"
     event: "enter"

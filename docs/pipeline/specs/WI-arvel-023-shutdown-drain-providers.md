@@ -85,3 +85,4 @@ cleared.
 
 - `packages/arvel/src/arvel/application/application.py`
 - `packages/arvel/tests/application/test_wi_023_shutdown_drains.py` (new)
+- `docs/site/docs/core-concepts/lifecycle.md` (Shutdown section: drain-all + first-failure semantics)
