@@ -71,12 +71,12 @@ class Context:
         current_repository().flush()
 
     @staticmethod
-    def dehydrate() -> dict[str, Any]:
+    def dehydrate() -> dict[str, dict[str, Any]]:
         return current_repository().dehydrate()
 
     @staticmethod
-    def hydrate(data: dict[str, Any]) -> None:
-        current_repository().hydrate(data)
+    def hydrate(payload: dict[str, dict[str, Any]]) -> None:
+        current_repository().hydrate(payload)
 
 
 def defer(callback: DeferredCallback) -> None:

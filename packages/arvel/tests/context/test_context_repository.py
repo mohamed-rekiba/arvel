@@ -58,19 +58,31 @@ def test_push_accumulates_a_list() -> None:
     assert Context.get("breadcrumbs") == ["one", "two", "three"]
 
 
-def test_dehydrate_excludes_hidden() -> None:
+def test_dehydrate_includes_hidden() -> None:
     Context.add("user_id", "42")
-    Context.add_hidden("token", "nope")
+    Context.add_hidden("locale", "fr")
 
     payload = Context.dehydrate()
-    assert payload == {"user_id": "42"}
-    assert "token" not in payload
+    # Laravel shape: hidden travels with the job, just kept out of logs/all().
+    assert payload == {"data": {"user_id": "42"}, "hidden": {"locale": "fr"}}
 
 
-def test_hydrate_restores_visible_keys() -> None:
-    Context.hydrate({"user_id": "42", "tenant_id": "acme"})
+def test_hydrate_restores_visible_and_hidden_keys() -> None:
+    Context.hydrate({"data": {"user_id": "42", "tenant_id": "acme"}, "hidden": {"locale": "fr"}})
     assert Context.get("user_id") == "42"
     assert Context.get("tenant_id") == "acme"
+    assert Context.get_hidden("locale") == "fr"
+    # Hidden stays out of the visible view.
+    assert "locale" not in Context.all()
+
+
+def test_hydrate_replaces_existing_state() -> None:
+    Context.add("stale", "old")
+    Context.add_hidden("stale_hidden", "old")
+    Context.hydrate({"data": {"fresh": "new"}, "hidden": {}})
+    assert not Context.has("stale")
+    assert not Context.has_hidden("stale_hidden")
+    assert Context.get("fresh") == "new"
 
 
 def test_forget_and_flush() -> None:

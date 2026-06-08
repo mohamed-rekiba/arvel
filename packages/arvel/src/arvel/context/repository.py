@@ -5,12 +5,12 @@ Laravel's ``Context`` ported to async Python. The active repository is held in a
 without passing it around. ``ContextMiddleware`` swaps in a fresh repository per
 request and resets it on teardown.
 
-Two stores live side by side:
+Two stores live side by side, and both round-trip to queued jobs via
+``dehydrate``/``hydrate`` (matching Laravel):
 
-- **visible** data — round-trips to queued jobs via ``dehydrate``/``hydrate`` and
-  shows up in ``all()``.
-- **hidden** data — never serialized, never in ``all()``. Use it for things that
-  must stay in-process (tokens, internal ids).
+- **visible** data — shows up in ``all()`` and ``get()``, and is appended to logs.
+- **hidden** data — kept out of ``all()``/``get()`` and out of logs, but still
+  travels with a queued job. "Hidden" means hidden from logs, not from the queue.
 """
 
 from __future__ import annotations
@@ -96,16 +96,22 @@ class ContextRepository:
         self._deferred.clear()
         return self
 
-    def dehydrate(self) -> dict[str, Any]:
-        """Visible keys as a plain dict, ready to ride along with a queued job.
+    def dehydrate(self) -> dict[str, dict[str, Any]]:
+        """Snapshot both stores, ready to ride along with a queued job.
 
-        Hidden keys are excluded by design — they must not leave the process.
+        Shape mirrors Laravel: ``{"data": {...}, "hidden": {...}}``. Hidden keys
+        travel too — they're hidden from logs and ``all()``, not from the queue.
         """
-        return dict(self._data)
+        return {"data": dict(self._data), "hidden": dict(self._hidden)}
 
-    def hydrate(self, data: dict[str, Any]) -> ContextRepository:
-        """Restore visible keys from a ``dehydrate()`` payload (queue worker side)."""
-        self._data.update(data)
+    def hydrate(self, payload: dict[str, dict[str, Any]]) -> ContextRepository:
+        """Restore both stores from a ``dehydrate()`` payload (queue worker side).
+
+        Replaces the current data, like Laravel — the worker starts from the
+        dispatcher's snapshot, not a merge of whatever the worker already held.
+        """
+        self._data = dict(payload.get("data", {}))
+        self._hidden = dict(payload.get("hidden", {}))
         return self
 
 
