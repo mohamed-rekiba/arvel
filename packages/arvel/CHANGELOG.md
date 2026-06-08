@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.18.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.17.3...arvel-v0.18.0) (2026-06-08)
+
+
+### Features
+
+* **orm:** enhance eager loading to respect soft delete scopes ([dc8e8d3](https://github.com/mohamed-rekiba/arvel/commit/dc8e8d3592bc42b78ba0a2009430c5fc596f7777))
+
+
+### Bug Fixes
+
+* **broadcasting:** make the default broadcast payload JSON-safe (WI-012) ([f3fb893](https://github.com/mohamed-rekiba/arvel/commit/f3fb893455dc8489d7726d3e58ba508496740cd8))
+* **framework:** module-by-module audit hardening (WI-001..010) ([53aa027](https://github.com/mohamed-rekiba/arvel/commit/53aa027ef856b400d0b5bc367acb0e04e66090c7))
+* **scheduling:** scope onOneServer election lock per minute ([015a3dc](https://github.com/mohamed-rekiba/arvel/commit/015a3dc2d2fa24ae3417a6aa456cd9d1bc34c18b))
+* **session:** destroy the old store record on regenerate (WI-011) ([8565bc5](https://github.com/mohamed-rekiba/arvel/commit/8565bc587cb474e1b2fe7e3fa11062fdce96af9b))
+
+
+### Refactors
+
+* **deps:** replace httpx with httpx2 across all packages ([0c2f530](https://github.com/mohamed-rekiba/arvel/commit/0c2f5301532487be2aa0d7da37583866d999dab4))
+
 ## [0.17.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.17.2...arvel-v0.17.3) (2026-06-08)
 
 
