@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.2...arvel-ecommerce-kit-v1.7.3) (2026-06-08)
+
+
+### Bug Fixes
+
+* **ecommerce-kit:** make seed refresh the catalog view unconditionally ([ebe9a97](https://github.com/mohamed-rekiba/arvel/commit/ebe9a97e0543805e6ef3d9454f43fc8450c61427))
+* **framework:** module-by-module audit hardening (WI-001..010) ([53aa027](https://github.com/mohamed-rekiba/arvel/commit/53aa027ef856b400d0b5bc367acb0e04e66090c7))
+
+
+### Refactors
+
+* **deps:** replace httpx with httpx2 across all packages ([0c2f530](https://github.com/mohamed-rekiba/arvel/commit/0c2f5301532487be2aa0d7da37583866d999dab4))
+
 ## [1.7.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.1...arvel-ecommerce-kit-v1.7.2) (2026-06-07)
 
 
