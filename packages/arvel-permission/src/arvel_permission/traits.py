@@ -37,6 +37,7 @@ from arvel_permission.models import (
     Role,
     model_has_permissions,
     model_has_roles,
+    role_has_permissions,
 )
 from arvel_permission.service import GuardMismatchError
 
@@ -108,6 +109,35 @@ def matches_wildcard(pattern: str, ability: str) -> bool:
         if "*" not in allowed and a not in allowed:
             return False
     return True
+
+
+async def _permissions_for_roles(roles: Sequence[Role]) -> list[Permission]:
+    """Every permission attached to ``roles``, in one query — not one per role.
+
+    Mirrors what ``role.permissions.all()`` does (join through
+    ``role_has_permissions``, apply the Permission global scope) but for the whole
+    role set at once, so a user with N roles costs 1 query instead of N.
+    """
+    role_ids = [r.id for r in roles]
+    if not role_ids:
+        return []
+    # Deferred: query.py imports the orm package, so this can't be top-level.
+    from arvel.database.query import QueryBuilder  # noqa: PLC0415
+
+    session = get_active_session()
+    stmt = (
+        select(Permission)
+        .join(
+            role_has_permissions,
+            role_has_permissions.c.permission_id == _primary_key_column(Permission),
+        )
+        .where(role_has_permissions.c.role_id.in_(role_ids))
+    )
+    scope = QueryBuilder(Permission, select(Permission)).apply_global_scopes().whereclause
+    if scope is not None:
+        stmt = stmt.where(scope)
+    result = await session.execute(stmt)
+    return list(result.scalars().unique())
 
 
 def _perm_matches(held: Permission, target: Permission, *, wildcards: bool) -> bool:
@@ -374,12 +404,8 @@ class HasPermissions:
         if any(_perm_matches(p, target, wildcards=wildcards) for p in await self.permissions.all()):
             return True
 
-        for role in await self._roles_for_permission_check():
-            if any(
-                _perm_matches(p, target, wildcards=wildcards) for p in await role.permissions.all()
-            ):
-                return True
-        return False
+        role_perms = await _permissions_for_roles(await self._roles_for_permission_check())
+        return any(_perm_matches(p, target, wildcards=wildcards) for p in role_perms)
 
     async def has_any_permission(self, *perms: Permission | str) -> bool:
         for p in perms:
@@ -401,12 +427,11 @@ class HasPermissions:
             if key not in seen:
                 seen.add(key)
                 out.append(p)
-        for role in await self._roles_for_permission_check():
-            for p in await role.permissions.all():
-                key = (p.name, p.guard_name)
-                if key not in seen:
-                    seen.add(key)
-                    out.append(p)
+        for p in await _permissions_for_roles(await self._roles_for_permission_check()):
+            key = (p.name, p.guard_name)
+            if key not in seen:
+                seen.add(key)
+                out.append(p)
         return out
 
     async def get_permission_names(self) -> list[str]:
@@ -420,12 +445,11 @@ class HasPermissions:
         """Return permissions inherited through roles (not directly granted)."""
         seen: set[tuple[str, str]] = set()
         out: list[Permission] = []
-        for role in await self._roles_for_permission_check():
-            for p in await role.permissions.all():
-                key = (p.name, p.guard_name)
-                if key not in seen:
-                    seen.add(key)
-                    out.append(p)
+        for p in await _permissions_for_roles(await self._roles_for_permission_check()):
+            key = (p.name, p.guard_name)
+            if key not in seen:
+                seen.add(key)
+                out.append(p)
         return out
 
     def _dispatch_permission_events(self, action: str, perms: list[Permission]) -> None:

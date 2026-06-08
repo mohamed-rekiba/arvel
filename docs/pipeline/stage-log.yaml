@@ -1881,3 +1881,27 @@ events:
       (new: X-XSRF-TOKEN alias on both middlewares, _token urlencoded form field on VerifyCsrf, JSON body not
       buffered, cookie check 403->419); mkdocs build --strict clean.
     timestamp: "2026-06-09T03:56:00Z"
+  - work_item: "deferred-F3"
+    stage: "execution"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Deferred F3 (arvel-permission perf). has_permission_to / get_all_permissions / get_permissions_via_roles
+      looped over the user's roles and called role.permissions.all() per role — one query each, an N+1 on the
+      role_has_permissions pivot. Added _permissions_for_roles(roles): a single SELECT joining Permission to
+      role_has_permissions filtered by role_id IN (...), with the Permission global scope reapplied and
+      scalars().unique() dedupe. All three call sites now batch. Behavior unchanged (same wildcard matching).
+    artifacts:
+      - "packages/arvel-permission/src/arvel_permission/traits.py"
+      - "packages/arvel-permission/tests/test_053_role_permission_batch.py"
+    timestamp: "2026-06-09T04:10:00Z"
+  - work_item: "deferred-F3"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff clean; mypy 0 issues; pyright 0/0; arvel-permission suite 79 passed (2 new: a before_cursor_execute
+      listener proves get_permissions_via_roles and has_permission_to each hit role_has_permissions exactly once
+      for a 3-role user — was 3 with the old loop).
+    timestamp: "2026-06-09T04:11:00Z"
