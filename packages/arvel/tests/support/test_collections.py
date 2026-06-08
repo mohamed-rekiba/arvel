@@ -318,3 +318,35 @@ def test_to_json_with_plain_scalars() -> None:
     import json
 
     assert json.loads(Collection([1, 2, 3]).to_json()) == [1, 2, 3]
+
+
+def test_to_json_serializes_datetime_decimal_uuid_bytes() -> None:
+    import json
+    from datetime import UTC, date, datetime, time
+    from decimal import Decimal
+    from uuid import UUID
+
+    uid = UUID("12345678-1234-5678-1234-567812345678")
+
+    class Row:
+        def to_dict(self) -> dict[str, object]:
+            return {
+                "created_at": datetime(2026, 6, 8, 17, 30, 0, tzinfo=UTC),
+                "born_on": date(2026, 6, 8),
+                "alarm": time(7, 30),
+                "price": Decimal("19.99"),
+                "id": uid,
+                "blob": b"hi",
+            }
+
+    parsed = json.loads(Collection([Row()]).to_json())
+    assert parsed == [
+        {
+            "created_at": "2026-06-08T17:30:00+00:00",
+            "born_on": "2026-06-08",
+            "alarm": "07:30:00",
+            "price": 19.99,
+            "id": str(uid),
+            "blob": "hi",
+        }
+    ]
