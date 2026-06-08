@@ -533,6 +533,8 @@ async def show(id: int) -> User:
     return await User.find_or_fail(id)   # password_hash dropped automatically
 ```
 
+This reaches models nested in the return value too — a `return {"user": user, "orders": [order, ...]}` hides `password_hash` on every model inside the dict, list, or tuple.
+
 This only kicks in when the route has no explicit `response_model`. If you annotate one, your schema decides the shape — declare a schema that omits sensitive fields.
 
 <a name="read-only-models"></a>

@@ -510,3 +510,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 34 (cache rate limiter) hardening WI. Spec: docs/pipeline/specs/WI-arvel-034-rate-limiter-fixed-window.md"
+  - id: "WI-arvel-035"
+    name: "Raw model returns leak __hidden__ when nested in a dict/list/tuple"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "confidential"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T23:05:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 35 (routing) — security follow-up to WI-032. Recurse the response normalizer so nested models honour __hidden__. Spec: docs/pipeline/specs/WI-arvel-035-nested-model-hidden-leak.md"

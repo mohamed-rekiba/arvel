@@ -43,7 +43,15 @@ def _make_app() -> Any:
     async def payload() -> Any:
         return {"ok": True, "count": 2}
 
-    for _f in (show, index, payload):
+    @Route.get("/nested")
+    async def nested() -> Any:
+        return {
+            "user": Widget(name="pub", secret="LEAK"),
+            "list": [Widget(name="a", secret="x")],
+            "deep": {"inner": Widget(name="d", secret="y")},
+        }
+
+    for _f in (show, index, payload, nested):
         del _f  # registered via @Route.*; drop local bindings
 
     app = FastAPI()
@@ -73,6 +81,19 @@ def test_non_model_return_passes_through_untouched() -> None:
     app = _make_app()
     body = _client(app).get("/payload").json()
     assert body == {"ok": True, "count": 2}
+
+
+def test_models_nested_in_dict_hide_hidden_columns() -> None:
+    app = _make_app()
+    body = _client(app).get("/nested").json()
+    assert body == {
+        "user": {"id": None, "name": "pub"},
+        "list": [{"id": None, "name": "a"}],
+        "deep": {"inner": {"id": None, "name": "d"}},
+    }
+    assert "secret" not in body["user"]
+    assert "secret" not in body["list"][0]
+    assert "secret" not in body["deep"]["inner"]
 
 
 def test_pydantic_return_passes_through_untouched() -> None:
