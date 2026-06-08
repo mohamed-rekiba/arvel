@@ -42,9 +42,12 @@ class OptimizeCommand(Command):
         view_count = warm_bytecode_cache()
         typer.echo(f"  view:cache    — {view_count} template(s) compiled.")
 
-        # Blocked — no serializer yet for these subsystems.
-        typer.echo("  route:cache   — pending (requires RouteCollection serializer).")
-        typer.echo("  event:cache   — pending (requires EventDispatcher serializer).")
+        # No route/event cache: unlike Laravel's string actions, Arvel routes and
+        # event listeners are live Python callables — they can't be serialized to
+        # skip the import, and importing the module is already .pyc-cached. So the
+        # cache would buy nothing. See docs research 048.
+        typer.echo("  route:cache   — n/a on Python (routes import as live callables).")
+        typer.echo("  event:cache   — n/a on Python (listeners import as live callables).")
 
         typer.echo("Optimization complete.")
 

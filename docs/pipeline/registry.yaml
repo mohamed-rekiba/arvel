@@ -705,3 +705,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Feature gap (WI-043). Already implemented + tested in a prior session (providers/storage_provider.py _register_serve_route + config/storage_config.py LocalConfig.serve; tests/storage/test_serve_route.py, 10 cases incl. traversal protection + signed/temporary URLs). Verified passing during the autonomous sweep; CHANGELOG triage entry was stale and has been moved to 'landed'. No new code needed."
+  - id: "WI-arvel-048"
+    name: "route:cache / route:clear"
+    complexity: "L2"
+    risk_tier: 1
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "wont-do"
+    blocked_by: null
+    started: "2026-06-09T02:30:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Feature gap (WI-043) resolved as N/A. Route/event caching is a boot optimization that doesn't apply to Python: Arvel handlers and listeners are live callables (not Laravel string actions), so they can't be safely serialized (pickle = code-exec risk; module:qualname can't round-trip closures/decorated/dynamic handlers), and importing the module is already .pyc-cached. optimize now reports route:cache/event:cache as 'n/a on Python' instead of 'pending serializer'. Decision: .context/research/048-route-cache-decision.md. No route:clear added (no cache artifact to clear)."
