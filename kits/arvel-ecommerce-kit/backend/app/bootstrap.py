@@ -18,7 +18,7 @@ from arvel.application._loader import clear_module_cache
 from arvel.database.db import DB
 from bootstrap.app import create_application, create_asgi
 
-from app.support.products_catalog import refresh_products_catalog
+from app.support.products_catalog import refresh_products_catalog_now
 
 
 class EcommerceApp:
@@ -53,7 +53,7 @@ class EcommerceApp:
                 await catalog_mod.CatalogSeeder().run()
                 await users_mod.SampleUsersSeeder().run()
             # Separate session: REFRESH sees committed rows.
-            await refresh_products_catalog()
+            await refresh_products_catalog_now()
 
     async def shutdown(self) -> None:
         await self._arvel_app.shutdown()

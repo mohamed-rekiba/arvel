@@ -26,10 +26,18 @@ def test_refresh_helper_uses_lock_and_runtime_refresh() -> None:
     assert "ProductCatalog.refresh_view" not in src
 
 
-def test_seed_bootstrap_uses_shared_refresh_helper() -> None:
+def test_unconditional_refresh_helper_skips_the_lock() -> None:
+    # The seed path must never skip — it runs the refresh directly and lets
+    # Postgres serialize any concurrent CONCURRENTLY refresh.
+    src = _src(SUPPORT_FILE)
+    assert "async def refresh_products_catalog_now() -> int:" in src
+    assert "return await _execute_refresh()" in src
+
+
+def test_seed_bootstrap_uses_unconditional_refresh_helper() -> None:
     src = _src(BOOTSTRAP_FILE)
-    assert "from app.support.products_catalog import refresh_products_catalog" in src
-    assert "await refresh_products_catalog()" in src
+    assert "from app.support.products_catalog import refresh_products_catalog_now" in src
+    assert "await refresh_products_catalog_now()" in src
     assert "ProductCatalog.refresh_view" not in src
 
 
