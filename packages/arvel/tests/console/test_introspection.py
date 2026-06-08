@@ -28,6 +28,8 @@ from arvel.console.commands.view_commands import ViewClearCommand
 from click.testing import CliRunner as ClickCliRunner
 from typer.testing import CliRunner
 
+from .conftest import invoke_async
+
 runner = CliRunner()
 
 
@@ -106,7 +108,7 @@ def test_db_table_nonexistent_table_exits_two(
         cmd.app = _FakeApp()  # type: ignore[assignment]
         app = _app(cmd)
         with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
-            result = runner.invoke(app.typer_app, ["db:table", "nonexistent_table_xyz"])
+            result = invoke_async(runner, app.typer_app, ["db:table", "nonexistent_table_xyz"])
             assert result.exit_code == 2, result.stdout + result.stderr
     finally:
         asyncio.run(engine.dispose())

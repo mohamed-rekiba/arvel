@@ -195,3 +195,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 13 (scheduling) hardening WI. Spec: docs/pipeline/specs/WI-arvel-013-onserver-lock-per-minute.md"
+  - id: "WI-arvel-014"
+    name: "Async CLI commands must defer via schedule_async (single event loop), not nest asyncio.run"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T12:15:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 14 (console/CLI) hardening WI. Spec: docs/pipeline/specs/WI-arvel-014-cli-single-event-loop.md"

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import typer
 
+from arvel.console._async import schedule_async as schedule_async
 from arvel.console._subsystem import CliSubsystem
 
 if TYPE_CHECKING:

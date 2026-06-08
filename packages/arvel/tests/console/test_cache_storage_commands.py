@@ -10,6 +10,8 @@ import typer
 from arvel.console.entrypoint import build_app
 from typer.testing import CliRunner
 
+from .conftest import invoke_async
+
 
 @pytest.fixture
 def runner() -> CliRunner:
@@ -47,7 +49,8 @@ class TestCacheClearCommand:
     def test_cache_clear_fails_loudly_when_subsystem_unbound(
         self, runner: CliRunner, cli_app: typer.Typer
     ) -> None:
-        result = runner.invoke(cli_app, ["cache:clear"])
+        # The flush runs in the coroutine deferred via schedule_async.
+        result = invoke_async(runner, cli_app, ["cache:clear"])
         assert result.exit_code != 0
         assert "cleared" not in result.output.lower()
 
@@ -59,7 +62,7 @@ class TestCacheForgetCommand:
     def test_cache_forget_fails_loudly_when_subsystem_unbound(
         self, runner: CliRunner, cli_app: typer.Typer
     ) -> None:
-        result = runner.invoke(cli_app, ["cache:forget", "some.key"])
+        result = invoke_async(runner, cli_app, ["cache:forget", "some.key"])
         assert result.exit_code != 0
 
 

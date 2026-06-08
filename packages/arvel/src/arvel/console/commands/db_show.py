@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
@@ -10,6 +9,7 @@ import typer
 from sqlalchemy import inspect
 
 from arvel.console import Command, Context
+from arvel.console import _async as _arvel_async
 from arvel.console._subsystem import CliSubsystem
 from arvel.console.commands.migrate import resolve_engine
 
@@ -35,11 +35,14 @@ class DbShowCommand(Command):
         cmd_self = self
 
         def _callback() -> None:
-            try:
-                asyncio.run(cmd_self._show())
-            except Exception as exc:
-                typer.echo(f"arvel: {exc}", err=True)
-                raise typer.Exit(code=2) from exc
+            async def _dispatch() -> None:
+                try:
+                    await cmd_self._show()
+                except Exception as exc:
+                    typer.echo(f"arvel: {exc}", err=True)
+                    raise typer.Exit(code=2) from exc
+
+            _arvel_async.schedule_async(_dispatch())
 
         app.command(name=self.name, help=self.help)(_callback)
 

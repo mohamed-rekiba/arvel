@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Annotated, ClassVar
 
 import typer
 
 from arvel.console import Command, Context
+from arvel.console import _async as _arvel_async
 from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.container.errors import BindingResolutionError
@@ -31,12 +31,15 @@ class QueuePruneFailedCommand(Command):
                 _Option("--hours", help="Age threshold in hours"),
             ] = 24,
         ) -> None:
-            try:
-                count = asyncio.run(cmd_self._run(hours=hours))
-            except (BindingResolutionError, RuntimeError) as exc:
-                typer.echo(f"arvel: {exc}", err=True)
-                raise typer.Exit(code=2) from exc
-            typer.echo(f"Pruned {count} failed job(s) older than {hours} hour(s).")
+            async def _dispatch() -> None:
+                try:
+                    count = await cmd_self._run(hours=hours)
+                except (BindingResolutionError, RuntimeError) as exc:
+                    typer.echo(f"arvel: {exc}", err=True)
+                    raise typer.Exit(code=2) from exc
+                typer.echo(f"Pruned {count} failed job(s) older than {hours} hour(s).")
+
+            _arvel_async.schedule_async(_dispatch())
 
         app.command(name=self.name, help=self.help)(_callback)
 

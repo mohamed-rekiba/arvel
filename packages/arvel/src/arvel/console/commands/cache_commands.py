@@ -14,12 +14,13 @@ The cache table migration ships as a publishable stub on
 
 from __future__ import annotations
 
-import asyncio
-from typing import Annotated
+from typing import Annotated, ClassVar
 
 import typer
 
 from arvel.console import Command, Context
+from arvel.console import _async as _arvel_async
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Argument as _Argument
 from arvel.console._t import Option as _Option
 
@@ -27,12 +28,13 @@ from arvel.console._t import Option as _Option
 class CacheClearCommand(Command):
     name = "cache:clear"
     help = "Flush all items from the cache"
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.CACHE})
 
     def register(self, app: typer.Typer) -> None:
         def _callback(
             store: Annotated[str, _Option("--store", "-s", help="Named store to clear")] = "",
         ) -> None:
-            asyncio.run(clear(store or None))
+            _arvel_async.schedule_async(clear(store or None))
 
         app.command(name=self.name, help=self.help)(_callback)
 
@@ -43,13 +45,14 @@ class CacheClearCommand(Command):
 class CacheForgetCommand(Command):
     name = "cache:forget"
     help = "Remove a specific key from the cache"
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.CACHE})
 
     def register(self, app: typer.Typer) -> None:
         def _callback(
             key: Annotated[str, _Argument(help="Cache key to remove")],
             store: Annotated[str, _Option("--store", "-s", help="Named store")] = "",
         ) -> None:
-            asyncio.run(forget(key, store or None))
+            _arvel_async.schedule_async(forget(key, store or None))
 
         app.command(name=self.name, help=self.help)(_callback)
 
