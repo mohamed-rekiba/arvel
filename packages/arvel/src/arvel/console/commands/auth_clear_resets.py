@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 class AuthClearResetsCommand(Command):
     name: ClassVar[str] = "auth:clear-resets"
-    help: ClassVar[str] = "Delete expired password_reset_tokens rows"
+    help: ClassVar[str] = "Delete expired password_resets rows"
     requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
         {CliSubsystem.AUTH}  # AUTH closure pulls in DATABASE
     )
@@ -53,16 +53,16 @@ class AuthClearResetsCommand(Command):
 
 
 class _NoResetsTableError(RuntimeError):
-    """Raised when the password_reset_tokens table is absent."""
+    """Raised when the password_resets table is absent."""
 
 
 def _delete_expired(sync_conn: SyncConnection) -> int:
     insp = sa_inspect(sync_conn)
-    if "password_reset_tokens" not in set(insp.get_table_names()):
-        msg = "password_reset_tokens table does not exist."
+    if "password_resets" not in set(insp.get_table_names()):
+        msg = "password_resets table does not exist."
         raise _NoResetsTableError(msg)
     metadata = MetaData()
-    table = Table("password_reset_tokens", metadata, autoload_with=sync_conn)
+    table = Table("password_resets", metadata, autoload_with=sync_conn)
     threshold = text("created_at < datetime('now', '-3600 seconds')")
     result = sync_conn.execute(delete(table).where(threshold))
     return int(result.rowcount or 0)

@@ -420,3 +420,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 28 (arvel-permission / Spatie parity) hardening WI. Spec: docs/pipeline/specs/WI-arvel-028-permission-query-morph-alias.md"
+  - id: "WI-arvel-029"
+    name: "Password-reset storage name drift breaks forgot/reset and auth:clear-resets"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "confidential"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T19:20:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 29 (auth / password-reset storage) hardening WI. Spec: docs/pipeline/specs/WI-arvel-029-password-resets-schema-drift.md"

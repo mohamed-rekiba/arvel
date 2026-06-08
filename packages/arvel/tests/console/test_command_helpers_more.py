@@ -63,21 +63,19 @@ def test_auth_clear_resets_deletes_expired_rows() -> None:
         with engine.begin() as conn:
             conn.execute(
                 text(
-                    "CREATE TABLE password_reset_tokens ("
-                    "email varchar primary key, token varchar, created_at datetime)"
+                    "CREATE TABLE password_resets ("
+                    "email varchar primary key, token_hash varchar, created_at datetime)"
                 )
             )
             conn.execute(
                 text(
-                    "INSERT INTO password_reset_tokens (email, token, created_at) VALUES "
+                    "INSERT INTO password_resets (email, token_hash, created_at) VALUES "
                     "('old@example.test', 'old', datetime('now', '-7200 seconds')), "
                     "('new@example.test', 'new', datetime('now'))"
                 )
             )
             assert delete_expired(conn) == 1
-            remaining = (
-                conn.execute(text("SELECT email FROM password_reset_tokens")).scalars().all()
-            )
+            remaining = conn.execute(text("SELECT email FROM password_resets")).scalars().all()
     finally:
         engine.dispose()
 

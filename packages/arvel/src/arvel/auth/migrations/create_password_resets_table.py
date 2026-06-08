@@ -10,7 +10,7 @@ Schema:
 
 - ``email`` — lookup key. UNIQUE so a second forgot-password call
  invalidates the first (UPSERT semantics in the broker).
-- ``token`` — sha256 hex digest (64 chars) of the user-facing token.
+- ``token_hash`` — sha256 hex digest (64 chars) of the user-facing token.
  Never stored as plaintext.
 - ``created_at`` — supports the TTL check (default 60 minutes via
  ``config.auth.passwords.ttl_minutes``) and the
@@ -33,7 +33,7 @@ async def up(schema: Schema) -> None:
 
     def _table(t: Blueprint) -> None:
         t.string("email", length=254).nullable(value=False)
-        t.string("token", length=64).nullable(value=False)
+        t.string("token_hash", length=64).nullable(value=False)
         t.datetime("created_at").nullable(value=False).use_current()
         t.unique(["email"], name="password_resets_email_unique")
         t.index(["created_at"], name="password_resets_created_at_idx")

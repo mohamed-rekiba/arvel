@@ -1160,3 +1160,43 @@ events:
       errors, ruff check + ruff format clean. permission.md documents the query helpers and that they honor
       morph_map/__morph_class__.
     timestamp: "2026-06-08T19:10:00Z"
+  - work_item: "WI-arvel-029"
+    stage: "qa-post"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 29 (auth / password-reset storage). C1: create_password_resets_table declared column "token"
+      but PasswordReset model + PasswordService use "token_hash" — apps running the published migration hit
+      "no such column: token_hash" on first forgot/reset; unit tests passed only because they build tables
+      from model metadata. C2: auth:clear-resets inspected/deleted from "password_reset_tokens" but the real
+      table is "password_resets", so it always errored. Sibling tables (PAT token, refresh_tokens token_hash)
+      verified consistent — only password_resets drifted. Repro: model cols [email, token_hash, created_at]
+      vs migration cols [email, token, created_at].
+    timestamp: "2026-06-08T19:20:00Z"
+  - work_item: "WI-arvel-029"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Converged on the canonical name table=password_resets, column=token_hash. Migration token -> token_hash
+      (+ docstring); auth:clear-resets password_reset_tokens -> password_resets (inspect/delete/error/help) and
+      regenerated _command_meta.py. Added a drift guard in test_framework_migrations.py asserting the migration
+      columns cover the ORM model columns for password_resets/personal_access_tokens/refresh_tokens. Fixed
+      test_command_helpers_more.py to build the correct table/column.
+    artifacts:
+      - "packages/arvel/src/arvel/auth/migrations/create_password_resets_table.py"
+      - "packages/arvel/src/arvel/console/commands/auth_clear_resets.py"
+      - "packages/arvel/src/arvel/console/_command_meta.py"
+      - "packages/arvel/tests/database/test_framework_migrations.py"
+      - "packages/arvel/tests/console/test_command_helpers_more.py"
+    timestamp: "2026-06-08T19:26:00Z"
+  - work_item: "WI-arvel-029"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      auth + console + migration suites 984 passed; mypy + uv run pyright 0 errors, ruff check + format clean
+      on changed files. Drift guard now prevents the migration/model column mismatch from recurring.
+    timestamp: "2026-06-08T19:30:00Z"
