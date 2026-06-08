@@ -315,3 +315,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 21 (i18n) hardening WI. Spec: docs/pipeline/specs/WI-arvel-021-plural-locale-rules.md"
+  - id: "WI-arvel-022"
+    name: "Context.dehydrate/hydrate must round-trip hidden data, matching Laravel"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T15:35:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 22 (context) hardening WI. Spec: docs/pipeline/specs/WI-arvel-022-context-dehydrate-hidden.md"

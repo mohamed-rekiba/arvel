@@ -889,3 +889,40 @@ events:
       ignore added for the CLDR rule table (domain constants), matching existing repo precedent.
       localization.md pluralisation section updated.
     timestamp: "2026-06-08T15:20:00Z"
+  - work_item: "WI-arvel-022"
+    stage: "qa-post"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 22 (context). C1 confirmed against Laravel 13 docs (context7 /laravel/docs):
+      Context::dehydrate captures both data AND hidden; the dehydrating example adds hidden 'locale'
+      so it rides along to the job and is read via getHidden in hydrated. Arvel dropped hidden on
+      dehydrate and merged-visible-only on hydrate, framing it as intentional ("must not leave the
+      process") — a misread of Laravel's hidden semantics. Maintenance module reviewed: no defect.
+    timestamp: "2026-06-08T15:35:00Z"
+  - work_item: "WI-arvel-022"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      dehydrate() now returns {"data":..., "hidden":...}; hydrate(payload) replaces both stores
+      (Laravel sets, not merges). Hidden still excluded from all()/get()/logs. Facade signatures +
+      repository docstring corrected. Updated test_context_repository (excludes-hidden -> includes-hidden,
+      added replace-semantics case); new test_wi_022_context_dehydrate_hidden.py (4 cases).
+    artifacts:
+      - "packages/arvel/src/arvel/context/repository.py"
+      - "packages/arvel/src/arvel/context/facade.py"
+      - "packages/arvel/tests/context/test_context_repository.py"
+      - "packages/arvel/tests/context/test_wi_022_context_dehydrate_hidden.py"
+    timestamp: "2026-06-08T15:41:00Z"
+  - work_item: "WI-arvel-022"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      context suite 27 passed (incl. 4 new); full arvel suite 4414 passed, 0 failures; mypy --strict
+      clean, uv run pyright 0 errors, ruff check + ruff format clean. No user-facing context doc page
+      (facades.md mention is generic) — repository docstring is the source of truth.
+    timestamp: "2026-06-08T15:45:00Z"
