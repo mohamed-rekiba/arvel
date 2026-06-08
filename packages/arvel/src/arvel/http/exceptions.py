@@ -109,6 +109,13 @@ class ThrottleException(HttpException):
         self.retry_after_seconds = retry_after_seconds
 
 
+class CsrfMismatchException(HttpException):
+    """Missing or mismatched CSRF token. 419 ("Page Expired"), like Laravel."""
+
+    status_code = 419
+    code = "CSRF_MISMATCH"
+
+
 class ServerErrorException(HttpException):
     status_code = 500
     code = "INTERNAL_ERROR"

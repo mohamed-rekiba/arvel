@@ -117,16 +117,23 @@ changelog once shipped.
   route loading and the registered-routes banner
 - `openapi:export --output FILE` — exports the spec to a file (or `-`/`--stdout`),
   YAML or JSON, with status text on stderr so stdout stays clean
+- CSRF consolidation — the session (`VerifyCsrf`) and cookie
+  (`CsrfDoubleSubmitMiddleware`) checks now share a single
+  `CsrfMismatchException` (419, `CSRF_MISMATCH`); the cookie check moved off its
+  old 403. Both accept the `X-XSRF-TOKEN` header alongside `X-CSRF-TOKEN`, and
+  `VerifyCsrf` also reads the `_token` field of urlencoded form posts (Laravel's
+  token-source order). `http/exceptions.py`, `http/_middleware_core.py`,
+  `auth/middleware/csrf_double_submit.py` + `test_csrf*`
 
 **Remaining priority gaps** (triaged 2026-06-09 against the codebase — see
 `.context/research/043-feature-gap-bucket3-triage.md` and
 [`docs/backlog/043-epic-feature-gap-bucket3-triage.md`](docs/backlog/043-epic-feature-gap-bucket3-triage.md)):
 
-- HTTP security hardening — consolidate the two CSRF middlewares (session 419 /
-  cookie 403), accept `X-XSRF-TOKEN` + form `_token`, and add a general
-  `TrustProxies` request middleware (trusted-proxy IP resolution exists for
-  observability/reverb but not on the app request path). Medium impact, **high
-  risk — security path, own WI with gates.**
+- `TrustProxies` request middleware — trusted-proxy client-IP resolution exists
+  for observability/reverb (`observability/forwarded.py`) but not on the app
+  request path, so behind a load balancer `request.client.host` (and the
+  throttle key that reads it) sees the proxy, not the real client. Medium
+  impact, **own WI — security path.**
 
 **Deliberately not implemented:**
 

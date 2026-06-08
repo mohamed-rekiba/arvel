@@ -160,7 +160,10 @@ Throttle(100, decay_seconds=60, store=RedisStore(redis_client))
 <a name="verifycsrf"></a>
 ### VerifyCsrf
 
-`VerifyCsrf(except_paths=None)` verifies a CSRF token on state-changing requests. It skips `GET`/`HEAD`/`OPTIONS` and any path listed in `except_paths`. It reads the expected token from the session key `_csrf_token` and the submitted token from the `X-CSRF-Token` header. A mismatch raises a CSRF error — **HTTP 419**, code `CSRF_MISMATCH`.
+`VerifyCsrf(except_paths=None)` verifies a CSRF token on state-changing requests. It skips `GET`/`HEAD`/`OPTIONS` and any path listed in `except_paths`. It reads the expected token from the session key `_csrf_token` and the submitted token, in order, from the `X-CSRF-Token` header, the `X-XSRF-TOKEN` header (the alias Axios sends from the `XSRF-TOKEN` cookie), or the `_token` field of an `application/x-www-form-urlencoded` body. A mismatch raises a CSRF error — **HTTP 419**, code `CSRF_MISMATCH`.
+
+> [!NOTE]
+> Only urlencoded form bodies are inspected for `_token` — JSON and multipart (upload) bodies aren't buffered, so put the token in a header for those. The same `CsrfMismatchException` (419) backs both `VerifyCsrf` and the cookie-based `CsrfDoubleSubmitMiddleware`.
 
 ```python
 VerifyCsrf(except_paths=["/api/webhooks/"])

@@ -90,6 +90,79 @@ async def test_csrf_passes_with_matching_session_and_header() -> None:
 
 
 @pytest.mark.asyncio
+async def test_csrf_passes_with_xsrf_alias_header() -> None:
+    from types import SimpleNamespace
+
+    from arvel.http.middleware import VerifyCsrf
+
+    request = SimpleNamespace(
+        method="POST",
+        url=SimpleNamespace(path="/x"),
+        session={"_csrf_token": "tok"},
+        headers={"X-XSRF-TOKEN": "tok"},
+    )
+
+    async def call_next(_: object) -> dict[str, bool]:
+        return {"ok": True}
+
+    assert await VerifyCsrf().handle(request, call_next) == {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_csrf_passes_with_form_token_field() -> None:
+    """An urlencoded form post can carry the token in the _token field."""
+    from types import SimpleNamespace
+
+    from arvel.http.middleware import VerifyCsrf
+
+    async def form() -> dict[str, str]:
+        return {"_token": "tok"}
+
+    request = SimpleNamespace(
+        method="POST",
+        url=SimpleNamespace(path="/x"),
+        session={"_csrf_token": "tok"},
+        headers={"content-type": "application/x-www-form-urlencoded"},
+        form=form,
+    )
+
+    async def call_next(_: object) -> dict[str, bool]:
+        return {"ok": True}
+
+    assert await VerifyCsrf().handle(request, call_next) == {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_csrf_ignores_form_token_for_json_body() -> None:
+    """JSON bodies aren't buffered to look for _token — only the header counts."""
+    from types import SimpleNamespace
+
+    from arvel.http.middleware import CsrfMismatchException, VerifyCsrf
+
+    form_called = False
+
+    async def form() -> dict[str, str]:
+        nonlocal form_called
+        form_called = True
+        return {"_token": "tok"}
+
+    request = SimpleNamespace(
+        method="POST",
+        url=SimpleNamespace(path="/x"),
+        session={"_csrf_token": "tok"},
+        headers={"content-type": "application/json"},
+        form=form,
+    )
+
+    async def call_next(_: object) -> dict[str, bool]:
+        return {"ok": True}
+
+    with pytest.raises(CsrfMismatchException):
+        await VerifyCsrf().handle(request, call_next)
+    assert form_called is False
+
+
+@pytest.mark.asyncio
 async def test_csrf_treats_non_dict_session_as_empty() -> None:
     from types import SimpleNamespace
 

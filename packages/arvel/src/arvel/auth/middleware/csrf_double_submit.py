@@ -1,16 +1,15 @@
 """CSRF double-submit middleware for the auth cookie flow.
 
-Reads the ``_csrf`` cookie set by the login endpoint and compares it to
-the ``X-CSRF-TOKEN`` request header. Uses ``constant_time_equals`` for
-timing-safe comparison.
+Reads the ``_csrf`` cookie set by the login endpoint and compares it to the
+``X-CSRF-TOKEN`` (or ``X-XSRF-TOKEN``) request header, timing-safe. Mismatch
+raises the shared :class:`arvel.http.exceptions.CsrfMismatchException` (419).
 
-This middleware is ASGI-native (not ``BaseHTTPMiddleware``) so framework
-exception handlers see :class:`CsrfMismatchException` through the normal
-handler chain (closes ).
+ASGI-native (not ``BaseHTTPMiddleware``) so framework exception handlers see
+the error through the normal handler chain.
 
-Exempt paths (checked with ``startswith``): login, register,
-forgot-password, reset-password, and the verify-email GET — these
-endpoints either create the cookie or do not need CSRF protection.
+Exempt paths (checked with ``startswith``): login, register, forgot-password,
+reset-password, and the verify-email GET — these endpoints either create the
+cookie or don't need CSRF protection.
 """
 
 from __future__ import annotations
@@ -20,12 +19,13 @@ from collections.abc import Sequence
 from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from arvel.http.exceptions import HttpException
+from arvel.http.exceptions import CsrfMismatchException
 from arvel.support.secure_compare import constant_time_equals
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 _DEFAULT_CSRF_COOKIE = "_csrf"
 _DEFAULT_CSRF_HEADER = "X-CSRF-TOKEN"
+_XSRF_HEADER = "X-XSRF-TOKEN"
 _DEFAULT_EXEMPT: tuple[str, ...] = (
     "/api/auth/login",
     "/api/auth/register",
@@ -38,16 +38,6 @@ _DEFAULT_EXEMPT: tuple[str, ...] = (
     "/auth/reset-password",
     "/auth/verify/",
 )
-
-
-class CsrfMismatchException(HttpException):
-    """Raised when the CSRF cookie and header do not match.
-
-    Re-exported here so callers only need to import from this module.
-    """
-
-    status_code = 403
-    code = "CSRF_MISMATCH"
 
 
 class CsrfDoubleSubmitMiddleware:
@@ -99,8 +89,11 @@ class CsrfDoubleSubmitMiddleware:
         cookies = _parse_cookies(cookie_header)
         csrf_cookie_value = cookies.get(self._csrf_cookie)
 
-        # Find the CSRF header (header names are lowercase in ASGI).
-        csrf_header_value = _find_header(headers, self._csrf_header.lower().encode("latin-1"))
+        # Find the CSRF header (header names are lowercase in ASGI). Accept the
+        # X-XSRF-TOKEN alias too — Axios and friends send it from the XSRF cookie.
+        csrf_header_value = _find_header(
+            headers, self._csrf_header.lower().encode("latin-1")
+        ) or _find_header(headers, _XSRF_HEADER.lower().encode("latin-1"))
 
         if (
             not csrf_cookie_value
@@ -145,6 +138,5 @@ def _error_response(exc: CsrfMismatchException) -> Response:
     )
 
 
-# Export CsrfMismatchException here so the test's `from arvel.auth.middleware.csrf_double_submit
-# import CsrfMismatchException` works without needing to know the internal location.
+# Re-export the shared exception so callers can import it alongside the middleware.
 __all__ = ["CsrfDoubleSubmitMiddleware", "CsrfMismatchException"]
