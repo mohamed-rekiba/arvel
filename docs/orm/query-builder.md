@@ -81,6 +81,41 @@ The soft-delete scope is the canonical example: it appends `WHERE deleted_at IS 
 | `await paginate(per_page=15, *, page=None)` | `Paginator[T]` | `count()` + limited select |
 | `await chunk(size, callback)` | `None` | offset batches |
 
+## Streaming large result sets
+
+For result sets too large to hold in memory, three terminals walk the rows
+incrementally. They differ in how they page the data and — crucially — in whether
+they can eager-load relationships:
+
+| Method | How it pages | Eager loads (`with_()`) |
+|---|---|---|
+| `async for row in chunk(size, cb)` / `chunk_by_id(size, cb)` | OFFSET / keyset batches | **Yes** — each batch runs the full eager pipeline |
+| `async for row in lazy(size)` / `lazy_by_id(size)` / `cursor(size)` | keyset batches, one row at a time | **Yes** — per batch |
+| `async for row in stream(batch_size=…)` | one server-side cursor (`yield_per`) | **No** — see below |
+
+`stream()` opens a single server-side cursor and only ever holds one `batch_size`
+window in memory, so it **cannot** eager-load relationships. Requesting any via
+`with_()` raises `EagerLoadNotStreamableError` rather than silently dropping the
+request (which would cause undetected N+1 queries or empty relations):
+
+```python
+# Raises EagerLoadNotStreamableError — naming the relations and pointing here.
+async for product in Product.with_("media").stream():
+    ...
+
+# Do this instead — lazy()/chunk() eager-load per batch:
+async for product in Product.with_("media").lazy(500):
+    ...
+```
+
+This mirrors Laravel's contract ("`cursor` cannot eager-load; use `lazy`") but fails
+fast instead of degrading. Use `stream()` only for relation-free passes; use
+`lazy()`/`chunk()`/`chunk_by_id()` when you need relations loaded.
+
+`RecursiveQueryBuilder.as_tree()` (from `Model.recursive(parent_key=…)`) materializes
+the whole forest in memory, so — like its sibling `all()` — it **does** honor
+`with_()` eager loads.
+
 ## Sessions: the active-session contextvar
 
 The builder never holds a session. It resolves one from a `ContextVar` at execution time:

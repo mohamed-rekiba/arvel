@@ -240,35 +240,51 @@ def _check_structure(value: object, structure: list[object]) -> None:
                 _check_dict_entry(body, key, sub_structure)
 
 
+def _fields_from_detail_entry(entry: dict[str, object]) -> str | None:
+    """One ``detail`` entry → field name. Handles {field} and {loc} shapes."""
+    field = entry.get("field")
+    if isinstance(field, str):
+        return field
+    loc = entry.get("loc")
+    if isinstance(loc, list) and loc:
+        # Drop the source prefix ("body" / "query" / "path") if present.
+        loc_items = cast("list[object]", loc)
+        tail = loc_items[1:] if loc_items[0] in {"body", "query", "path"} else loc_items
+        return ".".join(str(p) for p in tail)
+    return None
+
+
+def _fields_from_detail_list(detail: object) -> set[str]:
+    """Parse a ``detail`` list (RFC 7807 problem-details or FastAPI/Pydantic)."""
+    fields: set[str] = set()
+    if isinstance(detail, list):
+        for raw in cast("list[object]", detail):
+            if isinstance(raw, dict):
+                name = _fields_from_detail_entry(cast("dict[str, object]", raw))
+                if name is not None:
+                    fields.add(name)
+    return fields
+
+
 def _extract_error_fields(body: object) -> set[str]:
     """Extract the set of field names with validation errors.
 
-    Supports both:
-      - FastAPI / Pydantic: ``{"detail": [{"loc": ["body", "email"], ...}, ...]}``
+    Supports:
+      - Arvel error-bag:    ``{"error": {"details": [{"field": "email", "issue": ...}, ...]}}``
+      - RFC 7807 / FastAPI: ``{"detail": [{"field": ...}|{"loc": ["body", "email"]}, ...]}``
       - Laravel-style:      ``{"errors": {"email": [...], "name": [...]}}``
     """
+    if not isinstance(body, dict):
+        return set()
+    mapping = cast("dict[str, object]", body)
     fields: set[str] = set()
-    if isinstance(body, dict):
-        mapping = cast("dict[str, object]", body)
-        detail = mapping.get("detail")
-        if isinstance(detail, list):
-            for raw in cast("list[object]", detail):
-                if isinstance(raw, dict):
-                    entry = cast("dict[str, object]", raw)
-                    loc = entry.get("loc")
-                    if isinstance(loc, list) and loc:
-                        # Skip the prefix ("body" / "query" / "path") if present.
-                        loc_items = cast("list[object]", loc)
-                        tail = (
-                            loc_items[1:]
-                            if loc_items[0] in {"body", "query", "path"}
-                            else loc_items
-                        )
-                        fields.add(".".join(str(p) for p in tail))
-        errors = mapping.get("errors")
-        if isinstance(errors, dict):
-            errors_map = cast("dict[str, object]", errors)
-            fields.update(errors_map.keys())
+    error = mapping.get("error")
+    if isinstance(error, dict):
+        fields |= _fields_from_detail_list(cast("dict[str, object]", error).get("details"))
+    fields |= _fields_from_detail_list(mapping.get("detail"))
+    errors = mapping.get("errors")
+    if isinstance(errors, dict):
+        fields.update(cast("dict[str, object]", errors).keys())
     return fields
 
 

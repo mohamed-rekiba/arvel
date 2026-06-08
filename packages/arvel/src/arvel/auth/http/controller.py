@@ -210,13 +210,7 @@ class AuthController(Controller):
         except PasswordResetTokenInvalidError as exc:
             raise ValidationException(
                 "Reset token is invalid or has expired.",
-                details=[
-                    {
-                        "loc": ["body", "token"],
-                        "msg": "Reset token is invalid or has expired.",
-                        "type": "value_error.token_invalid",
-                    }
-                ],
+                details=[{"field": "token", "issue": "Reset token is invalid or has expired."}],
             ) from exc
         return {"status": "reset"}
 

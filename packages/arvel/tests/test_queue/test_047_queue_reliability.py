@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import ClassVar
 
 import pytest
+from arvel.notifications.notifiable import Notifiable
 from arvel.notifications.notification import Notification
 from arvel.queue.config import QueueConfig, QueueDriver
 from arvel.queue.drivers.database import DatabaseConnection
@@ -58,7 +59,7 @@ class _ImmediateFailJob(Job):
         cls.call_count = 0
 
 
-class _QueuedNotifiable:
+class _QueuedNotifiable(Notifiable):
     rows: ClassVar[dict[int, _QueuedNotifiable]] = {}
     find_calls: ClassVar[list[int | str]] = []
 
@@ -139,6 +140,28 @@ class TestStory4NotificationJob:
 
         assert _QueuedNotifiable.find_calls == [7]
         assert channel.sent == [_QueuedNotifiable.rows[7]]
+
+    @pytest.mark.asyncio
+    async def test_unregistered_class_is_rejected_without_import(self) -> None:
+        """A tampered payload must not trigger an arbitrary module import."""
+        import sys
+
+        from arvel.notifications.exceptions import UnregisteredNotificationClassError
+        from arvel.notifications.notification_job import NotificationJob
+
+        sentinel = "arvel._queue_import_gadget_probe"
+        assert sentinel not in sys.modules
+
+        job = NotificationJob(
+            notifiable_id="1",
+            notifiable_class=f"{sentinel}.Thing",
+            notification_class=f"{_QueuedNotification.__module__}.{_QueuedNotification.__qualname__}",
+        )
+        with pytest.raises(UnregisteredNotificationClassError):
+            await job.handle()
+
+        # The unknown module was never imported — the allowlist rejected it first.
+        assert sentinel not in sys.modules
 
 
 # ─── QueueWorkCommand must wire FailedJobStore ────────────────────────────────
@@ -285,6 +308,30 @@ class TestStory7JobTimeout:
 
         # After timeout, the job must be dead (either retried or in DLQ)
         assert worker.jobs_dead + worker.jobs_retried > 0
+
+    @pytest.mark.asyncio
+    async def test_external_cancellation_propagates_and_does_not_fail_job(self) -> None:
+        """Cancelling the worker mid-job must propagate, not DLQ/retry the job."""
+        manager, db_conn = await _make_db_manager()
+        store = await _make_db_store(db_conn)
+
+        from arvel.queue.bus import Bus
+
+        job = _TimeoutJob()
+        job.timeout = 0  # no per-job timeout, so only external cancel can interrupt
+        await Bus(manager).dispatch(job)
+
+        worker = Worker(manager, failed_job_store=store)
+        task = asyncio.create_task(worker.drain_then_stop(poll_timeout=0.1))
+        await asyncio.sleep(0.3)  # let the worker pop and start the job
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert worker.jobs_dead == 0
+        assert worker.jobs_retried == 0
+        assert await store.count() == 0
 
     @pytest.mark.asyncio
     async def test_timeout_zero_means_no_timeout(self) -> None:

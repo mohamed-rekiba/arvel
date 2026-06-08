@@ -79,16 +79,15 @@ async def test_mail_channel_skips_when_notification_has_no_mail() -> None:
     await channel.send(object(), _Notification({}))
 
 
-def test_notification_job_imports_classes() -> None:
-    import_class = cast(
-        "Callable[[str], type]",
-        object.__getattribute__(notification_job_module, "_import_class"),
-    )
+def test_notification_job_resolves_classes_from_registry() -> None:
+    from arvel.notifications.notifiable import NotifiableRegistry
+    from arvel.notifications.notification import NotificationRegistry
 
-    assert (
-        import_class("arvel.notifications.notification_job.NotificationJob")
-        is notification_job_module.NotificationJob
-    )
+    notifiable_key = f"{_User.__module__}.{_User.__qualname__}"
+    notification_key = f"{_Notification.__module__}.{_Notification.__qualname__}"
+
+    assert NotifiableRegistry[notifiable_key] is _User
+    assert NotificationRegistry[notification_key] is _Notification
 
 
 async def test_notifiable_uses_injected_manager() -> None:

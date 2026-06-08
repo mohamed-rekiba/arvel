@@ -9,8 +9,10 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
+from pathlib import Path
 from typing import Protocol, cast
 
+from arvel.mail.attachment import Attachment
 from arvel.mail.config import MailEncryption, SmtpConfig
 from arvel.mail.exceptions import MailException
 from arvel.mail.rendered_mail import RenderedMail
@@ -74,14 +76,25 @@ class SmtpMailDriver:
         msg.attach(alt)
 
         for att in mail.attachments:
-            if att.data is not None:
-                part = MIMEBase("application", "octet-stream")
-                part.set_payload(att.data)
-                encoders.encode_base64(part)
-                part.add_header("Content-Disposition", f'attachment; filename="{att.name}"')
-                msg.attach(part)
+            msg.attach(self._build_attachment(att))
 
         return msg
+
+    @staticmethod
+    def _build_attachment(att: Attachment) -> MIMEBase:
+        payload = att.data
+        if payload is None and att.path is not None:
+            payload = Path(att.path).read_bytes()
+        if payload is None:
+            raise MailException(f"Attachment {att.name!r} has neither path nor data.")
+
+        maintype, _, subtype = att.mime.partition("/")
+        part = MIMEBase(maintype or "application", subtype or "octet-stream")
+        part.set_payload(payload)
+        encoders.encode_base64(part)
+        # add_header encodes the filename per RFC 2231 — handles quotes/non-ASCII safely.
+        part.add_header("Content-Disposition", "attachment", filename=att.name)
+        return part
 
     async def _send_raw(self, msg: MIMEMultipart, recipients: list[str]) -> None:
         """Send via aiosmtplib. Raises on failure."""

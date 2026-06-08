@@ -76,6 +76,14 @@ Other methods: `remove_role`, `sync_roles`, `has_all_roles`, `has_level`, `revok
 
 Permissions resolve through roles automatically — `has_permission_to` is true if the user has the permission directly **or** via any assigned role.
 
+> [!WARNING]
+> `give_permission_to`, `revoke_permission_to`, `assign_role`, and `remove_role` are
+> primitives — they do **not** check the acting user's own authority. An admin endpoint
+> that exposes them must enforce policy itself, or a user who can manage roles could grant
+> themselves abilities they don't hold (privilege escalation). The rule the e-commerce kit
+> follows: you can only grant or revoke a permission you hold, and only manage a role at or
+> below your own level.
+
 <a name="wildcard-permissions"></a>
 ## Wildcard Permissions
 

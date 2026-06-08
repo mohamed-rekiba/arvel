@@ -83,12 +83,13 @@ class CacheManager:
                 )
             return RedisStore(redis=client, prefix=self._config.prefix)
         if driver == CacheDriver.DATABASE:
-            from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
             from arvel.cache.stores.database import DatabaseStore
+            from arvel.database.db import DB
 
-            engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-            maker = async_sessionmaker(engine, expire_on_commit=False)
+            # Share the app's default DB connection. A throwaway in-memory engine
+            # would make the cache per-process and ephemeral — useless for a
+            # database cache. Run the published cache migration to create the table.
+            maker = DB.session_maker_for()
             return DatabaseStore(session_maker=maker, prefix=self._config.prefix)
         raise ValueError(f"Unknown cache driver: {driver!r}")
 

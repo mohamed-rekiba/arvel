@@ -119,7 +119,7 @@ class InvoiceMail(Mailable):
         ]
 ```
 
-`Attachment` takes a `name` and `mime`, plus either a `path` (file on disk) or `data` (raw bytes).
+`Attachment` takes a `name` and `mime`, plus either a `path` (file on disk) or `data` (raw bytes). The SMTP driver reads `path` at send time and sets the part's `Content-Type` from `mime`. Provide one of `path`/`data` — an attachment with neither raises a `MailException`.
 
 <a name="sending-mail"></a>
 ## Sending Mail

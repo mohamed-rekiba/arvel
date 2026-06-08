@@ -126,6 +126,45 @@ class TestPermissionGuard:
         with pytest.raises(AuthorizationException):
             await guard(_request(authorization="Bearer t"), "products.create")
 
+    async def test_no_redundant_query_when_me_returns_user_model(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """me() already returns the configured model → guard must not re-query."""
+        queries = {"count": 0}
+
+        class _ModelUser:
+            id = 0
+
+            def __init__(self, perms: set[str]) -> None:
+                self.id = 7
+                self._perms = perms
+
+            async def has_permission_to(self, perm: str) -> bool:
+                return perm in self._perms
+
+            @classmethod
+            def where(cls, *_a: Any, **_k: Any) -> Any:
+                queries["count"] += 1
+                msg = "guard must not reload when me() already returns the user model"
+                raise AssertionError(msg)
+
+        me_user = _ModelUser({"products.create"})
+        _bind_service(monkeypatch, _FakeService(user=me_user))
+        guard = make_permission_guard(_ModelUser)
+        result = await guard(_request(authorization="Bearer t"), "products.create")
+        assert result is me_user
+        assert queries["count"] == 0
+
+    async def test_reloads_when_me_returns_other_type(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """me() returns a different type → fall back to a typed reload."""
+        _bind_service(monkeypatch, _FakeService(user=SimpleNamespace(id=7)))
+        held = _FakeUser(perms={"products.create"}, level=3)
+        guard = make_permission_guard(_user_model(held))
+        result = await guard(_request(authorization="Bearer t"), "products.create")
+        assert result is held
+
 
 class TestRoleLevelGuard:
     async def test_returns_user_when_level_met(self, monkeypatch: pytest.MonkeyPatch) -> None:

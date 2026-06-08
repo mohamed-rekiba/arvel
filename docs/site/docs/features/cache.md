@@ -28,11 +28,11 @@ CACHE_PREFIX=arvel_cache
 | `array` | In-process dict | Default; not shared across processes |
 | `file` | JSON files | `CACHE_FILE_PATH` |
 | `redis` | Redis | Requires `arvel[redis]`; supports atomic locks |
-| `database` | SQL table | See the warning below |
+| `database` | SQL table (`cache_entries`) | Uses your app's default DB connection |
 | `null` | No-op | Disables caching |
 
-> [!WARNING]
-> The `database` cache store currently hardcodes an in-memory SQLite URL — it is not yet wired to your application database. Use `redis` or `file` for shared, persistent caching.
+> [!NOTE]
+> The `database` driver uses your application's default database connection. Publish and run the cache migration first (`arvel vendor:publish --tag arvel-cache` then migrate) so the `cache_entries` table exists. It raises a clear error if the database isn't configured.
 
 > [!NOTE]
 > TTLs are always **integer seconds**, not `timedelta`. On `put`, a `None` TTL means "store forever" across every store (matching Laravel, where `Cache::put($key, $val, null)` is equivalent to `forever`). Use a positive TTL to set an expiry.

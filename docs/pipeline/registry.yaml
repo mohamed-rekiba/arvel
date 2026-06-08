@@ -1,0 +1,152 @@
+schema_version: 1
+work_items:
+  - id: "WI-arvel-001"
+    name: "ORM streaming must not silently drop eager loads (stream/as_tree)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T00:55:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 1 (database/ORM) first hardening WI. Spec: docs/pipeline/specs/WI-arvel-001-stream-eager-loads.md"
+  - id: "WI-arvel-002"
+    name: "Controllers must resolve fresh per request (no cross-request state bleed)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T04:35:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 2 (routing/http) hardening WI. Spec: docs/pipeline/specs/WI-arvel-002-per-request-controllers.md"
+  - id: "WI-arvel-003"
+    name: "Authorization guard hardening (no privilege escalation, no redundant fetch)"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T05:20:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 3 (auth/permission) hardening WI. Spec: docs/pipeline/specs/WI-arvel-003-authz-guard-hardening.md"
+  - id: "WI-arvel-004"
+    name: "Validation error contract consistency (canonical {field, issue} details + test helper)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T06:00:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 4 (validation/FormRequest) hardening WI. Spec: docs/pipeline/specs/WI-arvel-004-validation-error-contract.md"
+  - id: "WI-arvel-005"
+    name: "JsonResource.when_loaded must honor the eager-relation cache (no silent drop)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T06:40:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 5 (http/resources) hardening WI. Spec: docs/pipeline/specs/WI-arvel-005-when-loaded-eager-cache.md"
+  - id: "WI-arvel-006"
+    name: "Storage drivers must raise one missing-file exception (StorageFileNotFoundError)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T07:20:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 6 (storage/filesystem) hardening WI. Spec: docs/pipeline/specs/WI-arvel-006-storage-missing-file-contract.md"
+  - id: "WI-arvel-007"
+    name: "Database cache driver must use the app connection + matching migration"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T08:00:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 7 (cache) hardening WI. Spec: docs/pipeline/specs/WI-arvel-007-database-cache-driver.md"
+  - id: "WI-arvel-008"
+    name: "Worker cancellation must propagate, not fail the in-flight job"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T08:40:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 8 (queue) hardening WI. Spec: docs/pipeline/specs/WI-arvel-008-worker-cancellation-contract.md"
+  - id: "WI-arvel-009"
+    name: "Queued notifications must deserialize from an allowlist (no arbitrary import)"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T09:20:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 9 (events/notifications) hardening WI. Spec: docs/pipeline/specs/WI-arvel-009-queued-notification-allowlist.md"
+  - id: "WI-arvel-010"
+    name: "SMTP driver must send path-based attachments (and honor mime)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T10:00:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 10 (mail) hardening WI. Spec: docs/pipeline/specs/WI-arvel-010-smtp-path-attachments.md"

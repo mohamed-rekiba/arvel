@@ -70,6 +70,8 @@ contents = await disk.get("avatars/1.png")   # bytes
 exists = await disk.exists("avatars/1.png")
 ```
 
+`get` and `size` raise `StorageFileNotFoundError` when the file is missing — the same type on every disk. It subclasses the builtin `FileNotFoundError`, so `except FileNotFoundError` works too.
+
 <a name="storing-files"></a>
 ## Storing Files
 

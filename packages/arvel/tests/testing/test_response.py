@@ -267,6 +267,17 @@ class TestJsonValidationErrors:
         r = TestResponse(_make(body, status=422))
         r.assert_json_validation_errors("email")
 
+    def test_recognises_arvel_error_details_shape(self) -> None:
+        from arvel.testing import TestResponse
+
+        body = (
+            b'{"error": {"code": "VALIDATION_FAILED", "message": "Validation failed.", '
+            b'"details": [{"field": "email", "issue": "invalid"}, '
+            b'{"field": "name", "issue": "required"}]}}'
+        )
+        r = TestResponse(_make(body, status=422))
+        r.assert_json_validation_errors("email", "name")
+
     def test_fails_when_status_is_not_422(self) -> None:
         from arvel.testing import TestResponse
 

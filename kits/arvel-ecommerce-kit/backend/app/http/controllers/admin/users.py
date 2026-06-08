@@ -86,7 +86,10 @@ class AdminUsersController(Controller):
     async def revoke_role(
         self, user_id: int, role_name: str, request: Request
     ) -> AdminUserWrapperOut:
-        await require_permission(request, "roles.manage")
+        actor = await require_permission(request, "roles.manage")
+        level = await role_level(role_name)
+        if not await actor.has_level(level):
+            raise AuthorizationException("Cannot revoke a role above your level.")
         target: User | None = await User.where(User.id == user_id).first()
         if target is None:
             raise NotFoundException("User not found.")
@@ -96,7 +99,11 @@ class AdminUsersController(Controller):
     async def grant_permission(
         self, user_id: int, payload: GrantPermissionPayload, request: Request
     ) -> AdminUserWrapperOut:
-        await require_permission(request, "roles.manage")
+        actor = await require_permission(request, "roles.manage")
+        if not await actor.has_permission_to(payload.permission):
+            raise AuthorizationException(
+                f"Cannot grant a permission you do not hold: '{payload.permission}'."
+            )
         perm_obj: Permission | None = await Permission.where(name=payload.permission).first()
         if perm_obj is None:
             raise NotFoundException(f"Permission '{payload.permission}' not found.")
@@ -109,7 +116,11 @@ class AdminUsersController(Controller):
     async def revoke_permission(
         self, user_id: int, permission_name: str, request: Request
     ) -> AdminUserWrapperOut:
-        await require_permission(request, "roles.manage")
+        actor = await require_permission(request, "roles.manage")
+        if not await actor.has_permission_to(permission_name):
+            raise AuthorizationException(
+                f"Cannot revoke a permission you do not hold: '{permission_name}'."
+            )
         perm_obj: Permission | None = await Permission.where(name=permission_name).first()
         if perm_obj is None:
             raise NotFoundException(f"Permission '{permission_name}' not found.")

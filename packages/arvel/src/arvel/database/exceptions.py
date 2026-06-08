@@ -132,6 +132,29 @@ class InvalidCursorError(ORMError):
         self.reason = reason
 
 
+class EagerLoadNotStreamableError(ORMError):
+    """Raised by ``QueryBuilder.stream()`` when batched eager loads are pending.
+
+    A server-side cursor yields rows incrementally and holds only the current
+    batch in memory, so it cannot batch-load pivot/morph/FK-method, recursive
+    (tree), or chaperone relations the way ``all()``/``lazy()``/``chunk()`` do.
+    Silently dropping a ``with_()`` request would produce undetected N+1 queries
+    (or a ``LazyLoadingError`` far from the cause), so the call fails fast and
+    points to the streaming methods that *do* eager-load per batch.
+    """
+
+    def __init__(self, model_name: str, relations: list[str]) -> None:
+        rel_list = ", ".join(repr(name) for name in relations)
+        super().__init__(
+            f"{model_name}.stream() cannot eager-load {rel_list}: a server-side "
+            "cursor holds only one batch in memory and cannot batch-load these "
+            "relations. Use .lazy()/.cursor() or .chunk()/.chunk_by_id(), which "
+            "eager-load per batch, or drop the .with_() before streaming."
+        )
+        self.model_name = model_name
+        self.relations = relations
+
+
 class ReadOnlyModelError(ORMError):
     """Raised when a write operation is attempted on a ViewModel.
 
@@ -178,6 +201,7 @@ __all__ = [
     "CastError",
     "DatabaseConnectionError",
     "DecryptionError",
+    "EagerLoadNotStreamableError",
     "InvalidCursorError",
     "MassAssignmentError",
     "MigrationNotReversibleError",

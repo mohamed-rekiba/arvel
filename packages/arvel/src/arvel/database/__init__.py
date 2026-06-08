@@ -36,6 +36,7 @@ from arvel.database.domain import DomainService
 from arvel.database.events import ModelEvent, Observer, fire_after_commit
 from arvel.database.exceptions import (
     DatabaseConnectionError,
+    EagerLoadNotStreamableError,
     MassAssignmentError,
     MigrationNotReversibleError,
     ModelNotFoundError,
@@ -105,6 +106,7 @@ __all__ = [
     "DecryptionError",
     "Descendants",
     "DomainService",
+    "EagerLoadNotStreamableError",
     "EncryptedType",
     "EnumType",
     "Factory",

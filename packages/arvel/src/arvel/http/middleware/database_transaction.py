@@ -107,7 +107,7 @@ def _is_error_response(response: Any) -> bool:
     status = getattr(response, "status_code", 200)
     try:
         return int(status) >= _HTTP_ERROR_THRESHOLD
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return False
 
 

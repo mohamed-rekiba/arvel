@@ -9,7 +9,7 @@ from urllib.parse import unquote
 import anyio
 import anyio.to_thread
 
-from arvel.storage.exceptions import StoragePathError
+from arvel.storage.exceptions import StorageFileNotFoundError, StoragePathError
 from arvel.storage.url_signer import TemporaryUrlSigner
 
 
@@ -52,7 +52,7 @@ class LocalDriver:
 
         def _read() -> bytes:
             if not full.exists():
-                raise FileNotFoundError(path)
+                raise StorageFileNotFoundError(path)
             return full.read_bytes()
 
         return await anyio.to_thread.run_sync(_read)
@@ -129,6 +129,8 @@ class LocalDriver:
         full = self._safe_path(path)
 
         def _size() -> int:
+            if not full.exists():
+                raise StorageFileNotFoundError(path)
             return full.stat().st_size
 
         return await anyio.to_thread.run_sync(_size)

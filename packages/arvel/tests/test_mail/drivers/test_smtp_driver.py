@@ -89,6 +89,44 @@ class TestSmtpDriver:
         assert msg["From"] == "bot@x.com"
 
     @pytest.mark.asyncio
+    async def test_path_attachment_is_read_and_attached(self, tmp_path: object) -> None:
+        """A path-only attachment must be read from disk and attached (not dropped)."""
+        from pathlib import Path
+
+        from arvel.mail.attachment import Attachment
+        from arvel.mail.drivers.smtp import SmtpMailDriver
+        from arvel.mail.envelope import Envelope
+        from arvel.mail.rendered_mail import RenderedMail
+
+        assert isinstance(tmp_path, Path)
+        pdf = tmp_path / "invoice.pdf"
+        pdf.write_bytes(b"%PDF-1.4 body")
+
+        driver = SmtpMailDriver(SmtpConfig(host="localhost", port=1025, encryption=None))
+        rendered = RenderedMail(
+            envelope=Envelope(from_address="a@b.com", to=["c@d.com"], subject="Hi"),
+            body_text="x",
+            body_html=None,
+            attachments=[Attachment(path=str(pdf), name="invoice.pdf", mime="application/pdf")],
+        )
+        msg = driver._build_message(rendered)  # pyright: ignore[reportPrivateUsage]
+
+        parts = [p for p in msg.walk() if p.get_content_disposition() == "attachment"]
+        assert len(parts) == 1
+        assert parts[0].get_filename() == "invoice.pdf"
+        assert parts[0].get_content_type() == "application/pdf"
+        assert parts[0].get_payload(decode=True) == b"%PDF-1.4 body"
+
+    def test_attachment_without_path_or_data_raises(self) -> None:
+        from arvel.mail.attachment import Attachment
+        from arvel.mail.drivers.smtp import SmtpMailDriver
+        from arvel.mail.exceptions import MailException
+
+        att = Attachment(name="empty.bin", mime="application/octet-stream")
+        with pytest.raises(MailException):
+            SmtpMailDriver._build_attachment(att)  # pyright: ignore[reportPrivateUsage]
+
+    @pytest.mark.asyncio
     async def test_smtp_driver_raises_mail_exception_on_failure(self) -> None:
         """raises MailException wrapping aiosmtplib error."""
         from unittest.mock import AsyncMock, patch
