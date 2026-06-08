@@ -661,27 +661,31 @@ def _coerce_models_in_result(result: Any) -> Any:
 
     FastAPI serialises an Arvel ``Model`` as a plain dataclass — every mapped
     column, including ones a model marks ``__hidden__`` (password hashes, tokens).
-    Laravel's ``return $user;`` hides those; ours leaked them. Convert a returned
-    model, or a list of them, to its ``to_dict()`` form before FastAPI encodes it.
+    Laravel's ``return $user;`` hides those; ours leaked them. Convert any returned
+    model to its ``to_dict()`` form before FastAPI encodes it, reaching models
+    nested in dicts, lists, and tuples (``return {"user": user}`` leaked otherwise).
     ``to_dict`` only reads columns, so no async relation load happens here.
 
-    Anything that isn't a model (dicts, Pydantic models, ``Response`` objects,
-    primitives) passes through untouched.
+    Pydantic models, ``Response`` objects, and primitives pass through untouched.
     """
     try:
         from arvel.database.model import Model as _Model
     except ImportError:
         return result
-    if isinstance(result, _Model):
-        return result.to_dict()
-    if isinstance(result, list):
-        # cast to list[object] (not list[Any]): keeps pyright's element type known
-        # without mypy flagging a redundant cast off its own list[Any] narrowing.
-        items: list[object] = cast("list[object]", result)
-        if any(isinstance(item, _Model) for item in items):
-            return [item.to_dict() if isinstance(item, _Model) else item for item in items]
-        return items
-    return result
+
+    def coerce(value: object) -> object:
+        if isinstance(value, _Model):
+            return value.to_dict()
+        if isinstance(value, dict):
+            data = cast("dict[object, object]", value)
+            return {k: coerce(v) for k, v in data.items()}
+        if isinstance(value, list):
+            return [coerce(item) for item in cast("list[object]", value)]
+        if isinstance(value, tuple):
+            return tuple(coerce(item) for item in cast("tuple[object, ...]", value))
+        return value
+
+    return coerce(result)
 
 
 def _wrap_response_normalizer(

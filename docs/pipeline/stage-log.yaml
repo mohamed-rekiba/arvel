@@ -1401,3 +1401,27 @@ events:
       ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings. Cache + throttle +
       auth-security + auth-manager suites green (190 passed; warnings are the pre-existing process-local lock notices).
     timestamp: "2026-06-08T23:02:00Z"
+  - work_item: "WI-arvel-035"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Security follow-up to WI-032. _coerce_models_in_result only handled a top-level Model or list; a model nested in a
+      returned dict/tuple (e.g. {"user": user}) bypassed it and leaked __hidden__ columns. Made the normalizer recurse:
+      a local coerce() converts Model->to_dict() and rebuilds dict/list/tuple, leaving Pydantic/Response/primitives
+      untouched. to_dict() reads columns only, so no recursion blow-up or relation loads. Added a nested-leak regression
+      test to the WI-054 routing suite.
+    artifacts:
+      - "packages/arvel/src/arvel/routing.py"
+      - "packages/arvel/tests/routing/test_wi054_hidden_field_leak.py"
+      - "docs/site/docs/orm/models.md"
+    timestamp: "2026-06-08T23:10:00Z"
+  - work_item: "WI-arvel-035"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; WI-054 routing
+      suite 5 passed (top-level model/list/non-model/pydantic + new nested-dict case).
+    timestamp: "2026-06-08T23:12:00Z"
