@@ -495,3 +495,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 33 (logging) hardening WI — follow-up to WI-019's deferred nested-dict redaction. Spec: docs/pipeline/specs/WI-arvel-033-log-redaction-nested.md"
+  - id: "WI-arvel-034"
+    name: "Cache RateLimiter must use a fixed window, not a sliding TTL"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T22:50:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 34 (cache rate limiter) hardening WI. Spec: docs/pipeline/specs/WI-arvel-034-rate-limiter-fixed-window.md"
