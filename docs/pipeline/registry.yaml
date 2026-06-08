@@ -225,3 +225,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 15 (encryption) hardening WI. Spec: docs/pipeline/specs/WI-arvel-015-decrypt-error-contract.md"
+  - id: "WI-arvel-016"
+    name: "Hash.check / needs_rehash must be algorithm-aware (verify bcrypt hashes, no argon2-only crash)"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "confidential"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T13:05:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 16 (hashing) hardening WI. Spec: docs/pipeline/specs/WI-arvel-016-hash-cross-algorithm.md"

@@ -175,6 +175,8 @@ if Hash.needs_rehash(hashed):
 
 `Hash.make_bcrypt(password, rounds=12)` is available if you install the `arvel[bcrypt]` extra. All `Hash` methods are synchronous.
 
+`Hash.check` and `Hash.needs_rehash` are algorithm-aware: they dispatch on the hash's own prefix (`$argon2…` vs bcrypt's `$2…`). So a bcrypt hash — including a `$2y$` column imported from an existing Laravel app — verifies through `Hash.check` without any extra wiring, and `Hash.needs_rehash` returns `True` for it so the next successful login transparently upgrades it to argon2id.
+
 > [!NOTE]
 > Although a `HashConfig` exists with a `bcrypt` default, the `Hash` facade does not read it — it uses argon2id directly. Ignore the `hashing` block in the published config stub.
 
