@@ -4,16 +4,17 @@ from __future__ import annotations
 
 from arvel.database import Blueprint, Schema
 
-__tablename__ = "cache"
+# Must match arvel.cache.stores.database.CacheEntry — the DatabaseStore reads these names.
+__tablename__ = "cache_entries"
 
 
 async def up(schema: Schema) -> None:
     """Apply the migration."""
 
     def _table(t: Blueprint) -> None:
-        t.string("key", length=500).primary()
+        t.string("key", length=255).primary()
         t.text("value")
-        t.integer("expiration")
+        t.integer("expires_at")
 
     schema.create(__tablename__, _table)
 

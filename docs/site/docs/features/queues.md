@@ -130,6 +130,8 @@ arvel queue:restart
 
 That bumps a shared signal that every `queue:work` process checks between jobs. Workers finish whatever they're running and exit cleanly; your process manager (systemd, supervisor, k8s) brings them back up on the new code. No jobs are lost or duplicated — they go back on the queue if the worker exits mid-handle.
 
+Cancelling a worker (task cancellation, `SIGINT`) is **not** a job failure. The cancellation propagates and the worker stops — the in-flight job is never sent to the dead-letter queue or counted as a failed attempt. Only a real exception from `handle()` or a per-job `timeout` marks a job as failed.
+
 <a name="retries-and-backoff"></a>
 ## Retries & Backoff
 

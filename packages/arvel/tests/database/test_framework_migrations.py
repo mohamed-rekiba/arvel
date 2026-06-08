@@ -52,7 +52,7 @@ async def test_framework_migrations_define_expected_tables() -> None:
         ("password_resets", up_password_resets, down_password_resets),
         ("personal_access_tokens", up_tokens, down_tokens),
         ("refresh_tokens", up_refresh_tokens, down_refresh_tokens),
-        ("cache", up_cache, down_cache),
+        ("cache_entries", up_cache, down_cache),
         ("notifications", up_notifications, down_notifications),
         ("jobs", up_jobs, down_jobs),
         ("failed_jobs", up_failed_jobs, down_failed_jobs),

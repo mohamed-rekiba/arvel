@@ -102,7 +102,11 @@ class Worker:
                 await job.handle()
             self._jobs_processed += 1
             await self._dispatch_chain_successor(envelope)
-        except (Exception, asyncio.CancelledError) as exc:
+        except asyncio.CancelledError:
+            # External cancellation (graceful shutdown) — propagate, never treat
+            # as a job failure. A job timeout surfaces as TimeoutError, not this.
+            raise
+        except Exception as exc:
             if isinstance(exc, TimeoutError):
                 logger.warning(
                     "queue.job.timeout",
@@ -121,15 +125,8 @@ class Worker:
                 self._jobs_dead += 1
                 store = self._failed_job_store
                 if store is not None:
-                    actual_exc = (
-                        exc
-                        if not isinstance(exc, asyncio.CancelledError)
-                        else TimeoutError("Job timed out")
-                    )
                     error_text = "".join(
-                        traceback.format_exception(
-                            type(actual_exc), actual_exc, actual_exc.__traceback__
-                        )
+                        traceback.format_exception(type(exc), exc, exc.__traceback__)
                     )
                     from arvel.queue.failed_job_store import FailedJobStore
 

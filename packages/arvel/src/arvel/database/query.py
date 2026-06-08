@@ -46,6 +46,7 @@ from sqlalchemy.orm.attributes import set_committed_value
 from sqlalchemy.sql.elements import ColumnElement
 
 from arvel.database.exceptions import (
+    EagerLoadNotStreamableError,
     InvalidCursorError,
     ModelNotFoundError,
     MultipleResultsError,
@@ -3125,13 +3126,34 @@ class QueryBuilder(Generic[T]):
         """Alias for :meth:`lazy` — stream rows without loading them all at once."""
         return self.lazy(chunk_size, column=column)
 
+    def _unstreamable_eager_relations(self) -> list[str]:
+        """Names of pending eager loads a server-side cursor can't satisfy.
+
+        A server-side cursor yields rows incrementally and only ever holds the
+        current ``yield_per`` batch, so it cannot batch any eager load: the async
+        loaders (pivot/morph/FK-method), recursive (tree), and chaperone passes
+        need the full parent set in memory, and SA ``selectinload`` does not run
+        reliably under a streaming result (it would leave relations unpopulated).
+        All eager-load kinds are therefore reported so the call can fail fast.
+        """
+        names = [spec.path for spec in self._eager_loads]
+        names += [spec.path for spec in self._async_eager]
+        names += [spec.name for spec in self._tree_eager]
+        names += [chap.head for chap in self._chaperones]
+        return names
+
     async def stream(self, *, batch_size: int = 1000) -> AsyncGenerator[T]:
         """Server-side cursor: one statement, rows fetched incrementally from the driver.
 
         Distinct from :meth:`lazy` (which issues N keyset queries). Fires ``retrieved``
-        per row and does not batch-eager-load pivots — use :meth:`lazy`/:meth:`chunk`
-        for that.
+        per row. A server-side cursor holds only one batch in memory and therefore
+        cannot eager-load relationships — requesting any via :meth:`with_` raises
+        :class:`EagerLoadNotStreamableError`. Use :meth:`lazy`/:meth:`chunk`/
+        :meth:`chunk_by_id` (which eager-load per batch) when you need relations.
         """
+        unstreamable = self._unstreamable_eager_relations()
+        if unstreamable:
+            raise EagerLoadNotStreamableError(self._model.__name__, unstreamable)
         stmt = self.apply_global_scopes().execution_options(yield_per=batch_size)
         result = await get_active_session().stream_scalars(stmt)
         async for row in result:
@@ -3779,6 +3801,10 @@ class RecursiveQueryBuilder(QueryBuilder[T]):
         result = await get_active_session().execute(stmt)
         rows = list(result.scalars().all())
         await self._fire_retrieved(rows)
+        # as_tree() materializes the whole forest in memory, so it can (and must)
+        # honor pending eager loads the same way the sibling all() does — otherwise
+        # a with_()/with_tree()/chaperone request on a tree query is silently dropped.
+        await self._eager_load_async(rows)
         return assemble_forest(rows, id_key=self._id_key, parent_key=self._parent_key)
 
 

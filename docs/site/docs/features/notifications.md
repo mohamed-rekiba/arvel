@@ -98,3 +98,5 @@ class InvoicePaid(Notification, ShouldQueue):
 ```
 
 `Notification.send()` enqueues queued notifications automatically. Use `Notification.send_now()` to force inline delivery and bypass the queue. If the queue isn't configured, queued notifications fall back to inline delivery.
+
+A queued job carries the notification and notifiable as `module.ClassName` keys, not pickled objects. The worker resolves them from an allowlist built when those classes are imported — it never imports a class path straight from the queue payload. So the worker must import the modules that define your notifications and notifiable models (normal app boot does this). A payload referencing an unknown class is rejected instead of imported.

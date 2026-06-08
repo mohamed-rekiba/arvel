@@ -154,7 +154,7 @@ class UserResource(JsonResource[User]):
 ```
 
 > [!NOTE]
-> `when_loaded` never lazy-loads. If the relation isn't already hydrated on the model, the key is stripped. Eager-load the relation first — for example with `with_("posts")` — to include it. See [Relationships](../orm/relationships.md#eager-loading).
+> `when_loaded` never lazy-loads. If the relation isn't already hydrated on the model, the key is stripped. Eager-load the relation first — for example with `with_("posts")` — to include it. This works for every relation type: SQLAlchemy relations hydrated on the model and Arvel's async relations (has-many, belongs-to-many, morph-to-many) cached by `with_()`. See [Relationships](../orm/relationships.md#eager-loading).
 
 <a name="merging-conditional-data"></a>
 ### Merging Conditional Data

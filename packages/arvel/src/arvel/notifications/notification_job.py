@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 from typing import Any
 
+from arvel.notifications.exceptions import UnregisteredNotificationClassError
 from arvel.queue.job import Job
 
 
@@ -14,6 +15,10 @@ class NotificationJob(Job):
     Fields mirror the ShouldQueue contract: the notifiable object is referenced by
     class name + ID so the job is serializable; the notification is referenced by
     class name so it can be reconstructed on the worker side.
+
+    Both classes are resolved from allowlist registries populated at class
+    definition — never by importing the dotted path from the queue payload. That
+    keeps a tampered payload from triggering arbitrary module imports.
     """
 
     notifiable_id: str
@@ -22,20 +27,21 @@ class NotificationJob(Job):
 
     async def handle(self) -> None:
         from arvel.facades.notification import Notification
+        from arvel.notifications.notifiable import NotifiableRegistry
+        from arvel.notifications.notification import NotificationRegistry
 
-        notifiable_cls = _import_class(self.notifiable_class)
-        notification_cls = _import_class(self.notification_class)
+        notifiable_cls = _resolve(NotifiableRegistry, self.notifiable_class, "notifiable")
+        notification_cls = _resolve(NotificationRegistry, self.notification_class, "notification")
         notifiable = await _refetch_notifiable(notifiable_cls, self.notifiable_id)
         notification = notification_cls()
         await Notification.send_now(notifiable, notification)
 
 
-def _import_class(dotted: str) -> type:
-    module_path, _, class_name = dotted.rpartition(".")
-    import importlib
-
-    module = importlib.import_module(module_path)
-    return getattr(module, class_name)  # type: ignore[no-any-return]
+def _resolve(registry: dict[str, type[Any]], key: str, kind: str) -> type[Any]:
+    cls = registry.get(key)
+    if cls is None:
+        raise UnregisteredNotificationClassError(kind, key)
+    return cls
 
 
 async def _refetch_notifiable(notifiable_cls: type, notifiable_id: str) -> Any:

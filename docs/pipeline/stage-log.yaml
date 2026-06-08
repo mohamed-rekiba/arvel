@@ -1,0 +1,430 @@
+schema_version: 1
+events:
+  - work_item: "WI-arvel-001"
+    stage: "qa-pre"
+    event: "exit"
+    result: "pass"
+    note: "Spec derived from research brief F2 + review; SPEC-1..7 authored with failing tests first."
+    timestamp: "2026-06-08T01:05:00Z"
+  - work_item: "WI-arvel-001"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Root-cause fixes: stream() fail-fast on pending eager loads (all kinds);
+      RecursiveQueryBuilder.as_tree() now runs _eager_load_async like all();
+      new EagerLoadNotStreamableError exported. No backward-compat shims.
+    artifacts:
+      - "packages/arvel/src/arvel/database/exceptions.py"
+      - "packages/arvel/src/arvel/database/query.py"
+      - "packages/arvel/src/arvel/database/__init__.py"
+      - "packages/arvel/tests/database/test_stream_eager_load_guard.py"
+    timestamp: "2026-06-08T01:25:00Z"
+  - work_item: "WI-arvel-001"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      pytest packages/arvel/tests/database = 1137 passed + 7 new guard tests;
+      mypy --strict (1040 files) clean; pyright 0 errors; ruff clean;
+      live kit DB read sanity (13 visible + 1 draft; 14 live products).
+    timestamp: "2026-06-08T01:45:00Z"
+  - work_item: "WI-arvel-001"
+    stage: "reverify"
+    event: "exit"
+    result: "pass"
+    note: >-
+      requesting-code-review re-verify: implementation confirmed correct; initial
+      "With fixes" (test breadth + doc labels) resolved — guard tests now cover
+      all eager buckets (selectin/async/tree/chaperone) + all()/as_tree() parity;
+      docstring/section labels/assertions corrected.       Pre-existing recursive() eager
+      carry-over recorded as tracked deferral (backlog 001 notes). Verdict: clean.
+    timestamp: "2026-06-08T02:00:00Z"
+  - work_item: "WI-arvel-002"
+    stage: "qa-pre"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Spec derived from research brief 002 (D1 reproduced: controllers singleton at
+      mount -> calls 1,2,3) + review (Critical confirmed both adapters). SPEC-1..7
+      authored; freshness tests written to fail against the singleton behavior.
+    timestamp: "2026-06-08T04:40:00Z"
+  - work_item: "WI-arvel-002"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Root-cause fix: MethodControllerAdapter.build() and _invokable_controller_adapter()
+      now resolve a fresh instance per request (probe at mount only validates DI +
+      reads receiver-free signature, then discarded). D2: DB-tx middleware except tuple
+      parenthesized. No backward-compat shims.
+    artifacts:
+      - "packages/arvel/src/arvel/routing.py"
+      - "packages/arvel/src/arvel/http/middleware/database_transaction.py"
+      - "packages/arvel/tests/routing/test_wi002_per_request_controllers.py"
+    timestamp: "2026-06-08T04:50:00Z"
+  - work_item: "WI-arvel-002"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      pytest routing+http = 308 passed (incl. 4 new freshness tests + unchanged
+      boot-time DI fail-fast); mypy --strict clean; pyright 0 errors; ruff clean.
+      Kit ASGI boots (88 routes, all controllers resolve at mount); live E2E
+      /api/i18n/en + /healthz return 200 with stable ETag across requests.
+    timestamp: "2026-06-08T05:00:00Z"
+  - work_item: "WI-arvel-002"
+    stage: "reverify"
+    event: "exit"
+    result: "pass"
+    note: >-
+      requesting-code-review re-verify verdict: Ready. Minors folded in: added
+      intentional-shared (instance()-bound) controller test, tightened spec wording
+      on probe lifetime, checked backlog acceptance boxes. Dropped a redundant
+      invokable unit test that reached into a private symbol (pyright reportPrivateUsage)
+      — invokable freshness stays covered via HTTP. Final: 309 routing+http tests
+      pass, mypy/pyright/ruff clean. Deferred: auth _mount_routes closure capture,
+      per-request DI child scope, rate-limit header parity.
+    timestamp: "2026-06-08T05:10:00Z"
+  - work_item: "WI-arvel-003"
+    stage: "qa-pre"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Spec from research brief 003 (F1 escalation confirmed in grant_permission /
+      revoke_permission / revoke_role vs guarded assign_role; F2 redundant user fetch
+      confirmed: me() returns the configured user model the guard is built with).
+      SPEC-1..7 authored; escalation + no-redundant-query tests written to fail first.
+    timestamp: "2026-06-08T05:25:00Z"
+  - work_item: "WI-arvel-003"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Root-cause fixes: make_permission_guard uses the require_auth user directly via an
+      isinstance fast path (no second identical SELECT), reload kept only for mismatched
+      models; kit AdminUsersController now requires the actor to hold a permission to
+      grant/revoke it and to outrank a role to revoke it (mirrors assign_role). No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/auth/guards/__init__.py"
+      - "packages/arvel/tests/auth/test_guards.py"
+      - "kits/arvel-ecommerce-kit/backend/app/http/controllers/admin/users.py"
+      - "kits/arvel-ecommerce-kit/backend/tests/unit/test_057_authz_escalation_guard.py"
+    timestamp: "2026-06-08T05:40:00Z"
+  - work_item: "WI-arvel-003"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      pytest packages/arvel/tests/auth = 171 passed (incl. 2 new guard query tests);
+      kit tests/unit/test_057 = 5 passed (escalation deny + pass-through); arvel-permission
+      = 75 passed (no RBAC regression); full mypy --strict (1041 files) + pyright clean;
+      ruff clean. Deferred (tracked): F3 per-role permissions.all() N+1, F4 password_resets
+      schema drift, F5 access-JWT revocation + process-local throttle, F6 auth
+      _mount_routes boot capture, F7 monorepo config-shadow breaking ~33 kit unit tests.
+    timestamp: "2026-06-08T05:55:00Z"
+  - work_item: "WI-arvel-003"
+    stage: "reverify"
+    event: "exit"
+    result: "pass"
+    note: >-
+      requesting-code-review re-verify verdict: Ready. Guard fast path preserves the old
+      None/permission 403 semantics (me() never returns None, so isinstance-False reload is
+      safe); kit revoke_role now resolves role level first (consistent with assign_role).
+      Docs synced (permission.md primitive-vs-policy warning), backlog epic 003 boxes
+      checked. Final: 246 auth+permission tests + 5 kit authz tests pass, mypy --strict
+      (1041) + pyright + ruff clean. F7 (config-shadow) flagged as a test-infra WI.
+    timestamp: "2026-06-08T06:05:00Z"
+  - work_item: "WI-arvel-004"
+    stage: "planning"
+    event: "enter"
+    result: "pass"
+    note: >-
+      Module 4 (validation/FormRequest). deep-research brief 004 + code-review scoped two
+      defects: F1 reset_password emitted Pydantic-style {loc, msg, type} details while the
+      rest of the framework uses canonical {field, issue}; F2 the TestResponse helper could
+      not parse Arvel's own error-bag envelope ({"error": {"details": [{"field": ...}]}}).
+      Deferred (tracked): F3-F6 (rules-layer architecture, nullable parity, unknown-rule
+      soft-fail, exists/unique session error).
+    timestamp: "2026-06-08T06:00:00Z"
+  - work_item: "WI-arvel-004"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Fix A: reset_password ValidationException now carries {"field": "token", "issue": ...}
+      so the detail shape matches every other validation error (error-bag and RFC 7807
+      handlers both render it cleanly). Fix B: _extract_error_fields recognises the Arvel
+      error-bag and RFC 7807 {field} entries alongside FastAPI loc and Laravel errors-map,
+      refactored into small parsers to stay under the complexity limit. No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/auth/http/controller.py"
+      - "packages/arvel/src/arvel/testing/response.py"
+      - "packages/arvel/tests/testing/test_response.py"
+      - "packages/arvel/tests/test_auth/integration/test_controller.py"
+    timestamp: "2026-06-08T06:20:00Z"
+  - work_item: "WI-arvel-004"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Full arvel suite = 4287 passed (3 deselected); targeted auth-controller + testing
+      = 51 passed incl. new canonical-detail integration test and error-bag helper test;
+      mypy --strict + pyright + ruff all clean on changed files. Pre-existing harness
+      quirk noted: password_resets table only materialises under full-module ordering
+      (F4 schema drift), so the new test runs alongside the module's other reset tests.
+    timestamp: "2026-06-08T06:30:00Z"
+  - work_item: "WI-arvel-005"
+    stage: "planning"
+    event: "enter"
+    result: "pass"
+    note: >-
+      Module 5 (http/resources). deep-research brief 005 + empirical repro confirmed F1:
+      JsonResource.when_loaded only checked resource.__dict__, but Arvel's async relations
+      (has-many, belongs-to-many, morph-to-many) cache eager results under
+      __arvel_eager_relations__, so the documented with_(rel) -> when_loaded(rel) pattern
+      silently dropped the relation. Deferred: F2 missing whenNotNull/with()/withoutWrapping,
+      F3 no auto-resolve of bare resource return, F4 ResourceResponse can't encode
+      datetime/Decimal, F5 additional() overwrites paginator meta, F6 kit dead-code
+      resources, F7 schema ClassVar not wired to response_model.
+    timestamp: "2026-06-08T06:40:00Z"
+  - work_item: "WI-arvel-005"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      when_loaded now consults the eager cache (read by name as __arvel_eager_relations__,
+      no arvel.database import — preserves the module's layering rule) after the __dict__
+      check. Returns the cached relation; documented eager-load -> serialize works for every
+      relation type. New real-model test (MorphToMany via with_) covers the gap the prior
+      mock-based parity tests missed. No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/http/resources.py"
+      - "packages/arvel/tests/http/test_wi005_when_loaded_eager.py"
+    timestamp: "2026-06-08T06:55:00Z"
+  - work_item: "WI-arvel-005"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Full arvel suite = 4290 passed (3 deselected), +3 new resource tests, no regression;
+      http + eager-pivot suites = 202 passed; mypy --strict + pyright + ruff clean on
+      changed files. No new arvel.database import in http/resources.py (layering preserved).
+      Docs note clarified that when_loaded covers SQLAlchemy and async relations.
+    timestamp: "2026-06-08T07:05:00Z"
+  - work_item: "WI-arvel-006"
+    stage: "planning"
+    event: "enter"
+    result: "pass"
+    note: >-
+      Module 6 (storage/filesystem). deep-research brief 006 confirmed F1: a missing file raised
+      different, unrelated exceptions per disk — MemoryDriver raised StorageFileNotFoundError
+      (StorageDriverError only), LocalDriver raised the builtin FileNotFoundError (get explicitly,
+      size via Path.stat). The two were disjoint OSError branches, so disk-agnostic callers had no
+      single exception to catch. Two prior suspicions cleared as non-issues: LocalDriver path
+      traversal (false positive — startswith(root + "/") blocks sibling-prefix bypass) and
+      `except A, B:` syntax (valid under Python 3.14 PEP 758). Deferred: F2 size on directory,
+      F3 url() no validation (matches Laravel), F4 cloud-driver missing-key paths.
+    timestamp: "2026-06-08T07:20:00Z"
+  - work_item: "WI-arvel-006"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      StorageFileNotFoundError now subclasses the builtin FileNotFoundError (and StorageDriverError);
+      LocalDriver.get/size raise it explicitly, mirroring MemoryDriver. One type on every disk,
+      catchable as the storage taxonomy or the builtin — so existing catchers (serve route 404,
+      media _delete_quiet, console, maintenance) keep working with zero call-site churn. Tests
+      unified to assert StorageFileNotFoundError; added local size-missing + builtin-catchability
+      tests. No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/storage/exceptions.py"
+      - "packages/arvel/src/arvel/storage/drivers/local.py"
+      - "packages/arvel/tests/storage/test_drivers.py"
+      - "docs/site/docs/features/storage.md"
+    timestamp: "2026-06-08T07:35:00Z"
+  - work_item: "WI-arvel-006"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      storage + media suites = 834 passed; mypy --strict + pyright + ruff clean on changed files.
+      MRO verified: [StorageFileNotFoundError, FileNotFoundError, StorageDriverError, OSError, ...]
+      — isinstance true for builtin, StorageDriverError, and OSError. Docs storage.md documents the
+      unified missing-file contract.
+    timestamp: "2026-06-08T07:45:00Z"
+  - work_item: "WI-arvel-007"
+    stage: "planning"
+    event: "enter"
+    result: "pass"
+    note: >-
+      Module 7 (cache). deep-research brief 007 + empirical repro confirmed two coupled defects:
+      (C2) CacheManager DATABASE driver built a throwaway :memory: engine and never created the
+      table — first put/get raised "no such table: cache_entries"; (C1) the published migration
+      created table `cache`(expiration) but DatabaseStore reads `cache_entries`(expires_at). The
+      documented publish-migrate-use path could never work. Cleared as non-defects: remember not
+      single-flight (matches Laravel), whole-table/dir flush (matches Laravel), _get_or_create_mutex
+      "race" (asyncio false positive — sync, no await). Deferred: F3 ttl<=0 cross-store
+      inconsistency, F4 non-atomic RateLimiter, F5 parity-additive APIs, F6 assert_stored prefix.
+    timestamp: "2026-06-08T08:00:00Z"
+  - work_item: "WI-arvel-007"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      DATABASE branch now resolves DB.session_maker_for() (the app's default connection) instead of
+      a throwaway :memory: engine; raises a clear "DB not configured" error when unset. Migration
+      create_cache_table.py now creates cache_entries(key VARCHAR(255) PK, value TEXT, expires_at
+      INTEGER) matching the ORM. New driver tests cover app-connection use, the unconfigured-DB
+      error, and migration/ORM table-shape match; framework-migration table list updated to
+      cache_entries. No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/cache/__init__.py"
+      - "packages/arvel/src/arvel/cache/migrations/create_cache_table.py"
+      - "packages/arvel/tests/cache/test_cache_manager_drivers.py"
+      - "packages/arvel/tests/database/test_framework_migrations.py"
+      - "docs/site/docs/features/cache.md"
+    timestamp: "2026-06-08T08:15:00Z"
+  - work_item: "WI-arvel-007"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Full arvel suite = 4295 passed (3 deselected), no regression; cache suite 151 passed;
+      mypy --strict + pyright + ruff clean on changed files. Docs cache.md replaces the
+      "not yet wired to your application database" warning with publish-migrate-use instructions.
+    timestamp: "2026-06-08T08:25:00Z"
+  - work_item: "WI-arvel-008"
+    stage: "planning"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 8 (queue) deep-research: F1 = Worker._process_one caught CancelledError as a job
+      failure (re-queue/DLQ + swallowed cancellation). Verified empirically that on Python 3.14 a
+      job timeout surfaces as TimeoutError, not CancelledError, so the CancelledError->TimeoutError
+      conversion was dead code and CancelledError only means external cancellation. F2 (delete-on-pop
+      / no visibility timeout) and F3 (taskiq pop_blocking ignores timeout) deferred. Spec:
+      WI-arvel-008-worker-cancellation-contract.md.
+    artifacts:
+      - ".context/research/008-queue.md"
+      - "docs/pipeline/specs/WI-arvel-008-worker-cancellation-contract.md"
+    timestamp: "2026-06-08T08:40:00Z"
+  - work_item: "WI-arvel-008"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      worker.py: split `except (Exception, asyncio.CancelledError)` into
+      `except asyncio.CancelledError: raise` + `except Exception as exc`, and removed the dead
+      CancelledError->TimeoutError("Job timed out") conversion in the DLQ branch. New test
+      test_external_cancellation_propagates_and_does_not_fail_job asserts CancelledError propagates,
+      jobs_dead==0, jobs_retried==0, DLQ count()==0. Existing timeout/retry/DLQ tests unaffected
+      (timeout -> TimeoutError -> except Exception). No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/queue/worker.py"
+      - "packages/arvel/tests/test_queue/test_047_queue_reliability.py"
+      - "docs/site/docs/features/queues.md"
+    timestamp: "2026-06-08T08:55:00Z"
+  - work_item: "WI-arvel-008"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Queue suite = 231 passed; mypy --strict + pyright + ruff clean on changed files. Docs
+      queues.md notes worker cancellation is not a job failure. F2/F3 tracked as deferred.
+    timestamp: "2026-06-08T09:05:00Z"
+  - work_item: "WI-arvel-009"
+    stage: "planning"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 9 (events/notifications) deep-research: C1 = NotificationJob._import_class ran
+      importlib.import_module on dotted paths from the (untrusted) queue payload — the only place
+      in the queue layer bypassing the allowlist boundary (JobRegistry / ListenerJob's
+      EventRegistry+ListenerRegistry). Insecure deserialization (A08): arbitrary module import =
+      import-time side-effect gadget. Verified the Notifiable __init_subclass__ chain fires through
+      the ORM Model MRO. C2 (queued notification state loss), morph key, txn boundary, dispatcher
+      log-swallow deferred. Spec: WI-arvel-009-queued-notification-allowlist.md.
+    artifacts:
+      - ".context/research/009-events-notifications.md"
+      - "docs/pipeline/specs/WI-arvel-009-queued-notification-allowlist.md"
+    timestamp: "2026-06-08T09:20:00Z"
+  - work_item: "WI-arvel-009"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Added NotificationRegistry (notification.py) + NotifiableRegistry (notifiable.py) via
+      __init_subclass__, mirroring Event/Listener. NotificationJob.handle now resolves both classes
+      via _resolve() against the registries; removed _import_class; new
+      UnregisteredNotificationClassError raised on a miss (no import). Tests: unregistered class is
+      rejected without touching sys.modules; registry-resolution test replaces the old _import_class
+      test; _QueuedNotifiable now subclasses Notifiable. No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/notifications/notification.py"
+      - "packages/arvel/src/arvel/notifications/notifiable.py"
+      - "packages/arvel/src/arvel/notifications/notification_job.py"
+      - "packages/arvel/src/arvel/notifications/exceptions.py"
+      - "packages/arvel/tests/test_queue/test_047_queue_reliability.py"
+      - "packages/arvel/tests/test_notifications/test_channels_and_notifiable_more.py"
+      - "docs/site/docs/features/notifications.md"
+    timestamp: "2026-06-08T09:35:00Z"
+  - work_item: "WI-arvel-009"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Full arvel suite = 4297 passed (3 deselected), no regression (Notifiable.__init_subclass__
+      doesn't disturb model creation); notifications/queue/events 303 passed; mypy --strict +
+      pyright + ruff clean on changed files. Docs notifications.md documents the allowlist contract.
+    timestamp: "2026-06-08T09:45:00Z"
+  - work_item: "WI-arvel-010"
+    stage: "planning"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 10 (mail) deep-research: C1 = SmtpMailDriver._build_message attaches only att.data, so
+      documented path-based attachments are silently dropped (att.mime also ignored; filename
+      interpolated raw). C3 (CRLF header injection) cleared as false positive — Python's email
+      generator raises HeaderParseError on embedded newlines. C2 (sync render in async path), H1-H4,
+      and parity-additive gaps deferred. Spec: WI-arvel-010-smtp-path-attachments.md.
+    artifacts:
+      - ".context/research/010-mail.md"
+      - "docs/pipeline/specs/WI-arvel-010-smtp-path-attachments.md"
+    timestamp: "2026-06-08T10:00:00Z"
+  - work_item: "WI-arvel-010"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      smtp.py: extracted _build_attachment(att) — reads att.path when att.data is None (raises
+      MailException if neither), sets MIMEBase maintype/subtype from att.mime, sets filename via
+      add_header(..., filename=) (RFC 2231). New tests: path attachment read+attached with correct
+      content-type; empty attachment raises. No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/mail/drivers/smtp.py"
+      - "packages/arvel/tests/test_mail/drivers/test_smtp_driver.py"
+      - "docs/site/docs/features/mail.md"
+    timestamp: "2026-06-08T10:15:00Z"
+  - work_item: "WI-arvel-010"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Mail suite = 48 passed; mypy --strict + pyright + ruff clean on changed files. Docs mail.md
+      notes path is read, Content-Type from mime, and one of path/data required. C2/H/parity gaps
+      and the kit template-publish gap tracked as deferred.
+    timestamp: "2026-06-08T10:25:00Z"

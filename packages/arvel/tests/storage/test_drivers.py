@@ -46,7 +46,7 @@ async def test_local_driver_full_file_lifecycle(tmp_path: Path) -> None:
     driver = LocalDriver(tmp_path, base_url="https://cdn.test/storage", app_key=b"k" * 32)
 
     assert await driver.exists("docs/a.txt") is False
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(StorageFileNotFoundError):
         await driver.get("docs/a.txt")
 
     assert await driver.put("docs/a.txt", "hello") is True
@@ -67,6 +67,19 @@ async def test_local_driver_full_file_lifecycle(tmp_path: Path) -> None:
     signed = driver.temporary_url("docs/a.txt", 60)
     assert "token=" in signed
     assert "expires=" in signed
+
+
+async def test_local_driver_size_missing_raises(tmp_path: Path) -> None:
+    with pytest.raises(StorageFileNotFoundError):
+        await LocalDriver(tmp_path).size("missing.txt")
+
+
+async def test_local_missing_is_catchable_as_builtin(tmp_path: Path) -> None:
+    # StorageFileNotFoundError subclasses the builtin, so disk-agnostic
+    # callers can catch either type across every driver.
+    driver = LocalDriver(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        await driver.get("missing.txt")
 
 
 async def test_local_driver_blocks_path_traversal(tmp_path: Path) -> None:

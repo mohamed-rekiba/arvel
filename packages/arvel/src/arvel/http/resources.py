@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Callable, Mapping
-from typing import Any, ClassVar, Generic, Protocol, Self, TypeVar, runtime_checkable
+from typing import Any, ClassVar, Generic, Protocol, Self, TypeVar, cast, runtime_checkable
 
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
@@ -20,6 +20,11 @@ T = TypeVar("T")
 # Sentinel returned by when() / when_loaded() when their condition is false.
 # Stripped from the output dict automatically by the __init_subclass__ wrapper.
 _MISSING = object()
+
+# Per-instance attribute where Arvel's ORM caches eager-loaded async relations.
+# Mirrors arvel.database.orm._eager._CACHE_ATTR; read by name (not imported) so the
+# HTTP layer stays decoupled from arvel.database.
+_EAGER_CACHE_ATTR = "__arvel_eager_relations__"
 
 
 @runtime_checkable
@@ -162,13 +167,20 @@ class JsonResource(Generic[T]):
         return value if condition else _MISSING
 
     def when_loaded(self, relation: str) -> Any:
-        """Return the relation value if it's already in the resource's ``__dict__``.
+        """Return the relation value if it's already loaded, else a missing sentinel.
 
-        Never triggers a lazy load — safe to call on SQLAlchemy models.
+        Never triggers a lazy load. Checks both places a relation can be hydrated:
+        SQLAlchemy committed relations on ``__dict__``, and Arvel's async relations
+        (has-many, belongs-to-many, morph-to-many, …) which ``with_()`` stashes in the
+        per-instance eager cache. Reading the cache by name keeps this layer free of an
+        ``arvel.database`` import (see module docstring).
         """
         resource_dict: dict[str, Any] = getattr(self.resource, "__dict__", {})
         if relation in resource_dict:
             return resource_dict[relation]
+        eager = resource_dict.get(_EAGER_CACHE_ATTR)
+        if isinstance(eager, dict) and relation in eager:
+            return cast("dict[str, Any]", eager)[relation]
         return _MISSING
 
     def merge_when(self, condition: Any, data: dict[str, Any]) -> dict[str, Any]:

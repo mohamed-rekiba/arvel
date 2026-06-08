@@ -90,7 +90,7 @@ class UserController(Controller):
 ```
 
 > [!NOTE]
-> A controller instance is created when its route is mounted (at boot), not on every request. If you need a fresh instance per route on a class that backs several routes, that's the default for container `bind()` registrations; register the controller as a `singleton()` to share one instance across its routes.
+> Controllers are resolved from the container **fresh on every request**, like in Laravel — so it's safe to store per-request state on `self` without it leaking to the next request. Constructor dependencies registered as `singleton()` (or `instance()`) are still shared across those per-request controllers; only the controller shell is new each time. If you deliberately want one shared controller instance, bind the controller itself as a `singleton()` / `instance()`.
 
 <a name="method-injection"></a>
 ### Method Injection

@@ -414,18 +414,26 @@ def _invokable_controller_adapter(
     cls: type,
     container: Any = None,
 ) -> Callable[..., Awaitable[Any]]:
-    """Wrap an invokable controller class as an async handler FastAPI can route to."""
-    instance = container.make(cls) if container is not None else cls()
-    call = instance.__call__
-    if not callable(call):
+    """Wrap an invokable controller class as an async handler FastAPI can route to.
+
+    Resolves a fresh instance per request (Laravel parity, no cross-request state
+    bleed). The probe built here only validates DI at mount and reads ``__call__``'s
+    signature, then is discarded.
+    """
+
+    def _make() -> Any:
+        return container.make(cls) if container is not None else cls()
+
+    probe_call = _make().__call__
+    if not callable(probe_call):
         msg = f"{cls.__qualname__} is bound as an invokable controller but has no __call__."
         raise TypeError(msg)
 
-    sig = inspect.signature(call)
+    sig = inspect.signature(probe_call)
 
-    @wraps(call)
+    @wraps(probe_call)
     async def handler(**kwargs: Any) -> Any:
-        result: Any = call(**kwargs)
+        result: Any = _make().__call__(**kwargs)
         if inspect.isawaitable(result):
             return await result
         return result
@@ -468,17 +476,26 @@ class MethodControllerAdapter:
         return self.cls()
 
     def build(self) -> Callable[..., Awaitable[Any]]:
-        """Return an async handler with the controller method's signature."""
-        instance = self._instantiate()
-        method: Any = getattr(instance, self.action)
-        if not callable(method):
+        """Return an async handler that resolves a fresh controller per request.
+
+        The probe instance built here is only used to validate DI wiring at mount
+        (fail fast at boot, not on first request) and to read the bound method's
+        signature — which already has the receiver stripped, so static/class
+        methods need no special casing. It is then discarded: every request gets
+        its own instance, so per-request ``self`` state never bleeds across
+        requests. Matches Laravel, which resolves the controller per request.
+        """
+        probe = self._instantiate()
+        probe_method: Any = getattr(probe, self.action)
+        if not callable(probe_method):
             msg = f"{self.cls.__qualname__}.{self.action} is not callable."
             raise TypeError(msg)
 
-        sig = inspect.signature(method)
+        sig = inspect.signature(probe_method)
 
-        @wraps(method)
+        @wraps(probe_method)
         async def handler(**kwargs: Any) -> Any:
+            method: Any = getattr(self._instantiate(), self.action)
             result: Any = method(**kwargs)
             if inspect.isawaitable(result):
                 return await result

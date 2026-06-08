@@ -380,6 +380,33 @@ async def test_reset_password_revokes_all_refresh_tokens(
 
 
 @pytest.mark.asyncio
+async def test_reset_password_invalid_token_uses_canonical_detail_shape(
+    setup_db: AsyncSession,
+    test_app: FastAPI,
+    event_fake: EventFake,
+) -> None:
+    """Invalid reset token returns the framework's {field, issue} detail, not loc/msg/type."""
+    async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as c:
+        # Register + forgot to materialize the password_resets table, then reset with a
+        # bogus token so the token-hash lookup misses and raises the invalid-token error.
+        await _register_verified(c)
+        await c.post("/api/auth/forgot-password", json={"email": _EMAIL})
+
+        r = await c.post(
+            "/api/auth/reset-password",
+            json={
+                "token": "not-a-real-token",
+                "password": "NewP@ss99!",
+                "password_confirmation": "NewP@ss99!",
+            },
+        )
+        assert r.status_code == 422
+        # Canonical {field, issue} detail shape — not Pydantic's {loc, msg, type}.
+        details = r.json()["detail"]
+        assert details == [{"field": "token", "issue": "Reset token is invalid or has expired."}]
+
+
+@pytest.mark.asyncio
 async def test_verify_email_302_to_success_page(
     setup_db: AsyncSession,
     test_app: FastAPI,
