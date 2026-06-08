@@ -496,7 +496,7 @@ requires-dist = [
     { name = "ipython", marker = "extra == 'shell'", specifier = ">=9.14.0" },
     { name = "itsdangerous", specifier = ">=2.2.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.2.2" },
+    { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.2.1" },
     { name = "msgspec", specifier = ">=0.21.1" },
     { name = "openapi-spec-validator", marker = "extra == 'openapi'", specifier = ">=0.9.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.42.1" },
@@ -522,7 +522,7 @@ requires-dist = [
     { name = "taskiq-aio-pika", marker = "extra == 'queue-amqp'", specifier = ">=0.6.0" },
     { name = "taskiq-redis", marker = "extra == 'queue-redis'", specifier = ">=1.2.2" },
     { name = "typer", specifier = ">=0.26.4" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.49.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.48.0" },
     { name = "websockets", marker = "extra == 'broadcasting'", specifier = ">=16.0" },
 ]
 provides-extras = ["bcrypt", "redis", "postgres", "mysql", "sqlite", "queue", "queue-redis", "queue-amqp", "mail", "s3", "gcs", "azure", "jwt", "broadcasting", "shell", "openapi", "permission", "image", "image-heif", "oauth", "search", "audit", "dev", "all"]
@@ -645,7 +645,7 @@ requires-dist = [
 
 [[package]]
 name = "arvel-search"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "packages/arvel-search" }
 dependencies = [
     { name = "arvel" },
