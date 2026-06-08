@@ -580,9 +580,7 @@ class TestStory8SignedUrls:
         assert resp.status_code == 200
         assert resp.json() == {"user_id": 5}
 
-    def test_non_ascii_signature_is_rejected_not_500(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_non_ascii_signature_is_rejected_not_500(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # A non-ASCII signature value must fail closed (403), never crash the
         # guard with TypeError from hmac.compare_digest → 500.
         from arvel.http.middleware import SignedMiddleware
