@@ -963,3 +963,41 @@ events:
       failures; mypy --strict clean, uv run pyright 0 errors, ruff check + ruff format clean. No
       user-facing doc page (lifecycle is internal) — spec + shutdown docstring are the source of truth.
     timestamp: "2026-06-08T16:00:00Z"
+  - work_item: "WI-arvel-024"
+    stage: "qa-pre"
+    event: "enter"
+    result: "pass"
+    note: >-
+      arvel shell crashed at boot when the DB was unreachable: DatabaseServiceProvider.boot() ran an
+      eager SELECT 1 ping → DatabaseConnectionError → BootError (after blocking on DNS = the "slow").
+      Laravel Tinker survives a dead DB via lazy connections. Research 024 confirmed the ping is the
+      only eager network probe on the boot path (DatabaseService.connect() is a no-op).
+    timestamp: "2026-06-08T16:20:00Z"
+  - work_item: "WI-arvel-024"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Added Application.boot(*, probe_connections=True) + probe_connections() accessor; DB provider
+      runs the ping only when probing is on but wires engine/session-maker/DB facade unconditionally.
+      ShellCommand.run_repl now boots with probe_connections=False, so the REPL opens lazily and
+      queries connect on first use. Server/CLI keep eager fail-fast (default True). Tests: provider
+      probe-on raises (BootError → DatabaseConnectionError), probe-off opens with bindings wired,
+      lazy ORM query works on a healthy DB; shell run_repl boots without the probe.
+    artifacts:
+      - "packages/arvel/src/arvel/application/application.py"
+      - "packages/arvel/src/arvel/providers/database_provider.py"
+      - "packages/arvel/src/arvel/console/commands/shell.py"
+      - "packages/arvel/tests/database/test_database_provider.py"
+      - "packages/arvel/tests/console/test_shell_extended.py"
+    timestamp: "2026-06-08T16:26:00Z"
+  - work_item: "WI-arvel-024"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      console + database + application suites 1948 passed, 0 failures; mypy (1056 files) clean,
+      pyright 0 errors/warnings, ruff check clean. Doc note added to docs/site/docs/cli/commands.md
+      (shell/tinker connect lazily; serve/migrate keep eager fail-fast).
+    timestamp: "2026-06-08T16:30:00Z"

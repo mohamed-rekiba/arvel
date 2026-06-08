@@ -67,6 +67,9 @@ Some commands only register when their provider is installed: most `queue:*` com
 > [!NOTE]
 > `optimize` builds the config and view caches only. It prints that route/event caching is pending — there are no `route:cache` or `event:cache` commands yet.
 
+> [!NOTE]
+> `shell` / `tinker` connect to the database **lazily**, like Laravel Tinker — the REPL opens even when the DB is unreachable, and a connection error only surfaces on your first query. Servers and DB-using commands (`serve`, `migrate`, …) still fail fast at boot if the database is down.
+
 <a name="make"></a>
 ## `make:` Scaffolding
 

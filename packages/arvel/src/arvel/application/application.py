@@ -164,6 +164,7 @@ class Application:
         self._provider_instances: list[ServiceProvider] = []
         self._services: list[BaseService] = []
         self._booted: bool = False
+        self._probe_connections: bool = True
 
     def register_service(self, service: BaseService) -> None:
         """Register a ``BaseService`` into the managed lifecycle.
@@ -231,9 +232,26 @@ class Application:
     def use_base_path(self, path: Path) -> None:
         self._base_path = path
 
-    async def boot(self) -> None:
+    def probe_connections(self) -> bool:
+        """Whether providers should run eager connectivity health-probes at boot.
+
+        ``True`` everywhere except the interactive shell, which connects lazily
+        like Tinker — a dead DB shouldn't stop the REPL from opening. Set by the
+        current :meth:`boot` call.
+        """
+        return self._probe_connections
+
+    async def boot(self, *, probe_connections: bool = True) -> None:
+        """Run the async boot pass over every registered provider.
+
+        ``probe_connections=False`` tells infra providers to skip eager
+        connectivity checks (the DB ``SELECT 1``) and connect lazily instead —
+        used by the shell so the REPL opens even when the database is down.
+        """
         if self._booted:
             return
+
+        self._probe_connections = probe_connections
 
         # Provider instances + sync register() ran at create-time; this is
         # just the async boot pass.

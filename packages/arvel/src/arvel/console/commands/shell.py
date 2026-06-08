@@ -119,7 +119,9 @@ class ShellCommand(Command):
         loop, created = self._repl_loop()
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(framework_app.boot())
+            # Lazy boot: skip the DB connectivity probe so the REPL opens even
+            # when the database is down. Queries connect on first use, Tinker-style.
+            loop.run_until_complete(framework_app.boot(probe_connections=False))
             self.app = framework_app
             self._serve_repl(loop)
         finally:

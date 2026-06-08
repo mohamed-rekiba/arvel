@@ -159,3 +159,71 @@ async def test_database_provider_skips_ping_when_not_configured(
     # Should not raise even though no database is configured.
     await app.boot()
     await app.shutdown()
+
+
+def _unreachable_db_url(tmp_path: Path) -> str:
+    # Parent dir is missing → SQLite can't open the file → OperationalError on
+    # the boot ping. Deterministic and offline (no DNS/network flakiness).
+    return f"sqlite+aiosqlite:///{tmp_path}/missing/db.sqlite"
+
+
+async def test_boot_raises_on_unreachable_db_when_probing(
+    clean_env: None, tmp_app_path: Path, tmp_path: Path
+) -> None:
+    """Default boot keeps the fail-fast probe — serving must not start on a dead DB."""
+    from arvel import BootError
+    from arvel.database.exceptions import DatabaseConnectionError
+
+    os.environ["DB_URL"] = _unreachable_db_url(tmp_path)
+    app = (
+        ApplicationBuilder(base_path=tmp_app_path)
+        .with_providers([ConfigServiceProvider, DatabaseServiceProvider])
+        .create()
+    )
+    with pytest.raises(BootError) as excinfo:
+        await app.boot()
+    assert excinfo.value.provider is DatabaseServiceProvider
+    assert isinstance(excinfo.value.__cause__, DatabaseConnectionError)
+    await app.shutdown()
+
+
+async def test_boot_skips_ping_when_probing_disabled(
+    clean_env: None, tmp_app_path: Path, tmp_path: Path
+) -> None:
+    """probe_connections=False opens the app even when the DB is unreachable (shell path)."""
+    os.environ["DB_URL"] = _unreachable_db_url(tmp_path)
+    app = (
+        ApplicationBuilder(base_path=tmp_app_path)
+        .with_providers([ConfigServiceProvider, DatabaseServiceProvider])
+        .create()
+    )
+    await app.boot(probe_connections=False)
+    try:
+        assert app.probe_connections() is False
+        # Bindings are wired regardless of the probe — the ORM stays usable and
+        # connects lazily on first query.
+        assert isinstance(app.container.make(AsyncEngine), AsyncEngine)
+        assert isinstance(
+            app.container.make(async_sessionmaker[AsyncSession]), async_sessionmaker
+        )
+    finally:
+        await app.shutdown()
+
+
+async def test_orm_usable_after_lazy_boot(isolated_env: Path) -> None:
+    """With probing off and a healthy DB, the lazy connection succeeds on first query."""
+    from sqlalchemy import text
+
+    app = (
+        ApplicationBuilder(base_path=isolated_env)
+        .with_providers([ConfigServiceProvider, DatabaseServiceProvider])
+        .create()
+    )
+    await app.boot(probe_connections=False)
+    try:
+        maker = app.container.make(async_sessionmaker[AsyncSession])
+        async with maker() as session:
+            result = await session.execute(text("SELECT 1"))
+            assert result.scalar_one() == 1
+    finally:
+        await app.shutdown()
