@@ -165,6 +165,7 @@ class Application:
         self._services: list[BaseService] = []
         self._booted: bool = False
         self._probe_connections: bool = True
+        self._required_subsystems: frozenset[CliSubsystem] | None = None
 
     def register_service(self, service: BaseService) -> None:
         """Register a ``BaseService`` into the managed lifecycle.
@@ -272,13 +273,25 @@ class Application:
             Log.info("service.connected", service=service.name)
 
         self._booted = True
-        self._log_registered_routes()
+        if self._http_active():
+            self._log_registered_routes()
         Log.info(
             "app.boot.complete",
             environment=self._environment or "",
             services=len(self._services),
             routes=len(Router.singleton().routes()),
         )
+
+    def _http_active(self) -> bool:
+        """True when HTTP is in the boot set (or the full chain booted).
+
+        Route registration and the route-table log are HTTP-serving concerns. A
+        shell/queue/scheduler invocation that filters HTTP out shouldn't dump the
+        whole route table at DEBUG.
+        """
+        if self._required_subsystems is None:
+            return True
+        return CliSubsystem.HTTP in self._required_subsystems
 
     def _log_registered_routes(self) -> None:
         """Emit one DEBUG log per registered route once every provider has booted.
@@ -307,6 +320,7 @@ class Application:
     ) -> None:
         self._base_path = base_path
         self._environment = environment
+        self._required_subsystems = required_subsystems
         full_chain = self._resolve_provider_chain(providers)
         self._provider_classes = (
             full_chain
@@ -661,7 +675,10 @@ class ApplicationBuilder:
         # that Router.reset_singleton() (called inside _load_routing_files) cannot
         # wipe routes that providers register synchronously in register() — e.g.
         # AuthServiceProvider mounts /api/auth/* during register(), not boot().
-        if self._routing_paths:
+        # Skip the load entirely when HTTP won't boot: a shell/queue/scheduler run
+        # has no use for routes, and importing them drags in every controller
+        # (FastAPI, SQLAlchemy) just to dump the table at DEBUG.
+        if self._routing_paths and self._should_load_routing():
             self._load_routing_files()
 
         app = Application()
@@ -723,6 +740,17 @@ class ApplicationBuilder:
             module_name = f"{NAMESPACE_PREFIX}.config.{file.stem}"
             module = load_module_from_path(file, module_name)
             register(file.stem, module)
+
+    def _should_load_routing(self) -> bool:
+        """Load routing files only when the HTTP subsystem will boot.
+
+        Full boots (no subsystem filter) always load. A filtered boot that
+        excludes HTTP — the interactive shell, queue workers, the scheduler —
+        skips routing: it never serves requests, so the routes are dead weight.
+        """
+        if self._required_subsystems is None:
+            return True
+        return CliSubsystem.HTTP in self._required_subsystems
 
     def _load_routing_files(self) -> None:
         """Import each registered routing file so its decorators populate ``Router``.
