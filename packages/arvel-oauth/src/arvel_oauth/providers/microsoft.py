@@ -44,7 +44,10 @@ class MicrosoftProvider(OAuthProvider):
             provider=self.name,
             provider_id=str(data.get("sub", "")),
             email=email,
-            email_verified=bool(data.get("email_verified", email is not None)),
+            # Entra omits email_verified and its email/preferred_username aren't
+            # guaranteed verified (guests, MSA). Default False so the linker won't
+            # auto-attach to an existing user on an unproven email.
+            email_verified=bool(data.get("email_verified", False)),
             name=_str_or_none(data.get("name")),
             avatar=_str_or_none(data.get("picture")),
             raw=data,

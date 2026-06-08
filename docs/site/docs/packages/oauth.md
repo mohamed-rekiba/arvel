@@ -92,6 +92,14 @@ from arvel_oauth import OAuthAccountLinker
 account = await OAuthAccountLinker(session).link(oauth_user, token)
 ```
 
+The linker only attaches a new provider identity to an *existing* local user when the
+provider reports the email as verified (`OAuthUser.email_verified`). Otherwise it creates
+a fresh user with a synthetic `{provider_id}@{provider}.local` email. This guards against
+account takeover via an unproven email. Built-in providers set `email_verified`
+conservatively — only when the upstream claim is explicitly true (Apple proves it by
+verifying the `id_token` signature). Microsoft Entra in particular omits the claim, so its
+logins default to unverified and won't auto-link by email.
+
 <a name="data-model"></a>
 ## Data Model
 
