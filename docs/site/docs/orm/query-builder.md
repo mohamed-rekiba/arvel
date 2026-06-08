@@ -57,22 +57,29 @@ none = await Item.where(sku="ABC").doesnt_exist()
 <a name="the-where-method"></a>
 ### The where Method
 
-`where` accepts two forms: keyword equality, or a SQLAlchemy column expression. Use keyword arguments for simple equality:
+`where` accepts several forms: keyword equality, the Laravel-style string form, or a SQLAlchemy column expression. Use keyword arguments for simple equality:
 
 ```python
 await Item.where(is_active=True).get()
 await Item.where(status="published", featured=True).get()   # AND
 ```
 
-For comparisons other than equality, pass a SQLAlchemy expression on the model's columns:
+The string form mirrors Laravel — `where(column, value)` for equality, or `where(column, operator, value)` for any operator:
+
+```python
+await Item.where("status", "published").get()       # status = 'published'
+await Item.where("price", "<", 100).get()            # price < 100
+await Item.where("name", "ilike", "%ada%").get()     # case-insensitive LIKE
+```
+
+Valid operators: `=`, `!=`, `>`, `<`, `>=`, `<=`, `like`, `ilike`. `or_where` takes the same forms.
+
+For comparisons other than equality, you can also pass a SQLAlchemy expression on the model's columns:
 
 ```python
 await Item.where(Item.price < 100).get()
 await Item.where(Item.views >= 1000).get()
 ```
-
-> [!WARNING]
-> Arvent does **not** support the three-argument string form `where("price", "<", 100)` on `where`. Use a column expression (`Item.price < 100`) or keyword equality (`where(price=100)`). The three-argument operator form is supported on `having` and on the multi-column helpers (`where_any`, `where_all`) only.
 
 <a name="or-where-clauses"></a>
 ### Or Where Clauses

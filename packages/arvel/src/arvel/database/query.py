@@ -1528,15 +1528,43 @@ class QueryBuilder(Generic[T]):
             )
         return result._where_predicate
 
+    def _string_clause_predicate(self, clauses: tuple[Any, ...]) -> Any:
+        """Build a predicate from Laravel's string forms, or return ``_UNSET``.
+
+        ``where("email", value)`` → ``email = value``;
+        ``where("email", "ilike", value)`` → ``email ILIKE value``. Anything not
+        starting with a column-name string falls through to the expression path.
+        """
+        if not clauses or not isinstance(clauses[0], str):
+            return _UNSET
+        if len(clauses) == 2:
+            column, value = clauses
+            return _resolve_column(self._model, column) == value
+        if len(clauses) == 3:
+            column, operator, value = clauses
+            if operator not in _WHERE_ANY_OPS:
+                raise ValueError(
+                    f"Unsupported operator {operator!r}. Valid operators: {sorted(_WHERE_ANY_OPS)}"
+                )
+            return _apply_operator(_resolve_column(self._model, column), operator, value)
+        raise TypeError(
+            "where(column, value) or where(column, operator, value) expected a column "
+            f"name and 1-2 more args; got {len(clauses)} positional args starting with a string."
+        )
+
     def where(self, *clauses: Any, **kwargs: Any) -> Self:
         qb = self
-        for clause in clauses:
-            if callable(clause):
-                group = self._grouped_whereclause(clause)
-                if group is not None:
-                    qb = qb._and(group)
-            else:
-                qb = qb._and(clause)
+        string_predicate = self._string_clause_predicate(clauses)
+        if string_predicate is not _UNSET:
+            qb = qb._and(string_predicate)
+        else:
+            for clause in clauses:
+                if callable(clause):
+                    group = self._grouped_whereclause(clause)
+                    if group is not None:
+                        qb = qb._and(group)
+                else:
+                    qb = qb._and(clause)
         for key, value in kwargs.items():
             qb = qb._and(_resolve_column(self._model, key) == value)
         return qb if qb is not self else self._clone()
@@ -1544,13 +1572,17 @@ class QueryBuilder(Generic[T]):
     def _or_terms(self, clauses: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
         """Combine positional clauses + kwargs into one OR-group predicate (or None)."""
         terms: list[Any] = []
-        for clause in clauses:
-            if callable(clause):
-                group = self._grouped_whereclause(clause)
-                if group is not None:
-                    terms.append(group)
-            else:
-                terms.append(clause)
+        string_predicate = self._string_clause_predicate(clauses)
+        if string_predicate is not _UNSET:
+            terms.append(string_predicate)
+        else:
+            for clause in clauses:
+                if callable(clause):
+                    group = self._grouped_whereclause(clause)
+                    if group is not None:
+                        terms.append(group)
+                else:
+                    terms.append(clause)
         for key, value in kwargs.items():
             terms.append(_resolve_column(self._model, key) == value)
         if not terms:
