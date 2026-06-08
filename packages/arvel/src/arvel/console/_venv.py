@@ -18,6 +18,8 @@ to re-exec again.
 from __future__ import annotations
 
 import os
+
+# Only the Windows re-exec fallback in exec_into() uses subprocess.
 import subprocess  # nosec B404
 import sys
 from pathlib import Path
@@ -79,11 +81,13 @@ def exec_into(target: str, args: list[str], env: dict[str, str]) -> None:
     ``os.execve`` on Windows spawns a child and the parent keeps running with a
     bogus PID, so we run a real subprocess and exit with its code instead.
     """
-    # target is the project's own .venv interpreter/script path we located on
-    # disk — no shell, no untrusted input. Re-exec is the whole point here.
+    # target is the project's own .venv interpreter/script we located on disk —
+    # no shell, no untrusted input. Re-exec is the whole point here.
     if os.name == "nt":
+        # Located .venv path, our own argv, no shell.
         result = subprocess.run([target, *args[1:]], env=env, check=False)  # noqa: S603 # nosec B603
         sys.exit(result.returncode)
+    # Located .venv path, our own argv, no shell.
     os.execve(target, args, env)  # noqa: S606 # nosec B606
 
 
