@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.18.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.18.0...arvel-v0.18.1) (2026-06-08)
+
+
+### Bug Fixes
+
+* **config:** make dotted dict lookups key-only ([ce1345b](https://github.com/mohamed-rekiba/arvel/commit/ce1345b1d54e76fce9aa4bedbef215747542854e))
+* **console:** run async CLI commands on the single event loop ([3474f22](https://github.com/mohamed-rekiba/arvel/commit/3474f222a9c0f6fefb4e05ea0242d176f6c3bdba))
+* **container:** resolve async bindings at any depth in amake ([1f812c7](https://github.com/mohamed-rekiba/arvel/commit/1f812c753859b73f304a5e6bea746e99d1b7faaf))
+* **encryption:** raise DecryptionError on malformed base64 payloads ([70b5d91](https://github.com/mohamed-rekiba/arvel/commit/70b5d91b768046338a30cb33d9c327cb71e6d2fc))
+* **hashing:** make Hash.check and needs_rehash algorithm-aware ([75ebb17](https://github.com/mohamed-rekiba/arvel/commit/75ebb174b8c0cac2aea023da17f133a8a6cba9e1))
+* **logging:** redact secret log fields by substring ([daf6aca](https://github.com/mohamed-rekiba/arvel/commit/daf6aca61e02e750cf2270b890ec9391baf15dfd))
+* **support:** compare Collection intersect/diff by value ([7c51361](https://github.com/mohamed-rekiba/arvel/commit/7c51361ffcbeae9123f844f65512ae6a1ab08f15))
+
 ## [0.18.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.17.3...arvel-v0.18.0) (2026-06-08)
 
 
