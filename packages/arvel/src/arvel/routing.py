@@ -232,6 +232,11 @@ class Router:
             # __globals__, so FastAPI can't resolve them without this step.
             handler = _resolve_handler_signature(handler, spec.caller_locals)
             wrapped = _wrap_with_middleware(handler, spec.middleware, spec.caller_locals)
+            # Routes with an explicit response_model already control their output
+            # shape; for the rest, keep a bare ``return model`` from leaking
+            # __hidden__ columns through FastAPI's dataclass encoder.
+            if "response_model" not in spec.extras:
+                wrapped = _wrap_response_normalizer(wrapped)
             app.add_api_route(
                 spec.path,
                 wrapped,
@@ -649,6 +654,51 @@ def _is_model_subclass(ann: object) -> TypeGuard[type[Model]]:
     except ImportError:
         return False
     return isinstance(ann, type) and issubclass(ann, _Model)
+
+
+def _coerce_models_in_result(result: Any) -> Any:
+    """Route raw model returns through ``to_dict()`` so ``__hidden__`` is honoured.
+
+    FastAPI serialises an Arvel ``Model`` as a plain dataclass — every mapped
+    column, including ones a model marks ``__hidden__`` (password hashes, tokens).
+    Laravel's ``return $user;`` hides those; ours leaked them. Convert a returned
+    model, or a list of them, to its ``to_dict()`` form before FastAPI encodes it.
+    ``to_dict`` only reads columns, so no async relation load happens here.
+
+    Anything that isn't a model (dicts, Pydantic models, ``Response`` objects,
+    primitives) passes through untouched.
+    """
+    try:
+        from arvel.database.model import Model as _Model
+    except ImportError:
+        return result
+    if isinstance(result, _Model):
+        return result.to_dict()
+    if isinstance(result, list):
+        items: list[Any] = cast("list[Any]", result)
+        if any(isinstance(item, _Model) for item in items):
+            return [item.to_dict() if isinstance(item, _Model) else item for item in items]
+        return items
+    return result
+
+
+def _wrap_response_normalizer(
+    handler: Callable[..., Awaitable[Any]],
+) -> Callable[..., Awaitable[Any]]:
+    """Wrap *handler* so raw model returns honour ``__hidden__`` (see above).
+
+    Preserves the handler's ``__signature__`` so FastAPI still resolves
+    parameters and dependencies unchanged.
+    """
+
+    @wraps(handler)
+    async def wrapped(**kwargs: Any) -> Any:
+        return _coerce_models_in_result(await handler(**kwargs))
+
+    sig = getattr(handler, "__signature__", None)
+    if sig is not None:
+        cast("_SignatureCarrier", wrapped).__signature__ = sig
+    return wrapped
 
 
 def _route_key_for(model_cls: type[Model]) -> str | None:
