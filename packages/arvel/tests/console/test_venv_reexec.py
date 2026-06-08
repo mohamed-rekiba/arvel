@@ -31,7 +31,7 @@ def _make_project(tmp_path: Path, *, with_arvel_script: bool = True) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ARVEL_NO_REEXEC", raising=False)
     monkeypatch.delenv("ARVEL_VENV_REEXEC", raising=False)
     # Default to POSIX behaviour; Windows test overrides this.
@@ -61,8 +61,12 @@ class TestReexecTriggers:
         root = _make_project(tmp_path, with_arvel_script=False)
         monkeypatch.chdir(root)
         monkeypatch.setattr(_venv.sys, "executable", "/usr/bin/python3")
+
         # No arvel script, but the package is importable in the venv.
-        monkeypatch.setattr(_venv, "_venv_has_arvel_package", lambda _p: True)
+        def _has_pkg(_p: object) -> bool:
+            return True
+
+        monkeypatch.setattr(_venv, "_venv_has_arvel_package", _has_pkg)
 
         with patch.object(_venv.os, "execve") as execve:
             maybe_reexec_into_project_venv(["arvel", "route:list"])
@@ -77,7 +81,11 @@ class TestReexecTriggers:
         root = _make_project(tmp_path, with_arvel_script=False)
         monkeypatch.chdir(root)
         monkeypatch.setattr(_venv.sys, "executable", "/usr/bin/python3")
-        monkeypatch.setattr(_venv, "_venv_has_arvel_package", lambda _p: False)
+
+        def _no_pkg(_p: object) -> bool:
+            return False
+
+        monkeypatch.setattr(_venv, "_venv_has_arvel_package", _no_pkg)
 
         with patch.object(_venv.os, "execve") as execve:
             maybe_reexec_into_project_venv(["arvel", "migrate"])
@@ -141,16 +149,16 @@ class TestReexecSkips:
 
 
 class TestExecBranch:
-    """``_exec`` replaces the process on POSIX, spawns + exits on Windows.
+    """``exec_into`` replaces the process on POSIX, spawns + exits on Windows.
 
     Flipping the global ``os.name`` would make pathlib build WindowsPath on a
-    POSIX host, so we exercise ``_exec`` directly — it never touches pathlib.
+    POSIX host, so we exercise ``exec_into`` directly — it never touches pathlib.
     """
 
     def test_posix_uses_execve(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(_venv.os, "name", "posix")
         with patch.object(_venv.os, "execve") as execve:
-            _venv._exec("/v/bin/arvel", ["/v/bin/arvel", "migrate"], {"X": "1"})
+            _venv.exec_into("/v/bin/arvel", ["/v/bin/arvel", "migrate"], {"X": "1"})
         execve.assert_called_once_with("/v/bin/arvel", ["/v/bin/arvel", "migrate"], {"X": "1"})
 
     def test_windows_spawns_subprocess_and_exits(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -162,7 +170,7 @@ class TestExecBranch:
             patch.object(_venv.os, "execve") as execve,
             pytest.raises(SystemExit) as exit_info,
         ):
-            _venv._exec(exe, [exe, "migrate"], {"X": "1"})
+            _venv.exec_into(exe, [exe, "migrate"], {"X": "1"})
 
         execve.assert_not_called()
         run.assert_called_once()

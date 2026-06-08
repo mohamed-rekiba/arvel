@@ -203,9 +203,7 @@ async def test_boot_skips_ping_when_probing_disabled(
         # Bindings are wired regardless of the probe — the ORM stays usable and
         # connects lazily on first query.
         assert isinstance(app.container.make(AsyncEngine), AsyncEngine)
-        assert isinstance(
-            app.container.make(async_sessionmaker[AsyncSession]), async_sessionmaker
-        )
+        assert isinstance(app.container.make(async_sessionmaker[AsyncSession]), async_sessionmaker)
     finally:
         await app.shutdown()
 

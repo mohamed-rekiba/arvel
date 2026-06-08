@@ -63,7 +63,7 @@ def _already_inside(venv_python: Path) -> bool:
         return False
 
 
-def _exec(target: str, args: list[str], env: dict[str, str]) -> None:
+def exec_into(target: str, args: list[str], env: dict[str, str]) -> None:
     """Replace this process with ``target``. On Windows, fall back to a child.
 
     ``os.execve`` on Windows spawns a child and the parent keeps running with a
@@ -100,12 +100,12 @@ def maybe_reexec_into_project_venv(argv: list[str]) -> None:
     venv_arvel = _venv_arvel(root)
     if venv_arvel is not None:
         target = str(venv_arvel)
-        _exec(target, [target, *argv[1:]], env)
+        exec_into(target, [target, *argv[1:]], env)
         return
 
     if _venv_has_arvel_package(venv_python):
         target = str(venv_python)
-        _exec(target, [target, "-m", "arvel", *argv[1:]], env)
+        exec_into(target, [target, "-m", "arvel", *argv[1:]], env)
         return
 
     # .venv exists but has no arvel — let the normal flow surface its own error
