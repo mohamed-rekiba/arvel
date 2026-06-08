@@ -88,6 +88,12 @@ changelog once shipped.
   (`in_`, `not_in`, `exists`, `unique`, `required_if`, `required_unless`) —
   `validation/rules.py`, `validation/rule.py`, `validation/validator.py` +
   `test_wi044_*`
+- Nested/wildcard validation — dot-notation (`address.city`) and `*` wildcards
+  (`items.*.id`, dict wildcards, explicit indices); failures key by concrete
+  path; wildcards iterate only existing entries while non-wildcard nested paths
+  always validate; messages key by wildcard or concrete path. Completes the
+  validation parity backlog. `validation/validator.py` (`resolve_targets`) +
+  `test_wi045_*`
 - Needs-based CLI bootstrap — each command declares its `requires` subsystems
   (`CliSubsystem`) and only those service providers boot; non-HTTP commands skip
   route loading and the registered-routes banner
@@ -104,11 +110,6 @@ changelog once shipped.
   `redirect()` (with session flash). Medium impact, medium effort.
 - Route caching — `route:cache` / `route:clear` (`optimize` already stubs it
   pending a `RouteCollection` serializer). Medium impact, medium-large effort.
-- Nested/wildcard validation — array-of-objects rules like `items.*.id`. The
-  rest of the validation parity backlog (`date`, `bail`, `required_if`,
-  custom rules, `Rule` builders) landed; wildcard field expansion remains
-  because it changes the validator's field-iteration model. Medium impact,
-  medium effort — own WI.
 - HTTP security hardening — consolidate the two CSRF middlewares (session 419 /
   cookie 403), accept `X-XSRF-TOKEN` + form `_token`, and add a general
   `TrustProxies` request middleware (trusted-proxy IP resolution exists for

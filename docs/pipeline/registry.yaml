@@ -660,3 +660,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Feature gap (WI-043 #4, recommended first). Added bail (stop-at-first-failure per field), conditional presence (required_if/unless/with/with_all/without/without_all), date rules (date/date_format/before/after/before_or_equal/after_or_equal, UTC-normalized), register_rule() for custom rules, and Rule builders (in_/not_in/exists/unique/required_if/required_unless). Wildcard/nested (items.*.id) deferred — changes field-iteration model. Spec: docs/pipeline/specs/WI-arvel-044-validation-parity-round-2.md"
+  - id: "WI-arvel-045"
+    name: "Nested/wildcard validation (items.*.id, dotted paths)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-09T02:00:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Feature gap (WI-043 #4 remainder, last validation-parity item). Validator now expands dotted/wildcard field keys into concrete (path,value,present) targets via resolve_targets: address.city nested objects, items.*.id list wildcards, dict wildcards, explicit indices. Wildcards iterate only existing entries (missing collection -> no errors); non-wildcard nested paths always validate; errors key by concrete path; nested presence rules get a path-scoped data view; messages key by wildcard or concrete path. Backward-compatible (flat fields unchanged, zero-copy). Spec: docs/pipeline/specs/WI-arvel-045-nested-wildcard-validation.md"

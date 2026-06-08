@@ -1652,3 +1652,33 @@ events:
       suite 113 passed (incl. 27 new across bail, conditional presence, dates, custom registration, Rule builders);
       mkdocs build --strict clean.
     timestamp: "2026-06-09T01:52:00Z"
+  - work_item: "WI-arvel-045"
+    stage: "execution"
+    event: "implement"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Nested/wildcard validation — the last validation-parity item (WI-043 #4 remainder). Added resolve_targets() to
+      the validator: a (possibly dotted/wildcard) field key expands to concrete (path, value, present) targets.
+      Non-wildcard paths (address.city) always yield one target even when missing so required/present fire; `*`
+      only iterates entries that exist (list indices or dict keys), so a missing collection yields nothing — Laravel
+      parity. Explicit indices (items.0.id) and negative indices supported. The validate loop now runs each target's
+      rules via _run_target (bail honored per target); errors key by the concrete path; nested targets get a
+      path-scoped data view (_scoped_data) so present/filled/prohibited are path-aware; message overrides try the
+      concrete path then the wildcard form, attribute labels likewise. Flat fields are unchanged and zero-copy
+      (backward compatible). object->Mapping/list narrowing cast to concrete element types (cast, not ignore).
+    artifacts:
+      - "packages/arvel/src/arvel/validation/validator.py"
+      - "packages/arvel/tests/validation/test_wi045_nested_wildcard.py"
+      - "docs/site/docs/the-basics/validation.md"
+      - "CHANGELOG.md"
+    timestamp: "2026-06-09T02:05:00Z"
+  - work_item: "WI-arvel-045"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1067 files); uv run pyright 0 errors, 0 warnings; validation
+      suite 132 passed (incl. 19 new: resolve_targets unit cases, wildcard/nested/explicit-index validation,
+      path-aware presence, wildcard+concrete message overrides, backward-compat).
+    timestamp: "2026-06-09T02:07:00Z"
