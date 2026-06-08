@@ -148,6 +148,39 @@ def test_provider_wires_auth_exceptions_to_401_and_403() -> None:
     assert forbidden.status_code == 403
 
 
+def test_provider_wires_invalid_cursor_to_400() -> None:
+    from arvel.database.exceptions import InvalidCursorError
+    from arvel.http.exceptions import BadRequestException
+    from arvel.providers.http_provider import default_translators
+
+    wired = default_translators()
+    assert InvalidCursorError in wired
+    translated = wired[InvalidCursorError](InvalidCursorError("bad base64"))
+    assert isinstance(translated, BadRequestException)
+    assert translated.status_code == 400
+
+
+def test_invalid_cursor_returns_400_without_leaking_decode_internals() -> None:
+    from arvel.database.exceptions import InvalidCursorError
+    from arvel.providers.http_provider import default_translators
+
+    app = FastAPI()
+    HttpExceptionHandler(translators=default_translators()).register(app)
+
+    @app.get("/feed")
+    async def handler() -> dict[str, str]:
+        # Simulate a malformed ?cursor= reaching the paginator.
+        raise InvalidCursorError("Invalid base64-encoded string: padding")
+
+    del handler
+    resp = cast("httpx.Client", TestClient(app, raise_server_exceptions=False)).get("/feed")
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["error"]["message"] == "Invalid pagination cursor."
+    # The raw base64/JSON decode reason must not leak to the client.
+    assert "base64" not in resp.text
+
+
 def test_auth_unauthenticated_exception_returns_401_envelope() -> None:
     from arvel.auth.exceptions import UnauthenticatedException as AuthUnauth
     from arvel.providers.http_provider import default_translators

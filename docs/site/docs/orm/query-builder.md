@@ -221,6 +221,8 @@ page.next_cursor
 page.prev_cursor
 ```
 
+A cursor token is opaque — clients pass back whatever `next_cursor`/`prev_cursor` gave them. If a request arrives with a hand-edited or truncated `?cursor=`, decoding raises `InvalidCursorError`. The default HTTP wiring translates that to a `400 Bad Request` with a fixed message, so a malformed cursor never surfaces as a `500` or leaks the base64/JSON decode internals.
+
 <a name="chunking-and-streaming"></a>
 ## Chunking & Streaming
 

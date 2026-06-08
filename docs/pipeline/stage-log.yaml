@@ -1554,3 +1554,28 @@ events:
       ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; auth suites
       254 passed (incl. 1 tightened + 1 new verified-middleware case).
     timestamp: "2026-06-09T00:34:00Z"
+  - work_item: "WI-arvel-041"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      ORM pagination audit. paginate (offset+COUNT on ORDER-BY-stripped subquery, page>=1), simple_paginate (per_page+1,
+      has_more), cursor_paginate (keyset: flips directions for backward then reverses page, resets pre-existing ORDER BY,
+      applies global scopes) reviewed sound and Laravel-aligned. Defect: a malformed ?cursor= raises InvalidCursorError
+      (ORMError) from _decode_cursor with no HTTP translator -> 500 INTERNAL_ERROR and risked leaking the base64/JSON
+      decode reason. A cursor is opaque client input -> 400. Fix: http_provider.default_translators maps
+      InvalidCursorError -> BadRequestException("Invalid pagination cursor.") with a fixed message (no leak).
+    artifacts:
+      - "packages/arvel/src/arvel/providers/http_provider.py"
+      - "packages/arvel/tests/http/test_wi061_model_not_found_404.py"
+      - "docs/site/docs/orm/query-builder.md"
+    timestamp: "2026-06-09T00:48:00Z"
+  - work_item: "WI-arvel-041"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; pagination suite
+      82 passed; HTTP-translator file 11 passed (incl. 2 new cursor cases).
+    timestamp: "2026-06-09T00:50:00Z"
