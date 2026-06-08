@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 
+from arvel.support.secure_compare import constant_time_equals
+
 
 def sign_channel_auth(
     *,
@@ -42,7 +44,7 @@ def verify_channel_auth(
         channel=channel,
         channel_data=channel_data,
     )
-    return hmac.compare_digest(expected, auth)
+    return constant_time_equals(expected, auth)
 
 
 __all__ = ["sign_channel_auth", "verify_channel_auth"]

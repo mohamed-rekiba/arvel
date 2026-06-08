@@ -82,4 +82,4 @@ class TestTemporaryUrlSigner:
         import arvel.storage.url_signer as mod
 
         source = inspect.getsource(mod)
-        assert "compare_digest" in source
+        assert "constant_time_equals" in source

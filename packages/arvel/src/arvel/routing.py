@@ -30,6 +30,7 @@ from arvel.http.middleware import Middleware
 from arvel.http.requests import FormRequest
 from arvel.providers.service_provider import ServiceProvider
 from arvel.support.pipeline import Pipeline
+from arvel.support.secure_compare import constant_time_equals
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -1340,7 +1341,7 @@ class _URLFacade:
         query_without_sig = urlencode(pairs)
         base_url = f"{request.url.scheme}://{request.url.netloc}{request.url.path}"
         expected = _sign_message(_signature_payload(base_url, query_without_sig))
-        return hmac.compare_digest(expected, signature)
+        return constant_time_equals(expected, signature)
 
 
 URL: _URLFacade = _URLFacade()

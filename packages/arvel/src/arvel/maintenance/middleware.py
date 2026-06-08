@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import secrets
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -11,6 +10,7 @@ from urllib.parse import parse_qs
 from starlette.responses import HTMLResponse, PlainTextResponse, Response
 
 from arvel.logging.facade import Log
+from arvel.support.secure_compare import constant_time_equals
 
 if TYPE_CHECKING:
     from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -85,7 +85,7 @@ class MaintenanceModeMiddleware:
             return
 
         query_secret = self._extract_query_bypass(scope)
-        if query_secret is not None and secrets.compare_digest(query_secret, secret):
+        if query_secret is not None and constant_time_equals(query_secret, secret):
             await self._send_pass_through_with_cookie(scope, receive, send, secret)
             return
 
@@ -97,7 +97,7 @@ class MaintenanceModeMiddleware:
         provided = cookies.get(_BYPASS_COOKIE)
         if provided is None:
             return False
-        return secrets.compare_digest(provided, secret)
+        return constant_time_equals(provided, secret)
 
     @staticmethod
     def _extract_query_bypass(scope: Scope) -> str | None:

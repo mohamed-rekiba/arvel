@@ -1,8 +1,8 @@
 """CSRF double-submit middleware for the auth cookie flow.
 
 Reads the ``_csrf`` cookie set by the login endpoint and compares it to
-the ``X-CSRF-TOKEN`` request header. Uses ``secrets.compare_digest`` for
-constant-time comparison.
+the ``X-CSRF-TOKEN`` request header. Uses ``constant_time_equals`` for
+timing-safe comparison.
 
 This middleware is ASGI-native (not ``BaseHTTPMiddleware``) so framework
 exception handlers see :class:`CsrfMismatchException` through the normal
@@ -15,13 +15,13 @@ endpoints either create the cookie or do not need CSRF protection.
 
 from __future__ import annotations
 
-import secrets
 from collections.abc import Sequence
 
 from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from arvel.http.exceptions import HttpException
+from arvel.support.secure_compare import constant_time_equals
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 _DEFAULT_CSRF_COOKIE = "_csrf"
@@ -105,7 +105,7 @@ class CsrfDoubleSubmitMiddleware:
         if (
             not csrf_cookie_value
             or not csrf_header_value
-            or not secrets.compare_digest(csrf_cookie_value, csrf_header_value)
+            or not constant_time_equals(csrf_cookie_value, csrf_header_value)
         ):
             exc = CsrfMismatchException("CSRF token mismatch.")
             response = _error_response(exc)

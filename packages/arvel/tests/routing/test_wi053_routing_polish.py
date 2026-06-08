@@ -580,6 +580,40 @@ class TestStory8SignedUrls:
         assert resp.status_code == 200
         assert resp.json() == {"user_id": 5}
 
+    def test_non_ascii_signature_is_rejected_not_500(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A non-ASCII signature value must fail closed (403), never crash the
+        # guard with TypeError from hmac.compare_digest → 500.
+        from arvel.http.middleware import SignedMiddleware
+        from arvel.routing import Route, Router
+        from fastapi import FastAPI
+        from starlette.testclient import TestClient
+
+        Router.reset_singleton()
+        monkeypatch.setenv("APP_URL", "https://example.com")
+        monkeypatch.setenv("APP_KEY", "base64:" + "A" * 44)
+
+        with Route.group(middleware=[SignedMiddleware()]):
+
+            @Route.get("/verify/{user_id}", name="verify-email")
+            async def verify(user_id: int) -> dict[str, Any]:
+                return {"user_id": user_id}
+
+            del verify  # registered via @Route.*; drop local binding
+
+        app = FastAPI()
+        Router.singleton().register_with_app(app)
+
+        from arvel.http.exceptions import HttpExceptionHandler
+
+        HttpExceptionHandler().register(app)
+
+        client = cast("httpx.Client", TestClient(app, base_url="https://example.com"))
+        # %C3%A9 decodes to "é" — non-ASCII, the crash trigger.
+        resp = client.get("/verify/5?signature=caf%C3%A9")
+        assert resp.status_code == 403
+
     def test_signed_route_uses_hmac_sha256_not_md5(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # SHA-256 base64 produces ~43 chars (urlsafe, no padding). MD5 would
         # produce ~22. This guards against a regression to a weak algorithm.

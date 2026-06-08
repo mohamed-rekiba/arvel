@@ -450,3 +450,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 30 (observability + health access control) hardening WI. Spec: docs/pipeline/specs/WI-arvel-030-forwarded-ip-guard-bypass.md"
+  - id: "WI-arvel-031"
+    name: "Token-comparison guards crash (500) on non-ASCII input"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "confidential"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T21:00:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 31 (URL signing + CSRF/maintenance/storage/reverb token compare) hardening WI. Spec: docs/pipeline/specs/WI-arvel-031-constant-time-compare-typeerror.md"

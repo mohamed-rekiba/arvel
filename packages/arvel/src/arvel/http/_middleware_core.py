@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import secrets
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Protocol, runtime_checkable
 
@@ -12,6 +11,7 @@ from starlette.types import ASGIApp
 
 from arvel.http.exceptions import HttpException, ThrottleException, UnauthenticatedException
 from arvel.http.ratelimit import InMemoryStore, RateLimiterStore
+from arvel.support.secure_compare import constant_time_equals
 
 CallNext = Callable[[Any], Awaitable[Any]]
 
@@ -166,7 +166,7 @@ class CsrfMismatchException(HttpException):
 class VerifyCsrf:
     """Double-submit CSRF check. Skips safe methods and ``except_paths``.
 
-    Uses ``secrets.compare_digest`` for constant-time token comparison.
+    Uses ``constant_time_equals`` for timing-safe token comparison.
     """
 
     def __init__(self, except_paths: Sequence[str] | None = None) -> None:
@@ -190,7 +190,7 @@ class VerifyCsrf:
         token: Any = session.get(_CSRF_SESSION_KEY)
         sent = request.headers.get(_CSRF_HEADER) if hasattr(request, "headers") else None
 
-        if not token or not sent or not secrets.compare_digest(str(token), str(sent)):
+        if not token or not sent or not constant_time_equals(str(token), str(sent)):
             raise CsrfMismatchException("CSRF token mismatch.")
         return await call_next(request)
 

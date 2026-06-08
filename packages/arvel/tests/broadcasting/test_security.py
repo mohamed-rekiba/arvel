@@ -14,13 +14,13 @@ import pytest
 
 
 def test_sec_002_signature_verification_uses_compare_digest() -> None:
-    """signature comparison MUST use hmac.compare_digest."""
+    """signature comparison MUST use the timing-safe constant_time_equals."""
     import inspect
 
     from arvel.reverb import auth as auth_module
 
     src = inspect.getsource(auth_module)
-    assert "compare_digest" in src
+    assert "constant_time_equals" in src
     # And the lazy short-circuit `==` is NOT used to compare signatures.
     assert "expected == actual" not in src
     assert "actual == expected" not in src
