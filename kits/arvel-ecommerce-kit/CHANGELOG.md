@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.4](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.3...arvel-ecommerce-kit-v1.7.4) (2026-06-08)
+
+
+### Bug Fixes
+
+* **database:** wrap seeders in a database transaction for improved consistency ([dafcd60](https://github.com/mohamed-rekiba/arvel/commit/dafcd60ad29e11f7f91e524ff82affa9175a9b04))
+
 ## [1.7.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.2...arvel-ecommerce-kit-v1.7.3) (2026-06-08)
 
 
