@@ -1294,3 +1294,39 @@ events:
       suite failures unrelated and out of scope: test_nosec_annotations (bare # nosec codes in untouched
       console/_venv.py) and test_wi_030_config (cwd-dependent skeleton path, flagged in WI-arvel-030).
     timestamp: "2026-06-08T21:12:00Z"
+  - work_item: "WI-arvel-032"
+    stage: "qa-post"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 32 (ORM serialization boundary). C1 (A01/A09): Model.to_dict() honours __hidden__/__visible__, but an
+      Arvel Model is a MappedAsDataclass — FastAPI's jsonable_encoder serialises every column, so a handler's bare
+      `return user` leaks hidden columns (password_hash, tokens). Laravel's `return $user;` applies $hidden. Framework
+      + ecommerce kit unaffected (all return Pydantic/JsonResource/response_model). Mass assignment guard and
+      casts/mutators reviewed — sound; insecure-by-default mass assignment is a deliberate design stance, not a bug.
+    timestamp: "2026-06-08T21:40:00Z"
+  - work_item: "WI-arvel-032"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Added routing._coerce_models_in_result + _wrap_response_normalizer, wired into Router.register_with_app for
+      routes without an explicit response_model. Raw Model -> to_dict(); list of models -> per-element to_dict();
+      everything else (dict/Pydantic/Response/primitives) passes through. to_dict reads columns only (no async relation
+      load); handler __signature__ preserved so FastAPI DI is unchanged. Added test_wi054_hidden_field_leak covering
+      raw model + list returns honouring hidden, and dict/Pydantic passthrough.
+    artifacts:
+      - "packages/arvel/src/arvel/routing.py"
+      - "packages/arvel/tests/routing/test_wi054_hidden_field_leak.py"
+    timestamp: "2026-06-08T21:48:00Z"
+  - work_item: "WI-arvel-032"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean on changed files; uv run mypy 0 issues (1064 files); uv run pyright 0 errors on
+      routing.py. Full suite 4463 passed / 1 failed — the one failure is the pre-existing test_nosec_annotations (bare
+      # nosec codes in untouched console/_venv.py), unrelated and out of scope.
+    timestamp: "2026-06-08T21:54:00Z"
