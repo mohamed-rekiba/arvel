@@ -1605,3 +1605,18 @@ events:
       ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; txn middleware +
       db edge/imperative 42 passed (incl. 2 new); full http + database suites 1348 passed.
     timestamp: "2026-06-09T01:12:00Z"
+  - work_item: "WI-arvel-043"
+    stage: "planning"
+    event: "triage"
+    result: "pass"
+    note: >-
+      Feature-gap bucket-3 triage. Verified the CHANGELOG Unreleased "remaining gaps" against the codebase: needs-based
+      CLI bootstrap (CliSubsystem requires) and openapi:export --output FILE are already implemented (stale entries,
+      moved to landed); the "~25 missing rules" line over-counted (32 already shipped). Ranked the 6 genuine remaining
+      gaps by impact/effort/risk: (1) Http:: facade + fake, (2) response()/redirect(), (3) route:cache/clear, (4) more
+      validation rules [recommended first — low risk], (5) CSRF consolidation + TrustProxies [high risk, security path,
+      own gated WI], (6) STORAGE_LOCAL_SERVE. CHANGELOG de-staled in place (dropped nonexistent ROADMAP.md reference).
+    artifacts:
+      - "CHANGELOG.md"
+      - "docs/backlog/043-epic-feature-gap-bucket3-triage.md"
+    timestamp: "2026-06-09T01:30:00Z"
