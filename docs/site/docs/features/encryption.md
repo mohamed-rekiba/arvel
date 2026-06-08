@@ -49,7 +49,7 @@ data = Crypt.decrypt(token)   # back to the dict
 <a name="how-it-works"></a>
 ## How It Works
 
-The `Encrypter` uses **AES-256-GCM** from the `cryptography` library. The 32-byte key is derived from your `APP_KEY` with HKDF-SHA256. Each encryption produces a self-describing payload — a version byte, a random 12-byte IV, and the authenticated ciphertext — base64-encoded for transport. Decryption verifies the version and authentication tag, raising `DecryptionError` on any tampering or version mismatch.
+The `Encrypter` uses **AES-256-GCM** from the `cryptography` library. The 32-byte key is derived from your `APP_KEY` with HKDF-SHA256. Each encryption produces a self-describing payload — a version byte, a random 12-byte IV, and the authenticated ciphertext — base64-encoded for transport. Decryption raises `DecryptionError` for **any** invalid payload — malformed base64, an unknown version byte, a wrong key, or a tampered tag — so you can wrap a single `except DecryptionError` around untrusted input.
 
 > [!NOTE]
 > The application encrypter (`Crypt`, used by `encrypted:*` casts) and the column-level `EncryptedType` decorator use **different wire formats**. They are not interchangeable: data encrypted with one can't be read by the other. Use `Crypt` / `encrypted:*` casts for app-key-backed encryption, and `EncryptedType` only when you manage the raw key yourself.

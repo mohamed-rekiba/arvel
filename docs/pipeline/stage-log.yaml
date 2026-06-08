@@ -607,3 +607,47 @@ events:
       single-event-loop contract for command authors. Application.run()->handle() bypass + stale
       artisan.md pointer deferred.
     timestamp: "2026-06-08T12:35:00Z"
+  - work_item: "WI-arvel-015"
+    stage: "planning"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 15 (encryption) audit. C1 confirmed via repro: Encrypter.decrypt_string ran
+      base64.b64decode(payload) outside its try/except, so a non-base64 payload leaked a raw
+      binascii.Error instead of the documented DecryptionError. Sibling EncryptedType already funnels
+      all bad input into DecryptionError; Laravel's Encrypter::decrypt raises DecryptException for any
+      invalid payload. A Crypt-facade caller decrypting untrusted input and catching DecryptionError
+      gets an uncaught 500 (A10). decrypt() JSON + from_app_key bad-key deferred (parity-additive /
+      operator config). Spec: WI-arvel-015-decrypt-error-contract.md.
+    artifacts:
+      - ".context/research/015-encryption.md"
+      - "docs/pipeline/specs/WI-arvel-015-decrypt-error-contract.md"
+    timestamp: "2026-06-08T12:40:00Z"
+  - work_item: "WI-arvel-015"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      encrypter.py: wrapped base64.b64decode(payload) in try/except ValueError (binascii.Error
+      subclasses ValueError) raising DecryptionError, so decrypt_string raises the documented type for
+      every malformed payload (matches EncryptedType + Laravel). New tests/encryption/ package with
+      round-trip + parametrized malformed/wrong-version/wrong-key/tampered cases (Encrypter had no
+      direct unit coverage before). No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/encryption/encrypter.py"
+      - "packages/arvel/tests/encryption/__init__.py"
+      - "packages/arvel/tests/encryption/test_wi_015_decrypt_error_contract.py"
+      - "docs/site/docs/features/encryption.md"
+    timestamp: "2026-06-08T12:50:00Z"
+  - work_item: "WI-arvel-015"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      encryption + crypt-facade + encrypted-casts suites green (8 new encryption tests); full arvel
+      suite green; mypy --strict (1045 files) + pyright (0 errors) + ruff check + ruff format clean.
+      Docs encryption.md states DecryptionError covers malformed base64, unknown version, wrong key,
+      and tampering. decrypt() JSON + from_app_key deferred.
+    timestamp: "2026-06-08T12:55:00Z"
