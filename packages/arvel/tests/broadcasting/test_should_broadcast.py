@@ -46,6 +46,39 @@ def test_default_broadcast_with_returns_model_dump_for_basemodel() -> None:
     assert OrderShipped(order_id=42).broadcast_with() == {"order_id": 42}
 
 
+def test_broadcast_with_is_json_safe_for_rich_types() -> None:
+    """datetime/UUID/Decimal fields serialize to JSON-safe values, so drivers can
+    json.dumps the payload without blowing up."""
+    import json
+    from datetime import UTC, datetime
+    from decimal import Decimal
+    from uuid import UUID, uuid4
+
+    from arvel.broadcasting import ShouldBroadcast
+    from arvel.events.event import Event
+
+    class OrderShipped(Event, ShouldBroadcast):
+        order_id: UUID
+        total: Decimal
+        shipped_at: datetime
+
+        def broadcast_on(self) -> Sequence[str]:
+            return ["orders"]
+
+    oid = uuid4()
+    payload = OrderShipped(
+        order_id=oid,
+        total=Decimal("19.99"),
+        shipped_at=datetime(2026, 1, 1, tzinfo=UTC),
+    ).broadcast_with()
+
+    assert payload["order_id"] == str(oid)
+    assert payload["total"] == "19.99"
+    assert payload["shipped_at"] == "2026-01-01T00:00:00Z"
+    # The whole point: this must not raise.
+    json.dumps(dict(payload))
+
+
 def test_broadcast_on_without_override_raises() -> None:
     """Mixin alone (no broadcast_on override) raises NotImplementedError when called."""
     from arvel.broadcasting import ShouldBroadcast

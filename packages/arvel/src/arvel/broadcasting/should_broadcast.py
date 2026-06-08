@@ -27,7 +27,9 @@ class ShouldBroadcast:
     def broadcast_with(self) -> Mapping[str, object]:
         dump = getattr(self, "model_dump", None)
         if callable(dump):
-            return _as_payload_mapping(dump())
+            # mode="json" so datetime/UUID/Decimal land as JSON-safe values — the
+            # drivers json.dumps the payload, and python-mode dumps would blow up.
+            return _as_payload_mapping(dump(mode="json"))
         return {}
 
 

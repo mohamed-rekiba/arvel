@@ -165,3 +165,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 11 (session) hardening WI. Spec: docs/pipeline/specs/WI-arvel-011-session-regenerate-destroy.md"
+  - id: "WI-arvel-012"
+    name: "Default broadcast payload must be JSON-safe (model_dump mode=json)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T10:55:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 12 (broadcasting) hardening WI. Spec: docs/pipeline/specs/WI-arvel-012-broadcast-payload-json-safe.md"
