@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.6](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.5...arvel-v0.19.6) (2026-06-08)
+
+
+### Bug Fixes
+
+* **database:** run seeder after-commit callbacks once rows are committed ([3cf317f](https://github.com/mohamed-rekiba/arvel/commit/3cf317ff189c6fbb48e70f57c726b82e4dec3f67))
+* **observability:** stop X-Forwarded-For from bypassing /_health and /_metrics CIDR guards ([86d2609](https://github.com/mohamed-rekiba/arvel/commit/86d2609f1d89356e95fd649a74aa0271419dffe0))
+
 ## [0.19.5](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.4...arvel-v0.19.5) (2026-06-08)
 
 
