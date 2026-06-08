@@ -1809,3 +1809,26 @@ events:
       ruff clean; uv run mypy 0 issues (1073 files); uv run pyright 0/0; validation suite 132 + wi074 26 passed
       (2 new no-session cases); mkdocs build --strict clean.
     timestamp: "2026-06-09T03:06:00Z"
+  - work_item: "deferred-F-DOC"
+    stage: "execution"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Deferred F-DOC (docs-only). the-basics/error-handling.md's RFC 7807 section had a WARNING claiming
+      ProblemDetailsHandler installs no catch-all for unhandled Exceptions, so apps must handle them elsewhere. Wrong:
+      ProblemDetailsHandler.register() calls app.add_exception_handler(Exception, handle_unexpected_problem), which
+      renders a generic 500 problem+json with no traceback — already covered by
+      test_problem_details.test_unhandled_exception_renders_problem_json_without_leak. Replaced the WARNING with an
+      accurate note that it handles the same surface as the default handler plus the same Exception catch-all.
+    artifacts:
+      - "docs/site/docs/the-basics/error-handling.md"
+    timestamp: "2026-06-09T03:15:00Z"
+  - work_item: "deferred-F-DOC"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Docs-only; mkdocs build --strict clean. Claim verified against problem_details.py register() and the existing
+      unhandled-exception test.
+    timestamp: "2026-06-09T03:16:00Z"

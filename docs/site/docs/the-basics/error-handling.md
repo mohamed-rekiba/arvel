@@ -141,5 +141,4 @@ Arvel registers a few translators by default — for instance, the ORM's `ModelN
 
 Arvel also ships a `ProblemDetailsHandler` (in `arvel.http.problem_details`) that renders errors as `application/problem+json` per RFC 7807. It's opt-in: bind it in place of the default `HttpExceptionHandler` in the container.
 
-> [!WARNING]
-> `ProblemDetailsHandler` registers handlers for `HttpException` and validation errors but does **not** install a catch-all for unhandled `Exception`s. If you opt in, make sure unexpected errors are handled elsewhere so they don't escape as raw `500`s.
+It handles the same surface as the default handler — `HttpException` subclasses, FastAPI validation errors, and your registered translators — and installs the same catch-all for unhandled `Exception`s, rendering a generic `500` problem document (`"Something went wrong"`, no traceback) instead of letting it escape as a raw `500`.
