@@ -96,6 +96,8 @@ config("database.default")         # "postgresql"
 config("billing.plan", "free")     # default if the key is missing
 ```
 
+Dict segments are looked up by key only. A missing key returns the default even when its name collides with a dict method — `config("cache.stores.get", "x")` returns `"x"`, never `dict.get`.
+
 For a strict lookup that raises `ConfigKeyError` on a missing key, use `lookup()` instead of `config()`.
 
 <a name="adding-your-own-config"></a>
