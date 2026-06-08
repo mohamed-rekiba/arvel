@@ -73,19 +73,23 @@ class DatabaseServiceProvider(ServiceProvider):
             return
 
         engine = self.app.container.make(AsyncEngine)
-        try:
-            async with engine.connect() as conn:
-                await conn.execute(_PING)
-        except SQLAlchemyError as exc:
-            if registry_conn is not None:
-                raw_url = registry_conn.url
-                driver = raw_url.split("://")[0] if "://" in raw_url else "sqlite"
-                host = raw_url.split("@")[-1].split("/")[0] if "@" in raw_url else "<local>"
-            else:
-                url = cfg.async_url(self._base_path())
-                driver = url.split("://")[0] if "://" in url else "sqlite"
-                host = url.split("@")[-1].split("/")[0] if "@" in url else "<local>"
-            raise DatabaseConnectionError(driver=driver, host=host, inner=exc) from exc
+        # The ping is a fail-fast health check — right for serving, wrong for the
+        # shell. With probing off we still wire everything below and let the first
+        # query open the connection (and surface a dead DB), Tinker-style.
+        if self.app.probe_connections():
+            try:
+                async with engine.connect() as conn:
+                    await conn.execute(_PING)
+            except SQLAlchemyError as exc:
+                if registry_conn is not None:
+                    raw_url = registry_conn.url
+                    driver = raw_url.split("://")[0] if "://" in raw_url else "sqlite"
+                    host = raw_url.split("@")[-1].split("/")[0] if "@" in raw_url else "<local>"
+                else:
+                    url = cfg.async_url(self._base_path())
+                    driver = url.split("://")[0] if "://" in url else "sqlite"
+                    host = url.split("@")[-1].split("/")[0] if "@" in url else "<local>"
+                raise DatabaseConnectionError(driver=driver, host=host, inner=exc) from exc
 
         maker: async_sessionmaker[AsyncSession] = self.app.container.make(
             async_sessionmaker[AsyncSession]

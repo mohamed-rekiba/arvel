@@ -345,3 +345,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 23 (application kernel) hardening WI. Spec: docs/pipeline/specs/WI-arvel-023-shutdown-drain-providers.md"
+  - id: "WI-arvel-024"
+    name: "arvel shell boots lazily, like Laravel Tinker (skip eager DB probe)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T16:20:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 24 (application kernel / console shell) hardening WI. Spec: docs/pipeline/specs/WI-arvel-024-shell-lazy-database-boot.md"

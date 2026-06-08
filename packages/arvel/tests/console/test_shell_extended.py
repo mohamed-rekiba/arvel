@@ -379,6 +379,28 @@ class TestReplLoopLifecycle:
         assert ShellCommand.owns_process is True
         assert ShellCommand.needs_framework() is False
 
+    def test_run_repl_boots_without_connection_probe(
+        self, db_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The shell boots lazily so the REPL opens even when the DB is down.
+
+        We can't assert "DB down" without a flaky network, so we assert the lever
+        instead: run_repl must boot with the connectivity probe disabled.
+        """
+        import arvel.console.commands.shell as shell_mod
+
+        framework_app = _build_app(db_env)
+        monkeypatch.setattr(shell_mod, "find_project_root", lambda *_a, **_k: db_env)
+        monkeypatch.setattr(
+            shell_mod, "bootstrap_framework_application", lambda *_a, **_k: framework_app
+        )
+
+        cmd = ShellCommand()
+        monkeypatch.setattr(cmd, "_launch_repl", lambda _ns: None)
+        cmd.run_repl()
+
+        assert framework_app.probe_connections() is False
+
     def test_run_repl_runs_query_on_repl_loop_without_nested_run(
         self, db_env: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
