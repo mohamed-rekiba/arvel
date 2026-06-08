@@ -324,6 +324,44 @@ def rules(self) -> dict[str, str | list[str]]:
     }
 ```
 
+<a name="nested-and-wildcard-fields"></a>
+## Nested and Wildcard Fields
+
+Rules can target nested data with dot notation, and validate every entry of an
+array with the `*` wildcard — matching Laravel.
+
+```python
+def rules(self) -> dict[str, str | list[str]]:
+    return {
+        "address.city": "required|string",       # nested object
+        "items": "required",                       # the array itself
+        "items.*.id": "required|integer",          # every element's id
+        "items.*.qty": "integer|min:1",
+    }
+```
+
+Given `{"items": [{"id": 1, "qty": 2}, {"qty": 0}]}`, the failures come back
+keyed by the concrete path:
+
+```json
+[
+  {"field": "items.1.id", "issue": "The items.1.id field is required."},
+  {"field": "items.1.qty", "issue": "The items.1.qty must be at least 1."}
+]
+```
+
+Two behaviors worth knowing:
+
+- A **wildcard only iterates entries that exist** — if `items` is missing entirely,
+  `items.*.id` rules simply don't run (no false "required" errors).
+- A **non-wildcard nested path always validates**, even when the parent is
+  missing — `address.city: required` fails whether `address` is absent or present
+  without a `city`.
+
+Explicit indices (`items.0.id`) and dict wildcards (`meta.*.value`) work too.
+Custom messages can be keyed by the wildcard form (`items.*.id.required`) or by a
+concrete path (`items.1.id.required`) — the concrete key wins when both exist.
+
 <a name="conditional-rules"></a>
 ## Conditional Rules
 
