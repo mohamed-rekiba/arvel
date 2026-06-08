@@ -35,6 +35,9 @@ async def up(schema: Schema) -> None:
         t.big_integer("available_at").nullable(value=False)
         t.big_integer("created_at").nullable(value=False)
         t.integer("priority").default(0).nullable(value=False)
+        # Reservation timestamp (epoch seconds), NULL when free. Lets a worker
+        # claim a row without deleting it so a crash doesn't lose the job.
+        t.big_integer("reserved_at").nullable(value=True)
         t.index(["queue", "priority", "available_at"], name="jobs_queue_priority_available_idx")
 
     schema.create(__tablename__, _table)

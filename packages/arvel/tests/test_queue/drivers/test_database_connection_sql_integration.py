@@ -80,6 +80,7 @@ async def _create_jobs_table(engine: AsyncEngine) -> None:
         Column("available_at", BigInteger, nullable=False),
         Column("created_at", BigInteger, nullable=False),
         Column("priority", Integer, nullable=False, default=0),
+        Column("reserved_at", BigInteger, nullable=True, default=None),
         Index("jobs_queue_priority_available_idx", "queue", "priority", "available_at"),
     )
     async with engine.begin() as conn:

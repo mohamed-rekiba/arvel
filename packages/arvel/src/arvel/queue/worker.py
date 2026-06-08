@@ -95,6 +95,8 @@ class Worker:
         conn = self._manager.connection()
         job = deserialize_job(envelope)
         timeout = getattr(job, "timeout", 0)
+        # Reached on success or handled failure; skipped on CancelledError (re-raised
+        # below) so a cancelled job's reservation lapses and it redelivers.
         try:
             if timeout and timeout > 0:
                 await asyncio.wait_for(job.handle(), timeout=float(timeout))
@@ -136,6 +138,11 @@ class Worker:
                             queue=self._queue,
                             error=error_text,
                         )
+        # Job is fully handled (ran, retried, or DLQ'd) — release the reserved row.
+        # Optional capability: only the database driver reserves rows.
+        delete_reserved = getattr(conn, "delete_reserved", None)
+        if delete_reserved is not None:
+            await delete_reserved(envelope)
 
     async def _dispatch_chain_successor(self, envelope: JobEnvelope) -> None:
         """Pop the next chain step (if any) and enqueue it on its target queue."""
