@@ -851,3 +851,41 @@ events:
       mypy --strict clean, uv run pyright 0 errors, ruff check + ruff format clean. Docstrings state
       value-equality. No user-facing Collection-helper doc page exists; docstring is the source of truth.
     timestamp: "2026-06-08T15:00:00Z"
+  - work_item: "WI-arvel-021"
+    stage: "qa-post"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 21 (i18n). C1 confirmed via repro: select_plural_variant indexed positional variants by
+      raw count, so "apple|apples" returned "apples" at count=1 and "apple" at count=0 — opposite of
+      Laravel's getPluralIndex (English: singular only at count==1). Docs even claimed count=1 -> "1 apple".
+    timestamp: "2026-06-08T15:10:00Z"
+  - work_item: "WI-arvel-021"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Ported Laravel MessageSelector::getPluralIndex as a flat dispatch table of small per-family rule
+      fns (zero/two-form/zero-or-one/Slavic/Czech/Irish/Lithuanian/Slovenian/Macedonian/Maltese/Latvian/
+      Polish/Welsh/Romanian/Arabic), keyed by language subtag (pt from pt_BR). Threaded the active locale
+      from Translator.choice into select_plural_variant. Bracket path unchanged. Updated test_choice
+      (count-indexed -> Laravel contract); new test_wi_021_plural_rules.py.
+    artifacts:
+      - "packages/arvel/src/arvel/i18n/pluralisation.py"
+      - "packages/arvel/src/arvel/i18n/translator.py"
+      - "packages/arvel/tests/i18n/test_choice.py"
+      - "packages/arvel/tests/i18n/test_wi_021_plural_rules.py"
+      - "pyproject.toml"
+    timestamp: "2026-06-08T15:16:00Z"
+  - work_item: "WI-arvel-021"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      i18n suite 94 passed (incl. new plural-rule cases); full arvel suite 4409 passed, 0 failures;
+      mypy --strict clean, pyright 0 errors, ruff check + ruff format clean. PLR2004/ARG001 per-file
+      ignore added for the CLDR rule table (domain constants), matching existing repo precedent.
+      localization.md pluralisation section updated.
+    timestamp: "2026-06-08T15:20:00Z"

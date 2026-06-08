@@ -58,6 +58,17 @@ __choice("messages.apples", count=1)   # "1 apple"
 __choice("messages.apples", count=5)   # "5 apples"
 ```
 
+The positional `"singular|plural"` form is picked by the **locale's plural rule** (Laravel's `getPluralIndex`), not by the raw count. In English that means the first form is used only at `count == 1`; every other count — including `0` — uses the second:
+
+```python
+# messages.apples = ":count apple|:count apples"
+__choice("messages.apples", count=0)   # "0 apples"
+__choice("messages.apples", count=1)   # "1 apple"
+__choice("messages.apples", count=2)   # "2 apples"
+```
+
+Other locales follow their own rules — French treats `0` and `1` as singular, and languages like Russian or Arabic select among three or more forms. The locale comes from the `Translator` (or a per-call `locale=` override). For more than two forms in a single-rule locale like English, use the bracket syntax — `"{0}none|[1,*]:count items"` — which matches exact counts and ranges regardless of the plural rule.
+
 <a name="per-request-locale"></a>
 ## Per-Request Locale
 

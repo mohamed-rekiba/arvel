@@ -19,26 +19,26 @@ def parse_choice() -> _ParseChoice:
     return select_plural_variant
 
 
-class TestLaravelPipeSimple:
-    """`'a|b|c'` positional ordering."""
+class TestLaravelPipePositional:
+    """Positional pipe is picked by the locale plural rule, not raw count index."""
 
     @pytest.mark.parametrize(
         ("count", "expected"),
-        [(0, "no items"), (1, "one item"), (5, "many items")],
+        [(0, "apples"), (1, "apple"), (2, "apples"), (10, "apples")],
     )
-    def test_three_variant_pipe(
+    def test_two_form_english_rule(
         self, parse_choice: _ParseChoice, count: int, expected: str
     ) -> None:
-        spec = "no items|one item|many items"
-        out = parse_choice(spec, count=count, replace={})
-        assert out == expected
+        # Laravel: count == 1 -> singular (idx 0), everything else -> plural (idx 1).
+        spec = "apple|apples"
+        assert parse_choice(spec, count=count, replace={}) == expected
 
 
 class TestPlaceholder:
     """count substitution into :count or {count}."""
 
     def test_substitutes_count_placeholder(self, parse_choice: _ParseChoice) -> None:
-        spec = "no items|one item|:count items"
+        spec = "one item|:count items"
         assert parse_choice(spec, count=5, replace={"count": 5}) == "5 items"
 
 
