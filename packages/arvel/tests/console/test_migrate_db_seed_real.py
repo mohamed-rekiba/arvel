@@ -98,6 +98,31 @@ class BadSeeder(Seeder):
 '''
 
 
+# Registers an after-commit callback that appends to a sentinel file. run() writes
+# "R" first; the callback appends "C". A final "RC" proves the callback fired
+# exactly once, after run() returned — the wiring the kit seeder relies on to
+# refresh its materialized view only once the seeded rows are committed.
+_AFTER_COMMIT_SEEDER = '''"""Seeder that registers an after-commit callback."""
+
+from pathlib import Path
+
+from arvel.database import Seeder
+from arvel.database.db import DB
+
+_SENTINEL = Path(__file__).parent / "after_commit_ran.txt"
+
+
+class DatabaseSeeder(Seeder):
+    async def run(self) -> None:
+        _SENTINEL.write_text("R")
+
+        async def _record() -> None:
+            _SENTINEL.write_text(_SENTINEL.read_text() + "C")
+
+        DB.after_commit(_record)
+'''
+
+
 def _make_app_with_engine(tmp_path: Path, engine: AsyncEngine, *cmds: Any) -> Application:
     """Construct a console Application that binds AsyncEngine via a fake
     framework Application whose container resolves AsyncEngine to `engine`.
@@ -322,6 +347,20 @@ def test_db_seed_with_explicit_seeder_name(
     assert "PostSeeder" in result.stdout
 
 
+def test_db_seed_fires_after_commit_callbacks(
+    project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """db:seed drains the after-commit queue once, after the seeder commits."""
+    seeders = project / "database" / "seeders"
+    (seeders / "database_seeder.py").write_text(_AFTER_COMMIT_SEEDER)
+    monkeypatch.chdir(project)
+    app = _make_app_with_engine(project, engine, DbSeedCommand())
+    _mark_migrated(engine)
+    result = invoke_async(runner, app.typer_app, ["db:seed"])
+    assert result.exit_code == 0, result.stdout + result.stderr
+    assert (seeders / "after_commit_ran.txt").read_text() == "RC"
+
+
 def test_db_seed_missing_file_exits_2(
     project: Path, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -494,6 +533,18 @@ def test_run_seeder_for_app_runs_and_commits(project: Path, engine: AsyncEngine)
     cmd = DbSeedCommand()
     _make_app_with_engine(project, engine, cmd)
     asyncio.run(run_seeder_for_app(cmd.app))
+
+
+def test_run_seeder_for_app_fires_after_commit_callbacks(
+    project: Path, engine: AsyncEngine
+) -> None:
+    """The shared helper (migrate:fresh/refresh --seed) also drains the queue post-commit."""
+    seeders = project / "database" / "seeders"
+    (seeders / "database_seeder.py").write_text(_AFTER_COMMIT_SEEDER)
+    cmd = DbSeedCommand()
+    _make_app_with_engine(project, engine, cmd)
+    asyncio.run(run_seeder_for_app(cmd.app))
+    assert (seeders / "after_commit_ran.txt").read_text() == "RC"
 
 
 def test_run_seeder_for_app_rejects_invalid_name(project: Path, engine: AsyncEngine) -> None:

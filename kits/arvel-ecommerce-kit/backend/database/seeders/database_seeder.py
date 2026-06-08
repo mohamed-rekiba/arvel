@@ -21,9 +21,11 @@ class DatabaseSeeder(_BaseDatabaseSeeder):
     async def run(self) -> None:
         await super().run()  # production guard
 
-        async with DB.transaction():
-            await RolesAndPermissionsSeeder().run()
-            await CatalogSeeder().run()
-            await SampleUsersSeeder().run()
+        await RolesAndPermissionsSeeder().run()
+        await CatalogSeeder().run()
+        await SampleUsersSeeder().run()
 
-        await refresh_products_catalog_now()
+        # Refresh after the *outer* transaction commits. Under db:seed the
+        # session commits only once run() returns, so an inline refresh on
+        # its own autocommit connection would miss the just-seeded rows.
+        DB.after_commit(refresh_products_catalog_now)

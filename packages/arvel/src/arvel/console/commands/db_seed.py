@@ -17,6 +17,7 @@ from __future__ import annotations
 import importlib.util
 import re
 import sys
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Annotated, Any, ClassVar
 
@@ -35,7 +36,12 @@ from arvel.database.health import (
     check_database_connection,
 )
 from arvel.database.schema import Schema
-from arvel.database.session import use_session
+from arvel.database.session import (
+    get_after_commit_queue,
+    reset_after_commit_queue,
+    set_after_commit_queue,
+    use_session,
+)
 from arvel.support.str import Str
 
 _NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
@@ -109,6 +115,43 @@ def _load_seeder_class(path: Path, class_name: str) -> type[Seeder]:
     return cls
 
 
+async def _execute_seeder(
+    cls: type[Seeder],
+    seeder_name: str,
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """Run *cls* in one transaction, then fire its after-commit callbacks.
+
+    Owns the after-commit queue so seeders can register post-commit work via
+    ``DB.after_commit(...)`` — e.g. refreshing a materialized view, which must
+    run on its own connection *after* the seeded rows are committed, not before.
+    """
+    callbacks: list[Callable[[], Awaitable[Any]]] = []
+    owns_queue = get_after_commit_queue() is None
+    queue_token = set_after_commit_queue(callbacks) if owns_queue else None
+    try:
+        async with maker() as session, use_session(session):
+            instance = cls()
+            try:
+                await instance.run()
+            except Exception as exc:
+                typer.echo(
+                    f"arvel: seeder failed: {seeder_name} — {type(exc).__name__}: {exc}",
+                    err=True,
+                )
+                raise typer.Exit(code=1) from exc
+            await session.commit()
+    finally:
+        if queue_token is not None:
+            reset_after_commit_queue(queue_token)
+
+    if owns_queue:
+        for callback in callbacks:
+            await callback()
+
+    typer.echo(f"Seeded: {seeder_name}")
+
+
 async def run_seeder_for_app(app: object, seeder_name: str = "DatabaseSeeder") -> None:
     """Load *seeder_name* from the app's seeders directory and run it.
 
@@ -128,19 +171,7 @@ async def run_seeder_for_app(app: object, seeder_name: str = "DatabaseSeeder") -
 
     _app: Any = app
     maker: async_sessionmaker[AsyncSession] = _app.container.make(async_sessionmaker[AsyncSession])
-    async with maker() as session, use_session(session):
-        instance = cls()
-        try:
-            await instance.run()
-        except Exception as exc:
-            typer.echo(
-                f"arvel: seeder failed: {seeder_name} — {type(exc).__name__}: {exc}",
-                err=True,
-            )
-            raise typer.Exit(code=1) from exc
-        await session.commit()
-
-    typer.echo(f"Seeded: {seeder_name}")
+    await _execute_seeder(cls, seeder_name, maker)
 
 
 class DbSeedCommand(Command):
@@ -217,16 +248,4 @@ class DbSeedCommand(Command):
         maker: async_sessionmaker[AsyncSession] = self.app.container.make(
             async_sessionmaker[AsyncSession]
         )
-        async with maker() as session, use_session(session):
-            instance = cls()
-            try:
-                await instance.run()
-            except Exception as exc:
-                typer.echo(
-                    f"arvel: seeder failed: {seeder_name} — {type(exc).__name__}: {exc}",
-                    err=True,
-                )
-                raise typer.Exit(code=1) from exc
-            await session.commit()
-
-        typer.echo(f"Seeded: {seeder_name}")
+        await _execute_seeder(cls, seeder_name, maker)
