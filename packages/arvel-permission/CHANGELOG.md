@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.4](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.6.3...arvel-permission-v0.6.4) (2026-06-08)
+
+
+### Bug Fixes
+
+* **permission:** match morph-alias discriminator in role/permission query helpers ([a7f718a](https://github.com/mohamed-rekiba/arvel/commit/a7f718af81bebfc1be23de0bf11b719d7931c739))
+
 ## [0.6.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.6.2...arvel-permission-v0.6.3) (2026-06-07)
 
 
