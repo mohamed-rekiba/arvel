@@ -90,25 +90,32 @@ class EventDispatcher:
             )
 
     async def _dispatch_queued(self, listener_cls: type[Listener[Any]], event: Event) -> None:
-        """Enqueue via Bus; fall back to inline if Bus is not bound."""
+        """Enqueue via Bus. Inline only when no queue is configured."""
+        from arvel.facades.bus import Bus  # lazy import to avoid circular dep
+
+        listener_ref = f"{listener_cls.__module__}.{listener_cls.__qualname__}"
+
+        if Bus.manager is None:
+            # No queue wired up (e.g. dev without a worker) — run inline so the
+            # listener still fires rather than vanishing.
+            logger.debug("shouldqueue_fallback_inline", listener=listener_ref)
+            await self._dispatch_inline(listener_cls, event)
+            return
+
+        # Queue is configured: enqueue and surface failures. Don't silently run
+        # inline — that blocks the publish loop and can double-run if the enqueue
+        # half-succeeded. Log and move on so one broker hiccup can't stall dispatch.
         from arvel.events.listener_job import ListenerJob
 
         try:
-            from arvel.facades.bus import Bus  # lazy import to avoid circular dep
-
-            if Bus.manager is not None:
-                job = ListenerJob.create(listener_cls=listener_cls, event=event)
-                await Bus.dispatch(job)
-                return
+            job = ListenerJob.create(listener_cls=listener_cls, event=event)
+            await Bus.dispatch(job)
         except Exception:
-            # Logged upstream; a Bus failure must not break the publish loop.
-            pass  # nosec B110
-
-        logger.debug(
-            "shouldqueue_fallback_inline",
-            listener=f"{listener_cls.__module__}.{listener_cls.__qualname__}",
-        )
-        await self._dispatch_inline(listener_cls, event)
+            logger.exception(
+                "queued_listener_enqueue_failed",
+                listener=listener_ref,
+                event_type=type(event).__name__,
+            )
 
 
 __all__ = ["EventDispatcher"]

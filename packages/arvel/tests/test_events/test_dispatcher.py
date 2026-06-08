@@ -118,3 +118,63 @@ class TestEventDispatcher:
         # Bus is not bound — should execute inline, not raise
         await dispatcher.dispatch(_OrderEvent(order_id=7))
         assert seen == [7]
+
+    @pytest.mark.asyncio
+    async def test_queued_listener_enqueues_and_does_not_run_inline(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When a queue is configured, the listener is enqueued, not run inline."""
+        from arvel.events.listener_job import ListenerJob
+        from arvel.facades.bus import Bus
+
+        dispatcher = EventDispatcher()
+        ran_inline: list[int] = []
+        dispatched: list[ListenerJob] = []
+
+        class QueuedListener(Listener[_OrderEvent], ShouldQueue):
+            async def handle(self, event: _OrderEvent) -> None:
+                ran_inline.append(event.order_id)
+
+        async def fake_dispatch(job: ListenerJob) -> None:
+            dispatched.append(job)
+
+        monkeypatch.setattr(Bus, "manager", object())
+        monkeypatch.setattr(Bus, "dispatch", staticmethod(fake_dispatch))
+
+        dispatcher.listen(_OrderEvent, QueuedListener)
+        await dispatcher.dispatch(_OrderEvent(order_id=8))
+
+        assert ran_inline == []
+        assert len(dispatched) == 1
+        assert dispatched[0].listener_class_key.endswith("QueuedListener")
+
+    @pytest.mark.asyncio
+    async def test_enqueue_failure_is_logged_not_swallowed_or_inline(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A broker failure logs and is swallowed at the loop level — never run inline."""
+        from arvel.facades.bus import Bus
+        from arvel.queue.job import Job
+        from arvel.testing.observability import FakeObservability
+
+        dispatcher = EventDispatcher()
+        ran_inline: list[int] = []
+
+        class QueuedListener(Listener[_OrderEvent], ShouldQueue):
+            async def handle(self, event: _OrderEvent) -> None:
+                ran_inline.append(event.order_id)
+
+        async def boom(job: Job) -> None:
+            raise RuntimeError("broker down")
+
+        monkeypatch.setattr(Bus, "manager", object())
+        monkeypatch.setattr(Bus, "dispatch", staticmethod(boom))
+
+        dispatcher.listen(_OrderEvent, QueuedListener)
+        with FakeObservability() as obs:
+            # The publish loop must not raise even though the enqueue failed.
+            await dispatcher.dispatch(_OrderEvent(order_id=9))
+
+        assert ran_inline == []
+        failures = [r for r in obs.log_records if r.body == "queued_listener_enqueue_failed"]
+        assert len(failures) == 1

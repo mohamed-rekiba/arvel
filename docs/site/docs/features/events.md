@@ -88,7 +88,7 @@ class SendShipmentNotification(Listener[OrderShipped], ShouldQueue):
 ```
 
 > [!NOTE]
-> If the queue (`Bus`) isn't bound, queued listeners fall back to running inline so events still fire in development.
+> If no queue is configured (`Bus` isn't bound), queued listeners run inline so events still fire in development. Once a queue *is* configured, the listener is always enqueued — a broker failure is logged (`queued_listener_enqueue_failed`), not silently run inline, so one hiccup can't double-run a listener or stall the publish loop.
 
 <a name="events-and-broadcasting"></a>
 ## Events & Broadcasting

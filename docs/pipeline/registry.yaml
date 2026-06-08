@@ -570,3 +570,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 38 (queue) — database driver now reserves-then-acks: pop sets reserved_at, the worker deletes on completion, and a reserved job redelivers after retry_after (visibility timeout). Spec: docs/pipeline/specs/WI-arvel-038-queue-visibility-timeout.md"
+  - id: "WI-arvel-039"
+    name: "Event dispatcher swallows queued-listener enqueue failures and runs them inline"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-09T00:05:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 39 (events) — closes WI-009's deferred Bus-error log-swallow: _dispatch_queued now logs queued_listener_enqueue_failed on a broker failure instead of swallowing + running inline; inline only when no queue is configured. Spec: docs/pipeline/specs/WI-arvel-039-queued-listener-enqueue-failure.md"

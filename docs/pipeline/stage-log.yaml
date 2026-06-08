@@ -1504,3 +1504,28 @@ events:
       ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; full queue suite
       233 passed (incl. postgres/mysql integration + 2 new reserve/redeliver cases).
     timestamp: "2026-06-08T23:54:00Z"
+  - work_item: "WI-arvel-039"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Events dispatcher audit. Inline dispatch (DI + catch/continue), broadcast routing, and ListenerJob allowlist
+      deserialization (ListenerRegistry/EventRegistry, A08-safe) reviewed sound. Defect (WI-009 deferred): _dispatch_queued
+      wrapped Bus lookup + create + dispatch in one try/except: pass then ran the listener inline, so a configured-but-down
+      broker swallowed the failure (no log) and ran a ShouldQueue listener synchronously in the publish path (blocking +
+      double-run risk). Split: Bus.manager is None -> log + inline (dev fallback, unchanged); queue configured -> enqueue,
+      on failure logger.exception(queued_listener_enqueue_failed) and return (never inline). Catch stays per-listener.
+    artifacts:
+      - "packages/arvel/src/arvel/events/dispatcher.py"
+      - "packages/arvel/tests/test_events/test_dispatcher.py"
+      - "docs/site/docs/features/events.md"
+    timestamp: "2026-06-09T00:12:00Z"
+  - work_item: "WI-arvel-039"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; events suite
+      32 passed (30 existing + 2 new enqueue/inline cases).
+    timestamp: "2026-06-09T00:14:00Z"
