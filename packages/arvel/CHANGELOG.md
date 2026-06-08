@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.21.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.20.0...arvel-v0.21.0) (2026-06-08)
+
+
+### Features
+
+* **orm:** complete QueryMixin parity and use model query shortcuts ([ea77780](https://github.com/mohamed-rekiba/arvel/commit/ea777802adf5fbf46b4b433df4548e2e5ab439fb))
+* **validation:** add bail, conditional presence, date rules, custom rules, Rule builders ([faf5391](https://github.com/mohamed-rekiba/arvel/commit/faf53918d3232ea9705215f020880273371b7bf5))
+
+
+### Bug Fixes
+
+* **auth:** return 403 for an unverified logged-in user, not 401 ([5122890](https://github.com/mohamed-rekiba/arvel/commit/5122890ac7dd224d3e6254e37afc5d41031e7a3b))
+* **auth:** run policy before() filters in the Gate ([84d2412](https://github.com/mohamed-rekiba/arvel/commit/84d241243e80064ad1729636a6d7d63456e9b688))
+* **cache:** anchor RateLimiter window to the first hit, not the last ([ae1851e](https://github.com/mohamed-rekiba/arvel/commit/ae1851ecd47bf756842def62a5dab6f1e9ebb670))
+* **console:** annotate venv re-exec nosec suppressions with rationale ([8b18cef](https://github.com/mohamed-rekiba/arvel/commit/8b18cefe164bbbb303fcfd225fad803eefa120ea))
+* **events:** log queued-listener enqueue failures instead of running inline ([10a91e7](https://github.com/mohamed-rekiba/arvel/commit/10a91e79e023c794a01bd113741c2d3888929809))
+* **http:** map malformed pagination cursor to 400, not 500 ([88713ac](https://github.com/mohamed-rekiba/arvel/commit/88713ace16e032dbc74625f17ec238795c06ccab))
+* **http:** run after-commit callbacks after the session is unbound ([ddea10e](https://github.com/mohamed-rekiba/arvel/commit/ddea10e8eb9e914ba5b5a2f4ff9736ca8b4f2aa2))
+* **logging:** redact secrets nested in dicts/lists, not just top-level keys ([e9aaef7](https://github.com/mohamed-rekiba/arvel/commit/e9aaef7dbf38cb86b9ee69d68b5e6056a9990682))
+* **migrations:** pre-flight DB check in migrate:fresh/refresh ([b2f142d](https://github.com/mohamed-rekiba/arvel/commit/b2f142d2198ea82d54a095deefb7fde55eccdfee))
+* **queue:** reserve-then-ack so a worker crash redelivers the job ([49d2d2b](https://github.com/mohamed-rekiba/arvel/commit/49d2d2ba2d646db141721e3ae5ccffc3f4f0d8d7))
+* **routing:** hide __hidden__ on models nested in raw returns ([3362544](https://github.com/mohamed-rekiba/arvel/commit/33625447dcf323c9805ecc8268c4552a82ee0a05))
+
 ## [0.20.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.6...arvel-v0.20.0) (2026-06-08)
 
 
