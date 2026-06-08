@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import cast
 
 import httpx2 as httpx
@@ -80,9 +81,8 @@ class TestStartSessionMiddleware:
         assert old_id == guest_id
         assert old_id != new_id
         # Old record is gone; only the authenticated session remains.
-        assert old_id not in store._store
-        assert new_id in store._store
-        assert store._store[new_id][0].get("_auth_id") == "u1"
+        assert asyncio.run(store.read(old_id)) == {}
+        assert asyncio.run(store.read(new_id)).get("_auth_id") == "u1"
 
     def test_accessing_session_without_middleware_raises(self) -> None:
         """Accessing request.state.session without StartSession gives a clear error."""

@@ -133,6 +133,55 @@ class TestOnOneServer:
 
         assert len(winners) == 1
 
+    @pytest.mark.asyncio
+    async def test_lock_rotates_per_minute(self, cache_manager: CacheManager) -> None:
+        """The election key carries the due minute, so a long TTL never blocks
+        the next execution. With a static key this ran once and then went dark."""
+        from datetime import timedelta
+
+        from arvel.scheduling import Schedule, SchedulerKernel
+
+        runs: list[int] = []
+
+        async def task() -> None:
+            runs.append(1)
+
+        sched = Schedule()
+        # TTL deliberately longer than the run interval — the danger case.
+        sched.call(task).everyMinute().onOneServer(ttl_seconds=120).name("rotating")
+        kernel = SchedulerKernel(schedule=sched, cache_manager=cache_manager)
+
+        start = datetime(2026, 5, 19, 14, 30, 0, tzinfo=UTC)
+        for minute in range(3):
+            await kernel.run_due_tasks(start + timedelta(minutes=minute))
+
+        assert len(runs) == 3
+
+    @pytest.mark.asyncio
+    async def test_two_servers_same_minute_still_elect_one_winner(
+        self, cache_manager: CacheManager
+    ) -> None:
+        """Per-minute key still dedupes servers that tick within the same minute."""
+        import asyncio
+
+        from arvel.scheduling import Schedule, SchedulerKernel
+
+        winners: list[str] = []
+
+        async def task() -> None:
+            winners.append("won")
+
+        async def make_kernel() -> SchedulerKernel:
+            sched = Schedule()
+            sched.call(task).everyMinute().onOneServer(ttl_seconds=30).name("shared")
+            return SchedulerKernel(schedule=sched, cache_manager=cache_manager)
+
+        k1, k2 = await make_kernel(), await make_kernel()
+        now = datetime(2026, 5, 19, 14, 30, 0, tzinfo=UTC)
+        await asyncio.gather(k1.run_due_tasks(now), k2.run_due_tasks(now))
+
+        assert len(winners) == 1
+
 
 class TestFailureHandling:
     """task exception is caught and logged."""
