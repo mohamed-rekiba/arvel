@@ -739,3 +739,40 @@ events:
       service-container.md states amake resolves async bindings at any depth and sync make still
       rejects them. AsyncSession scope + alias()/extend() deferred.
     timestamp: "2026-06-08T14:05:00Z"
+  - work_item: "WI-arvel-018"
+    stage: "research"
+    event: "enter"
+    result: "pass"
+    note: >-
+      Module 18 (config). C1 confirmed via repro: lookup() tried attribute access before dict
+      subscript, so a missing dict key named like a dict builtin (get/items/keys/values/pop/...)
+      resolved to the bound method instead of missing — breaking config(key, default) and Laravel
+      array-is-key-lookup parity. Secret redaction, to_jsonable, source precedence verified correct.
+    artifacts:
+      - ".context/research/018-config.md"
+      - "docs/pipeline/specs/WI-arvel-018-config-dict-key-shadowing.md"
+    timestamp: "2026-06-08T14:10:00Z"
+  - work_item: "WI-arvel-018"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      _lookup_registry.lookup(): traversal now branches on cursor type — dict segments are key-only
+      (raise ConfigKeyError on miss, never fall through to attributes); modules/namespaces/objects
+      use attribute access unchanged. New tests/config/test_wi_018_dict_key_shadowing.py (25 cases:
+      11 dict builtins x config+lookup, plus real-key, default, and namespace-attr paths). No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/config/_lookup_registry.py"
+      - "packages/arvel/tests/config/test_wi_018_dict_key_shadowing.py"
+      - "docs/site/docs/core-concepts/configuration.md"
+    timestamp: "2026-06-08T14:18:00Z"
+  - work_item: "WI-arvel-018"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Config + console suites 786 passed; full arvel suite 4364 passed, 0 failures; mypy --strict
+      clean, pyright 0 errors, ruff check + ruff format clean. configuration.md states dict segments
+      are key-only. URL-embedded-credential redaction and config() array-set form deferred.
+    timestamp: "2026-06-08T14:22:00Z"

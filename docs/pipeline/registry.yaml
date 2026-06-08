@@ -255,3 +255,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 17 (container/DI) hardening WI. Spec: docs/pipeline/specs/WI-arvel-017-async-deep-resolution.md"
+  - id: "WI-arvel-018"
+    name: "Config dotted lookups into dicts must be key-only (no dict-method shadowing of missing keys)"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T14:10:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 18 (config) hardening WI. Spec: docs/pipeline/specs/WI-arvel-018-config-dict-key-shadowing.md"

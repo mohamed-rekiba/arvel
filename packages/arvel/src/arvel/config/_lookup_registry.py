@@ -89,13 +89,20 @@ def lookup(key: str) -> Any:
     cursor: Any = module
     walked = [stem]
     for segment in rest:
-        # Try attribute access first (module/object), fall back to dict subscript.
-        if hasattr(cursor, segment) and not (  # pyright: ignore[reportUnknownArgumentType]
-            isinstance(cursor, dict) and segment in cursor
-        ):
+        # Dicts are config data, not objects: look the segment up as a key only.
+        # Never fall through to attribute access — otherwise a missing key named
+        # like a dict builtin (get/items/keys/values/pop/...) would silently
+        # resolve to the bound method instead of honoring the default.
+        if isinstance(cursor, dict):
+            if segment in cursor:
+                cursor = cursor[segment]  # pyright: ignore[reportUnknownVariableType]
+            else:
+                walked_path = ".".join(walked)
+                raise ConfigKeyError(
+                    f"Cannot resolve {key!r}: no key {segment!r} on {walked_path}",
+                )
+        elif hasattr(cursor, segment):  # pyright: ignore[reportUnknownArgumentType]
             cursor = getattr(cursor, segment)  # pyright: ignore[reportUnknownArgumentType]
-        elif isinstance(cursor, dict) and segment in cursor:
-            cursor = cursor[segment]  # pyright: ignore[reportUnknownVariableType]
         else:
             walked_path = ".".join(walked)
             raise ConfigKeyError(
