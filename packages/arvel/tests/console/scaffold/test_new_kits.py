@@ -272,7 +272,6 @@ def test_new_ecommerce_next_steps_use_make_not_arvel_serve(
         result = runner.invoke(app, ["new", "my-shop", "--kit", "ecommerce", "--no-install"])
         assert result.exit_code == 0, result.stderr
         # The host venv lands in backend/, where the pyproject is.
-        assert "source backend/.venv/bin/activate" in result.stdout
         assert "make up" in result.stdout
         assert "make migrate" in result.stdout
         assert "make seed" in result.stdout

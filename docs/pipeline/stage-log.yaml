@@ -1120,3 +1120,43 @@ events:
       ruff check + ruff format clean. oauth.md documents the linker email-verification contract and
       Microsoft's conservative default.
     timestamp: "2026-06-08T18:50:00Z"
+  - work_item: "WI-arvel-028"
+    stage: "qa-post"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 28 (arvel-permission). C1 confirmed via repro: MorphToMany writes the pivot model_type as
+      get_morph_alias(owner) (override -> morph_map alias -> short class name), but the four class helpers
+      query_with/without_role and query_with/without_permission filtered model_type == cls.__name__. Under
+      a registered morph_map/__morph_class__ the tokens diverge: query_with_* returned [] and query_without_*
+      returned everyone (incl. actual holders, ~pk.in_(empty) excludes nobody) — A01-adjacent for bulk admin
+      tooling. Repro: morph_map({"m_quser": _MQUser}) -> stored 'm_quser', has_role True, query_with_role [].
+      Instance checks (has_role/has_permission_to) use the accessor and were always correct. Swept arvel-audit
+      (redaction applied on every create/update/delete path) and arvel-image (filename sanitization,
+      content-based MIME, decompression-bomb ceiling) — clean.
+    timestamp: "2026-06-08T19:00:00Z"
+  - work_item: "WI-arvel-028"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Replaced cls.__name__ with get_morph_alias(cls) in all four query helpers (matches the pivot writer).
+      Default no-morph-map case unchanged (alias falls back to short class name). Added
+      test_052_query_morph_alias.py covering query_with/without_role and query_with/without_permission under a
+      registered morph map. arvel-permission suite 77 passed.
+    artifacts:
+      - "packages/arvel-permission/src/arvel_permission/traits.py"
+      - "packages/arvel-permission/tests/test_052_query_morph_alias.py"
+      - "docs/site/docs/packages/permission.md"
+    timestamp: "2026-06-08T19:06:00Z"
+  - work_item: "WI-arvel-028"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      arvel-permission suite 77 passed (2 new); mypy (-p arvel_permission, 12 files) clean, uv run pyright 0
+      errors, ruff check + ruff format clean. permission.md documents the query helpers and that they honor
+      morph_map/__morph_class__.
+    timestamp: "2026-06-08T19:10:00Z"
