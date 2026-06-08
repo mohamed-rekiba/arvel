@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.19.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.2...arvel-v0.19.3) (2026-06-08)
+
+
+### Bug Fixes
+
+* **support:** serialize datetime/Decimal/UUID/bytes in Collection.to_json ([bbb83be](https://github.com/mohamed-rekiba/arvel/commit/bbb83bec50752de676c8049237df733fac98c37f))
+
+
+### Refactors
+
+* **console:** promote exec_into and type test fakes for pyright ([c5db702](https://github.com/mohamed-rekiba/arvel/commit/c5db702c6c53432df9504423949447d08fc6138e))
+
 ## [0.19.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.1...arvel-v0.19.2) (2026-06-08)
 
 
