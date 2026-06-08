@@ -13,6 +13,14 @@ from argon2.exceptions import VerifyMismatchError
 
 _DEFAULT_HASHER = PasswordHasher()
 
+# bcrypt hashes are self-identifying: $2a$/$2b$/$2y$. argon2 hashes start with $argon2.
+_BCRYPT_PREFIXES = ("$2a$", "$2b$", "$2y$")
+_BCRYPT_DEFAULT_ROUNDS = 12
+
+
+def _is_bcrypt(hashed: str) -> bool:
+    return hashed.startswith(_BCRYPT_PREFIXES)
+
 
 class Hash:
     """Facade for password hashing operations."""
@@ -30,6 +38,12 @@ class Hash:
 
     @classmethod
     def check(cls, password: str, hashed: str) -> bool:
+        # Empty hash never matches (Laravel parity). Dispatch on the hash's own
+        # prefix so a bcrypt hash verifies with bcrypt, not argon2.
+        if not hashed:
+            return False
+        if _is_bcrypt(hashed):
+            return cls._check_bcrypt(password, hashed)
         try:
             return _DEFAULT_HASHER.verify(hashed, password)
         except VerifyMismatchError:
@@ -39,23 +53,43 @@ class Hash:
 
     @classmethod
     def needs_rehash(cls, hashed: str) -> bool:
+        # Default algorithm is argon2id, so any bcrypt hash wants an upgrade
+        # (Laravel's password_needs_rehash flags an algorithm mismatch too).
+        if _is_bcrypt(hashed):
+            return True
         return _DEFAULT_HASHER.check_needs_rehash(hashed)
 
     @classmethod
-    def make_bcrypt(cls, password: str, rounds: int = 12) -> str:
+    def make_bcrypt(cls, password: str, rounds: int = _BCRYPT_DEFAULT_ROUNDS) -> str:
+        _bcrypt = cls._load_bcrypt()
+        hashed: bytes = _bcrypt.hashpw(password.encode(), _bcrypt.gensalt(rounds=rounds))
+        return hashed.decode()
+
+    @staticmethod
+    def _load_bcrypt() -> Any:
         try:
-            _bcrypt_lib = importlib.import_module("bcrypt")
+            return importlib.import_module("bcrypt")
         except ImportError as exc:
             msg = (
                 "bcrypt hashing requires the 'bcrypt' extra. "
                 "Install it with: pip install 'arvel[bcrypt]'"
             )
             raise ImportError(msg) from exc
-        _bcrypt: Any = _bcrypt_lib
-        hashed: bytes = _bcrypt.hashpw(password.encode(), _bcrypt.gensalt(rounds=rounds))
-        return hashed.decode()
+
+    @classmethod
+    def _check_bcrypt(cls, password: str, hashed: str) -> bool:
+        # Can't verify a bcrypt hash without the extra — treat as a non-match,
+        # not a crash, so the auth path degrades gracefully.
+        try:
+            _bcrypt = cls._load_bcrypt()
+        except ImportError:
+            return False
+        try:
+            return bool(_bcrypt.checkpw(password.encode(), hashed.encode()))
+        except ValueError, TypeError:
+            return False
 
     @classmethod
     def checkpw(cls, password: str, hashed: str) -> bool:
-        """Timing-safe password check via argon2 verify."""
+        """Timing-safe password check; dispatches to argon2 or bcrypt by hash prefix."""
         return cls.check(password, hashed)

@@ -651,3 +651,46 @@ events:
       Docs encryption.md states DecryptionError covers malformed base64, unknown version, wrong key,
       and tampering. decrypt() JSON + from_app_key deferred.
     timestamp: "2026-06-08T12:55:00Z"
+  - work_item: "WI-arvel-016"
+    stage: "planning"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 16 (hashing) audit. C1 confirmed via repro: Hash.check/checkpw hardcoded argon2 verify,
+      so a bcrypt hash (Hash.make_bcrypt or an imported Laravel $2y$ column) raised InvalidHashError,
+      swallowed by the broad except → a correct password silently returned False (every bcrypt user
+      locked out; session guard + login both verify via Hash.check). C2 coupled: needs_rehash raised
+      InvalidHashError on a bcrypt hash. Laravel's Hash::check is algorithm-agnostic (password_verify
+      auto-detects) and needsRehash flags an algorithm mismatch. Spec: WI-arvel-016-hash-cross-algorithm.md.
+    artifacts:
+      - ".context/research/016-hashing.md"
+      - "docs/pipeline/specs/WI-arvel-016-hash-cross-algorithm.md"
+    timestamp: "2026-06-08T13:05:00Z"
+  - work_item: "WI-arvel-016"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      hash.py: check returns False for an empty hash, dispatches a bcrypt-prefixed hash
+      ($2a$/$2b$/$2y$) to bcrypt.checkpw and everything else to argon2 verify; missing bcrypt extra
+      degrades to a non-match (no crash). needs_rehash returns True for any bcrypt hash (argon2id is
+      the default, so login upgrades it) and defers argon2 hashes to check_needs_rehash. Extracted
+      _load_bcrypt() shared by make_bcrypt + _check_bcrypt. New tests/auth/test_wi_016_hash_cross_algorithm.py
+      (no bcrypt-check coverage existed). No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/facades/hash.py"
+      - "packages/arvel/tests/auth/test_wi_016_hash_cross_algorithm.py"
+      - "docs/site/docs/features/authentication.md"
+    timestamp: "2026-06-08T13:20:00Z"
+  - work_item: "WI-arvel-016"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Auth suite 178 passed (7 new hash cross-algorithm tests + 13 existing hash tests green); full
+      arvel suite green; mypy --strict (1046 files) + pyright (0 errors) + ruff check + ruff format
+      clean. Docs authentication.md notes Hash.check/needs_rehash are algorithm-aware and imported
+      Laravel $2y$ hashes verify and auto-upgrade. HashConfig wiring + make(**kwargs) deferred.
+    timestamp: "2026-06-08T13:25:00Z"
