@@ -43,8 +43,17 @@ class Gate:
         # policy lookup: if a policy is registered for the first argument's type
         if args and type(args[0]) in self._policies:
             policy = self._policies[type(args[0])]
-            if hasattr(policy, ability):
-                result = await self._invoke(getattr(policy, ability), user, *args)
+            # Policy-level before() runs first: True grants all, False denies all,
+            # None falls through to the ability method (Laravel policy filters).
+            before = getattr(policy, "before", None)
+            if callable(before):
+                pre = await self._invoke(before, user, ability)
+                if pre is not None:
+                    await self._run_after(user, ability, result=bool(pre))
+                    return bool(pre)
+            method = getattr(policy, ability, None)
+            if callable(method):
+                result = await self._invoke(method, user, *args)
                 await self._run_after(user, ability, result=bool(result))
                 return bool(result)
 

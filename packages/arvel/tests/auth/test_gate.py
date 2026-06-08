@@ -190,3 +190,84 @@ async def test_gate_policy_registration_routes_to_policy_method() -> None:
     user = _FakeUser("u1")
     assert await gate.allows("view", user, {"public": True}) is True
     assert await gate.allows("view", user, {"public": False}) is False
+
+
+# Policy before() filters — Laravel parity (True grants all, False denies all, None falls through)
+
+
+@pytest.mark.asyncio
+async def test_gate_policy_before_grants_all_for_admin() -> None:
+    from arvel.auth.gate import Gate
+    from arvel.auth.policy import Policy
+
+    class PostPolicy(Policy[dict[str, Any]]):
+        def before(self, user: Any, _ability: str) -> bool | None:
+            return True if user.role == "admin" else None
+
+        async def view(self, _user: Any, resource: dict[str, Any]) -> bool:
+            return resource.get("public", False) is True
+
+    gate = Gate()
+    gate.policy(dict, PostPolicy())
+
+    admin = _FakeUser("a1", role="admin")
+    # before() grants even when the view method would deny
+    assert await gate.allows("view", admin, {"public": False}) is True
+
+
+@pytest.mark.asyncio
+async def test_gate_policy_before_denies_all_for_banned() -> None:
+    from arvel.auth.gate import Gate
+    from arvel.auth.policy import Policy
+
+    class PostPolicy(Policy[dict[str, Any]]):
+        def before(self, user: Any, _ability: str) -> bool | None:
+            return False if user.role == "banned" else None
+
+        async def view(self, _user: Any, _resource: dict[str, Any]) -> bool:
+            return True
+
+    gate = Gate()
+    gate.policy(dict, PostPolicy())
+
+    banned = _FakeUser("b1", role="banned")
+    # before() denies even though view() would allow
+    assert await gate.allows("view", banned, {"public": True}) is False
+
+
+@pytest.mark.asyncio
+async def test_gate_policy_before_none_falls_through_to_method() -> None:
+    from arvel.auth.gate import Gate
+    from arvel.auth.policy import Policy
+
+    class PostPolicy(Policy[dict[str, Any]]):
+        def before(self, _user: Any, _ability: str) -> bool | None:
+            return None
+
+        async def view(self, _user: Any, resource: dict[str, Any]) -> bool:
+            return resource.get("public", False) is True
+
+    gate = Gate()
+    gate.policy(dict, PostPolicy())
+
+    user = _FakeUser("u1")
+    assert await gate.allows("view", user, {"public": True}) is True
+    assert await gate.allows("view", user, {"public": False}) is False
+
+
+@pytest.mark.asyncio
+async def test_policy_check_honours_before() -> None:
+    from arvel.auth.policy import Policy
+
+    class PostPolicy(Policy[dict[str, Any]]):
+        def before(self, user: Any, _ability: str) -> bool | None:
+            return True if user.role == "admin" else None
+
+        async def update(self, _user: Any, _resource: dict[str, Any]) -> bool:
+            return False
+
+    policy = PostPolicy()
+    admin = _FakeUser("a1", role="admin")
+    user = _FakeUser("u1", role="user")
+    assert await policy.check("update", admin, {"id": "p1"}) is True
+    assert await policy.check("update", user, {"id": "p1"}) is False

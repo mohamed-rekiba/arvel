@@ -17,6 +17,14 @@ class Policy(ABC, Generic[T]):
     """
 
     async def check(self, ability: str, user: Any, resource: T | None = None) -> bool:
+        # before() short-circuits: True grants all, False denies all, None falls through.
+        before = getattr(self, "before", None)
+        if callable(before):
+            pre = before(user, ability)
+            if inspect.isawaitable(pre):
+                pre = await pre
+            if pre is not None:
+                return bool(pre)
         method = getattr(self, ability, None)
         if method is None:
             return False

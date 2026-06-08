@@ -120,6 +120,24 @@ await gate.allows("update", user, post)   # routed to PostPolicy.update
 > [!NOTE]
 > There is no policy auto-discovery — register each policy explicitly. The ability name must exactly match the policy method name.
 
+<a name="policy-filters"></a>
+### Policy Filters
+
+Add a `before` method to authorize (or deny) every ability on a policy before its per-ability methods run. Return `True` to grant all, `False` to deny all, or `None` to fall through to the ability method — the same semantics as Laravel's policy filters. Most often used to let administrators do anything, or to lock out a banned user:
+
+```python
+class PostPolicy(Policy[Post]):
+    def before(self, user: Any, ability: str) -> bool | None:
+        if user.role == "admin":
+            return True
+        return None
+
+    async def update(self, user: Any, post: Post) -> bool:
+        return post.user_id == user.id
+```
+
+`before` runs after a gate-level `before` hook and before the matching ability method, on both `gate.allows(...)` and `Policy.check(...)`.
+
 <a name="enforcing-authorization-in-routes"></a>
 ## Enforcing Authorization in Routes
 
