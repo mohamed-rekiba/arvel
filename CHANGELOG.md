@@ -98,6 +98,11 @@ changelog once shipped.
   `redirect(to)`, `to_route(name, **params)`, `back(request)`, and
   `redirect(...).with_(request, key=value)` to flash into the session before
   redirecting. `http/responses.py` + `test_wi046_*`
+- Framework-level local file serving — `STORAGE_LOCAL_SERVE` registers a route at
+  `STORAGE_LOCAL_URL` that serves files from the local disk (Laravel `serve =>
+  true` parity), with path-traversal protection and signed/temporary-URL support.
+  Skipped when the disk URL is absolute (CDN) or serve is off.
+  `providers/storage_provider.py` + `test_serve_route`
 - Needs-based CLI bootstrap — each command declares its `requires` subsystems
   (`CliSubsystem`) and only those service providers boot; non-HTTP commands skip
   route loading and the registered-routes banner
@@ -117,7 +122,5 @@ changelog once shipped.
   `TrustProxies` request middleware (trusted-proxy IP resolution exists for
   observability/reverb but not on the app request path). Medium impact, **high
   risk — security path, own WI with gates.**
-- Framework-level local file serving (`STORAGE_LOCAL_SERVE`, Laravel
-  `serve => true` parity). Low-medium impact, small-medium effort.
 
 > The headline goal before `1.0` is a public-API review and stability pass.
