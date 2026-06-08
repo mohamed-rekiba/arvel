@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, Annotated, ClassVar
 
 import typer
 from sqlalchemy import inspect
 
 from arvel.console import Command, Context
+from arvel.console import _async as _arvel_async
 from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Argument as _Argument
 from arvel.console.commands.migrate import resolve_engine
@@ -30,14 +30,17 @@ class DbTableCommand(Command):
         def _callback(
             table: Annotated[str, _Argument(help="Table name")],
         ) -> None:
-            try:
-                exists = asyncio.run(cmd_self._show(table))
-            except Exception as exc:
-                typer.echo(f"arvel: {exc}", err=True)
-                raise typer.Exit(code=2) from exc
-            if not exists:
-                typer.echo(f"arvel: table '{table}' does not exist.", err=True)
-                raise typer.Exit(code=2)
+            async def _dispatch() -> None:
+                try:
+                    exists = await cmd_self._show(table)
+                except Exception as exc:
+                    typer.echo(f"arvel: {exc}", err=True)
+                    raise typer.Exit(code=2) from exc
+                if not exists:
+                    typer.echo(f"arvel: table '{table}' does not exist.", err=True)
+                    raise typer.Exit(code=2)
+
+            _arvel_async.schedule_async(_dispatch())
 
         app.command(name=self.name, help=self.help)(_callback)
 

@@ -302,9 +302,18 @@ async def async_main(project_root: Path, command: str | None) -> None:
             _deferred_exit = exc
 
         # Await any coroutine that a command deferred via schedule_async().
+        # Typer's main() has already returned, so a typer.Exit/Abort raised
+        # inside the deferred coroutine won't be turned into a process exit
+        # code — translate it here. Otherwise the command's honest failure code
+        # escapes as an uncaught RuntimeError (traceback + exit 1).
         coro = get_pending_task()
         if coro is not None:
-            await coro
+            try:
+                await coro
+            except typer.Exit as exc:
+                raise SystemExit(exc.exit_code) from exc
+            except typer.Abort as exc:
+                raise SystemExit(1) from exc
 
         if _deferred_exit is not None:
             raise _deferred_exit

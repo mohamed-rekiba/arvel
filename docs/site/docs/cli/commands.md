@@ -14,6 +14,9 @@ arvel <command> --help
 > [!NOTE]
 > Most commands need a project — they look for `bootstrap/app.py` in the current directory tree. The exceptions that run anywhere: `about`, `key:generate`, `new`, and any `make:*` command, plus `--help` / `--version`.
 
+> [!NOTE]
+> The CLI runs every command on **one** event loop that the entrypoint owns. In a custom command, don't call `asyncio.run()` inside your Typer callback — it nests on the running loop and crashes with "asyncio.run() cannot be called from a running event loop". Hand your coroutine to `arvel.console.schedule_async(...)` instead; the entrypoint awaits it on the same loop (and turns a `typer.Exit(code)` raised inside it into the process exit code). Commands that drive their own loop — `serve` (uvicorn), `shell` (IPython) — opt out with `owns_process = True`.
+
 ### Needs-based bootstrap
 
 Every command declares which **subsystems** it touches (`Command.requires`). The CLI computes the transitive closure of those subsystems and asks the user's `bootstrap/app.py::create_application(required_subsystems=...)` to boot only those providers. The four foundation subsystems — `CONFIG`, `LOG`, `LANG`, `CONTEXT` — are always loaded; everything else (`DATABASE`, `HTTP`, `QUEUE`, `MAIL`, `CACHE`, `STORAGE`, `BROADCAST`, `AUTH`, `EVENTS`, `SCHEDULER`, `USER_PROVIDERS`) only boots when something asks for it.

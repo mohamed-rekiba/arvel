@@ -28,6 +28,8 @@ from arvel.queue.restart import QueueRestartSignal
 from click.testing import CliRunner as ClickCliRunner
 from typer.testing import CliRunner
 
+from .conftest import invoke_async
+
 runner = CliRunner()
 
 
@@ -50,7 +52,7 @@ def test_queue_restart_writes_marker(tmp_path: Path, monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(QueueRestartSignal, "signal_restart", fake_signal, raising=False)
     app = _app(QueueRestartCommand())
     with cast("ClickCliRunner", runner).isolated_filesystem(temp_dir=tmp_path):
-        result = runner.invoke(app.typer_app, ["queue:restart"])
+        result = invoke_async(runner, app.typer_app, ["queue:restart"])
         assert result.exit_code == 0, result.output
         assert "timestamp" in written
 

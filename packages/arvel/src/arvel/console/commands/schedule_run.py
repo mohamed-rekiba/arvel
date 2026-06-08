@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime
 from typing import ClassVar
 
 import typer
 
 from arvel.console import Command, Context
+from arvel.console import _async as _arvel_async
 from arvel.console._subsystem import CliSubsystem
 from arvel.console.commands.schedule_commands import resolve_kernel
 
@@ -32,7 +32,7 @@ class ScheduleRunCommand(Command):
                     err=True,
                 )
                 raise typer.Exit(code=2) from exc
-            asyncio.run(kernel.run_due_tasks(datetime.now(UTC)))
+            _arvel_async.schedule_async(kernel.run_due_tasks(datetime.now(UTC)))
 
         app.command(name=self.name, help=self.help)(_callback)
 

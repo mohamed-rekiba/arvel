@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, ClassVar
 
 import typer
@@ -10,6 +9,7 @@ from sqlalchemy import MetaData, Table, delete, text
 from sqlalchemy import inspect as sa_inspect
 
 from arvel.console import Command, Context
+from arvel.console import _async as _arvel_async
 from arvel.console._subsystem import CliSubsystem
 from arvel.console.commands.migrate import resolve_engine
 
@@ -28,15 +28,18 @@ class AuthClearResetsCommand(Command):
         cmd_self = self
 
         def _callback() -> None:
-            try:
-                count = asyncio.run(cmd_self._run())
-            except _NoResetsTableError as exc:
-                typer.echo(f"arvel: {exc}", err=True)
-                raise typer.Exit(code=2) from exc
-            except Exception as exc:
-                typer.echo(f"arvel: {exc}", err=True)
-                raise typer.Exit(code=2) from exc
-            typer.echo(f"Deleted {count} expired reset token(s).")
+            async def _dispatch() -> None:
+                try:
+                    count = await cmd_self._run()
+                except _NoResetsTableError as exc:
+                    typer.echo(f"arvel: {exc}", err=True)
+                    raise typer.Exit(code=2) from exc
+                except Exception as exc:
+                    typer.echo(f"arvel: {exc}", err=True)
+                    raise typer.Exit(code=2) from exc
+                typer.echo(f"Deleted {count} expired reset token(s).")
+
+            _arvel_async.schedule_async(_dispatch())
 
         app.command(name=self.name, help=self.help)(_callback)
 

@@ -554,3 +554,56 @@ events:
       mypy --strict (1042 files) + pyright (0 errors) + ruff clean. Docs scheduling.md explains the
       per-minute election scope and shared-cache requirement. Builder sugar + tick-drift deferred.
     timestamp: "2026-06-08T12:10:00Z"
+  - work_item: "WI-arvel-014"
+    stage: "planning"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 14 (console/CLI) audit. C1 confirmed systemic: 9 command callbacks (cache:clear,
+      cache:forget, schedule:run, db:show, db:table, queue:clear, queue:prune-failed, queue:restart,
+      auth:clear-resets) call asyncio.run inside the Typer callback, nesting on the entrypoint's live
+      asyncio.run(async_main()) loop -> RuntimeError in-project (reproduced for cache:clear/forget/
+      schedule:run in the kit). Coupled: async_main dropped a deferred coro's typer.Exit/Abort, so an
+      honest failure escaped as a traceback. cache:clear/forget/queue:restart also missed requires=CACHE.
+      Application.run()->handle() bypass deferred (separate WI). Spec: WI-arvel-014-cli-single-event-loop.md.
+    artifacts:
+      - ".context/research/014-console.md"
+      - "docs/pipeline/specs/WI-arvel-014-cli-single-event-loop.md"
+    timestamp: "2026-06-08T12:15:00Z"
+  - work_item: "WI-arvel-014"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      9 command callbacks converted asyncio.run(coro) -> schedule_async(coro), moving post-processing
+      and the typer.Exit raise into an inner async fn. entrypoint.async_main now maps a deferred
+      typer.Exit -> SystemExit(code) and typer.Abort -> SystemExit(1). requires=CACHE added to
+      cache:clear, cache:forget, queue:restart. Folded-in: fixed a Python-2 "except A, B:" SyntaxError
+      in tests/console/conftest.py (console suite was uncollectable from HEAD); switched cache/
+      introspection/queue tests that assert deferred behavior to the invoke_async helper. No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/console/commands/cache_commands.py"
+      - "packages/arvel/src/arvel/console/commands/schedule_run.py"
+      - "packages/arvel/src/arvel/console/commands/db_show.py"
+      - "packages/arvel/src/arvel/console/commands/db_table.py"
+      - "packages/arvel/src/arvel/console/commands/queue_clear.py"
+      - "packages/arvel/src/arvel/console/commands/queue_prune_failed.py"
+      - "packages/arvel/src/arvel/console/commands/queue_restart.py"
+      - "packages/arvel/src/arvel/console/commands/auth_clear_resets.py"
+      - "packages/arvel/src/arvel/console/entrypoint.py"
+      - "packages/arvel/tests/console/test_wi_014_cli_async_loop.py"
+      - "packages/arvel/tests/console/conftest.py"
+    timestamp: "2026-06-08T12:30:00Z"
+  - work_item: "WI-arvel-014"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Console suite = 721 passed; full arvel suite green (2 pre-existing cwd/DB-dependent skeleton
+      failures confirmed failing on clean HEAD, unrelated to console); mypy --strict (1043 files) +
+      pyright (0 errors, repo root) + ruff check + ruff format clean. Docs cli/commands.md notes the
+      single-event-loop contract for command authors. Application.run()->handle() bypass + stale
+      artisan.md pointer deferred.
+    timestamp: "2026-06-08T12:35:00Z"
