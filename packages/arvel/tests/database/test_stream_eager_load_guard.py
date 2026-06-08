@@ -133,9 +133,7 @@ async def test_stream_rejects_selectin_relationship(
     _assert_remediation_hints(exc.value)
 
 
-async def test_stream_rejects_tree_eager_load(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_stream_rejects_tree_eager_load(engine: AsyncEngine, session: AsyncSession) -> None:
     # _tree_eager bucket: recursive eager load registered via with_tree().
     await _setup(engine)
     await SgNode.create(name="root", parent_id=None)
@@ -224,9 +222,7 @@ async def test_as_tree_honors_eager_load_like_all(
     assert _cached_tag_labels(by_name["a"]) == ["t-a"]
 
 
-async def test_as_tree_eager_state_matches_all(
-    engine: AsyncEngine, session: AsyncSession
-) -> None:
+async def test_as_tree_eager_state_matches_all(engine: AsyncEngine, session: AsyncSession) -> None:
     """as_tree() and all() must leave identical per-node eager-cache state."""
     await _setup(engine)
     root = await SgNode.create(name="root", parent_id=None)
