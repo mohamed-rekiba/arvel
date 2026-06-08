@@ -57,8 +57,18 @@ def _venv_has_arvel_package(venv_python: Path) -> bool:
 
 
 def _already_inside(venv_python: Path) -> bool:
+    """True when the running interpreter already belongs to this project's venv.
+
+    Compares ``sys.prefix`` (the active environment root) to the project's
+    ``.venv`` — NOT the interpreter binary. uv venvs symlink a single shared base
+    CPython, so a globally-installed ``arvel`` and the project's ``.venv/bin/python``
+    both resolve to the *same* ``python3`` file. An executable-path check would
+    then wrongly report "already inside" and skip the re-exec, leaving commands
+    running against the global site-packages instead of the project's deps.
+    """
+    venv_dir = venv_python.parent.parent
     try:
-        return Path(sys.executable).resolve() == venv_python.resolve()
+        return Path(sys.prefix).resolve() == venv_dir.resolve()
     except OSError:
         return False
 

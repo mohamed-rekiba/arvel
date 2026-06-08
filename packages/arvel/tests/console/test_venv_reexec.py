@@ -119,13 +119,32 @@ class TestReexecSkips:
     def test_already_inside_venv(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = _make_project(tmp_path)
         monkeypatch.chdir(root)
-        venv_python = str(root / ".venv" / "bin" / "python")
-        monkeypatch.setattr(_venv.sys, "executable", venv_python)
+        # sys.prefix points at the project venv → we're already inside it.
+        monkeypatch.setattr(_venv.sys, "prefix", str(root / ".venv"))
 
         with patch.object(_venv.os, "execve") as execve:
             maybe_reexec_into_project_venv(["arvel", "migrate"])
 
         execve.assert_not_called()
+
+    def test_reexecs_when_uv_shares_base_interpreter(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """uv symlinks one base CPython, so the global tool and the project .venv
+        resolve to the same python3. The re-exec must still fire — keyed on
+        sys.prefix, not the interpreter path."""
+        root = _make_project(tmp_path)
+        monkeypatch.chdir(root)
+        # Both interpreters point at the same shared base, but the active prefix
+        # is the global tool's, not the project venv.
+        shared = root / ".venv" / "bin" / "python"
+        monkeypatch.setattr(_venv.sys, "executable", str(shared))
+        monkeypatch.setattr(_venv.sys, "prefix", str(tmp_path / "global-tool"))
+
+        with patch.object(_venv.os, "execve") as execve:
+            maybe_reexec_into_project_venv(["arvel", "shell"])
+
+        execve.assert_called_once()
 
     def test_no_venv_present(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         (tmp_path / "bootstrap").mkdir()

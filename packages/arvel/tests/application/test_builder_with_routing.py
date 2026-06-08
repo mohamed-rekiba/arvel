@@ -161,6 +161,73 @@ def test_with_routing_loads_web_routes_at_boot(tmp_path: Path) -> None:
     assert "/hello" in routes_on_app
 
 
+def test_routing_skipped_when_http_subsystem_filtered_out(tmp_path: Path) -> None:
+    """A subsystem-filtered boot that excludes HTTP must not load routing files.
+
+    The shell/queue/scheduler never serve requests; loading routes just drags in
+    every controller and dumps the table at DEBUG. Regression guard for the shell
+    logging route.registered for routes it never serves.
+    """
+    pytest.importorskip("fastapi")
+    from arvel import HttpServiceProvider
+    from arvel.console._subsystem import CliSubsystem
+    from arvel.routing import Router
+
+    Router.reset_singleton()
+    routes = tmp_path / "routes"
+    routes.mkdir()
+    (routes / "web.py").write_text(
+        "from arvel import Route\n"
+        "\n"
+        "@Route.get('/hello', name='web.hello')\n"
+        "async def hello() -> dict[str, str]:\n"
+        "    return {'msg': 'hi'}\n",
+    )
+
+    app = (
+        Application.configure(tmp_path)
+        .with_environment("testing")
+        .with_providers([HttpServiceProvider])
+        .with_routing(web=routes / "web.py")
+        .with_required_subsystems(frozenset({CliSubsystem.DATABASE}))
+        .create()
+    )
+
+    assert app._http_active() is False  # pyright: ignore[reportPrivateUsage]
+    assert Router.singleton().routes() == []
+
+
+def test_routing_loaded_when_http_subsystem_required(tmp_path: Path) -> None:
+    """The same filtered boot WITH HTTP in the set loads routes as normal."""
+    pytest.importorskip("fastapi")
+    from arvel import HttpServiceProvider
+    from arvel.console._subsystem import CliSubsystem
+    from arvel.routing import Router
+
+    Router.reset_singleton()
+    routes = tmp_path / "routes"
+    routes.mkdir()
+    (routes / "web.py").write_text(
+        "from arvel import Route\n"
+        "\n"
+        "@Route.get('/hello', name='web.hello')\n"
+        "async def hello() -> dict[str, str]:\n"
+        "    return {'msg': 'hi'}\n",
+    )
+
+    app = (
+        Application.configure(tmp_path)
+        .with_environment("testing")
+        .with_providers([HttpServiceProvider])
+        .with_routing(web=routes / "web.py")
+        .with_required_subsystems(frozenset({CliSubsystem.HTTP}))
+        .create()
+    )
+
+    assert app._http_active() is True  # pyright: ignore[reportPrivateUsage]
+    assert [r.path for r in Router.singleton().routes()] == ["/hello"]
+
+
 def test_with_routing_missing_path_raises_at_create(tmp_path: Path) -> None:
     """A registered routing path that doesn't exist on disk raises at .create()."""
     missing = tmp_path / "routes" / "web.py"  # parent doesn't exist
