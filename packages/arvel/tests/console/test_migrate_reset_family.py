@@ -220,6 +220,40 @@ def test_destructive_command_refuses_in_production(
 
 
 @pytest.mark.parametrize(
+    ("command_cls", "module"),
+    [
+        (MigrateFreshCommand, "arvel.console.commands.migrate_fresh"),
+        (MigrateRefreshCommand, "arvel.console.commands.migrate_refresh"),
+    ],
+)
+def test_destructive_command_exits_2_when_database_unavailable(
+    command_cls: type[Command],
+    module: str,
+    project: Path,
+    engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from arvel.config._lookup_registry import register
+    from arvel.database.health import DatabaseUnavailableError
+
+    # Non-production so the destructive guard doesn't short-circuit before the DB check.
+    register("app", SimpleNamespace(env="testing", is_production=False))
+
+    async def _down(_engine: object) -> None:
+        raise DatabaseUnavailableError("cannot connect to the database: refused")
+
+    monkeypatch.setattr(f"{module}.check_database_connection", _down)
+    monkeypatch.delenv("ARVEL_ALLOW_DESTRUCTIVE", raising=False)
+    monkeypatch.chdir(project)
+    app = _make_app_with_engine(project, engine, command_cls())
+    result = invoke_async(runner, app.typer_app, [command_cls.name])
+    assert result.exit_code == 2, result.stdout + result.stderr
+    assert "database is not available" in (result.stdout + result.stderr).lower()
+
+
+@pytest.mark.parametrize(
     "command_cls",
     [MigrateFreshCommand, MigrateRefreshCommand],
 )

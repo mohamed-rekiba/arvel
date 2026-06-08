@@ -540,3 +540,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 36 (auth) — Gate/Policy now run policy before() filters (True grants all / False denies all / None falls through). Spec: docs/pipeline/specs/WI-arvel-036-policy-before-filter.md"
+  - id: "WI-arvel-037"
+    name: "migrate:fresh / migrate:refresh leak a raw traceback when the DB is down"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T23:30:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 37 (migrations) — Migrator core audited sound; fixed destructive commands to pre-flight the DB connection and exit 2 like migrate. Spec: docs/pipeline/specs/WI-arvel-037-migrate-fresh-db-availability.md"
