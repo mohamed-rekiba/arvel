@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.19.5](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.4...arvel-v0.19.5) (2026-06-08)
+
+
+### Bug Fixes
+
+* **auth:** align password_resets storage name across migration, model, and CLI ([baf613b](https://github.com/mohamed-rekiba/arvel/commit/baf613bf8a0fbe95b1a707f83e0963e556513848))
+* **cli:** re-exec into project venv and silence shell route logs ([8c197e6](https://github.com/mohamed-rekiba/arvel/commit/8c197e60f8fefcade493c60779ea5154f418c7a0))
+* **permission:** match morph-alias discriminator in role/permission query helpers ([a7f718a](https://github.com/mohamed-rekiba/arvel/commit/a7f718af81bebfc1be23de0bf11b719d7931c739))
+
 ## [0.19.4](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.3...arvel-v0.19.4) (2026-06-08)
 
 
