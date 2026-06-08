@@ -173,6 +173,10 @@ ignore = [
     "BLE001",  # broad except in middleware: convert any guard error to 401
     "N818",    # HttpException name is canonical; subclasses already follow OWASP
 ]
+"packages/arvel/src/arvel/i18n/pluralisation.py" = [
+    "PLR2004", # CLDR plural-rule arithmetic (n % 100 != 11, etc.) — domain constants, not magic numbers
+    "ARG001",  # rule fns share a Callable[[int], int] signature; the zero rule ignores its arg
+]
 "packages/arvel/src/arvel/routing.py" = [
     "BLE001",  # annotation resolution is best-effort, must not crash
     "C901",    # signature rewriting is intrinsically a multi-branch routine

@@ -74,10 +74,11 @@ class Translator:
         locale: str | None = None,
     ) -> str:
         replace = replace or {}
-        raw = self.get(key, locale=locale)
+        loc = locale or self._locale
+        raw = self.get(key, locale=loc)
         # If the key didn't resolve, `get` returned the key verbatim. We pass
         # that through pluralisation harmlessly: count=N -> still the key.
-        return select_plural_variant(raw, count=count, replace=replace)
+        return select_plural_variant(raw, count=count, replace=replace, locale=loc)
 
     # ── Internal ─────────────────────────────────────────────────────────
     def _lookup(self, key: str, locale: str) -> TranslationValue | None:

@@ -300,3 +300,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 20 (support helpers) hardening WI. Spec: docs/pipeline/specs/WI-arvel-020-collection-value-equality.md"
+  - id: "WI-arvel-021"
+    name: "Positional pluralisation must follow the locale plural rule, not raw count index"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T15:10:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 21 (i18n) hardening WI. Spec: docs/pipeline/specs/WI-arvel-021-plural-locale-rules.md"
