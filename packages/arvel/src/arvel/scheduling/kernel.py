@@ -138,7 +138,7 @@ class SchedulerKernel:
 
         async with asyncio.TaskGroup() as tg:
             for task in due:
-                tg.create_task(self._run_one(task, outcomes))
+                tg.create_task(self._run_one(task, outcomes, now))
 
         if any(o.failed for o in outcomes):
             self.consecutive_failures += 1
@@ -199,12 +199,20 @@ class SchedulerKernel:
             _Log.channel("scheduler").info("scheduler.loop.interrupted")
             raise
 
-    async def _run_one(self, task: ScheduledTask, outcomes: list[TaskOutcome]) -> None:
+    async def _run_one(
+        self, task: ScheduledTask, outcomes: list[TaskOutcome], now: datetime
+    ) -> None:
         async with self._sem:
-            # onOneServer: short-lived election lock. Only the winner runs.
+            # onOneServer: per-minute election lock. Only the winner runs.
+            # The key carries the due minute so it dedupes servers within that
+            # minute but rotates afterwards — without the slot a single static
+            # key would keep every server blocked for the whole TTL, silently
+            # dropping the next runs (Laravel keys it mutexName().format('Hi')).
             if task.on_one_server and self._cache is not None:
+                slot = now.strftime("%Y%m%d%H%M")
                 lock = self._cache.lock(
-                    f"scheduler:onserver:{task.name}", ttl=task.on_one_server_ttl_seconds
+                    f"scheduler:onserver:{task.name}:{slot}",
+                    ttl=task.on_one_server_ttl_seconds,
                 )
                 if not await lock.acquire():
                     outcomes.append(TaskOutcome.skip(task.name, "not_one_server_winner"))

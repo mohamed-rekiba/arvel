@@ -86,7 +86,13 @@ If a task runs long, the next tick could start a second copy. `withoutOverlappin
 schedule.call(generate_report).everyFiveMinutes().withoutOverlapping()
 ```
 
-For multi-server deployments, `onOneServer()` ensures only one server runs a given task per tick.
+For multi-server deployments, `onOneServer()` ensures only one server runs a given task per tick:
+
+```python
+schedule.command("reports:generate").daily().onOneServer()
+```
+
+The election lock is scoped to the task's due minute, so it dedupes servers within that minute but never blocks the next run — a task keeps firing on schedule no matter how long the lock TTL is. `onOneServer()` needs a shared cache (Redis); with a process-local cache each process still elects itself.
 
 ## Maintenance Mode & Output Capture
 

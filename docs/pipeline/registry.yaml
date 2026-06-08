@@ -180,3 +180,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 12 (broadcasting) hardening WI. Spec: docs/pipeline/specs/WI-arvel-012-broadcast-payload-json-safe.md"
+  - id: "WI-arvel-013"
+    name: "onOneServer election lock must be per-execution (per-minute key), not a static key"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-08T11:55:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 13 (scheduling) hardening WI. Spec: docs/pipeline/specs/WI-arvel-013-onserver-lock-per-minute.md"

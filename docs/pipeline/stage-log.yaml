@@ -511,3 +511,46 @@ events:
       mypy --strict + pyright + ruff clean on changed files. Docs broadcasting.md notes the default
       uses model_dump(mode="json"). Auth discriminator, toOthers(), Pusher auto-build deferred.
     timestamp: "2026-06-08T11:15:00Z"
+  - work_item: "WI-arvel-013"
+    stage: "planning"
+    event: "enter"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Module 13 (scheduling) audit. C1 confirmed via deterministic repro: SchedulerKernel onOneServer
+      election lock used a time-less key (scheduler:onserver:{name}) and relied on TTL expiry, so a
+      lock acquired in minute N blocked every server until TTL — any task with TTL >= run interval
+      fired once then went dark. Laravel keys it per minute (mutexName().format('Hi')). Builder
+      frequency/constraint sugar and tick-drift-vs-cron deferred (parity-additive / design).
+      Spec: WI-arvel-013-onserver-lock-per-minute.md.
+    artifacts:
+      - ".context/research/013-scheduling.md"
+      - "docs/pipeline/specs/WI-arvel-013-onserver-lock-per-minute.md"
+    timestamp: "2026-06-08T11:55:00Z"
+  - work_item: "WI-arvel-013"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      kernel.py: _run_one now takes the tick's now and folds the due minute
+      (now.strftime("%Y%m%d%H%M")) into the election key scheduler:onserver:{name}:{slot}, so the lock
+      rotates per minute — dedupes servers within a minute, never blocks the next run. Lock still never
+      released (TTL cleanup), matching Laravel. New tests: lock_rotates_per_minute (3/3 over 3 mins),
+      two_servers_same_minute_still_elect_one_winner. Folded-in: session test_middleware switched off
+      private _store to public store.read() to keep pyright clean. No shims.
+    artifacts:
+      - "packages/arvel/src/arvel/scheduling/kernel.py"
+      - "packages/arvel/tests/scheduling/test_scheduler_kernel.py"
+      - "packages/arvel/tests/session/test_middleware.py"
+      - "docs/site/docs/features/scheduling.md"
+    timestamp: "2026-06-08T12:05:00Z"
+  - work_item: "WI-arvel-013"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Scheduling suite = 56 passed; full arvel suite = 4306 passed (3 deselected), no regression;
+      mypy --strict (1042 files) + pyright (0 errors) + ruff clean. Docs scheduling.md explains the
+      per-minute election scope and shared-cache requirement. Builder sugar + tick-drift deferred.
+    timestamp: "2026-06-08T12:10:00Z"
