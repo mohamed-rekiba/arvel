@@ -585,3 +585,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Module 39 (events) — closes WI-009's deferred Bus-error log-swallow: _dispatch_queued now logs queued_listener_enqueue_failed on a broker failure instead of swallowing + running inline; inline only when no queue is configured. Spec: docs/pipeline/specs/WI-arvel-039-queued-listener-enqueue-failure.md"
+  - id: "WI-arvel-040"
+    name: "VerifiedMiddleware returns 401 for an authenticated-but-unverified user"
+    complexity: "L2"
+    risk_tier: 2
+    data_classification: "internal"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-09T00:25:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Module 40 (HTTP/auth middleware stack) — stack audited sound; VerifiedMiddleware now splits None->401 and unverified->403 (was 401 for both). Spec: docs/pipeline/specs/WI-arvel-040-verified-middleware-status.md"
