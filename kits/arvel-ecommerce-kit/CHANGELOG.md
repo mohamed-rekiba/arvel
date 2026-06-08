@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.5](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.4...arvel-ecommerce-kit-v1.7.5) (2026-06-08)
+
+
+### Bug Fixes
+
+* **database:** run seeder after-commit callbacks once rows are committed ([3cf317f](https://github.com/mohamed-rekiba/arvel/commit/3cf317ff189c6fbb48e70f57c726b82e4dec3f67))
+* **ecommerce:** update environment configuration for Docker setup ([52bd1c6](https://github.com/mohamed-rekiba/arvel/commit/52bd1c67b8ef74949f00170367621135bb67a7d4))
+
 ## [1.7.4](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.3...arvel-ecommerce-kit-v1.7.4) (2026-06-08)
 
 
