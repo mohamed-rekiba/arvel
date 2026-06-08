@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.19.0...arvel-v0.19.1) (2026-06-08)
+
+
+### Bug Fixes
+
+* **shell:** boot lazily so the REPL opens when the DB is down ([494de4c](https://github.com/mohamed-rekiba/arvel/commit/494de4ca39483b9fe51ee14240a5e01e45ed2133))
+
 ## [0.19.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.18.1...arvel-v0.19.0) (2026-06-08)
 
 
