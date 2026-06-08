@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-search-v0.6.0...arvel-search-v0.6.1) (2026-06-08)
+
+
+### Refactors
+
+* **deps:** replace httpx with httpx2 across all packages ([0c2f530](https://github.com/mohamed-rekiba/arvel/commit/0c2f5301532487be2aa0d7da37583866d999dab4))
+
 ## [0.6.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-search-v0.5.1...arvel-search-v0.6.0) (2026-06-01)
 
 
