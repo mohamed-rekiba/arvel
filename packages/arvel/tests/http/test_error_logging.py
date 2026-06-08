@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import cast
 
-import httpx
+import httpx2 as httpx
 from arvel.context import Context, ContextRepository, bind_repository, reset_repository
 from arvel.http.exceptions import HttpExceptionHandler, NotFoundException
 from arvel.testing.observability import FakeObservability

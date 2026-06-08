@@ -20,7 +20,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any, cast
 
-import httpx
+import httpx2 as httpx
 import pytest
 import pytest_asyncio
 from arvel.container import Container

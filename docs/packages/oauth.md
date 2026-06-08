@@ -37,7 +37,7 @@ sequenceDiagram
 - **Auth**: `OAuthController` issues a session/JWT via `AuthService` after linking; needs `AuthServiceProvider` and a users table.
 - **DB**: links inside `DB.transaction()`.
 - **State**: CSRF state + PKCE verifier ride in `HttpOnly` cookies (`oauth_state`, `oauth_pkce`), not the session.
-- **HTTP client**: `httpx` (injectable for tests); `pyjwt[crypto]` for Apple/OIDC.
+- **HTTP client**: `httpx2` (injectable for tests); `pyjwt[crypto]` for Apple/OIDC.
 
 ## Config
 

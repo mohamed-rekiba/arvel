@@ -72,11 +72,11 @@ async def fetch_url(
     Returns ``(bytes_content, derived_file_name)``.
     """
     try:
-        import httpx  # noqa: PLC0415
+        import httpx2 as httpx  # noqa: PLC0415
     except ImportError as exc:
         msg = (
-            "httpx is required to add media from an http(s):// URL. "
-            "Install it with: pip install httpx  (or: uv add httpx)."
+            "httpx2 is required to add media from an http(s):// URL. "
+            "Install it with: pip install httpx2  (or: uv add httpx2)."
         )
         raise ImportError(msg) from exc
 

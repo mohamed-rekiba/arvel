@@ -12,7 +12,7 @@ import time
 import urllib.request
 from typing import Any, Protocol, cast
 
-import httpx
+import httpx2 as httpx
 import pytest
 import pytest_asyncio
 from arvel.mail.config import MailConfig, SmtpConfig

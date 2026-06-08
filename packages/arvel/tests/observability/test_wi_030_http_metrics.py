@@ -45,7 +45,7 @@ class TestHttpMetrics:
     @pytest.mark.asyncio
     async def test_http_duration_metric_emitted(self) -> None:
         from arvel.testing.observability import FakeObservability
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         with FakeObservability() as obs:
             app = _make_instrumented_app()
@@ -58,7 +58,7 @@ class TestHttpMetrics:
     @pytest.mark.asyncio
     async def test_http_metrics_have_route_attribute(self) -> None:
         from arvel.testing.observability import FakeObservability
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         with FakeObservability() as obs:
             app = _make_instrumented_app()
@@ -77,7 +77,7 @@ class TestInternalRouteExclusion:
     @pytest.mark.asyncio
     async def test_metrics_endpoint_not_instrumented(self) -> None:
         from arvel.testing.observability import FakeObservability
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         with FakeObservability() as obs:
             app = _make_instrumented_app()
@@ -93,7 +93,7 @@ class TestInternalRouteExclusion:
     @pytest.mark.asyncio
     async def test_healthz_endpoint_not_instrumented(self) -> None:
         from arvel.testing.observability import FakeObservability
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         with FakeObservability() as obs:
             app = _make_instrumented_app()

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import cast
 
-import httpx
+import httpx2 as httpx
 
 from arvel_oauth.dtos import OAuthToken, OAuthUser
 from arvel_oauth.exceptions import OAuthExchangeError

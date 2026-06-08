@@ -28,7 +28,7 @@ from arvel.http.exceptions import HttpException
 from arvel.http.problem_details import ProblemDetailsHandler
 from arvel.testing.fakes.event import EventFake
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession

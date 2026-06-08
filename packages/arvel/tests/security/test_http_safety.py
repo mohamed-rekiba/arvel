@@ -7,7 +7,7 @@ import logging
 import time
 from typing import Any, cast
 
-import httpx
+import httpx2 as httpx
 import pytest
 from arvel.auth.config import JwtConfig
 

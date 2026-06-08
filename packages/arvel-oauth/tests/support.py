@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-import httpx
+import httpx2 as httpx
 
 
 def mock_client(handler: Callable[[httpx.Request], httpx.Response]) -> httpx.AsyncClient:

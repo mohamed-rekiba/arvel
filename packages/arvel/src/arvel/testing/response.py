@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Self, cast
 
-import httpx
+import httpx2 as httpx
 
 
 class TestResponse:

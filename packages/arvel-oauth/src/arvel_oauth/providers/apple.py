@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 from typing import cast
 
-import httpx
+import httpx2 as httpx
 import jwt
 from jwt import PyJWK, PyJWKSet
 

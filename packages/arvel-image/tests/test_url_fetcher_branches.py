@@ -3,7 +3,7 @@
 Pins the missing branches surfaced by the coverage report:
 - 32-33: ``_safe_url``'s urlparse ValueError fallback
 - 36-39: ``_safe_url``'s userinfo-stripping happy path
-- 76-81: ``fetch_url``'s httpx ImportError branch
+- 76-81: ``fetch_url``'s httpx2 ImportError branch
 - 180:   ``sniff_image_mime``'s ``if fmt is None`` branch
 
 Security focus: the userinfo-stripping tests are the credential-leak guard.
@@ -111,28 +111,28 @@ def test_safe_url_passthrough_for_clean_url() -> None:
     assert _safe_url(clean) == clean
 
 
-# ─── fetch_url: httpx ImportError branch (L76-81) ────────────────────────────
+# ─── fetch_url: httpx2 ImportError branch (L76-81) ───────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_fetch_url_raises_helpful_import_error_when_httpx_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # L76-81: `try: import httpx except ImportError as exc: raise ImportError(<helpful msg>)`.
+    # L76-81: `try: import httpx2 except ImportError as exc: raise ImportError(<helpful msg>)`.
     # Force the import to fail by stashing None into sys.modules — Python's
     # import machinery raises ImportError when it encounters None there.
     from arvel_image.media.url_fetcher import fetch_url
 
-    monkeypatch.setitem(sys.modules, "httpx", None)
+    monkeypatch.setitem(sys.modules, "httpx2", None)
 
     with pytest.raises(ImportError) as exc_info:
         await fetch_url("https://example.com/img.jpg", max_bytes=1024 * 1024)
 
     msg = str(exc_info.value)
     # The helpful message must name the install incantations.
-    assert "httpx" in msg
-    assert "pip install httpx" in msg
-    assert "uv add httpx" in msg
+    assert "httpx2" in msg
+    assert "pip install httpx2" in msg
+    assert "uv add httpx2" in msg
 
 
 # ─── sniff_image_mime: fmt is None branch (L180) ─────────────────────────────

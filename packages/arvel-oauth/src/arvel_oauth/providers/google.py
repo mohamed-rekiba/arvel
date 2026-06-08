@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import httpx
+import httpx2 as httpx
 
 from arvel_oauth.dtos import OAuthToken, OAuthUser
 from arvel_oauth.providers.base import OAuthProvider

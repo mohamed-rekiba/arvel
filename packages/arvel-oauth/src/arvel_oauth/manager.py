@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-import httpx
+import httpx2 as httpx
 
 from arvel_oauth.config import OAuthConfig
 from arvel_oauth.exceptions import ProviderNotFound

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-import httpx
+import httpx2 as httpx
 from arvel.http.exceptions import HttpExceptionHandler
 from arvel.http.requests import FormRequest
 from arvel.routing import Route, Router

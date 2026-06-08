@@ -6,7 +6,7 @@ import json
 
 import pytest
 from arvel.auth.middleware.throttle_login import ThrottleLoginMiddleware
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse

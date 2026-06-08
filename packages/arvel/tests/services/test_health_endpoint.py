@@ -6,7 +6,7 @@ import asyncio
 from pathlib import Path
 from typing import cast
 
-import httpx
+import httpx2 as httpx
 import pytest
 from arvel.application import Application
 from arvel.services import BaseService, HealthResult, HealthStatus

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import httpx
+import httpx2 as httpx
 from arvel_search.dtos import SearchQuery
 from arvel_search.engines import (
     CollectionEngine,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import cast
 
-import httpx
+import httpx2 as httpx
 from arvel.http.exceptions import ThrottleException, ValidationException
 from arvel.http.problem_details import ProblemDetailsHandler
 from fastapi import FastAPI

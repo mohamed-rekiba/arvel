@@ -40,7 +40,7 @@ class TestPrometheusEndpointImport:
 class TestPrometheusEndpointResponse:
     @pytest.mark.asyncio
     async def test_metrics_endpoint_returns_200(self, metrics_app: FastAPI) -> None:
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         async with AsyncClient(
             transport=ASGITransport(app=metrics_app), base_url="http://test"
@@ -50,7 +50,7 @@ class TestPrometheusEndpointResponse:
 
     @pytest.mark.asyncio
     async def test_metrics_content_type_is_prometheus(self, metrics_app: FastAPI) -> None:
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         async with AsyncClient(
             transport=ASGITransport(app=metrics_app), base_url="http://test"
@@ -61,7 +61,7 @@ class TestPrometheusEndpointResponse:
 
     @pytest.mark.asyncio
     async def test_metrics_body_is_valid_prometheus_format(self, metrics_app: FastAPI) -> None:
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         async with AsyncClient(
             transport=ASGITransport(app=metrics_app), base_url="http://test"
@@ -75,7 +75,7 @@ class TestPrometheusEndpointResponse:
 class TestMetricsCidrGuard:
     @pytest.mark.asyncio
     async def test_metrics_forbidden_for_disallowed_ip(self, restricted_app: FastAPI) -> None:
-        from httpx import ASGITransport, AsyncClient
+        from httpx2 import ASGITransport, AsyncClient
 
         # 10.0.0.1 is not in 192.0.2.0/24
         async with AsyncClient(

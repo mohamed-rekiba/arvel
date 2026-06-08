@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import httpx
+import httpx2 as httpx
 import pytest
 from arvel_oauth.exceptions import OIDCDiscoveryError
 from arvel_oauth.providers import OIDCProvider

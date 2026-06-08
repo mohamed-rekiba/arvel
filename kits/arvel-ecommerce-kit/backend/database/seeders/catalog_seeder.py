@@ -46,7 +46,7 @@ _DOWNLOAD_TIMEOUT = 8.0  # seconds
 
 async def _fetch_product_image(slug: str) -> bytes:
     """Download from Unsplash; fall back to a synthetic JPEG on any error."""
-    import httpx  # noqa: PLC0415
+    import httpx2 as httpx  # noqa: PLC0415
     from PIL import Image as _PILImage  # noqa: PLC0415
 
     url = _PRODUCT_IMAGES.get(slug, f"https://picsum.photos/seed/{slug}/800/600")

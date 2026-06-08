@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import cast
 
-import httpx
+import httpx2 as httpx
 from arvel.session import SessionData
 from arvel.session.middleware import StartSession
 from arvel.session.stores.array import ArraySessionStore
