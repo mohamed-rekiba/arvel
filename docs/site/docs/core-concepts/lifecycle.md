@@ -153,11 +153,13 @@ await app.shutdown()
 
 Under ASGI this fires automatically on lifespan shutdown.
 
+Teardown is best-effort: every provider's `shutdown()` runs even if an earlier one raises, so a single failing provider can't strand the others (the database provider still disposes its connection pool, for example). The first failure is re-raised as `ShutdownError` once all providers have run, and the app is always left un-booted.
+
 <a name="lifecycle-errors"></a>
 ## Lifecycle Errors
 
 | Exception | Raised when |
 |---|---|
 | `BootError` | A provider's `register()` or `boot()` raises. |
-| `ShutdownError` | A provider's `shutdown()` raises. |
+| `ShutdownError` | A provider's `shutdown()` raises — surfaced for the first failure after every provider has torn down. |
 | `EnvironmentNotSetError` | `environment()` or `base_path()` is called before the app is configured. |
