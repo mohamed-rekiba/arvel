@@ -301,36 +301,39 @@ class AuthServiceProvider(ServiceProvider):
         from arvel.http.middleware.database_transaction import DatabaseTransaction  # noqa: PLC0415
         from arvel.routing import Route  # noqa: PLC0415
 
-        ctrl = self.container.make(AuthController)
         p = config.routes.prefix.rstrip("/")
         db_tx = [DatabaseTransaction()]
+        container = self.container
 
+        # Resolve the controller per request (framework convention, WI-002) rather than
+        # capturing it at boot — so a rebound/extended AuthController is honored. The
+        # binding is a container instance, so this is a cheap lookup.
         async def handle_register(payload: RegisterRequest) -> Any:
-            return await ctrl.register(payload)
+            return await container.make(AuthController).register(payload)
 
         async def handle_login(payload: LoginRequest, response: Response) -> Any:
-            return await ctrl.login(payload, response)
+            return await container.make(AuthController).login(payload, response)
 
         async def handle_refresh(request: FastAPIRequest, response: Response) -> Any:
-            return await ctrl.refresh(request, response)
+            return await container.make(AuthController).refresh(request, response)
 
         async def handle_logout(request: FastAPIRequest, response: Response) -> Any:
-            return await ctrl.logout(request, response)
+            return await container.make(AuthController).logout(request, response)
 
         async def handle_me(request: FastAPIRequest) -> Any:
-            return await ctrl.me(request)
+            return await container.make(AuthController).me(request)
 
         async def handle_forgot_password(payload: ForgotPasswordRequest) -> Any:
-            return await ctrl.forgot_password(payload)
+            return await container.make(AuthController).forgot_password(payload)
 
         async def handle_reset_password(payload: ResetPasswordRequest) -> Any:
-            return await ctrl.reset_password(payload)
+            return await container.make(AuthController).reset_password(payload)
 
         async def handle_verify_email(signed: str) -> Any:
-            return await ctrl.verify_email(signed)
+            return await container.make(AuthController).verify_email(signed)
 
         async def handle_verify_resend(request: FastAPIRequest) -> Any:
-            return await ctrl.verify_email_resend(request)
+            return await container.make(AuthController).verify_email_resend(request)
 
         Route.post(f"{p}/register", name="auth.register", status_code=201, middleware=db_tx)(
             handle_register

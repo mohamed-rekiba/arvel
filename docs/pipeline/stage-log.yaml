@@ -1832,3 +1832,25 @@ events:
       Docs-only; mkdocs build --strict clean. Claim verified against problem_details.py register() and the existing
       unhandled-exception test.
     timestamp: "2026-06-09T03:16:00Z"
+  - work_item: "deferred-F6"
+    stage: "execution"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Deferred F6 (auth). AuthServiceProvider._mount_routes resolved AuthController once at boot and closed over that
+      instance in all nine route handlers, so a rebound/extended controller was ignored — counter to the framework's
+      per-request resolution convention (WI-002). Fixed: handlers now call container.make(AuthController) at invocation
+      time; captured self.container once as a local to keep _mount_routes under C901.
+    artifacts:
+      - "packages/arvel/src/arvel/auth/provider.py"
+      - "packages/arvel/tests/auth/test_auth_provider_internals.py"
+    timestamp: "2026-06-09T03:40:00Z"
+  - work_item: "deferred-F6"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff clean; mypy 0 issues; pyright 0/0; auth suite 184 passed (1 new white-box regression:
+      bind controller -> mount -> rebind -> register handler answers the rebound controller).
+    timestamp: "2026-06-09T03:41:00Z"
