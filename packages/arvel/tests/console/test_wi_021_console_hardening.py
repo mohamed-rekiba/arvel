@@ -820,10 +820,10 @@ class TestShellNamespace:
 
         # shell drives its own event loop (IPython autoawait + prompt_toolkit
         # both call asyncio.run), so it must run outside the entrypoint's
-        # asyncio.run wrapper and bootstrap the framework itself — the
-        # entrypoint must not pre-boot anything for it.
+        # asyncio.run wrapper and bootstrap the framework itself. owns_process
+        # (not needs_framework) is the lever that routes it out of async_main,
+        # so the entrypoint never pre-boots it even though it declares requires.
         assert ShellCommand.owns_process is True
-        assert ShellCommand.needs_framework() is False
 
     def test_bootstrap_app_includes_app_and_container(self) -> None:
         from arvel.console.commands.shell import ShellCommand
