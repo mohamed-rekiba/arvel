@@ -343,6 +343,22 @@ await users.load("posts")
 await users.load_missing("posts")
 ```
 
+<a name="eager-loading-and-soft-deletes"></a>
+### Eager Loading and Soft Deletes
+
+Eager loads honour the **related** model's global scopes. If the related model uses soft deletes, `with_` skips trashed rows — the same behaviour as the lazy accessor, `with_count`, and `where_has`:
+
+```python
+# Comment uses SoftDeletes; trashed comments are left out
+await Post.with_("comments").get()
+```
+
+To include trashed related rows, opt back in with a constraint closure:
+
+```python
+await Post.with_({"comments": lambda q: q.with_trashed()}).get()
+```
+
 <a name="counting-related-models"></a>
 ### Counting Related Models
 

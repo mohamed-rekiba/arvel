@@ -103,6 +103,14 @@ class BelongsToManyAccessor(Generic[T]):
             raise TypeError(f"{self._related_model} is not a mapped SQLAlchemy class")
         return mapper.primary_key[0]
 
+    def _global_scope_clause(self) -> Any:
+        """Related model's global-scope predicate (soft-delete `deleted_at IS NULL`), or None."""
+        # Deferred import: query.py imports the orm package, so this can't be top-level.
+        from arvel.database.query import QueryBuilder
+
+        related: type[Any] = self._related_model
+        return QueryBuilder(related, select(related)).apply_global_scopes().whereclause
+
     def _hydrate_pivot(self, rows: Sequence[Any], pivot_cols: Sequence[str]) -> list[T]:
         """Attach a pivot namespace (the configured accessor name) onto each related row."""
         items: list[T] = []
@@ -126,6 +134,9 @@ class BelongsToManyAccessor(Generic[T]):
             .join(self._table, self._table.c[self._rfk] == pk_col)
             .where(self._table.c[self._fk] == self._owner_id)
         )
+        scope_where = self._global_scope_clause()
+        if scope_where is not None:
+            stmt = stmt.where(scope_where)
         for pred in predicates:
             stmt = stmt.where(pred)
         if order_col is not None:

@@ -494,20 +494,28 @@ def _selectin_loader_for_path(
     head_rel = mapper.relationships[head]
     related_cls = head_rel.mapper.class_
     head_attr: Any = getattr(model, head)
+    # Eager loads honour the related model's global scopes (soft deletes) at every
+    # hop — Laravel never hydrates trashed related rows, and this keeps with_() in
+    # step with with_count/where_has. Routing the constraint through
+    # apply_global_scopes (like _exists_subquery) lets a closure opt back in with
+    # with_trashed()/without_global_scopes().
+    sub_qb = QueryBuilder(related_cls, select(related_cls))
     if constraint is not None:
-        sub_qb = QueryBuilder(related_cls, select(related_cls))
         sub_qb = constraint(sub_qb)
-        where_clause = sub_qb.statement.whereclause
-        if where_clause is not None:
-            head_attr = head_attr.and_(where_clause)
+    head_where = sub_qb.apply_global_scopes().whereclause
+    if head_where is not None:
+        head_attr = head_attr.and_(head_where)
     loader = selectinload(head_attr)
     cursor_mapper = head_rel.mapper
     for hop in tail.split(".") if tail else []:
         if not hop:
             continue
-        cursor_attr = getattr(cursor_mapper.class_, hop, None)
+        cursor_attr: Any = getattr(cursor_mapper.class_, hop, None)
         if not isinstance(cursor_attr, InstrumentedAttribute):
             raise UnknownRelationError(cursor_mapper.class_.__name__, hop)
+        hop_scope = _global_scope_whereclause(cursor_mapper.relationships[hop].mapper.class_)
+        if hop_scope is not None:
+            cursor_attr = cursor_attr.and_(hop_scope)
         loader = loader.selectinload(cursor_attr)  # pyright: ignore[reportUnknownArgumentType]
         cursor_mapper = cursor_mapper.relationships[hop].mapper
     return loader
@@ -918,6 +926,57 @@ def _dedupe_by_pk(model: type[Any], objs: list[Any]) -> list[Any]:
     return out
 
 
+def _pivot_eager_select(
+    model: type[Any],
+    attr_name: str,
+    target: _RelationTarget,
+    owner_values: list[Any],
+    owner_label: str,
+) -> tuple[type[Any], Select[Any]]:
+    """Build the batched ``related JOIN pivot WHERE owner IN (...)`` select for one pivot kind."""
+    if target.kind == "mtm":
+        mlink = target.mtm_link
+        if mlink is None:
+            raise UnknownRelationError(model.__name__, attr_name)
+        related_cls = mlink.related_model
+        owner_col = mlink.table.c[mlink.id_column]
+        return related_cls, (
+            select(related_cls, owner_col.label(owner_label))
+            .join(
+                mlink.table,
+                mlink.table.c[mlink.related_foreign_key] == _primary_key_column(related_cls),
+            )
+            .where(mlink.table.c[mlink.type_column] == mlink.owner_type)
+            .where(owner_col.in_({str(v) for v in owner_values}))
+        )
+    if target.kind == "mbm":
+        blink = target.mbm_link
+        if blink is None:
+            raise UnknownRelationError(model.__name__, attr_name)
+        related_cls = blink.related_model
+        owner_col = blink.table.c[blink.owner_foreign_key]
+        related_pk = sqla_cast(_primary_key_column(related_cls), String)
+        return related_cls, (
+            select(related_cls, owner_col.label(owner_label))
+            .join(blink.table, blink.table.c[blink.id_column] == related_pk)
+            .where(blink.table.c[blink.type_column] == blink.related_type)
+            .where(owner_col.in_(set(owner_values)))
+        )
+    link = target.btm_link
+    if link is None:
+        raise UnknownRelationError(model.__name__, attr_name)
+    related_cls = link.related_model
+    owner_col = link.table.c[link.foreign_key]
+    return related_cls, (
+        select(related_cls, owner_col.label(owner_label))
+        .join(
+            link.table,
+            link.table.c[link.related_foreign_key] == _primary_key_column(related_cls),
+        )
+        .where(owner_col.in_(set(owner_values)))
+    )
+
+
 async def _batch_load_async(
     model: type[Any],
     parents: list[Any],
@@ -935,57 +994,19 @@ async def _batch_load_async(
     owner_values = [getattr(p, owner_pk_key) for p in parents]
     owner_label = "__arvel_owner_key__"
 
-    if target.kind == "mtm":
-        mlink = target.mtm_link
-        if mlink is None:
-            raise UnknownRelationError(model.__name__, attr_name)
-        related_cls = mlink.related_model
-        owner_col = mlink.table.c[mlink.id_column]
-        stmt = (
-            select(related_cls, owner_col.label(owner_label))
-            .join(
-                mlink.table,
-                mlink.table.c[mlink.related_foreign_key] == _primary_key_column(related_cls),
-            )
-            .where(mlink.table.c[mlink.type_column] == mlink.owner_type)
-            .where(owner_col.in_({str(v) for v in owner_values}))
-        )
-    elif target.kind == "mbm":
-        blink = target.mbm_link
-        if blink is None:
-            raise UnknownRelationError(model.__name__, attr_name)
-        related_cls = blink.related_model
-        owner_col = blink.table.c[blink.owner_foreign_key]
-        related_pk = sqla_cast(_primary_key_column(related_cls), String)
-        stmt = (
-            select(related_cls, owner_col.label(owner_label))
-            .join(blink.table, blink.table.c[blink.id_column] == related_pk)
-            .where(blink.table.c[blink.type_column] == blink.related_type)
-            .where(owner_col.in_(set(owner_values)))
-        )
-    else:
-        link = target.btm_link
-        if link is None:
-            raise UnknownRelationError(model.__name__, attr_name)
-        related_cls = link.related_model
-        owner_col = link.table.c[link.foreign_key]
-        stmt = (
-            select(related_cls, owner_col.label(owner_label))
-            .join(
-                link.table,
-                link.table.c[link.related_foreign_key] == _primary_key_column(related_cls),
-            )
-            .where(owner_col.in_(set(owner_values)))
-        )
+    related_cls, stmt = _pivot_eager_select(model, attr_name, target, owner_values, owner_label)
 
-    # No global-scope filter here: the cache must be a transparent substitute
-    # for the lazy accessor, which also reads through the raw pivot join.
+    # Honour the related model's global scopes (soft deletes) — Laravel excludes
+    # trashed related rows from pivot relations, and this keeps the eager cache in
+    # step with with_count/where_has and the lazy accessor (both scope the join).
+    # Routing the constraint through apply_global_scopes lets a closure opt back in
+    # with with_trashed()/without_global_scopes().
+    sub_qb: QueryBuilder[Any] = QueryBuilder(related_cls, select(related_cls))
     if constraint is not None:
-        sub_qb: QueryBuilder[Any] = QueryBuilder(related_cls, select(related_cls))
         sub_qb = constraint(sub_qb)
-        where_clause = sub_qb.statement.whereclause
-        if where_clause is not None:
-            stmt = stmt.where(where_clause)
+    pivot_where = sub_qb.apply_global_scopes().whereclause
+    if pivot_where is not None:
+        stmt = stmt.where(pivot_where)
 
     result = await get_active_session().execute(stmt)
     grouped: dict[str, list[Any]] = {}

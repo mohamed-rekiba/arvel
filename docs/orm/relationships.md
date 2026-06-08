@@ -135,6 +135,8 @@ sequenceDiagram
 
 The async buckets store results in a per-instance `__arvel_eager_relations__` map; terminal accessors (`HasMany.all()`, etc.) check that cache before querying. `load(*relations)` / `load_missing` do the same after the fact on already-fetched models (including on a whole `ModelCollection`).
 
+All three buckets apply the **related** model's global scopes. If the related model uses `SoftDeletes`, eager loads exclude trashed rows — the same rule `with_count`, `has`, and `where_has` follow, and the same rows the lazy accessor returns. Reach trashed related rows with `with_trashed()` on the relation constraint, e.g. `with_({"comments": lambda q: q.with_trashed()})`.
+
 ## See also
 
 - [Query builder](query-builder.md) — `with_`, `with_count`, `has`/`where_has`.
