@@ -80,27 +80,31 @@ changelog once shipped.
   `alpha_dash`, `regex`, `not_regex`, `starts_with`, `ends_with`, `in`,
   `not_in`), size/range (`min`, `max`, `between`, `size`), comparisons
   (`confirmed`, `same`, `different`)
+- Needs-based CLI bootstrap — each command declares its `requires` subsystems
+  (`CliSubsystem`) and only those service providers boot; non-HTTP commands skip
+  route loading and the registered-routes banner
+- `openapi:export --output FILE` — exports the spec to a file (or `-`/`--stdout`),
+  YAML or JSON, with status text on stderr so stdout stays clean
 
-**Remaining priority gaps** (ordered by impact, see
-[`docs/backlog/ROADMAP.md`](docs/backlog/ROADMAP.md)):
+**Remaining priority gaps** (triaged 2026-06-09 against the codebase — see
+`.context/research/043-feature-gap-bucket3-triage.md` and
+[`docs/backlog/043-epic-feature-gap-bucket3-triage.md`](docs/backlog/043-epic-feature-gap-bucket3-triage.md)):
 
 - Outbound HTTP — first-party `Http::` facade + `Http::fake` (currently apps
-  call `httpx` directly)
-- Needs-based CLI bootstrap — original ask: each command should boot only its
-  required service providers, plus `openapi:export --output FILE` for clean
-  banner separation
-- Laravel-style validation rules — ~25 missing string rules (`string`,
-  `integer`, `min`, `max`, `in`, `email`, `url`, `date`, `confirmed`,
-  `same`, `different`, `nullable`, `bail`, …), conditional rules,
-  nested/wildcard, custom rule registration, `Rule::in()` / `Rule::unique()`
-  builders
-- HTTP facades — `response()`, `redirect()`, `Http::` outbound client
-- Route caching — `route:cache` / `route:clear`
-- Needs-based CLI bootstrap (only init the providers the command needs)
-  ([WI-001](docs/backlog/001-epic-needs-based-cli-bootstrap.md))
-- HTTP security hardening — dedup `CsrfMismatchException`, align CSRF
-  header casing, trusted-proxy middleware
+  call `httpx` directly). High impact, large effort.
+- HTTP response facades — `response()` (JSON/text/no-content builders) and
+  `redirect()` (with session flash). Medium impact, medium effort.
+- Route caching — `route:cache` / `route:clear` (`optimize` already stubs it
+  pending a `RouteCollection` serializer). Medium impact, medium-large effort.
+- More validation rules — `date`, `bail`, conditional (`required_if`/`sometimes`),
+  nested/wildcard (`items.*.id`), custom rule registration, and `Rule.in_()` /
+  `Rule.unique()` builders. Medium impact, low risk, incremental.
+- HTTP security hardening — consolidate the two CSRF middlewares (session 419 /
+  cookie 403), accept `X-XSRF-TOKEN` + form `_token`, and add a general
+  `TrustProxies` request middleware (trusted-proxy IP resolution exists for
+  observability/reverb but not on the app request path). Medium impact, **high
+  risk — security path, own WI with gates.**
 - Framework-level local file serving (`STORAGE_LOCAL_SERVE`, Laravel
-  `serve => true` parity)
+  `serve => true` parity). Low-medium impact, small-medium effort.
 
 > The headline goal before `1.0` is a public-API review and stability pass.
