@@ -45,12 +45,40 @@ class TestDatabaseDriver:
         assert envelope.payload["message"] == "pop-me"
 
     @pytest.mark.asyncio
-    async def test_pop_decrements_queue_size(self, db_driver: DatabaseConnection) -> None:
+    async def test_pop_reserves_then_delete_reserved_removes_row(
+        self, db_driver: DatabaseConnection
+    ) -> None:
+        """Pop reserves the row (still counted in size); delete_reserved removes it."""
         job = _DbJob(message="retried")
         await db_driver.push(job.to_envelope(), queue="default")
-        row = await db_driver.pop_blocking(queue="default", timeout=0)
-        assert row is not None
+        envelope = await db_driver.pop_blocking(queue="default", timeout=0)
+        assert envelope is not None
+        assert envelope.receipt is not None
+        # Reserved, not deleted — still present until the worker acks it.
+        assert await db_driver.size(queue="default") == 1
+        # A second pop won't hand out the in-flight row.
+        assert await db_driver.pop_blocking(queue="default", timeout=0) is None
+        await db_driver.delete_reserved(envelope)
         assert await db_driver.size(queue="default") == 0
+
+    @pytest.mark.asyncio
+    async def test_reservation_lapses_after_retry_after(
+        self, db_driver: DatabaseConnection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A reserved row a crashed worker never acked is reclaimable after retry_after."""
+        clock = {"now": 1_000_000.0}
+        monkeypatch.setattr("arvel.queue.drivers.database.time.time", lambda: clock["now"])
+
+        await db_driver.push(_DbJob(message="orphan").to_envelope(), queue="default")
+        first = await db_driver.pop_blocking(queue="default", timeout=0)
+        assert first is not None
+        # Worker "crashes" — no delete_reserved. Still reserved, not yet reclaimable.
+        assert await db_driver.pop_blocking(queue="default", timeout=0) is None
+        # Advance past the visibility timeout (default 90s).
+        clock["now"] += 91
+        redelivered = await db_driver.pop_blocking(queue="default", timeout=0)
+        assert redelivered is not None
+        assert redelivered.payload["message"] == "orphan"
 
     @pytest.mark.asyncio
     async def test_pop_empty_queue_returns_none(self, db_driver: DatabaseConnection) -> None:

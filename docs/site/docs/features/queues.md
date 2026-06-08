@@ -132,6 +132,19 @@ That bumps a shared signal that every `queue:work` process checks between jobs. 
 
 Cancelling a worker (task cancellation, `SIGINT`) is **not** a job failure. The cancellation propagates and the worker stops — the in-flight job is never sent to the dead-letter queue or counted as a failed attempt. Only a real exception from `handle()` or a per-job `timeout` marks a job as failed.
 
+<a name="reliability"></a>
+### Reliability (at-least-once delivery)
+
+The `database` driver reserves a job instead of deleting it on pop. The worker deletes the row only after the job finishes — succeeds, exhausts retries, or lands in the dead-letter queue. If the worker is killed mid-handle (OOM, `SIGKILL`, node loss), the row stays reserved and becomes claimable again once its visibility timeout lapses, so the job redelivers rather than vanishing.
+
+`retry_after` sets that timeout in seconds (default `90`). Set it comfortably above your longest job's worst-case runtime — otherwise a slow job can be picked up by a second worker while the first is still running it.
+
+```ini
+QUEUE_DATABASE_RETRY_AFTER=90
+```
+
+This is at-least-once delivery: a crash at the wrong moment can redeliver a job that already ran. Make handlers idempotent (guard on a unique key, upsert instead of insert) so a redelivery is harmless.
+
 <a name="retries-and-backoff"></a>
 ## Retries & Backoff
 

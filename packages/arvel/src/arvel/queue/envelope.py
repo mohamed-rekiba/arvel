@@ -71,6 +71,10 @@ class JobEnvelope:
     delay: int = 0
     priority: int = 0
     chain: list[ChainStep] = field(default_factory=list["ChainStep"])
+    # Transient reservation handle set by a driver on pop (e.g. the database
+    # driver's row id). Never serialized — it identifies the in-flight row so the
+    # worker can delete it after processing. None for freshly built envelopes.
+    receipt: int | None = field(default=None, compare=False, repr=False)
 
     def to_json(self) -> str:
         return json.dumps(

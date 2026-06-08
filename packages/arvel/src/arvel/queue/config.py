@@ -22,6 +22,10 @@ class DatabaseQueueConfig(ArvelSettings):
 
     table: str = "jobs"
     connection: str = "default"
+    # Visibility timeout (seconds). A reserved job whose worker crashed becomes
+    # claimable again after this long. Must exceed your longest job runtime, or a
+    # slow job gets redelivered and runs twice. Matches Laravel's retry_after.
+    retry_after: int = 90
 
 
 class RedisQueueConfig(ArvelSettings):

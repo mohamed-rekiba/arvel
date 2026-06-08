@@ -1474,3 +1474,33 @@ events:
       ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; reset-family
       suite 11 passed (9 existing + 2 new DB-unavailable cases).
     timestamp: "2026-06-08T23:38:00Z"
+  - work_item: "WI-arvel-038"
+    stage: "qa-post"
+    event: "fix"
+    result: "pass"
+    gate: "auto-pass-eligible"
+    note: >-
+      Queue reliability audit. Worker cancellation/retry/DLQ/chains/poison-pill reviewed sound. Defect (F2): the database
+      driver deleted the row on pop, so a worker killed mid-handle (OOM/SIGKILL) lost the job — at-most-once with a loss
+      window. Adopted Laravel's reserve-then-ack: pop stamps reserved_at + returns row id on envelope.receipt; the worker
+      calls delete_reserved on completion; pop reclaims reservations older than retry_after (default 90s, env
+      QUEUE_DATABASE_RETRY_AFTER); malformed/unknown rows are deleted outright. delete_reserved is duck-typed so
+      redis/taskiq/sync are untouched. At-least-once now — documented idempotency requirement in the queue guide.
+    artifacts:
+      - "packages/arvel/src/arvel/queue/config.py"
+      - "packages/arvel/src/arvel/queue/envelope.py"
+      - "packages/arvel/src/arvel/queue/drivers/database.py"
+      - "packages/arvel/src/arvel/queue/worker.py"
+      - "packages/arvel/src/arvel/queue/migrations/create_jobs_table.py"
+      - "packages/arvel/tests/test_queue/drivers/test_database.py"
+      - "packages/arvel/tests/test_queue/drivers/test_database_connection_sql_integration.py"
+      - "docs/site/docs/features/queues.md"
+    timestamp: "2026-06-08T23:52:00Z"
+  - work_item: "WI-arvel-038"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff check + format clean; uv run mypy 0 issues (1065 files); uv run pyright 0 errors, 0 warnings; full queue suite
+      233 passed (incl. postgres/mysql integration + 2 new reserve/redeliver cases).
+    timestamp: "2026-06-08T23:54:00Z"
