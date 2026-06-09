@@ -14,8 +14,11 @@ from arvel.http.exceptions import ConflictException, ValidationException
 class CheckoutController(Controller):
     async def checkout(self, payload: CheckoutPayload, request: Request) -> OrderWrapperOut:
         user = await require_auth(request)
+        resolved_locale = getattr(request.state, "locale", "en") or "en"
         try:
-            order = await orders.checkout(int(user.id), payload.shipping_address)
+            order = await orders.checkout(
+                int(user.id), payload.shipping_address, locale=resolved_locale
+            )
         except EmptyCartError as exc:
             raise ValidationException("Cart is empty.") from exc
         except InsufficientStockError as exc:
