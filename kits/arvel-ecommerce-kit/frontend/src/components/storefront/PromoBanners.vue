@@ -19,7 +19,7 @@ interface Promo {
 const promos = computed<Promo[]>(() => [
   {
     id: 'smartphones',
-    eyebrow: t('promo.mobiles.eyebrow', 'Flat 15% OFF'),
+    eyebrow: t('promo.mobiles.eyebrow', 'Trending now'),
     title: t('promo.mobiles.title', 'Smart Mobiles'),
     subtitle: t('promo.mobiles.subtitle', 'Indulge in latest models'),
     cta: t('promo.shop_now', 'Shop Now'),
@@ -29,7 +29,7 @@ const promos = computed<Promo[]>(() => [
   },
   {
     id: 'headsets',
-    eyebrow: t('promo.headsets.eyebrow', 'Flat 10% OFF'),
+    eyebrow: t('promo.headsets.eyebrow', 'Fan favorites'),
     title: t('promo.headsets.title', 'Smart Headset'),
     subtitle: t('promo.headsets.subtitle', 'Enjoy wireless freedom'),
     cta: t('promo.shop_now', 'Shop Now'),
@@ -39,7 +39,7 @@ const promos = computed<Promo[]>(() => [
   },
   {
     id: 'speakers',
-    eyebrow: t('promo.speakers.eyebrow', 'Flat 15% OFF'),
+    eyebrow: t('promo.speakers.eyebrow', "Editor's pick"),
     title: t('promo.speakers.title', 'Portable Speaker'),
     subtitle: t('promo.speakers.subtitle', 'Take your music anywhere'),
     cta: t('promo.shop_now', 'Shop Now'),
