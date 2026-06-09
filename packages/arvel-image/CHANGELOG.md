@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-image-v0.8.2...arvel-image-v0.9.0) (2026-06-09)
+
+
+### Features
+
+* **arvon:** add fluent datetime layer over whenever ([50ea34e](https://github.com/mohamed-rekiba/arvel/commit/50ea34e2ee6ab3510105006f24245ade7a8ed8b8))
+
 ## [0.8.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-image-v0.8.1...arvel-image-v0.8.2) (2026-06-08)
 
 
