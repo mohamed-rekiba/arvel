@@ -114,6 +114,22 @@ async def test_me_exposes_role_level(
 
 
 @pytest.mark.asyncio
+async def test_user_detail_shows_effective_permissions(
+    client: Any, super_admin_token: str
+) -> None:
+    """The detail view resolves the effective permission set, not just direct grants."""
+    headers = {"Authorization": f"Bearer {super_admin_token}"}
+    listing = await client.get("/api/admin/users", headers=headers)
+    sa = next(u for u in listing.json()["data"] if "super_admin" in u["roles"])
+
+    detail = await client.get(f"/api/admin/users/{sa['id']}", headers=headers)
+    data = detail.json()["data"]
+    # super_admin's perms come from the role, not direct grants.
+    assert "users.manage" in data["permissions"]
+    assert len(data["permissions"]) > len(data["direct_permissions"])
+
+
+@pytest.mark.asyncio
 async def test_customer_cannot_access_admin_products(client: Any, customer_token: str) -> None:
     """customer role has no products.view permission → 403."""
     response = await client.get(
