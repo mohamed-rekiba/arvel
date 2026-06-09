@@ -553,6 +553,14 @@ available." New test `test_checkout_fails_when_product_unpublished` unpublishes 
 carted product and asserts the unavailable message; the existing out-of-stock
 test still 409s. Backend ruff clean.
 
+## Iteration 36 — Wire the post-checkout success banner (frontend)
+
+LOW: iteration 26 made `StorefrontAccount` show a success banner only for an
+order id in `?order=`, but the checkout confirmation's "View orders" link went to
+`/account` with no query — so the banner was dead code. The link now carries
+`{ path: '/account', query: { order: placedOrder.id } }` when an order was placed,
+falling back to plain `/account` otherwise. Frontend typecheck + lint green.
+
 ## Blockers
 
 None. All quality gates green.

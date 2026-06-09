@@ -435,7 +435,7 @@ function itemShipping(index: number): string {
           </button>
           <RouterLink
             v-else
-            to="/account"
+            :to="placedOrder ? { path: '/account', query: { order: placedOrder.id } } : '/account'"
             class="flex-1 rounded-xl bg-brand py-3 text-center text-sm font-semibold text-white hover:bg-brand-hover"
           >
             {{ t('checkout.view_orders') }}
