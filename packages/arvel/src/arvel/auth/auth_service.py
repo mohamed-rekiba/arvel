@@ -257,9 +257,7 @@ class AuthService:
 
     # ─── Logout ────────────────────────────────────────────────────────────
 
-    async def logout(
-        self, *, refresh_token: str | None, access_token: str | None = None
-    ) -> None:
+    async def logout(self, *, refresh_token: str | None, access_token: str | None = None) -> None:
         """Revoke the session. Idempotent — missing/unknown is fine.
 
         Denies the presented access token's ``jti`` (so it stops working before

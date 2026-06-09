@@ -54,9 +54,7 @@ class FakeResponse:
         if body is None:
             raw = httpx.Response(self._status, headers=self._headers, request=request)
         elif isinstance(body, (str, bytes)):
-            raw = httpx.Response(
-                self._status, content=body, headers=self._headers, request=request
-            )
+            raw = httpx.Response(self._status, content=body, headers=self._headers, request=request)
         else:
             # Anything else is JSON. httpx's json= is typed Any; pass it through.
             raw = httpx.Response(
