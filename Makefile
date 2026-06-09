@@ -111,7 +111,7 @@ build:  ## Build sdist + wheel
 
 .PHONY: clean
 clean:  ## Remove build / cache artifacts
-	rm -rf dist build site _site .ruff_cache .pyright .pytest_cache .playwright-mcp htmlcov bootstrap .coverage* coverage.xml
+	rm -rf dist build site _site storage .ruff_cache .pyright .pytest_cache .playwright-mcp htmlcov bootstrap .coverage* coverage.xml
 	find . \( -name "__pycache__" -o -name ".mypy_cache" -o -name ".benchmarks" -o -name "dist" \) -type d -prune -exec rm -rf {} +
 
 .PHONY: no-process-artifacts

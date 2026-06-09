@@ -4,7 +4,7 @@ The generated class subclasses :class:`arvel.console.Command` and
 implements :meth:`Command.handle`, the default entry point for
 zero-argument commands. For commands that need typed CLI flags, override
 :meth:`Command.register` and drive Typer directly (see
-``docs/site/docs/artisan.md`` § "Writing your own commands").
+``docs/site/artisan.md`` § "Writing your own commands").
 
 Declare ``requires`` to opt into framework DI — the entrypoint then boots
 the listed subsystems and binds the resulting ``Application`` to

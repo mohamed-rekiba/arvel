@@ -3,7 +3,7 @@
 Speaks the AWS S3 wire protocol and works against any S3-compatible
 provider — AWS S3, MinIO, Cloudflare R2, Hetzner Object Storage,
 Backblaze B2, DigitalOcean Spaces, Wasabi, and others. Provider-specific
-configuration is documented in ``docs/site/docs/filesystem.md``.
+configuration is documented in ``docs/site/filesystem.md``.
 """
 
 from __future__ import annotations

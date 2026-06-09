@@ -221,7 +221,7 @@ Add a first-class `MorphToMany` async descriptor to Arvent and map the permissio
 
 - **Removed**: `make_role_assignments`, `make_permission_assignments`, `roles_proxy`,
   `permissions_proxy`, `_StringId`, and the three association-object classes. Host models that
-  followed ADR-019 § 4 must switch to the `MorphToMany` declaration in `docs/site/docs/permission.md`.
+  followed ADR-019 § 4 must switch to the `MorphToMany` declaration in `docs/site/permission.md`.
 - **Async-only API**: all mixin methods now require `await`. The demo, guards, middleware, and
   services were updated accordingly; `User.is_admin` is now `async def`.
 - **No `with_("roles","permissions")`**: load via `await user.roles.all()` /
@@ -292,7 +292,7 @@ internally.
 
 ### Consequences
 
-- Host models declare both the link collection and the proxy (see `docs/site/docs/permission.md`).
+- Host models declare both the link collection and the proxy (see `docs/site/permission.md`).
 - `arvel_permission.traits` exports `make_role_assignments`, `make_permission_assignments`,
   `roles_proxy`, and `permissions_proxy`. The old `make_roles_relationship` /
   `make_permissions_relationship` factories are gone.
