@@ -942,6 +942,17 @@ Two questions answered:
   Checks use `with_trashed()` because soft-deleted rows still hold the FK. Added
   3 feature tests (category-with-products → 409 then 204 once freed; vendor → 409)
   — all pass against real Postgres (~60s). 387 unit pass, ruff clean.
+- **iter 66 — frontend admin route RBAC (MED #3, done):** the router gated *every*
+  `/admin/*` route on a single coarse `hasAdminAccess` check, while the backend
+  enforces per-feature permissions. A deep link to `/admin/users` or `/admin/roles`
+  rendered the shell for any admin (e.g. catalog_manager) and then 403'd from the
+  API. Added `meta.permission` (+ `permissionMatch`) to each admin child route
+  mirroring the controllers' `require_permission`, a `RouteMeta` augmentation for
+  type-safety, and a `satisfiesPermission` check in `beforeEach` that redirects
+  unauthorized users to the always-reachable dashboard. Translations route mirrors
+  the backend's `["products.view","categories.view"]` all-match. Dashboard stays
+  ungated (the safe landing), consistent with the sidebar. Added a `test_047`
+  contract test (17 pass); vue-tsc + eslint clean; 26 frontend vitest pass.
 
 ## Blockers
 
