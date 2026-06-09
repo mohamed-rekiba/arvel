@@ -52,7 +52,7 @@ async function handleAddToCart(event: Event): Promise<void> {
 
 <template>
   <article
-    class="group relative flex flex-col rounded-xl border border-border bg-app-bg shadow-2xs transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+    class="group relative flex flex-col rounded-xl border border-border bg-app-bg shadow-2xs transition duration-300 ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-1 hover:border-primary-300 hover:shadow-lg"
   >
     <RouterLink :to="`/products/${product.slug}`" class="block">
       <!-- Image area -->
@@ -132,7 +132,7 @@ async function handleAddToCart(event: Event): Promise<void> {
     <div class="mt-auto px-3 pb-3">
       <button
         type="button"
-        class="w-full rounded-lg py-2 text-sm font-bold transition duration-150"
+        class="w-full rounded-lg py-2 text-sm font-bold transition duration-200 active:scale-[0.98]"
         :class="
           isOutOfStock
             ? 'cursor-not-allowed bg-app-bg-sunken text-fg-faint'

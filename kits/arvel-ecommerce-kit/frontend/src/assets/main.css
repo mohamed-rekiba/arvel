@@ -63,6 +63,98 @@
   }
 }
 
+/* ── Motion ───────────────────────────────────────────────────────── *
+ * Scroll reveal + ambient hero animations. Everything here is wrapped in
+ * prefers-reduced-motion:no-preference so the whole layer goes inert for
+ * users who opt out — content shows immediately, nothing moves.
+ */
+
+/* Reveal base: elements tagged by the v-reveal directive start hidden and
+   ease in once the directive adds .is-revealed. The directive also sets a
+   per-element transition-delay for stagger. */
+.reveal {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition:
+      opacity var(--duration-slow) var(--ease-standard),
+      transform var(--duration-slow) var(--ease-standard);
+    will-change: opacity, transform;
+  }
+
+  .reveal.is-revealed {
+    opacity: 1;
+    transform: none;
+  }
+
+  @keyframes float-y {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-12px);
+    }
+  }
+
+  @keyframes twinkle {
+    0%,
+    100% {
+      opacity: 0.25;
+      transform: scale(0.8);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes glow-breathe {
+    0%,
+    100% {
+      opacity: 0.45;
+    }
+    50% {
+      opacity: 0.85;
+    }
+  }
+
+  @keyframes gradient-pan {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .animate-float {
+    animation: float-y 6s var(--ease-standard) infinite;
+  }
+
+  .animate-float-slow {
+    animation: float-y 9s var(--ease-standard) infinite;
+  }
+
+  .animate-twinkle {
+    animation: twinkle 3.2s ease-in-out infinite;
+  }
+
+  .animate-glow {
+    animation: glow-breathe 5s ease-in-out infinite;
+  }
+
+  /* Slow drift across an oversized gradient — needs background-size > 100%. */
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-pan 9s ease-in-out infinite alternate;
+  }
+}
+
 /* Material Symbols variable font settings */
 .material-symbols-outlined {
   font-variation-settings:

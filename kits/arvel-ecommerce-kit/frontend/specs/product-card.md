@@ -34,6 +34,7 @@ sale override.
 
 ## Behavior
 
+- Card lifts and its border picks up `--color-primary-300` on hover (soft elevation)
 - Image scales on `group-hover` (subtle zoom)
 - "Add to Cart" slides up and fades in on `group-hover`
 - Unauthenticated "Add to Cart" redirects to `/login`

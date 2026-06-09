@@ -53,10 +53,11 @@ const promos = computed<Promo[]>(() => [
 <template>
   <div class="grid gap-4 sm:grid-cols-3">
     <RouterLink
-      v-for="promo in promos"
+      v-for="(promo, i) in promos"
       :key="promo.id"
+      v-reveal="i * 90"
       :to="promo.to"
-      class="group relative flex min-h-[160px] flex-col justify-between overflow-hidden rounded-xl p-5 transition duration-200 hover:opacity-95 hover:shadow-lg"
+      class="group relative flex min-h-[160px] flex-col justify-between overflow-hidden rounded-xl p-5 shadow-sm transition duration-300 ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-1 hover:shadow-xl"
       :style="{ background: promo.bg }"
     >
       <div>
