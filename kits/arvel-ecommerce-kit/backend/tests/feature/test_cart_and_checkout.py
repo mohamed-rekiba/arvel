@@ -268,6 +268,9 @@ async def test_checkout_creates_order_with_price_snapshot(
     order = response.json()["data"]
     assert order["status"] == "pending"
     assert order["total"] > 0
+    # The persisted total must equal the sum of its line subtotals — checkout keeps
+    # money in Decimal end-to-end, so there's no float round-trip drift between them.
+    assert order["total"] == sum(i["subtotal"] for i in order["items"])
 
     # Cart must be empty after checkout
     cart = await client.get("/api/cart", headers={"Authorization": f"Bearer {customer_token}"})
@@ -497,6 +500,17 @@ async def test_force_delete_product_with_order_keeps_history(
     assert order.status_code == 200
     items = order.json()["data"]["items"]
     assert items and items[0]["product_name"] == line_name
+
+    # The admin views must survive the NULL FK too — the response schema allows a
+    # null product_id, so serialization doesn't 500 on a sold-then-deleted product.
+    admin_show = await client.get(f"/api/admin/orders/{order_id}", headers=sa)
+    assert admin_show.status_code == 200
+    admin_items = admin_show.json()["data"]["items"]
+    assert admin_items and admin_items[0]["product_id"] is None
+    assert admin_items[0]["product_name"] == line_name
+
+    admin_list = await client.get("/api/admin/orders", headers=sa)
+    assert admin_list.status_code == 200
 
 
 @pytest.mark.asyncio

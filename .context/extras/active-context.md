@@ -964,6 +964,27 @@ Two questions answered:
   next navigation. Admin traffic is low, so the extra `/me` is cheap; no polling.
   Locked with a `test_047` assertion that the `requiresAdmin` branch re-hydrates.
   vue-tsc + eslint clean; 26 vitest + 17 contract tests pass.
+- **iter 68 — re-review batch r4: order data integrity (2 HIGH, done):** new
+  thorough review surfaced two real order bugs.
+  - **Admin order views 500 after a sold product is force-deleted.** `order_items.product_id`
+    is `null_on_delete`, and `_format_items` emits `None`, but `AdminOrderItemOut.product_id`
+    was required `str` — so `admin_get_order` / `admin_list_orders` `model_validate`
+    raised (account endpoints already used `str | None`). Aligned the admin schema to
+    `str | None`, re-exported OpenAPI, regenerated the orval client (also picked up the
+    already-shipped account-orders `limit`/`offset` query params the committed client
+    was stale on). Extended the existing force-delete test to hit `GET /admin/orders/{id}`
+    + `GET /admin/orders` → 200 with `product_id: null`.
+  - **Checkout total had float round-trip drift.** `get_cart_for_checkout` floated the
+    per-line price and the total, while order lines recomputed subtotals from those
+    floats — so `order.total` could diverge from `Σ order_items.subtotal`. Kept money in
+    `Decimal` end-to-end (line price + total derive from the same `unit_price_snapshot`
+    Decimal). Locked with an invariant assertion `order.total == Σ subtotal` on the
+    canonical checkout test. Both integration tests pass (~46s); ruff clean; 388 unit
+    pass; mypy parity with baseline (27 pre-existing kit errors, 0 added); vue-tsc clean.
+  - Remaining r4 backlog (deferred, lower signal): optimistic cart stock (checkout is the
+    authoritative gate), checkout-page unavailable-item guard parity, `Registered`→customer
+    role listener, admin self-delete guard, category parent_id 422, JsonResource/FormRequest
+    adoption on catalog mutations, dashboard revenue SQL aggregate, admin order status enum.
 
 ## Blockers
 

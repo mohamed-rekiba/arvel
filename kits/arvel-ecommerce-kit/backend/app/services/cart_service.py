@@ -136,16 +136,19 @@ class CartService:
         """Returns flat checkout-ready cart data using price snapshots."""
         cart_id = await self.get_or_create_cart(user_id)
         items: list[CartItem] = await self._get_items(cart_id)
+        # Decimal end-to-end: order.total must equal the sum of order_items.subtotal,
+        # so the per-line price and the total derive from the same Decimal — no float
+        # round-trip drift between the persisted total and its lines.
         checkout_items = [
             {
                 "product_id": str(i.product_id),
                 "quantity": int(i.quantity),
-                "unit_price": float(i.unit_price_snapshot),
+                "unit_price": Decimal(str(i.unit_price_snapshot)),
             }
             for i in items
         ]
         total = sum(Decimal(str(i.unit_price_snapshot)) * int(i.quantity) for i in items)
-        return {"items": checkout_items, "total": float(total)}
+        return {"items": checkout_items, "total": total}
 
     async def clear_cart(self, user_id: int) -> None:
         cart_id = await self.get_or_create_cart(user_id)
