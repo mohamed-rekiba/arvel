@@ -1,12 +1,12 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
-import { createI18n } from 'vue-i18n'
 import App from './App.vue'
 import router from './router'
 import './assets/main.css'
 import { i18nCatalogueApiI18nLocaleGet } from './api/i18n/i18n'
 import { setUnauthorizedHandler } from './lib/api'
+import { i18n } from './lib/i18n-instance'
 import {
   applyDocumentLocale,
   cacheTranslations,
@@ -99,6 +99,10 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'cart.continue': 'Continue Shopping',
     'cart.subtotal': 'Subtotal',
     'cart.checkout': 'Proceed to Checkout',
+    'cart.error_load': 'Failed to load cart',
+    'cart.error_add': 'Failed to add item',
+    'cart.error_update': 'Failed to update item',
+    'cart.error_remove': 'Failed to remove item',
     // checkout
     'checkout.title': 'Checkout',
     'checkout.place_order': 'Place Order',
@@ -470,6 +474,10 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'cart.continue': 'مواصلة التسوق',
     'cart.subtotal': 'المجموع الفرعي',
     'cart.checkout': 'إتمام الشراء',
+    'cart.error_load': 'تعذّر تحميل السلة',
+    'cart.error_add': 'تعذّر إضافة العنصر',
+    'cart.error_update': 'تعذّر تحديث العنصر',
+    'cart.error_remove': 'تعذّر إزالة العنصر',
     // checkout
     'checkout.title': 'إتمام الطلب',
     'checkout.place_order': 'تأكيد الطلب',
@@ -841,6 +849,10 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'cart.continue': 'Alışverişe devam et',
     'cart.subtotal': 'Ara toplam',
     'cart.checkout': 'Ödemeye geç',
+    'cart.error_load': 'Sepet yüklenemedi',
+    'cart.error_add': 'Ürün eklenemedi',
+    'cart.error_update': 'Ürün güncellenemedi',
+    'cart.error_remove': 'Ürün kaldırılamadı',
     // checkout
     'checkout.title': 'Ödeme',
     'checkout.place_order': 'Siparişi ver',
@@ -1155,12 +1167,8 @@ async function bootstrap(): Promise<void> {
   // Static fallbacks first, then backend keys override them.
   const messages = { ...UI_FALLBACKS[locale], ...backendMessages }
 
-  const i18n = createI18n({
-    legacy: false,
-    locale,
-    fallbackLocale: 'en',
-    messages: { [locale]: messages },
-  })
+  i18n.global.setLocaleMessage(locale, messages)
+  i18n.global.locale.value = locale
 
   const app = createApp(App)
   const pinia = createPinia()

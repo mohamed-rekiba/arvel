@@ -7,6 +7,7 @@ import {
   cartShowApiCartGet,
 } from '@/api/cart/cart'
 import type { CartOut } from '@/api/schemas'
+import { translate } from '@/lib/i18n-instance'
 import { useAuthStore } from '@/stores/auth'
 
 export const useCartStore = defineStore('cart', () => {
@@ -32,7 +33,7 @@ export const useCartStore = defineStore('cart', () => {
     try {
       cart.value = (await cartShowApiCartGet()).data
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to load cart'
+      error.value = err instanceof Error ? err.message : translate('cart.error_load')
     } finally {
       loading.value = false
     }
@@ -44,7 +45,7 @@ export const useCartStore = defineStore('cart', () => {
     try {
       cart.value = (await cartItemsStoreApiCartItemsPost({ product_id: productId, quantity })).data
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to add item'
+      error.value = err instanceof Error ? err.message : translate('cart.error_add')
       throw err
     } finally {
       loading.value = false
@@ -61,7 +62,7 @@ export const useCartStore = defineStore('cart', () => {
         cart.value = (await cartItemsUpdateApiCartItemsItemIdPatch(itemId, { quantity })).data
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to update item'
+      error.value = err instanceof Error ? err.message : translate('cart.error_update')
       throw err
     } finally {
       loading.value = false
@@ -74,7 +75,7 @@ export const useCartStore = defineStore('cart', () => {
     try {
       cart.value = (await cartItemsDestroyApiCartItemsItemIdDelete(itemId)).data
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to remove item'
+      error.value = err instanceof Error ? err.message : translate('cart.error_remove')
       throw err
     } finally {
       loading.value = false
