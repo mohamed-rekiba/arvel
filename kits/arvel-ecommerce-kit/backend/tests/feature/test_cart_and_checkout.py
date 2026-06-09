@@ -228,6 +228,31 @@ async def test_checkout_creates_order_with_price_snapshot(
 
 
 @pytest.mark.asyncio
+async def test_checkout_snapshots_product_name_in_shopper_locale(
+    client: Any, customer_token: str, headphones_id: str
+) -> None:
+    """The order line name is frozen in the locale the shopper checked out in."""
+    storefront = await client.get(
+        "/api/products/wireless-headphones-pro", headers={"Accept-Language": "ar"}
+    )
+    arabic_name = storefront.json()["data"]["name"]
+
+    await client.post(
+        "/api/cart/items",
+        headers={"Authorization": f"Bearer {customer_token}"},
+        json={"product_id": headphones_id, "quantity": 1},
+    )
+    response = await client.post(
+        "/api/checkout",
+        headers={"Authorization": f"Bearer {customer_token}", "Accept-Language": "ar"},
+        json={"shipping_address": {"line1": "1 St", "city": "City", "country_code": "US"}},
+    )
+    assert response.status_code == 201
+    item = response.json()["data"]["items"][0]
+    assert item["product_name"] == arabic_name
+
+
+@pytest.mark.asyncio
 async def test_checkout_fails_on_insufficient_stock(
     client: Any, customer_token: str, headphones_id: str
 ) -> None:

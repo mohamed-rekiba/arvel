@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
 
+from arvel.database import TranslatableMixin
 from arvel.logging.facade import Log
 
 from app.models.order import Order
@@ -50,7 +51,9 @@ class OrderService:
         except ValueError:
             return None
 
-    async def checkout(self, user_id: int, shipping_address: dict[str, Any]) -> dict[str, Any]:
+    async def checkout(
+        self, user_id: int, shipping_address: dict[str, Any], *, locale: str = "en"
+    ) -> dict[str, Any]:
         cart = await self._cart_service.get_cart_for_checkout(user_id)
         items = cart["items"]
         if not items:
@@ -87,8 +90,9 @@ class OrderService:
             pid = uuid.UUID(item["product_id"])
             product = locked_products[pid]
             published = published_products[pid]
-            name_data = published.name or {}
-            name_snapshot = name_data.get("en", "")
+            # Freeze the name in the shopper's locale (en fallback) — the order is a
+            # historical record in the language they bought it in, not always English.
+            name_snapshot = TranslatableMixin.translate_dict(published.name or {}, locale)
             qty = item["quantity"]
             unit_price = Decimal(str(item["unit_price"]))
 

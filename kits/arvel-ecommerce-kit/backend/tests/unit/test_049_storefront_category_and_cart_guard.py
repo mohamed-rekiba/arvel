@@ -68,7 +68,8 @@ def test_checkout_validates_catalog_product_before_stock_lock() -> None:
     assert "from app.models.product_catalog import ProductCatalog" in service
     assert "ProductCatalog.where(" in checkout_source
     assert checkout_source.index("ProductCatalog.where(") < checkout_source.index("Product.where(")
-    assert "name_data = published.name or {}" in checkout_source
+    # The line-item name is snapshotted in the shopper's locale, not always English.
+    assert "TranslatableMixin.translate_dict(published.name or {}, locale)" in checkout_source
 
 
 def test_checkout_endpoint_uses_observer_refresh() -> None:
