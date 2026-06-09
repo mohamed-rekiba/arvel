@@ -7,7 +7,13 @@ import {
   useAdminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch,
 } from '@/api/admin-orders/admin-orders'
 import { useQueryClient } from '@tanstack/vue-query'
-import { formatCurrency, formatDate, pickLocalized, routeParam, toSupportedLocale } from '@/lib/i18n'
+import {
+  formatCurrency,
+  formatDate,
+  pickLocalized,
+  routeParam,
+  toSupportedLocale,
+} from '@/lib/i18n'
 import { useToastStore } from '@/stores/toast'
 import PermissionGate from '@/components/admin/PermissionGate.vue'
 import { getShippingField, isOrderStatus } from '@/types'

@@ -115,7 +115,10 @@ async function handleAddToCart(event: Event): Promise<void> {
 
         <!-- Price row -->
         <div class="mt-2 flex items-baseline gap-2">
-          <span class="text-base font-extrabold" :class="isDiscounted ? 'text-price-sale' : 'text-fg'">
+          <span
+            class="text-base font-extrabold"
+            :class="isDiscounted ? 'text-price-sale' : 'text-fg'"
+          >
             {{ formatCurrency(product.price, currentLocale) }}
           </span>
           <span v-if="isDiscounted && originalPrice" class="text-xs text-fg-muted line-through">

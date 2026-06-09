@@ -877,7 +877,8 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'auth.full_name': 'Ad Soyad',
     'auth.signing_in': 'Giriş yapılıyor…',
     'auth.creating_account': 'Hesap oluşturuluyor…',
-    'auth.verify_sent': 'Hesap oluşturuldu. Hesabınızı doğrulamak için e-postanızı kontrol edin, ardından giriş yapın.',
+    'auth.verify_sent':
+      'Hesap oluşturuldu. Hesabınızı doğrulamak için e-postanızı kontrol edin, ardından giriş yapın.',
     // shared order labels
     'order.product': 'Ürün',
     'order.price': 'Fiyat',

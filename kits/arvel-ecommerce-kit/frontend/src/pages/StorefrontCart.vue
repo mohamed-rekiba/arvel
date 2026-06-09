@@ -122,7 +122,11 @@ async function remove(itemId: string): Promise<void> {
                       </p>
                     </div>
                   </div>
-                  <RouterLink v-else :to="`/products/${item.product.slug}`" class="flex items-center gap-3">
+                  <RouterLink
+                    v-else
+                    :to="`/products/${item.product.slug}`"
+                    class="flex items-center gap-3"
+                  >
                     <div class="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-app-bg-sunken">
                       <img
                         v-if="item.product.thumbnail_url"
@@ -227,9 +231,7 @@ async function remove(itemId: string): Promise<void> {
           v-if="cart.hasUnavailableItems"
           class="mt-5 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger"
         >
-          {{
-            t('cart.has_unavailable', 'Remove items that are no longer available to check out.')
-          }}
+          {{ t('cart.has_unavailable', 'Remove items that are no longer available to check out.') }}
         </p>
 
         <RouterLink
