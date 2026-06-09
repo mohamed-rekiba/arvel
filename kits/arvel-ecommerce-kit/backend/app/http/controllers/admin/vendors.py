@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from app.http.controllers._deps import require_permission, require_role_level, vendors
+from app.http.controllers._deps import (
+    clamp_limit,
+    clamp_offset,
+    require_permission,
+    require_role_level,
+    vendors,
+)
 from app.http.controllers._responses import AdminVendorListOut, AdminVendorWrapperOut
 from app.http.controllers._schemas import CreateVendorPayload, UpdateVendorPayload
 from arvel.http import Request
@@ -23,7 +29,7 @@ class AdminVendorsController(Controller):
     ) -> AdminVendorListOut:
         await require_permission(request, "vendors.view")
         return AdminVendorListOut.model_validate(
-            await vendors.list(trashed, limit=limit, offset=offset)
+            await vendors.list(trashed, limit=clamp_limit(limit), offset=clamp_offset(offset))
         )
 
     async def show(self, vendor_id: str, request: Request) -> AdminVendorWrapperOut:

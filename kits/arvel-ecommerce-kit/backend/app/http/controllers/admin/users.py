@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from app.http.controllers._deps import (
+    clamp_limit,
+    clamp_offset,
     highest_role_level,
     require_permission,
     require_role_level,
@@ -40,7 +42,12 @@ class AdminUsersController(Controller):
     ) -> AdminUserListOut:
         await require_permission(request, "users.manage")
         return AdminUserListOut.model_validate(
-            await users.list_users(trashed=trashed, search=search, limit=limit, offset=offset)
+            await users.list_users(
+                trashed=trashed,
+                search=search,
+                limit=clamp_limit(limit),
+                offset=clamp_offset(offset),
+            )
         )
 
     async def show(self, user_id: int, request: Request) -> AdminUserWrapperOut:

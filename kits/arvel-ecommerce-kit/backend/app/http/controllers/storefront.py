@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.http.controllers._deps import categories, products
+from app.http.controllers._deps import categories, clamp_limit, products
 from app.http.controllers._responses import (
     ProductDetailOut,
     ProductListOut,
@@ -26,7 +26,9 @@ class StorefrontController(Controller):
     ) -> ProductListOut:
         resolved_locale = locale or getattr(request.state, "locale", "en") or "en"
         return ProductListOut.model_validate(
-            await products.list_published(locale=resolved_locale, limit=limit, cursor=cursor)
+            await products.list_published(
+                locale=resolved_locale, limit=clamp_limit(limit), cursor=cursor
+            )
         )
 
     async def show(
@@ -52,7 +54,7 @@ class StorefrontController(Controller):
         resolved_locale = locale or getattr(request.state, "locale", "en") or "en"
         return ProductListOut.model_validate(
             await products.list_published_by_category_slug(
-                slug, locale=resolved_locale, limit=limit, cursor=cursor
+                slug, locale=resolved_locale, limit=clamp_limit(limit), cursor=cursor
             )
         )
 
@@ -69,5 +71,7 @@ class StorefrontController(Controller):
         if len(q) < _MIN_QUERY_LENGTH:
             raise BadRequestException("Search query must be at least 2 characters.")
         resolved_locale = locale or getattr(request.state, "locale", "en") or "en"
-        results = await products.search_published(q=q, locale=resolved_locale, limit=limit)
+        results = await products.search_published(
+            q=q, locale=resolved_locale, limit=clamp_limit(limit)
+        )
         return SearchOut.model_validate({"data": results})

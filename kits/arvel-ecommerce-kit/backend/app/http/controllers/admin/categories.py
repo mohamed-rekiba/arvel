@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from app.http.controllers._deps import categories, require_permission, require_role_level
+from app.http.controllers._deps import (
+    categories,
+    clamp_limit,
+    clamp_offset,
+    require_permission,
+    require_role_level,
+)
 from app.http.controllers._responses import AdminCategoryListOut, AdminCategoryWrapperOut
 from app.http.controllers._schemas import CreateCategoryPayload, UpdateCategoryPayload
 from arvel.http import Request
@@ -23,7 +29,7 @@ class AdminCategoriesController(Controller):
     ) -> AdminCategoryListOut:
         await require_permission(request, "categories.view")
         return AdminCategoryListOut.model_validate(
-            await categories.list(trashed, limit=limit, offset=offset)
+            await categories.list(trashed, limit=clamp_limit(limit), offset=clamp_offset(offset))
         )
 
     async def show(self, category_id: str, request: Request) -> AdminCategoryWrapperOut:

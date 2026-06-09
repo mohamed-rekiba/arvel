@@ -5,7 +5,13 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
-from app.http.controllers._deps import products, require_permission, require_role_level
+from app.http.controllers._deps import (
+    clamp_limit,
+    clamp_offset,
+    products,
+    require_permission,
+    require_role_level,
+)
 from app.http.controllers._responses import (
     AdminProductListOut,
     AdminProductWrapperOut,
@@ -67,8 +73,8 @@ class AdminProductsController(Controller):
                     "status": request.query_params.get("status"),
                     "real_status": request.query_params.get("real_status"),
                     "slug": request.query_params.get("slug"),
-                    "limit": limit,
-                    "offset": offset,
+                    "limit": clamp_limit(limit),
+                    "offset": clamp_offset(offset),
                 }
             )
         )
