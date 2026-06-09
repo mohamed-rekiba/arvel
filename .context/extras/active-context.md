@@ -1,0 +1,438 @@
+# Active Context
+
+## Current Focus
+
+Driving the `kits/arvel-ecommerce-kit` demo to completion via the autonomous
+review → implement → document → design loop. The kit stress-tests the Arvel
+framework, so gaps it exposes are real framework/demo work.
+
+## Key Decisions
+
+- **Run kit tests via the workspace, not the `demo-*` containers.** The running
+  Docker stack mounts a stale checkout (`/Users/.../temp/test/demo`), so its
+  results are misleading. Correct command:
+  `uv run --project kits/arvel-ecommerce-kit/backend pytest kits/arvel-ecommerce-kit/backend/tests/...`
+- **A01 privilege-escalation guard belongs in the controller, mirroring
+  `assign_role`'s `>=` convention.** Peer rank is allowed; acting on a user who
+  outranks you raises `AuthorizationException`.
+- **Don't fabricate UI data.** Backend returns `rating`/`rating_count` as `null`
+  (no reviews feature). Frontend now hides the rating UI instead of faking
+  `4.2`/`73`. Analytics/Settings render an honest "coming soon" instead of the
+  translations table.
+- **Defer the full Orval-only consolidation.** `lib/api.ts` is pinned by the
+  `test_047` frontend-shell contract test (`listAdminRows(`, `getAdminUser(`,
+  `runAdminUserAction(`, ...). Removing the dual layer requires rewriting that
+  contract test — a dedicated iteration, not a surgical batch.
+- **CHANGELOG.md is Release-Please-generated** (commit-linked) — never hand-edit.
+- **`docs/` trees are mid-reorganization** (`docs_dir: docs/site`, plus untracked
+  `docs/kits` and `docs/docs`). Avoid editing until the layout settles; no
+  published doc claim is contradicted by this iteration.
+
+## Changes This Iteration
+
+Backend (`kits/arvel-ecommerce-kit/backend`):
+- `app/http/controllers/_deps.py` — added `highest_role_level(user)`.
+- `app/http/controllers/admin/users.py` — `_assert_outranks` guard wired into
+  `destroy`, `force_destroy`, `suspend`, `unsuspend`, `restore` (OWASP A01).
+- `pyproject.toml` — self-contained `[tool.pytest.ini_options]` (`asyncio_mode`,
+  markers) so a standalone `arvel new --kit ecommerce` runs the async security
+  tests correctly.
+- `tests/unit/_framework_src.py` — new helper; `importlib.find_spec` resolves
+  framework package sources, replacing brittle `parents[5]` in
+  `test_054/055/056`.
+- `tests/unit/test_057_authz_escalation_guard.py` — 6 new guard tests.
+- Result: 356 unit tests pass, ruff clean.
+
+Frontend (`kits/arvel-ecommerce-kit/frontend`):
+- `pages/AdminListPage.vue` — "Show deleted" toggle now passes `trashed` and
+  resets pagination.
+- `pages/AdminPlaceholderPage.vue` + `router.ts` — Analytics/Settings/catch-all
+  now use a `coming-soon` state; Translations passes `pageType: 'translations'`.
+  Removed the stray `AdminUserDetailPage` redirect route.
+- `components/storefront/ProductCard.vue`, `pages/StorefrontProductDetail.vue` —
+  ratings render only when the backend supplies them (no more fake stars).
+- `lib/api.ts` — removed dead `deactivateAdminUser` (posted to a nonexistent
+  `/deactivate` route, zero references).
+- `main.ts` — added `admin.placeholder.coming_soon` for en/ar/tr.
+- `src/lib/i18n.test.ts`, `src/stores/cart.test.ts` — first Vitest tests
+  (15 passing). Closes the "zero frontend tests" gap.
+- Result: typecheck + lint + build clean, 15 vitest tests pass.
+
+## Iteration 2 — Orval consolidation (admin user detail)
+
+- `pages/AdminUserDetailPage.vue` is now fully Orval-driven. Removed the dead
+  `void`-ed `lib/api.ts` handlers and migrated the one live call (force-delete)
+  to `useAdminUsersForceDestroyApiAdminUsersUserIdForceDelete`, with toast +
+  users-list invalidation + redirect to `/admin/users` on success.
+- Deleted 8 now-dead hand-written admin-user helpers from `lib/api.ts`
+  (`getAdminUser`, `assignAdminUserRole`, `revokeAdminUserRole`,
+  `grantAdminUserPermission`, `revokeAdminUserPermission`, `runAdminUserAction`,
+  `deleteAdminUser`, `forceDeleteAdminUser`). The Orval custom mutator and the
+  auth/session/media helpers in `lib/api.ts` stay — they are not duplicates.
+- Rewrote `test_047`'s user-detail test to assert Orval hook usage and the
+  absence of the removed helpers.
+- Added `admin.user.toast_force_deleted` / `force_delete_failed` (en/ar/tr).
+- Verified: typecheck + lint + build clean, 15 vitest, 356 backend unit tests.
+
+`listAdminRows` intentionally kept — it's a generic multi-resource admin fetch
+used by `AdminDashboard` and `AdminListPage`, not a per-endpoint Orval duplicate.
+
+## Iteration 3 — Test-endpoint hardening (security)
+
+- `app/http/controllers/test.py` seed/refresh endpoints were allow-by-default
+  (denied only `production`), so a reachable `development`/`staging` deployment
+  exposed destructive reseed to anonymous callers. Switched to deny-by-default
+  via `_guard_test_env()` with an allowlist of `{local, testing}`.
+- `.env.example` is `APP_ENV=local` (local stack + tests keep working);
+  `config/app.py` defaults to `production` when unset (denied). `make seed`
+  uses the CLI, not these HTTP endpoints, so nothing else breaks.
+- New `tests/unit/test_058_test_endpoints_guard.py` (10 tests) asserts the
+  deny path for production/development/staging/unset and allow for local/testing.
+- Result: 366 unit tests pass, ruff clean.
+
+## Iteration 4 — Remove remaining fabricated UI data
+
+- Admin dashboard StatCards dropped the hardcoded `:trend="12/8/5/3"` (no
+  period-over-period data exists). `StatCard.trend` stays optional/reusable.
+- Deleted the `FlashSale` "Deal of the Day" component: it invented 15-20%
+  discounts (`price * 0.8/0.85`) and a countdown that reset every page load.
+  No backend sale feature exists. Removed its usage in `StorefrontHome`, the
+  component file, and the orphaned frontend `flash.*` i18n keys (en/ar/tr).
+- `ProductCard` discount/strikethrough is now purely backend-driven: shows
+  only when `product.original_price > product.price`. Removed the FlashSale-only
+  `salePrice`/`originalPrice` override props and updated `specs/product-card.md`.
+- Left backend `flash_sale.*` i18n catalogue keys + `test_042` alone — that's a
+  forward-looking catalogue-completeness contract (pins `nav.analytics`/
+  `nav.settings` placeholders too), separate from the frontend `flash.*` keys.
+- Verified: typecheck + lint + build clean, 15 vitest, 366 backend unit tests.
+
+## Iteration 5 — Design refresh (in progress)
+
+User approved a full autonomous redesign (storefront + admin). The existing
+design is already strong (OKLCH token system, violet/cyan framework brand, full
+dark mode), so this is a cohesive refresh/polish — not a teardown. The framework
+brand color stays.
+
+Batch 1 (foundation, done): added Plus Jakarta Sans as the heading/display font
+(Cairo trails for Arabic), refined the shadow scale to soft two-stop elevation
+(light + dark), applied via token layer so it cascades app-wide. Verified build +
+lint clean. The live docker stack at :8002 reflects it via Vite HMR.
+
+Batch 2 (hero honesty, done): the wide home promo banner asserted a fake
+"Get Up To 85% OFF on Big Billion Day" and the three `PromoBanners` carried
+fabricated "Flat 10/15% OFF" eyebrows. No sale/discount backend feature exists,
+so these were dishonest. Rewrote the banner copy to a single honest headline and
+swapped the promo eyebrows to curation labels (Trending now / Fan favorites /
+Editor's pick) across en/ar/tr; dropped the orphaned `home.big_sale_highlight`/
+`home.big_sale_suffix` keys. Verified typecheck + lint + 15 vitest + build clean.
+
+Next batches: product/listing polish, admin polish.
+
+## Iteration 6 — Complete the A01 outrank guard (security)
+
+Re-ran parallel review subagents. They confirmed the lifecycle mutators are
+guarded but flagged that `assign_role`, `revoke_role`, `grant_permission`, and
+`revoke_permission` skipped `_assert_outranks` — a level-80 actor that cleared
+the actor-level/permission gate could still strip roles/perms from a level-100
+target. Added `await _assert_outranks(actor, target)` to all four (after the
+target + role/perm existence checks, before mutation). Added four blocking tests
+to test_057 (target outranks actor → AuthorizationException). 370 backend unit
+tests pass; ruff clean; users.py mypy-clean (the 19 mypy errors are pre-existing
+in product_base/cart/services dependency files, untouched here).
+
+## Iteration 7 — Hero honesty (frontend)
+
+HeroBanner.vue hardcoded SAVE10 / 10% SALE / From $399.99 / strikethrough
+$499.99 / 4.9 rating / 20% OFF, and the en/ar/tr `hero.subtitle` promised "free
+shipping over $75" — all fabricated (no promo, sale, rating, or shipping feature
+exists). Rewrote to honest editorial copy: kept the layout/blob/mockup, replaced
+the title with "Tech that keeps up / with you", dropped the promo-code + price
+lines, swapped the rating badge for a non-numeric "Curated picks" (verified
+icon), and removed the price badge + discount pill. Pruned the dead hero keys
+(sale_title, sale_accent, promo_hint, price_from, top_rated, discount) across
+en/ar/tr and added hero.title_accent / hero.badge. Gates green.
+
+## Iteration 8 — Real permission matrix (full-stack)
+
+AdminPermissionsPage rendered a fake grant matrix: every role with level>=80 got
+a ✓ on every permission, ignoring actual role_has_permissions. Made it real:
+- Backend: RoleOut now carries `permissions: list[str]`; roles.index loads each
+  role's `role.permissions.all()` (small fixed role set, N+1 is fine).
+- Regenerated openapi.yaml + Orval client via `make api-generate` (stack was up).
+  Note: openapi.yaml is gitignored, so the committed generated TS client had
+  drifted from the live spec — regen (clean:true) also corrected that drift
+  (dropped stale LoginRequest.remember, split storefront image sub-schemas).
+- FE: matrix cell now checks `(role.permissions ?? []).includes(perm.name)`.
+- Updated test_047 stale assertion (the removed dead `redirectTo` prop on
+  /admin/login → assert the real `adminRedirect: true`). 370 backend + 15 vitest
+  pass; lint/typecheck/build clean.
+
+## Iteration 9 — Real dashboard aggregates (full-stack)
+
+AdminDashboard summed only the first page (listAdminRows, no limit → backend's
+default 50) for revenue/orders/customers/AOV/status breakdown — under-reports
+once >50 orders exist. Added a DB-aggregated stats endpoint:
+- Backend: OrderService.dashboard_stats (sum/count/COUNT(DISTINCT)/GROUP BY
+  status, all soft-delete-scoped to live orders) + a 7-day revenue series
+  (bounded window, bucketed in Python). New GET /api/admin/orders/stats
+  (orders.view), DashboardStatsOut schema. Route ordered before /{order_id}.
+- Regenerated Orval; AdminDashboard now uses useAdminOrdersStats... for KPIs +
+  status, and useAdminOrdersIndex({limit:6}) for the recent-orders card only.
+- RevenueBarChart now takes the server series instead of recomputing from a
+  capped orders array.
+- Verified live (superadmin token → 200) and with 2 new feature tests
+  (test_admin_dashboard: orders.view enforcement + 7-point series shape),
+  passing under the testcontainers harness. 370 unit + lint/typecheck/build green.
+
+## Iteration 10 — Auth hydration + admin-access consistency (frontend)
+
+Two real bugs:
+- router.beforeEach and AdminLayout.onMounted called lib/api `loadCurrentUser()`,
+  which fetched /api/auth/me but discarded the result — the Pinia store was never
+  refreshed, so permissions stayed whatever localStorage held (stale grants
+  survive a server-side role change until next login).
+- router had its own hasAdminAccess() using broad prefixes (products./orders./
+  users./roles.) while the store/nav use exact ADMIN_PERMISSIONS
+  (products.view/orders.view/users.manage/roles.manage) — the guard and the nav
+  could disagree about who's an admin.
+
+Fix: both call sites now use auth.hydrate() (calls authMeApiAuthMeGet → persists
+to the store) and the guard reuses auth.hasAdminAccess. Deleted the now-dead
+lib/api auth block (loginUser, registerUser, fetchCurrentUser, loadCurrentUser,
+MeResponse, AuthTokenResponse) — auth has gone through Orval store hooks for a
+while. Updated test_047 (router + admin-shell + the two stale iteration-9
+dashboard/auth-helper assertions that referenced removed code). 370 unit +
+15 vitest + typecheck/lint/build green.
+
+## Iteration 11 — Drop dead admin list helpers (frontend)
+
+AdminListPage already read orders/users via the generated orval index hooks, but
+onMounted still fired a lib/api `listAdminRows()` whose result was thrown away
+(the comment literally said "Orval hooks handle actual data loading"). Removed
+the dead onMounted + the orphaned `resource` computed, and deleted the now-unused
+`listAdminRows`, `listAdminCatalog`, and `AdminListParams` from lib/api.ts.
+Rewrote test_047's list-page contract to assert the real orval hooks and that
+listAdminRows is gone. Gates green (16 contract tests, typecheck/lint/build).
+
+## Iteration 12 — i18n the storefront listing/search copy (frontend)
+
+StorefrontProducts and StorefrontSearch had hardcoded English in the template:
+"{n} items", "Filter products…", "No products found", "Load more",
+"{n} results for {q}", "Enter a search term above", "No products match your
+search". Arabic/Turkish visitors saw English here. Added 7 keys (products.count,
+products.filter_placeholder, products.none, products.load_more, search.count,
+search.prompt, search.none) across en/ar/tr with {n}/{q} interpolation and wired
+the templates. Gates green (typecheck/lint/15 vitest/build).
+
+Note on product-card surface (deferred, not a bug): original_price, rating,
+rating_count, is_new, is_bestseller are hardcoded None/False in
+product_service/cart_service — they're spec'd (specs/product-card.md) but not yet
+wired to data. They never render (guarded), so nothing fabricated. Wiring or
+removing them is a design call, left for a human.
+
+## Iteration 13 — Remove test-driven storefront prefetch (frontend)
+
+StorefrontHome/Products/ProductDetail each fired a lib/api fetcher
+(fetchProductList/fetchCategory/fetchProductBySlug) whose result was discarded —
+the comment literally said "so the import is exercised; Orval query drives the
+UI". The only thing keeping these alive was test_047 asserting the imports. Real
+data already comes from the orval storefront hooks. Removed the dead calls +
+imports, deleted the now-orphaned fetchProductList/fetchProductBySlug/
+fetchCategory/searchProducts and ProductListResponse/StorefrontProduct types,
+and rewrote the contract test to assert the orval hooks (and that the dead
+fetchers are gone). 370 unit + 15 vitest + typecheck/lint/build green.
+
+## Iteration 14 — Delete dead admin CRUD lib helpers (frontend)
+
+Confirmed zero runtime + zero test consumers for createAdminCatalog,
+updateAdminCatalog, deleteAdminCatalog, forceDeleteAdminCatalog,
+getAdminCatalogRecord, getAdminOrder, updateAdminOrderStatus, and the
+AdminCatalogResource type — catalog/order admin pages use the generated orval
+mutation hooks. Removed them; kept AdminListResource (AdminListPage prop) and the
+product-media helpers (AdminCatalogEditPage still uses those). No test changes
+needed. typecheck/lint/build green.
+
+## Iteration 15 — Delete dead cart/checkout lib helpers (frontend)
+
+The cart store + StorefrontCart/Checkout/Account use generated orval hooks
+(cartShow/cartItemsStore/Update/Destroy, checkoutApiCheckoutPost,
+useAccountOrdersIndex…). The lib/api fetchCart/addCartItem/updateCartItem/
+removeCartItem/checkout/fetchAccountOrders helpers + authorizedJson + the
+CartResponse/CartItem/DetailResponse/OrderSummary types had no runtime consumers
+— only test_047 propped them up. Removed them and rewrote the customer-pages
+contract test to assert the real orval cart/checkout/account hooks. lib/api.ts is
+now just the orval mutator (request), the json helper, session helpers, and the
+product-media helpers. 370 unit + 15 vitest + typecheck/lint/build green.
+
+Review backlog is clear of the actionable FE items found in this loop. Open,
+deferred-to-human design calls remain noted above (product-card spec'd surface:
+original_price/rating/is_new/is_bestseller wiring).
+
+## Iteration 16 — Localize admin date/currency formatting (frontend)
+
+Re-ran the parallel review. Triaged the 10 findings:
+- #1 (admin trusts tampered localStorage): mitigated — `main.ts` awaits
+  `auth.hydrate()` (the authoritative `/me`) before mount and overwrites stored
+  perms; the store reads localStorage once at init, and the backend enforces 403.
+  UI flash only, not exploitable.
+- #2/#9 (cart snapshot vs live price): non-issue — cart shows live `product.price`
+  and checkout charges live DB price (read at checkout); both match.
+- #4 (KPIs mix soft-deleted orders): false positive — `Order.sum/count` apply the
+  global soft-delete scope (verified in `arvel/database/query_mixin.py`).
+- #3 (test reseed endpoints): accepted — `APP_ENV ∈ {local,testing}` gated, demo
+  posture stands.
+Real, in-theme fix shipped: `AdminListPage` and `AdminOrderDetailPage` hardcoded
+`'en'` for `formatDate`/`formatCurrency` (and `pickLocalized` for the order-line
+product name) while the rest of the app is locale-aware. Wired `currentLocale`
+(`toSupportedLocale(locale.value)`) so admin dates/currency/product names follow
+the chosen locale like the storefront. typecheck/lint/15 vitest/build + 16
+contract tests green.
+
+## Documentation audit (doc-agent pass)
+
+Verified the doc surface before touching anything (accuracy-first, no fabrication):
+- `make docs` green — link check "57 files, all resolve"; strict mkdocs build OK.
+- Every `mkdocs.yml` nav page exists; kit README + published kit page accurate.
+- All 4 component specs map to real components (`SalesBadge.vue` still exists;
+  only `FlashSale` was removed and it never had a spec).
+- STALE NOTE RETIRED: the "docs/ mid-reorg, avoid editing" caution is obsolete —
+  `git status` shows `docs/` fully committed and clean. Site docs are editable.
+- Undocumented in-flight code (not a doc deliverable): `AdminListPage.vue` +
+  `AdminOrderDetailPage.vue` switched admin order date/currency from hardcoded
+  `'en'` to the active locale (`toSupportedLocale(locale)`). Flag for the code loop.
+
+No broken or stale published doc found — no doc rewrite was fabricated.
+
+## Iteration 17 — Admin product PATCH returns 404, not 500 (backend)
+
+`AdminProductsController.update` called `products.update(...)` directly. The
+service raises `ProductNotFoundError` (a plain `Exception`, not an HTTP type) on a
+missing product and does `uuid.UUID(product_id)` which throws `ValueError` on a
+malformed id — both surfaced as 500s. `show`/`restore`/`publish` already guard
+None → 404, and `categories`/`vendors` controllers fetch-then-guard. Mirrored that:
+`update` now checks `products.admin_get(product_id, include_trashed=True)` (safe on
+bad UUID and missing) and raises `NotFoundException` before mutating. Added
+`test_update_missing_product_returns_404` to `test_admin_products.py`. 370 unit +
+the targeted feature pair (missing→404, real update→200) green; ruff clean.
+
+## Iteration 18 — Cart PATCH/DELETE on unknown item is 404, not silent 200 (backend)
+
+`CartService.update_item`/`remove_item` wrapped the mutation in `if item is not
+None:` and otherwise returned the cart unchanged with 200 — a stale/foreign item id
+looked like success. `int(item_id)` also 500'd on a non-numeric id. Extracted
+`_owned_item(cart_id, item_id)` that raises `NotFoundException` for a bad/foreign
+id (mirrors the iteration-17 product fix). Added two feature tests
+(update/remove unknown id → 404). Existing update/remove (→200) still pass; ruff
+clean. Normal FE flows only touch items already in cart state, so no regression.
+
+## Iteration 19 — Checkout self-loads the cart (frontend)
+
+`StorefrontCheckout` rendered the review step purely from the in-memory cart store
+and only called `requireStoredAccessToken()` on mount — it relied entirely on
+boot-time `useCartStore().load()` ordering in `main.ts`. The sibling
+`StorefrontCart` already self-loads (`void cart.load()` on mount). Added the same
+to checkout so a direct load/refresh on `/checkout` populates the review reliably,
+independent of boot order. typecheck/lint/15 vitest/build + 16 contract tests green.
+
+Review triage recap (no code needed): #1 admin localStorage trust → mitigated by
+boot `auth.hydrate()`; #2/#9 cart price → live price both sides; #4 KPIs → soft-delete
+scoped; #3 test endpoints → APP_ENV-gated demo posture.
+
+## Iteration 20 — Order line names snapshot in shopper's locale (backend)
+
+`OrderService.checkout` froze each line's `product_name_snapshot` as
+`published.name.get("en")` — Arabic/Turkish shoppers got English order history.
+Threaded `locale` through `CheckoutController` (from `request.state.locale`,
+Accept-Language) into `checkout(...)` and snapshot via
+`TranslatableMixin.translate_dict(published.name or {}, locale)` (en fallback) —
+same picker the storefront/cart use. Added a feature test (checkout with
+Accept-Language: ar → order line name == Arabic catalog name) and updated the
+stale source-text assertion in test_049 (was pinned to the old `name_data =`
+line — exactly the #10 brittle-contract smell). 370 unit + targeted feature pair
+(price snapshot, locale snapshot) green; ruff clean.
+
+## Iteration 21 — Guard the /admin catch-all (frontend)
+
+The `/admin/:pathMatch(.*)*` catch-all was a top-level sibling of the `/admin`
+group, so it carried no `requiresAuth`/`requiresAdmin` meta — an unknown
+`/admin/whatever` rendered the admin placeholder unguarded (and outside the admin
+shell). Moved it to be the last child of the `/admin` group so it inherits the
+guard and renders inside `AdminLayout`. Added a nesting assertion to test_047
+(catch-all index falls after the group's `children: [`). Backend still serves the
+SPA shell for it via the existing `/admin/{path:path}` web route. typecheck/lint/
+build + 16 contract tests green.
+
+## Iteration 22 — Fix broken self-service registration flow (frontend)
+
+Fresh review (agent 5a1d597a) surfaced new items. Highest user-visible: the SPA's
+`auth.register()` auto-called `login()`, but the framework rejects login while
+`email_verified_at IS NULL` (auth_service.py:159 → 422 "Email not verified") and
+register only queues a verification email. So every new storefront signup failed
+at the auto-login step. Fixed honestly (keeps the framework's verify-email feature):
+`register()` no longer auto-logs-in; `StorefrontAuth` now prefills the login email,
+switches to the login tab, and shows an `auth.verify_sent` notice (added en/ar/tr).
+The verify link (Mailpit in the demo) marks the user verified, then login works.
+typecheck/lint/15 vitest/build + 16 contract tests green.
+
+### Review backlog (iteration 22 findings, remaining)
+
+- MED: `shipping_address: dict[str, Any]` accepts `{}`/garbage → typed model + 422.
+- MED: AdminUserDetailPage "Permissions" shows direct grants only, not effective
+  (role-derived) perms — rename or expose effective set.
+- MED: force-delete button gated on `users.manage` but API needs role level 100 →
+  non-superadmins get a 403 after clicking (need a level signal in MeOut).
+- MED #6: global 401 handler always routes to storefront `login`, even for /admin.
+- MED: `/account?order=...` shows "Order placed" with no verification.
+- LOW: WishlistButton is local-only (fake); checkout delivery date hardcodes en-US;
+  category parent_id allows self/cycle; admin edit pages lack per-action gates.
+
+## Iteration 23 — Serialize concurrent checkout (backend)
+
+HIGH #1: checkout locked Product rows but not the cart, so two simultaneous
+`POST /checkout` (or a double-click) could both read the same lines, create two
+orders, and double-decrement stock. Added `CartService.lock_cart(user_id)`
+(`SELECT … FOR UPDATE` on the cart row) and call it first in `OrderService.checkout`
+(runs under the route's DB_TX). The second request blocks on the lock, then
+re-reads the emptied cart and fails as EmptyCart (422). Added a feature test that
+fires two checkouts via `asyncio.gather` and asserts exactly one 201 + one 422 and
+a single order. 370 unit + targeted feature trio (concurrent, insufficient stock,
+price snapshot) green; ruff clean.
+
+## Iteration 24 — Admin 401 routing + checkout delivery-date locale (frontend)
+
+Two small UX fixes. MED #6: the global 401 handler always pushed to the
+storefront `login`, so an admin whose token expired lost the admin shell + the
+post-login dashboard redirect — now routes to `admin-login` when the current
+path is under `/admin`. LOW #9: checkout estimated-delivery date was hardcoded
+`en-US` — now formats with the active locale like the rest of the page.
+Committed `6931dee`, `3bccc96`. Frontend gates green.
+
+## Iteration 25 — Type and validate the checkout shipping address (full-stack)
+
+MED: `CheckoutPayload.shipping_address` was `dict[str, Any]` — checkout accepted
+`{}` or any junk and persisted it, and the tests used an ad-hoc
+`{line1, country_code}` shape that never matched what the UI writes/reads
+(`{name, street, city, country}`). Added a `ShippingAddress` Pydantic model
+(`extra="forbid"`, each field `min_length=1`, sane max lengths) and used it in
+`CheckoutPayload`; controller passes `.model_dump()` to the service (storage
+shape unchanged). Standardized all checkout test payloads on the canonical
+shape. Regenerated `openapi.yaml` (gitignored) + the Orval client — the loose
+`{ [key: string]: unknown }` is now a typed `ShippingAddress`. Added a feature
+test asserting a missing-field address is a 422. 370 unit + 14 checkout feature
+tests green; frontend typecheck/lint/vitest green; ruff clean.
+
+Note: host `node_modules` was a partial install (missing transitive `dist`);
+a `npm ci` into the (cleared) mount repaired it so `api:generate` runs locally.
+
+## Blockers
+
+None. All quality gates green.
+
+## Next 3 Actions
+
+1. Design phase: run `design-system-kit` against the storefront/admin using
+   `deep-research` inspiration (large, standalone iteration).
+2. Re-run the review subagents to confirm A01 + broken-contract + dual-layer
+   findings are resolved and surface the next priority batch.
+3. Consider migrating `AdminListPage`/`AdminDashboard` off `listAdminRows` to
+   the generated index hooks if the review still flags the generic helper.

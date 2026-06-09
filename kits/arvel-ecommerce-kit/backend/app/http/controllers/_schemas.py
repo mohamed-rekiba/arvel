@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -32,9 +32,17 @@ class UpdateCartItemPayload(BaseModel):
     quantity: Annotated[int, Field(ge=1)]
 
 
+class ShippingAddress(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    name: Annotated[str, Field(min_length=1, max_length=200)]
+    street: Annotated[str, Field(min_length=1, max_length=200)]
+    city: Annotated[str, Field(min_length=1, max_length=120)]
+    country: Annotated[str, Field(min_length=1, max_length=120)]
+
+
 class CheckoutPayload(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-    shipping_address: dict[str, Any]
+    shipping_address: ShippingAddress
 
 
 class CreateProductPayload(BaseModel):
