@@ -8,11 +8,10 @@ is available without a join.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, TypedDict
 
-from arvel.config import config
 from arvel.database import TranslatableMixin
 from arvel.database.exceptions import InvalidCursorError
 from arvel.http.exceptions import ValidationException
@@ -325,12 +324,6 @@ class ProductService:
             if card_url and card_url != first["url"]:
                 card_srcset = f"{card_url} 400w"
 
-        created = product.created_at
-        if created is not None and created.tzinfo is None:
-            created = created.replace(tzinfo=UTC)
-        new_window = timedelta(days=int(config("catalog.new_product_days", 30)))
-        is_new = created is not None and (datetime.now(UTC) - created) <= new_window
-
         tr = TranslatableMixin.translate_dict
         name: dict[str, Any] = product.name or {}
         slug: dict[str, Any] = product.slug or {}
@@ -354,7 +347,7 @@ class ProductService:
             "images": images,
             "rating": None,
             "rating_count": None,
-            "is_new": is_new,
+            "is_new": product.is_new,
             # No order-count signal in the catalog view; stays false until there's a
             # real bestseller metric rather than a fabricated badge.
             "is_bestseller": False,

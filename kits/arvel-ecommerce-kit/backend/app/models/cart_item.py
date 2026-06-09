@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, ClassVar
 
 from arvel.database import Model, Timestamps, decimal, foreign_uuid, id_
+from arvel.database.attributes import accessor
 
 if TYPE_CHECKING:
     from arvel.database.orm.relations import BelongsTo
@@ -28,6 +29,11 @@ class CartItem(Model, Timestamps):
     product_id: uuid.UUID = foreign_uuid("products.id", on_delete="CASCADE")
     quantity: int = 1
     unit_price_snapshot: Decimal = decimal(10, 2, default=Decimal(0))
+
+    @accessor
+    def subtotal(self) -> float:
+        # Snapshot price * qty; the line total never re-reads the live product price.
+        return round(float(self.unit_price_snapshot or 0) * int(self.quantity or 0), 2)
 
     def cart(self) -> BelongsTo[Cart]:
         return self.belongs_to("Cart", foreign_key="cart_id")

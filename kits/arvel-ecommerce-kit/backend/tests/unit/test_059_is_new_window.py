@@ -1,8 +1,9 @@
 """is_new is a real recency flag, not a hardcoded badge.
 
-product_to_storefront should mark a product "new" only while it's within the
-recency window of its created_at. Behavioral test with a stub catalog row — no
-DB / docker.
+The logic lives on the ProductCatalog.is_new accessor — a product is "new" only
+while it's within catalog.new_product_days of created_at. Exercised through the
+accessor's getter directly, so no DB / docker and no config load is needed
+(config() falls back to the 30-day default).
 """
 
 from __future__ import annotations
@@ -12,56 +13,47 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 
-def _product_service() -> Any:
+def _is_new(created_at: datetime | None) -> bool:
     backend = Path(__file__).resolve().parents[2]
     if str(backend) not in sys.path:
         sys.path.insert(0, str(backend))
     sys.modules.pop("config", None)
-    return importlib.import_module("app.services.product_service")
-
-
-def _stub(created_at: datetime | None) -> Any:
-    # Empty media skips the image branch; the rest are the fields the serializer reads.
-    return SimpleNamespace(
-        id="00000000-0000-0000-0000-000000000001",
-        media=[],
-        name={"en": "Thing"},
-        slug={"en": "thing"},
-        description={"en": ""},
-        category_name={},
-        category_slug={},
-        parent_category_name={},
-        parent_category_slug={},
-        price=10,
-        stock_qty=5,
-        category_id=None,
-        category_parent_id=None,
-        vendor_id=None,
-        vendor_name="",
-        vendor_slug="",
-        created_at=created_at,
-    )
+    model = importlib.import_module("app.models.product_catalog")
+    getter = model.ProductCatalog.is_new.fget
+    return bool(getter(SimpleNamespace(created_at=created_at)))
 
 
 def test_recent_product_is_new() -> None:
-    svc = _product_service()
-    row = _stub(datetime.now(UTC) - timedelta(days=1))
-    result = svc.ProductService.product_to_storefront(cast("Any", row), "en")
-    assert result["is_new"] is True
+    assert _is_new(datetime.now(UTC) - timedelta(days=1)) is True
 
 
 def test_old_product_is_not_new() -> None:
-    svc = _product_service()
-    row = _stub(datetime.now(UTC) - timedelta(days=90))
-    result = svc.ProductService.product_to_storefront(cast("Any", row), "en")
-    assert result["is_new"] is False
+    assert _is_new(datetime.now(UTC) - timedelta(days=90)) is False
 
 
 def test_naive_created_at_is_handled() -> None:
-    svc = _product_service()
-    row = _stub(datetime.now(UTC).replace(tzinfo=None))
-    result = svc.ProductService.product_to_storefront(cast("Any", row), "en")
-    assert result["is_new"] is True
+    assert _is_new(datetime.now(UTC).replace(tzinfo=None)) is True
+
+
+def test_missing_created_at_is_not_new() -> None:
+    assert _is_new(None) is False
+
+
+def _cart_item_subtotal(unit_price: Any, quantity: Any) -> float:
+    backend = Path(__file__).resolve().parents[2]
+    if str(backend) not in sys.path:
+        sys.path.insert(0, str(backend))
+    model = importlib.import_module("app.models.cart_item")
+    getter = model.CartItem.subtotal.fget
+    return float(getter(SimpleNamespace(unit_price_snapshot=unit_price, quantity=quantity)))
+
+
+def test_cart_item_subtotal_multiplies_snapshot_by_quantity() -> None:
+    assert _cart_item_subtotal(9.99, 3) == 29.97
+
+
+def test_cart_item_subtotal_handles_zero_quantity() -> None:
+    assert _cart_item_subtotal(9.99, 0) == 0.0

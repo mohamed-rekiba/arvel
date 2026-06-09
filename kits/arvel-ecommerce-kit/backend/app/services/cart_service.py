@@ -196,7 +196,7 @@ class CartService:
             "product_id": str(item.product_id),
             "quantity": int(item.quantity),
             "unit_price": unit_price,
-            "subtotal": round(unit_price * int(item.quantity), 2),
+            "subtotal": item.subtotal,
             "available": available,
             "product": product_data,
         }
