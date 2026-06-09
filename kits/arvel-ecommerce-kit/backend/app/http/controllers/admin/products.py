@@ -26,27 +26,17 @@ from app.services.media_service import (
     delete_product_image,
     list_product_images,
 )
+from arvel.config import config
 from arvel.http import File, Request, Response, UploadFile
 from arvel.http.controller import Controller
 from arvel.http.exceptions import BadRequestException, NotFoundException
+from arvel_image.media.exceptions import (
+    ConversionFailedError,
+    FileTooLargeError,
+    InvalidMimeTypeError,
+)
 
-_ALLOWED_IMAGE_TYPES = frozenset({"image/jpeg", "image/png", "image/webp", "image/gif"})
 _IMAGE_UPLOAD_FIELD: UploadFile = File(..., description="Product image (JPEG, PNG, WebP, GIF).")
-# Cap uploads so a single request can't read an unbounded blob into worker memory.
-_MAX_IMAGE_BYTES = 5 * 1024 * 1024
-
-
-def _sniff_image_type(data: bytes) -> str | None:
-    """Return the image MIME from magic bytes, or None if it's not an image we accept."""
-    if data.startswith(b"\xff\xd8\xff"):
-        return "image/jpeg"
-    if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "image/png"
-    if data.startswith((b"GIF87a", b"GIF89a")):
-        return "image/gif"
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return "image/webp"
-    return None
 
 
 async def _product_model(product_id: str) -> Product | None:
@@ -151,26 +141,22 @@ class AdminProductsController(Controller):
         file: UploadFile = _IMAGE_UPLOAD_FIELD,
     ) -> MediaWrapperOut:
         await require_permission(request, "products.update")
-        mime = file.content_type or ""
-        if mime not in _ALLOWED_IMAGE_TYPES:
-            raise BadRequestException(
-                f"Unsupported media type '{mime}'. Upload JPEG, PNG, WebP, or GIF."
-            )
-        # Read at most the cap + 1 byte: bounds memory even when the client omits
-        # Content-Length (file.size is None), which the header-only check missed.
-        contents = await file.read(_MAX_IMAGE_BYTES + 1)
-        if len(contents) > _MAX_IMAGE_BYTES:
-            raise BadRequestException(
-                f"Image exceeds the {_MAX_IMAGE_BYTES // (1024 * 1024)} MB upload limit."
-            )
-        # Don't trust the declared content-type — sniff the magic bytes so a
-        # non-image payload can't ride in under an image/* header.
-        if _sniff_image_type(contents) is None:
-            raise BadRequestException("File content is not a recognized image.")
         product = await _product_model(product_id)
         if product is None:
             raise NotFoundException("Product not found.")
-        media = await attach_product_image(product, contents, file.filename or "upload")
+        # Bound the in-memory read at the collection's configured ceiling (+1 so an
+        # over-limit body still trips the collection's size check instead of being
+        # silently truncated). Size, MIME, and content validation all belong to the
+        # arvel-image collection — see config/image.py — not to this controller.
+        max_bytes = int(config("image.collections.images.max_size_bytes", 5 * 1024 * 1024))
+        contents = await file.read(max_bytes + 1)
+        try:
+            media = await attach_product_image(product, contents, file.filename or "upload")
+        except (FileTooLargeError, InvalidMimeTypeError) as exc:
+            raise BadRequestException(str(exc)) from exc
+        except ConversionFailedError as exc:
+            # Passed the MIME gate via filename but Pillow couldn't decode it.
+            raise BadRequestException("File content is not a valid image.") from exc
         return MediaWrapperOut.model_validate({"data": media})
 
     async def media_index(self, product_id: str, request: Request) -> MediaListOut:
