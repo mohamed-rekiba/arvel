@@ -123,19 +123,22 @@ def test_storefront_pages_use_backend_api_client() -> None:
 
 
 def test_customer_pages_call_cart_checkout_and_account_apis() -> None:
-    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
-
-    for snippet in (
-        "authorizedJson<CartResponse>('/api/cart'",
-        "authorizedJson<CartResponse>('/api/cart/items'",
-        "`/api/cart/items/${encodeURIComponent(itemId)}`",
-        "requireStoredAccessToken(",
-        "authorizedJson<DetailResponse<OrderSummary>>",
-        "'/api/checkout'",
-        "authorizedJson<DetailResponse<OrderSummary[]>>",
-        "'/api/account/orders'",
+    # Cart mutations go through the generated orval cart hooks in the store;
+    # checkout and account orders go through their own generated hooks.
+    store = _src(FRONTEND_DIR / "src" / "stores" / "cart.ts")
+    for hook in (
+        "cartShowApiCartGet",
+        "cartItemsStoreApiCartItemsPost",
+        "cartItemsUpdateApiCartItemsItemIdPatch",
+        "cartItemsDestroyApiCartItemsItemIdDelete",
     ):
-        assert snippet in api
+        assert hook in store
+
+    checkout = _src(FRONTEND_DIR / "src" / "pages" / "StorefrontCheckout.vue")
+    assert "checkoutApiCheckoutPost" in checkout
+
+    account = _src(FRONTEND_DIR / "src" / "pages" / "StorefrontAccount.vue")
+    assert "useAccountOrdersIndexApiAccountOrdersGet" in account
 
     for page in (
         "StorefrontCart.vue",
@@ -149,6 +152,7 @@ def test_customer_pages_call_cart_checkout_and_account_apis() -> None:
     for page in ("StorefrontCart.vue", "StorefrontCheckout.vue", "StorefrontAccount.vue"):
         src = _src(FRONTEND_DIR / "src" / "pages" / page)
         assert "Paste a bearer token" not in src
+        # These pages still gate on a stored session before issuing requests.
         assert "requireStoredAccessToken(" in src
 
 
