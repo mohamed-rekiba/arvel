@@ -378,7 +378,7 @@ typecheck/lint/15 vitest/build + 16 contract tests green.
 
 - MED: `shipping_address: dict[str, Any]` accepts `{}`/garbage → typed model + 422. [done iter 25]
 - MED: AdminUserDetailPage "Permissions" shows direct grants only, not effective
-  (role-derived) perms — rename or expose effective set.
+  (role-derived) perms — rename or expose effective set. [done iter 28]
 - MED: force-delete button gated on `users.manage` but API needs role level 100 →
   non-superadmins get a 403 after clicking (need a level signal in MeOut). [done iter 27]
 - MED #6: global 401 handler always routes to storefront `login`, even for /admin. [done iter 24]
@@ -444,6 +444,18 @@ see it. Regenerated the Orval client (only `meOut.ts` changed — pinned local o
 back to 8.15.0 to avoid a 132-file header churn from a stray 8.16.0). Added an
 RBAC feature test asserting `/me` reports level 100 for super_admin, <100 for catalog.
 370 unit green; ruff clean; frontend typecheck/lint/vitest green.
+
+## Iteration 28 — Admin user detail shows effective permissions (backend)
+
+MED: `_format_user` set both `permissions` and `direct_permissions` to the same
+direct-only set, so the detail page's "Permissions" card showed a super_admin
+(all perms via role, zero direct) as empty. Added an `effective` flag to
+`_format_user`: detail responses (`get_user`, suspend/unsuspend/restore) now
+resolve `get_all_permissions()` for `permissions`, while the N+1-sensitive list
+keeps the cheap direct set (no per-user role expansion, no query-count regression).
+`direct_permissions` still carries direct grants. Added an RBAC feature test
+asserting super_admin's detail `permissions` includes `users.manage` and exceeds
+`direct_permissions`. 370 unit green; ruff clean.
 
 ## Blockers
 

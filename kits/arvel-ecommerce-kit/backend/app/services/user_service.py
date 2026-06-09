@@ -63,7 +63,7 @@ class UserService:
         user: User | None = await User.with_trashed().where(User.id == user_id).first()
         if user is None:
             return None
-        return await self._format_user(user)
+        return await self._format_user(user, effective=True)
 
     async def suspend(self, user_id: int) -> dict[str, Any] | None:
         user: User | None = await User.find(user_id)
@@ -72,7 +72,7 @@ class UserService:
         Log.debug("user.suspending", user_id=user_id)
         await user.suspend()
         Log.debug("user.suspended", user_id=user_id)
-        return await self._format_user(user)
+        return await self._format_user(user, effective=True)
 
     async def unsuspend(self, user_id: int) -> dict[str, Any] | None:
         user: User | None = await User.find(user_id)
@@ -81,7 +81,7 @@ class UserService:
         Log.debug("user.unsuspending", user_id=user_id)
         await user.unsuspend()
         Log.debug("user.unsuspended", user_id=user_id)
-        return await self._format_user(user)
+        return await self._format_user(user, effective=True)
 
     async def soft_delete(self, user_id: int) -> None:
         user: User | None = await User.find(user_id)
@@ -104,19 +104,26 @@ class UserService:
         Log.debug("user.restoring", user_id=user_id)
         await user.restore()
         Log.debug("user.restored", user_id=user_id)
-        return await self._format_user(user)
+        return await self._format_user(user, effective=True)
 
     @staticmethod
-    async def _format_user(user: User) -> dict[str, Any]:
+    async def _format_user(user: User, *, effective: bool = False) -> dict[str, Any]:
         roles = sorted({role.name or "" for role in await user.roles.all()})
         direct = await user.get_direct_permissions()
         direct_permissions = sorted({perm.name or "" for perm in direct})
+        # The list view only needs direct grants (cheap, no per-user role expansion).
+        # Detail views resolve the effective set so "Permissions" reflects what the
+        # user can actually do — a super_admin with no direct grants isn't shown empty.
+        if effective:
+            permissions = sorted({p.name or "" for p in await user.get_all_permissions()})
+        else:
+            permissions = direct_permissions
         return {
             "id": int(user.id),
             "name": user.name or "",
             "email": user.email or "",
             "roles": roles,
-            "permissions": direct_permissions,
+            "permissions": permissions,
             "direct_permissions": direct_permissions,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "suspended_at": user.suspended_at.isoformat() if user.suspended_at else None,
