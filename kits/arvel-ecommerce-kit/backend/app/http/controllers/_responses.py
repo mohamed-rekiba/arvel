@@ -154,6 +154,9 @@ class CartItemOut(_Out):
     # product.price is the live catalog price and may have since drifted.
     unit_price: float
     subtotal: float
+    # False once the product is unpublished/deleted: the line still exists (so the
+    # shopper can remove it) but it blocks checkout and can't have its qty changed.
+    available: bool
     product: ProductCardOut
 
 

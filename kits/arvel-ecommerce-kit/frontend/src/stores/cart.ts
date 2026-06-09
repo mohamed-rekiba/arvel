@@ -15,12 +15,23 @@ export const useCartStore = defineStore('cart', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  const itemCount = computed(
-    () => cart.value?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0,
+  // Count and total only the lines that can actually be checked out. Unavailable
+  // lines (product unpublished/deleted) still exist so the shopper can remove them,
+  // but they don't contribute to the charged amount and block checkout.
+  const availableItems = computed(() => cart.value?.items.filter((i) => i.available) ?? [])
+
+  const itemCount = computed(() =>
+    availableItems.value.reduce((sum, item) => sum + item.quantity, 0),
   )
 
   // Snapshot prices (what checkout charges), not live product.price which can drift.
-  const subtotal = computed(() => cart.value?.total ?? 0)
+  const subtotal = computed(() =>
+    availableItems.value.reduce((sum, item) => sum + item.subtotal, 0),
+  )
+
+  const hasUnavailableItems = computed(
+    () => cart.value?.items.some((i) => !i.available) ?? false,
+  )
 
   async function load(): Promise<void> {
     const auth = useAuthStore()
@@ -92,6 +103,7 @@ export const useCartStore = defineStore('cart', () => {
     error,
     itemCount,
     subtotal,
+    hasUnavailableItems,
     load,
     addItem,
     updateQuantity,

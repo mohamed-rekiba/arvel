@@ -31,13 +31,14 @@ function makeProduct(price: number): ProductCardOut {
   }
 }
 
-function makeItem(id: string, quantity: number, price: number): CartItemOut {
+function makeItem(id: string, quantity: number, price: number, available = true): CartItemOut {
   return {
     id,
     product_id: 'p1',
     quantity,
     unit_price: price,
     subtotal: price * quantity,
+    available,
     product: makeProduct(price),
   }
 }
@@ -76,5 +77,19 @@ describe('cart store getters', () => {
     store.clear()
     expect(store.cart).toBeNull()
     expect(store.itemCount).toBe(0)
+  })
+
+  it('excludes unavailable lines from itemCount and subtotal', () => {
+    const store = useCartStore()
+    store.cart = makeCart([makeItem('a', 2, 10), makeItem('b', 3, 5, false)])
+    expect(store.itemCount).toBe(2)
+    expect(store.subtotal).toBe(20)
+    expect(store.hasUnavailableItems).toBe(true)
+  })
+
+  it('hasUnavailableItems is false when every line is available', () => {
+    const store = useCartStore()
+    store.cart = makeCart([makeItem('a', 1, 10)])
+    expect(store.hasUnavailableItems).toBe(false)
   })
 })

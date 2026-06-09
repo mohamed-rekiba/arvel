@@ -738,8 +738,22 @@ typecheck/lint/vitest(18)/build green.
 - Test: `test_translations_requires_both_product_and_category_view` grants a
   customer only `categories.view` and asserts 403.
 
+## Iteration 52 — Surface unavailable cart lines (full-stack)
+
+- MED: a cart line whose product gets unpublished/soft-deleted/force-deleted
+  used to render as a ghost — empty name, dead `/products/` link, qty steppers
+  that 404, and a checkout button that always failed. Cart items now carry
+  `available: bool` (`real_status == "visible"`, not mere presence, since the
+  catalog view keeps hidden rows). Orval regenerated.
+- Frontend: unavailable lines show a "No longer available — remove it to
+  continue" row (no link), disabled qty steppers, and an enabled remove button.
+  Store `itemCount`/`subtotal` count only available lines; `hasUnavailableItems`
+  disables checkout with a notice. New i18n keys in en/ar/tr.
+- Tests: backend `test_cart_line_marked_unavailable_after_unpublish`; frontend
+  store getters cover available-only totals + `hasUnavailableItems`.
+
 ### Fresh review backlog (iteration-45 review) — remaining
-- MED: ghost cart lines (unpublished product) → broken links, blocked quantity updates.
+- (none from this batch; see tracked item below)
 - MED (tracked): scheduled catalog refresh skipped under Redis lock → stale storefront (needs retry/queue).
 
 ## Blockers
