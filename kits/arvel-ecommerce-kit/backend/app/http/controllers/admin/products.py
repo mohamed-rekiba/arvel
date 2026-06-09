@@ -84,11 +84,15 @@ class AdminProductsController(Controller):
 
     async def destroy(self, product_id: str, request: Request) -> Response:
         await require_permission(request, "products.delete")
+        if await products.admin_get(product_id, include_trashed=True) is None:
+            raise NotFoundException("Product not found.")
         await products.soft_delete(product_id)
         return Response(status_code=204)
 
     async def force_destroy(self, product_id: str, request: Request) -> Response:
         await require_role_level(request, "products.delete", 100)
+        if await products.admin_get(product_id, include_trashed=True) is None:
+            raise NotFoundException("Product not found.")
         await products.force_delete(product_id)
         return Response(status_code=204)
 

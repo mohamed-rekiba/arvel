@@ -530,6 +530,17 @@ revenue chart for consistency. New feature test
 rises, cancels it, asserts revenue returns to baseline. Backend ruff clean;
 dashboard + cart/checkout feature suites green (18 passed).
 
+## Iteration 34 — Admin delete on unknown/malformed id is 404, not 204 (backend)
+
+MED: `destroy`/`force_destroy` on products, vendors, and categories returned 204
+even when the id didn't exist (or wasn't a UUID) — a silent no-op that hid typos
+and broke REST semantics. Products blindly called `soft_delete`; vendors and
+categories did `if found: delete` then 204 regardless. All three now guard with
+the existing `admin_get`/`find` (both return None for missing *and* malformed
+ids) and raise `NotFoundException`. Users already 404'd correctly (outrank guard
+loads the target first) — no change. New tests: delete unknown product → 404,
+malformed product id → 404, unknown category → 404. Backend ruff clean.
+
 ## Blockers
 
 None. All quality gates green.

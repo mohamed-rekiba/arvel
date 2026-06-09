@@ -67,15 +67,17 @@ class AdminVendorsController(Controller):
     async def destroy(self, vendor_id: str, request: Request) -> Response:
         await require_permission(request, "vendors.delete")
         vendor = await vendors.find(vendor_id)
-        if vendor is not None:
-            await vendors.delete(vendor)
+        if vendor is None:
+            raise NotFoundException("Vendor not found.")
+        await vendors.delete(vendor)
         return Response(status_code=204)
 
     async def force_destroy(self, vendor_id: str, request: Request) -> Response:
         await require_role_level(request, "vendors.delete", 100)
         vendor = await vendors.find(vendor_id, include_trashed=True)
-        if vendor is not None:
-            await vendors.force_delete(vendor)
+        if vendor is None:
+            raise NotFoundException("Vendor not found.")
+        await vendors.force_delete(vendor)
         return Response(status_code=204)
 
     async def restore(self, vendor_id: str, request: Request) -> AdminVendorWrapperOut:

@@ -69,15 +69,17 @@ class AdminCategoriesController(Controller):
     async def destroy(self, category_id: str, request: Request) -> Response:
         await require_permission(request, "categories.delete")
         category = await categories.find(category_id)
-        if category is not None:
-            await categories.delete(category)
+        if category is None:
+            raise NotFoundException("Category not found.")
+        await categories.delete(category)
         return Response(status_code=204)
 
     async def force_destroy(self, category_id: str, request: Request) -> Response:
         await require_role_level(request, "categories.delete", 100)
         category = await categories.find(category_id, include_trashed=True)
-        if category is not None:
-            await categories.force_delete(category)
+        if category is None:
+            raise NotFoundException("Category not found.")
+        await categories.force_delete(category)
         return Response(status_code=204)
 
     async def restore(self, category_id: str, request: Request) -> AdminCategoryWrapperOut:

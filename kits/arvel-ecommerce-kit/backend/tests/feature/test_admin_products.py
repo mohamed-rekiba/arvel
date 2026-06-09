@@ -16,6 +16,7 @@ Coverage:
 from __future__ import annotations
 
 import io
+import uuid
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -501,6 +502,36 @@ async def test_upload_rejects_non_image_file(
         files={"file": ("doc.pdf", io.BytesIO(b"%PDF-1.4 fake"), "application/pdf")},
     )
     assert upload.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_delete_unknown_product_returns_404(client: Any, catalog_token: str) -> None:
+    """Deleting a nonexistent product is a 404, not a silent 204."""
+    response = await client.delete(
+        f"/api/admin/products/{uuid.uuid4()}",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_malformed_product_id_returns_404(client: Any, catalog_token: str) -> None:
+    """A non-UUID product id on delete is a 404, not a 500."""
+    response = await client.delete(
+        "/api/admin/products/not-a-uuid",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_unknown_category_returns_404(client: Any, catalog_token: str) -> None:
+    """Deleting a nonexistent category is a 404, not a silent 204."""
+    response = await client.delete(
+        f"/api/admin/categories/{uuid.uuid4()}",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+    )
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio
