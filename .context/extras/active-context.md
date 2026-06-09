@@ -862,6 +862,25 @@ Two questions answered:
   (20 pass), mypy clean; kit unit 380 pass; rbac translations feature test
   still 403 for category-only role. (Answers reviewer Q2.)
 
+- **iter 61 — FormRequest FK validation (done):** added
+  `app/http/requests/product_request.py::validate_product_fks` using the
+  framework `Validator` + `Rule.exists` for category/vendor existence; retired
+  ProductService's imperative `_resolve_category_id`/`_resolve_vendor_id`
+  (`.count()` lookups) and dropped the now-unused Category/Vendor imports. The
+  service now trusts pre-validated, coerced FK ids.
+  - **Why not auto-wired FormRequest:** the framework wrapper runs
+    `validate_rules()` *before* `authorize()`, and the admin route group has no
+    auth middleware — auto-wiring would run DB existence checks for
+    unauthenticated callers. Kept the `require_permission` guard first in the
+    controller and call `validate_product_fks` after it (OWASP A01/A07).
+  - **Why str→UUID coercion stays in the request layer:** `Rule.exists` uses an
+    untyped table clause, so a raw string trips Postgres `uuid = text`; binding
+    a real `uuid.UUID` works. Blank/absent → `None` (nullable FK). Coercion is
+    request-layer input parsing, not the existence check.
+  - Verified: 6 FK feature tests pass (happy create/update, unknown→422,
+    malformed→422, unauthorized→403 before validation). Unit +4 (384), mypy +
+    pyright clean.
+
 ## Blockers
 
 None. All quality gates green.

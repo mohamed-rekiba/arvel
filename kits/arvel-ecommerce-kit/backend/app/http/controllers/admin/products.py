@@ -20,6 +20,7 @@ from app.http.controllers._responses import (
     MediaWrapperOut,
 )
 from app.http.controllers._schemas import CreateProductPayload, UpdateProductPayload
+from app.http.requests.product_request import validate_product_fks
 from app.models.product import Product
 from app.services.media_service import (
     attach_product_image,
@@ -80,7 +81,9 @@ class AdminProductsController(Controller):
         self, payload: CreateProductPayload, request: Request
     ) -> AdminProductWrapperOut:
         await require_permission(request, "products.create")
-        product = await products.create(payload.model_dump())
+        data = payload.model_dump()
+        await validate_product_fks(data)
+        product = await products.create(data)
         return AdminProductWrapperOut.model_validate({"data": product})
 
     async def update(
@@ -90,7 +93,9 @@ class AdminProductsController(Controller):
         # Guard first so a missing product (or malformed id) is a 404, not a 500.
         if await products.admin_get(product_id, include_trashed=True) is None:
             raise NotFoundException("Product not found.")
-        product = await products.update(product_id, payload.model_dump(exclude_unset=True))
+        changes = payload.model_dump(exclude_unset=True)
+        await validate_product_fks(changes)
+        product = await products.update(product_id, changes)
         return AdminProductWrapperOut.model_validate({"data": product})
 
     async def destroy(self, product_id: str, request: Request) -> Response:
