@@ -6,9 +6,14 @@ import ProductCard from '@/components/storefront/ProductCard.vue'
 import {
   storefrontProductsCatalogApiCategoriesSlugGet,
   storefrontIndexApiProductsGet,
+  storefrontSearchApiSearchGet,
 } from '@/api/storefront/storefront'
 import type { ProductCardOut } from '@/api/schemas'
 import { routeQuery, toSupportedLocale } from '@/lib/i18n'
+
+// Backend rejects shorter queries; below this we show the normal paginated list.
+const MIN_QUERY_LENGTH = 2
+const SEARCH_DEBOUNCE_MS = 300
 
 const route = useRoute()
 const { locale, t } = useI18n({ useScope: 'global' })
@@ -19,8 +24,15 @@ const products = ref<ProductCardOut[]>([])
 const hasMore = ref(false)
 const cursor = ref('')
 
+const searching = ref(false)
+const searchResults = ref<ProductCardOut[]>([])
+
 const currentLocale = computed(() => toSupportedLocale(locale.value))
 const categorySlug = computed(() => routeQuery(route.query.category))
+const activeQuery = computed(() => {
+  const q = searchTerm.value.trim()
+  return q.length >= MIN_QUERY_LENGTH ? q : ''
+})
 
 async function load(resetCursor = true): Promise<void> {
   loading.value = true
@@ -55,11 +67,42 @@ async function load(resetCursor = true): Promise<void> {
 
 watch([categorySlug, currentLocale], () => load(), { immediate: true })
 
-const filtered = computed(() => {
-  const q = searchTerm.value.trim().toLowerCase()
-  if (!q) return products.value
-  return products.value.filter((p) => p.name.toLowerCase().includes(q))
+// Search the whole catalog server-side, not just the page already loaded.
+// Debounce keystrokes and drop stale responses so a slow request can't clobber
+// a newer one.
+let debounceTimer: ReturnType<typeof setTimeout> | undefined
+let searchSeq = 0
+
+async function runSearch(query: string, locale: string): Promise<void> {
+  const seq = ++searchSeq
+  searching.value = true
+  try {
+    const result = await storefrontSearchApiSearchGet({ q: query, locale, limit: 48 })
+    if (seq === searchSeq) searchResults.value = result.data
+  } finally {
+    if (seq === searchSeq) searching.value = false
+  }
+}
+
+watch([activeQuery, currentLocale], ([query, locale]) => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  if (!query) {
+    searchSeq++ // cancel any in-flight result
+    searching.value = false
+    searchResults.value = []
+    return
+  }
+  debounceTimer = setTimeout(() => void runSearch(query, locale), SEARCH_DEBOUNCE_MS)
 })
+
+const displayed = computed(() => (activeQuery.value ? searchResults.value : products.value))
+const showLoadMore = computed(() => !activeQuery.value && hasMore.value && !loading.value)
+const showSkeleton = computed(() =>
+  activeQuery.value ? searching.value && searchResults.value.length === 0 : loading.value && products.value.length === 0,
+)
+const showEmpty = computed(() =>
+  activeQuery.value ? !searching.value && searchResults.value.length === 0 : !loading.value && products.value.length === 0,
+)
 </script>
 
 <template>
@@ -72,7 +115,7 @@ const filtered = computed(() => {
           }}
         </h1>
         <p v-if="!loading" class="mt-1 text-fg-muted">
-          {{ t('products.count', { n: filtered.length }) }}
+          {{ t('products.count', { n: displayed.length }) }}
         </p>
       </div>
       <input
@@ -83,21 +126,21 @@ const filtered = computed(() => {
       />
     </div>
 
-    <div v-if="loading && products.length === 0" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+    <div v-if="showSkeleton" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
       <div
         v-for="i in 8"
         :key="i"
         class="aspect-square animate-pulse rounded-xl bg-app-bg-sunken"
       />
     </div>
-    <div v-else-if="!loading && filtered.length === 0" class="py-20 text-center text-fg-faint">
+    <div v-else-if="showEmpty" class="py-20 text-center text-fg-faint">
       {{ t('products.none', 'No products found') }}
     </div>
     <div v-else class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-      <ProductCard v-for="product in filtered" :key="product.id" :product="product" />
+      <ProductCard v-for="product in displayed" :key="product.id" :product="product" />
     </div>
 
-    <div v-if="hasMore && !loading" class="mt-10 text-center">
+    <div v-if="showLoadMore" class="mt-10 text-center">
       <button
         type="button"
         class="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-fg transition hover:bg-app-bg-raised"
