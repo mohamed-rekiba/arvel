@@ -8,7 +8,7 @@ is available without a join.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, TypedDict
 
@@ -20,6 +20,9 @@ from app.models.product import Product
 from app.models.product_catalog import ProductCatalog
 from app.support.labels import label
 from app.support.products_catalog import refresh_products_catalog
+
+# A product counts as "new" for this long after it's created.
+_NEW_WINDOW = timedelta(days=30)
 
 
 class ProductAdminFilter(TypedDict, total=False):
@@ -317,6 +320,11 @@ class ProductService:
             if card_url and card_url != first["url"]:
                 card_srcset = f"{card_url} 400w"
 
+        created = product.created_at
+        if created is not None and created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        is_new = created is not None and (datetime.now(UTC) - created) <= _NEW_WINDOW
+
         tr = TranslatableMixin.translate_dict
         name: dict[str, Any] = product.name or {}
         slug: dict[str, Any] = product.slug or {}
@@ -340,7 +348,9 @@ class ProductService:
             "images": images,
             "rating": None,
             "rating_count": None,
-            "is_new": False,
+            "is_new": is_new,
+            # No order-count signal in the catalog view; stays false until there's a
+            # real bestseller metric rather than a fabricated badge.
             "is_bestseller": False,
             "category_id": str(product.category_id or ""),
             "category_name": tr(cat_name, locale),
