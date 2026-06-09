@@ -244,6 +244,18 @@ async def test_catalog_manager_can_update_product_price(
     assert updated.json()["data"]["price"] == 14.99
 
 
+@pytest.mark.asyncio
+async def test_update_missing_product_returns_404(client: Any, catalog_token: str) -> None:
+    """PATCH on an unknown product id is a 404, not a 500."""
+    missing_id = "00000000-0000-0000-0000-000000000000"
+    response = await client.patch(
+        f"/api/admin/products/{missing_id}",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+        json={"price": 1.00},
+    )
+    assert response.status_code == 404
+
+
 # ─── soft-delete + force-delete ──────────────────────────────────────────
 
 
