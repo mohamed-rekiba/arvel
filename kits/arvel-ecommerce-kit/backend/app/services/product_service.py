@@ -18,10 +18,8 @@ from arvel.database.exceptions import InvalidCursorError
 from arvel.http.exceptions import ValidationException
 from arvel.logging.facade import Log
 
-from app.models.category import Category
 from app.models.product import Product
 from app.models.product_catalog import ProductCatalog
-from app.models.vendor import Vendor
 from app.support.labels import label
 from app.support.products_catalog import refresh_products_catalog_now
 
@@ -212,43 +210,12 @@ class ProductService:
         }
 
     # ─── admin create / update ────────────────────────────────────────────────
-
-    @staticmethod
-    async def _resolve_category_id(raw: Any) -> uuid.UUID | None:
-        """Parse and verify a category FK, or None when blank.
-
-        Both checks turn what would otherwise be a 500 into a 422: a malformed
-        UUID raises ValueError on the cast, and a valid-but-missing id trips the
-        DB FK constraint. with_trashed mirrors the FK — a soft-deleted row still
-        exists in the table, so the constraint is satisfied.
-        """
-        if not raw:
-            return None
-        try:
-            cid = uuid.UUID(str(raw))
-        except ValueError as exc:
-            raise ValidationException("Invalid category id.") from exc
-        if await Category.with_trashed().where(Category.id == cid).count() == 0:
-            raise ValidationException("Category not found.")
-        return cid
-
-    @staticmethod
-    async def _resolve_vendor_id(raw: Any) -> uuid.UUID | None:
-        """Parse and verify a vendor FK, or None when blank. See _resolve_category_id."""
-        if not raw:
-            return None
-        try:
-            vid = uuid.UUID(str(raw))
-        except ValueError as exc:
-            raise ValidationException("Invalid vendor id.") from exc
-        if await Vendor.with_trashed().where(Vendor.id == vid).count() == 0:
-            raise ValidationException("Vendor not found.")
-        return vid
+    # FK ids arrive pre-validated and coerced to uuid.UUID | None by
+    # app.http.requests.product_request.validate_product_fks (run in the
+    # controller, after the permission guard).
 
     async def create(self, data: dict[str, Any]) -> dict[str, Any]:
         Log.debug("product.creating", name=label(data.get("name")))
-        category_id = await self._resolve_category_id(data.get("category_id"))
-        vendor_id = await self._resolve_vendor_id(data.get("vendor_id"))
         product: Product = await Product.create(
             name=data.get("name", {}),
             slug=data.get("slug", {}),
@@ -256,8 +223,8 @@ class ProductService:
             price=Decimal(str(data["price"])),
             stock_qty=data.get("stock_qty", 0),
             status="draft",
-            category_id=category_id,
-            vendor_id=vendor_id,
+            category_id=data.get("category_id"),
+            vendor_id=data.get("vendor_id"),
         )
         Log.debug("product.created", product_id=str(product.id))
         return self._product_to_admin(product)
@@ -271,11 +238,8 @@ class ProductService:
         for key, val in changes.items():
             if key == "price":
                 product.price = Decimal(str(val))
-            elif key == "category_id":
-                product.category_id = await self._resolve_category_id(val)
-            elif key == "vendor_id":
-                product.vendor_id = await self._resolve_vendor_id(val)
-            elif key in {"name", "slug", "description", "stock_qty", "status"}:
+            elif key in {"name", "slug", "description", "stock_qty", "status",
+                         "category_id", "vendor_id"}:
                 setattr(product, key, val)
         await product.save()
         Log.debug("product.updated", product_id=product_id)
