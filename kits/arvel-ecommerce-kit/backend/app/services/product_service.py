@@ -14,6 +14,7 @@ from typing import Any, TypedDict
 
 from arvel.database import TranslatableMixin
 from arvel.database.exceptions import InvalidCursorError
+from arvel.http.exceptions import ValidationException
 from arvel.logging.facade import Log
 
 from app.models.product import Product
@@ -84,18 +85,16 @@ class ProductService:
         if category_slug is not None:
             query = query.where_json_path("category_slug", locale, category_slug)
 
-        # Malformed cursor must not 500 the storefront — cursor_paginate
-        # raises InvalidCursorError, so fall back to page one.
+        # A bad cursor is a client error, not a silent reset: the storefront appends
+        # pages, so falling back to page one would duplicate rows in the grid.
         try:
             page = await query.cursor_paginate(
                 limit,
                 cursor=cursor,
                 keyset=["published_at DESC", "id ASC"],
             )
-        except InvalidCursorError:
-            page = await query.cursor_paginate(
-                limit, cursor=None, keyset=["published_at DESC", "id ASC"]
-            )
+        except InvalidCursorError as exc:
+            raise ValidationException("Invalid pagination cursor.") from exc
 
         return {
             "data": [self.product_to_storefront(p, locale) for p in page.items],

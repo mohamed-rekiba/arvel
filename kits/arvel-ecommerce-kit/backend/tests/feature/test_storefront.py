@@ -149,6 +149,13 @@ async def test_product_list_cursor_pagination_works(client: Any, seeded_db: None
 
 
 @pytest.mark.asyncio
+async def test_malformed_cursor_returns_422(client: Any, seeded_db: None) -> None:
+    """A garbage cursor is a 422, not a silent reset to page one (which would dup rows)."""
+    response = await client.get("/api/products?limit=3&cursor=not-a-real-cursor")
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_product_detail_returns_200_for_published_product(
     client: Any, seeded_db: None
 ) -> None:
