@@ -253,7 +253,8 @@ You can skip CORS by serving the built SPA from the same Arvel app. Build the fr
 # routes/web.py
 from pathlib import Path
 
-from arvel import Route, Request
+from arvel import Route
+from starlette.requests import Request
 from fastapi.responses import FileResponse
 
 SPA_INDEX = Path("public/spa/index.html")
@@ -325,7 +326,7 @@ Register it on the `NotificationManager` from a [service provider's](../core-con
 from arvel.notifications.manager import NotificationManager
 
 class FcmServiceProvider(ServiceProvider):
-    def boot(self) -> None:
+    async def boot(self) -> None:
         self.container.make(NotificationManager).register_channel("fcm", FcmChannel())
 ```
 

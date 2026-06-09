@@ -33,7 +33,7 @@ The practical upshot: a facade is a thin, explicit shortcut to a service. There'
 ### The arvel.facades Package
 
 ```python
-from arvel.facades import Cache, Config, Crypt, Log, Session, Storage
+from arvel.facades import Cache, Config, Crypt, Http, Log, Session, Storage
 from arvel.context import Context
 ```
 
@@ -44,6 +44,7 @@ from arvel.context import Context
 | `Storage` | `StorageManager` | `StorageServiceProvider` | [File Storage](../features/storage.md) |
 | `Session` | `SessionManager` | `SessionServiceProvider` | [Sessions](../features/session.md) |
 | `Crypt` | `Encrypter` (from `APP_KEY`) | none (reads env) | [Encryption](../features/encryption.md) |
+| `Http` | Outbound HTTP client | none (stateless) | [HTTP Client](../features/http-client.md) |
 | `Log` | OpenTelemetry logger | none (OTel-backed) | [Logging](../features/logging.md) |
 | `Context` | Per-request context repository | none (ContextVar) | — (module-level facade) |
 
@@ -116,6 +117,9 @@ with Mail.fake() as mail, Cache.fake(), Storage.fake(), Event.fake():
 | `Cache` | yes | `assert_stored`, `assert_missing` |
 | `Storage` | yes | `assert_exists`, `assert_missing` |
 | `Event` | yes | `assert_dispatched`, `assert_not_dispatched` |
+| `Bus` | yes | `assert_dispatched`, `assert_not_dispatched` |
+| `Notification` | yes | `assert_sent_to`, `assert_not_sent_to`, `assert_nothing_sent` |
+| `Http` | yes | `assert_sent`, `assert_not_sent`, `recorded` |
 | `Mail` | yes | `.sent` list |
 
-For facades without a `fake()` (e.g. `Broadcast`, `Bus`, `Notification`, `Crypt`), swap the underlying service directly — for instance, `Crypt.set_encrypter(...)` or `Broadcast.set_manager(...)`. See [Testing](../features/testing.md).
+For facades without a `fake()` (e.g. `Broadcast`, `Session`, `Crypt`), swap the underlying service directly — for instance, `Crypt.set_encrypter(...)` or `Broadcast.set_manager(...)`. See [Testing](../features/testing.md).

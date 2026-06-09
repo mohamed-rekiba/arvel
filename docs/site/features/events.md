@@ -51,7 +51,7 @@ Map events to listeners on the dispatcher with `listen`. Registration is idempot
 from arvel.events.dispatcher import EventDispatcher
 
 
-def boot(self) -> None:
+async def boot(self) -> None:
     dispatcher = self.app.make(EventDispatcher)
     dispatcher.listen(OrderShipped, SendShipmentNotification)
 ```

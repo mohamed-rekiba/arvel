@@ -61,10 +61,10 @@ That deletes the marker; the next request through any worker sees no marker and 
 
 ## Scheduler interaction
 
-Scheduled tasks respect maintenance mode by default: while the app is down, the scheduler kernel skips every task with the outcome `in_maintenance_mode`. If a task is essential during downtime (e.g. backups, log rotation), opt it in:
+Scheduled tasks respect maintenance mode by default: while the app is down, the scheduler kernel skips every task with the outcome `in_maintenance_mode`. If a task is essential during downtime (e.g. backups, log rotation), opt it in with `inMaintenanceMode()`:
 
 ```python
-task.in_maintenance_mode = True
+schedule.call(rotate_logs).hourly().inMaintenanceMode()
 ```
 
 See [Task Scheduling](scheduling.md) for the scheduling DSL.

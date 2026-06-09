@@ -96,18 +96,18 @@ The election lock is scoped to the task's due minute, so it dedupes servers with
 
 ## Maintenance Mode & Output Capture
 
-By default, the scheduler skips every task while the app is in [maintenance mode](maintenance-mode.md) — the outcome appears as `in_maintenance_mode` in the scheduler log. If a task must still run during downtime (backups, log rotation), opt it in:
+By default, the scheduler skips every task while the app is in [maintenance mode](maintenance-mode.md) — the outcome appears as `in_maintenance_mode` in the scheduler log. If a task must still run during downtime (backups, log rotation), opt it in with `inMaintenanceMode()`:
 
 ```python
-task = schedule.call(rotate_logs).hourly()
-task.in_maintenance_mode = True
+schedule.call(rotate_logs).hourly().inMaintenanceMode()
 ```
 
-To capture a task's stdout and stderr to a file (for example, when shelling out to a CLI tool that prints to the console), set `output_to`:
+To capture a task's stdout and stderr to a file (for example, when running a console command that prints to the console), chain `outputTo(path)` with a `Path`:
 
 ```python
-task = schedule.exec("backup.sh").daily_at("02:30")
-task.output_to = "storage/logs/backup.log"
+from pathlib import Path
+
+schedule.command("backup:run").dailyAt("02:30").outputTo(Path("storage/logs/backup.log"))
 ```
 
 The file is opened in append mode, so each run appends to it. Failures to open the file are logged but don't stop the task — your scheduler stays running.
