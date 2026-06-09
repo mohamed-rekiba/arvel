@@ -150,12 +150,18 @@ class CartItemOut(_Out):
     id: str
     product_id: str
     quantity: int
+    # Price locked in when the item was added — what checkout actually charges.
+    # product.price is the live catalog price and may have since drifted.
+    unit_price: float
+    subtotal: float
     product: ProductCardOut
 
 
 class CartOut(_Out):
     id: str
     items: list[CartItemOut]
+    # Sum of line subtotals at snapshot prices; matches the charged amount.
+    total: float
 
 
 class CartWrapperOut(_Out):

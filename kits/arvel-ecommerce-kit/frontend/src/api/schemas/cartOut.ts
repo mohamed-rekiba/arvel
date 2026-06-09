@@ -9,4 +9,5 @@ import type { CartItemOut } from './cartItemOut.ts'
 export interface CartOut {
   id: string
   items: CartItemOut[]
+  total: number
 }

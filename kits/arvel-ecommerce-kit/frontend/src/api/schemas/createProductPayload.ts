@@ -12,7 +12,9 @@ export interface CreateProductPayload {
   name: CreateProductPayloadName
   slug?: CreateProductPayloadSlug
   description?: CreateProductPayloadDescription
+  /** @minimum 0 */
   price: number
+  /** @minimum 0 */
   stock_qty?: number
   category_id: string
   vendor_id?: string

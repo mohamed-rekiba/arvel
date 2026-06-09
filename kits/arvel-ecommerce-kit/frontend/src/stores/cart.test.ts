@@ -32,11 +32,19 @@ function makeProduct(price: number): ProductCardOut {
 }
 
 function makeItem(id: string, quantity: number, price: number): CartItemOut {
-  return { id, product_id: 'p1', quantity, product: makeProduct(price) }
+  return {
+    id,
+    product_id: 'p1',
+    quantity,
+    unit_price: price,
+    subtotal: price * quantity,
+    product: makeProduct(price),
+  }
 }
 
 function makeCart(items: CartItemOut[]): CartOut {
-  return { id: 'cart-1', items }
+  const total = items.reduce((sum, i) => sum + i.subtotal, 0)
+  return { id: 'cart-1', items, total }
 }
 
 describe('cart store getters', () => {
