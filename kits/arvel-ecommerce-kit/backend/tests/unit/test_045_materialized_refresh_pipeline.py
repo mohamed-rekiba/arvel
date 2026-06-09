@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 BASE_DIR = Path(__file__).parents[2]
 SUPPORT_FILE = BASE_DIR / "app" / "support" / "products_catalog.py"
@@ -47,6 +50,73 @@ def test_manual_refresh_uses_unconditional_helper() -> None:
     src = _src(PRODUCT_SERVICE_FILE)
     assert "from app.support.products_catalog import refresh_products_catalog_now" in src
     assert "await refresh_products_catalog_now()" in src
+
+
+class _Lock:
+    def __init__(self, *, acquired: bool) -> None:
+        self._acquired = acquired
+
+    async def __aenter__(self) -> bool:
+        return self._acquired
+
+    async def __aexit__(self, *_: object) -> bool:
+        return False
+
+
+@pytest.mark.asyncio
+async def test_refresh_returns_minus_one_when_lock_held_but_marks_dirty() -> None:
+    """A contended caller skips the refresh but leaves the dirty flag for the holder."""
+    from app.support import products_catalog as pc
+
+    with (
+        patch("app.support.products_catalog.Cache") as cache,
+        patch("app.support.products_catalog._execute_refresh", AsyncMock()) as execute,
+    ):
+        cache.put = AsyncMock()
+        cache.lock = MagicMock(return_value=_Lock(acquired=False))
+
+        result = await pc.refresh_products_catalog()
+
+    assert result == -1
+    cache.put.assert_awaited_once()  # dirty flag set so the holder picks up our write
+    execute.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_refresh_drains_a_write_that_lands_mid_refresh() -> None:
+    """A write arriving during the holder's refresh re-arms the flag and forces another pass."""
+    from app.support import products_catalog as pc
+
+    dirty = {"set": False}
+    calls = 0
+
+    async def _put(_key: str, _value: object, ttl: int | None = None) -> None:
+        dirty["set"] = True
+
+    async def _forget(_key: str) -> bool:
+        was = dirty["set"]
+        dirty["set"] = False
+        return was
+
+    async def _execute() -> int:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            dirty["set"] = True  # a concurrent write commits during the first refresh
+        return 5
+
+    with (
+        patch("app.support.products_catalog.Cache") as cache,
+        patch("app.support.products_catalog._execute_refresh", _execute),
+    ):
+        cache.put = AsyncMock(side_effect=_put)
+        cache.forget = AsyncMock(side_effect=_forget)
+        cache.lock = MagicMock(return_value=_Lock(acquired=True))
+
+        result = await pc.refresh_products_catalog()
+
+    assert calls == 2, "the write that landed mid-refresh must trigger a second pass"
+    assert result == 5
 
 
 def test_scheduler_provider_is_registered() -> None:

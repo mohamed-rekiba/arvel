@@ -752,8 +752,23 @@ typecheck/lint/vitest(18)/build green.
 - Tests: backend `test_cart_line_marked_unavailable_after_unpublish`; frontend
   store getters cover available-only totals + `hasUnavailableItems`.
 
-### Fresh review backlog (iteration-45 review) — remaining
-- (none from this batch; see tracked item below)
+## Iteration 53 — Coalescing catalog refresh (backend)
+
+- MED (was tracked): the scheduled/observer refresh used a plain lock-and-skip,
+  so a write committing while another refresh held the lock had its refresh
+  silently dropped — storefront stayed stale until the next 10-min tick.
+  `refresh_products_catalog` now sets a dirty flag before contending for the
+  lock and the holder drains it in a loop (clear-then-refresh), so every
+  committed write is followed by a refresh that started after it. Returns -1
+  only when another process holds the lock (it picks up the flag). Scheduler
+  remains the backstop for the microscopic check-then-release window.
+- Tests: `test_refresh_returns_minus_one_when_lock_held_but_marks_dirty`,
+  `test_refresh_drains_a_write_that_lands_mid_refresh`. Full unit suite 375 pass;
+  publish/soft-delete → storefront integration tests green.
+
+### Fresh review backlog — cleared
+All iteration-45 review items are resolved. Next: re-run review subagents to
+surface the next priority batch, or move to the design phase.
 - MED (tracked): scheduled catalog refresh skipped under Redis lock → stale storefront (needs retry/queue).
 
 ## Blockers
