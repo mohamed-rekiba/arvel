@@ -26,6 +26,8 @@ from arvel.http.exceptions import BadRequestException, NotFoundException
 
 _ALLOWED_IMAGE_TYPES = frozenset({"image/jpeg", "image/png", "image/webp", "image/gif"})
 _IMAGE_UPLOAD_FIELD: UploadFile = File(..., description="Product image (JPEG, PNG, WebP).")
+# Cap uploads so a single request can't read an unbounded blob into worker memory.
+_MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 
 async def _product_model(product_id: str) -> Product | None:
@@ -134,6 +136,10 @@ class AdminProductsController(Controller):
         if mime not in _ALLOWED_IMAGE_TYPES:
             raise BadRequestException(
                 f"Unsupported media type '{mime}'. Upload JPEG, PNG, or WebP."
+            )
+        if file.size is not None and file.size > _MAX_IMAGE_BYTES:
+            raise BadRequestException(
+                f"Image exceeds the {_MAX_IMAGE_BYTES // (1024 * 1024)} MB upload limit."
             )
         product = await _product_model(product_id)
         if product is None:
