@@ -17,7 +17,12 @@ import type {
 import { computed, unref } from 'vue'
 import type { MaybeRef } from 'vue'
 
-import type { HTTPValidationError, OrderListOut, OrderWrapperOut } from '../schemas'
+import type {
+  AccountOrdersIndexApiAccountOrdersGetParams,
+  HTTPValidationError,
+  OrderListOut,
+  OrderWrapperOut,
+} from '../schemas'
 
 import { request } from '../../lib/api'
 
@@ -27,36 +32,47 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
  * @summary Account.Orders.Index
  */
 export const accountOrdersIndexApiAccountOrdersGet = (
+  params?: MaybeRef<AccountOrdersIndexApiAccountOrdersGetParams>,
   options?: SecondParameter<typeof request>,
   signal?: AbortSignal,
 ) => {
-  return request<OrderListOut>({ url: `/api/account/orders`, method: 'GET', signal }, options)
+  params = unref(params)
+
+  return request<OrderListOut>(
+    { url: `/api/account/orders`, method: 'GET', params: unref(params), signal },
+    options,
+  )
 }
 
-export const getAccountOrdersIndexApiAccountOrdersGetQueryKey = () => {
-  return ['api', 'account', 'orders'] as const
+export const getAccountOrdersIndexApiAccountOrdersGetQueryKey = (
+  params?: MaybeRef<AccountOrdersIndexApiAccountOrdersGetParams>,
+) => {
+  return ['api', 'account', 'orders', ...(params ? [params] : [])] as const
 }
 
 export const getAccountOrdersIndexApiAccountOrdersGetQueryOptions = <
   TData = Awaited<ReturnType<typeof accountOrdersIndexApiAccountOrdersGet>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof accountOrdersIndexApiAccountOrdersGet>>,
-      TError,
-      TData
+  TError = HTTPValidationError,
+>(
+  params?: MaybeRef<AccountOrdersIndexApiAccountOrdersGetParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof accountOrdersIndexApiAccountOrdersGet>>,
+        TError,
+        TData
+      >
     >
-  >
-  request?: SecondParameter<typeof request>
-}) => {
+    request?: SecondParameter<typeof request>
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getAccountOrdersIndexApiAccountOrdersGetQueryKey()
+  const queryKey = getAccountOrdersIndexApiAccountOrdersGetQueryKey(params)
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof accountOrdersIndexApiAccountOrdersGet>>
-  > = ({ signal }) => accountOrdersIndexApiAccountOrdersGet(requestOptions, signal)
+  > = ({ signal }) => accountOrdersIndexApiAccountOrdersGet(params, requestOptions, signal)
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof accountOrdersIndexApiAccountOrdersGet>>,
@@ -68,7 +84,7 @@ export const getAccountOrdersIndexApiAccountOrdersGetQueryOptions = <
 export type AccountOrdersIndexApiAccountOrdersGetQueryResult = NonNullable<
   Awaited<ReturnType<typeof accountOrdersIndexApiAccountOrdersGet>>
 >
-export type AccountOrdersIndexApiAccountOrdersGetQueryError = unknown
+export type AccountOrdersIndexApiAccountOrdersGetQueryError = HTTPValidationError
 
 /**
  * @summary Account.Orders.Index
@@ -76,8 +92,9 @@ export type AccountOrdersIndexApiAccountOrdersGetQueryError = unknown
 
 export function useAccountOrdersIndexApiAccountOrdersGet<
   TData = Awaited<ReturnType<typeof accountOrdersIndexApiAccountOrdersGet>>,
-  TError = unknown,
+  TError = HTTPValidationError,
 >(
+  params?: MaybeRef<AccountOrdersIndexApiAccountOrdersGetParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -90,7 +107,7 @@ export function useAccountOrdersIndexApiAccountOrdersGet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getAccountOrdersIndexApiAccountOrdersGetQueryOptions(options)
+  const queryOptions = getAccountOrdersIndexApiAccountOrdersGetQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

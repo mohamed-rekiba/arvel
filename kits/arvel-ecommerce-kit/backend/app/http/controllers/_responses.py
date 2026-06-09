@@ -307,7 +307,9 @@ class AdminOrderItemProductOut(_Out):
 
 class AdminOrderItemOut(_Out):
     id: str
-    product_id: str
+    # SET NULL on product force-delete (see order_items migration), so a historical
+    # line can outlive its product. The name snapshot keeps the row readable.
+    product_id: str | None
     product_name: str
     quantity: int
     unit_price: float
