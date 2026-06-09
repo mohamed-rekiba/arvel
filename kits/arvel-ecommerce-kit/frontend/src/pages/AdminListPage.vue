@@ -5,14 +5,15 @@ import { useI18n } from 'vue-i18n'
 import { useAdminOrdersIndexApiAdminOrdersGet } from '@/api/admin-orders/admin-orders'
 import { useAdminUsersIndexApiAdminUsersGet } from '@/api/admin-users/admin-users'
 import type { AdminListResource } from '@/lib/api'
-import { formatCurrency, formatDate } from '@/lib/i18n'
+import { formatCurrency, formatDate, toSupportedLocale } from '@/lib/i18n'
 
 const props = defineProps<{
   listType: 'orders' | 'users'
   resource?: AdminListResource
 }>()
 
-const { t } = useI18n({ useScope: 'global' })
+const { locale, t } = useI18n({ useScope: 'global' })
+const currentLocale = computed(() => toSupportedLocale(locale.value))
 
 const PAGE_SIZE = 50
 const page = ref(0)
@@ -147,7 +148,9 @@ const statusColors: Record<string, string> = {
                 >
                   #{{ order.id.slice(0, 8) }}
                 </RouterLink>
-                <p class="text-xs text-fg-faint">{{ formatDate(order.created_at, 'en') }}</p>
+                <p class="text-xs text-fg-faint">
+                  {{ formatDate(order.created_at, currentLocale) }}
+                </p>
               </td>
               <td class="px-6 py-4 text-sm text-fg">{{ order.user?.name }}</td>
               <td class="px-6 py-4">
@@ -159,7 +162,7 @@ const statusColors: Record<string, string> = {
                 </span>
               </td>
               <td class="px-6 py-4 text-end text-sm font-semibold">
-                {{ formatCurrency(order.total, 'en') }}
+                {{ formatCurrency(order.total, currentLocale) }}
               </td>
             </tr>
           </template>
