@@ -685,9 +685,19 @@ Backend ruff clean; targeted tests green.
   Aligned the allowed-types error message and upload-field description to include
   GIF. Tests: `test_upload_rejects_mime_spoofed_file`; updated `test_048` contract.
 
+## Iteration 47 — Scope storefront search to category; gate short queries (frontend)
+
+- MED: `/products` filter no longer leaks cross-category results. When a
+  `?category=` is active, search results are scoped client-side by
+  `category_slug`/`parent_category_slug` (both locale-resolved, same as the
+  listing endpoint) — fixes the iteration-44 regression without a backend/Orval
+  change.
+- LOW: `StorefrontSearch.vue` no longer fires 1-char queries the backend 400s;
+  gated on `MIN_QUERY_LENGTH = 2`, and the prompt/count states track it.
+typecheck/lint/vitest(18)/build green.
+
 ### Fresh review backlog (iteration-45 review) — remaining
 - MED: cart PATCH (`update_item`) keeps stale price snapshot — inconsistent with `add_item` re-snapshot; checkout can charge old price.
-- MED: storefront search drops the active category filter (regression from the catalog-search wiring).
 - MED: force_delete on product/user with dependent orders hits FK RESTRICT → 500 instead of 409.
 - MED: product create/update doesn't validate category/vendor FK existence → opaque 500.
 - MED: admin translations endpoint gated only on `categories.view`.
