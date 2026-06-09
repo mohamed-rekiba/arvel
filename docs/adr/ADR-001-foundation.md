@@ -65,7 +65,7 @@ We commit one way before writing framework code.
 ### Current implementation
 
 - Dependencies: `packages/arvel/pyproject.toml` (`[project] dependencies`, `[project.optional-dependencies]`).
-- Architecture overview: `docs-fresh/architecture/overview.md`.
+- Architecture overview: `docs/architecture/overview.md`.
 
 ### Notes
 
@@ -108,7 +108,7 @@ Laravel's service container is a defining feature: autowiring from type hints; s
 ### Current implementation
 
 - Code: `packages/arvel/src/arvel/container/`, `packages/arvel/src/arvel/dep.py`.
-- Docs: `docs-fresh/architecture/service-container.md`.
+- Docs: `docs/architecture/service-container.md`.
 
 ### Notes
 
@@ -163,7 +163,7 @@ Current workspace members:
 ### Current implementation
 
 - Layout: `packages/*` (companion libraries), `kits/*` (starter kits), root `pyproject.toml` (`[tool.uv]`), `uv.lock`.
-- Docs: `docs-fresh/contributing/repo-and-build.md`, `docs-fresh/packages/overview.md`.
+- Docs: `docs/contributing/repo-and-build.md`, `docs/packages/overview.md`.
 
 ### Notes
 
@@ -216,7 +216,7 @@ Companion-package extras (each pulls a separate distribution):
 ### Current implementation
 
 - Extras: `packages/arvel/pyproject.toml` (`[project.optional-dependencies]`).
-- Companions: `packages/arvel-*`; docs at `docs-fresh/packages/overview.md`.
+- Companions: `packages/arvel-*`; docs at `docs/packages/overview.md`.
 
 ### Notes
 
@@ -302,7 +302,7 @@ Changes to this layout are **breaking** per Article X §7 and require a major ve
 
 - Authoritative skeleton: `packages/arvel/src/arvel/_skeleton/` (rendered by `arvel new`).
 - Loader contract: ADR-001 § 6.
-- Docs: `docs-fresh/architecture/bootstrap-lifecycle.md`, `docs-fresh/console/cli-architecture.md`.
+- Docs: `docs/architecture/bootstrap-lifecycle.md`, `docs/console/cli-architecture.md`.
 
 ### Notes
 
@@ -428,7 +428,7 @@ rather than silently inherit the leak.
 
 - Code: `packages/arvel/src/arvel/application/application.py`
   (`with_routing`, the boot-time loader) and the path-loader helper it calls.
-- Docs: `docs-fresh/architecture/bootstrap-lifecycle.md`, `docs-fresh/http/routing.md`.
+- Docs: `docs/architecture/bootstrap-lifecycle.md`, `docs/http/routing.md`.
 
 ### Notes
 
@@ -436,7 +436,7 @@ rather than silently inherit the leak.
   only **`web` and `api` are loaded at boot today**. The `console` path is
   validated and stored on the application (`_routing_paths["console"]`) but the
   loader skips it — console commands are discovered via entry points and
-  `ConsoleServiceProvider` instead (see `docs-fresh/console/cli-architecture.md`).
+  `ConsoleServiceProvider` instead (see `docs/console/cli-architecture.md`).
   Loading `routes/console.py` is deferred work, not a shipped behavior.
 
 ---

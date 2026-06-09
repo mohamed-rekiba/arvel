@@ -40,7 +40,7 @@ Direct `APIRouter` was rejected because it doesn't compose group state through c
 ### Current implementation
 
 - Code: `packages/arvel/src/arvel/routing/`, registered at boot by `arvel/providers/http_provider.py`.
-- Docs: `docs-fresh/http/routing.md`.
+- Docs: `docs/http/routing.md`.
 
 ---
 
@@ -81,7 +81,7 @@ Slightly more verbose than magical inference: developers write the Pydantic sche
 ### Current implementation
 
 - Code: `packages/arvel/src/arvel/http/resources.py`.
-- Docs: `docs-fresh/http/resources.md`.
+- Docs: `docs/http/resources.md`.
 
 ---
 
@@ -133,7 +133,7 @@ Request ─► Starlette middleware stack (app-level: CORS, TrustedHost, …)
 ### Current implementation
 
 - Code: `packages/arvel/src/arvel/http/_middleware_core.py` (`Middleware` Protocol, `Cors`), `packages/arvel/src/arvel/http/middleware/` (concrete middlewares), `arvel/support` Pipeline.
-- Docs: `docs-fresh/http/middleware.md`.
+- Docs: `docs/http/middleware.md`.
 
 ---
 
@@ -182,7 +182,7 @@ Two built-in drivers:
 ### Current implementation
 
 - Code: `packages/arvel/src/arvel/http/ratelimit.py`; default binding in `packages/arvel/src/arvel/providers/http_provider.py`.
-- Docs: `docs-fresh/http/middleware.md`.
+- Docs: `docs/http/middleware.md`.
 
 ### Notes
 
@@ -256,7 +256,7 @@ Every `arvel.database.*` module is forbidden from importing `arvel.http.*`
 
 - Middleware: `packages/arvel/src/arvel/http/middleware/database_transaction.py`.
 - Layering guard: `packages/arvel/tests/architecture/` (forbidden-import test).
-- Docs: `docs-fresh/http/middleware.md`, `docs-fresh/orm/model-internals.md`.
+- Docs: `docs/http/middleware.md`, `docs/orm/model-internals.md`.
 
 ---
 
@@ -291,7 +291,7 @@ All headers use `setdefault` semantics — handler-set values are never overwrit
 ### Current implementation
 
 - Code: `packages/arvel/src/arvel/http/middleware/security_headers.py` (defaults: `_DEFAULT_HSTS_MAX_AGE`, `_DEFAULT_CSP`, `_DEFAULT_REFERRER_POLICY`).
-- Docs: `docs-fresh/http/middleware.md`.
+- Docs: `docs/http/middleware.md`.
 
 ### Notes
 
@@ -325,7 +325,7 @@ stays available as an opt-in import for projects that prefer RFC 7807.
 
 - Default binding: `packages/arvel/src/arvel/providers/http_provider.py` binds `HttpExceptionHandler` (with the default foreign-exception translators).
 - Opt-in RFC 7807: `packages/arvel/src/arvel/http/problem_details.py` (`ProblemDetailsHandler`, bound as a singleton override).
-- Docs: `docs-fresh/http/exceptions.md`.
+- Docs: `docs/http/exceptions.md`.
 
 ---
 
@@ -355,7 +355,7 @@ stays available as an opt-in import for projects that prefer RFC 7807.
 ### Current implementation
 
 - Code: `packages/arvel/src/arvel/http/middleware/scope.py` (`ArvelScopeMiddleware`); mounted in `packages/arvel/src/arvel/application/application.py::into_asgi()`.
-- Docs: `docs-fresh/architecture/bootstrap-lifecycle.md`, `docs-fresh/architecture/service-container.md`.
+- Docs: `docs/architecture/bootstrap-lifecycle.md`, `docs/architecture/service-container.md`.
 
 ### Notes
 

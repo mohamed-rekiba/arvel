@@ -47,7 +47,7 @@ Type-safety is a stated product feature of Arvel. Python has two production-grad
 
 - Config: `packages/arvel/pyproject.toml` (`[tool.mypy]`, `[tool.pyright]`), root `pyproject.toml`.
 - Gates: `make typecheck` (runs `uv run mypy` and `uv run pyright`); `.pre-commit-config.yaml`; `.github/workflows/ci.yml` typecheck job.
-- Docs: `docs-fresh/contributing/quality-gates.md`.
+- Docs: `docs/contributing/quality-gates.md`.
 
 ### References
 
@@ -120,7 +120,7 @@ The team had also, at various points, reached for the easy fixes: a `# type: ign
 - Promoted pyright checks: `packages/arvel/pyproject.toml` `[tool.pyright]` (the eleven checks above are set to `error`).
 - Gates: `make pre-commit`, `make ci`, `.pre-commit-config.yaml`, `.github/workflows/ci.yml`.
 - Policy rule: `.cursor/rules/enforce-quality-gates.mdc`.
-- Docs: `docs-fresh/contributing/quality-gates.md`.
+- Docs: `docs/contributing/quality-gates.md`.
 
 ---
 
@@ -347,7 +347,7 @@ indirection.
   nine modules and values quoted above).
 - Enforcement: workspace-root `conftest.py` (`pytest_terminal_summary` +
   `pytest_sessionfinish`).
-- Docs: `docs-fresh/contributing/quality-gates.md`.
+- Docs: `docs/contributing/quality-gates.md`.
 
 ---
 
@@ -385,7 +385,7 @@ ASGI types use `starlette.types.Scope`, `Receive`, `Send` (not `Any`) to satisfy
 ### Current implementation
 
 - Code: `packages/arvel/src/arvel/testing/app.py` (yields `httpx.AsyncClient`, boots on entry, shuts down on exit via `finally`; the bootable app is a `Protocol`).
-- Docs: `docs-fresh/contributing/testing.md`.
+- Docs: `docs/contributing/testing.md`.
 
 ---
 
