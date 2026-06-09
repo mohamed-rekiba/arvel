@@ -22,6 +22,15 @@ const route = useRoute()
 const { data, isPending } = useAccountOrdersIndexApiAccountOrdersGet()
 const orders = computed(() => data.value?.data ?? [])
 
+// Only confirm an order the caller actually owns — a hand-typed ?order=anything
+// must not fake a success banner.
+const justPlacedOrder = computed<OrderOut | null>(() => {
+  const raw = route.query.order
+  const id = Array.isArray(raw) ? raw[0] : raw
+  if (!id) return null
+  return orders.value.find((o) => o.id === id) ?? null
+})
+
 const selectedOrderId = ref<string | null>(null)
 
 const orderIdForQuery = computed<string>(() => selectedOrderId.value ?? '')
@@ -67,7 +76,7 @@ function closeDrawer(): void {
 
     <!-- Success banner after checkout redirect -->
     <div
-      v-if="route.query.order"
+      v-if="justPlacedOrder"
       class="mt-4 flex items-center gap-2 rounded-xl bg-status-delivered-bg px-4 py-3 text-sm text-status-delivered-fg"
     >
       <span
