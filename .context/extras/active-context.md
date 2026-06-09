@@ -626,10 +626,23 @@ Three fresh-review fixes in one batch:
   non-superadmins don't see an action that always 403s.
 Backend ruff clean; frontend typecheck/lint/vitest(18)/build green.
 
+## Iteration 42 — Reject malformed cursor; cap media upload size (backend)
+
+Two hardening fixes:
+- MED: `_list_published` no longer swallows `InvalidCursorError` and silently
+  resets to page one — it now re-raises as `ValidationException` (422). Silent
+  reset duplicated rows because the storefront appends pages. Updated the
+  source-assertion unit test `test_storefront_list_rejects_malformed_cursor`
+  (was pinning the old "fall back to page one" behavior) and added feature test
+  `test_malformed_cursor_returns_422`.
+- MED: product media upload now rejects files over `_MAX_IMAGE_BYTES` (5 MB)
+  with a 400 before the body is read into storage, closing a memory-DoS gap.
+  Test `test_upload_rejects_oversized_image`.
+Backend ruff clean; targeted tests green.
+
 ### Fresh review backlog (iteration-39 pass) — remaining
-- MED: malformed pagination cursor silently returns page 1 (product_service) while client appends → dup rows.
-- MED: product media upload has no max-size guard (memory DoS).
 - MED: materialized catalog refresh skipped under Redis lock → stale storefront (harder; needs retry/queue).
+- MED: manual "Refresh catalog" can report product_count: -1.
 - MED: /products "Filter" box only filters loaded page, not catalog (UX).
 - LOW: cart store error strings hardcoded English, bypass i18n.
 

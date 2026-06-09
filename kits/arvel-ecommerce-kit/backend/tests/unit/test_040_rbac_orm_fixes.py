@@ -129,13 +129,13 @@ class TestV014JsonbGapDocumented:
 
 
 class TestV015CursorGapDocumented:
-    """storefront_list documents malformed-cursor handling."""
+    """storefront_list rejects a malformed cursor instead of silently resetting."""
 
-    def test_storefront_list_documents_malformed_cursor(self) -> None:
+    def test_storefront_list_rejects_malformed_cursor(self) -> None:
         src = _src(PRODUCT_SVC_FILE)
-        assert "malformed cursor" in src.lower() and "InvalidCursorError" in src, (
-            "storefront_list must document how a malformed cursor is handled "
-            "(fall back to page one) in product_service.py"
+        assert "InvalidCursorError" in src and "ValidationException" in src, (
+            "storefront_list must convert InvalidCursorError into a ValidationException "
+            "(client error) rather than falling back to page one in product_service.py"
         )
 
 
