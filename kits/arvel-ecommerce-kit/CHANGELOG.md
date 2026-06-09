@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.11.1...arvel-ecommerce-kit-v1.12.0) (2026-06-09)
+
+
+### Features
+
+* **arvon:** add fluent datetime layer over whenever ([50ea34e](https://github.com/mohamed-rekiba/arvel/commit/50ea34e2ee6ab3510105006f24245ade7a8ed8b8))
+
 ## [1.11.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.11.0...arvel-ecommerce-kit-v1.11.1) (2026-06-09)
 
 
