@@ -24,7 +24,9 @@ const products = computed(() => data.value?.data ?? [])
     <h1 class="text-3xl font-bold text-fg">
       {{ t('search.results', 'Search Results') }}
     </h1>
-    <p v-if="query" class="mt-2 text-fg-muted">{{ products.length }} results for "{{ query }}"</p>
+    <p v-if="query" class="mt-2 text-fg-muted">
+      {{ t('search.count', { n: products.length, q: query }) }}
+    </p>
 
     <div v-if="isPending" class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
       <div
@@ -33,9 +35,11 @@ const products = computed(() => data.value?.data ?? [])
         class="aspect-square animate-pulse rounded-xl bg-app-bg-sunken"
       />
     </div>
-    <div v-else-if="!query" class="mt-16 text-center text-fg-faint">Enter a search term above</div>
+    <div v-else-if="!query" class="mt-16 text-center text-fg-faint">
+      {{ t('search.prompt', 'Enter a search term above') }}
+    </div>
     <div v-else-if="products.length === 0" class="mt-16 text-center text-fg-faint">
-      No products match your search
+      {{ t('search.none', 'No products match your search') }}
     </div>
     <div v-else class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
       <ProductCard v-for="product in products" :key="product.id" :product="product" />

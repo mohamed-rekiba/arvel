@@ -76,12 +76,14 @@ const filtered = computed(() => {
             categorySlug ? t('products.category', 'Category') : t('products.all', 'All Products')
           }}
         </h1>
-        <p v-if="!loading" class="mt-1 text-fg-muted">{{ filtered.length }} items</p>
+        <p v-if="!loading" class="mt-1 text-fg-muted">
+          {{ t('products.count', { n: filtered.length }) }}
+        </p>
       </div>
       <input
         v-model="searchTerm"
         type="search"
-        placeholder="Filter products…"
+        :placeholder="t('products.filter_placeholder', 'Filter products…')"
         class="w-full max-w-xs rounded-lg border border-border px-4 py-2 text-sm outline-none focus:border-brand sm:w-64"
       />
     </div>
@@ -94,7 +96,7 @@ const filtered = computed(() => {
       />
     </div>
     <div v-else-if="!loading && filtered.length === 0" class="py-20 text-center text-fg-faint">
-      No products found
+      {{ t('products.none', 'No products found') }}
     </div>
     <div v-else class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
       <ProductCard v-for="product in filtered" :key="product.id" :product="product" />
@@ -106,7 +108,7 @@ const filtered = computed(() => {
         class="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-fg transition hover:bg-app-bg-raised"
         @click="load(false)"
       >
-        Load more
+        {{ t('products.load_more', 'Load more') }}
       </button>
     </div>
   </div>
