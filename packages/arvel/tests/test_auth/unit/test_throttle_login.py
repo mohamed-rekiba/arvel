@@ -5,7 +5,12 @@ from __future__ import annotations
 import json
 
 import pytest
-from arvel.auth.middleware.throttle_login import ThrottleLoginMiddleware
+from arvel.auth.middleware.throttle_login import (
+    CacheLoginAttemptStore,
+    ThrottleLoginConfig,
+    ThrottleLoginMiddleware,
+)
+from arvel.facades.cache import Cache
 from httpx2 import ASGITransport, AsyncClient
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -28,9 +33,11 @@ def _make_app(max_attempts: int = 5, window: int = 60) -> tuple[Starlette, Throt
     inner = Starlette(routes=[Route("/api/auth/login", _login_handler, methods=["POST"])])
     mw = ThrottleLoginMiddleware(
         inner,
-        login_path="/api/auth/login",
-        max_attempts=max_attempts,
-        window_seconds=window,
+        ThrottleLoginConfig(
+            login_path="/api/auth/login",
+            max_attempts=max_attempts,
+            window_seconds=window,
+        ),
     )
     return inner, mw
 
@@ -157,3 +164,40 @@ async def test_keys_per_email_and_ip() -> None:
             headers={"content-type": "application/json"},
         )
     assert r.status_code == 401  # different email, fresh counter
+
+
+async def _post_login(app: ThrottleLoginMiddleware, email: str) -> int:
+    body = json.dumps({"email": email, "password": "wrong"})
+    headers = {"content-type": "application/json"}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        resp = await c.post("/api/auth/login", content=body, headers=headers)
+    return resp.status_code
+
+
+@pytest.mark.asyncio
+async def test_cache_store_shares_counter_across_instances() -> None:
+    """Two middleware instances (= two workers) share the limit via the cache."""
+    with Cache.fake():
+        inner_a = Starlette(routes=[Route("/api/auth/login", _login_handler, methods=["POST"])])
+        inner_b = Starlette(routes=[Route("/api/auth/login", _login_handler, methods=["POST"])])
+        cfg = ThrottleLoginConfig(max_attempts=3, store=CacheLoginAttemptStore())
+        mw_a = ThrottleLoginMiddleware(inner_a, cfg)
+        mw_b = ThrottleLoginMiddleware(inner_b, cfg)
+
+        # 3 failures spread across both "workers".
+        assert await _post_login(mw_a, "shared@test.com") == 401
+        assert await _post_login(mw_a, "shared@test.com") == 401
+        assert await _post_login(mw_b, "shared@test.com") == 401
+        # 4th attempt on worker B is blocked thanks to the shared counter.
+        assert await _post_login(mw_b, "shared@test.com") == 429
+
+
+@pytest.mark.asyncio
+async def test_cache_store_success_clears_shared_counter() -> None:
+    with Cache.fake():
+        store = CacheLoginAttemptStore()
+        await store.increment("k", window_seconds=60)
+        await store.increment("k", window_seconds=60)
+        assert await store.count("k") == 2
+        await store.reset("k")
+        assert await store.count("k") == 0

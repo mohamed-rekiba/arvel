@@ -201,6 +201,19 @@ With [`AuthServiceProvider` registered](#registering-the-provider) and `config.r
 
 These are backed by `AuthService` (register/login/refresh/logout/me), `PasswordService` (forgot/reset), and `EmailVerificationService`. Access tokens are JWTs; refresh tokens are opaque, stored as SHA-256 digests in a `refresh_tokens` table and rotated on use.
 
+<a name="revoking-tokens"></a>
+### Revoking access tokens
+
+A JWT is valid until its `exp` — there's no taking it back without server-side state. Arvel keeps that state in a Cache-backed denylist, so revocation works the moment it happens instead of waiting out the access TTL:
+
+- **Logout** denies the presented access token's `jti`. The token stops working right away; the user's other sessions keep theirs.
+- **Password reset** and **refresh-token-reuse detection** revoke *every* outstanding access token for the user (a cutoff on `iat`), not just the refresh rows. A reset ends every session.
+
+The denylist lives in the Cache subsystem, so it's shared across workers when you configure a Redis cache. The default array/in-process cache is single-process only. Checks **fail open**: if the cache is unavailable, a token is treated as not-revoked rather than rejecting everyone — a cache outage shouldn't lock out the whole app.
+
+> [!NOTE]
+> Login attempts are throttled by `ThrottleLoginMiddleware`. By default the counter is process-local; pass `ThrottleLoginConfig(store=CacheLoginAttemptStore())` to share the limit across workers via the cache.
+
 > [!NOTE]
 > "Remember me" is not implemented. The framework deliberately omits the `LoginRequest.remember` flag and the `users.remember_token` column until a full session-guard remember-me flow ships (token rotation, hashed storage, scoped cookies).
 

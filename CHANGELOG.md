@@ -131,6 +131,18 @@ changelog once shipped.
   Configured via `TRUSTED_PROXIES` (CSV of IPs/CIDRs, or `*` to trust all);
   mounted as the outermost layer only when set. `http/config.py`,
   `http/middleware/trust_proxies.py` + `test_trust_proxies`
+- Access-token revocation — logout now denies the presented access JWT's `jti`,
+  and password reset / refresh-token-reuse revoke every outstanding access token
+  for the user (an `iat` cutoff), so a stateless JWT stops working the moment
+  it's revoked instead of riding out its TTL. Cache-backed (shared across workers
+  on Redis), fails open on cache outage. Tokens gained an `iat` claim; both
+  `AuthService.me` and `JwtGuard` consult the denylist. `auth/token_denylist.py`,
+  `auth/auth_service.py`, `auth/guards/jwt.py`, `auth/password_service.py` +
+  `test_token_denylist`
+- Shared login throttle — `ThrottleLoginMiddleware` takes a pluggable
+  `LoginAttemptStore`; pass `CacheLoginAttemptStore` to share the failed-attempt
+  limit across workers instead of counting per-process. Tuning moved to
+  `ThrottleLoginConfig`. `auth/middleware/throttle_login.py` + `test_throttle_login`
 
 All bucket-3 feature-parity gaps triaged on 2026-06-09 (see
 `.context/research/043-feature-gap-bucket3-triage.md` and

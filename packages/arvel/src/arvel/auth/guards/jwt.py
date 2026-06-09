@@ -33,6 +33,15 @@ _HMAC_ALGS = frozenset({"HS256", "HS384", "HS512"})
 _JWT_ACCESS_CLAIM = "access"
 
 
+def _as_int(value: object) -> int | None:
+    """Coerce a JWT numeric claim (``iat``) to int, or None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    return None
+
+
 class _JwtDecode(Protocol):
     """Minimal interface for jwt.decode so pyright can reason about the return type."""
 
@@ -127,6 +136,15 @@ class JwtGuard(Guard):
         sub = payload.get("sub")
         if not isinstance(sub, str):
             return None
+
+        from arvel.auth.token_denylist import is_revoked  # noqa: PLC0415
+
+        if await is_revoked(
+            jti=str(payload.get("jti", "")),
+            subject=sub,
+            issued_at=_as_int(payload.get("iat")),
+        ):
+            return None
         return await self._resolver.by_id(sub)
 
     async def issue_token(
@@ -157,6 +175,7 @@ class JwtGuard(Guard):
         now = int(time.time())
         payload: dict[str, object] = {
             "sub": subject,
+            "iat": now,
             "exp": now + int(expires_in.total_seconds()),
             "jti": secrets.token_hex(16),
             **extra_claims,

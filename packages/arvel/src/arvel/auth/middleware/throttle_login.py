@@ -16,7 +16,8 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable
-from typing import cast
+from dataclasses import dataclass
+from typing import Protocol, cast, runtime_checkable
 
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -29,43 +30,107 @@ _HTTP_ERROR_MAX = 600
 _HTTP_SUCCESS_MAX = 300
 
 
+@runtime_checkable
+class LoginAttemptStore(Protocol):
+    """Failed-login counter backing the throttle.
+
+    Three ops: peek the count, bump it on a failure, clear it on success.
+    The default is process-local; pass a shared implementation
+    (:class:`CacheLoginAttemptStore`) to make the limit hold across workers.
+    """
+
+    async def count(self, key: str) -> int: ...
+    async def increment(self, key: str, *, window_seconds: int) -> int: ...
+    async def reset(self, key: str) -> None: ...
+
+
+class InMemoryLoginAttemptStore:
+    """Process-local counter. Fine for dev, tests, single-process apps."""
+
+    def __init__(self) -> None:
+        self._counters: dict[str, tuple[int, float]] = {}
+
+    async def count(self, key: str) -> int:
+        count, expires_at = self._counters.get(key, (0, 0.0))
+        if time.monotonic() >= expires_at:
+            return 0
+        return count
+
+    async def increment(self, key: str, *, window_seconds: int) -> int:
+        now = time.monotonic()
+        count, expires_at = self._counters.get(key, (0, 0.0))
+        if now >= expires_at:
+            self._counters[key] = (1, now + window_seconds)
+            return 1
+        new_count = count + 1
+        self._counters[key] = (new_count, expires_at)
+        return new_count
+
+    async def reset(self, key: str) -> None:
+        self._counters.pop(key, None)
+
+
+class CacheLoginAttemptStore:
+    """Cache-backed counter — shared across workers when the cache is Redis.
+
+    Continued failures extend the lockout (the TTL resets on each hit), which
+    is the behavior you want against a sustained attack. The peek/increment
+    isn't atomic, so under a burst the count can lag by a few — acceptable for a
+    throttle.
+    """
+
+    async def count(self, key: str) -> int:
+        from arvel.facades.cache import Cache  # noqa: PLC0415
+
+        return _coerce_count(await Cache.get(key, 0))
+
+    async def increment(self, key: str, *, window_seconds: int) -> int:
+        from arvel.facades.cache import Cache  # noqa: PLC0415
+
+        new_count = _coerce_count(await Cache.get(key, 0)) + 1
+        await Cache.put(key, new_count, ttl=window_seconds)
+        return new_count
+
+    async def reset(self, key: str) -> None:
+        from arvel.facades.cache import Cache  # noqa: PLC0415
+
+        await Cache.forget(key)
+
+
+def _coerce_count(value: object) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+@dataclass(frozen=True, slots=True)
+class ThrottleLoginConfig:
+    """Tuning for :class:`ThrottleLoginMiddleware`."""
+
+    login_path: str = _DEFAULT_LOGIN_PATH
+    max_attempts: int = _DEFAULT_MAX_ATTEMPTS
+    window_seconds: int = _DEFAULT_WINDOW
+    key_fn: Callable[[str, str], str] | None = None
+    store: LoginAttemptStore | None = None
+
+
 class ThrottleLoginMiddleware:
     """ASGI-native login-throttle middleware.
 
     Keyed on ``(email, ip)`` to avoid blocking one user's email from
     multiple IPs when only a single IP is the attacker.
 
-    Parameters
-    ----------
-    app:
-        The next ASGI application in the stack.
-    login_path:
-        The exact path to intercept. Defaults to ``/api/auth/login``.
-    max_attempts:
-        Number of allowed failed attempts before 429 is returned.
-    window_seconds:
-        Sliding window duration in seconds.
-    key_fn:
-        Optional override for the rate-limit key: ``(email, ip) -> str``.
-        Defaults to ``"throttle:login:{email}:{ip}"``.
+    Tuning (path, limits, key function, counter backend) comes from
+    :class:`ThrottleLoginConfig`. Pass a config with
+    :class:`CacheLoginAttemptStore` to share the limit across workers.
     """
 
-    def __init__(
-        self,
-        app: ASGIApp,
-        *,
-        login_path: str = _DEFAULT_LOGIN_PATH,
-        max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
-        window_seconds: int = _DEFAULT_WINDOW,
-        key_fn: Callable[[str, str], str] | None = None,
-    ) -> None:
+    def __init__(self, app: ASGIApp, config: ThrottleLoginConfig | None = None) -> None:
+        cfg = config or ThrottleLoginConfig()
         self._app = app
-        self._login_path = login_path
-        self._max = max_attempts
-        self._window = window_seconds
-        self._key_fn: Callable[[str, str], str] = key_fn or _default_key
-        # Internal counter store: key -> (count, expires_at_monotonic)
-        self._counters: dict[str, tuple[int, float]] = {}
+        self._login_path = cfg.login_path
+        self._max = cfg.max_attempts
+        self._window = cfg.window_seconds
+        self._key_fn: Callable[[str, str], str] = cfg.key_fn or _default_key
+        self._store: LoginAttemptStore = cfg.store or InMemoryLoginAttemptStore()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -94,7 +159,7 @@ class ThrottleLoginMiddleware:
         key = self._key_fn(email, ip)
 
         # Pre-flight check: already at threshold?
-        if self._get_count(key) >= self._max:
+        if await self._store.count(key) >= self._max:
             resp = _too_many_response(self._window)
             await resp(scope, receive, send)
             return
@@ -113,32 +178,11 @@ class ThrottleLoginMiddleware:
         )
 
         if _HTTP_ERROR_MIN <= status_code < _HTTP_ERROR_MAX:
-            self._increment(key)
+            await self._store.increment(key, window_seconds=self._window)
         elif status_code < _HTTP_SUCCESS_MAX:
-            self._reset(key)
+            await self._store.reset(key)
 
         await _replay_response(send, status_code, resp_headers, resp_body)
-
-    # ── counter helpers ───────────────────────────────────────────────────────
-
-    def _get_count(self, key: str) -> int:
-        count, expires_at = self._counters.get(key, (0, 0.0))
-        if time.monotonic() >= expires_at:
-            return 0
-        return count
-
-    def _increment(self, key: str) -> int:
-        now = time.monotonic()
-        count, expires_at = self._counters.get(key, (0, 0.0))
-        if now >= expires_at:
-            self._counters[key] = (1, now + self._window)
-            return 1
-        new_count = count + 1
-        self._counters[key] = (new_count, expires_at)
-        return new_count
-
-    def _reset(self, key: str) -> None:
-        self._counters.pop(key, None)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -213,4 +257,10 @@ async def _replay_response(
     await send({"type": "http.response.body", "body": body, "more_body": False})
 
 
-__all__ = ["ThrottleLoginMiddleware"]
+__all__ = [
+    "CacheLoginAttemptStore",
+    "InMemoryLoginAttemptStore",
+    "LoginAttemptStore",
+    "ThrottleLoginConfig",
+    "ThrottleLoginMiddleware",
+]

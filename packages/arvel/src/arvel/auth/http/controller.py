@@ -164,9 +164,9 @@ class AuthController(Controller):
     # ─── Logout ────────────────────────────────────────────────────────────
 
     async def logout(self, request: Request, response: Response) -> Response:
-        """``POST /auth/logout`` — revoke refresh token + clear cookies. Always 204."""
+        """``POST /auth/logout`` — revoke refresh + access token, clear cookies. Always 204."""
         cookie = request.cookies.get(self._refresh_cookie)
-        await self._auth.logout(refresh_token=cookie)
+        await self._auth.logout(refresh_token=cookie, access_token=_extract_bearer(request))
         self._clear_auth_cookies(response)
         return JSONResponse(status_code=204, content=None)
 

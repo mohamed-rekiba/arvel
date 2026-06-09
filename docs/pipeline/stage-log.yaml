@@ -1937,3 +1937,39 @@ events:
       trusted peer; '*' leftmost pick; no-XFF keeps peer; invalid proto ignored; lifespan passthrough; ws https->wss;
       import identity; TRUSTED_PROXIES CSV + empty default); mkdocs build --strict clean.
     timestamp: "2026-06-09T04:36:00Z"
+  - work_item: "WI-arvel-052"
+    stage: "execution"
+    event: "fix"
+    result: "pass"
+    gate: "user-approval"
+    note: >-
+      Deferred F5 (security path). (a) Stateless access JWTs couldn't be revoked: logout deleted the refresh row but
+      the access token kept working until exp; password reset / refresh-reuse revoked only refresh rows. Added a
+      Cache-backed denylist (auth/token_denylist.py): per-jti deny for single-session logout (ttl = remaining life)
+      and a per-user iat cutoff for reset/reuse (kill all). Tokens gained an iat claim; AuthService.me and
+      JwtGuard.user consult is_revoked() after signature/exp. logout() takes access_token (controller passes the
+      bearer); refresh() reuse and PasswordService.reset() call revoke_all_for_user. Fails open on cache outage;
+      shared across workers on Redis. (b) Login throttle was process-local: ThrottleLoginMiddleware now takes a
+      pluggable LoginAttemptStore (InMemory default, CacheLoginAttemptStore cross-worker); tuning moved to
+      ThrottleLoginConfig (6-arg ctor -> options struct).
+    artifacts:
+      - "packages/arvel/src/arvel/auth/token_denylist.py"
+      - "packages/arvel/src/arvel/auth/auth_service.py"
+      - "packages/arvel/src/arvel/auth/guards/jwt.py"
+      - "packages/arvel/src/arvel/auth/password_service.py"
+      - "packages/arvel/src/arvel/auth/http/controller.py"
+      - "packages/arvel/src/arvel/auth/provider.py"
+      - "packages/arvel/src/arvel/auth/middleware/throttle_login.py"
+      - "docs/pipeline/specs/WI-arvel-052-jwt-revocation-login-throttle.md"
+    timestamp: "2026-06-09T06:45:00Z"
+  - work_item: "WI-arvel-052"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      ruff clean; uv run mypy 0 issues; uv run pyright 0/0; auth + test_auth suites 270 passed (14 new:
+      test_token_denylist 9 — deny/peek, expired clamp, empty jti, user cutoff, is_revoked by jti and cutoff,
+      missing-iat rule, no-cutoff, fail-open unbound; test_auth_service 3 — logout revokes presented token, isolates
+      other sessions, works with no cache; test_throttle_login 2 — cache store shares counter across instances,
+      success clears it); mkdocs build --strict clean.
+    timestamp: "2026-06-09T06:46:00Z"

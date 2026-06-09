@@ -15,12 +15,14 @@ from typing import Any
 from arvel.auth.events import PasswordResetCompleted, PasswordResetRequested
 from arvel.auth.exceptions import PasswordResetTokenInvalidError
 from arvel.auth.models import RefreshToken
+from arvel.auth.token_denylist import revoke_all_for_user
 from arvel.database.db import DB
 from arvel.facades.event import Event as EventFacade
 from arvel.facades.hash import Hash
 
 _DEFAULT_RESET_TTL = timedelta(minutes=60)
 _DEFAULT_THROTTLE = timedelta(seconds=60)
+_DEFAULT_ACCESS_TTL = timedelta(minutes=15)
 
 
 def _default_user_model() -> type[Any]:
@@ -46,10 +48,12 @@ class PasswordService:
         ttl: timedelta = _DEFAULT_RESET_TTL,
         throttle: timedelta = _DEFAULT_THROTTLE,
         user_model: type[Any] | None = None,
+        access_ttl: timedelta = _DEFAULT_ACCESS_TTL,
     ) -> None:
         self._ttl = ttl
         self._throttle = throttle
         self._user_cls: type[Any] = user_model if user_model is not None else _default_user_model()
+        self._access_ttl = access_ttl
 
     async def forgot(self, email: str) -> None:
         """Mint a reset token for a known email and dispatch ``PasswordResetRequested``.
@@ -128,6 +132,12 @@ class PasswordService:
             await user.save()
             await PasswordReset.where(token_hash=digest).delete()
             await RefreshToken.where(user_id=str(user.id)).delete()
+
+        # Kill outstanding access tokens too — a reset must end every session,
+        # not just block new refreshes.
+        await revoke_all_for_user(
+            str(user.id), ttl_seconds=int(self._access_ttl.total_seconds())
+        )
 
         await EventFacade.dispatch(
             PasswordResetCompleted(
