@@ -11,7 +11,7 @@ from arvel.database import Blueprint, Schema
 
 def _users(t: Blueprint) -> None:
     t.id()
-    t.string("name", length=120).nullable(value=False)
+    t.string("name", length=255).nullable(value=False)
     t.string("email", length=254).nullable(value=False)
     t.datetime("email_verified_at").nullable()
     t.string("password", length=255).nullable(value=False)

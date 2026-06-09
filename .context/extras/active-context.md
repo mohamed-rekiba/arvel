@@ -923,6 +923,15 @@ Two questions answered:
     — register-name length (255 vs DB 120 → 500), category/vendor force-delete FK
     RESTRICT → 500, frontend admin route gate coarser than backend, client
     permissions go stale after admin change.
+- **iter 64 — register name length (MED #1, done):** the framework's
+  `RegisterRequest.name` is `max_length=255`, but the kit narrowed the `users.name`
+  column to `string(120)` (in the model + the `create_rbac_tables` migration's
+  `_users` blueprint). A 121–255-char name passed validation then died at the
+  INSERT with `value too long for type character varying(120)` → 500 instead of a
+  clean 422. The column was the arbitrary deviation, so aligned it *up* to the
+  framework contract: migration `length=120 → 255` (edited in place — greenfield,
+  no back-compat) and model `string(120) → string(255)`. No test pinned 120; 387
+  unit pass, ruff clean.
 
 ## Blockers
 
