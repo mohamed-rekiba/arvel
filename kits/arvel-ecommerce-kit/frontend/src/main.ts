@@ -1169,7 +1169,9 @@ async function bootstrap(): Promise<void> {
     if (!auth.isAuthenticated) return
     auth.logout()
     toast.error('Your session has expired. Please log in again.')
-    void router.push({ name: 'login' })
+    // Keep admins on the admin login so the redirect lands back in the dashboard.
+    const inAdmin = router.currentRoute.value.path.startsWith('/admin')
+    void router.push({ name: inAdmin ? 'admin-login' : 'login' })
   })
 
   await auth.hydrate()
