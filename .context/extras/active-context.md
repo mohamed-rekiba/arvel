@@ -902,6 +902,27 @@ Two questions answered:
   - test_059 rewritten to exercise the accessors directly (via `property.fget`,
     no DB). Unit 387 pass; mypy + pyright clean. Storefront + cart feature
     suites re-running to confirm end-to-end.
+- **iter 63 — order seeder + best-sellers answer (R7, done):** the admin
+  dashboard best-sellers list was empty because `best_sellers` only counts
+  `status == "delivered"` orders and the kit seeded zero orders. Added
+  `database/seeders/orders_seeder.py` (wired into `DatabaseSeeder` after
+  `SampleUsersSeeder` — orders need both users and products): 4 delivered + 1
+  pending order across the two sample customers, referencing real catalog
+  products by slug. Idempotent — fixed order-id literals (`upsert` on `id`) and
+  line items inserted only when the order has none yet. Reuses the existing
+  seeder primitives (`self.db.upsert` + ORM lookups, same as `CatalogSeeder`)
+  and backdates `created_at` so the dashboard's 7-day revenue series has data.
+  - **"Top-selling electronics" was a red herring.** That storefront string is a
+    static promo *eyebrow* (`home.big_sale_eyebrow`), not a data list — it's
+    never "empty". The actual empty feature was the admin best-sellers card.
+  - No seeder unit test: matches the kit convention (no seeder has one), and the
+    best-sellers/dashboard SQL is already covered by `test_admin_dashboard.py`
+    integration tests that build orders through the live checkout API. Lint +
+    ruff clean; 387 unit tests green.
+  - **Remaining (R7 closes the remediation set):** 4 MED review items still open
+    — register-name length (255 vs DB 120 → 500), category/vendor force-delete FK
+    RESTRICT → 500, frontend admin route gate coarser than backend, client
+    permissions go stale after admin change.
 
 ## Blockers
 
