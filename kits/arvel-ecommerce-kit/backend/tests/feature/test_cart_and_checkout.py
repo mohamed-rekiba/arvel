@@ -126,6 +126,28 @@ async def test_add_item_to_cart(client: Any, customer_token: str, headphones_id:
 
 
 @pytest.mark.asyncio
+async def test_cart_line_marked_unavailable_after_unpublish(
+    client: Any, customer_token: str, super_admin_token: str, headphones_id: str
+) -> None:
+    """A line whose product is unpublished after adding is flagged available=false."""
+    cust = {"Authorization": f"Bearer {customer_token}"}
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+
+    add = await client.post(
+        "/api/cart/items", headers=cust, json={"product_id": headphones_id, "quantity": 1}
+    )
+    assert add.status_code == 200
+    assert add.json()["data"]["items"][0]["available"] is True
+
+    unpub = await client.patch(f"/api/admin/products/{headphones_id}/unpublish", headers=sa)
+    assert unpub.status_code == 200
+
+    cart = await client.get("/api/cart", headers=cust)
+    line = next(i for i in cart.json()["data"]["items"] if i["product_id"] == headphones_id)
+    assert line["available"] is False, "an unpublished product's cart line must be unavailable"
+
+
+@pytest.mark.asyncio
 async def test_adding_same_product_twice_increments_quantity(
     client: Any, customer_token: str, headphones_id: str
 ) -> None:

@@ -12,5 +12,6 @@ export interface CartItemOut {
   quantity: number
   unit_price: number
   subtotal: number
+  available: boolean
   product: ProductCardOut
 }

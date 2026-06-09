@@ -102,10 +102,27 @@ async function remove(itemId: string): Promise<void> {
 
                 <!-- Product -->
                 <td class="px-4 py-4">
-                  <RouterLink
-                    :to="`/products/${item.product.slug}`"
-                    class="flex items-center gap-3"
-                  >
+                  <!-- Unavailable: product was unpublished/deleted; no link, clear label -->
+                  <div v-if="!item.available" class="flex items-center gap-3">
+                    <div
+                      class="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-app-bg-sunken"
+                    >
+                      <span
+                        class="material-symbols-outlined select-none text-[24px] leading-none text-fg-faint"
+                      >
+                        remove_shopping_cart
+                      </span>
+                    </div>
+                    <div>
+                      <p class="text-sm font-semibold text-fg-muted">
+                        {{ t('cart.item_unavailable', 'No longer available') }}
+                      </p>
+                      <p class="mt-0.5 text-xs text-fg-faint">
+                        {{ t('cart.item_unavailable_hint', 'Remove it to continue') }}
+                      </p>
+                    </div>
+                  </div>
+                  <RouterLink v-else :to="`/products/${item.product.slug}`" class="flex items-center gap-3">
                     <div class="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-app-bg-sunken">
                       <img
                         v-if="item.product.thumbnail_url"
@@ -140,7 +157,7 @@ async function remove(itemId: string): Promise<void> {
                   <div class="flex items-center justify-center gap-2">
                     <button
                       type="button"
-                      :disabled="cart.loading || item.quantity <= 1"
+                      :disabled="cart.loading || !item.available || item.quantity <= 1"
                       class="flex h-7 w-7 items-center justify-center rounded-full border border-border text-fg hover:bg-app-bg-raised disabled:opacity-40"
                       @click="updateQty(item.id, item.quantity - 1)"
                     >
@@ -153,7 +170,7 @@ async function remove(itemId: string): Promise<void> {
                     </span>
                     <button
                       type="button"
-                      :disabled="cart.loading"
+                      :disabled="cart.loading || !item.available"
                       class="flex h-7 w-7 items-center justify-center rounded-full border border-border text-fg hover:bg-app-bg-raised disabled:opacity-40"
                       @click="updateQty(item.id, item.quantity + 1)"
                     >
@@ -206,12 +223,30 @@ async function remove(itemId: string): Promise<void> {
           <span class="text-start w-25">{{ formatCurrency(total, currentLocale) }}</span>
         </div>
 
+        <p
+          v-if="cart.hasUnavailableItems"
+          class="mt-5 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger"
+        >
+          {{
+            t('cart.has_unavailable', 'Remove items that are no longer available to check out.')
+          }}
+        </p>
+
         <RouterLink
+          v-if="!cart.hasUnavailableItems"
           to="/checkout"
           class="mt-5 block w-full rounded-xl bg-brand py-3 text-center text-sm font-semibold text-white hover:bg-brand-hover"
         >
           {{ t('cart.checkout', 'Proceed to Checkout') }}
         </RouterLink>
+        <button
+          v-else
+          type="button"
+          disabled
+          class="mt-3 block w-full cursor-not-allowed rounded-xl bg-brand py-3 text-center text-sm font-semibold text-white opacity-40"
+        >
+          {{ t('cart.checkout', 'Proceed to Checkout') }}
+        </button>
 
         <RouterLink
           to="/products"

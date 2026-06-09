@@ -103,6 +103,9 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'cart.error_add': 'Failed to add item',
     'cart.error_update': 'Failed to update item',
     'cart.error_remove': 'Failed to remove item',
+    'cart.item_unavailable': 'No longer available',
+    'cart.item_unavailable_hint': 'Remove it to continue',
+    'cart.has_unavailable': 'Remove items that are no longer available to check out.',
     // checkout
     'checkout.title': 'Checkout',
     'checkout.place_order': 'Place Order',
@@ -478,6 +481,9 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'cart.error_add': 'تعذّر إضافة العنصر',
     'cart.error_update': 'تعذّر تحديث العنصر',
     'cart.error_remove': 'تعذّر إزالة العنصر',
+    'cart.item_unavailable': 'لم يعد متوفّرًا',
+    'cart.item_unavailable_hint': 'أزِله للمتابعة',
+    'cart.has_unavailable': 'أزِل العناصر غير المتوفّرة لإتمام الشراء.',
     // checkout
     'checkout.title': 'إتمام الطلب',
     'checkout.place_order': 'تأكيد الطلب',
@@ -853,6 +859,9 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'cart.error_add': 'Ürün eklenemedi',
     'cart.error_update': 'Ürün güncellenemedi',
     'cart.error_remove': 'Ürün kaldırılamadı',
+    'cart.item_unavailable': 'Artık mevcut değil',
+    'cart.item_unavailable_hint': 'Devam etmek için kaldırın',
+    'cart.has_unavailable': 'Ödeme yapmak için mevcut olmayan ürünleri kaldırın.',
     // checkout
     'checkout.title': 'Ödeme',
     'checkout.place_order': 'Siparişi ver',

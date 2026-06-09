@@ -160,6 +160,9 @@ class CartService:
     async def _format_item(self, item: CartItem, locale: str) -> dict[str, Any]:
         # Served from the with_("product.media") eager cache — no query here.
         product = await item.product().first()
+        # The catalog view keeps unpublished/soft-deleted rows (real_status != visible),
+        # so presence alone isn't availability — checkout rejects anything not visible.
+        available = product is not None and getattr(product, "real_status", None) == "visible"
         if product is not None:
             product_data = self._products.product_to_storefront(product, locale)
         else:
@@ -194,6 +197,7 @@ class CartService:
             "quantity": int(item.quantity),
             "unit_price": unit_price,
             "subtotal": round(unit_price * int(item.quantity), 2),
+            "available": available,
             "product": product_data,
         }
 
