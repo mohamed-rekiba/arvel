@@ -39,8 +39,8 @@ watch(
   },
 )
 
-// reset to first page when search term changes
-watch(search, () => {
+// reset to first page when search term or trashed filter changes
+watch([search, trashedMode], () => {
   page.value = 0
 })
 
@@ -53,6 +53,7 @@ const usersParams = computed(() => ({
   limit: PAGE_SIZE,
   offset: page.value * PAGE_SIZE,
   search: search.value || undefined,
+  trashed: trashedMode.value,
 }))
 
 const { data: ordersData, isPending: loadingOrders } = useAdminOrdersIndexApiAdminOrdersGet(

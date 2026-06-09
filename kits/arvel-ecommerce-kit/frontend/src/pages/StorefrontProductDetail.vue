@@ -244,7 +244,12 @@ async function handleAddToCart(): Promise<void> {
       <!-- Product info -->
       <div>
         <h1 class="text-3xl font-bold text-fg">{{ product.name }}</h1>
-        <ProductRating class="mt-3" :rating="4.5" :count="128" />
+        <ProductRating
+          v-if="product.rating != null"
+          class="mt-3"
+          :rating="product.rating"
+          :count="product.rating_count ?? undefined"
+        />
         <p class="mt-4 text-2xl font-bold text-fg">
           {{ formatCurrency(product.price, currentLocale) }}
         </p>

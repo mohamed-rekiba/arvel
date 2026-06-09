@@ -10,7 +10,8 @@ import type { PermissionOut, RoleOut, TranslationEntryOut } from '@/api/schemas'
 import { pickLocalized } from '@/lib/i18n'
 
 const props = defineProps<{
-  pageType: 'roles' | 'translations'
+  pageType: 'roles' | 'translations' | 'coming-soon'
+  title?: string
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -18,15 +19,16 @@ const { t } = useI18n({ useScope: 'global' })
 const roles = ref<RoleOut[]>([])
 const permissions = ref<PermissionOut[]>([])
 const translations = ref<TranslationEntryOut[]>([])
-const loading = ref(true)
+const loading = ref(props.pageType !== 'coming-soon')
 
-const title = computed(() =>
-  props.pageType === 'roles'
-    ? t('admin.placeholder.roles_perms')
-    : t('admin.placeholder.translations'),
-)
+const heading = computed(() => {
+  if (props.pageType === 'roles') return t('admin.placeholder.roles_perms')
+  if (props.pageType === 'translations') return t('admin.placeholder.translations')
+  return props.title ?? ''
+})
 
 onMounted(async () => {
+  if (props.pageType === 'coming-soon') return
   try {
     if (props.pageType === 'roles') {
       const [rolesOut, permsOut] = await Promise.all([
@@ -46,9 +48,19 @@ onMounted(async () => {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-fg">{{ title }}</h1>
+    <h1 class="text-2xl font-bold text-fg">{{ heading }}</h1>
 
-    <div v-if="loading" class="mt-8 h-48 animate-pulse rounded-xl bg-app-bg-sunken" />
+    <div
+      v-if="pageType === 'coming-soon'"
+      class="mt-8 flex flex-col items-center justify-center rounded-xl border border-dashed border-border-subtle bg-admin-surface px-6 py-16 text-center"
+    >
+      <span class="material-symbols-outlined text-4xl text-fg-faint" aria-hidden="true"
+        >hourglass_empty</span
+      >
+      <p class="mt-4 text-sm text-fg-muted">{{ t('admin.placeholder.coming_soon') }}</p>
+    </div>
+
+    <div v-else-if="loading" class="mt-8 h-48 animate-pulse rounded-xl bg-app-bg-sunken" />
 
     <template v-else-if="pageType === 'roles'">
       <div class="mt-6 grid gap-6 lg:grid-cols-2">
