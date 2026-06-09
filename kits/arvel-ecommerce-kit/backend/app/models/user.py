@@ -48,7 +48,7 @@ class User(
     default_guard_name: ClassVar[str] = "api"
 
     id: int = id_()
-    name: str = string(120)
+    name: str = string(255)
     email: str = string(254, unique=True, index=True)
     email_verified_at: _datetime | None = None
     password: str
