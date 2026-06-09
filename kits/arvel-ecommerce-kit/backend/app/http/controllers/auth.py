@@ -8,7 +8,7 @@ AuthController cannot do generically.
 
 from __future__ import annotations
 
-from app.http.controllers._deps import require_auth
+from app.http.controllers._deps import highest_role_level, require_auth
 from app.http.controllers._responses import MeOut
 from app.models.user import User
 from arvel.auth.http.controller import AuthController
@@ -33,5 +33,6 @@ class EcommerceAuthController(AuthController):
                 "theme": str(getattr(user, "theme", "system") or "system"),
                 "roles": sorted(set(role_names)),
                 "permissions": sorted(set(all_permissions)),
+                "role_level": await highest_role_level(user),
             }
         )

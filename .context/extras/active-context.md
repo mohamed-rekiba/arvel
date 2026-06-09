@@ -380,7 +380,7 @@ typecheck/lint/15 vitest/build + 16 contract tests green.
 - MED: AdminUserDetailPage "Permissions" shows direct grants only, not effective
   (role-derived) perms — rename or expose effective set.
 - MED: force-delete button gated on `users.manage` but API needs role level 100 →
-  non-superadmins get a 403 after clicking (need a level signal in MeOut).
+  non-superadmins get a 403 after clicking (need a level signal in MeOut). [done iter 27]
 - MED #6: global 401 handler always routes to storefront `login`, even for /admin. [done iter 24]
 - MED: `/account?order=...` shows "Order placed" with no verification. [done iter 26]
 - LOW: WishlistButton is local-only (fake); checkout delivery date hardcodes en-US;
@@ -430,6 +430,20 @@ MED: `/account` showed "Order placed" for any `?order=` value (`v-if="route.quer
 so a hand-typed `/account?order=anything` faked a success state. Now resolves the
 query param against the caller's loaded orders and only shows the banner when it
 matches a real owned order. Typecheck/lint green.
+
+## Iteration 27 — Gate force-delete on role level, not just permission (full-stack)
+
+MED: the force-delete button was wrapped in `<PermissionGate permission="users.manage">`,
+but `force_destroy` requires role level 100 (`require_role_level(..., 100)`). A
+non-superadmin with `users.manage` (e.g. admin level 80) saw the button and got a
+403 on click. Added `role_level` to `MeOut` (caller's highest role level via
+`highest_role_level`), exposed `roleLevel`/`hasLevel(min)` on the auth store, and
+gave `PermissionGate` an optional `minLevel` prop. Wrapped the force-delete button
+in `<PermissionGate permission="users.manage" :min-level="100">` so only superadmins
+see it. Regenerated the Orval client (only `meOut.ts` changed — pinned local orval
+back to 8.15.0 to avoid a 132-file header churn from a stray 8.16.0). Added an
+RBAC feature test asserting `/me` reports level 100 for super_admin, <100 for catalog.
+370 unit green; ruff clean; frontend typecheck/lint/vitest green.
 
 ## Blockers
 

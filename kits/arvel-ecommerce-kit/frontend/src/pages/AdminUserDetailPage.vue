@@ -167,16 +167,18 @@ const saving = computed(() => assigning.value || revoking.value)
             </span>
           </div>
 
-          <div class="mt-4">
-            <button
-              type="button"
-              class="rounded-lg border border-danger px-4 py-2 text-sm text-danger hover:bg-red-50 disabled:opacity-50"
-              :disabled="deleting"
-              @click="forceDelete({ userId: user.id })"
-            >
-              {{ t('admin.user.force_delete', 'Force delete user') }}
-            </button>
-          </div>
+          <PermissionGate permission="users.manage" :min-level="100">
+            <div class="mt-4">
+              <button
+                type="button"
+                class="rounded-lg border border-danger px-4 py-2 text-sm text-danger hover:bg-red-50 disabled:opacity-50"
+                :disabled="deleting"
+                @click="forceDelete({ userId: user.id })"
+              >
+                {{ t('admin.user.force_delete', 'Force delete user') }}
+              </button>
+            </div>
+          </PermissionGate>
         </div>
       </PermissionGate>
     </div>

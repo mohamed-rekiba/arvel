@@ -60,6 +60,9 @@ class MeOut(_Out):
     theme: str
     roles: list[str]
     permissions: list[str]
+    # Highest role level the caller holds. Lets the UI gate level-restricted
+    # actions (e.g. force-delete needs 100) instead of showing a button that 403s.
+    role_level: int
 
 
 class RegisterOut(_Out):

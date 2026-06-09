@@ -13,4 +13,5 @@ export interface MeOut {
   theme: string
   roles: string[]
   permissions: string[]
+  role_level: number
 }
