@@ -303,23 +303,22 @@ def test_admin_user_detail_manages_roles_and_permissions() -> None:
 
     assert "AdminUserDetailPage" in router
     assert "path: '/admin/users/:userId'" in router
-    for snippet in (
-        "getAdminUser(",
-        "assignAdminUserRole(",
-        "revokeAdminUserRole(",
-        "grantAdminUserPermission(",
-        "revokeAdminUserPermission(",
-        "runAdminUserAction(",
-        "deleteAdminUser(",
-        "forceDeleteAdminUser(",
-        "`/api/admin/users/${encodeURIComponent(userId)}/force`",
+    # The user-detail page is fully Orval-driven — no hand-written lib/api
+    # admin-user helpers. The generated mutator still backs every call.
+    for hook in (
+        "useAdminUsersShowApiAdminUsersUserIdGet",
+        "useAdminUsersRolesAssignApiAdminUsersUserIdRolesPost",
+        "useAdminUsersRolesRevokeApiAdminUsersUserIdRolesDelete",
+        "useAdminUsersForceDestroyApiAdminUsersUserIdForceDelete",
     ):
-        assert snippet in api
+        assert hook in user_page
+    for removed in ("getAdminUser", "assignAdminUserRole", "forceDeleteAdminUser"):
+        assert removed not in api, f"{removed} should be replaced by its Orval hook"
     assert "props.resource === 'users'" in list_page
     assert 'id="admin-list-trashed-mode"' in list_page
     assert 'PermissionGate permission="roles.manage"' in user_page
     assert 'PermissionGate permission="users.manage"' in user_page
-    assert "forceDeleteAdminUser(token, id)" in user_page
+    assert "forceDelete({ userId: user.id })" in user_page
     assert 'Route.get("/{user_id}"' in routes
     assert '"/{user_id}/force"' in routes
     assert '"roles": roles' in users
