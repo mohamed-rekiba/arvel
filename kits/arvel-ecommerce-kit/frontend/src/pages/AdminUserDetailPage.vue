@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAdminRolesIndexApiAdminRolesGet } from '@/api/admin-roles-permissions/admin-roles-permissions'
 import {
+  getAdminUsersIndexApiAdminUsersGetQueryKey,
   getAdminUsersShowApiAdminUsersUserIdGetQueryKey,
+  useAdminUsersForceDestroyApiAdminUsersUserIdForceDelete,
   useAdminUsersRolesAssignApiAdminUsersUserIdRolesPost,
   useAdminUsersRolesRevokeApiAdminUsersUserIdRolesDelete,
   useAdminUsersShowApiAdminUsersUserIdGet,
@@ -12,73 +14,15 @@ import {
 import { useQueryClient } from '@tanstack/vue-query'
 import { routeParam } from '@/lib/i18n'
 import { useToastStore } from '@/stores/toast'
-import {
-  getAdminUser,
-  assignAdminUserRole,
-  revokeAdminUserRole,
-  grantAdminUserPermission,
-  revokeAdminUserPermission,
-  runAdminUserAction,
-  deleteAdminUser,
-  forceDeleteAdminUser,
-  requireStoredAccessToken,
-} from '@/lib/api'
 import PermissionGate from '@/components/admin/PermissionGate.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const toast = useToastStore()
 const route = useRoute()
+const router = useRouter()
 const queryClient = useQueryClient()
 
 const userId = computed(() => Number(routeParam(route.params.userId ?? route.params.id)))
-
-async function loadUser(id: string | number): Promise<unknown> {
-  const token = requireStoredAccessToken()
-  return getAdminUser(token, id)
-}
-
-async function handleAssignRole(id: string | number, role: string): Promise<void> {
-  const token = requireStoredAccessToken()
-  await assignAdminUserRole(token, id, role)
-}
-
-async function handleRevokeRole(id: string | number, role: string): Promise<void> {
-  const token = requireStoredAccessToken()
-  await revokeAdminUserRole(token, id, role)
-}
-
-async function handleGrantPermission(id: string | number, permission: string): Promise<void> {
-  const token = requireStoredAccessToken()
-  await grantAdminUserPermission(token, id, permission)
-}
-
-async function handleRevokePermission(id: string | number, permission: string): Promise<void> {
-  const token = requireStoredAccessToken()
-  await revokeAdminUserPermission(token, id, permission)
-}
-
-async function handleUserAction(id: string | number, action: string): Promise<void> {
-  const token = requireStoredAccessToken()
-  await runAdminUserAction(token, id, action)
-}
-
-async function handleDeleteUser(id: string | number): Promise<void> {
-  const token = requireStoredAccessToken()
-  await deleteAdminUser(token, id)
-}
-
-async function handleForceDeleteUser(id: string | number): Promise<void> {
-  const token = requireStoredAccessToken()
-  await forceDeleteAdminUser(token, id)
-}
-
-void loadUser
-void handleAssignRole
-void handleRevokeRole
-void handleGrantPermission
-void handleRevokePermission
-void handleUserAction
-void handleDeleteUser
 const selectedRole = ref('')
 
 const { data: userWrapper, isPending } = useAdminUsersShowApiAdminUsersUserIdGet(userId)
@@ -115,6 +59,21 @@ const { mutate: revokeRole, isPending: revoking } =
       },
       onError: (err: unknown) =>
         toast.error(err instanceof Error ? err.message : t('admin.user.remove_failed')),
+    },
+  })
+
+const { mutate: forceDelete, isPending: deleting } =
+  useAdminUsersForceDestroyApiAdminUsersUserIdForceDelete({
+    mutation: {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: getAdminUsersIndexApiAdminUsersGetQueryKey(),
+        })
+        toast.success(t('admin.user.toast_force_deleted'))
+        void router.push('/admin/users')
+      },
+      onError: (err: unknown) =>
+        toast.error(err instanceof Error ? err.message : t('admin.user.force_delete_failed')),
     },
   })
 
@@ -211,8 +170,9 @@ const saving = computed(() => assigning.value || revoking.value)
           <div class="mt-4">
             <button
               type="button"
-              class="rounded-lg border border-danger px-4 py-2 text-sm text-danger hover:bg-red-50"
-              @click="handleForceDeleteUser(user.id)"
+              class="rounded-lg border border-danger px-4 py-2 text-sm text-danger hover:bg-red-50 disabled:opacity-50"
+              :disabled="deleting"
+              @click="forceDelete({ userId: user.id })"
             >
               {{ t('admin.user.force_delete', 'Force delete user') }}
             </button>

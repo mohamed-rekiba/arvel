@@ -344,6 +344,8 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.user.toast_removed': 'Role "{role}" removed',
     'admin.user.assign_failed': 'Failed to assign role',
     'admin.user.remove_failed': 'Failed to remove role',
+    'admin.user.toast_force_deleted': 'User permanently deleted',
+    'admin.user.force_delete_failed': 'Failed to delete user',
     // admin — permissions page
     'admin.perms.title': 'Permissions',
     'admin.perms.summary': '{count} permissions across {domains} domains',
@@ -712,6 +714,8 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.user.toast_removed': 'تم إزالة الدور "{role}"',
     'admin.user.assign_failed': 'فشل تعيين الدور',
     'admin.user.remove_failed': 'فشل إزالة الدور',
+    'admin.user.toast_force_deleted': 'تم حذف المستخدم نهائيًا',
+    'admin.user.force_delete_failed': 'فشل حذف المستخدم',
     // admin — permissions page
     'admin.perms.title': 'الصلاحيات',
     'admin.perms.summary': '{count} صلاحية عبر {domains} نطاق',
@@ -1081,6 +1085,8 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.user.toast_removed': '"{role}" rolü kaldırıldı',
     'admin.user.assign_failed': 'Rol atanamadı',
     'admin.user.remove_failed': 'Rol kaldırılamadı',
+    'admin.user.toast_force_deleted': 'Kullanıcı kalıcı olarak silindi',
+    'admin.user.force_delete_failed': 'Kullanıcı silinemedi',
     // admin — permissions page
     'admin.perms.title': 'İzinler',
     'admin.perms.summary': '{domains} alanda {count} izin',
