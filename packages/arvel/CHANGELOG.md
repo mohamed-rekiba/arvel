@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.22.0...arvel-v0.22.1) (2026-06-09)
+
+
+### Bug Fixes
+
+* streamline code formatting and exception handling ([4991b3f](https://github.com/mohamed-rekiba/arvel/commit/4991b3f95bc543ff3f94e3b718d02845dda13613))
+
 ## [0.22.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.21.0...arvel-v0.22.0) (2026-06-09)
 
 
