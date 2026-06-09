@@ -385,7 +385,10 @@ typecheck/lint/15 vitest/build + 16 contract tests green.
 - MED: `/account?order=...` shows "Order placed" with no verification. [done iter 26]
 - LOW: WishlistButton is local-only (fake) [done iter 30 — now a real persisted guest wishlist];
   checkout delivery date hardcodes en-US [done iter 24];
-  category parent_id allows self/cycle [done iter 29]; admin edit pages lack per-action gates.
+  category parent_id allows self/cycle [done iter 29]; admin edit pages lack per-action gates [done iter 31].
+
+Iteration-22 review backlog fully cleared (iters 23–31). Next: dispatch a fresh
+review pass to surface a new batch, or start the storefront/admin design refresh.
 
 ## Iteration 23 — Serialize concurrent checkout (backend)
 
@@ -476,6 +479,15 @@ same class as the removed fake ratings). Replaced with a `useWishlistStore`
 reloads, shared across all cards. Honest scope — guest-only, no account sync
 (there's no backend wishlist). Added a vitest covering add/remove and rehydration.
 Frontend typecheck/lint/vitest green (18 tests).
+
+## Iteration 31 — Per-action gates on the admin catalog list (frontend)
+
+LOW: the catalog list gated create/publish/delete but not Edit or Restore (both
+hit `<resource>.update`), so a read-only support agent saw buttons that 403 on
+click. Added an `updatePermission` computed and wrapped the Edit and Restore
+buttons in `PermissionGate`. Order-detail (orders.update) and user-detail role/
+grant/force-delete actions were already gated, so no change needed there. This
+clears the iteration-22 review backlog. Frontend typecheck/lint/vitest green.
 
 ## Blockers
 

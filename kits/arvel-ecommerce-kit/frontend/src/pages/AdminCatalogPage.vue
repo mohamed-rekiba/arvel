@@ -55,6 +55,8 @@ const publishPermission = computed(() =>
 )
 const deletePermission = computed(() => `${props.catalog}.delete`)
 const createPermission = computed(() => `${props.catalog}.create`)
+// Edit and restore both hit <resource>.update on the backend.
+const updatePermission = computed(() => `${props.catalog}.update`)
 
 const trashedMode = ref<'without' | 'only'>('without')
 
@@ -451,13 +453,15 @@ function handleRestore(id: string): void {
             </td>
             <td class="px-6 py-4 text-end">
               <div class="flex justify-end gap-3">
-                <button
-                  type="button"
-                  class="text-xs text-fg-muted hover:text-fg hover:underline"
-                  @click="goEdit(record.id)"
-                >
-                  {{ t('admin.catalog.action_edit') }}
-                </button>
+                <PermissionGate :permission="updatePermission">
+                  <button
+                    type="button"
+                    class="text-xs text-fg-muted hover:text-fg hover:underline"
+                    @click="goEdit(record.id)"
+                  >
+                    {{ t('admin.catalog.action_edit') }}
+                  </button>
+                </PermissionGate>
                 <PermissionGate :permission="publishPermission">
                   <button
                     v-if="itemStatus(record) !== 'published'"
@@ -476,14 +480,16 @@ function handleRestore(id: string): void {
                     {{ t('admin.catalog.action_unpublish') }}
                   </button>
                 </PermissionGate>
-                <button
-                  v-if="'deleted_at' in record && record.deleted_at"
-                  type="button"
-                  class="text-xs text-stock-in hover:underline"
-                  @click="handleRestore(record.id)"
-                >
-                  {{ t('admin.catalog.action_restore') }}
-                </button>
+                <PermissionGate :permission="updatePermission">
+                  <button
+                    v-if="'deleted_at' in record && record.deleted_at"
+                    type="button"
+                    class="text-xs text-stock-in hover:underline"
+                    @click="handleRestore(record.id)"
+                  >
+                    {{ t('admin.catalog.action_restore') }}
+                  </button>
+                </PermissionGate>
                 <PermissionGate :permission="deletePermission">
                   <button
                     type="button"
