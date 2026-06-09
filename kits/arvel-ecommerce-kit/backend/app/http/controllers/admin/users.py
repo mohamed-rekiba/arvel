@@ -116,6 +116,7 @@ class AdminUsersController(Controller):
             raise NotFoundException("User not found.")
         if role_obj is None:
             raise NotFoundException(f"Role '{payload.role}' not found.")
+        await _assert_outranks(actor, target)
         await target.assign_role(role_obj)
         return AdminUserWrapperOut.model_validate({"data": await users.get_user(user_id)})
 
@@ -129,6 +130,7 @@ class AdminUsersController(Controller):
         target: User | None = await User.where(User.id == user_id).first()
         if target is None:
             raise NotFoundException("User not found.")
+        await _assert_outranks(actor, target)
         await target.remove_role(role_name)
         return AdminUserWrapperOut.model_validate({"data": await users.get_user(user_id)})
 
@@ -146,6 +148,7 @@ class AdminUsersController(Controller):
         target: User | None = await User.where(User.id == user_id).first()
         if target is None:
             raise NotFoundException("User not found.")
+        await _assert_outranks(actor, target)
         await target.give_permission_to(perm_obj)
         return AdminUserWrapperOut.model_validate({"data": await users.get_user(user_id)})
 
@@ -163,5 +166,6 @@ class AdminUsersController(Controller):
         target: User | None = await User.where(User.id == user_id).first()
         if target is None:
             raise NotFoundException("User not found.")
+        await _assert_outranks(actor, target)
         await target.revoke_permission_to(perm_obj)
         return AdminUserWrapperOut.model_validate({"data": await users.get_user(user_id)})
