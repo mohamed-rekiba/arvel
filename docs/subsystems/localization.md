@@ -48,4 +48,4 @@ flowchart TD
 
 ## See also
 
-- [Bootstrap & lifecycle](../architecture/bootstrap-lifecycle.md) — `LangServiceProvider` runs early so later error messages can localize.
+- [Bootstrap & lifecycle](../architecture/ARCH-002-bootstrap-lifecycle.md) — `LangServiceProvider` runs early so later error messages can localize.

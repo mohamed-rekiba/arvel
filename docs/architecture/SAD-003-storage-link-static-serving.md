@@ -1,8 +1,6 @@
 # SAD-003 — Static serving for `storage:link`
 
-**WI**: WI-arvel-003
-**Status**: Accepted
-**Related**: ADR-022 (this decision), ADR-009 § 4 (serve=true route)
+**Work Item**: WI-arvel-003 · **Status**: Accepted · **Related**: ADR-022 (this decision), ADR-009 § 4 (serve=true route)
 
 ## Overview
 
@@ -24,7 +22,9 @@ GET /storage/{path}
       → serve file if under that realpath, else 404
 ```
 
-The mount is appended after `router.register_with_app(fa)` and the health route, so it only ever handles `/storage/*` that no earlier route claimed. It does not shadow other paths.
+The mount is appended after `router.register_with_app(fa)` and the health route, so it only ever handles `/storage/*` that no earlier route claimed. It does not shadow other paths. It's also conditional on `public/storage` existing at boot — `.exists()` follows the symlink, so a dangling link is treated as absent and the mount is skipped.
+
+When the `local` driver's serve route ([SAD-001](SAD-001-local-storage-serving.md)) is also on `/storage`, the router-registered serve route is registered first and wins; this static mount only catches what the router didn't.
 
 ## Why not the parent `public/`
 
@@ -41,6 +41,6 @@ Mounting `public/` would (1) serve `public/asgi.py` as source (A05) and (2) make
 
 No auth, PII, or crypto surface → no Stage 4b. Security verified in QA-Post.
 
-## Test coverage (planned)
+## Test coverage
 
-Unit/feature: linked file served (200 + content-type), missing file 404, traversal rejected, boot-safe with no symlink, unrelated route unaffected. See `packages/arvel/tests/http/test_public_storage_mount.py`.
+Implemented in `packages/arvel/tests/http/test_public_storage_mount.py` (7 tests): linked file served (200 + content-type), symlink resolution, missing file 404, traversal rejected, boot-safe with no symlink, framework JSON 404 preserved for unrelated paths.

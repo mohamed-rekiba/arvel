@@ -1,7 +1,6 @@
 # SAD-002 — Config-file cascade for all services
 
-**Work Item**: WI-arvel-002 | **PRD**: `docs/prd/PRD-002-config-file-cascade.md`
-**Related ADRs**: ADR-021 (config files override env via a pydantic-settings source)
+**Work Item**: WI-arvel-002 · **Status**: Accepted · **Related**: ADR-021 (config files override env via a pydantic-settings source), PRD-002-config-file-cascade
 
 ---
 
@@ -19,7 +18,7 @@ that reads the loaded `config/*.py` modules. No per-provider plumbing.
 | `config/settings.py` → `ArvelSettings` | `__config_path__` ClassVar + `settings_customise_sources` inserting the source above env |
 | `config/storage_config.py` | `__config_path__` on `StorageConfig` + the four disk configs |
 | `config/db_config.py`, `config/cache_config.py` | `__config_path__` with `{default}` token |
-| `queue/config.py`, `config/session_config.py`, `broadcasting/config.py` | `__config_path__` |
+| `queue/config.py`, `config/session_config.py`, `broadcasting/config.py`, `http/config.py` | `__config_path__` (top-level only — nested queue-connection configs don't opt in) |
 | `config/_lookup_registry.py` → `dump_config_cache` | strip secret-named keys before writing |
 
 ## Precedence

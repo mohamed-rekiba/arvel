@@ -355,7 +355,7 @@ stays available as an opt-in import for projects that prefer RFC 7807.
 ### Current implementation
 
 - Code: `packages/arvel/src/arvel/http/middleware/scope.py` (`ArvelScopeMiddleware`); mounted in `packages/arvel/src/arvel/application/application.py::into_asgi()`.
-- Docs: `docs/architecture/bootstrap-lifecycle.md`, `docs/architecture/service-container.md`.
+- Docs: `docs/architecture/ARCH-002-bootstrap-lifecycle.md`, `docs/architecture/ARCH-003-service-container.md`.
 
 ### Notes
 

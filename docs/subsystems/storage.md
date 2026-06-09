@@ -48,4 +48,4 @@ manager = StorageManager(config=config, local_config=..., s3_config=..., ...)  #
 ## See also
 
 - [Encryption](encryption.md) — both use HKDF over `APP_KEY`.
-- [Configuration](../architecture/configuration.md)
+- [Configuration](../architecture/ARCH-006-configuration.md)

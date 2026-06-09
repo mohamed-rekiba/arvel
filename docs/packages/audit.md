@@ -47,4 +47,4 @@ flowchart TB
 
 ## See also
 
-- [Encryption](../subsystems/encryption.md) · [Model internals](../orm/model-internals.md) · [Facades](../architecture/facades.md) (`Context`)
+- [Encryption](../subsystems/encryption.md) · [Model internals](../orm/model-internals.md) · [Facades](../architecture/ARCH-005-facades.md) (`Context`)

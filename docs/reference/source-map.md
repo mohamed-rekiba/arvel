@@ -6,12 +6,12 @@ Where each subsystem lives in the tree, so a doc page maps back to code. All pat
 
 | Area | Path | Docs |
 |---|---|---|
-| Application / builder | `application/` | [bootstrap](../architecture/bootstrap-lifecycle.md) |
-| Service container | `container/` | [container](../architecture/service-container.md) |
-| Service providers (base) | `providers/service_provider.py` | [providers](../architecture/service-providers.md) |
-| Baseline providers | `providers/` | [providers](../architecture/service-providers.md) |
-| Config (class + module) | `config/` | [configuration](../architecture/configuration.md) |
-| Facades | `facades/` | [facades](../architecture/facades.md) |
+| Application / builder | `application/` | [bootstrap](../architecture/ARCH-002-bootstrap-lifecycle.md) |
+| Service container | `container/` | [container](../architecture/ARCH-003-service-container.md) |
+| Service providers (base) | `providers/service_provider.py` | [providers](../architecture/ARCH-004-service-providers.md) |
+| Baseline providers | `providers/` | [providers](../architecture/ARCH-004-service-providers.md) |
+| Config (class + module) | `config/` | [configuration](../architecture/ARCH-006-configuration.md) |
+| Facades | `facades/` | [facades](../architecture/ARCH-005-facades.md) |
 | Support / annotations | `support/` | — |
 
 ## HTTP

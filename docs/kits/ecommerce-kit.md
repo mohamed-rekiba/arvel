@@ -33,5 +33,5 @@ The kit is picked up by the `kits/*` workspace glob, but unlike the five librari
 
 ## See also
 
-- [Bootstrap & lifecycle](../architecture/bootstrap-lifecycle.md) — what `create_application()` does.
+- [Bootstrap & lifecycle](../architecture/ARCH-002-bootstrap-lifecycle.md) — what `create_application()` does.
 - [arvel-permission](../packages/permission.md) · [arvel-image](../packages/image.md)

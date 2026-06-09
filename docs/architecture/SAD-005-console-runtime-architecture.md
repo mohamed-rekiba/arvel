@@ -1,10 +1,10 @@
 # SAD-005 — Console / CLI runtime architecture
 
+**Work Item**: WI (CLI runtime) · **Status**: Approved · **Related**: ADR-017, ADR-013, ADR-009
+
 **Scope**: How the `arvel` CLI is structured at runtime — entrypoint flow, the inside-vs-outside-project split, needs-based bootstrap, command discovery channels, the subsystem closure, the listing-app fast path, the async event-loop ownership story, and the scaffolding subsystem.
 
 **Date**: 2026-06-07.
-
-**Status**: Approved.
 
 > **Relationship to ADR-017.** ADR-017 records the seven *decisions* that shaped the CLI ("Typer", "two command channels", "needs-based bootstrap", "outside-project allow-list", etc.). This SAD records the *runtime architecture* that implements those decisions — what code runs, in what order, on which event loop, and why the lazy-import paths exist. ADR-017 is the "why"; this document is the "how it actually executes".
 
@@ -20,14 +20,15 @@ arvel = "arvel.console.entrypoint:main"
 
 `main()` is a synchronous gatekeeper. It:
 
-1. Prints the banner (TTY-gated, opt-out via `--no-banner` / `ARVEL_NO_BANNER`).
-2. Strips `--no-banner` from `argv` so Typer doesn't choke on it.
-3. Handles `--version` / `-V` synchronously and exits.
-4. Computes the *requested command name* (first non-flag positional) without parsing the rest of `argv`.
-5. Walks up to four ancestors looking for `bootstrap/app.py` to decide *inside-project vs outside-project*.
-6. Dispatches to one of three runtime branches:
+1. Re-execs into the project's virtualenv if needed (`maybe_reexec_into_project_venv(argv)`), so `arvel` run from outside the venv still picks up the project's installed packages.
+2. Prints the banner (TTY-gated, opt-out via `--no-banner` / `ARVEL_NO_BANNER`).
+3. Strips `--no-banner` from `argv` so Typer doesn't choke on it.
+4. Handles `--version` / `-V` synchronously and exits.
+5. Computes the *requested command name* (first non-flag positional) without parsing the rest of `argv`.
+6. Walks up to four ancestors looking for `bootstrap/app.py` to decide *inside-project vs outside-project*.
+7. Dispatches to one of three runtime branches:
    - **Outside project** — sync fast path; no event loop, no provider boot.
-   - **Process-owning command** (e.g. `serve`) — sync; the command itself owns `asyncio.run`.
+   - **Process-owning command** (`serve`, `shell`) — sync; the command itself owns `asyncio.run`.
    - **Inside project, normal command** — `asyncio.run(async_main(...))` owns the loop for the rest of the lifecycle.
 
 ```mermaid
@@ -96,7 +97,7 @@ The fix: catch `SystemExit` into `_deferred_exit`, await `get_pending_task()`, t
 
 ### 3.3 Process-owning commands bypass the loop
 
-`serve`, which delegates to `uvicorn`, has `owns_process: ClassVar[bool] = True`. `main()` checks for that *before* `asyncio.run` — uvicorn calls `asyncio.run()` itself, and you can't nest event loops. Process-owning commands run their Typer dispatch synchronously and let the command's `handle` deal with its own runtime.
+`serve` (delegates to `uvicorn`) and `shell` (runs an interactive REPL) both set `owns_process: ClassVar[bool] = True`. `main()` checks for that *before* `asyncio.run` — uvicorn calls `asyncio.run()` itself and you can't nest event loops, and the shell wants the terminal. Process-owning commands run their Typer dispatch synchronously and let the command's `handle` own its runtime (the command boots the framework itself if it needs to). `serve` additionally checks `find_project_root()` in `handle()` and exits `2` when run outside a project.
 
 ## 4. Needs-based bootstrap: `_required_subsystems_for`
 
@@ -108,7 +109,7 @@ class MigrateCommand(Command):
     requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.DATABASE})
 ```
 
-`_required_subsystems_for(command)` resolves the requested name to a class (without instantiating it) and computes `closure(cls.requires)` — the transitive set under the dependency graph in `arvel.console._subsystem`. The bootstrap then merges that with `FOUNDATION_SUBSYSTEMS` (always-on: `CONFIG`, `LOG`, `LANG`, `CONTEXT`).
+`_required_subsystems_for(command)` resolves the requested name to a class (without instantiating it) and computes `closure(cls.requires)` — the transitive set under the dependency graph in `arvel.console._subsystem`. The bootstrap then merges that with `FOUNDATION_SUBSYSTEMS` — an always-on **set** of `CONFIG`, `LOG`, `LANG`, `CONTEXT` (the arrows in the diagram below show grouping, not boot order; provider boot order is fixed by the HEAD chain in [bootstrap & lifecycle](ARCH-002-bootstrap-lifecycle.md#provider-ordering-head--user--tail)).
 
 ```mermaid
 flowchart LR

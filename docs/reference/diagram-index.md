@@ -7,12 +7,12 @@ Every diagram in this documentation, by page. All are Mermaid; they render in Mk
 | Diagram | Page |
 |---|---|
 | 10,000-foot view (app → arvel → stack) | [README](../README.md) |
-| Layered design | [overview](../architecture/overview.md) |
-| Bootstrap sequence (register → boot → shutdown) | [bootstrap & lifecycle](../architecture/bootstrap-lifecycle.md) |
-| Container resolution order | [service container](../architecture/service-container.md) |
-| Provider lifecycle states | [service providers](../architecture/service-providers.md) |
-| Two config systems | [configuration](../architecture/configuration.md) |
-| Facade binding | [facades](../architecture/facades.md) |
+| Layered design | [overview](../architecture/ARCH-001-overview.md) |
+| Bootstrap sequence (register → boot → shutdown) | [bootstrap & lifecycle](../architecture/ARCH-002-bootstrap-lifecycle.md) |
+| Container resolution order | [service container](../architecture/ARCH-003-service-container.md) |
+| Provider lifecycle states | [service providers](../architecture/ARCH-004-service-providers.md) |
+| Two config systems | [configuration](../architecture/ARCH-006-configuration.md) |
+| Facade binding | [facades](../architecture/ARCH-005-facades.md) |
 
 ## HTTP
 

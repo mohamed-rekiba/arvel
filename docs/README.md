@@ -65,12 +65,12 @@ Start with **Architecture** — it is the spine. Everything else is a subsystem 
 
 ### Architecture (start here)
 
-1. [Overview](architecture/overview.md) — the layered design and where the seams are.
-2. [Bootstrap & lifecycle](architecture/bootstrap-lifecycle.md) — how `Application` boots: register vs boot, provider ordering, ASGI assembly.
-3. [Service container](architecture/service-container.md) — bindings, resolution, autowiring, scopes, async.
-4. [Service providers](architecture/service-providers.md) — the `register`/`boot`/`shutdown` contract and baseline chain.
-5. [Configuration](architecture/configuration.md) — the two config systems: typed `ArvelSettings` and module-based `config()`.
-6. [Facades](architecture/facades.md) — how the static accessors bind to container services.
+1. [Overview](architecture/ARCH-001-overview.md) — the layered design and where the seams are.
+2. [Bootstrap & lifecycle](architecture/ARCH-002-bootstrap-lifecycle.md) — how `Application` boots: register vs boot, provider ordering, ASGI assembly.
+3. [Service container](architecture/ARCH-003-service-container.md) — bindings, resolution, autowiring, scopes, async.
+4. [Service providers](architecture/ARCH-004-service-providers.md) — the `register`/`boot`/`shutdown` contract and baseline chain.
+5. [Configuration](architecture/ARCH-006-configuration.md) — the two config systems: typed `ArvelSettings` and module-based `config()`.
+6. [Facades](architecture/ARCH-005-facades.md) — how the static accessors bind to container services.
 
 ### HTTP layer
 

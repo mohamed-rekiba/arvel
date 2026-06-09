@@ -1,6 +1,6 @@
-# Service providers
+# ARCH-004 — Service providers
 
-A service provider is the unit of bootstrap. Each subsystem ships one, and the [bootstrap pipeline](bootstrap-lifecycle.md) drives them through three lifecycle hooks. If you're adding a feature to Arvel, you're almost certainly writing or extending a provider.
+A service provider is the unit of bootstrap. Each subsystem ships one, and the [bootstrap pipeline](ARCH-002-bootstrap-lifecycle.md) drives them through three lifecycle hooks. If you're adding a feature to Arvel, you're almost certainly writing or extending a provider.
 
 **Source**: `packages/arvel/src/arvel/providers/service_provider.py` (base class), plus one provider per subsystem (e.g. `providers/config_provider.py`, `http`, `database`, `cache`, …).
 
@@ -121,7 +121,7 @@ When `is_migrations=True`, each destination is treated as a directory and the ba
 
 ## Baseline providers
 
-The framework always installs a HEAD set before user providers and a TAIL provider after them. The ordering and rationale are in [bootstrap & lifecycle](bootstrap-lifecycle.md#provider-ordering-head--user--tail). In short:
+The framework always installs a HEAD set before user providers and a TAIL provider after them. The ordering and rationale are in [bootstrap & lifecycle](ARCH-002-bootstrap-lifecycle.md#provider-ordering-head--user--tail). In short:
 
 ```mermaid
 flowchart LR
