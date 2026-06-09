@@ -7,11 +7,12 @@ from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
 from arvel.database import PublishableMixin
-from arvel.http.exceptions import ValidationException
+from arvel.http.exceptions import ConflictException, ValidationException
 from arvel.logging.facade import Log
 
 from app.http.controllers._schemas import CreateCategoryPayload, UpdateCategoryPayload
 from app.models.category import Category
+from app.models.product import Product
 from app.support.labels import label
 
 
@@ -143,6 +144,13 @@ class CategoryService:
         Log.debug("category.deleted", category_id=str(category.id))
 
     async def force_delete(self, category: Category) -> None:
+        # products.category_id and the self-referential parent_id are FK RESTRICT.
+        # Soft-deleted rows still hold the FK, so check with_trashed — otherwise the
+        # hard delete trips a DB-level violation and surfaces as a 500 instead of 409.
+        if await Product.with_trashed().where(Product.category_id == category.id).count():
+            raise ConflictException("Cannot permanently delete a category that has products.")
+        if await Category.with_trashed().where(Category.parent_id == category.id).count():
+            raise ConflictException("Cannot permanently delete a category that has subcategories.")
         Log.debug("category.force_deleting", category_id=str(category.id))
         await category.force_delete()
         Log.debug("category.force_deleted", category_id=str(category.id))
