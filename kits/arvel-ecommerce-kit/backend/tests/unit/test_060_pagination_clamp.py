@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from app.http.controllers._deps import MAX_PAGE_LIMIT, clamp_limit, clamp_offset
+from app.http.controllers._deps import clamp_limit, clamp_offset
+
+# With no app booted, config("pagination.max_limit", 100) falls back to 100.
+_DEFAULT_MAX = 100
 
 
 def test_limit_is_capped_at_max() -> None:
-    assert clamp_limit(10_000_000) == MAX_PAGE_LIMIT
+    assert clamp_limit(10_000_000) == _DEFAULT_MAX
 
 
 def test_limit_floor_is_one() -> None:
@@ -16,7 +19,7 @@ def test_limit_floor_is_one() -> None:
 
 def test_limit_passes_through_within_bounds() -> None:
     assert clamp_limit(20) == 20
-    assert clamp_limit(MAX_PAGE_LIMIT) == MAX_PAGE_LIMIT
+    assert clamp_limit(_DEFAULT_MAX) == _DEFAULT_MAX
 
 
 def test_custom_maximum_is_honored() -> None:

@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, TypedDict
 
+from arvel.config import config
 from arvel.database import TranslatableMixin
 from arvel.database.exceptions import InvalidCursorError
 from arvel.http.exceptions import ValidationException
@@ -23,9 +24,6 @@ from app.models.product_catalog import ProductCatalog
 from app.models.vendor import Vendor
 from app.support.labels import label
 from app.support.products_catalog import refresh_products_catalog_now
-
-# A product counts as "new" for this long after it's created.
-_NEW_WINDOW = timedelta(days=30)
 
 
 class ProductAdminFilter(TypedDict, total=False):
@@ -366,7 +364,8 @@ class ProductService:
         created = product.created_at
         if created is not None and created.tzinfo is None:
             created = created.replace(tzinfo=UTC)
-        is_new = created is not None and (datetime.now(UTC) - created) <= _NEW_WINDOW
+        new_window = timedelta(days=int(config("catalog.new_product_days", 30)))
+        is_new = created is not None and (datetime.now(UTC) - created) <= new_window
 
         tr = TranslatableMixin.translate_dict
         name: dict[str, Any] = product.name or {}

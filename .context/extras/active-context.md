@@ -811,6 +811,29 @@ typecheck/lint/vitest(18)/build green.
 7. MED: frontend admin route gate coarser than backend.
 8. MED: client permissions go stale after admin change.
 
+## Framework-convention remediation (review feedback, approved)
+
+Reviewer: stop bypassing framework primitives (config layer, scopes, accessors,
+FormRequest validation, arvel-image collection validation, starter structure).
+Survey: subagent 39f3de81. Plan = 7 steps (config, media, scopes, guards,
+validation, accessors/resources, seeding) before resuming r3 #5-#8.
+
+- **iter 57 — config layer (done):** added `config/catalog.py`
+  (`new_product_days`, `search_min_length`) and `config/pagination.py`
+  (`max_limit`). `product_to_storefront` new-window, storefront search min
+  length, and `clamp_limit` ceiling now read via `config(...)` at call time
+  (not module import — registry is boot-populated). Dropped `_NEW_WINDOW`,
+  `_MIN_QUERY_LENGTH`, `MAX_PAGE_LIMIT` constants. Unit 380 pass; storefront
+  search feature tests green.
+
+Two questions answered:
+- "Top-selling electronics" is a decorative `home.big_sale_eyebrow` banner with
+  no data binding; real best-sellers (`OrderService.best_sellers`) counts only
+  delivered orders and there's **no order seeder** → always empty (iter rm7).
+- Guards take a single `perm`; the arvel_permission trait already has
+  `has_any_permission`/`has_all_permissions` — guard factory should accept a
+  list (iter rm6).
+
 ## Blockers
 
 None. All quality gates green.

@@ -9,11 +9,10 @@ from app.http.controllers._responses import (
     SearchOut,
     StorefrontCategoryListOut,
 )
+from arvel.config import config
 from arvel.http import Request
 from arvel.http.controller import Controller
 from arvel.http.exceptions import BadRequestException, NotFoundException
-
-_MIN_QUERY_LENGTH = 2
 
 
 class StorefrontController(Controller):
@@ -68,8 +67,9 @@ class StorefrontController(Controller):
         locale: str | None = None,
         limit: int = 20,
     ) -> SearchOut:
-        if len(q) < _MIN_QUERY_LENGTH:
-            raise BadRequestException("Search query must be at least 2 characters.")
+        min_length = int(config("catalog.search_min_length", 2))
+        if len(q) < min_length:
+            raise BadRequestException(f"Search query must be at least {min_length} characters.")
         resolved_locale = locale or getattr(request.state, "locale", "en") or "en"
         results = await products.search_published(
             q=q, locale=resolved_locale, limit=clamp_limit(limit)

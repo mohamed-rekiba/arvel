@@ -4,7 +4,6 @@ from __future__ import annotations
 
 __all__ = [
     "DB_TX",
-    "MAX_PAGE_LIMIT",
     "carts",
     "categories",
     "clamp_limit",
@@ -28,19 +27,18 @@ from app.services.product_service import ProductService
 from app.services.user_service import UserService
 from app.services.vendor_service import VendorService
 from arvel.auth.guards import make_permission_guard, make_role_level_guard, require_auth
+from arvel.config import config
 from arvel.http.exceptions import NotFoundException
 from arvel.http.middleware.database_transaction import DatabaseTransaction
 from arvel_permission.models import Role
 
 DB_TX = [DatabaseTransaction()]
 
-# Hard ceiling for any client-supplied page size. A hostile ?limit=10000000 would
-# otherwise force a full-table scan (and, on order lists, an N+1 per row).
-MAX_PAGE_LIMIT = 100
 
-
-def clamp_limit(limit: int, *, maximum: int = MAX_PAGE_LIMIT) -> int:
-    return min(max(limit, 1), maximum)
+def clamp_limit(limit: int, *, maximum: int | None = None) -> int:
+    # Ceiling is config-driven (pagination.max_limit) so deployments can tune it.
+    ceiling = maximum if maximum is not None else int(config("pagination.max_limit", 100))
+    return min(max(limit, 1), ceiling)
 
 
 def clamp_offset(offset: int) -> int:
