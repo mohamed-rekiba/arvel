@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
 from arvel.database import PublishableMixin
+from arvel.http.exceptions import ValidationException
 from arvel.logging.facade import Log
 
 from app.http.controllers._schemas import CreateCategoryPayload, UpdateCategoryPayload
@@ -60,8 +61,36 @@ class CategoryService:
             return await Category.with_trashed().where(Category.id == cid).first()
         return await Category.where(Category.id == cid).first()
 
+    async def _assert_acyclic_parent(self, category: Category, parent_id: uuid.UUID) -> None:
+        """Reject self-parenting and cycles before writing parent_id."""
+        if parent_id == category.id:
+            raise ValidationException("A category cannot be its own parent.")
+        # Walk the proposed parent's ancestor chain; hitting this category means
+        # the new edge closes a loop. seen[] guards against a pre-existing cycle.
+        cursor: Category | None = await Category.with_trashed().where(
+            Category.id == parent_id
+        ).first()
+        if cursor is None:
+            raise ValidationException("Parent category not found.")
+        seen: set[uuid.UUID] = set()
+        while cursor is not None and cursor.parent_id is not None:
+            if cursor.parent_id == category.id:
+                raise ValidationException("Category parent would create a cycle.")
+            if cursor.parent_id in seen:
+                break
+            seen.add(cursor.parent_id)
+            cursor = await Category.with_trashed().where(
+                Category.id == cursor.parent_id
+            ).first()
+
     async def create(self, payload: CreateCategoryPayload) -> Category:
         Log.debug("category.creating", name=label(payload.name))
+        if payload.parent_id:
+            parent = await Category.with_trashed().where(
+                Category.id == uuid.UUID(payload.parent_id)
+            ).first()
+            if parent is None:
+                raise ValidationException("Parent category not found.")
         category = await Category.create(
             name=payload.name,
             slug=payload.slug,
@@ -80,7 +109,9 @@ class CategoryService:
         Log.debug("category.updating", category_id=str(category.id))
         for key, value in payload.model_dump(exclude_unset=True).items():
             if key == "parent_id" and value is not None:
-                category.parent_id = uuid.UUID(value)
+                new_parent = uuid.UUID(value)
+                await self._assert_acyclic_parent(category, new_parent)
+                category.parent_id = new_parent
             else:
                 setattr(category, key, value)
         if payload.status is not None:
