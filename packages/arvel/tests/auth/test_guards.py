@@ -210,9 +210,7 @@ class TestPermissionGuard:
         _bind_service(monkeypatch, _FakeService(user=SimpleNamespace(id=7)))
         guard = make_permission_guard(_user_model(_FakeUser(perms=set(), level=0)))
         with pytest.raises(AuthorizationException):
-            await guard(
-                _request(authorization="Bearer t"), ["a", "b"], match="any"
-            )
+            await guard(_request(authorization="Bearer t"), ["a", "b"], match="any")
 
 
 class TestRoleLevelGuard:

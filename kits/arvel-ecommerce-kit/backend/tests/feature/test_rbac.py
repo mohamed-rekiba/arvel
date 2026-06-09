@@ -217,6 +217,19 @@ async def test_super_admin_can_soft_delete_user(client: Any, super_admin_token: 
     assert delete.status_code == 204
 
 
+@pytest.mark.asyncio
+async def test_admin_cannot_delete_their_own_account(client: Any, super_admin_token: str) -> None:
+    """An admin can't soft- or hard-delete themselves — losing your own access is a footgun."""
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+    listing = await client.get("/api/admin/users?search=superadmin@example.com", headers=sa)
+    me = next(u for u in listing.json()["data"] if u["email"] == "superadmin@example.com")
+
+    soft = await client.delete(f"/api/admin/users/{me['id']}", headers=sa)
+    assert soft.status_code == 403
+    hard = await client.delete(f"/api/admin/users/{me['id']}/force", headers=sa)
+    assert hard.status_code == 403
+
+
 # ─── role assignment ─────────────────────────────────────────────────────
 
 
