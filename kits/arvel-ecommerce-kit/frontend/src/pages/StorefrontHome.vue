@@ -4,7 +4,6 @@ import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import CategoryGrid from '@/components/storefront/CategoryGrid.vue'
 import FeatureBadges from '@/components/storefront/FeatureBadges.vue'
-import FlashSale from '@/components/storefront/FlashSale.vue'
 import HeroBanner from '@/components/storefront/HeroBanner.vue'
 import ProductCard from '@/components/storefront/ProductCard.vue'
 import PromoBanners from '@/components/storefront/PromoBanners.vue'
@@ -110,9 +109,6 @@ onMounted(async () => {
         </RouterLink>
       </div>
     </section>
-
-    <!-- ── Deal of the Day (FlashSale) ───────────────────────────────── -->
-    <FlashSale v-if="products.length > 0" :products="products" />
 
     <!-- ── Feature badges ─────────────────────────────────────────────── -->
     <FeatureBadges />

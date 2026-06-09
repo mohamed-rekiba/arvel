@@ -12,8 +12,6 @@ import type { ProductCardOut } from '@/api/schemas'
 
 const props = defineProps<{
   product: ProductCardOut
-  salePrice?: number
-  originalPrice?: number
 }>()
 
 const { locale, t } = useI18n({ useScope: 'global' })
@@ -24,16 +22,13 @@ const router = useRouter()
 const currentLocale = computed(() => toSupportedLocale(locale.value))
 
 const productImage = computed(() => props.product.thumbnail_url ?? '')
-const effectiveSalePrice = computed(() => props.salePrice ?? null)
-const effectiveOriginalPrice = computed(
-  () => props.originalPrice ?? props.product.original_price ?? null,
+const originalPrice = computed(() => props.product.original_price ?? null)
+const isDiscounted = computed(
+  () => originalPrice.value != null && originalPrice.value > props.product.price,
 )
-const displayPrice = computed(() => effectiveSalePrice.value ?? props.product.price)
 const discountPct = computed(() => {
-  const orig = effectiveOriginalPrice.value
-  const sale = effectiveSalePrice.value ?? props.product.price
-  if (!orig || orig <= sale) return null
-  return Math.round((1 - sale / orig) * 100)
+  if (!isDiscounted.value || originalPrice.value == null) return null
+  return Math.round((1 - props.product.price / originalPrice.value) * 100)
 })
 const isOutOfStock = computed(() => (props.product.stock ?? 0) === 0)
 
@@ -120,17 +115,11 @@ async function handleAddToCart(event: Event): Promise<void> {
 
         <!-- Price row -->
         <div class="mt-2 flex items-baseline gap-2">
-          <span
-            class="text-base font-extrabold"
-            :class="effectiveSalePrice ? 'text-price-sale' : 'text-fg'"
-          >
-            {{ formatCurrency(displayPrice, currentLocale) }}
+          <span class="text-base font-extrabold" :class="isDiscounted ? 'text-price-sale' : 'text-fg'">
+            {{ formatCurrency(product.price, currentLocale) }}
           </span>
-          <span
-            v-if="effectiveOriginalPrice && effectiveSalePrice"
-            class="text-xs text-fg-muted line-through"
-          >
-            {{ formatCurrency(effectiveOriginalPrice, currentLocale) }}
+          <span v-if="isDiscounted && originalPrice" class="text-xs text-fg-muted line-through">
+            {{ formatCurrency(originalPrice, currentLocale) }}
           </span>
         </div>
       </div>
