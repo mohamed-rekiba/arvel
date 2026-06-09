@@ -1,17 +1,17 @@
 # Cutover notes
 
-Notes for whoever migrates this documentation into its final home. These are the assumptions, open questions, and gaps surfaced while writing `docs-fresh/` from source.
+Notes for whoever migrates this documentation into its final home. These are the assumptions, open questions, and gaps surfaced while writing `docs/` from source.
 
 ## What this is
 
-`docs-fresh/` is a **contributor / framework-internals** documentation set, written from scratch against the code in `packages/`. It explains how Arvel works under the hood and how to extend it — it is not the application-developer site under `docs/site`, which was left untouched per instruction.
+`docs/` is a **contributor / framework-internals** documentation set, written from scratch against the code in `packages/`. It explains how Arvel works under the hood and how to extend it — it is not the application-developer site under `docs/site`, which was left untouched per instruction.
 
 It covers: architecture (container, providers, bootstrap, config, facades), HTTP, the Arvent ORM, 13 subsystems, the CLI, the 5 companion packages + kit, and the contributing workflow.
 
 ## Assumptions made
 
 - **MkDocs Material + Mermaid** is the render target. `mkdocs.yml` already enables Mermaid via the Material superfences, so diagrams render as-is. If this set is wired into a nav, it needs its own `nav:` entries (not yet added).
-- **Relative links** between pages assume the current `docs-fresh/` tree layout. Moving the tree means re-rooting links.
+- **Relative links** between pages assume the current `docs/` tree layout. Moving the tree means re-rooting links.
 - Source is the **current code on the working branch**, not any release tag.
 
 ## Open questions for SMEs
@@ -41,6 +41,6 @@ Per instruction, the existing `docs/site` (user-facing site) and the SDLC artifa
 ## Suggested next steps for cutover
 
 1. Decide the final home (replace `docs/site` internals docs, or stand up a separate "contributing" section).
-2. Add a `nav:` block for `docs-fresh/` in `mkdocs.yml` (or merge into the existing nav).
+2. Add a `nav:` block for `docs/` in `mkdocs.yml` (or merge into the existing nav).
 3. Resolve the open questions above; turn confirmed bugs into issues and drop the `TODO/QUESTION:` markers once addressed.
 4. Run `make docs` (`mkdocs build --strict`) to catch broken links/anchors before publishing.
