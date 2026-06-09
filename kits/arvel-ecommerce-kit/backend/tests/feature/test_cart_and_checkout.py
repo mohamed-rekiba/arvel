@@ -212,9 +212,10 @@ async def test_checkout_creates_order_with_price_snapshot(
         headers={"Authorization": f"Bearer {customer_token}"},
         json={
             "shipping_address": {
-                "line1": "123 Main St",
+                "name": "Pat Buyer",
+                "street": "123 Main St",
                 "city": "Testville",
-                "country_code": "US",
+                "country": "US",
             }
         },
     )
@@ -246,11 +247,35 @@ async def test_checkout_snapshots_product_name_in_shopper_locale(
     response = await client.post(
         "/api/checkout",
         headers={"Authorization": f"Bearer {customer_token}", "Accept-Language": "ar"},
-        json={"shipping_address": {"line1": "1 St", "city": "City", "country_code": "US"}},
+        json={
+            "shipping_address": {
+                "name": "Pat",
+                "street": "1 St",
+                "city": "City",
+                "country": "US",
+            }
+        },
     )
     assert response.status_code == 201
     item = response.json()["data"]["items"][0]
     assert item["product_name"] == arabic_name
+
+
+@pytest.mark.asyncio
+async def test_checkout_rejects_invalid_shipping_address(
+    client: Any, customer_token: str, headphones_id: str
+) -> None:
+    """A shipping address missing required fields is a 422, not a saved garbage order."""
+    headers = {"Authorization": f"Bearer {customer_token}"}
+    await client.post(
+        "/api/cart/items", headers=headers, json={"product_id": headphones_id, "quantity": 1}
+    )
+    response = await client.post(
+        "/api/checkout",
+        headers=headers,
+        json={"shipping_address": {"city": "City"}},
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -262,7 +287,9 @@ async def test_concurrent_checkout_creates_single_order(
     await client.post(
         "/api/cart/items", headers=headers, json={"product_id": headphones_id, "quantity": 1}
     )
-    body = {"shipping_address": {"line1": "1 St", "city": "City", "country_code": "US"}}
+    body = {
+        "shipping_address": {"name": "Pat", "street": "1 St", "city": "City", "country": "US"}
+    }
     first, second = await asyncio.gather(
         client.post("/api/checkout", headers=headers, json=body),
         client.post("/api/checkout", headers=headers, json=body),
@@ -302,7 +329,14 @@ async def test_checkout_fails_on_insufficient_stock(
     checkout = await client.post(
         "/api/checkout",
         headers={"Authorization": f"Bearer {customer_token}"},
-        json={"shipping_address": {"line1": "1 St", "city": "City", "country_code": "US"}},
+        json={
+            "shipping_address": {
+                "name": "Pat",
+                "street": "1 St",
+                "city": "City",
+                "country": "US",
+            }
+        },
     )
     assert checkout.status_code == 409
 
@@ -323,7 +357,14 @@ async def test_customer_can_list_their_orders(
     await client.post(
         "/api/checkout",
         headers={"Authorization": f"Bearer {customer_token}"},
-        json={"shipping_address": {"line1": "1 St", "city": "City", "country_code": "US"}},
+        json={
+            "shipping_address": {
+                "name": "Pat",
+                "street": "1 St",
+                "city": "City",
+                "country": "US",
+            }
+        },
     )
 
     orders = await client.get(
@@ -350,7 +391,14 @@ async def test_customer_cannot_access_another_customers_order(
     checkout = await client.post(
         "/api/checkout",
         headers={"Authorization": f"Bearer {customer_token}"},
-        json={"shipping_address": {"line1": "1 St", "city": "City", "country_code": "US"}},
+        json={
+            "shipping_address": {
+                "name": "Pat",
+                "street": "1 St",
+                "city": "City",
+                "country": "US",
+            }
+        },
     )
     order_id = checkout.json()["data"]["id"]
 

@@ -4,8 +4,8 @@
  * FastAPI
  * OpenAPI spec version: 0.1.0
  */
-import type { CheckoutPayloadShippingAddress } from './checkoutPayloadShippingAddress.ts'
+import type { ShippingAddress } from './shippingAddress.ts'
 
 export interface CheckoutPayload {
-  shipping_address: CheckoutPayloadShippingAddress
+  shipping_address: ShippingAddress
 }

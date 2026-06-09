@@ -17,7 +17,7 @@ class CheckoutController(Controller):
         resolved_locale = getattr(request.state, "locale", "en") or "en"
         try:
             order = await orders.checkout(
-                int(user.id), payload.shipping_address, locale=resolved_locale
+                int(user.id), payload.shipping_address.model_dump(), locale=resolved_locale
             )
         except EmptyCartError as exc:
             raise ValidationException("Cart is empty.") from exc
