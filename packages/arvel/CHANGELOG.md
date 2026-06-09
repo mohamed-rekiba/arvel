@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.22.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.21.0...arvel-v0.22.0) (2026-06-09)
+
+
+### Features
+
+* **auth:** revoke access tokens and share the login throttle ([1de46d6](https://github.com/mohamed-rekiba/arvel/commit/1de46d68b1dc077f362b2f7d77691caeb86b7f64))
+* **http:** add Http facade and Http.fake outbound client ([a458738](https://github.com/mohamed-rekiba/arvel/commit/a4587383b2c2a4675a798e664083115cfd368eeb))
+* **http:** add response() and redirect() helpers ([e58cb40](https://github.com/mohamed-rekiba/arvel/commit/e58cb40d8c2a579ee05bda383a9705d2cbb90aeb))
+* **http:** consolidate CSRF middlewares and accept more token sources ([da44892](https://github.com/mohamed-rekiba/arvel/commit/da448921fd213ac7c4aac293c2b6c3b4ba6d2a66))
+* **http:** trust proxies on the general request path ([446421a](https://github.com/mohamed-rekiba/arvel/commit/446421a2896b97fb1a17da590ac94971ccff25ac))
+* **validation:** support nested and wildcard field paths ([817556b](https://github.com/mohamed-rekiba/arvel/commit/817556b02de22877e879df4174ab96a8c82166ea))
+
+
+### Bug Fixes
+
+* **auth:** resolve AuthController per request, not at boot ([17b41ef](https://github.com/mohamed-rekiba/arvel/commit/17b41ef2ace15fc4583a3ca0e71942d2c1cbc582))
+* **skeleton:** move observability config skeleton out of workspace root ([6f16939](https://github.com/mohamed-rekiba/arvel/commit/6f169396b66d798e1fb0d562c871f3b727e6384f))
+* **validation:** actionable error for exists/unique without a DB session ([bfdecc9](https://github.com/mohamed-rekiba/arvel/commit/bfdecc9fcecc9cfecb275f9552e94c8e187c0469))
+
 ## [0.21.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.20.0...arvel-v0.21.0) (2026-06-08)
 
 
