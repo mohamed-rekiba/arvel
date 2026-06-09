@@ -146,3 +146,83 @@ async def test_revoke_role_allows_when_actor_level_sufficient(
     ctrl = mod.AdminUsersController()
     with pytest.raises(NotFoundException):
         await ctrl.revoke_role(5, "catalog_manager", _request())
+
+
+# ─── lifecycle outrank guards (suspend / unsuspend / delete / restore) ─────
+
+
+class _Target:
+    id = 5
+
+
+def _user_model(target: Any) -> type:
+    class _Query:
+        async def first(self) -> Any:
+            return target
+
+    class _Model:
+        id = 0
+
+        @classmethod
+        def where(cls, *_a: Any, **_k: Any) -> Any:
+            return _Query()
+
+        @classmethod
+        def with_trashed(cls) -> type:
+            return cls
+
+    return _Model
+
+
+def _patch_target_level(monkeypatch: pytest.MonkeyPatch, mod: ModuleType, level: int) -> None:
+    async def fake_highest_role_level(_user: Any) -> int:
+        return level
+
+    monkeypatch.setattr(mod, "highest_role_level", fake_highest_role_level)
+
+
+@pytest.mark.parametrize("action", ["suspend", "unsuspend", "destroy", "restore"])
+async def test_lifecycle_blocks_when_target_outranks_actor(
+    monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    mod = _controller_module()
+    _patch_actor(monkeypatch, mod, _Actor(perms={"users.manage"}, level=80))
+    monkeypatch.setattr(mod, "User", _user_model(_Target()))
+    _patch_target_level(monkeypatch, mod, 100)
+    ctrl = mod.AdminUsersController()
+    with pytest.raises(AuthorizationException):
+        await getattr(ctrl, action)(5, _request())
+
+
+async def test_force_destroy_blocks_when_target_outranks_actor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mod = _controller_module()
+
+    async def fake_require_role_level(_request: Any, _perm: str, _level: int) -> Any:
+        return _Actor(perms={"users.manage"}, level=80)
+
+    monkeypatch.setattr(mod, "require_role_level", fake_require_role_level)
+    monkeypatch.setattr(mod, "User", _user_model(_Target()))
+    _patch_target_level(monkeypatch, mod, 100)
+    ctrl = mod.AdminUsersController()
+    with pytest.raises(AuthorizationException):
+        await ctrl.force_destroy(5, _request())
+
+
+async def test_suspend_allows_when_actor_outranks_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Actor outranks the target → passes the guard and reaches the service."""
+    mod = _controller_module()
+    _patch_actor(monkeypatch, mod, _Actor(perms={"users.manage"}, level=100))
+    monkeypatch.setattr(mod, "User", _user_model(_Target()))
+    _patch_target_level(monkeypatch, mod, 80)
+
+    async def reached_service(_user_id: int) -> Any:
+        raise RuntimeError("reached service")
+
+    monkeypatch.setattr(mod.users, "suspend", reached_service)
+    ctrl = mod.AdminUsersController()
+    with pytest.raises(RuntimeError, match="reached service"):
+        await ctrl.suspend(5, _request())
