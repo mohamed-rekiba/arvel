@@ -7,7 +7,6 @@ import FeatureBadges from '@/components/storefront/FeatureBadges.vue'
 import HeroBanner from '@/components/storefront/HeroBanner.vue'
 import ProductCard from '@/components/storefront/ProductCard.vue'
 import PromoBanners from '@/components/storefront/PromoBanners.vue'
-import { fetchProductList } from '../lib/api'
 import { useStorefrontIndexApiProductsGet } from '@/api/storefront/storefront'
 import { toSupportedLocale } from '@/lib/i18n'
 import { useCategoriesStore } from '@/stores/categories'
@@ -24,10 +23,8 @@ const { data, isPending } = useStorefrontIndexApiProductsGet(
 const products = computed(() => data.value?.data ?? [])
 const categories = computed(() => categoriesStore.list)
 
-onMounted(async () => {
+onMounted(() => {
   categoriesStore.load()
-  // Pre-fetch via manual client so the import is exercised; Orval query drives the UI.
-  await fetchProductList('/api/products').catch(() => undefined)
 })
 </script>
 

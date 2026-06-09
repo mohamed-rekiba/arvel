@@ -100,22 +100,20 @@ def test_web_routes_serve_spa_shell_for_storefront_and_admin() -> None:
 
 
 def test_storefront_pages_use_backend_api_client() -> None:
-    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
-
-    assert "fetchProductList('/api/products'" in api
-    assert "`/api/categories/${encodeURIComponent(slug)}`" in api
-    assert "`/api/products/${encodeURIComponent(slug)}?${params}`" in api
-
-    for page in (
-        "StorefrontHome.vue",
-        "StorefrontProducts.vue",
-        "StorefrontProductDetail.vue",
-    ):
+    # Storefront pages fetch through the generated orval storefront hooks; no
+    # hand-rolled lib/api product fetchers and no in-component demo fixtures.
+    hooks = {
+        "StorefrontHome.vue": "useStorefrontIndexApiProductsGet",
+        "StorefrontProducts.vue": "storefrontIndexApiProductsGet",
+        "StorefrontProductDetail.vue": "useStorefrontShowApiProductsSlugGet",
+    }
+    for page, hook in hooks.items():
         src = _src(FRONTEND_DIR / "src" / "pages" / page)
+        assert hook in src
         assert "demoProducts" not in src
-        assert "../lib/api" in src
+        assert "fetchProductList" not in src
+        assert "fetchProductBySlug" not in src
 
-    assert "image_srcset" in api
     assert ':srcset="product.image_srcset || undefined"' in _src(
         FRONTEND_DIR / "src" / "components" / "storefront" / "ProductCard.vue"
     )
@@ -136,7 +134,6 @@ def test_customer_pages_call_cart_checkout_and_account_apis() -> None:
         "'/api/checkout'",
         "authorizedJson<DetailResponse<OrderSummary[]>>",
         "'/api/account/orders'",
-        "fetch(`/api/search?${params}`)",
     ):
         assert snippet in api
 
