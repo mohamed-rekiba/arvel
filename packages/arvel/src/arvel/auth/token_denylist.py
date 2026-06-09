@@ -77,7 +77,7 @@ async def revoked_before_for_user(user_id: str) -> int | None:
         return None
     try:
         return int(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 

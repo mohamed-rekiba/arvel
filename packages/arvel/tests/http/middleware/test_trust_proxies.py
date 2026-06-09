@@ -17,7 +17,7 @@ def _run(scope: Scope) -> Scope:
     async def inner(inner_scope: Scope, _receive: Receive, _send: Send) -> None:
         seen["scope"] = inner_scope
 
-    trusted = scope.pop("_trusted", ["10.0.0.0/8"])  # type: ignore[assignment]
+    trusted = scope.pop("_trusted", ["10.0.0.0/8"])
     app = TrustProxiesMiddleware(inner, trusted_proxies=list(trusted))
 
     async def noop_receive() -> Message:
@@ -50,8 +50,8 @@ def _http_scope(
 
 def _host_header(scope: Scope) -> str | None:
     for name, value in scope["headers"]:
-        if name == b"host":
-            return value.decode("latin-1")
+        if name == b"host" and isinstance(value, bytes):
+            return str(value.decode("latin-1"))
     return None
 
 

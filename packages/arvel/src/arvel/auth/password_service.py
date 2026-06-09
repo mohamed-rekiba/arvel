@@ -135,9 +135,7 @@ class PasswordService:
 
         # Kill outstanding access tokens too — a reset must end every session,
         # not just block new refreshes.
-        await revoke_all_for_user(
-            str(user.id), ttl_seconds=int(self._access_ttl.total_seconds())
-        )
+        await revoke_all_for_user(str(user.id), ttl_seconds=int(self._access_ttl.total_seconds()))
 
         await EventFacade.dispatch(
             PasswordResetCompleted(

@@ -308,8 +308,8 @@ class AuthServiceProvider(ServiceProvider):
         db_tx = [DatabaseTransaction()]
         container = self.container
 
-        # Resolve the controller per request (framework convention, WI-002) rather than
-        # capturing it at boot — so a rebound/extended AuthController is honored. The
+        # Resolve the controller per request rather than capturing it at boot — so a
+        # rebound/extended AuthController is honored. The
         # binding is a container instance, so this is a cheap lookup.
         async def handle_register(payload: RegisterRequest) -> Any:
             return await container.make(AuthController).register(payload)
