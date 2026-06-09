@@ -652,9 +652,18 @@ Backend ruff clean; targeted tests green.
   The scheduler and write observers keep the lock-guarded variant (skipping a
   redundant refresh there is fine — the next tick catches up).
 
+## Iteration 44 — Storefront filter searches the whole catalog (frontend)
+
+- MED: `/products` filter box now hits the backend `/api/search` (which already
+  existed, ORM full-text) instead of client-side filtering only the page
+  already loaded. Below 2 chars (the backend minimum) it falls back to the
+  normal paginated listing; at ≥2 chars it debounces 300 ms, drops stale
+  responses via a sequence guard, and hides "Load more" (search returns a flat
+  ranked set, not a cursor page). Skeleton/empty states track the active mode.
+  Frontend typecheck/lint/vitest(18)/build green.
+
 ### Fresh review backlog (iteration-39 pass) — remaining
 - MED: materialized catalog refresh skipped under Redis lock → stale storefront for the *scheduled* path (harder; needs retry/queue).
-- MED: /products "Filter" box only filters loaded page, not catalog (UX).
 - LOW: cart store error strings hardcoded English, bypass i18n.
 
 ## Blockers
