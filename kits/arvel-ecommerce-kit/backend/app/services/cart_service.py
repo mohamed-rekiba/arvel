@@ -28,6 +28,16 @@ class CartService:
             raise RuntimeError("Cart creation failed.")
         return created.id
 
+    async def lock_cart(self, user_id: int) -> uuid.UUID:
+        """Lock the user's cart row FOR UPDATE so concurrent checkouts serialize.
+
+        Must run inside a transaction. A second checkout blocks here until the
+        first commits; it then re-reads an emptied cart and fails as EmptyCart.
+        """
+        cart_id = await self.get_or_create_cart(user_id)
+        await Cart.where(Cart.id == cart_id).lock_for_update().first()
+        return cart_id
+
     async def get_cart(self, user_id: int, *, locale: str = "en") -> dict[str, Any]:
         cart_id = await self.get_or_create_cart(user_id)
         # with_("product.media") eager-loads each line's catalog row and its media —

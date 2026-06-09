@@ -12,6 +12,7 @@ Coverage:
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -250,6 +251,26 @@ async def test_checkout_snapshots_product_name_in_shopper_locale(
     assert response.status_code == 201
     item = response.json()["data"]["items"][0]
     assert item["product_name"] == arabic_name
+
+
+@pytest.mark.asyncio
+async def test_concurrent_checkout_creates_single_order(
+    client: Any, customer_token: str, headphones_id: str
+) -> None:
+    """Two simultaneous checkouts on one cart create exactly one order."""
+    headers = {"Authorization": f"Bearer {customer_token}"}
+    await client.post(
+        "/api/cart/items", headers=headers, json={"product_id": headphones_id, "quantity": 1}
+    )
+    body = {"shipping_address": {"line1": "1 St", "city": "City", "country_code": "US"}}
+    first, second = await asyncio.gather(
+        client.post("/api/checkout", headers=headers, json=body),
+        client.post("/api/checkout", headers=headers, json=body),
+    )
+    # The cart lock serializes them: one places the order, the other finds it empty.
+    assert sorted([first.status_code, second.status_code]) == [201, 422]
+    orders = await client.get("/api/account/orders", headers=headers)
+    assert len(orders.json()["data"]) == 1
 
 
 @pytest.mark.asyncio
