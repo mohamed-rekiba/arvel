@@ -137,14 +137,15 @@ class TestV030AnalyticsSettingsPermissions:
 
 
 class TestV031CategorySlugWrapped:
-    _CAT_SVC = _BACKEND / "app" / "services" / "category_service.py"
+    # Serialization moved from CategoryService.to_dict into the JsonResource.
+    _CAT_RESOURCE = _BACKEND / "app" / "http" / "resources" / "category_resource.py"
 
     def test_category_slug_returned_as_jsonb_mapping(self) -> None:
-        src = _src(self._CAT_SVC)
-        assert '"slug": category.slug or {}' in src, (
+        src = _src(self._CAT_RESOURCE)
+        assert '"slug": c.slug or {}' in src, (
             "category slug must be returned as the JSONB locale mapping"
         )
-        assert '"slug": category.slug,' not in src, (
+        assert '"slug": c.slug,' not in src, (
             "category slug must not be returned as a bare scalar"
         )
 

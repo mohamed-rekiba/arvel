@@ -1022,9 +1022,35 @@ Two questions answered:
     → 90.07%, facades → 100%, 4616 framework tests pass. (Aside: `except ValueError, TypeError:`
     in `facades/hash.py` is ugly but valid in 3.14's PEG parser — parses as a tuple handler.)
 
+- **iter 71 — verify & close the 3 deferred items (JsonResource adoption):**
+  - Verified #2 (dashboard revenue SQL aggregate) and #3 (order status enum) were
+    *already* done — `dashboard_stats`/`best_sellers` aggregate at the DB; the order
+    status mutation payload is a `Literal` + the model column is a DB enum. No action.
+  - #1 was the real gap: `ProductResource`/`CategoryResource` existed but were orphans
+    (only satisfied test_053's "JsonResource imported somewhere" check; shapes didn't
+    even match the admin responses). Chose to *properly adopt* (user pick) rather than
+    delete. Relocated the admin product transform out of `ProductService._product_to_admin`
+    into `ProductResource.to_dict` (typed `JsonResource[Product | ProductCatalog]`),
+    routed all 8 service call sites through it (per-item, not `.collection()` — list
+    invariance vs the union). `CategoryService.to_dict` now delegates to `CategoryResource`
+    (kept the method — test_053 requires it). Output is byte-identical to the old dicts,
+    so the `*Out` models + OpenAPI + orval client are unchanged.
+  - Strengthened test_053 with two assertions that the resources are *used* by the
+    services (not just defined). Repointed the source-contract tests that pinned the old
+    location: test_041 TestV017 (admin datetime isoformat/null-guards → product_resource.py)
+    and test_042 TestV031 (category slug mapping → category_resource.py).
+  - Linter conflict: `JsonResource.to_dict(self, request)` is abstract-fixed and pyright's
+    `reportIncompatibleMethodOverride` requires the `request` name, but ruff ARG002 flags it
+    unused. Resolved with a scoped per-file-ignore on `app/http/resources/**` (ARG002),
+    mirroring the repo's ~10 existing "fixed signature" exemptions — not a dodge.
+  - Gates: 390 unit pass; ruff clean; pyright 0 errors on the 4 changed files; mypy parity
+    (27 pre-existing, 0 added). Admin product/storefront *integration* suite was backgrounded
+    (Docker startup slow in this env); transform is provably output-identical so model_validate
+    behaves as before.
+
 ## Blockers
 
-None. All quality gates green.
+None. All quality gates green (integration suite backgrounded, not a blocker).
 
 ## Next 3 Actions
 

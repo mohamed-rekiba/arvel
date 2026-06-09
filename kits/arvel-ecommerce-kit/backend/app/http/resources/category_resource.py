@@ -9,7 +9,7 @@ from arvel.http.resources import JsonResource
 
 
 class CategoryResource(JsonResource[Category]):
-    def to_dict(self, _request: Any) -> dict[str, Any]:
+    def to_dict(self, request: Any) -> dict[str, Any]:
         c = self.resource
         return {
             "id": str(c.id),

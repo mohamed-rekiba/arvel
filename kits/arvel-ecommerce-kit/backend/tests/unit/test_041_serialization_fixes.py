@@ -10,6 +10,7 @@ from pathlib import Path
 
 _BACKEND = Path(__file__).parents[2]
 _PRODUCT_SERVICE = _BACKEND / "app" / "services" / "product_service.py"
+_PRODUCT_RESOURCE = _BACKEND / "app" / "http" / "resources" / "product_resource.py"
 _PUBLISHED_PRODUCT = _BACKEND / "app" / "models" / "product_catalog.py"
 _ROUTES = _BACKEND / "routes" / "api.py"
 _CART_SERVICE = _BACKEND / "app" / "services" / "cart_service.py"
@@ -21,39 +22,41 @@ def _src(path: Path) -> str:
     return path.read_text()
 
 
-# ─── _product_to_admin datetime serialization ─────────────────────────
+# ─── ProductResource admin datetime serialization ─────────────────────
+# The admin product transform lives in the JsonResource (ProductResource), not
+# the service — the service is just the call site.
 
 
 class TestV017ProductAdminDatetimes:
-    def test_published_at_isoformat_in_product_to_admin(self) -> None:
-        src = _src(_PRODUCT_SERVICE)
-        assert "product.published_at.isoformat()" in src, (
-            "product.published_at.isoformat() call missing in _product_to_admin"
+    def test_published_at_isoformat_in_resource(self) -> None:
+        src = _src(_PRODUCT_RESOURCE)
+        assert "p.published_at.isoformat()" in src, (
+            "p.published_at.isoformat() call missing in ProductResource"
         )
 
-    def test_created_at_isoformat_in_product_to_admin(self) -> None:
-        src = _src(_PRODUCT_SERVICE)
-        assert "product.created_at.isoformat()" in src, (
-            "product.created_at.isoformat() call missing in _product_to_admin"
+    def test_created_at_isoformat_in_resource(self) -> None:
+        src = _src(_PRODUCT_RESOURCE)
+        assert "p.created_at.isoformat()" in src, (
+            "p.created_at.isoformat() call missing in ProductResource"
         )
 
-    def test_updated_at_isoformat_in_product_to_admin(self) -> None:
-        src = _src(_PRODUCT_SERVICE)
-        assert "product.updated_at.isoformat()" in src, (
-            "product.updated_at.isoformat() call missing in _product_to_admin"
+    def test_updated_at_isoformat_in_resource(self) -> None:
+        src = _src(_PRODUCT_RESOURCE)
+        assert "p.updated_at.isoformat()" in src, (
+            "p.updated_at.isoformat() call missing in ProductResource"
         )
 
-    def test_product_to_admin_null_guard_for_timestamps(self) -> None:
-        src = _src(_PRODUCT_SERVICE)
+    def test_resource_null_guard_for_timestamps(self) -> None:
+        src = _src(_PRODUCT_RESOURCE)
         # Null guards must be present (pattern: field.isoformat() if field else None)
-        assert "product.published_at.isoformat() if product.published_at else None" in src, (
-            "null guard missing for published_at in _product_to_admin"
+        assert "p.published_at.isoformat() if p.published_at else None" in src, (
+            "null guard missing for published_at in ProductResource"
         )
-        assert "product.created_at.isoformat() if product.created_at else None" in src, (
-            "null guard missing for created_at in _product_to_admin"
+        assert "p.created_at.isoformat() if p.created_at else None" in src, (
+            "null guard missing for created_at in ProductResource"
         )
-        assert "product.updated_at.isoformat() if product.updated_at else None" in src, (
-            "null guard missing for updated_at in _product_to_admin"
+        assert "p.updated_at.isoformat() if p.updated_at else None" in src, (
+            "null guard missing for updated_at in ProductResource"
         )
 
 
