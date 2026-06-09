@@ -4,6 +4,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import './assets/main.css'
+import { vReveal } from './directives/reveal'
 import { i18nCatalogueApiI18nLocaleGet } from './api/i18n/i18n'
 import { setUnauthorizedHandler } from './lib/api'
 import { i18n } from './lib/i18n-instance'
@@ -1190,6 +1191,7 @@ async function bootstrap(): Promise<void> {
   app.use(router)
   app.use(i18n)
   app.use(VueQueryPlugin, { queryClient })
+  app.directive('reveal', vReveal)
 
   const { useAuthStore } = await import('./stores/auth')
   const { useToastStore } = await import('./stores/toast')

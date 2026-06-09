@@ -37,7 +37,7 @@ onMounted(() => {
 
     <!-- ── Category circles ───────────────────────────────────────────── -->
     <section v-if="categories.length > 0" class="mx-auto max-w-7xl px-4 pb-8 lg:px-8">
-      <h2 class="mb-5 text-xl font-extrabold text-fg">
+      <h2 v-reveal class="mb-5 text-xl font-extrabold text-fg">
         {{ t('home.shop_by_category', 'Shop by Category') }}
       </h2>
       <CategoryGrid :categories="categories" />
@@ -50,7 +50,7 @@ onMounted(() => {
 
     <!-- ── New Arrivals grid ──────────────────────────────────────────── -->
     <section class="mx-auto max-w-7xl px-4 pb-12 lg:px-8">
-      <div class="mb-6 flex items-center justify-between">
+      <div v-reveal class="mb-6 flex items-center justify-between">
         <div>
           <h2 class="text-xl font-extrabold text-fg">
             {{ t('home.new_arrivals', 'New Arrival Item') }}
@@ -61,7 +61,7 @@ onMounted(() => {
         </div>
         <RouterLink
           to="/products"
-          class="rounded-full border border-brand px-4 py-1.5 text-sm font-semibold text-brand transition hover:bg-brand hover:text-white hover:shadow-sm"
+          class="rounded-full border border-brand px-4 py-1.5 text-sm font-semibold text-brand transition duration-300 hover:bg-brand hover:text-white hover:shadow-sm"
         >
           {{ t('home.view_all', 'View all') }}
         </RouterLink>
@@ -75,30 +75,40 @@ onMounted(() => {
         />
       </div>
       <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <ProductCard v-for="product in products.slice(0, 8)" :key="product.id" :product="product" />
+        <ProductCard
+          v-for="(product, i) in products.slice(0, 8)"
+          :key="product.id"
+          v-reveal="(i % 4) * 70"
+          :product="product"
+        />
       </div>
     </section>
 
     <!-- ── Wide promo banner ──────────────────────────────────────────── -->
     <section class="mx-auto max-w-7xl px-4 pb-12 lg:px-8">
       <div
-        class="relative flex flex-col items-center justify-between gap-4 overflow-hidden rounded-2xl bg-gradient-to-r from-brand-hero via-slate-800 to-brand-hero px-8 py-10 text-center md:flex-row md:text-start"
+        v-reveal
+        class="animate-gradient group relative flex flex-col items-center justify-between gap-4 overflow-hidden rounded-2xl bg-gradient-to-r from-primary-950 via-brand-hero to-primary-900 px-8 py-12 text-center md:flex-row md:text-start"
       >
-        <!-- Subtle decorative glow -->
+        <!-- Decorative glows -->
         <div
-          class="pointer-events-none absolute start-0 top-0 h-full w-1/3 bg-accent/10 blur-3xl"
+          class="animate-glow pointer-events-none absolute -start-10 top-0 h-full w-1/3 bg-accent/15 blur-3xl"
         />
-        <div>
-          <p class="relative text-sm font-semibold uppercase tracking-widest text-accent">
+        <div
+          class="animate-glow pointer-events-none absolute -end-10 bottom-0 h-40 w-72 bg-primary-500/25 blur-3xl"
+          style="animation-delay: 1.2s"
+        />
+        <div class="relative">
+          <p class="text-sm font-semibold uppercase tracking-widest text-accent">
             {{ t('home.big_sale_eyebrow', 'Top-selling electronics') }}
           </p>
-          <h3 class="relative mt-2 text-2xl font-extrabold text-white md:text-3xl">
+          <h3 class="mt-2 text-2xl font-extrabold text-white md:text-3xl">
             {{ t('home.big_sale_title', 'Gear that keeps up with you') }}
           </h3>
         </div>
         <RouterLink
           to="/products"
-          class="relative shrink-0 rounded-full bg-brand px-8 py-3 text-sm font-bold text-white shadow-md transition hover:bg-brand-hover hover:shadow-lg"
+          class="relative shrink-0 rounded-full bg-primary-500 px-8 py-3 text-sm font-bold text-white shadow-[0_8px_30px_-8px_oklch(0.591_0.201_294_/_0.8)] transition duration-300 hover:-translate-y-0.5 hover:bg-primary-400 hover:shadow-[0_14px_40px_-8px_oklch(0.591_0.201_294_/_0.95)]"
         >
           {{ t('hero.cta', 'Shop Now') }}
         </RouterLink>

@@ -36,12 +36,13 @@ const badges = computed(() => [
   <div class="border-t border-border">
     <div class="mx-auto grid max-w-7xl grid-cols-2 gap-6 px-4 py-10 md:grid-cols-4 lg:px-8">
       <div
-        v-for="badge in badges"
+        v-for="(badge, i) in badges"
         :key="badge.id"
-        class="flex items-center gap-4 rounded-xl p-3 transition duration-150 hover:bg-app-bg-raised"
+        v-reveal="i * 70"
+        class="group flex items-center gap-4 rounded-xl p-3 transition duration-300 hover:bg-app-bg-raised"
       >
         <div
-          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-100 shadow-sm"
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-100 shadow-sm transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-110 group-hover:shadow-md"
         >
           <span
             class="material-symbols-outlined select-none text-[22px] leading-none text-primary-700"
