@@ -114,6 +114,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'auth.full_name': 'Full name',
     'auth.signing_in': 'Signing in…',
     'auth.creating_account': 'Creating account…',
+    'auth.verify_sent': 'Account created. Check your email to verify your account, then log in.',
     // shared order labels
     'order.product': 'Product',
     'order.price': 'Price',
@@ -479,6 +480,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'auth.full_name': 'الاسم الكامل',
     'auth.signing_in': 'جارٍ تسجيل الدخول…',
     'auth.creating_account': 'جارٍ إنشاء الحساب…',
+    'auth.verify_sent': 'تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتأكيد حسابك، ثم سجّل الدخول.',
     // shared order labels
     'order.product': 'المنتج',
     'order.price': 'السعر',
@@ -844,6 +846,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'auth.full_name': 'Ad Soyad',
     'auth.signing_in': 'Giriş yapılıyor…',
     'auth.creating_account': 'Hesap oluşturuluyor…',
+    'auth.verify_sent': 'Hesap oluşturuldu. Hesabınızı doğrulamak için e-postanızı kontrol edin, ardından giriş yapın.',
     // shared order labels
     'order.product': 'Ürün',
     'order.price': 'Fiyat',

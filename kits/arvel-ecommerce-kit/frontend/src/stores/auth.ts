@@ -75,13 +75,14 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
     try {
+      // No auto-login: the backend requires email verification before login
+      // succeeds (422 otherwise). Caller prompts the user to verify, then log in.
       await authRegisterApiAuthRegisterPost({
         name,
         email,
         password,
         password_confirmation: password,
       })
-      await login(email, password)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Registration failed'
       throw err
