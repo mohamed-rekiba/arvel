@@ -1,5 +1,54 @@
 # Changelog
 
+## [1.9.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.8.0...arvel-ecommerce-kit-v1.9.0) (2026-06-09)
+
+
+### Features
+
+* **ecommerce-kit:** persist the storefront wishlist for guests ([1fe2718](https://github.com/mohamed-rekiba/arvel/commit/1fe27180496074991155732ffc8039db128a07b1))
+* **ecommerce:** add suspend/reinstate controls to admin user detail ([79765a1](https://github.com/mohamed-rekiba/arvel/commit/79765a153754efa2f71a317658de8b0e2c19e1cb))
+* **ecommerce:** derive is_new from created_at instead of hardcoding false ([2966774](https://github.com/mohamed-rekiba/arvel/commit/2966774cfcba8057c7d0c4c1373df07d0b3a1a21))
+* **ecommerce:** storefront filter searches the full catalog ([e2dc121](https://github.com/mohamed-rekiba/arvel/commit/e2dc121ae184e0fb855878e9cb69443ae2906652))
+
+
+### Bug Fixes
+
+* **ecommerce-kit:** fix broken self-service registration flow ([fd3d14b](https://github.com/mohamed-rekiba/arvel/commit/fd3d14bcdc416981f6b3fa1527f52f08db17349d))
+* **ecommerce-kit:** gate catalog edit/restore on the update permission ([6f8d6b0](https://github.com/mohamed-rekiba/arvel/commit/6f8d6b0d5bc5791772861937978a100a43c33d23))
+* **ecommerce-kit:** gate force-delete on role level, not just permission ([2cd4dac](https://github.com/mohamed-rekiba/arvel/commit/2cd4dacdfd43fc0b8a709ec5eaf9b5d46bdddec0))
+* **ecommerce-kit:** guard the /admin catch-all route ([d55606f](https://github.com/mohamed-rekiba/arvel/commit/d55606fe5e77fef2421849429e73688d38a7d749))
+* **ecommerce-kit:** localize checkout estimated-delivery date ([3bccc96](https://github.com/mohamed-rekiba/arvel/commit/3bccc9671694741f4dd3ff32de80f4d1d6e9e373))
+* **ecommerce-kit:** only confirm an order the account owner placed ([8986912](https://github.com/mohamed-rekiba/arvel/commit/898691282d718668ebd3db62b72c70e69ce304f9))
+* **ecommerce-kit:** reject category self-parent and parent cycles ([ec1fdb8](https://github.com/mohamed-rekiba/arvel/commit/ec1fdb877b0de0632cf0a5a8fc232a9f6547f111))
+* **ecommerce-kit:** route expired admin sessions to the admin login ([6931dee](https://github.com/mohamed-rekiba/arvel/commit/6931dee49bb82f77ecefb84777fe5e478a37be61))
+* **ecommerce-kit:** serialize concurrent checkout to prevent duplicate orders ([120d9da](https://github.com/mohamed-rekiba/arvel/commit/120d9dad741acdbf6a4db3c10c95d3b4f804354a))
+* **ecommerce-kit:** show effective permissions on the admin user detail ([a2fd8d4](https://github.com/mohamed-rekiba/arvel/commit/a2fd8d42032cb7ecb60c36b82772dacf018330e4))
+* **ecommerce-kit:** snapshot order line names in shopper locale ([b503bc0](https://github.com/mohamed-rekiba/arvel/commit/b503bc0180e0d1b1aa4223c282fdb0aefc96f778))
+* **ecommerce-kit:** type and validate the checkout shipping address ([3c2efb6](https://github.com/mohamed-rekiba/arvel/commit/3c2efb670c54f6f70392317a916fbc7875f07756))
+* **ecommerce-kit:** validate product price/stock bounds and malformed cart ids ([e192d39](https://github.com/mohamed-rekiba/arvel/commit/e192d39a6d999542eae6f7d43c12c4e30a5ef00f))
+* **ecommerce/api:** clamp page size on all list endpoints ([5b44be0](https://github.com/mohamed-rekiba/arvel/commit/5b44be07fd3b893bfd6f766f5ffc094b39371c71))
+* **ecommerce/auth:** block post-login open redirect ([40f8c12](https://github.com/mohamed-rekiba/arvel/commit/40f8c1289e2556e9bb4a666f24ea5c177b97c655))
+* **ecommerce/orders:** bound customer order history pagination ([d32b656](https://github.com/mohamed-rekiba/arvel/commit/d32b6564823b9f52095dc6d5fdf5d6dcba0c94d4))
+* **ecommerce:** bound and sniff product media uploads ([48f3f8b](https://github.com/mohamed-rekiba/arvel/commit/48f3f8b2b4ef082de60e60df673ce2b89b74a4a4))
+* **ecommerce:** cap product media upload size to prevent memory DoS ([2ffb7ec](https://github.com/mohamed-rekiba/arvel/commit/2ffb7ec9dfe1029557f80692137fb433ad8aa183))
+* **ecommerce:** catalog status enum, cart re-snapshot, force-delete gate ([c0d2baf](https://github.com/mohamed-rekiba/arvel/commit/c0d2baf01df1cf43f3e9b178536c3336ff4665bd))
+* **ecommerce:** coalesce catalog refresh so writes aren't dropped ([d5472e6](https://github.com/mohamed-rekiba/arvel/commit/d5472e6244e07b5174c9f9c76a2b63951c363fbb))
+* **ecommerce:** exclude cancelled orders from dashboard revenue ([6f2a543](https://github.com/mohamed-rekiba/arvel/commit/6f2a5436743aa402799d1fdec2a18d575d48d23a))
+* **ecommerce:** graceful force-delete with dependent orders ([c437bde](https://github.com/mohamed-rekiba/arvel/commit/c437bdeda85319c748eb2ce6b6785d756599d9c4))
+* **ecommerce:** lock order row on cancel to prevent double stock restore ([ab3d664](https://github.com/mohamed-rekiba/arvel/commit/ab3d664725572e5a5d62e0b42272ad4e31ec0a76))
+* **ecommerce:** manual catalog refresh never reports product_count -1 ([ffb35ce](https://github.com/mohamed-rekiba/arvel/commit/ffb35ceabf0d454ffaee88a0a5e436fa5805e3bd))
+* **ecommerce:** pass placed order id to the account success banner ([22f0180](https://github.com/mohamed-rekiba/arvel/commit/22f0180b681a5cfcfd25fca5e7262b46db068c78))
+* **ecommerce:** re-snapshot cart price on quantity PATCH ([e6c6c3b](https://github.com/mohamed-rekiba/arvel/commit/e6c6c3b4bb4ec55e839f66b9160e4b520f151e93))
+* **ecommerce:** reject malformed pagination cursor with 422 ([91406c9](https://github.com/mohamed-rekiba/arvel/commit/91406c9ac0a53e02bd5558233620ef65ab19097e))
+* **ecommerce:** report unavailable cart items distinctly from low stock ([99def41](https://github.com/mohamed-rekiba/arvel/commit/99def418eabf595ccfcc56e1eb96b0ef13e4bc9e))
+* **ecommerce:** require both view grants for translations endpoint ([260c408](https://github.com/mohamed-rekiba/arvel/commit/260c4089f0d278f78e6ca0f772b01d45f7801738))
+* **ecommerce:** return 404 when deleting an unknown admin resource ([a08bfef](https://github.com/mohamed-rekiba/arvel/commit/a08bfef0d039daebb33726eb4824708149fd9693))
+* **ecommerce:** route cart store error fallbacks through i18n ([dc7a2eb](https://github.com/mohamed-rekiba/arvel/commit/dc7a2ebbb819c761e151d5c9ae7575cb671c468b))
+* **ecommerce:** scope storefront search to active category, gate short queries ([a7deaf6](https://github.com/mohamed-rekiba/arvel/commit/a7deaf685a0cd6bf4a49efcc2fd7fc8ea33626af))
+* **ecommerce:** show charged snapshot prices in the cart, not live ones ([d2df751](https://github.com/mohamed-rekiba/arvel/commit/d2df751cd95ddf061a2272e1abd22e982bc4ed18))
+* **ecommerce:** surface unavailable cart lines instead of ghosts ([b0231db](https://github.com/mohamed-rekiba/arvel/commit/b0231db08d0fe833cca757bea73498ee0e765523))
+* **ecommerce:** validate product category/vendor FK at the API ([efc591f](https://github.com/mohamed-rekiba/arvel/commit/efc591fd8d25a079f0278d373dfc8ffe91f84b5a))
+
 ## [1.8.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.5...arvel-ecommerce-kit-v1.8.0) (2026-06-09)
 
 
