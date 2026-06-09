@@ -325,7 +325,11 @@ class OrderService:
         oid = self._parse_id(order_id)
         if oid is None:
             return None
-        order: Order | None = await Order.with_trashed().where(Order.id == oid).first()
+        # Lock the row so two concurrent cancels serialize — otherwise both pass the
+        # "not already cancelled" guard and each restores stock, double-crediting it.
+        order: Order | None = (
+            await Order.with_trashed().where(Order.id == oid).lock_for_update().first()
+        )
         if order is None:
             return None
         current_status = order.status or "pending"

@@ -87,6 +87,18 @@ async def headphones_id(client: Any) -> str:
     return str(response.json()["data"]["id"])
 
 
+@pytest.fixture
+async def super_admin_token(client: Any) -> str:
+    return await _login(client, "superadmin@example.com", "password")
+
+
+async def _admin_stock(client: Any, token: str, product_id: str) -> int:
+    detail = await client.get(
+        f"/api/admin/products/{product_id}", headers={"Authorization": f"Bearer {token}"}
+    )
+    return int(detail.json()["data"]["stock_qty"])
+
+
 # ─── cart ────────────────────────────────────────────────────────────────
 
 
@@ -379,6 +391,40 @@ async def test_checkout_fails_when_product_unpublished(
     )
     assert checkout.status_code == 409
     assert "no longer available" in checkout.json()["error"]["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_cancel_restores_stock_once(
+    client: Any, customer_token: str, super_admin_token: str, headphones_id: str
+) -> None:
+    """Two simultaneous cancels must restore stock once, not double-credit inventory."""
+    cust = {"Authorization": f"Bearer {customer_token}"}
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+
+    await client.post(
+        "/api/cart/items", headers=cust, json={"product_id": headphones_id, "quantity": 2}
+    )
+    checkout = await client.post(
+        "/api/checkout",
+        headers=cust,
+        json={
+            "shipping_address": {"name": "Pat", "street": "1 St", "city": "City", "country": "US"}
+        },
+    )
+    assert checkout.status_code == 201
+    order_id = checkout.json()["data"]["id"]
+
+    stock_after_order = await _admin_stock(client, super_admin_token, headphones_id)
+
+    body = {"status": "cancelled"}
+    first, second = await asyncio.gather(
+        client.patch(f"/api/admin/orders/{order_id}/status", headers=sa, json=body),
+        client.patch(f"/api/admin/orders/{order_id}/status", headers=sa, json=body),
+    )
+    assert {first.status_code, second.status_code} == {200}
+
+    stock_after_cancel = await _admin_stock(client, super_admin_token, headphones_id)
+    assert stock_after_cancel == stock_after_order + 2
 
 
 # ─── order history ────────────────────────────────────────────────────────

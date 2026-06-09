@@ -600,6 +600,26 @@ path. `FeatureBadges` (1-click returns / app / 24-7) left as-is: generic
 storefront marketing chrome, not data fabrication. Backend ruff clean; storefront
 feature suite (11) + new unit tests green.
 
+## Iteration 40 — Lock order row on cancel to stop double stock-restore (backend)
+
+HIGH (fresh review): `update_status` read the order without a row lock, so two
+concurrent cancels both passed the "not already cancelled" guard and each called
+`_restore_stock_for_order`, double-crediting inventory. Now the order is fetched
+`lock_for_update()` inside the request transaction; the second cancel blocks,
+re-reads status as cancelled, and skips the restore. New integration test
+`test_concurrent_cancel_restores_stock_once` places a qty-2 order and fires two
+simultaneous cancels, asserting stock rises by exactly 2. Backend ruff clean.
+
+### Fresh review backlog (iteration-39 pass) — remaining
+- MED: admin catalog force-delete button not gated on role_level 100 in UI (backend blocks; UI 403s for non-superadmin). AdminCatalogPage.vue.
+- MED: duplicate cart add keeps old unit_price_snapshot for new units (cart_service.add_item).
+- MED: category/vendor `status` is unconstrained `str` in schemas → DB 500 on bad value; narrow to Literal.
+- MED: malformed pagination cursor silently returns page 1 (product_service) while client appends → dup rows.
+- MED: product media upload has no max-size guard (memory DoS).
+- MED: materialized catalog refresh skipped under Redis lock → stale storefront (harder; needs retry/queue).
+- MED: /products "Filter" box only filters loaded page, not catalog (UX).
+- LOW: cart store error strings hardcoded English, bypass i18n.
+
 ## Blockers
 
 None. All quality gates green.
