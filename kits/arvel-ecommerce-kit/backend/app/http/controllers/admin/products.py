@@ -76,6 +76,9 @@ class AdminProductsController(Controller):
         self, product_id: str, payload: UpdateProductPayload, request: Request
     ) -> AdminProductWrapperOut:
         await require_permission(request, "products.update")
+        # Guard first so a missing product (or malformed id) is a 404, not a 500.
+        if await products.admin_get(product_id, include_trashed=True) is None:
+            raise NotFoundException("Product not found.")
         product = await products.update(product_id, payload.model_dump(exclude_unset=True))
         return AdminProductWrapperOut.model_validate({"data": product})
 
