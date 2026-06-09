@@ -14,8 +14,7 @@ class AdminTranslationsController(Controller):
     async def index(self, request: Request) -> TranslationsListOut:
         # Returns both product and category fields, so it needs both view grants —
         # categories.view alone would leak product translations to a category-only role.
-        await require_permission(request, "products.view")
-        await require_permission(request, "categories.view")
+        await require_permission(request, ["products.view", "categories.view"])
         prods: list[Product] = await Product.order_by("created_at").limit(50).all()
         cats: list[Category] = await Category.order_by("created_at").limit(50).all()
         return TranslationsListOut.model_validate(

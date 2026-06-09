@@ -87,6 +87,12 @@ class _FakeUser:
     async def has_permission_to(self, perm: str) -> bool:
         return perm in self._perms
 
+    async def has_any_permission(self, *perms: str) -> bool:
+        return any(p in self._perms for p in perms)
+
+    async def has_all_permissions(self, *perms: str) -> bool:
+        return all(p in self._perms for p in perms)
+
     async def has_level(self, minimum: int) -> bool:
         return self._level >= minimum
 
@@ -142,6 +148,12 @@ class TestPermissionGuard:
             async def has_permission_to(self, perm: str) -> bool:
                 return perm in self._perms
 
+            async def has_any_permission(self, *perms: str) -> bool:
+                return any(p in self._perms for p in perms)
+
+            async def has_all_permissions(self, *perms: str) -> bool:
+                return all(p in self._perms for p in perms)
+
             @classmethod
             def where(cls, *_a: Any, **_k: Any) -> Any:
                 queries["count"] += 1
@@ -164,6 +176,43 @@ class TestPermissionGuard:
         guard = make_permission_guard(_user_model(held))
         result = await guard(_request(authorization="Bearer t"), "products.create")
         assert result is held
+
+    async def test_all_match_requires_every_permission(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _bind_service(monkeypatch, _FakeService(user=SimpleNamespace(id=7)))
+        held = _FakeUser(perms={"products.view"}, level=3)
+        guard = make_permission_guard(_user_model(held))
+        with pytest.raises(AuthorizationException):
+            await guard(_request(authorization="Bearer t"), ["products.view", "categories.view"])
+
+    async def test_all_match_passes_when_all_held(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _bind_service(monkeypatch, _FakeService(user=SimpleNamespace(id=7)))
+        held = _FakeUser(perms={"products.view", "categories.view"}, level=3)
+        guard = make_permission_guard(_user_model(held))
+        result = await guard(
+            _request(authorization="Bearer t"), ["products.view", "categories.view"]
+        )
+        assert result is held
+
+    async def test_any_match_passes_with_one_permission(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _bind_service(monkeypatch, _FakeService(user=SimpleNamespace(id=7)))
+        held = _FakeUser(perms={"products.view"}, level=3)
+        guard = make_permission_guard(_user_model(held))
+        result = await guard(
+            _request(authorization="Bearer t"), ["products.view", "categories.view"], match="any"
+        )
+        assert result is held
+
+    async def test_any_match_raises_when_none_held(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _bind_service(monkeypatch, _FakeService(user=SimpleNamespace(id=7)))
+        guard = make_permission_guard(_user_model(_FakeUser(perms=set(), level=0)))
+        with pytest.raises(AuthorizationException):
+            await guard(
+                _request(authorization="Bearer t"), ["a", "b"], match="any"
+            )
 
 
 class TestRoleLevelGuard:
