@@ -1,6 +1,6 @@
 [project]
 name = "arvel-permission"
-version = "0.6.4" # x-release-please-version
+version = "0.6.5" # x-release-please-version
 description = "Roles and permissions for Arvel — async-first authorization with HasRoles / HasPermissions mixins."
 readme = "README.md"
 requires-python = ">=3.14"

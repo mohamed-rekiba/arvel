@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.5](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.6.4...arvel-permission-v0.6.5) (2026-06-09)
+
+
+### Performance
+
+* **permission:** batch role permission loading to kill N+1 ([ef2515b](https://github.com/mohamed-rekiba/arvel/commit/ef2515b4330a7ef824a98edfb55fd84ece75214a))
+
 ## [0.6.4](https://github.com/mohamed-rekiba/arvel/compare/arvel-permission-v0.6.3...arvel-permission-v0.6.4) (2026-06-08)
 
 
