@@ -66,8 +66,9 @@ function byDomain(d: string): PermissionOut[] {
             <tr v-for="perm in byDomain(d)" :key="perm.id" class="hover:bg-app-bg-raised">
               <td class="px-6 py-3 font-mono text-sm text-fg">{{ perm.name }}</td>
               <td v-for="role in roles" :key="role.id" class="px-4 py-3 text-center">
-                <!-- Level-based: roles with level ≥ 80 (Admin+) have all permissions. -->
-                <span v-if="role.level >= 80" class="text-stock-in">✓</span>
+                <span v-if="(role.permissions ?? []).includes(perm.name)" class="text-stock-in"
+                  >✓</span
+                >
                 <span v-else class="text-fg-faint">—</span>
               </td>
             </tr>

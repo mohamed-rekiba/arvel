@@ -4,7 +4,17 @@
  * FastAPI
  * OpenAPI spec version: 0.1.0
  */
+import type { StorefrontProductImageOutConversions } from './storefrontProductImageOutConversions.ts'
+import type { StorefrontProductImageOutCustomProperties } from './storefrontProductImageOutCustomProperties.ts'
+import type { StorefrontProductImageOutSrcsets } from './storefrontProductImageOutSrcsets.ts'
 
+/**
+ * Per-image payload — mirrors ``Media.to_dict()`` from arvel-image.
+ *
+ * The frontend reads URLs from the ``conversions`` and ``srcsets`` dicts
+ * keyed by conversion name (``thumbnail``, ``card``, ``full``, …) instead of
+ * hard-coded fields. ``url`` is the original.
+ */
 export interface StorefrontProductImageOut {
   id: string
   uuid?: string | null
@@ -15,10 +25,10 @@ export interface StorefrontProductImageOut {
   size: number
   disk: string
   order?: number | null
-  custom_properties?: Record<string, unknown>
+  custom_properties?: StorefrontProductImageOutCustomProperties
   url: string
-  conversions?: Record<string, string>
-  srcsets?: Record<string, string>
+  conversions?: StorefrontProductImageOutConversions
+  srcsets?: StorefrontProductImageOutSrcsets
   placeholder_svg?: string
   created_at?: string | null
   updated_at?: string | null

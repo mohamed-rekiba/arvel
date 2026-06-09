@@ -168,7 +168,9 @@ def test_protected_frontend_routes_use_stored_session_guard() -> None:
     assert "meta: { requiresAuth: true" in router
     assert "meta: { requiresAuth: true, requiresAdmin: true }" in router
     assert "path: '/admin/login'" in router
-    assert "redirectTo: '/admin'" in router
+    # adminRedirect is the declared prop that sends admins to the dashboard;
+    # the old undeclared redirectTo prop was dead and fell through to the DOM.
+    assert "adminRedirect: true" in router
     assert "route.query.redirect" in auth_page
 
 

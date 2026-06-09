@@ -11,6 +11,7 @@ export interface AdminUserOut {
   email: string
   roles: string[]
   permissions: string[]
+  direct_permissions: string[]
   suspended_at: string | null
   deleted_at: string | null
 }
