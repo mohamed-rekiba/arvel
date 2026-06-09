@@ -387,8 +387,37 @@ typecheck/lint/15 vitest/build + 16 contract tests green.
   checkout delivery date hardcodes en-US [done iter 24];
   category parent_id allows self/cycle [done iter 29]; admin edit pages lack per-action gates [done iter 31].
 
-Iteration-22 review backlog fully cleared (iters 23–31). Next: dispatch a fresh
-review pass to surface a new batch, or start the storefront/admin design refresh.
+Iteration-22 review backlog fully cleared (iters 23–31).
+
+## Iteration 32 — Reject negative price/stock and malformed cart product id (backend)
+
+Two contained input-validation fixes from the fresh review. MED: product
+create/update accepted negative `price`/`stock_qty` via the API (UI used `min=0`
+only) — added `Field(ge=0)` constraints to both payloads (422 on bad input). MED:
+`add_item` called `uuid.UUID(product_id)` unguarded, so a non-UUID id 500'd —
+now caught and raised as `NotFoundException` (404), matching `_owned_item`. Added
+feature tests for both. 370 unit green; ruff clean.
+
+### Review backlog (iteration 32 findings)
+
+- HIGH: dashboard revenue/AOV/order-count include cancelled+pending orders
+  (`order_service.dashboard_stats`), contradicting `best_sellers` (delivered-only).
+- HIGH: cart/checkout UI totals use live `product.price` but checkout charges
+  snapshot prices → mismatch after an admin price change (needs server totals on
+  CartOut). Larger change; previously triaged as acceptable — revisit.
+- MED: admin DELETE returns 204 for missing/ malformed ids (products/categories/
+  vendors destroy) — should 404.
+- MED: unpublished/removed cart line fails checkout as "Insufficient stock" not
+  "item unavailable".
+- MED: product create/update accepts negative price/stock via API (no Field bounds). [done iter 32]
+- MED: coarse admin gate — `products.view` ⇒ full /admin shell (previously triaged).
+- MED: malformed `product_id` on cart add → 500 (uuid.UUID ValueError unhandled). [done iter 32]
+- MED: no admin UI for suspend/unsuspend or permission grant/revoke (APIs exist).
+- LOW: post-checkout success banner never fires — checkout links to /account
+  without `?order=` (the iter-26 banner is now dead code).
+- LOW: "New Arrivals" not filtered to new; FeatureBadges assert unimplemented
+  capabilities; media upload helpers bypass the 401 handler; test reseed has no
+  auth even in local/testing (previously triaged as accepted).
 
 ## Iteration 23 — Serialize concurrent checkout (backend)
 

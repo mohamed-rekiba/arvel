@@ -50,8 +50,8 @@ class CreateProductPayload(BaseModel):
     name: dict[str, str]
     slug: dict[str, str] = {}
     description: dict[str, str] = {}
-    price: float
-    stock_qty: int = 0
+    price: Annotated[float, Field(ge=0)]
+    stock_qty: Annotated[int, Field(ge=0)] = 0
     category_id: str
     vendor_id: str = ""
 
@@ -61,8 +61,8 @@ class UpdateProductPayload(BaseModel):
     name: dict[str, str] | None = None
     slug: dict[str, str] | None = None
     description: dict[str, str] | None = None
-    price: float | None = None
-    stock_qty: int | None = None
+    price: Annotated[float, Field(ge=0)] | None = None
+    stock_qty: Annotated[int, Field(ge=0)] | None = None
     category_id: str | None = None
     vendor_id: str | None = None
 

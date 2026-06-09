@@ -174,6 +174,17 @@ async def test_remove_cart_item(client: Any, customer_token: str, headphones_id:
 
 
 @pytest.mark.asyncio
+async def test_add_malformed_product_id_returns_404(client: Any, customer_token: str) -> None:
+    """A non-UUID product id is a 404, not a 500."""
+    response = await client.post(
+        "/api/cart/items",
+        headers={"Authorization": f"Bearer {customer_token}"},
+        json={"product_id": "not-a-uuid", "quantity": 1},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_update_unknown_cart_item_returns_404(client: Any, customer_token: str) -> None:
     """PATCH on an item id not in the caller's cart is a 404, not a silent 200."""
     response = await client.patch(
