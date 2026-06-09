@@ -455,6 +455,64 @@ async def test_update_quantity_resnapshots_to_current_price(
 
 
 @pytest.mark.asyncio
+async def test_force_delete_product_with_order_keeps_history(
+    client: Any, customer_token: str, super_admin_token: str, headphones_id: str
+) -> None:
+    """Force-deleting a sold product SET-NULLs the FK (not a 500); order line keeps its name."""
+    cust = {"Authorization": f"Bearer {customer_token}"}
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+
+    await client.post(
+        "/api/cart/items", headers=cust, json={"product_id": headphones_id, "quantity": 1}
+    )
+    checkout = await client.post(
+        "/api/checkout",
+        headers=cust,
+        json={
+            "shipping_address": {"name": "Pat", "street": "1 St", "city": "City", "country": "US"}
+        },
+    )
+    assert checkout.status_code == 201
+    order_id = checkout.json()["data"]["id"]
+    line_name = checkout.json()["data"]["items"][0]["product_name"]
+
+    force = await client.delete(f"/api/admin/products/{headphones_id}/force", headers=sa)
+    assert force.status_code == 204
+
+    order = await client.get(f"/api/account/orders/{order_id}", headers=cust)
+    assert order.status_code == 200
+    items = order.json()["data"]["items"]
+    assert items and items[0]["product_name"] == line_name
+
+
+@pytest.mark.asyncio
+async def test_force_delete_user_with_orders_returns_409(
+    client: Any, customer_token: str, super_admin_token: str, headphones_id: str
+) -> None:
+    """A user with orders can't be hard-deleted (RESTRICT FK) — clear 409, not a raw 500."""
+    cust = {"Authorization": f"Bearer {customer_token}"}
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+
+    await client.post(
+        "/api/cart/items", headers=cust, json={"product_id": headphones_id, "quantity": 1}
+    )
+    checkout = await client.post(
+        "/api/checkout",
+        headers=cust,
+        json={
+            "shipping_address": {"name": "Pat", "street": "1 St", "city": "City", "country": "US"}
+        },
+    )
+    assert checkout.status_code == 201
+
+    listing = await client.get("/api/admin/users?search=customer@example.com", headers=sa)
+    user = next(u for u in listing.json()["data"] if u["email"] == "customer@example.com")
+
+    force = await client.delete(f"/api/admin/users/{user['id']}/force", headers=sa)
+    assert force.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_concurrent_cancel_restores_stock_once(
     client: Any, customer_token: str, super_admin_token: str, headphones_id: str
 ) -> None:

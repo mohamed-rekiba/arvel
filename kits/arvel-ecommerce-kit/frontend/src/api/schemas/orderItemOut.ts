@@ -7,7 +7,7 @@
 
 export interface OrderItemOut {
   id: string
-  product_id: string
+  product_id: string | null
   product_name: string
   quantity: number
   unit_price: number

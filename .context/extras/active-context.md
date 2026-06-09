@@ -703,12 +703,25 @@ typecheck/lint/vitest(18)/build green.
   the stale first-add price, so checkout could charge an outdated amount after an
   admin price change. Test `test_update_quantity_resnapshots_to_current_price`.
 
+## Iteration 49 — Graceful force-delete with dependent orders (full-stack)
+
+- MED: force-deleting a sold product no longer 500s. `order_items.product_id`
+  FK switched from `restrict_on_delete()` to `null_on_delete()` (the model and
+  comments already assumed SET NULL); the line keeps `product_name` for history.
+  `OrderItemOut.product_id` is now `str | None`, Orval regenerated to match.
+- MED: force-deleting a user who has orders returns a clear 409 instead of a raw
+  FK violation. `orders.user_id` is non-nullable with ON DELETE RESTRICT, so
+  `UserService.force_delete` pre-checks `Order.with_trashed().count()` and raises
+  `ConflictException`. Counts trashed orders too — soft-deleted rows still bind
+  the FK.
+- Tests: `test_force_delete_product_with_order_keeps_history`,
+  `test_force_delete_user_with_orders_returns_409`. Frontend typecheck + ruff
+  clean.
+
 ### Fresh review backlog (iteration-45 review) — remaining
-- MED: force_delete on product/user with dependent orders hits FK RESTRICT → 500 instead of 409.
 - MED: product create/update doesn't validate category/vendor FK existence → opaque 500.
 - MED: admin translations endpoint gated only on `categories.view`.
 - MED: ghost cart lines (unpublished product) → broken links, blocked quantity updates.
-- LOW: StorefrontSearch.vue fires 1-char queries the backend rejects.
 - MED (tracked): scheduled catalog refresh skipped under Redis lock → stale storefront (needs retry/queue).
 
 ## Blockers

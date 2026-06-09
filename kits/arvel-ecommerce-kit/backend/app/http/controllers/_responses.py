@@ -173,7 +173,8 @@ class CartWrapperOut(_Out):
 
 class OrderItemOut(_Out):
     id: str
-    product_id: str
+    # Null once the product is force-deleted (FK SET NULL); product_name keeps history.
+    product_id: str | None
     product_name: str
     quantity: int
     unit_price: float
