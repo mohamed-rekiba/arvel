@@ -433,6 +433,23 @@ async def test_upload_product_image_creates_conversions(
 
 
 @pytest.mark.asyncio
+async def test_upload_rejects_oversized_image(
+    client: Any, catalog_token: str, vendor_id: str, category_id: str
+) -> None:
+    """An image past the size cap is a 400, rejected before it's read into storage."""
+    product_id = await _create_product(
+        client, catalog_token, vendor_id, category_id, "Big Photo", "big-photo"
+    )
+    oversized = b"\xff\xd8\xff" + b"\x00" * (5 * 1024 * 1024 + 1)
+    upload = await client.post(
+        f"/api/admin/products/{product_id}/media",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+        files={"file": ("huge.jpg", io.BytesIO(oversized), "image/jpeg")},
+    )
+    assert upload.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_upload_product_image_has_responsive_srcset(
     client: Any, catalog_token: str, vendor_id: str, category_id: str
 ) -> None:
