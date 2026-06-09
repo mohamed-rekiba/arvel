@@ -81,7 +81,7 @@ class ProductService:
         """Cursor-paginated storefront listing via ProductCatalog ORM."""
         # .with_("media") batches the per-product media into one extra query —
         # without it the listing is a textbook N+1 (one media fetch per row).
-        query = ProductCatalog.where(ProductCatalog.real_status == "visible").with_("media")
+        query = ProductCatalog.visible().with_("media")
         if category_slug is not None:
             query = query.where_json_path("category_slug", locale, category_slug)
 
@@ -103,7 +103,7 @@ class ProductService:
 
     async def get_published_by_slug(self, slug: str, locale: str = "en") -> dict[str, Any] | None:
         product = (
-            await ProductCatalog.where(ProductCatalog.real_status == "visible")
+            await ProductCatalog.visible()
             .where_json_path("slug", locale, slug)
             .with_("media")
             .first()
@@ -121,7 +121,7 @@ class ProductService:
     ) -> list[dict[str, Any]]:
         sv = ProductCatalog.search_vector
         products: list[ProductCatalog] = (
-            await ProductCatalog.where(ProductCatalog.real_status == "visible")
+            await ProductCatalog.visible()
             .where_full_text(sv, q, tsquery_fn="plainto_tsquery", lang="simple")
             .order_by_relevance(sv, q, lang="simple")
             .with_("media")

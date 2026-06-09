@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime as _datetime
 from typing import Any
 
-from arvel.database import ViewModel, datetime, jsonb, string, uuid
+from arvel.database import QueryBuilder, ViewModel, datetime, jsonb, string, uuid
 
 from app.models.product_base import ProductBase
 
@@ -16,7 +16,7 @@ class ProductCatalog(ProductBase, ViewModel):
     Backed by the ``products_catalog`` materialized view. Write operations raise
     ``ReadOnlyModelError`` — use ``Product`` for mutations.
 
-    Storefront queries add ``.where(ProductCatalog.real_status == "visible")``.
+    Storefront queries use the ``visible`` scope (``ProductCatalog.visible()``).
     Admin queries use the full table and filter by ``status`` / ``real_status`` as needed.
 
     ``__morph_class__`` makes this view present as ``"Product"`` for polymorphic
@@ -49,6 +49,11 @@ class ProductCatalog(ProductBase, ViewModel):
     # nullable because a LEFT JOIN can yield NULLs in unusual edge cases.
     created_at: _datetime | None = datetime(nullable=True, default=None)
     updated_at: _datetime | None = datetime(nullable=True, default=None)
+
+    def scope_visible(self, query: QueryBuilder[ProductCatalog]) -> QueryBuilder[ProductCatalog]:
+        # "visible" = published and neither soft-deleted nor in a draft/hidden state;
+        # the view's CASE expression folds all of that into real_status.
+        return query.where(ProductCatalog.real_status == "visible")
 
 
 __all__ = ["ProductCatalog"]

@@ -845,6 +845,15 @@ Two questions answered:
   fallback passes the gate, then inline Pillow conversion fails). All 5 upload
   feature tests pass; unit 380 pass.
 
+- **iter 59 — visible scope (done):** added `ProductCatalog.scope_visible`
+  (method-style, like `Product.scope_published`). Replaced the duplicated
+  `real_status == "visible"` query filters in product/cart/order/category
+  services with `ProductCatalog.visible()` (entrypoint, chained, and inside a
+  `where_has` callback). The scope is now the single place that pins the
+  visibility predicate. Updated test_046/test_049 contracts to assert the scope
+  instead of the raw filter. Unit 380 pass; storefront + cart/checkout feature
+  suites 35 pass.
+
 ## Blockers
 
 None. All quality gates green.

@@ -66,9 +66,9 @@ class CartService:
 
         existing: CartItem | None = await CartItem.where(cart_id=cart_id, product_id=pid).first()
         requested_quantity = quantity + int(existing.quantity) if existing is not None else quantity
-        product: ProductCatalog | None = await ProductCatalog.where(
-            ProductCatalog.id == pid, ProductCatalog.real_status == "visible"
-        ).first()
+        product: ProductCatalog | None = (
+            await ProductCatalog.visible().where(ProductCatalog.id == pid).first()
+        )
         if product is None:
             raise NotFoundException(f"Product '{product_id}' not found.")
         if int(product.stock_qty) < requested_quantity:

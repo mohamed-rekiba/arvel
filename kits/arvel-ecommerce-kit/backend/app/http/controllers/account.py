@@ -10,9 +10,7 @@ from arvel.http.exceptions import NotFoundException
 
 
 class AccountController(Controller):
-    async def list_orders(
-        self, request: Request, limit: int = 50, offset: int = 0
-    ) -> OrderListOut:
+    async def list_orders(self, request: Request, limit: int = 50, offset: int = 0) -> OrderListOut:
         user = await require_auth(request)
         rows = await orders.list_orders(
             int(user.id), limit=clamp_limit(limit), offset=clamp_offset(offset)
