@@ -54,6 +54,9 @@ class OrderService:
     async def checkout(
         self, user_id: int, shipping_address: dict[str, Any], *, locale: str = "en"
     ) -> dict[str, Any]:
+        # Serialize per-cart: a concurrent checkout (or double-click) blocks here,
+        # then re-reads the emptied cart below and fails as EmptyCart — no dup order.
+        await self._cart_service.lock_cart(user_id)
         cart = await self._cart_service.get_cart_for_checkout(user_id)
         items = cart["items"]
         if not items:
