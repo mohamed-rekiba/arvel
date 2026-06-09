@@ -65,6 +65,10 @@ def test_frontend_router_declares_prompt_surfaces() -> None:
         "path: '/admin/:pathMatch(.*)*'",
     ):
         assert route in src
+    # The /admin catch-all must sit inside the requiresAdmin group's children so an
+    # unknown /admin/* path is guarded, not rendered unauthenticated at top level.
+    children_start = src.index("children: [", src.index("requiresAdmin: true"))
+    assert children_start < src.index("admin-catch-all")
     for page in (
         "StorefrontCart",
         "StorefrontCheckout",

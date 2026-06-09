@@ -195,13 +195,15 @@ const router = createRouter({
           component: () => import('@/pages/AdminPlaceholderPage.vue'),
           props: { pageType: 'coming-soon', title: 'Settings' },
         },
+        {
+          // Nested so an unknown /admin/* path inherits requiresAuth + requiresAdmin
+          // (and the admin shell) instead of rendering unguarded at the top level.
+          path: '/admin/:pathMatch(.*)*',
+          name: 'admin-catch-all',
+          component: () => import('@/pages/AdminPlaceholderPage.vue'),
+          props: { pageType: 'coming-soon', title: 'Not found' },
+        },
       ],
-    },
-    {
-      path: '/admin/:pathMatch(.*)*',
-      name: 'admin-catch-all',
-      component: () => import('@/pages/AdminPlaceholderPage.vue'),
-      props: { pageType: 'coming-soon', title: 'Not found' },
     },
   ],
 })
