@@ -172,6 +172,27 @@ async def test_remove_cart_item(client: Any, customer_token: str, headphones_id:
     assert removed.json()["data"]["items"] == []
 
 
+@pytest.mark.asyncio
+async def test_update_unknown_cart_item_returns_404(client: Any, customer_token: str) -> None:
+    """PATCH on an item id not in the caller's cart is a 404, not a silent 200."""
+    response = await client.patch(
+        "/api/cart/items/999999",
+        headers={"Authorization": f"Bearer {customer_token}"},
+        json={"quantity": 3},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_remove_unknown_cart_item_returns_404(client: Any, customer_token: str) -> None:
+    """DELETE on an item id not in the caller's cart is a 404, not a silent 200."""
+    response = await client.delete(
+        "/api/cart/items/999999",
+        headers={"Authorization": f"Bearer {customer_token}"},
+    )
+    assert response.status_code == 404
+
+
 # ─── checkout ────────────────────────────────────────────────────────────
 
 
