@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.11.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.10.0...arvel-ecommerce-kit-v1.11.0) (2026-06-09)
+
+
+### Features
+
+* **ecommerce-kit:** cosmic hero and storefront animation layer ([261bbdd](https://github.com/mohamed-rekiba/arvel/commit/261bbdd544de9993775bac5e39a3017c4d069d58))
+* **ecommerce-kit:** customer-role listener, cart stock lock, checkout guard ([0b7bce0](https://github.com/mohamed-rekiba/arvel/commit/0b7bce0c1c96664f4fa45659e66479f8c7f28caf))
+
+
+### Bug Fixes
+
+* **ecommerce-kit:** harden admin self-delete and category parent_id validation ([511ba5f](https://github.com/mohamed-rekiba/arvel/commit/511ba5f93e55cc928d52631ea56a70fbc0d960ac))
+* **ecommerce-kit:** order data integrity after force-delete and on checkout totals ([12e06b1](https://github.com/mohamed-rekiba/arvel/commit/12e06b182e367e7f47af6fe7ecc6639d55785376))
+* **ecommerce-kit:** smooth storefront hover and reveal motion ([d9f90d1](https://github.com/mohamed-rekiba/arvel/commit/d9f90d1bce49696618c15ea7542722cf5f4eede0))
+
+
+### Refactors
+
+* **ecommerce-kit:** adopt JsonResource for product/category responses ([cd91824](https://github.com/mohamed-rekiba/arvel/commit/cd918244656b484e51bd9cb021ee66e1f2641666))
+
 ## [1.10.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.9.0...arvel-ecommerce-kit-v1.10.0) (2026-06-09)
 
 
