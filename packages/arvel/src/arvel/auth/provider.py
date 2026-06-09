@@ -258,7 +258,10 @@ class AuthServiceProvider(ServiceProvider):
             refresh_ttl=timedelta(seconds=refresh.ttl_seconds),
             user_model=user_model_cls,
         )
-        password_service = PasswordService(user_model=user_model_cls)
+        password_service = PasswordService(
+            user_model=user_model_cls,
+            access_ttl=timedelta(seconds=jwt.ttl_seconds),
+        )
         email_verification_service = EmailVerificationService(
             secret=jwt.secret,
             user_model=user_model_cls,

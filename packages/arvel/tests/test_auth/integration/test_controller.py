@@ -199,7 +199,10 @@ async def test_login_429_after_5_failed_attempts(
     event_fake: EventFake,
 ) -> None:
     """/ — throttle returns 429 + Retry-After after threshold."""
-    from arvel.auth.middleware.throttle_login import ThrottleLoginMiddleware
+    from arvel.auth.middleware.throttle_login import (
+        ThrottleLoginConfig,
+        ThrottleLoginMiddleware,
+    )
 
     # Build app with ThrottleLoginMiddleware (and proper exception handler).
     from fastapi import APIRouter
@@ -226,7 +229,9 @@ async def test_login_429_after_5_failed_attempts(
     api_router: APIRouter = APIRouter()
     register_auth_routes(api_router, controller=ctrl_t, prefix="/api/auth")
     inner_app.include_router(api_router)
-    throttled = ThrottleLoginMiddleware(inner_app, login_path="/api/auth/login", max_attempts=5)
+    throttled = ThrottleLoginMiddleware(
+        inner_app, ThrottleLoginConfig(login_path="/api/auth/login", max_attempts=5)
+    )
 
     async with AsyncClient(transport=ASGITransport(app=throttled), base_url="http://test") as c:
         for _ in range(5):

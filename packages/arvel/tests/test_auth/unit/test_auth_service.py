@@ -29,6 +29,7 @@ from arvel.auth import (
 )
 from arvel.auth.config import JwtConfig
 from arvel.database.model import Model
+from arvel.facades.cache import Cache
 from arvel.facades.event import Event as EventFacade
 from arvel.testing.fakes.event import EventFake
 
@@ -309,3 +310,63 @@ async def test_me_rejects_invalid_jwt(auth_service: AuthService, setup_db: Async
     """malformed token → InvalidCredentialsError."""
     with pytest.raises(InvalidCredentialsError):
         await auth_service.me(access_token="not.a.jwt")
+
+
+# Revocation
+
+
+@pytest.mark.asyncio
+async def test_logout_revokes_access_token(
+    auth_service: AuthService,
+    event_fake: EventFake,
+    setup_db: AsyncSession,
+) -> None:
+    """The presented access token stops working right after logout."""
+    with Cache.fake():
+        await _seed_verified_user(auth_service)
+        _u, tokens = await auth_service.login(email="alice@example.com", password="S3cret-pw!")
+        me = await auth_service.me(access_token=tokens.access_token)
+        assert me.email == "alice@example.com"
+
+        await auth_service.logout(
+            refresh_token=tokens.refresh_token, access_token=tokens.access_token
+        )
+
+        with pytest.raises(InvalidCredentialsError):
+            await auth_service.me(access_token=tokens.access_token)
+
+
+@pytest.mark.asyncio
+async def test_logout_only_revokes_the_presented_token(
+    auth_service: AuthService,
+    event_fake: EventFake,
+    setup_db: AsyncSession,
+) -> None:
+    """Logging out one session leaves the user's other access tokens working."""
+    with Cache.fake():
+        await _seed_verified_user(auth_service)
+        _u, session_a = await auth_service.login(email="alice@example.com", password="S3cret-pw!")
+        _u, session_b = await auth_service.login(email="alice@example.com", password="S3cret-pw!")
+
+        await auth_service.logout(
+            refresh_token=session_a.refresh_token, access_token=session_a.access_token
+        )
+
+        with pytest.raises(InvalidCredentialsError):
+            await auth_service.me(access_token=session_a.access_token)
+        # Session B is untouched.
+        me_b = await auth_service.me(access_token=session_b.access_token)
+        assert me_b.email == "alice@example.com"
+
+
+@pytest.mark.asyncio
+async def test_logout_without_cache_does_not_raise(
+    auth_service: AuthService,
+    event_fake: EventFake,
+    setup_db: AsyncSession,
+) -> None:
+    """No cache bound → access-token revocation no-ops, logout still works."""
+    await _seed_verified_user(auth_service)
+    _u, tokens = await auth_service.login(email="alice@example.com", password="S3cret-pw!")
+    await auth_service.logout(refresh_token=tokens.refresh_token, access_token=tokens.access_token)
+    EventFacade.assert_dispatched(LoggedOut, times=1)

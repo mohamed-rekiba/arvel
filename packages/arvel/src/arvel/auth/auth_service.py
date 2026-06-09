@@ -35,6 +35,7 @@ from arvel.auth.refresh_tokens import (
     hash_refresh_token,
     refresh_token_expires_at,
 )
+from arvel.auth.token_denylist import deny_token, is_revoked, revoke_all_for_user
 from arvel.auth.token_pair import TokenPair
 from arvel.database.db import DB
 from arvel.facades.event import Event as EventFacade
@@ -210,6 +211,11 @@ class AuthService:
 
         if replayed:
             Log.debug("auth.refresh.rejected", reason="token_reuse")
+            # Reuse means the family is compromised — kill the outstanding access
+            # tokens too, not just the refresh rows.
+            await revoke_all_for_user(
+                user_id_str, ttl_seconds=int(self._access_ttl.total_seconds())
+            )
             await self.revoke_family(user_id=user_id_str)  # raises when rows remain
             msg = "refresh token reuse detected"
             raise InvalidCredentialsError(msg)
@@ -251,8 +257,17 @@ class AuthService:
 
     # ─── Logout ────────────────────────────────────────────────────────────
 
-    async def logout(self, *, refresh_token: str | None) -> None:
-        """Delete the supplied refresh row. Idempotent — missing/unknown is fine."""
+    async def logout(
+        self, *, refresh_token: str | None, access_token: str | None = None
+    ) -> None:
+        """Revoke the session. Idempotent — missing/unknown is fine.
+
+        Denies the presented access token's ``jti`` (so it stops working before
+        ``exp``) and deletes the refresh row. Logging out one device leaves the
+        user's other sessions alone.
+        """
+        await self._deny_access_token(access_token)
+
         user_cls = self._user_cls
         if not refresh_token:
             return
@@ -268,6 +283,19 @@ class AuthService:
         email = str(getattr(user, "email", ""))
         await EventFacade.dispatch(LoggedOut(user_id=user_id_str, email=email, occurred_at=_now()))
         Log.debug("auth.logged_out", user_id=user_id_str)
+
+    async def _deny_access_token(self, access_token: str | None) -> None:
+        """Add a still-valid access token to the denylist (best effort)."""
+        if not access_token:
+            return
+        try:
+            claims = self._decode_access(access_token)
+        except _JwtDecodeError:
+            return  # already expired/garbage — nothing to revoke
+        jti = str(claims.get("jti", ""))
+        exp = _as_int(claims.get("exp"))
+        if jti and exp is not None:
+            await deny_token(jti, expires_at_epoch=exp)
 
     # ─── Me ────────────────────────────────────────────────────────────────
 
@@ -288,6 +316,14 @@ class AuthService:
         sub = claims.get("sub")
         if not isinstance(sub, str):
             msg = "JWT missing sub claim"
+            raise InvalidCredentialsError(msg)
+
+        if await is_revoked(
+            jti=str(claims.get("jti", "")),
+            subject=sub,
+            issued_at=_as_int(claims.get("iat")),
+        ):
+            msg = "access token revoked"
             raise InvalidCredentialsError(msg)
 
         user = await user_cls.find(_coerce_pk(sub))
@@ -326,6 +362,7 @@ class AuthService:
         now = int(time.time())
         payload: dict[str, object] = {
             "sub": subject,
+            "iat": now,
             "exp": now + int(self._access_ttl.total_seconds()),
             "jti": secrets.token_hex(16),
             "typ": "access",
@@ -377,6 +414,20 @@ class _JwtDecodeError(Exception):
 
 def _now() -> datetime:
     return datetime.now(tz=UTC)
+
+
+def _as_int(value: object) -> int | None:
+    """Coerce a JWT numeric claim (``iat``/``exp``) to int, or None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
 
 
 # ─── Application-scoped accessor ───────────────────────────────────────────

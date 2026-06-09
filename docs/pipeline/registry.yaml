@@ -765,3 +765,18 @@ work_items:
     has_frontend: false
     state_file: null
     notes: "Feature gap (WI-043, split out of WI-050; security path). Trusted-proxy forwarded-header resolution existed only for observability/reverb (observability/forwarded.py), not the app request path — so behind a load balancer request.client.host (and the Throttle key that reads it), the scheme, and the host all saw the proxy. Added TrustProxiesMiddleware (http/middleware/trust_proxies.py): when the TCP peer matches TRUSTED_PROXIES it rewrites scope client (XFF, reusing resolve_client_ip; leftmost entry for '*'), scheme (X-Forwarded-Proto, ws/wss for websocket), and Host (X-Forwarded-Host). New HttpConfig.trusted_proxies reads bare TRUSTED_PROXIES (NoPrefix, CSV; '*' trusts all -> 0.0.0.0/0 + ::/0). Bound in HttpServiceProvider; mounted as the OUTERMOST layer in Application ASGI assembly only when set (default off = fail-safe, headers ignored). Untrusted peer -> scope untouched. Also fixed a latent WI-050 re-export gap (CsrfMismatchException imported via _middleware_core which doesn't __all__-export it; now imported from arvel.http.exceptions). Spec: docs/pipeline/specs/WI-arvel-051-trust-proxies.md"
+  - id: "WI-arvel-052"
+    name: "JWT revocation denylist + shared login throttle (deferred F5)"
+    complexity: "L2"
+    risk_tier: 3
+    data_classification: "confidential"
+    current_stage: "completed"
+    status: "completed"
+    blocked_by: null
+    started: "2026-06-09T06:30:00Z"
+    target: null
+    schema: "default"
+    autonomous: true
+    has_frontend: false
+    state_file: null
+    notes: "Deferred finding F5 (security path). (a) Stateless access JWTs couldn't be revoked: logout deleted the refresh row but the access token kept working until exp, and password reset / refresh-token-reuse revoked only refresh rows. Added a Cache-backed denylist (auth/token_denylist.py): per-jti deny for single-session logout (ttl = remaining token life) and a per-user iat cutoff for reset/reuse (kill all sessions). Tokens gained an iat claim (AuthService.issue_access_token + JwtGuard._encode); both AuthService.me and JwtGuard.user consult is_revoked() after signature/exp checks. logout() takes access_token (controller passes the bearer); refresh() reuse path and PasswordService.reset() call revoke_all_for_user. Checks fail open on cache outage (no auth DoS); shared across workers on Redis cache. (b) Login throttle was process-local: ThrottleLoginMiddleware now takes a pluggable LoginAttemptStore (InMemory default, CacheLoginAttemptStore for cross-worker), tuning moved to ThrottleLoginConfig (6-arg ctor -> options struct). Tests: test_token_denylist (9), revocation cases in test_auth_service (3), cache-store cases in test_throttle_login (2). Spec: docs/pipeline/specs/WI-arvel-052-jwt-revocation-login-throttle.md"
