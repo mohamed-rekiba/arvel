@@ -9,15 +9,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from arvel.http import UploadFile
 from arvel_image.media.exceptions import MediaError
 
 from app.models.product import Product
 
 
-async def attach_product_image(product: Product, file: UploadFile) -> dict[str, Any]:
-    contents = await file.read()
-    filename = file.filename or "upload"
+async def attach_product_image(product: Product, contents: bytes, filename: str) -> dict[str, Any]:
+    # contents is read with a hard cap in the controller — never read the raw
+    # UploadFile here, or an oversized body lands in worker memory.
     media = await product.add_image(contents, file_name=filename)
     return media.to_dict()
 

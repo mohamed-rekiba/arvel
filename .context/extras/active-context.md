@@ -672,8 +672,28 @@ Backend ruff clean; targeted tests green.
   keys, replacing the hardcoded English strings. Server `err.message` is still
   shown as-is, matching the admin-page pattern. typecheck/lint/vitest(18)/build green.
 
-### Fresh review backlog (iteration-39 pass) — remaining
-- MED: materialized catalog refresh skipped under Redis lock → stale storefront for the *scheduled* path (harder; needs retry/queue).
+## Iteration 46 — Harden product media upload (backend)
+
+- HIGH: media upload no longer reads the raw body unbounded. The old size check
+  only fired when `file.size` was set (header-only); clients omitting
+  Content-Length bypassed it and `attach_product_image` read the whole body into
+  memory. Now the controller does `file.read(_MAX_IMAGE_BYTES + 1)` and rejects
+  over-cap with 400; `attach_product_image(product, contents, filename)` takes
+  pre-read bytes.
+- MED: declared content-type is no longer trusted alone — `_sniff_image_type`
+  checks magic bytes (JPEG/PNG/GIF/WebP) and rejects MIME-spoofed payloads.
+  Aligned the allowed-types error message and upload-field description to include
+  GIF. Tests: `test_upload_rejects_mime_spoofed_file`; updated `test_048` contract.
+
+### Fresh review backlog (iteration-45 review) — remaining
+- MED: cart PATCH (`update_item`) keeps stale price snapshot — inconsistent with `add_item` re-snapshot; checkout can charge old price.
+- MED: storefront search drops the active category filter (regression from the catalog-search wiring).
+- MED: force_delete on product/user with dependent orders hits FK RESTRICT → 500 instead of 409.
+- MED: product create/update doesn't validate category/vendor FK existence → opaque 500.
+- MED: admin translations endpoint gated only on `categories.view`.
+- MED: ghost cart lines (unpublished product) → broken links, blocked quantity updates.
+- LOW: StorefrontSearch.vue fires 1-char queries the backend rejects.
+- MED (tracked): scheduled catalog refresh skipped under Redis lock → stale storefront (needs retry/queue).
 
 ## Blockers
 

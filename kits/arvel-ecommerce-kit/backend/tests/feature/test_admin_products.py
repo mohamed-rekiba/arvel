@@ -494,6 +494,23 @@ async def test_upload_product_image_has_responsive_srcset(
 
 
 @pytest.mark.asyncio
+async def test_upload_rejects_mime_spoofed_file(
+    client: Any, catalog_token: str, vendor_id: str, category_id: str
+) -> None:
+    """A non-image body sent under an image/* content-type is rejected by magic-byte sniffing."""
+    product_id = await _create_product(
+        client, catalog_token, vendor_id, category_id, "Spoofed", "spoofed"
+    )
+    not_an_image = b"%PDF-1.4 this is not really a jpeg"
+    upload = await client.post(
+        f"/api/admin/products/{product_id}/media",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+        files={"file": ("evil.jpg", io.BytesIO(not_an_image), "image/jpeg")},
+    )
+    assert upload.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_upload_rejects_non_image_file(
     client: Any, catalog_token: str, vendor_id: str, category_id: str
 ) -> None:
