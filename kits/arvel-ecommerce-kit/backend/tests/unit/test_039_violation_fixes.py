@@ -132,7 +132,18 @@ class TestV003CreateUsesOrm:
         mock_product.updated_at = None
         mock_product.deleted_at = None
 
-        with patch("app.services.product_service.Product") as MockProduct:
+        # create() now resolves the category/vendor FK before writing, so both
+        # models are queried for existence — stub them to "found" (count == 1).
+        def _exists_stub() -> MagicMock:
+            stub = MagicMock()
+            stub.with_trashed.return_value.where.return_value.count = AsyncMock(return_value=1)
+            return stub
+
+        with (
+            patch("app.services.product_service.Product") as MockProduct,
+            patch("app.services.product_service.Category", _exists_stub()),
+            patch("app.services.product_service.Vendor", _exists_stub()),
+        ):
             MockProduct.create = AsyncMock(return_value=mock_product)
             result = await svc.create(
                 {
