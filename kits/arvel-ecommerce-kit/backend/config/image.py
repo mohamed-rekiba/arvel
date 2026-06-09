@@ -18,7 +18,7 @@ default: str = "images"
 collections: dict[str, CollectionConfig] = {
     default: {
         "disk": fs_cfg.default,
-        "max_size_bytes": 10 * 1024 * 1024,  # 10 MiB
+        "max_size_bytes": 5 * 1024 * 1024,  # 5 MiB
         "max_files": 4,
         "allowed_mimetypes": ["image/jpeg", "image/png", "image/webp", "image/gif"],
         "conversions": {

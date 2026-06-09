@@ -834,6 +834,17 @@ Two questions answered:
   `has_any_permission`/`has_all_permissions` — guard factory should accept a
   list (iter rm6).
 
+- **iter 58 — media validation (done):** dropped the controller's hand-rolled
+  `_MAX_IMAGE_BYTES`/`_ALLOWED_IMAGE_TYPES`/`_sniff_image_type`. Uploads now rely
+  on the arvel-image collection (`config/image.py`) for size + MIME + content
+  validation; controller maps `FileTooLargeError`/`InvalidMimeTypeError`/
+  `ConversionFailedError` → 400 and reads a bounded body from
+  `config("image.collections.images.max_size_bytes")`. Made config the single
+  source: collection max set to 5 MiB (matches the previously-enforced limit).
+  Spoofed `.jpg`/non-image still 400 (the framework's filename-extension MIME
+  fallback passes the gate, then inline Pillow conversion fails). All 5 upload
+  feature tests pass; unit 380 pass.
+
 ## Blockers
 
 None. All quality gates green.
