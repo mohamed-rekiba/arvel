@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import UTC, timedelta
 from datetime import datetime as _datetime
 from typing import Any
 
+from arvel.config import config
 from arvel.database import QueryBuilder, ViewModel, datetime, jsonb, string, uuid
+from arvel.database.attributes import accessor
 
 from app.models.product_base import ProductBase
 
@@ -54,6 +57,19 @@ class ProductCatalog(ProductBase, ViewModel):
         # "visible" = published and neither soft-deleted nor in a draft/hidden state;
         # the view's CASE expression folds all of that into real_status.
         return query.where(ProductCatalog.real_status == "visible")
+
+    @accessor
+    def is_new(self) -> bool:
+        # Wears the "new" badge for catalog.new_product_days after creation.
+        # The view exposes created_at as nullable, and a LEFT JOIN can hand back a
+        # tz-naive value, so normalize before comparing.
+        created = self.created_at
+        if created is None:
+            return False
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        window = timedelta(days=int(config("catalog.new_product_days", 30)))
+        return (_datetime.now(UTC) - created) <= window
 
 
 __all__ = ["ProductCatalog"]

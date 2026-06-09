@@ -881,6 +881,28 @@ Two questions answered:
     malformed→422, unauthorized→403 before validation). Unit +4 (384), mypy +
     pyright clean.
 
+- **iter 62 — accessors (done):** moved the two *pure-derived* values to model
+  `@accessor`s (same pattern as the framework's `RefreshToken.is_expired`):
+  - `ProductCatalog.is_new` (from `created_at` + `catalog.new_product_days`);
+    `product_to_storefront` now reads `product.is_new` and dropped the inline
+    window math (and the now-unused `config`/`timedelta` imports).
+  - `CartItem.subtotal` (snapshot price × qty); `_format_item` reads
+    `item.subtotal`.
+  - **Deliberately left in the serializer:** image urls / srcset and the cart
+    line `available` flag. Those aren't intrinsic model state — image fields are
+    presentation transforms of the eager-loaded media collection, and
+    `available` is a cross-relation runtime check on the joined product's
+    `real_status`. Forcing them into model accessors would couple the ORM to
+    presentation/relation concerns (wrong abstraction).
+  - **JsonResource:** not adopted. The kit already serializes through Pydantic
+    response models (`*Out.model_validate`) wired as FastAPI `response_model` —
+    a valid framework pattern. A wholesale JsonResource rewrite changes no
+    behavior, would churn every endpoint + the Orval-generated frontend, and
+    risks regressions in a heavily-tested path. Flagging rather than forcing.
+  - test_059 rewritten to exercise the accessors directly (via `property.fget`,
+    no DB). Unit 387 pass; mypy + pyright clean. Storefront + cart feature
+    suites re-running to confirm end-to-end.
+
 ## Blockers
 
 None. All quality gates green.
