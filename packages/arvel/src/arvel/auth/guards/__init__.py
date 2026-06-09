@@ -16,8 +16,8 @@ does not gain a hard dependency on it.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, Literal
 
 from arvel.auth import get_auth_service
 from arvel.auth.exceptions import AccountSuspendedError, InvalidCredentialsError
@@ -26,11 +26,28 @@ from arvel.http.exceptions import AuthorizationException, UnauthenticatedExcepti
 if TYPE_CHECKING:
     from starlette.requests import Request
 
+# A guard accepts either one permission or several. With several, ``match``
+# picks the semantics: "all" (default) requires every permission, "any" one of.
+PermissionSpec = str | Sequence[str]
+MatchMode = Literal["all", "any"]
+
 __all__ = [
     "make_permission_guard",
     "make_role_level_guard",
     "require_auth",
 ]
+
+
+def _normalize_perms(spec: PermissionSpec) -> tuple[str, ...]:
+    # str is itself a Sequence[str] — guard against iterating it into characters.
+    return (spec,) if isinstance(spec, str) else tuple(spec)
+
+
+def _perm_error(perms: tuple[str, ...], match: MatchMode) -> str:
+    if len(perms) == 1:
+        return f"Permission '{perms[0]}' required."
+    joiner = " or " if match == "any" else " and "
+    return f"Permission required: {joiner.join(perms)}."
 
 
 def _extract_bearer(request: Request) -> str | None:
@@ -61,21 +78,25 @@ async def require_auth(request: Request) -> Any:
 
 
 def make_permission_guard(user_model: type) -> Callable[..., Any]:
-    """Return an async ``require_permission(request, perm)`` guard.
+    """Return an async ``require_permission(request, perm, *, match="all")`` guard.
 
     ``user_model`` is the application's ORM User class (with arvel_permission
-    traits). The guard loads the user with roles and permissions and checks
-    ``has_permission_to(perm)``::
+    traits). ``perm`` is one permission or several; ``match`` picks "all" or
+    "any" when several are given::
 
         require_permission = make_permission_guard(User)
 
-        # In a controller:
         await require_permission(request, "products.create")
+        await require_permission(request, ["products.view", "categories.view"])
+        await require_permission(request, ["a", "b"], match="any")
 
-    Raises :class:`AuthorizationException` if the permission is not held.
+    Raises :class:`AuthorizationException` if the requirement is not met.
     """
 
-    async def require_permission(request: Request, perm: str) -> Any:
+    async def require_permission(
+        request: Request, perm: PermissionSpec, *, match: MatchMode = "all"
+    ) -> Any:
+        perms = _normalize_perms(perm)
         user = await require_auth(request)
         # me() already loads the configured user model; only reload when the auth
         # service is wired with a different model than this guard captured.
@@ -83,30 +104,36 @@ def make_permission_guard(user_model: type) -> Callable[..., Any]:
             model: Any = user_model
             user = await model.where(model.id == user.id).first()
             if user is None:
-                raise AuthorizationException(f"Permission '{perm}' required.")
-        if not await user.has_permission_to(perm):
-            raise AuthorizationException(f"Permission '{perm}' required.")
+                raise AuthorizationException(_perm_error(perms, match))
+        granted = (
+            await user.has_any_permission(*perms)
+            if match == "any"
+            else await user.has_all_permissions(*perms)
+        )
+        if not granted:
+            raise AuthorizationException(_perm_error(perms, match))
         return user
 
     return require_permission
 
 
 def make_role_level_guard(user_model: type) -> Callable[..., Any]:
-    """Return an async ``require_role_level(request, perm, minimum)`` guard.
+    """Return an async ``require_role_level(request, perm, minimum, *, match="all")`` guard.
 
     Builds on top of ``make_permission_guard``::
 
         require_role_level = make_role_level_guard(User)
 
-        # In a controller:
         await require_role_level(request, "admin.access", minimum=2)
 
     Raises :class:`AuthorizationException` if the level requirement is not met.
     """
     _require_permission = make_permission_guard(user_model)
 
-    async def require_role_level(request: Request, perm: str, minimum: int) -> Any:
-        user = await _require_permission(request, perm)
+    async def require_role_level(
+        request: Request, perm: PermissionSpec, minimum: int, *, match: MatchMode = "all"
+    ) -> Any:
+        user = await _require_permission(request, perm, match=match)
         if not await user.has_level(minimum):
             raise AuthorizationException(f"Role level {minimum} required.")
         return user

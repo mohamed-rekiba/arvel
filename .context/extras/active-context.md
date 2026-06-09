@@ -854,6 +854,14 @@ Two questions answered:
   instead of the raw filter. Unit 380 pass; storefront + cart/checkout feature
   suites 35 pass.
 
+- **iter 60 — guard list/any-all (done):** `make_permission_guard` /
+  `make_role_level_guard` now accept `str | Sequence[str]` with
+  `match="all"|"any"`, delegating to the trait's `has_any_permission` /
+  `has_all_permissions`. Collapsed the translations endpoint's two sequential
+  `require_permission` calls into one list check. Framework guard tests +4
+  (20 pass), mypy clean; kit unit 380 pass; rbac translations feature test
+  still 403 for category-only role. (Answers reviewer Q2.)
+
 ## Blockers
 
 None. All quality gates green.
