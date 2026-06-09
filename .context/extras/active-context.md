@@ -541,6 +541,18 @@ ids) and raise `NotFoundException`. Users already 404'd correctly (outrank guard
 loads the target first) — no change. New tests: delete unknown product → 404,
 malformed product id → 404, unknown category → 404. Backend ruff clean.
 
+## Iteration 35 — Distinguish "unavailable" from "out of stock" at checkout (backend)
+
+MED: checkout raised `InsufficientStockError` whenever a cart line's product
+wasn't a visible catalog row — so unpublished/removed items reported "Insufficient
+stock," which is wrong and confusing. Added `ProductUnavailableError`; the catalog
+and locked-product lookups now raise it on `None` (gone from catalog / row
+missing) and reserve `InsufficientStockError` for genuine low stock. The checkout
+controller maps the new error to a 409 "A product in your cart is no longer
+available." New test `test_checkout_fails_when_product_unpublished` unpublishes a
+carted product and asserts the unavailable message; the existing out-of-stock
+test still 409s. Backend ruff clean.
+
 ## Blockers
 
 None. All quality gates green.

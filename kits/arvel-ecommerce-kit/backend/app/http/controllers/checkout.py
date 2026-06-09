@@ -5,7 +5,11 @@ from __future__ import annotations
 from app.http.controllers._deps import orders, require_auth
 from app.http.controllers._responses import OrderWrapperOut
 from app.http.controllers._schemas import CheckoutPayload
-from app.services.order_service import EmptyCartError, InsufficientStockError
+from app.services.order_service import (
+    EmptyCartError,
+    InsufficientStockError,
+    ProductUnavailableError,
+)
 from arvel.http import Request
 from arvel.http.controller import Controller
 from arvel.http.exceptions import ConflictException, ValidationException
@@ -21,6 +25,11 @@ class CheckoutController(Controller):
             )
         except EmptyCartError as exc:
             raise ValidationException("Cart is empty.") from exc
+        except ProductUnavailableError as exc:
+            raise ConflictException(
+                "A product in your cart is no longer available.",
+                details=[{"field": "product_id", "issue": exc.product_id}],
+            ) from exc
         except InsufficientStockError as exc:
             raise ConflictException(
                 "Insufficient stock.",
