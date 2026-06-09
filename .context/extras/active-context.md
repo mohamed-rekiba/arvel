@@ -730,8 +730,15 @@ typecheck/lint/vitest(18)/build green.
   `test_create_product_rejects_malformed_category_id`,
   `test_update_product_rejects_unknown_vendor`.
 
+## Iteration 51 — Translations endpoint needs both view grants (security)
+
+- MED: `/api/admin/translations` returns product *and* category fields but was
+  gated only on `categories.view`, leaking product translations to a
+  category-only role. Now requires `products.view` AND `categories.view`.
+- Test: `test_translations_requires_both_product_and_category_view` grants a
+  customer only `categories.view` and asserts 403.
+
 ### Fresh review backlog (iteration-45 review) — remaining
-- MED: admin translations endpoint gated only on `categories.view`.
 - MED: ghost cart lines (unpublished product) → broken links, blocked quantity updates.
 - MED (tracked): scheduled catalog refresh skipped under Redis lock → stale storefront (needs retry/queue).
 

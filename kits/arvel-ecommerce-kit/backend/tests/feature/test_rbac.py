@@ -266,6 +266,29 @@ async def test_super_admin_can_grant_direct_permission(client: Any, super_admin_
     assert "orders.view" in direct_perms
 
 
+@pytest.mark.asyncio
+async def test_translations_requires_both_product_and_category_view(
+    client: Any, super_admin_token: str, customer_token: str
+) -> None:
+    """Translations expose product + category fields, so categories.view alone isn't enough."""
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+    users = await client.get("/api/admin/users", headers=sa)
+    customer = next(u for u in users.json()["data"] if u["email"] == "customer@example.com")
+
+    # Grant only categories.view — deliberately not products.view.
+    grant = await client.post(
+        f"/api/admin/users/{customer['id']}/permissions",
+        headers=sa,
+        json={"permission": "categories.view"},
+    )
+    assert grant.status_code == 200
+
+    resp = await client.get(
+        "/api/admin/translations", headers={"Authorization": f"Bearer {customer_token}"}
+    )
+    assert resp.status_code == 403, "categories.view alone must not expose product translations"
+
+
 # ─── helpers ────────────────────────────────────────────────────────────────────
 
 
