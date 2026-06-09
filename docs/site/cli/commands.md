@@ -77,8 +77,8 @@ Every `make:*` command takes a class `name` and supports `--force` to overwrite.
 
 | Command | Generates | Extra options |
 |---|---|---|
-| `make:controller` | HTTP controller | `--resource`, `--api` (with `--resource`), `--model` (with `--resource`) |
-| `make:model` | ORM model | `--view`, `--materialized-view` |
+| `make:controller` | HTTP controller | `--resource`, `--api` (needs `--resource`), `--model`, `--model-name`, `--observer`, `--policy`, `--requests` |
+| `make:model` | ORM model | `--view`, `--materialized-view`; companions: `--migration`/`-m`, `--factory`/`-f`, `--seed`/`-s`, `--controller`/`-c` (`--resource`, `--api`), `--requests`, `--policy`/`-p`, `--observer`/`-o`, `--json-resource`/`-R`, `--test`, `--all`/`-a` |
 | `make:migration` | Migration file | `--view`, `--materialized-view`, `--extension` |
 | `make:request` | Typed `FormRequest` | — |
 | `make:resource` | `JsonResource` transformer | — |

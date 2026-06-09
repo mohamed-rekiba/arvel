@@ -27,11 +27,12 @@ Every route handler is a plain `async def`. Add more with `@Route.get`, `@Route.
 ## Creating a Model & Migration
 
 ```bash
-arvel make:model Item
-arvel make:migration create_items_table
+arvel make:model Item --migration
 ```
 
-`make:model` writes `app/models/item.py`. Edit it to declare columns with the schema helpers:
+`--migration` (or `-m`) generates two files: the model at `app/models/item.py` and a timestamped migration at `database/migrations/<timestamp>_create_items_table.py`. (`make:model` accepts other companions too — `--factory`, `--controller`, `--all`, and more.)
+
+Edit the model to declare its columns with the schema helpers:
 
 ```python
 from decimal import Decimal
@@ -50,8 +51,21 @@ class Item(Model, Timestamps):
 
 Each helper (`id_`, `string`, `decimal`, `boolean`) maps a typed attribute to a database column. `Timestamps` adds `created_at` / `updated_at`. See [Models & CRUD](../orm/models.md).
 
-> [!NOTE]
-> `make:migration` writes a file under `database/migrations/`. Open it and fill in the table's columns (see [Migrations](../orm/migrations.md)) before running it. The model and the migration are separate steps — there is no `make:model --migration` flag.
+The generated migration starts with just an `id` and `timestamps()`. Add the remaining columns so the table matches the model:
+
+```python
+async def up(schema: Schema) -> None:
+    def _table(t: Blueprint) -> None:
+        t.id()
+        t.string("name", length=255)
+        t.decimal("price", precision=10, scale=2)
+        t.boolean("is_active").server_default("true")
+        t.timestamps()
+
+    schema.create(__tablename__, _table)
+```
+
+See [Migrations](../orm/migrations.md) for the full column DSL.
 
 <a name="running-the-migration"></a>
 ## Running the Migration

@@ -27,6 +27,7 @@ my-app/
 │   ├── app.py                # app name, env, debug, url, timezone, locale
 │   ├── database.py
 │   ├── logging.py
+│   ├── observability.py      # OpenTelemetry / tracing config
 │   └── view.py
 ├── database/
 │   ├── factories/            # model factories

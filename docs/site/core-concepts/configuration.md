@@ -185,7 +185,7 @@ stripe_key = Config.of(BillingConfig).stripe_key
 <a name="environments"></a>
 ## Environments
 
-The current environment is exposed as `config("app.env")` and `app.environment()`. The framework keys a few safeguards off it: the database seeder and the destructive migration commands (`migrate:fresh`, `migrate:refresh`) refuse to run in production, and `key:rotate` is blocked in production without `--force`.
+The current environment is exposed as `config("app.env")` and `app.environment()`. The framework keys a few safeguards off it: the database seeder and the destructive migration commands (`migrate:fresh`, `migrate:refresh`) refuse to run in production. (`key:rotate` carries the same production guard, but the command itself is still a stub — see [Encryption](../features/encryption.md#generating-and-rotating-keys).)
 
 > [!NOTE]
 > `APP_DEBUG` is present in the skeleton's `config/app.py` for parity, but it does not currently change the framework's error verbosity — unhandled errors never leak stack traces, in any environment. Control runtime detail through logging configuration (`LOG_LEVEL`, observability). See [Logging](../features/logging.md).

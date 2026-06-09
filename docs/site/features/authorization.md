@@ -41,7 +41,7 @@ from arvel.providers import ServiceProvider
 
 
 class AuthorizationServiceProvider(ServiceProvider):
-    def boot(self) -> None:
+    async def boot(self) -> None:
         gate = self.container.make(Gate)
         gate.define("edit-post", lambda user, post: user.id == post["owner_id"])
 ```
