@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.11.0...arvel-ecommerce-kit-v1.11.1) (2026-06-09)
+
+
+### Bug Fixes
+
+* **tests:** simplify assertion for category slug in JSONB mapping test ([6a8d148](https://github.com/mohamed-rekiba/arvel/commit/6a8d148f1706cd0263e78f25344e8535ed0867be))
+
 ## [1.11.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.10.0...arvel-ecommerce-kit-v1.11.0) (2026-06-09)
 
 
