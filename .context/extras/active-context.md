@@ -640,9 +640,20 @@ Two hardening fixes:
   Test `test_upload_rejects_oversized_image`.
 Backend ruff clean; targeted tests green.
 
+## Iteration 43 — Manual catalog refresh uses unconditional helper (backend)
+
+- MED: `ProductService.refresh_catalog` (admin "Refresh catalog" action) now
+  calls `refresh_products_catalog_now()` instead of the lock-guarded
+  `refresh_products_catalog()`. The locked variant returns `-1` when another
+  process holds the Redis lock — a nonsensical `product_count: -1` for an admin
+  who explicitly asked to refresh. The unconditional helper always runs;
+  Postgres serializes concurrent `REFRESH ... CONCURRENTLY` on the same view.
+  Updated source-assertion test `test_manual_refresh_uses_unconditional_helper`.
+  The scheduler and write observers keep the lock-guarded variant (skipping a
+  redundant refresh there is fine — the next tick catches up).
+
 ### Fresh review backlog (iteration-39 pass) — remaining
-- MED: materialized catalog refresh skipped under Redis lock → stale storefront (harder; needs retry/queue).
-- MED: manual "Refresh catalog" can report product_count: -1.
+- MED: materialized catalog refresh skipped under Redis lock → stale storefront for the *scheduled* path (harder; needs retry/queue).
 - MED: /products "Filter" box only filters loaded page, not catalog (UX).
 - LOW: cart store error strings hardcoded English, bypass i18n.
 

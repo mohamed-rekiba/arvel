@@ -41,10 +41,12 @@ def test_seed_bootstrap_uses_unconditional_refresh_helper() -> None:
     assert "ProductCatalog.refresh_view" not in src
 
 
-def test_product_service_uses_shared_refresh_helper() -> None:
+def test_manual_refresh_uses_unconditional_helper() -> None:
+    # The admin "Refresh catalog" action must actually refresh and report a real
+    # count — never the lock-skip -1 sentinel — so it uses the unconditional helper.
     src = _src(PRODUCT_SERVICE_FILE)
-    assert "from app.support.products_catalog import refresh_products_catalog" in src
-    assert "await refresh_products_catalog()" in src
+    assert "from app.support.products_catalog import refresh_products_catalog_now" in src
+    assert "await refresh_products_catalog_now()" in src
 
 
 def test_scheduler_provider_is_registered() -> None:

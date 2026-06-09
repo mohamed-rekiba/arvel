@@ -20,7 +20,7 @@ from arvel.logging.facade import Log
 from app.models.product import Product
 from app.models.product_catalog import ProductCatalog
 from app.support.labels import label
-from app.support.products_catalog import refresh_products_catalog
+from app.support.products_catalog import refresh_products_catalog_now
 
 # A product counts as "new" for this long after it's created.
 _NEW_WINDOW = timedelta(days=30)
@@ -198,8 +198,14 @@ class ProductService:
     # ─── admin catalog refresh ────────────────────────────────────────────────
 
     async def refresh_catalog(self) -> dict[str, Any]:
-        """Manually refresh products_catalog and return the indexed count."""
-        count = await refresh_products_catalog()
+        """Manually refresh products_catalog and return the indexed count.
+
+        Uses the unconditional helper, not the lock-guarded one: an admin who
+        clicks "Refresh" expects an actual refresh and a real count, never the
+        ``-1`` skip sentinel. Postgres serializes any concurrent CONCURRENTLY
+        refresh on the same view, so there's no thundering-herd risk.
+        """
+        count = await refresh_products_catalog_now()
         return {
             "refreshed_at": datetime.now(UTC).isoformat(),
             "product_count": int(count),
