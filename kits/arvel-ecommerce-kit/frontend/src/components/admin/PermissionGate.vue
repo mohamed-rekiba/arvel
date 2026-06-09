@@ -4,6 +4,9 @@ import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   permission?: string | string[]
+  // Minimum role level required on top of the permission — for level-restricted
+  // actions like force-delete (needs 100) that a plain permission can't express.
+  minLevel?: number
 }>()
 
 const auth = useAuthStore()
@@ -15,6 +18,7 @@ function hasPermission(perm: string): boolean {
 }
 
 const allowed = computed(() => {
+  if (props.minLevel !== undefined && !auth.hasLevel(props.minLevel)) return false
   if (!props.permission) return true
   if (Array.isArray(props.permission)) {
     return props.permission.some((p) => hasPermission(p))

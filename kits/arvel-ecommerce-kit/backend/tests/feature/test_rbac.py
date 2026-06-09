@@ -97,6 +97,23 @@ async def test_unauthenticated_request_to_admin_returns_401(client: Any) -> None
 
 
 @pytest.mark.asyncio
+async def test_me_exposes_role_level(
+    client: Any, super_admin_token: str, catalog_token: str
+) -> None:
+    """/me reports the caller's highest role level so the UI can gate level-restricted actions."""
+    sa = await client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {super_admin_token}"}
+    )
+    assert sa.status_code == 200
+    assert sa.json()["role_level"] == 100
+
+    catalog = await client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {catalog_token}"}
+    )
+    assert catalog.json()["role_level"] < 100
+
+
+@pytest.mark.asyncio
 async def test_customer_cannot_access_admin_products(client: Any, customer_token: str) -> None:
     """customer role has no products.view permission → 403."""
     response = await client.get(

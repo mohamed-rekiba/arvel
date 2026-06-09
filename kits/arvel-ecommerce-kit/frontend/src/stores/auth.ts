@@ -38,6 +38,12 @@ export const useAuthStore = defineStore('auth', () => {
     return permissions.value.has(permission)
   }
 
+  const roleLevel = computed(() => user.value?.role_level ?? 0)
+
+  function hasLevel(min: number): boolean {
+    return roleLevel.value >= min
+  }
+
   function persistUser(next: MeOut | null): void {
     user.value = next
     if (next) {
@@ -118,6 +124,8 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     hasAdminAccess,
     hasPermission,
+    roleLevel,
+    hasLevel,
     login,
     register,
     hydrate,
