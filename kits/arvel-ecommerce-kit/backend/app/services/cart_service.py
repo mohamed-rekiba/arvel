@@ -103,6 +103,9 @@ class CartService:
         if int(product.stock_qty) < quantity:
             raise ValidationException("Insufficient stock for cart item.")
         item.quantity = quantity
+        # Re-snapshot like add_item: any quantity change re-prices the whole line
+        # to today's price, so a PATCH can't lock in a stale snapshot for checkout.
+        item.unit_price_snapshot = Decimal(str(product.price or 0))
         await item.save()
         Log.debug("cart.item.updated", item_id=item_id, quantity=quantity)
         return await self.get_cart(user_id, locale=locale)

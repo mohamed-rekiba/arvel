@@ -696,8 +696,14 @@ Backend ruff clean; targeted tests green.
   gated on `MIN_QUERY_LENGTH = 2`, and the prompt/count states track it.
 typecheck/lint/vitest(18)/build green.
 
+## Iteration 48 — Cart PATCH re-snapshots price like add (backend)
+
+- MED: `update_item` now re-snapshots `unit_price_snapshot` to the current
+  catalog price, matching `add_item`. Before, a PATCH-based quantity change kept
+  the stale first-add price, so checkout could charge an outdated amount after an
+  admin price change. Test `test_update_quantity_resnapshots_to_current_price`.
+
 ### Fresh review backlog (iteration-45 review) — remaining
-- MED: cart PATCH (`update_item`) keeps stale price snapshot — inconsistent with `add_item` re-snapshot; checkout can charge old price.
 - MED: force_delete on product/user with dependent orders hits FK RESTRICT → 500 instead of 409.
 - MED: product create/update doesn't validate category/vendor FK existence → opaque 500.
 - MED: admin translations endpoint gated only on `categories.view`.

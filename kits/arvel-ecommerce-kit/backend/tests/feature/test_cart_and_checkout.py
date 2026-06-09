@@ -423,6 +423,38 @@ async def test_duplicate_add_resnapshots_to_current_price(
 
 
 @pytest.mark.asyncio
+async def test_update_quantity_resnapshots_to_current_price(
+    client: Any, customer_token: str, super_admin_token: str, headphones_id: str
+) -> None:
+    """PATCH quantity re-prices the line to today's price, like add does — no stale snapshot."""
+    cust = {"Authorization": f"Bearer {customer_token}"}
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+
+    add = await client.post(
+        "/api/cart/items", headers=cust, json={"product_id": headphones_id, "quantity": 1}
+    )
+    item_id = next(
+        i["id"] for i in add.json()["data"]["items"] if i["product_id"] == headphones_id
+    )
+
+    bumped = await client.patch(
+        f"/api/admin/products/{headphones_id}", headers=sa, json={"price": 999.0}
+    )
+    assert bumped.status_code == 200
+
+    updated = await client.patch(
+        f"/api/cart/items/{item_id}", headers=cust, json={"quantity": 3}
+    )
+    assert updated.status_code == 200
+    line = next(
+        i for i in updated.json()["data"]["items"] if i["product_id"] == headphones_id
+    )
+    assert line["quantity"] == 3
+    assert line["unit_price"] == 999.0
+    assert line["subtotal"] == 2997.0
+
+
+@pytest.mark.asyncio
 async def test_concurrent_cancel_restores_stock_once(
     client: Any, customer_token: str, super_admin_token: str, headphones_id: str
 ) -> None:
