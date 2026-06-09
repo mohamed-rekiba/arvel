@@ -33,6 +33,18 @@ dev = [
     "testcontainers>=4.14.2",
 ]
 
+[tool.pytest.ini_options]
+# Self-contained config so a scaffolded kit (arvel new --kit ecommerce) runs the
+# same way standalone as it does inside the monorepo. Without asyncio_mode the
+# async security tests (escalation guards) silently don't run.
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "unit: pure-unit tests with no external dependencies",
+    "integration: integration tests (require Docker)",
+    "security: security-focused tests",
+]
+
 [tool.uv]
 # Not a package. The kit ships as a GitHub Release tarball and is scaffolded
 # verbatim by `arvel new --kit ecommerce` — never built, never published. It
