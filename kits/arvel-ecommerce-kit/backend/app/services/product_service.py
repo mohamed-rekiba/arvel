@@ -17,6 +17,7 @@ from arvel.database.exceptions import InvalidCursorError
 from arvel.http.exceptions import ValidationException
 from arvel.logging.facade import Log
 
+from app.http.resources.product_resource import ProductResource
 from app.models.product import Product
 from app.models.product_catalog import ProductCatalog
 from app.support.labels import label
@@ -151,7 +152,10 @@ class ProductService:
             catalog_items: list[ProductCatalog] = (
                 await qb.order_by("-created_at").limit(limit).offset(offset).all()
             )
-            return {"data": [self._product_to_admin(p) for p in catalog_items], "total": total}
+            return {
+                "data": [ProductResource(p).to_dict(None) for p in catalog_items],
+                "total": total,
+            }
 
         if trashed == "only":
             qb_t = (
@@ -175,7 +179,10 @@ class ProductService:
         trashed_items: list[Product] = (
             await qb_t.order_by("-created_at").limit(limit).offset(offset).all()
         )
-        return {"data": [self._product_to_admin(p) for p in trashed_items], "total": total_t}
+        return {
+            "data": [ProductResource(p).to_dict(None) for p in trashed_items],
+            "total": total_t,
+        }
 
     async def admin_get(
         self, product_id: str, *, include_trashed: bool = False
@@ -190,7 +197,7 @@ class ProductService:
             product = await Product.where(Product.id == pid).first()
         if product is None:
             return None
-        return self._product_to_admin(product)
+        return ProductResource(product).to_dict(None)
 
     # ─── admin catalog refresh ────────────────────────────────────────────────
 
@@ -226,7 +233,7 @@ class ProductService:
             vendor_id=data.get("vendor_id"),
         )
         Log.debug("product.created", product_id=str(product.id))
-        return self._product_to_admin(product)
+        return ProductResource(product).to_dict(None)
 
     async def update(self, product_id: str, changes: dict[str, Any]) -> dict[str, Any]:
         Log.debug("product.updating", product_id=product_id, fields=sorted(changes))
@@ -249,7 +256,7 @@ class ProductService:
                 setattr(product, key, val)
         await product.save()
         Log.debug("product.updated", product_id=product_id)
-        return self._product_to_admin(product)
+        return ProductResource(product).to_dict(None)
 
     # ─── admin lifecycle ──────────────────────────────────────────────────────
 
@@ -277,7 +284,7 @@ class ProductService:
             return None
         await product.restore()
         Log.debug("product.restored", product_id=product_id)
-        return self._product_to_admin(product)
+        return ProductResource(product).to_dict(None)
 
     async def publish(self, product_id: str) -> dict[str, Any] | None:
         Log.debug("product.publishing", product_id=product_id)
@@ -289,7 +296,7 @@ class ProductService:
         product.published_at = datetime.now(UTC)
         await product.save()
         Log.debug("product.published", product_id=product_id)
-        return self._product_to_admin(product)
+        return ProductResource(product).to_dict(None)
 
     async def unpublish(self, product_id: str) -> dict[str, Any] | None:
         Log.debug("product.unpublishing", product_id=product_id)
@@ -300,7 +307,7 @@ class ProductService:
         product.status = "draft"
         await product.save()
         Log.debug("product.unpublished", product_id=product_id)
-        return self._product_to_admin(product)
+        return ProductResource(product).to_dict(None)
 
     # ─── stock ────────────────────────────────────────────────────────────────
 
@@ -369,27 +376,6 @@ class ProductService:
             "vendor_id": str(product.vendor_id or ""),
             "vendor_name": product.vendor_name or "",
             "vendor_slug": product.vendor_slug or "",
-        }
-
-    @staticmethod
-    def _product_to_admin(product: Product | ProductCatalog) -> dict[str, Any]:
-        deleted_at = getattr(product, "deleted_at", None)
-        real_status: str | None = getattr(product, "real_status", None)
-        return {
-            "id": str(product.id),
-            "name": product.name or {},
-            "slug": product.slug or {},
-            "description": product.description or {},
-            "price": float(product.price or 0),
-            "stock_qty": int(product.stock_qty or 0),
-            "status": product.status or "draft",
-            "real_status": real_status,
-            "published_at": product.published_at.isoformat() if product.published_at else None,
-            "category_id": str(product.category_id or ""),
-            "vendor_id": str(product.vendor_id or ""),
-            "created_at": product.created_at.isoformat() if product.created_at else None,
-            "updated_at": product.updated_at.isoformat() if product.updated_at else None,
-            "deleted_at": deleted_at.isoformat() if deleted_at else None,
         }
 
 

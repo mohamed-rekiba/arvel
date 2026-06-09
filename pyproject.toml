@@ -167,6 +167,9 @@ ignore = [
     "RUF001", # intentional Turkish locale strings — dotless-i is correct spelling
     "E501",   # long seeder data lines are intentional (readability beats wrapping)
 ]
+"kits/arvel-ecommerce-kit/backend/app/http/resources/**" = [
+    "ARG002", # JsonResource.to_dict keeps the base's fixed (request) name — pyright requires it
+]
 "packages/arvel/src/arvel/http/**" = [
     "PLC0415", # lazy imports avoid heavy FastAPI/jwt at module load
     "PLR0913", # CORS / Throttle constructors have many tunables

@@ -263,6 +263,30 @@ def test_json_resource_used_in_kit() -> None:
     )
 
 
+def test_product_resource_is_actually_used_not_orphaned() -> None:
+    """ProductResource must drive product serialization, not sit unused.
+
+    A defined-but-never-called resource games this gate. ProductService is the
+    canonical call site for the admin product transform.
+    """
+    src = _src(SERVICES_DIR / "product_service.py")
+    assert "from app.http.resources.product_resource import ProductResource" in src, (
+        "product_service.py must import ProductResource"
+    )
+    assert "ProductResource(" in src, "ProductService must serialize through ProductResource"
+
+
+def test_category_resource_is_actually_used_not_orphaned() -> None:
+    """CategoryResource must drive category serialization via CategoryService.to_dict."""
+    src = _src(SERVICES_DIR / "category_service.py")
+    assert "from app.http.resources.category_resource import CategoryResource" in src, (
+        "category_service.py must import CategoryResource"
+    )
+    assert "CategoryResource(" in src, (
+        "CategoryService.to_dict must serialize through CategoryResource"
+    )
+
+
 def test_category_controller_uses_category_service() -> None:
     """CategoryService is wired through _deps.py and used by the controller."""
     # Services are instantiated in _deps.py and injected into controllers via DI.

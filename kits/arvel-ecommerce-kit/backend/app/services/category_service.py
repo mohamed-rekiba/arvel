@@ -11,6 +11,7 @@ from arvel.http.exceptions import ConflictException, ValidationException
 from arvel.logging.facade import Log
 
 from app.http.controllers._schemas import CreateCategoryPayload, UpdateCategoryPayload
+from app.http.resources.category_resource import CategoryResource
 from app.models.category import Category
 from app.models.product import Product
 from app.support.labels import label
@@ -171,12 +172,5 @@ class CategoryService:
         return category
 
     def to_dict(self, category: Category) -> dict[str, Any]:
-        return {
-            "id": str(category.id),
-            "name": category.name,
-            "slug": category.slug or {},
-            "status": category.status,
-            "published_at": category.published_at.isoformat() if category.published_at else None,
-            "parent_id": str(category.parent_id) if category.parent_id else None,
-            "deleted_at": category.deleted_at.isoformat() if category.deleted_at else None,
-        }
+        # Transformation lives in the JsonResource; the service is the call site.
+        return CategoryResource(category).to_dict(None)
