@@ -152,28 +152,24 @@ const formattedDate = computed(() =>
         <StatCard
           :label="t('admin.stat.revenue')"
           :value="formatCurrency(totalRevenue, currentLocale)"
-          :trend="12"
           icon="payments"
           tone="amber"
         />
         <StatCard
           :label="t('admin.stat.orders')"
           :value="String(totalOrders)"
-          :trend="8"
           icon="shopping_bag"
           tone="indigo"
         />
         <StatCard
           :label="t('admin.stat.customers')"
           :value="String(uniqueCustomers)"
-          :trend="5"
           icon="group"
           tone="emerald"
         />
         <StatCard
           :label="t('admin.stat.avg_order')"
           :value="formatCurrency(avgOrderValue, currentLocale)"
-          :trend="3"
           icon="analytics"
           tone="violet"
         />

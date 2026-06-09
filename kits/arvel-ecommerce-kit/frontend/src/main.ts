@@ -74,7 +74,6 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'home.big_sale_title': 'Get Up To',
     'home.big_sale_highlight': '85% OFF',
     'home.big_sale_suffix': 'on Big Billion Day',
-    'flash.title': 'Deal of the Day',
     // promo banners
     'promo.shop_now': 'Shop Now',
     'promo.mobiles.eyebrow': 'Flat 15% OFF',
@@ -384,11 +383,6 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'footer.search': 'Search',
     'footer.account': 'Account',
     'footer.copyright': 'Arvel. All rights reserved.',
-    // flash sale
-    'flash.limited_time': 'Limited Time',
-    'flash.hrs': 'Hrs',
-    'flash.min': 'Min',
-    'flash.sec': 'Sec',
     // product card
     'product.out_of_stock': 'Out of Stock',
     // feature badges
@@ -444,7 +438,6 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'home.big_sale_title': 'احصل على',
     'home.big_sale_highlight': 'خصم 85%',
     'home.big_sale_suffix': 'في يوم التسوق الكبير',
-    'flash.title': 'عرض اليوم',
     // promo banners
     'promo.shop_now': 'تسوق الآن',
     'promo.mobiles.eyebrow': 'خصم 15% على الكل',
@@ -754,11 +747,6 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'footer.search': 'بحث',
     'footer.account': 'الحساب',
     'footer.copyright': 'أرفيل. جميع الحقوق محفوظة.',
-    // flash sale
-    'flash.limited_time': 'وقت محدود',
-    'flash.hrs': 'ساعة',
-    'flash.min': 'دقيقة',
-    'flash.sec': 'ثانية',
     // product card
     'product.out_of_stock': 'نفد من المخزون',
     // feature badges
@@ -814,7 +802,6 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'home.big_sale_title': 'Büyük Alışveriş Gününde',
     'home.big_sale_highlight': '%85 İNDİRİM',
     'home.big_sale_suffix': 'Kazan',
-    'flash.title': 'Günün Fırsatı',
     // promo banners
     'promo.shop_now': 'Şimdi Al',
     'promo.mobiles.eyebrow': 'Düz %15 İndirim',
@@ -1125,11 +1112,6 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'footer.search': 'Ara',
     'footer.account': 'Hesap',
     'footer.copyright': 'Arvel. Tüm hakları saklıdır.',
-    // flash sale
-    'flash.limited_time': 'Sınırlı Süre',
-    'flash.hrs': 'Saat',
-    'flash.min': 'Dak',
-    'flash.sec': 'Sn',
     // product card
     'product.out_of_stock': 'Stokta Yok',
     // feature badges

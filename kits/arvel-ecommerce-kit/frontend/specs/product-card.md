@@ -12,11 +12,13 @@ overlays (discount badge, wishlist button) and a hover-revealed "Add to Cart" CT
 
 ## Props
 
-| Prop            | Type      | Required | Description                                 |
-| --------------- | --------- | -------- | ------------------------------------------- |
-| `product`       | `Product` | yes      | Full storefront product object              |
-| `salePrice`     | `number`  | no       | Override sale price (used by FlashSale)     |
-| `originalPrice` | `number`  | no       | Override original price (used by FlashSale) |
+| Prop      | Type      | Required | Description                    |
+| --------- | --------- | -------- | ------------------------------ |
+| `product` | `Product` | yes      | Full storefront product object |
+
+The discount badge and struck-through price render only when the product's
+`original_price` is set and greater than `price` — there is no client-side
+sale override.
 
 ## Tokens
 
