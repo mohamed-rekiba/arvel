@@ -259,4 +259,4 @@ The README is explicit: "Make sure the index exists on the server first."
 - ADR-013 (Queue subsystem): § 4 dispatches `SearchIndexJob` / `SearchRemoveJob` through the same `Bus` facade.
 - ADR-017 (Console / CLI): `Search.fake()` integrates with `RefreshDatabase` cleanup.
 - ADR-023 (`arvel-audit`) § 2: `Auditable` uses the same lifecycle-event pattern; this package was modelled after that one.
-- User-facing docs: `docs/site/docs/packages/search.md`.
+- User-facing docs: `docs/site/packages/search.md`.

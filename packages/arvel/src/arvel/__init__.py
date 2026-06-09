@@ -1,7 +1,7 @@
 """Arvel — the Laravel of Python.
 
 Public API surface for foundations and the HTTP layer. The full reference lives
-at ``docs/site/docs/reference/api.md`` (published at ``/reference/api/``).
+at ``docs/site/reference/api.md`` (published at ``/reference/api/``).
 Symbols not in ``__all__`` are internal and may change without notice.
 
 Re-exports are resolved lazily (PEP 562). Importing ``arvel`` no longer drags in

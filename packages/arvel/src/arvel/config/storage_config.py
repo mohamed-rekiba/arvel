@@ -25,7 +25,7 @@ class S3Config(ArvelSettings):
     """AWS S3 or any S3-compatible provider (MinIO, R2, Hetzner, B2, …).
 
     Point ``endpoint`` at a non-AWS S3 endpoint to use a compatible provider.
-    See ``docs/site/docs/filesystem.md`` for per-provider worked examples.
+    See ``docs/site/filesystem.md`` for per-provider worked examples.
     """
 
     model_config = SettingsConfigDict(env_prefix="STORAGE_S3_", extra="ignore")

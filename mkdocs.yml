@@ -18,18 +18,18 @@ site_description: >-
 # Repository
 repo_name: mohamed-rekiba/arvel
 repo_url: https://github.com/mohamed-rekiba/arvel
-edit_uri: edit/main/docs/site/docs/
+edit_uri: edit/main/docs/site/
 
 # Copyright
 copyright: Copyright &copy; 2026 Arvel contributors
 
 # Where the docs live
-docs_dir: docs/site/docs
+docs_dir: docs/site
 
 # Configuration
 theme:
   name: material
-  custom_dir: docs/site/docs/overrides
+  custom_dir: docs/site/overrides
   logo: assets/brand/arvel-mark-dark.svg
   favicon: assets/brand/favicon.svg
   features:

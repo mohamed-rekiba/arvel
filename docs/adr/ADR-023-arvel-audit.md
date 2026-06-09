@@ -196,4 +196,4 @@ There's no `Activity.write(...)` shortcut that pulls an implicit session. The tr
 - ADR-007 § 8 (event suppression / quiet persistence): `Auditable` honours the suppression flag automatically.
 - ADR-008 § 4 (morph map): `_identity.morph_type()` consults the same registry.
 - ADR-010 (Auth): the trail's actor is read from `Context.get("user_id")`, populated by `AuthMiddleware`.
-- User-facing docs: `docs/site/docs/packages/audit.md`.
+- User-facing docs: `docs/site/packages/audit.md`.

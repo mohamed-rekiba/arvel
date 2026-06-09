@@ -322,7 +322,7 @@ Migration:
 ✅ Stateless access tokens preserve scaling story.
 
 ⚠️ Refresh requires a DB round-trip. Acceptable: refresh is rare relative to access-token use.
-⚠️ Apps must store the refresh token securely on the client (OS keychain, HttpOnly cookie). Documented in `docs/site/docs/authentication.md`.
+⚠️ Apps must store the refresh token securely on the client (OS keychain, HttpOnly cookie). Documented in `docs/site/authentication.md`.
 
 ### Related
 

@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://arvel.dev"><img src="https://raw.githubusercontent.com/mohamed-rekiba/arvel/main/docs/site/docs/assets/brand/arvel-logo-dark.svg" alt="Arvel" width="180"></a>
+  <a href="https://arvel.dev"><img src="https://raw.githubusercontent.com/mohamed-rekiba/arvel/main/docs/site/assets/brand/arvel-logo-dark.svg" alt="Arvel" width="180"></a>
 </p>
 <p align="center">
     <em>The Laravel of Python — expressive routing, a typed ORM, and first-class async.</em>

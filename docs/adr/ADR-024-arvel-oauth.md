@@ -219,4 +219,4 @@ The provider counts as "configured" once `OIDC_ISSUER_URL` and `OIDC_CLIENT_ID` 
 - ADR-007 § 6 (EncryptedType: AES-GCM) and § 7 (Crypt facade): § 5 above reuses both.
 - ADR-010 (Auth subsystem): § 3 issues sessions through the same `AuthService`; § 4 mounts on top of the same routing primitives.
 - ADR-010 § 5 (email validation at boundary) — provider emails are validated as input, not assumed.
-- User-facing docs: `docs/site/docs/packages/oauth.md`.
+- User-facing docs: `docs/site/packages/oauth.md`.
