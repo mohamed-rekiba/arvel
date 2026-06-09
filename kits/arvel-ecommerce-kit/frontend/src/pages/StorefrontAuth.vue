@@ -27,6 +27,7 @@ const activeTab = ref<'login' | 'register'>(
 const loginForm = ref({ email: '', password: '' })
 const registerForm = ref({ name: '', email: '', password: '' })
 const localError = ref<string | null>(null)
+const notice = ref<string | null>(null)
 
 const redirectPath = computed(() => {
   if (props.adminRedirect) return '/admin/dashboard'
@@ -45,13 +46,19 @@ async function handleLogin(): Promise<void> {
 
 async function handleRegister(): Promise<void> {
   localError.value = null
+  notice.value = null
   try {
     await auth.register(
       registerForm.value.name,
       registerForm.value.email,
       registerForm.value.password,
     )
-    await router.push(redirectPath.value)
+    // Login needs a verified email, so send them to the login tab with a prompt
+    // to verify rather than failing an immediate auto-login.
+    loginForm.value.email = registerForm.value.email
+    registerForm.value = { name: '', email: '', password: '' }
+    activeTab.value = 'login'
+    notice.value = t('auth.verify_sent')
   } catch {
     localError.value = auth.error
   }
@@ -84,6 +91,13 @@ async function handleRegister(): Promise<void> {
     </div>
 
     <form v-if="activeTab === 'login'" class="mt-6 space-y-4" @submit.prevent="handleLogin">
+      <p
+        v-if="notice"
+        class="rounded-lg bg-stock-in/10 px-4 py-3 text-sm text-stock-in"
+        role="status"
+      >
+        {{ notice }}
+      </p>
       <input
         v-model="loginForm.email"
         type="email"
