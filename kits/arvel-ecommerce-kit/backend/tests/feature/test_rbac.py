@@ -101,22 +101,16 @@ async def test_me_exposes_role_level(
     client: Any, super_admin_token: str, catalog_token: str
 ) -> None:
     """/me reports the caller's highest role level so the UI can gate level-restricted actions."""
-    sa = await client.get(
-        "/api/auth/me", headers={"Authorization": f"Bearer {super_admin_token}"}
-    )
+    sa = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {super_admin_token}"})
     assert sa.status_code == 200
     assert sa.json()["role_level"] == 100
 
-    catalog = await client.get(
-        "/api/auth/me", headers={"Authorization": f"Bearer {catalog_token}"}
-    )
+    catalog = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {catalog_token}"})
     assert catalog.json()["role_level"] < 100
 
 
 @pytest.mark.asyncio
-async def test_user_detail_shows_effective_permissions(
-    client: Any, super_admin_token: str
-) -> None:
+async def test_user_detail_shows_effective_permissions(client: Any, super_admin_token: str) -> None:
     """The detail view resolves the effective permission set, not just direct grants."""
     headers = {"Authorization": f"Bearer {super_admin_token}"}
     listing = await client.get("/api/admin/users", headers=headers)

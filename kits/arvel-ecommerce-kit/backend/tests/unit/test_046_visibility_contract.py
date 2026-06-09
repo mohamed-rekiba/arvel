@@ -82,9 +82,13 @@ def test_products_catalog_view_covers_all_non_deleted_products() -> None:
 
 
 def test_storefront_filters_by_real_status_visible() -> None:
-    """Storefront queries must use real_status = 'visible' instead of raw WHERE clauses."""
+    """Storefront queries go through the ProductCatalog.visible() scope, and the
+    scope is the single place that pins real_status == 'visible'."""
     service = _src(PRODUCT_SERVICE)
-    assert 'real_status == "visible"' in service or "real_status = 'visible'" in service
+    model = _src(PRODUCT_CATALOG_MODEL)
+    assert "ProductCatalog.visible(" in service
+    assert "def scope_visible(" in model
+    assert 'real_status == "visible"' in model
 
 
 def test_storefront_serializes_locale_aware_category_fields() -> None:
@@ -101,15 +105,15 @@ def test_storefront_serializes_locale_aware_category_fields() -> None:
 
 
 def test_cart_only_adds_visible_products() -> None:
-    """Adding to cart must reject draft/hidden products via real_status = 'visible'."""
+    """Adding to cart must reject draft/hidden products via the visible() scope."""
     service = _src(CART_SERVICE)
-    assert 'real_status == "visible"' in service or "real_status = 'visible'" in service
+    assert "ProductCatalog.visible(" in service
 
 
 def test_checkout_only_accepts_visible_products() -> None:
-    """Checkout must validate against real_status = 'visible', not raw status."""
+    """Checkout must validate against the visible() scope, not raw status."""
     service = _src(ORDER_SERVICE)
-    assert 'real_status == "visible"' in service or "real_status = 'visible'" in service
+    assert "ProductCatalog.visible(" in service
 
 
 def test_products_gin_indexes_cover_all_translation_columns() -> None:

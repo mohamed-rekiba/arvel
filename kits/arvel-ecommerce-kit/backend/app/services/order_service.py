@@ -75,9 +75,9 @@ class OrderService:
         published_products: dict[uuid.UUID, ProductCatalog] = {}
         for item in items:
             pid = uuid.UUID(item["product_id"])
-            published: ProductCatalog | None = await ProductCatalog.where(
-                ProductCatalog.id == pid, ProductCatalog.real_status == "visible"
-            ).first()
+            published: ProductCatalog | None = (
+                await ProductCatalog.visible().where(ProductCatalog.id == pid).first()
+            )
             # No longer in the visible catalog (unpublished, soft-deleted, vendor
             # hidden) is a different failure than "out of stock" — say so.
             if published is None:

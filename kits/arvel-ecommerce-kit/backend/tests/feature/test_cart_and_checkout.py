@@ -332,9 +332,7 @@ async def test_concurrent_checkout_creates_single_order(
     await client.post(
         "/api/cart/items", headers=headers, json={"product_id": headphones_id, "quantity": 1}
     )
-    body = {
-        "shipping_address": {"name": "Pat", "street": "1 St", "city": "City", "country": "US"}
-    }
+    body = {"shipping_address": {"name": "Pat", "street": "1 St", "city": "City", "country": "US"}}
     first, second = await asyncio.gather(
         client.post("/api/checkout", headers=headers, json=body),
         client.post("/api/checkout", headers=headers, json=body),
@@ -455,22 +453,16 @@ async def test_update_quantity_resnapshots_to_current_price(
     add = await client.post(
         "/api/cart/items", headers=cust, json={"product_id": headphones_id, "quantity": 1}
     )
-    item_id = next(
-        i["id"] for i in add.json()["data"]["items"] if i["product_id"] == headphones_id
-    )
+    item_id = next(i["id"] for i in add.json()["data"]["items"] if i["product_id"] == headphones_id)
 
     bumped = await client.patch(
         f"/api/admin/products/{headphones_id}", headers=sa, json={"price": 999.0}
     )
     assert bumped.status_code == 200
 
-    updated = await client.patch(
-        f"/api/cart/items/{item_id}", headers=cust, json={"quantity": 3}
-    )
+    updated = await client.patch(f"/api/cart/items/{item_id}", headers=cust, json={"quantity": 3})
     assert updated.status_code == 200
-    line = next(
-        i for i in updated.json()["data"]["items"] if i["product_id"] == headphones_id
-    )
+    line = next(i for i in updated.json()["data"]["items"] if i["product_id"] == headphones_id)
     assert line["quantity"] == 3
     assert line["unit_price"] == 999.0
     assert line["subtotal"] == 2997.0

@@ -56,7 +56,7 @@ def test_cart_add_item_never_reads_raw_products_table() -> None:
 
     assert "from app.models.product import Product" not in service
     assert "from app.models.product_catalog import ProductCatalog" in service
-    assert "ProductCatalog.where(" in service
+    assert "ProductCatalog.visible(" in service
 
 
 def test_checkout_validates_catalog_product_before_stock_lock() -> None:
@@ -66,8 +66,8 @@ def test_checkout_validates_catalog_product_before_stock_lock() -> None:
     checkout_source = service[checkout_start:list_orders_start]
 
     assert "from app.models.product_catalog import ProductCatalog" in service
-    assert "ProductCatalog.where(" in checkout_source
-    assert checkout_source.index("ProductCatalog.where(") < checkout_source.index("Product.where(")
+    assert "ProductCatalog.visible(" in checkout_source
+    assert checkout_source.index("ProductCatalog.visible(") < checkout_source.index("Product.where(")
     # The line-item name is snapshotted in the shopper's locale, not always English.
     assert "TranslatableMixin.translate_dict(published.name or {}, locale)" in checkout_source
 
@@ -101,7 +101,9 @@ async def test_cart_add_item_rejects_products_absent_from_catalog() -> None:
     ):
         cart_item.where.return_value = MagicMock(first=AsyncMock(return_value=None))
         product_catalog.id = object()
-        product_catalog.where.return_value = MagicMock(first=AsyncMock(return_value=None))
+        product_catalog.visible.return_value.where.return_value = MagicMock(
+            first=AsyncMock(return_value=None)
+        )
 
         with pytest.raises(NotFoundException):
             await svc.add_item(1, product_id, 1)
@@ -125,7 +127,9 @@ async def test_cart_add_item_uses_catalog_price_snapshot() -> None:
         patch("app.services.cart_service.CartItem") as cart_item,
     ):
         product_catalog.id = object()
-        product_catalog.where.return_value = MagicMock(first=AsyncMock(return_value=product))
+        product_catalog.visible.return_value.where.return_value = MagicMock(
+            first=AsyncMock(return_value=product)
+        )
         cart_item.where.return_value = MagicMock(first=AsyncMock(return_value=None))
         cart_item.create = AsyncMock()
 
@@ -156,7 +160,9 @@ async def test_cart_add_item_rejects_quantity_above_catalog_stock() -> None:
     ):
         cart_item.where.return_value = MagicMock(first=AsyncMock(return_value=None))
         product_catalog.id = object()
-        product_catalog.where.return_value = MagicMock(first=AsyncMock(return_value=product))
+        product_catalog.visible.return_value.where.return_value = MagicMock(
+            first=AsyncMock(return_value=product)
+        )
 
         with pytest.raises(ValidationException):
             await svc.add_item(1, product_id, 2)
@@ -221,7 +227,7 @@ async def test_product_service_reads_eager_loaded_media() -> None:
         product_query.where_json_path.return_value.with_.return_value = MagicMock(
             first=AsyncMock(return_value=published)
         )
-        product_catalog_cls.where.return_value = product_query
+        product_catalog_cls.visible.return_value = product_query
         product_catalog_cls.real_status = MagicMock()
 
         result = await ProductService().get_published_by_slug("test")

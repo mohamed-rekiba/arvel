@@ -629,9 +629,7 @@ async def test_update_product_rejects_unknown_vendor(
 
 
 @pytest.mark.asyncio
-async def test_create_category_rejects_invalid_status(
-    client: Any, catalog_token: str
-) -> None:
+async def test_create_category_rejects_invalid_status(client: Any, catalog_token: str) -> None:
     """An unknown status is a 422 at the API, not a 500 from the DB."""
     response = await client.post(
         "/api/admin/categories",

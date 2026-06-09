@@ -12,7 +12,6 @@ from arvel.logging.facade import Log
 
 from app.http.controllers._schemas import CreateCategoryPayload, UpdateCategoryPayload
 from app.models.category import Category
-from app.models.product_catalog import ProductCatalog
 from app.support.labels import label
 
 
@@ -25,7 +24,7 @@ class CategoryService:
             "list[Category]",
             await Category.where_has(
                 "catalog_products",
-                lambda q: q.where(ProductCatalog.real_status == "visible"),
+                lambda q: q.visible(),
             )
             .order_by_raw("name->>'en'")
             .all(),
@@ -67,9 +66,9 @@ class CategoryService:
             raise ValidationException("A category cannot be its own parent.")
         # Walk the proposed parent's ancestor chain; hitting this category means
         # the new edge closes a loop. seen[] guards against a pre-existing cycle.
-        cursor: Category | None = await Category.with_trashed().where(
-            Category.id == parent_id
-        ).first()
+        cursor: Category | None = (
+            await Category.with_trashed().where(Category.id == parent_id).first()
+        )
         if cursor is None:
             raise ValidationException("Parent category not found.")
         seen: set[uuid.UUID] = set()
@@ -79,16 +78,16 @@ class CategoryService:
             if cursor.parent_id in seen:
                 break
             seen.add(cursor.parent_id)
-            cursor = await Category.with_trashed().where(
-                Category.id == cursor.parent_id
-            ).first()
+            cursor = await Category.with_trashed().where(Category.id == cursor.parent_id).first()
 
     async def create(self, payload: CreateCategoryPayload) -> Category:
         Log.debug("category.creating", name=label(payload.name))
         if payload.parent_id:
-            parent = await Category.with_trashed().where(
-                Category.id == uuid.UUID(payload.parent_id)
-            ).first()
+            parent = (
+                await Category.with_trashed()
+                .where(Category.id == uuid.UUID(payload.parent_id))
+                .first()
+            )
             if parent is None:
                 raise ValidationException("Parent category not found.")
         category = await Category.create(
