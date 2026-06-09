@@ -383,6 +383,23 @@ class RolesListOut(_Out):
     data: list[RoleOut]
 
 
+# ── Admin dashboard ───────────────────────────────────────────────────────────
+
+
+class DashboardRevenuePointOut(_Out):
+    date: str
+    revenue: float
+
+
+class DashboardStatsOut(_Out):
+    total_revenue: float
+    total_orders: int
+    unique_customers: int
+    avg_order_value: float
+    status_counts: dict[str, int]
+    revenue_last_7_days: list[DashboardRevenuePointOut]
+
+
 class PermissionsListOut(_Out):
     data: list[PermissionOut]
 
