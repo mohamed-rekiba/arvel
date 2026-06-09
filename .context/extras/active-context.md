@@ -383,8 +383,8 @@ typecheck/lint/15 vitest/build + 16 contract tests green.
   non-superadmins get a 403 after clicking (need a level signal in MeOut). [done iter 27]
 - MED #6: global 401 handler always routes to storefront `login`, even for /admin. [done iter 24]
 - MED: `/account?order=...` shows "Order placed" with no verification. [done iter 26]
-- LOW: WishlistButton is local-only (fake); checkout delivery date hardcodes en-US;
-  category parent_id allows self/cycle; admin edit pages lack per-action gates.
+- LOW: WishlistButton is local-only (fake); checkout delivery date hardcodes en-US [done iter 24];
+  category parent_id allows self/cycle [done iter 29]; admin edit pages lack per-action gates.
 
 ## Iteration 23 — Serialize concurrent checkout (backend)
 
@@ -456,6 +456,15 @@ keeps the cheap direct set (no per-user role expansion, no query-count regressio
 `direct_permissions` still carries direct grants. Added an RBAC feature test
 asserting super_admin's detail `permissions` includes `users.manage` and exceeds
 `direct_permissions`. 370 unit green; ruff clean.
+
+## Iteration 29 — Reject category self-parent and cycles (backend)
+
+LOW: category `update` wrote `parent_id` unchecked, so a category could become its
+own parent or form a cycle (breaks the tree, risks infinite walks). Added
+`_assert_acyclic_parent`: rejects self-parenting and walks the proposed parent's
+ancestor chain to catch cycles, raising `ValidationException` (422). `create` now
+also rejects a non-existent parent. Added a feature test asserting self-parent is
+a 422. 370 unit green; ruff clean.
 
 ## Blockers
 

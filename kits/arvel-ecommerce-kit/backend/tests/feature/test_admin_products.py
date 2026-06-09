@@ -503,6 +503,19 @@ async def test_upload_rejects_non_image_file(
     assert upload.status_code == 400
 
 
+@pytest.mark.asyncio
+async def test_category_cannot_be_its_own_parent(
+    client: Any, catalog_token: str, category_id: str
+) -> None:
+    """Setting a category's parent to itself is a 422, not a self-referential row."""
+    response = await client.patch(
+        f"/api/admin/categories/{category_id}",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+        json={"parent_id": category_id},
+    )
+    assert response.status_code == 422
+
+
 # ─── helpers ────────────────────────────────────────────────────────────────────
 
 
