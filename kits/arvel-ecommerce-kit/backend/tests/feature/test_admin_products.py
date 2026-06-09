@@ -504,6 +504,19 @@ async def test_upload_rejects_non_image_file(
 
 
 @pytest.mark.asyncio
+async def test_create_product_rejects_negative_price(
+    client: Any, catalog_token: str, category_id: str
+) -> None:
+    """A negative price is a 422 — the API can't be bypassed past the UI's min=0."""
+    response = await client.post(
+        "/api/admin/products",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+        json={"name": {"en": "Bad"}, "price": -5, "category_id": category_id},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_category_cannot_be_its_own_parent(
     client: Any, catalog_token: str, category_id: str
 ) -> None:

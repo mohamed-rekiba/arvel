@@ -59,7 +59,10 @@ class CartService:
     ) -> dict[str, Any]:
         Log.debug("cart.item.adding", product_id=product_id, quantity=quantity)
         cart_id = await self.get_or_create_cart(user_id)
-        pid = uuid.UUID(product_id)
+        try:
+            pid = uuid.UUID(product_id)
+        except ValueError:
+            raise NotFoundException(f"Product '{product_id}' not found.") from None
 
         existing: CartItem | None = await CartItem.where(cart_id=cart_id, product_id=pid).first()
         requested_quantity = quantity + int(existing.quantity) if existing is not None else quantity
