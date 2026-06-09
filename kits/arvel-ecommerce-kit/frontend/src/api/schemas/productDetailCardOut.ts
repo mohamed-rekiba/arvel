@@ -4,9 +4,34 @@
  * FastAPI
  * OpenAPI spec version: 0.1.0
  */
-import type { ProductCardOut } from './productCardOut.ts'
 import type { StorefrontProductImageOut } from './storefrontProductImageOut.ts'
 
-export interface ProductDetailCardOut extends ProductCardOut {
+/**
+ * ProductCardOut extended with the full image gallery for the detail page.
+ */
+export interface ProductDetailCardOut {
+  id: string
+  name: string
+  slug: string
+  short_description: string | null
+  price: number
+  stock: number
+  original_price: number | null
+  thumbnail_url: string | null
+  image_srcset: string
+  image_sizes: string
+  rating: number | null
+  rating_count: number | null
+  is_new: boolean
+  is_bestseller: boolean
+  category_id: string | null
+  category_name: string | null
+  category_slug: string | null
+  category_parent_id: string | null
+  parent_category_name: string | null
+  parent_category_slug: string | null
+  vendor_id: string | null
+  vendor_name: string | null
+  vendor_slug: string | null
   images: StorefrontProductImageOut[]
 }

@@ -370,6 +370,7 @@ class RoleOut(_Out):
     name: str
     guard_name: str
     level: int
+    permissions: list[str] = Field(default_factory=list)
 
 
 class PermissionOut(_Out):

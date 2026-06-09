@@ -10,4 +10,5 @@ export interface RoleOut {
   name: string
   guard_name: string
   level: number
+  permissions?: string[]
 }

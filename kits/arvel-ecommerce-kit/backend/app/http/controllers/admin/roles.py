@@ -13,6 +13,7 @@ class AdminRolesController(Controller):
     async def index(self, request: Request) -> RolesListOut:
         await require_permission(request, "roles.manage")
         roles: list[Role] = await Role.order_by("name").all()
+        # Small, fixed set of roles — the per-role permission load is fine here.
         return RolesListOut.model_validate(
             {
                 "data": [
@@ -21,6 +22,7 @@ class AdminRolesController(Controller):
                         "name": role.name,
                         "guard_name": role.guard_name,
                         "level": role.level,
+                        "permissions": [p.name for p in await role.permissions.all()],
                     }
                     for role in roles
                 ]

@@ -95,7 +95,7 @@ export function useHealthzHealthzGet<
 }
 
 /**
- * Test-only seeder trigger. Disabled in production.
+ * Run the catalog seeders. Local/testing only.
  *
  * Intentionally has no DB_TX middleware so we can run seeder inserts
  * in one transaction and REFRESH MATERIALIZED VIEW in a separate transaction
@@ -178,11 +178,9 @@ export const useApiTestSeedCatalogApiTestSeedCatalogPost = <TError = unknown, TC
   )
 }
 /**
- * Trigger an immediate refresh of the products_catalog materialized view.
+ * Refresh the products_catalog materialized view. Local/testing only.
  *
- * Used by ``make seed`` after ``arvel db:seed`` commits, since the refresh
- * must run in a separate transaction to see the newly committed rows.
- * Disabled in production.
+ * The refresh must run in its own transaction to see newly committed rows.
  * @summary Api.Test.Catalog.Refresh
  */
 export const apiTestCatalogRefreshApiTestCatalogRefreshPost = (
