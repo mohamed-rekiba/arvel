@@ -149,6 +149,15 @@ changelog once shipped.
   `import config` to it and broke a consumer's own `config.*` (e.g. the kit's
   `config.app`). Moved to the app scaffold (`_skeleton/config/observability.py`)
   where it belongs; the workspace root no longer exposes a `config` package
+- Arvon — fluent date/time (Carbon parity). Immutable, tz-aware value type over
+  `whenever`: `from arvel.support import Arvon, now, today`. Construction
+  (`now/today/of().at()/parse/from_timestamp/from_datetime`), immutable
+  arithmetic with month/year clamping, comparison + `between`, `start_of`/
+  `end_of` (week = Mon..Sun), `diff_for_humans`, `to_iso8601`/`to_date_string`/
+  `format`, stdlib interop, and `Arvon.freeze`/`travel` for deterministic tests.
+  First-class Pydantic field (`string($date-time)`) and an opt-in `arvon` ORM
+  cast that leaves the default `datetime` cast untouched. `support/arvon.py`,
+  `database/model.py` + `test_arvon*`. See `docs/site/features/datetime.md`.
 
 All bucket-3 feature-parity gaps triaged on 2026-06-09 (see
 `.context/research/043-feature-gap-bucket3-triage.md` and

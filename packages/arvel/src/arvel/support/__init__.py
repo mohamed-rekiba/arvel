@@ -20,6 +20,7 @@ from arvel.support.env import env
 if TYPE_CHECKING:
     from arvel.support.annotations import resolve_annotations
     from arvel.support.arr import Arr
+    from arvel.support.arvon import Arvon, ArvonParseError, now, today
     from arvel.support.collections import Collection
     from arvel.support.env import EnvCoercionError
     from arvel.support.http_helpers import abort, abort_if, abort_unless
@@ -29,6 +30,10 @@ if TYPE_CHECKING:
 _LAZY_EXPORTS: dict[str, str] = {
     "resolve_annotations": "arvel.support.annotations",
     "Arr": "arvel.support.arr",
+    "Arvon": "arvel.support.arvon",
+    "ArvonParseError": "arvel.support.arvon",
+    "now": "arvel.support.arvon",
+    "today": "arvel.support.arvon",
     "Collection": "arvel.support.collections",
     "EnvCoercionError": "arvel.support.env",
     "abort": "arvel.support.http_helpers",
@@ -54,6 +59,8 @@ def __dir__() -> list[str]:
 
 __all__ = [
     "Arr",
+    "Arvon",
+    "ArvonParseError",
     "Collection",
     "EnvCoercionError",
     "Middleware",
@@ -64,5 +71,7 @@ __all__ = [
     "abort_if",
     "abort_unless",
     "env",
+    "now",
     "resolve_annotations",
+    "today",
 ]

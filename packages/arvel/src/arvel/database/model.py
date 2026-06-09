@@ -154,6 +154,21 @@ def _datetime_cast(value: Any) -> _datetime:
     return _to_utc_datetime(value)
 
 
+def _arvon_cast(value: Any) -> Any:
+    """Opt-in cast: return a UTC-coerced Arvon. Same UTC-at-rest as the datetime cast."""
+    from arvel.support.arvon import Arvon
+
+    if isinstance(value, Arvon):
+        return value
+    return Arvon.from_datetime(_to_utc_datetime(value))
+
+
+def _arvon_serialize(value: Any) -> Any:
+    from arvel.support.arvon import Arvon
+
+    return value.to_iso8601() if isinstance(value, Arvon) else value
+
+
 def _date_cast(value: Any) -> date:
     # datetime is a date subclass — narrow that case before bare-date passthrough.
     if isinstance(value, _datetime):
@@ -219,6 +234,7 @@ _CAST_DISPATCH: dict[str, Callable[[Any], Any]] = {
     "list": _json_cast,
     "array": _json_cast,
     "datetime": _datetime_cast,
+    "arvon": _arvon_cast,
     "date": _date_cast,
     "timestamp": _timestamp_cast,
     "hashed": _hashed_cast,
@@ -239,6 +255,7 @@ def _object_serialize(value: Any) -> Any:
 _BUILTIN_SERIALIZERS: dict[str, Callable[[Any], Any]] = {
     "object": _object_serialize,
     "collection": list,
+    "arvon": _arvon_serialize,
 }
 
 # JSON collection casts stay read-path only on write — coercing to dict/list in

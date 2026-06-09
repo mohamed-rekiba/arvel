@@ -205,6 +205,7 @@ nav:
       - Migrations: orm/migrations.md
       - Casts, Accessors & Mutators: orm/casts.md
   - Features:
+      - Date & Time: features/datetime.md
       - Authentication: features/authentication.md
       - Authorization: features/authorization.md
       - Encryption: features/encryption.md
