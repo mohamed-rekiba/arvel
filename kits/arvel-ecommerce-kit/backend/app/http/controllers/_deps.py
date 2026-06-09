@@ -6,6 +6,7 @@ __all__ = [
     "DB_TX",
     "carts",
     "categories",
+    "highest_role_level",
     "orders",
     "products",
     "require_auth",
@@ -41,6 +42,12 @@ async def role_level(role_name: str) -> int:
     if role is None:
         raise NotFoundException(f"Role '{role_name}' not found.")
     return role.level
+
+
+async def highest_role_level(user: User) -> int:
+    """Highest role level held by a user (0 if they hold none)."""
+    roles = await user.roles.all()
+    return max((int(role.level or 0) for role in roles), default=0)
 
 
 # ─── Service singletons ───────────────────────────────────────────────────────

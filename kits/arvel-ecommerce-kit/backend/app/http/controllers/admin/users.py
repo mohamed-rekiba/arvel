@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from app.http.controllers._deps import require_permission, require_role_level, role_level, users
+from app.http.controllers._deps import (
+    highest_role_level,
+    require_permission,
+    require_role_level,
+    role_level,
+    users,
+)
 from app.http.controllers._responses import AdminUserListOut, AdminUserWrapperOut
 from app.http.controllers._schemas import AssignRolePayload, GrantPermissionPayload
 from app.models.user import User
@@ -11,6 +17,16 @@ from arvel.http.controller import Controller
 from arvel.http.exceptions import AuthorizationException, NotFoundException
 from arvel_permission.models import Permission, Role
 from starlette.responses import Response
+
+
+async def _assert_outranks(actor: User, target: User) -> None:
+    """Block lifecycle actions against a user who outranks the actor (OWASP A01).
+
+    A peer rank is allowed (matches assign_role's >= convention). Acting on
+    yourself always passes since your level equals your own.
+    """
+    if not await actor.has_level(await highest_role_level(target)):
+        raise AuthorizationException("Cannot manage a user who outranks you.")
 
 
 class AdminUsersController(Controller):
@@ -35,12 +51,20 @@ class AdminUsersController(Controller):
         return AdminUserWrapperOut.model_validate({"data": user})
 
     async def destroy(self, user_id: int, request: Request) -> Response:
-        await require_permission(request, "users.manage")
+        actor = await require_permission(request, "users.manage")
+        target = await User.where(User.id == user_id).first()
+        if target is None:
+            raise NotFoundException("User not found.")
+        await _assert_outranks(actor, target)
         await users.soft_delete(user_id)
         return Response(status_code=204)
 
     async def force_destroy(self, user_id: int, request: Request) -> Response:
-        await require_role_level(request, "users.manage", 100)
+        actor = await require_role_level(request, "users.manage", 100)
+        target = await User.with_trashed().where(User.id == user_id).first()
+        if target is None:
+            raise NotFoundException("User not found.")
+        await _assert_outranks(actor, target)
         await users.force_delete(user_id)
         return Response(status_code=204)
 
@@ -48,20 +72,32 @@ class AdminUsersController(Controller):
         actor = await require_permission(request, "users.manage")
         if int(actor.id) == user_id:
             raise AuthorizationException("Cannot suspend your own account.")
+        target = await User.where(User.id == user_id).first()
+        if target is None:
+            raise NotFoundException("User not found.")
+        await _assert_outranks(actor, target)
         result = await users.suspend(user_id)
         if result is None:
             raise NotFoundException("User not found.")
         return AdminUserWrapperOut.model_validate({"data": result})
 
     async def unsuspend(self, user_id: int, request: Request) -> AdminUserWrapperOut:
-        await require_permission(request, "users.manage")
+        actor = await require_permission(request, "users.manage")
+        target = await User.where(User.id == user_id).first()
+        if target is None:
+            raise NotFoundException("User not found.")
+        await _assert_outranks(actor, target)
         result = await users.unsuspend(user_id)
         if result is None:
             raise NotFoundException("User not found.")
         return AdminUserWrapperOut.model_validate({"data": result})
 
     async def restore(self, user_id: int, request: Request) -> AdminUserWrapperOut:
-        await require_permission(request, "users.manage")
+        actor = await require_permission(request, "users.manage")
+        target = await User.with_trashed().where(User.id == user_id).first()
+        if target is None:
+            raise NotFoundException("User not found.")
+        await _assert_outranks(actor, target)
         result = await users.restore(user_id)
         if result is None:
             raise NotFoundException("User not found.")
