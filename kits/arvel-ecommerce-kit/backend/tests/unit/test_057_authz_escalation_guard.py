@@ -226,3 +226,69 @@ async def test_suspend_allows_when_actor_outranks_target(
     ctrl = mod.AdminUsersController()
     with pytest.raises(RuntimeError, match="reached service"):
         await ctrl.suspend(5, _request())
+
+
+# ─── role/permission mutators also enforce the outrank guard ───────────────
+# The actor-level / actor-permission gate isn't enough: a level-80 actor that
+# clears it must still not touch a level-100 target (OWASP A01).
+
+
+async def test_assign_role_blocks_when_target_outranks_actor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mod = _controller_module()
+    _patch_actor(monkeypatch, mod, _Actor(perms={"roles.manage"}, level=80))
+
+    async def fake_role_level(_name: str) -> int:
+        return 60
+
+    monkeypatch.setattr(mod, "role_level", fake_role_level)
+    monkeypatch.setattr(mod, "User", _user_model(_Target()))
+    monkeypatch.setattr(mod, "Role", _model_returning(SimpleNamespace()))
+    _patch_target_level(monkeypatch, mod, 100)
+    ctrl = mod.AdminUsersController()
+    with pytest.raises(AuthorizationException, match="outranks"):
+        await ctrl.assign_role(5, SimpleNamespace(role="catalog_manager"), _request())
+
+
+async def test_revoke_role_blocks_when_target_outranks_actor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mod = _controller_module()
+    _patch_actor(monkeypatch, mod, _Actor(perms={"roles.manage"}, level=80))
+
+    async def fake_role_level(_name: str) -> int:
+        return 60
+
+    monkeypatch.setattr(mod, "role_level", fake_role_level)
+    monkeypatch.setattr(mod, "User", _user_model(_Target()))
+    _patch_target_level(monkeypatch, mod, 100)
+    ctrl = mod.AdminUsersController()
+    with pytest.raises(AuthorizationException, match="outranks"):
+        await ctrl.revoke_role(5, "catalog_manager", _request())
+
+
+async def test_grant_permission_blocks_when_target_outranks_actor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mod = _controller_module()
+    _patch_actor(monkeypatch, mod, _Actor(perms={"roles.manage", "users.manage"}, level=80))
+    monkeypatch.setattr(mod, "Permission", _model_returning(SimpleNamespace()))
+    monkeypatch.setattr(mod, "User", _user_model(_Target()))
+    _patch_target_level(monkeypatch, mod, 100)
+    ctrl = mod.AdminUsersController()
+    with pytest.raises(AuthorizationException, match="outranks"):
+        await ctrl.grant_permission(5, SimpleNamespace(permission="users.manage"), _request())
+
+
+async def test_revoke_permission_blocks_when_target_outranks_actor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mod = _controller_module()
+    _patch_actor(monkeypatch, mod, _Actor(perms={"roles.manage", "users.manage"}, level=80))
+    monkeypatch.setattr(mod, "Permission", _model_returning(SimpleNamespace()))
+    monkeypatch.setattr(mod, "User", _user_model(_Target()))
+    _patch_target_level(monkeypatch, mod, 100)
+    ctrl = mod.AdminUsersController()
+    with pytest.raises(AuthorizationException, match="outranks"):
+        await ctrl.revoke_permission(5, "users.manage", _request())
