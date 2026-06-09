@@ -93,12 +93,10 @@ onMounted(async () => {
         />
         <div>
           <p class="relative text-sm font-semibold uppercase tracking-widest text-accent">
-            {{ t('home.big_sale_eyebrow', 'Big Saving on Top-selling Electronics') }}
+            {{ t('home.big_sale_eyebrow', 'Top-selling electronics') }}
           </p>
           <h3 class="relative mt-2 text-2xl font-extrabold text-white md:text-3xl">
-            {{ t('home.big_sale_title', 'Get Up To') }}
-            <span class="text-accent">{{ t('home.big_sale_highlight', '85% OFF') }}</span>
-            {{ t('home.big_sale_suffix', 'on Big Billion Day') }}
+            {{ t('home.big_sale_title', 'Gear that keeps up with you') }}
           </h3>
         </div>
         <RouterLink
