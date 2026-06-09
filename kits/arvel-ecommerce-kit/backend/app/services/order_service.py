@@ -133,10 +133,18 @@ class OrderService:
             raise OrderNotFoundError(str(order.id))
         return result
 
-    async def list_orders(self, user_id: int) -> list[dict[str, Any]]:
+    async def list_orders(
+        self, user_id: int, *, limit: int = 50, offset: int = 0
+    ) -> list[dict[str, Any]]:
         # Eager-load items in one batched query — no per-order line-item lookup.
+        # Bounded: a customer with a huge history can't force an unbounded scan.
         orders: list[Order] = (
-            await Order.where(user_id=user_id).with_("items").order_by("-created_at").all()
+            await Order.where(user_id=user_id)
+            .with_("items")
+            .order_by("-created_at")
+            .limit(limit)
+            .offset(offset)
+            .all()
         )
         results = []
         for o in orders:

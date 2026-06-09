@@ -776,11 +776,24 @@ typecheck/lint/vitest(18)/build green.
   `redirectPath` now routes through it. Admin redirect is hardcoded, unaffected.
 - Tests: `lib/navigation.test.ts` (6 cases). typecheck + lint clean.
 
+## Iteration 55 — Bound customer order history (backend, MED)
+
+- MED: `GET /api/account/orders` → `OrderService.list_orders` fetched every order
+  a customer had ever placed (no limit), then re-queried items per order — a
+  customer with a long history could force an unbounded scan + N+1. Added a
+  shared `clamp_limit`/`clamp_offset` (`MAX_PAGE_LIMIT=100`) in `_deps.py`;
+  `list_orders` now takes bounded `limit`/`offset` (default 50), and the account
+  controller accepts + clamps `?limit`/`?offset`. Response shape unchanged.
+- Test: `test_order_history_respects_limit` (2 orders, `?limit=1` → 1 row).
+  Kit unit suite 375 pass; feature order-history tests green.
+
 ### r3 review backlog (in progress)
-1. ~~HIGH: post-login open redirect~~ ✅ (above)
-2. MED: checkout bypasses unavailable-item guard (server-side enforce).
-3. MED: customer order history unbounded (no pagination).
-4. MED: admin list endpoints accept unbounded `limit`.
+1. ~~HIGH: post-login open redirect~~ ✅ (iter 54)
+2. ~~MED: checkout bypasses unavailable-item guard~~ — verified NOT a bug:
+   `checkout` raises `ProductUnavailableError` → 409 for any non-visible line.
+3. ~~MED: customer order history unbounded~~ ✅ (iter 55)
+4. MED: admin/storefront list endpoints accept unbounded `limit` (clamp helper
+   landed in iter 55; still need to wire it into admin + storefront controllers).
 5. MED: register name 255 vs DB column 120 → 500.
 6. MED: category/vendor force-delete FK RESTRICT → 500.
 7. MED: frontend admin route gate coarser than backend.

@@ -602,6 +602,34 @@ async def test_customer_can_list_their_orders(
 
 
 @pytest.mark.asyncio
+async def test_order_history_respects_limit(
+    client: Any, customer_token: str, headphones_id: str
+) -> None:
+    """?limit caps the page size so a huge history can't force an unbounded scan."""
+    headers = {"Authorization": f"Bearer {customer_token}"}
+    for _ in range(2):
+        await client.post(
+            "/api/cart/items", headers=headers, json={"product_id": headphones_id, "quantity": 1}
+        )
+        await client.post(
+            "/api/checkout",
+            headers=headers,
+            json={
+                "shipping_address": {
+                    "name": "Pat",
+                    "street": "1 St",
+                    "city": "City",
+                    "country": "US",
+                }
+            },
+        )
+
+    capped = await client.get("/api/account/orders?limit=1", headers=headers)
+    assert capped.status_code == 200
+    assert len(capped.json()["data"]) == 1
+
+
+@pytest.mark.asyncio
 async def test_customer_cannot_access_another_customers_order(
     client: Any,
     customer_token: str,

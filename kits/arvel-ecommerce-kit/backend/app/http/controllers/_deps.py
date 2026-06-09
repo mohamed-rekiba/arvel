@@ -4,8 +4,11 @@ from __future__ import annotations
 
 __all__ = [
     "DB_TX",
+    "MAX_PAGE_LIMIT",
     "carts",
     "categories",
+    "clamp_limit",
+    "clamp_offset",
     "highest_role_level",
     "orders",
     "products",
@@ -30,6 +33,19 @@ from arvel.http.middleware.database_transaction import DatabaseTransaction
 from arvel_permission.models import Role
 
 DB_TX = [DatabaseTransaction()]
+
+# Hard ceiling for any client-supplied page size. A hostile ?limit=10000000 would
+# otherwise force a full-table scan (and, on order lists, an N+1 per row).
+MAX_PAGE_LIMIT = 100
+
+
+def clamp_limit(limit: int, *, maximum: int = MAX_PAGE_LIMIT) -> int:
+    return min(max(limit, 1), maximum)
+
+
+def clamp_offset(offset: int) -> int:
+    return max(offset, 0)
+
 
 # ─── Auth guards wired to the kit's User model ────────────────────────────────
 
