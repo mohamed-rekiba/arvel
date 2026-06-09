@@ -82,6 +82,6 @@ def test_admin_media_routes_bind_to_controller() -> None:
 def test_admin_products_controller_owns_media_handlers() -> None:
     src = _src(ADMIN_PRODUCTS_CTRL)
 
-    assert "await attach_product_image(product, file)" in src
+    assert 'await attach_product_image(product, contents, file.filename or "upload")' in src
     assert "list_product_images(product)" in src
     assert "await delete_product_image(product, media_id)" in src

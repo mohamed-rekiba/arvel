@@ -25,9 +25,22 @@ from arvel.http.controller import Controller
 from arvel.http.exceptions import BadRequestException, NotFoundException
 
 _ALLOWED_IMAGE_TYPES = frozenset({"image/jpeg", "image/png", "image/webp", "image/gif"})
-_IMAGE_UPLOAD_FIELD: UploadFile = File(..., description="Product image (JPEG, PNG, WebP).")
+_IMAGE_UPLOAD_FIELD: UploadFile = File(..., description="Product image (JPEG, PNG, WebP, GIF).")
 # Cap uploads so a single request can't read an unbounded blob into worker memory.
 _MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+def _sniff_image_type(data: bytes) -> str | None:
+    """Return the image MIME from magic bytes, or None if it's not an image we accept."""
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
 
 
 async def _product_model(product_id: str) -> Product | None:
@@ -135,16 +148,23 @@ class AdminProductsController(Controller):
         mime = file.content_type or ""
         if mime not in _ALLOWED_IMAGE_TYPES:
             raise BadRequestException(
-                f"Unsupported media type '{mime}'. Upload JPEG, PNG, or WebP."
+                f"Unsupported media type '{mime}'. Upload JPEG, PNG, WebP, or GIF."
             )
-        if file.size is not None and file.size > _MAX_IMAGE_BYTES:
+        # Read at most the cap + 1 byte: bounds memory even when the client omits
+        # Content-Length (file.size is None), which the header-only check missed.
+        contents = await file.read(_MAX_IMAGE_BYTES + 1)
+        if len(contents) > _MAX_IMAGE_BYTES:
             raise BadRequestException(
                 f"Image exceeds the {_MAX_IMAGE_BYTES // (1024 * 1024)} MB upload limit."
             )
+        # Don't trust the declared content-type — sniff the magic bytes so a
+        # non-image payload can't ride in under an image/* header.
+        if _sniff_image_type(contents) is None:
+            raise BadRequestException("File content is not a recognized image.")
         product = await _product_model(product_id)
         if product is None:
             raise NotFoundException("Product not found.")
-        media = await attach_product_image(product, file)
+        media = await attach_product_image(product, contents, file.filename or "upload")
         return MediaWrapperOut.model_validate({"data": media})
 
     async def media_index(self, product_id: str, request: Request) -> MediaListOut:
