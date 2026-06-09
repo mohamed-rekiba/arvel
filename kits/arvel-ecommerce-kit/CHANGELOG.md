@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.10.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.9.0...arvel-ecommerce-kit-v1.10.0) (2026-06-09)
+
+
+### Features
+
+* **auth:** permission guards accept a list with all/any semantics ([b14a303](https://github.com/mohamed-rekiba/arvel/commit/b14a30378debbf62aa052a46f6aafc1ab439644b))
+* **ecommerce:** seed sample orders so best-sellers has data ([d9b9344](https://github.com/mohamed-rekiba/arvel/commit/d9b93449e4b8a45e87c7e90c32dd99f853a1b22c))
+
+
+### Bug Fixes
+
+* **ecommerce-kit:** refresh client RBAC on admin navigation ([2aaf9d1](https://github.com/mohamed-rekiba/arvel/commit/2aaf9d17f53ebe57795a53dde0cead990107a3e2))
+* **ecommerce:** gate admin routes by per-feature permission ([1bef3e6](https://github.com/mohamed-rekiba/arvel/commit/1bef3e6a4fa6cf087b8bf26fc265f40d79e66135))
+* **ecommerce:** improve code formatting and readability ([cc4e3b7](https://github.com/mohamed-rekiba/arvel/commit/cc4e3b7e570775bf70295ad07888e125f809c10e))
+* **ecommerce:** return 409 when force-deleting referenced category/vendor ([2c94952](https://github.com/mohamed-rekiba/arvel/commit/2c949521d27e4887b03000b897974488bb745cba))
+* **ecommerce:** widen users.name to 255 to match register contract ([d42b020](https://github.com/mohamed-rekiba/arvel/commit/d42b020597de05dc34cd1a2fabbbce0a1d7aaf70))
+
+
+### Refactors
+
+* **ecommerce:** centralize catalog visibility in a model scope ([f88b56a](https://github.com/mohamed-rekiba/arvel/commit/f88b56a4fda1009d0b11548d40b120bff16ba802))
+* **ecommerce:** delegate image-upload validation to arvel-image ([d872efa](https://github.com/mohamed-rekiba/arvel/commit/d872efa66eb83456f4e96b0d1e3b7dfe0520ab56))
+* **ecommerce:** derive is_new and subtotal via model accessors ([7ae2af7](https://github.com/mohamed-rekiba/arvel/commit/7ae2af76d449809fce7fc7af4f569c69f90aee1a))
+* **ecommerce:** move tunables into the config layer ([d572292](https://github.com/mohamed-rekiba/arvel/commit/d572292ef3988473ade98fe37693da9e6ba9636d))
+* **ecommerce:** validate product FKs with framework Rule.exists ([4ed24af](https://github.com/mohamed-rekiba/arvel/commit/4ed24afe54483dbc3203f1601e588a7e9f292686))
+
 ## [1.9.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.8.0...arvel-ecommerce-kit-v1.9.0) (2026-06-09)
 
 
