@@ -29,9 +29,7 @@ export const useCartStore = defineStore('cart', () => {
     availableItems.value.reduce((sum, item) => sum + item.subtotal, 0),
   )
 
-  const hasUnavailableItems = computed(
-    () => cart.value?.items.some((i) => !i.available) ?? false,
-  )
+  const hasUnavailableItems = computed(() => cart.value?.items.some((i) => !i.available) ?? false)
 
   async function load(): Promise<void> {
     const auth = useAuthStore()

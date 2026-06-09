@@ -101,8 +101,7 @@ watch([activeQuery, currentLocale], ([query, locale]) => {
 const scopedResults = computed(() => {
   if (!categorySlug.value) return searchResults.value
   return searchResults.value.filter(
-    (p) =>
-      p.category_slug === categorySlug.value || p.parent_category_slug === categorySlug.value,
+    (p) => p.category_slug === categorySlug.value || p.parent_category_slug === categorySlug.value,
   )
 })
 
