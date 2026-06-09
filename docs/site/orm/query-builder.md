@@ -266,32 +266,85 @@ Get-or-create helpers cover the common idioms: `first_or_create`, `first_or_new`
 <a name="local-scopes"></a>
 ### Local Scopes
 
-Local scopes are reusable query fragments. Define a `scope_<name>` method on the model and call it as `Model.<name>()`:
+Local scopes are reusable query fragments you call by name. The preferred way is the `@scope` decorator stacked on a `@staticmethod`. The first parameter is the query builder — the framework injects it — and the resulting method exposes only your own arguments:
+
+```python
+from arvel.database import Model, Timestamps, QueryBuilder, id_, scope
+
+
+class Post(Model, Timestamps):
+    __tablename__ = "posts"
+    id: int = id_()
+
+    @scope
+    @staticmethod
+    def published(qb: QueryBuilder["Post"]) -> QueryBuilder["Post"]:
+        return qb.where(status="published")
+
+    @scope
+    @staticmethod
+    def of_author(qb: QueryBuilder["Post"], author_id: int) -> QueryBuilder["Post"]:
+        return qb.where(user_id=author_id)
+
+
+published = await Post.published().get()              # QB is created for you
+mine = await Post.published().of_author(7).get()       # chains onto the live QB
+```
+
+Stacking `@staticmethod` keeps type checkers from treating the function as a regular method (so they don't complain about a missing `self`), and the decorated call type-checks with just the user-supplied arguments.
+
+#### Without the decorator
+
+If you'd rather skip the decorator, name a method `scope_<name>` and Arvent discovers it automatically. The signature is `(self, query, *args)` — the framework supplies a throwaway instance as `self`:
 
 ```python
 class Post(Model, Timestamps):
     __tablename__ = "posts"
     id: int = id_()
 
-    def scope_published(self, query):
+    def scope_published(self, query: QueryBuilder["Post"]) -> QueryBuilder["Post"]:
         return query.where(status="published")
-
-    def scope_of_author(self, query, author_id: int):
-        return query.where(user_id=author_id)
-
-
-published = await Post.published().get()
-mine = await Post.published().of_author(7).get()
 ```
+
+Both styles call the same way: `Post.published()`.
 
 <a name="global-scopes"></a>
 ### Global Scopes
 
-Global scopes apply to every query for a model — this is exactly how soft deletes hide trashed rows. Register one and opt out per query:
+Global scopes apply to every query for a model — this is exactly how [soft deletes](models.md#soft-deleting) hide trashed rows. The simplest form is `add_global_scope` with a callable `(QueryBuilder) -> QueryBuilder`:
 
 ```python
 Post.add_global_scope("tenant", lambda q: q.where(tenant_id=current_tenant()))
+```
 
+For anything beyond a one-liner, subclass `GlobalScope` and implement `apply`. `add_global_scope` takes either a `GlobalScope` instance or a callable:
+
+```python
+from arvel.database import GlobalScope, QueryBuilder
+
+
+class TenantScope(GlobalScope):
+    def apply(self, qb: QueryBuilder["Post"]) -> QueryBuilder["Post"]:
+        return qb.where(tenant_id=current_tenant())
+
+
+Post.add_global_scope("tenant", TenantScope())
+```
+
+The built-in `SoftDeleteScope` is a `GlobalScope` — the `SoftDeletes` mixin registers one on every soft-deleting model.
+
+To attach scopes at class-definition time instead of a separate call, set `__arvel_global_scopes__`:
+
+```python
+class Post(Model, Timestamps):
+    __tablename__ = "posts"
+    __arvel_global_scopes__ = {"tenant": TenantScope().apply}
+    id: int = id_()
+```
+
+Opt out per query by name, or drop them all:
+
+```python
 await Post.without_global_scope("tenant").get()
 await Post.without_global_scopes().get()
 ```
