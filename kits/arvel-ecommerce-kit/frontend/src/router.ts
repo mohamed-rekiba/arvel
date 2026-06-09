@@ -252,13 +252,15 @@ function satisfiesPermission(
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
-  if (!auth.user && hasStoredSession()) {
-    await auth.hydrate()
-  }
-
   // Admin routes carry both requiresAuth and requiresAdmin. Handle them first
   // so unauthenticated users land on the admin login, not the storefront one.
   if (to.meta.requiresAdmin) {
+    // Re-fetch /me on every admin entry so a role/permission change applies on
+    // the next navigation instead of lingering in the cached session until
+    // re-login. Admin traffic is low, so the extra request is cheap.
+    if (hasStoredSession()) {
+      await auth.hydrate()
+    }
     if (!auth.isAuthenticated) {
       return { name: 'admin-login', query: { redirect: to.fullPath } }
     }
@@ -271,6 +273,10 @@ router.beforeEach(async (to) => {
       return { name: 'admin-dashboard' }
     }
     return true
+  }
+
+  if (!auth.user && hasStoredSession()) {
+    await auth.hydrate()
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {

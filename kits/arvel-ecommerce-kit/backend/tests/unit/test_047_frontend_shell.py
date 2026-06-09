@@ -195,6 +195,12 @@ def test_protected_frontend_routes_use_stored_session_guard() -> None:
     # and reuses the store's admin-access check so it can't drift from the nav.
     assert "auth.hydrate()" in router
     assert "auth.hasAdminAccess" in router
+    # Admin entry re-hydrates /me so a role/permission change applies on the next
+    # navigation instead of lingering in the cached session until re-login.
+    admin_branch = router[
+        router.index("requiresAdmin) {") : router.index("requiresAuth && !auth.isAuthenticated")
+    ]
+    assert "auth.hydrate()" in admin_branch
     assert "meta: { requiresAuth: true" in router
     assert "meta: { requiresAuth: true, requiresAdmin: true }" in router
     assert "path: '/admin/login'" in router

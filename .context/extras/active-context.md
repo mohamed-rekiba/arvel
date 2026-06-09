@@ -953,6 +953,17 @@ Two questions answered:
   the backend's `["products.view","categories.view"]` all-match. Dashboard stays
   ungated (the safe landing), consistent with the sidebar. Added a `test_047`
   contract test (17 pass); vue-tsc + eslint clean; 26 frontend vitest pass.
+- **iter 67 — stale client permissions on admin nav (MED #4, done):** the backend
+  guard re-queries the user (`me()` + `has_all_permissions()`) on *every* request,
+  so authorization is always authoritative — the bug was purely client UI staleness.
+  `useAuthStore.hydrate()` only ran on first load / empty in-memory user, so a
+  role or permission change made by another admin lingered in the cached session
+  (sidebar + route gate) until re-login. Fix: `beforeEach` now calls
+  `auth.hydrate()` on entry to any admin route when a stored session exists, so
+  the per-route `satisfiesPermission` check and sidebar reflect the change on the
+  next navigation. Admin traffic is low, so the extra `/me` is cheap; no polling.
+  Locked with a `test_047` assertion that the `requiresAdmin` branch re-hydrates.
+  vue-tsc + eslint clean; 26 vitest + 17 contract tests pass.
 
 ## Blockers
 
