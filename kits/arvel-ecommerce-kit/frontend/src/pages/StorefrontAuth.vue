@@ -8,8 +8,9 @@ import { routeQuery } from '@/lib/i18n'
 const props = withDefaults(
   defineProps<{
     adminRedirect?: boolean
+    defaultTab?: 'login' | 'register'
   }>(),
-  { adminRedirect: false },
+  { adminRedirect: false, defaultTab: 'login' },
 )
 
 const route = useRoute()
@@ -18,8 +19,9 @@ const auth = useAuthStore()
 const { t } = useI18n({ useScope: 'global' })
 
 // Admin login never shows the register tab — admins are provisioned, not self-registered.
+const wantsRegister = props.defaultTab === 'register' || route.query.tab === 'register'
 const activeTab = ref<'login' | 'register'>(
-  !props.adminRedirect && route.query.tab === 'register' ? 'register' : 'login',
+  !props.adminRedirect && wantsRegister ? 'register' : 'login',
 )
 
 const loginForm = ref({ email: '', password: '' })

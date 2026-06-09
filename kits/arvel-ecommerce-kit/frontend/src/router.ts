@@ -91,7 +91,7 @@ const router = createRouter({
       path: '/admin/login',
       name: 'admin-login',
       component: () => import('@/pages/StorefrontAuth.vue'),
-      props: { adminRedirect: true, redirectTo: '/admin' },
+      props: { adminRedirect: true },
     },
     {
       path: '/admin',
