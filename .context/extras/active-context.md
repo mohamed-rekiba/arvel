@@ -383,7 +383,8 @@ typecheck/lint/15 vitest/build + 16 contract tests green.
   non-superadmins get a 403 after clicking (need a level signal in MeOut). [done iter 27]
 - MED #6: global 401 handler always routes to storefront `login`, even for /admin. [done iter 24]
 - MED: `/account?order=...` shows "Order placed" with no verification. [done iter 26]
-- LOW: WishlistButton is local-only (fake); checkout delivery date hardcodes en-US [done iter 24];
+- LOW: WishlistButton is local-only (fake) [done iter 30 — now a real persisted guest wishlist];
+  checkout delivery date hardcodes en-US [done iter 24];
   category parent_id allows self/cycle [done iter 29]; admin edit pages lack per-action gates.
 
 ## Iteration 23 — Serialize concurrent checkout (backend)
@@ -465,6 +466,16 @@ own parent or form a cycle (breaks the tree, risks infinite walks). Added
 ancestor chain to catch cycles, raising `ValidationException` (422). `create` now
 also rejects a non-existent parent. Added a feature test asserting self-parent is
 a 422. 370 unit green; ruff clean.
+
+## Iteration 30 — Real guest wishlist instead of a fake heart (frontend)
+
+LOW: `WishlistButton` held per-instance `ref(false)` state — clicking toggled a
+heart that reset on re-render and wasn't shared across cards (a fake affordance,
+same class as the removed fake ratings). Replaced with a `useWishlistStore`
+(Pinia) backed by localStorage: toggle/has/count, persists across navigation and
+reloads, shared across all cards. Honest scope — guest-only, no account sync
+(there's no backend wishlist). Added a vitest covering add/remove and rehydration.
+Frontend typecheck/lint/vitest green (18 tests).
 
 ## Blockers
 

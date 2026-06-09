@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed } from 'vue'
+import { useWishlistStore } from '@/stores/wishlist'
 
-defineProps<{
+const props = defineProps<{
   productId: string
 }>()
 
-const wished = ref(false)
+const wishlist = useWishlistStore()
+const wished = computed(() => wishlist.has(props.productId))
 
 function toggle(): void {
-  wished.value = !wished.value
+  wishlist.toggle(props.productId)
 }
 </script>
 
