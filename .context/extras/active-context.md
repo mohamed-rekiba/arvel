@@ -766,10 +766,25 @@ typecheck/lint/vitest(18)/build green.
   `test_refresh_drains_a_write_that_lands_mid_refresh`. Full unit suite 375 pass;
   publish/soft-delete → storefront integration tests green.
 
-### Fresh review backlog — cleared
-All iteration-45 review items are resolved. Next: re-run review subagents to
-surface the next priority batch, or move to the design phase.
-- MED (tracked): scheduled catalog refresh skipped under Redis lock → stale storefront (needs retry/queue).
+## Iteration 54 — Block post-login open redirect (frontend, HIGH security)
+
+- HIGH: `StorefrontAuth.vue` pushed `route.query.redirect` straight into
+  `router.push` after login. `?redirect=//evil.test/phish` (or `https://...`,
+  `/\evil`) bounced a freshly-authenticated user off-origin. New
+  `lib/navigation.ts` `safeInternalPath()` allows only rooted same-origin paths
+  and rejects protocol-relative / scheme / backslash variants; the login
+  `redirectPath` now routes through it. Admin redirect is hardcoded, unaffected.
+- Tests: `lib/navigation.test.ts` (6 cases). typecheck + lint clean.
+
+### r3 review backlog (in progress)
+1. ~~HIGH: post-login open redirect~~ ✅ (above)
+2. MED: checkout bypasses unavailable-item guard (server-side enforce).
+3. MED: customer order history unbounded (no pagination).
+4. MED: admin list endpoints accept unbounded `limit`.
+5. MED: register name 255 vs DB column 120 → 500.
+6. MED: category/vendor force-delete FK RESTRICT → 500.
+7. MED: frontend admin route gate coarser than backend.
+8. MED: client permissions go stale after admin change.
 
 ## Blockers
 

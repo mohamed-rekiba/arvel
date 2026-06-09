@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { routeQuery } from '@/lib/i18n'
+import { safeInternalPath } from '@/lib/navigation'
 
 const props = withDefaults(
   defineProps<{
@@ -31,7 +32,7 @@ const notice = ref<string | null>(null)
 
 const redirectPath = computed(() => {
   if (props.adminRedirect) return '/admin/dashboard'
-  return routeQuery(route.query.redirect) || '/'
+  return safeInternalPath(routeQuery(route.query.redirect))
 })
 
 async function handleLogin(): Promise<void> {
