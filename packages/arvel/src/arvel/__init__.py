@@ -79,7 +79,7 @@ if TYPE_CHECKING:
     #: Type of a lifespan callable accepted by ``Application.into_asgi(lifespan=...)``.
     HttpLifespan = _StarletteLifespan[_FastAPI]
 
-__version__ = "0.24.0"  # x-release-please-version
+__version__ = "0.25.0"  # x-release-please-version
 
 # Public symbol -> module it lives in. Resolved on first access via __getattr__.
 _LAZY_EXPORTS: dict[str, str] = {
