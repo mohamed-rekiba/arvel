@@ -184,6 +184,8 @@ async def test_product_service_reads_eager_loaded_media() -> None:
     published.vendor_id = None
     published.vendor_name = ""
     published.vendor_slug = ""
+    # is_new derives from created_at; a real catalog row always has it.
+    published.created_at = None
 
     # Storefront serialization now flows through Media.to_dict() — the kit
     # never calls url() / srcset() by hand, so the mock only needs to_dict().
