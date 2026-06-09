@@ -1,4 +1,4 @@
-"""Test-only endpoints — disabled in production."""
+"""Test-only endpoints — enabled only in local/testing environments."""
 
 from __future__ import annotations
 
@@ -11,17 +11,26 @@ from arvel.database.db import DB
 from arvel.http.exceptions import NotFoundException
 from arvel.support.env import env
 
+# Deny-by-default. These reseed/refresh helpers exist for the local dev stack
+# and the pytest harness only. Anything else — development, staging, an
+# unset APP_ENV, production — gets a 404, so a reachable non-prod deployment
+# can't be reseeded by an anonymous caller.
+_ALLOWED_ENVS = frozenset({"local", "testing"})
+
+
+def _guard_test_env() -> None:
+    if env("APP_ENV", "production").strip().lower() not in _ALLOWED_ENVS:
+        raise NotFoundException("Not found.")
+
 
 async def seed_catalog() -> dict[str, Any]:
-    """Test-only seeder trigger. Disabled in production.
+    """Run the catalog seeders. Local/testing only.
 
     Intentionally has no DB_TX middleware so we can run seeder inserts
     in one transaction and REFRESH MATERIALIZED VIEW in a separate transaction
     after the data is committed (the view query cannot see uncommitted rows).
-
     """
-    if env("APP_ENV", "production").lower() == "production":
-        raise NotFoundException("Not found.")
+    _guard_test_env()
     rbac_mod = importlib.import_module("database.seeders.roles_and_permissions_seeder")
     catalog_mod = importlib.import_module("database.seeders.catalog_seeder")
     users_mod = importlib.import_module("database.seeders.sample_users_seeder")
@@ -37,15 +46,11 @@ async def seed_catalog() -> dict[str, Any]:
 
 
 async def refresh_catalog() -> dict[str, Any]:
-    """Trigger an immediate refresh of the products_catalog materialized view.
+    """Refresh the products_catalog materialized view. Local/testing only.
 
-
-    Used by ``make seed`` after ``arvel db:seed`` commits, since the refresh
-    must run in a separate transaction to see the newly committed rows.
-    Disabled in production.
+    The refresh must run in its own transaction to see newly committed rows.
     """
-    if env("APP_ENV", "production").lower() == "production":
-        raise NotFoundException("Not found.")
+    _guard_test_env()
     count = await refresh_products_catalog()
     return {"status": "refreshed", "count": count}
 
