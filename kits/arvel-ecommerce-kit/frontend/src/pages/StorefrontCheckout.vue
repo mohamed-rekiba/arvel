@@ -14,6 +14,9 @@ const cart = useCartStore()
 
 onMounted(() => {
   requireStoredAccessToken()
+  // Don't rely on boot-time hydration — a direct load/refresh on /checkout
+  // must still populate the cart for the review step (mirrors StorefrontCart).
+  void cart.load()
 })
 
 const step = ref(1)
