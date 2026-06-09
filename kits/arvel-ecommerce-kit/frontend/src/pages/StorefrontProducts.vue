@@ -3,7 +3,6 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import ProductCard from '@/components/storefront/ProductCard.vue'
-import { fetchProductList, fetchCategory } from '../lib/api'
 import {
   storefrontProductsCatalogApiCategoriesSlugGet,
   storefrontIndexApiProductsGet,
@@ -31,7 +30,6 @@ async function load(resetCursor = true): Promise<void> {
   }
   try {
     if (categorySlug.value) {
-      await fetchCategory(categorySlug.value).catch(() => undefined)
       const result = await storefrontProductsCatalogApiCategoriesSlugGet(categorySlug.value, {
         locale: currentLocale.value,
         limit: 24,
@@ -41,9 +39,6 @@ async function load(resetCursor = true): Promise<void> {
       hasMore.value = result.pagination.has_more ?? false
       cursor.value = result.pagination.next_cursor ?? ''
     } else {
-      await fetchProductList('/api/products', { locale: currentLocale.value }).catch(
-        () => undefined,
-      )
       const result = await storefrontIndexApiProductsGet({
         locale: currentLocale.value,
         limit: 24,

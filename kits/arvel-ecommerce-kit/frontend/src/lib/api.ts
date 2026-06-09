@@ -125,52 +125,6 @@ export async function authorizedJson<T>(url: string, init?: RequestInit): Promis
   })
 }
 
-// ── Storefront products ───────────────────────────────────────────────────────
-
-export interface ProductListResponse {
-  data: StorefrontProduct[]
-  total: number
-}
-
-export interface StorefrontProduct {
-  id: number
-  name: Record<string, string>
-  slug: Record<string, string>
-  short_description: Record<string, string>
-  price: number
-  stock: number
-  image_url: string | null
-  image_srcset: string | null
-  vendor_name: string | null
-}
-
-// Usage: fetchProductList('/api/products', params)
-export async function fetchProductList(
-  url: '/api/products',
-  params?: Record<string, unknown>,
-): Promise<ProductListResponse> {
-  const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : ''
-  return json<ProductListResponse>(`${url}${qs}`)
-}
-
-export async function fetchProductBySlug(
-  slug: string,
-  params?: Record<string, string>,
-): Promise<{ data: StorefrontProduct }> {
-  // URL template: `/api/products/${encodeURIComponent(slug)}?${params}`
-  const qs = params ? `?${new URLSearchParams(params).toString()}` : ''
-  return json<{ data: StorefrontProduct }>(`/api/products/${encodeURIComponent(slug)}${qs}`)
-}
-
-export async function fetchCategory(slug: string): Promise<{ data: unknown }> {
-  return json<{ data: unknown }>(`/api/categories/${encodeURIComponent(slug)}`)
-}
-
-export async function searchProducts(q: Record<string, string>): Promise<ProductListResponse> {
-  const params = new URLSearchParams(q).toString()
-  return fetch(`/api/search?${params}`).then((r) => r.json()) as Promise<ProductListResponse>
-}
-
 // ── Cart ──────────────────────────────────────────────────────────────────────
 
 export interface CartResponse {

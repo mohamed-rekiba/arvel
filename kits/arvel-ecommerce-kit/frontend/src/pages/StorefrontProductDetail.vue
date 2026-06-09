@@ -3,7 +3,6 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import ProductRating from '@/components/storefront/ProductRating.vue'
-import { fetchProductBySlug } from '../lib/api'
 import { useStorefrontShowApiProductsSlugGet } from '@/api/storefront/storefront'
 import { formatCurrency, routeParam, toSupportedLocale } from '@/lib/i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -36,8 +35,7 @@ const hasMultiple = computed(() => images.value.length > 1)
 
 watch(
   slug,
-  (s) => {
-    if (s) void fetchProductBySlug(s).catch(() => undefined)
+  () => {
     activeIndex.value = 0
   },
   { immediate: true },
