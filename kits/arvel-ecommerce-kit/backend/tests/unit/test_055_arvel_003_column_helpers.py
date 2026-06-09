@@ -21,16 +21,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-_ROOT = Path(__file__).parents[5]
-ARVEL_COLS = _ROOT / "packages" / "arvel" / "src" / "arvel" / "database" / "columns.py"
-ARVEL_SCHEMA = _ROOT / "packages" / "arvel" / "src" / "arvel" / "database" / "schema.py"
-ARVEL_MIXINS = _ROOT / "packages" / "arvel" / "src" / "arvel" / "database" / "mixins.py"
-ARVEL_PERM_MODELS = (
-    _ROOT / "packages" / "arvel-permission" / "src" / "arvel_permission" / "models.py"
-)
-ARVEL_PERM_TRAITS = (
-    _ROOT / "packages" / "arvel-permission" / "src" / "arvel_permission" / "traits.py"
-)
+from _framework_src import ARVEL_PERMISSION_SRC, ARVEL_SRC
+
+ARVEL_COLS = ARVEL_SRC / "database" / "columns.py"
+ARVEL_SCHEMA = ARVEL_SRC / "database" / "schema.py"
+ARVEL_MIXINS = ARVEL_SRC / "database" / "mixins.py"
+ARVEL_PERM_MODELS = ARVEL_PERMISSION_SRC / "models.py"
+ARVEL_PERM_TRAITS = ARVEL_PERMISSION_SRC / "traits.py"
 KIT = Path(__file__).parents[2]
 
 
@@ -168,15 +165,7 @@ def test_role_level_is_integer_column() -> None:
 
 def test_arvel_permission_migration_has_level() -> None:
     """arvel_permission create_permission_tables migration includes level."""
-    migration = (
-        _ROOT
-        / "packages"
-        / "arvel-permission"
-        / "src"
-        / "arvel_permission"
-        / "migrations"
-        / "create_permission_tables.py"
-    )
+    migration = ARVEL_PERMISSION_SRC / "migrations" / "create_permission_tables.py"
     src = migration.read_text()
     assert "level" in src, "arvel_permission migration missing level column in roles"
 

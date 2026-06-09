@@ -14,23 +14,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from _framework_src import ARVEL_SRC
+
 BASE = Path(__file__).parents[2]
-ARVEL_DB_COLS = (
-    Path(__file__).parents[5] / "packages" / "arvel" / "src" / "arvel" / "database" / "columns.py"
-)
-ARVEL_DB_MIXINS = (
-    Path(__file__).parents[5] / "packages" / "arvel" / "src" / "arvel" / "database" / "mixins.py"
-)
-ARVEL_AUTH_GUARDS = (
-    Path(__file__).parents[5]
-    / "packages"
-    / "arvel"
-    / "src"
-    / "arvel"
-    / "auth"
-    / "guards"
-    / "__init__.py"
-)
+ARVEL_DB_COLS = ARVEL_SRC / "database" / "columns.py"
+ARVEL_DB_MIXINS = ARVEL_SRC / "database" / "mixins.py"
+ARVEL_AUTH_GUARDS = ARVEL_SRC / "auth" / "guards" / "__init__.py"
 CART_ITEM_MODEL = BASE / "app" / "models" / "cart_item.py"
 ORDER_ITEM_MODEL = BASE / "app" / "models" / "order_item.py"
 AUTH_CTRL = BASE / "app" / "http" / "controllers" / "auth.py"

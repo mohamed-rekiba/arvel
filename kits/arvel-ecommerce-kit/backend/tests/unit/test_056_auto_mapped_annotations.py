@@ -16,18 +16,15 @@ from pathlib import Path
 from typing import Any, ClassVar, get_origin
 
 import pytest
+from _framework_src import ARVEL_SRC
 from sqlalchemy.orm import Mapped
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 MODELS_DIR = Path(__file__).parents[2] / "app" / "models"
-ARVEL_MODEL = (
-    Path(__file__).parents[5] / "packages" / "arvel" / "src" / "arvel" / "database" / "model.py"
-)
-ARVEL_COLUMNS = (
-    Path(__file__).parents[5] / "packages" / "arvel" / "src" / "arvel" / "database" / "columns.py"
-)
+ARVEL_MODEL = ARVEL_SRC / "database" / "model.py"
+ARVEL_COLUMNS = ARVEL_SRC / "database" / "columns.py"
 
 
 # ---------------------------------------------------------------------------
