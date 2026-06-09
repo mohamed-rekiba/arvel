@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.24.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.23.0...arvel-v0.24.0) (2026-06-09)
+
+
+### Features
+
+* **ecommerce-kit:** customer-role listener, cart stock lock, checkout guard ([0b7bce0](https://github.com/mohamed-rekiba/arvel/commit/0b7bce0c1c96664f4fa45659e66479f8c7f28caf))
+
+
+### Bug Fixes
+
+* **ecommerce-kit:** harden admin self-delete and category parent_id validation ([511ba5f](https://github.com/mohamed-rekiba/arvel/commit/511ba5f93e55cc928d52631ea56a70fbc0d960ac))
+
 ## [0.23.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.22.1...arvel-v0.23.0) (2026-06-09)
 
 
