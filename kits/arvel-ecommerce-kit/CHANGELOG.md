@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.8.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.5...arvel-ecommerce-kit-v1.8.0) (2026-06-09)
+
+
+### Features
+
+* **ecommerce-kit:** aggregate admin dashboard stats at the DB ([47639d8](https://github.com/mohamed-rekiba/arvel/commit/47639d8e4f47f02345bc7f7381781f784994f537))
+* **ecommerce:** give product cards soft resting elevation ([d073851](https://github.com/mohamed-rekiba/arvel/commit/d07385185ad4085893bc7ffed5afeeb2417f5f79))
+* **ecommerce:** refresh design foundation — display font + soft elevation ([2b458b8](https://github.com/mohamed-rekiba/arvel/commit/2b458b8389358be01ea8e46abb011e7d7e782238))
+
+
+### Bug Fixes
+
+* **ecommerce-kit:** 404 on cart PATCH/DELETE for unknown item ([48bbad2](https://github.com/mohamed-rekiba/arvel/commit/48bbad29ebd78b7484aef0101060006dae9483d9))
+* **ecommerce-kit:** checkout self-loads the cart on mount ([f40b54e](https://github.com/mohamed-rekiba/arvel/commit/f40b54ec3593d50db6e5ec65519af6bca855e514))
+* **ecommerce-kit:** hydrate auth store on guard and unify admin-access check ([7aa44fc](https://github.com/mohamed-rekiba/arvel/commit/7aa44fc169521ab672cce5cdb9ca4fd27d7cc4ab))
+* **ecommerce-kit:** localize admin date/currency formatting ([b48c3bb](https://github.com/mohamed-rekiba/arvel/commit/b48c3bbe97abae6b6d3d55d429147420fc8a720e))
+* **ecommerce-kit:** localize storefront listing and search copy ([af17fb0](https://github.com/mohamed-rekiba/arvel/commit/af17fb0ff17402e9f14554d41a126e849196569f))
+* **ecommerce-kit:** return 404 for admin PATCH on missing product ([171ee16](https://github.com/mohamed-rekiba/arvel/commit/171ee162998fc553ee8172dbecd046b7f2d3e7c0))
+* **ecommerce:** deny-by-default the test seed/refresh endpoints ([91966a6](https://github.com/mohamed-rekiba/arvel/commit/91966a6cbb86eeffaaa00da38d45ec3cb2e9fde7))
+* **ecommerce:** drop fabricated dashboard trends and flash-sale discounts ([5453691](https://github.com/mohamed-rekiba/arvel/commit/54536917e32f05616bc79f421da4171361e66633))
+* **ecommerce:** drop fabricated discount claims from storefront promos ([725bdf5](https://github.com/mohamed-rekiba/arvel/commit/725bdf52f91cc5b2a595239cce4a09fadf8786b0))
+* **ecommerce:** extend A01 outrank guard to role/permission mutators ([9fd983d](https://github.com/mohamed-rekiba/arvel/commit/9fd983d2cc9c003839eb24bd407f35abeb752bf7))
+* **ecommerce:** guard admin user lifecycle against privilege escalation ([6c63e30](https://github.com/mohamed-rekiba/arvel/commit/6c63e30e124cfdea175bf593ffd4d797f646effe))
+* **ecommerce:** honor defaultTab so /register opens the register tab ([d3eb292](https://github.com/mohamed-rekiba/arvel/commit/d3eb292541b171a775ae8ff0f25e91380c38c71f))
+* **ecommerce:** render real role-permission grants in admin matrix ([e68bb92](https://github.com/mohamed-rekiba/arvel/commit/e68bb9278d63af60d7618a71953ee9232af43d97))
+* **ecommerce:** repair admin contracts and drop fabricated UI data ([3172a36](https://github.com/mohamed-rekiba/arvel/commit/3172a3639bed7109f223091de1f8b2e8ae0c84d8))
+* **ecommerce:** replace fabricated hero claims with honest copy ([2cd888b](https://github.com/mohamed-rekiba/arvel/commit/2cd888b90d104b69b6f42962de3ac00b59a5228c))
+
+
+### Refactors
+
+* **ecommerce-kit:** delete unused admin CRUD lib helpers ([6a71e5f](https://github.com/mohamed-rekiba/arvel/commit/6a71e5fd337c4a64a3d1362a821d735ee625cfff))
+* **ecommerce-kit:** delete unused cart/checkout lib helpers ([a9c75a4](https://github.com/mohamed-rekiba/arvel/commit/a9c75a48950eda9f7da9d311b59f1e57e0023b95))
+* **ecommerce-kit:** drop dead admin list-fetch helpers ([258c7a4](https://github.com/mohamed-rekiba/arvel/commit/258c7a437a1466cbd82bc39107d12ac2f668e75b))
+* **ecommerce-kit:** drop test-driven storefront prefetch calls ([ac62252](https://github.com/mohamed-rekiba/arvel/commit/ac62252cdbb4faa9e87f5584a0fcd5f50d12d375))
+* **ecommerce:** make admin user detail fully Orval-driven ([f31fdb7](https://github.com/mohamed-rekiba/arvel/commit/f31fdb78e3fb06d0c4a1083c6ffeb6e8edfb23be))
+
 ## [1.7.5](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.7.4...arvel-ecommerce-kit-v1.7.5) (2026-06-08)
 
 
