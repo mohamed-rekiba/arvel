@@ -45,7 +45,11 @@ const total = computed(() => subtotal.value + DELIVERY_FEE + TAXES)
 const estimatedDelivery = computed(() => {
   const d = new Date()
   d.setDate(d.getDate() + 5)
-  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+  return d.toLocaleDateString(currentLocale.value, {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+  })
 })
 
 async function placeOrder(): Promise<void> {
