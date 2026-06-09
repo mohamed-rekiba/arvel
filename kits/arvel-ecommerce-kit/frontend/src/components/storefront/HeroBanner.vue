@@ -35,24 +35,12 @@ const { t } = useI18n({ useScope: 'global' })
         <h1
           class="relative mt-4 text-balance text-4xl font-extrabold leading-tight text-primary-950 md:text-5xl"
         >
-          {{ t('hero.sale_title', 'SUMMER') }}
-          <span class="text-primary-700">{{ t('hero.sale_accent', '10% SALE') }}</span>
+          {{ t('hero.title', 'Tech that keeps up') }}
+          <span class="text-primary-700">{{ t('hero.title_accent', 'with you') }}</span>
         </h1>
 
-        <div class="relative mt-4 flex items-center gap-3">
-          <span
-            class="rounded-lg border-2 border-dashed border-primary-700 px-3 py-1.5 text-sm font-bold tracking-widest text-primary-700"
-          >
-            SAVE10
-          </span>
-          <span class="text-sm text-primary-900/60">{{
-            t('hero.promo_hint', 'Use this code at checkout')
-          }}</span>
-        </div>
-
-        <p class="relative mt-3 text-primary-900/60">
-          {{ t('hero.price_from', 'From') }}
-          <span class="text-xl font-extrabold text-primary-950">$399.99</span>
+        <p class="relative mt-4 max-w-md text-primary-900/70">
+          {{ t('hero.subtitle', 'Curated electronics, ready to ship.') }}
         </p>
 
         <div class="relative mt-6 flex gap-3">
@@ -94,27 +82,10 @@ const { t } = useI18n({ useScope: 'global' })
               class="material-symbols-outlined select-none text-[16px] leading-none text-accent"
               style="font-variation-settings: 'FILL' 1"
               aria-hidden="true"
-              >star</span
+              >verified</span
             >
-            <span class="text-accent font-bold">4.9</span>
-            <span class="text-white/70">{{ t('hero.top_rated', 'Top Rated') }}</span>
+            <span class="text-white">{{ t('hero.badge', 'Curated picks') }}</span>
           </div>
-        </div>
-
-        <!-- Price badge -->
-        <div
-          class="absolute end-6 top-6 rounded-xl bg-white/15 px-3 py-2 shadow-lg backdrop-blur-sm"
-        >
-          <p class="text-xs text-white/60 line-through">$499.99</p>
-          <p class="text-lg font-extrabold text-accent">$399.99</p>
-        </div>
-
-        <!-- Discount pill — dir="ltr" keeps "20%" from flipping in RTL -->
-        <div
-          dir="ltr"
-          class="absolute bottom-6 end-6 rounded-full bg-brand px-3 py-1 text-xs font-bold text-white shadow-md"
-        >
-          {{ t('hero.discount', '20% OFF') }}
         </div>
       </div>
     </div>
