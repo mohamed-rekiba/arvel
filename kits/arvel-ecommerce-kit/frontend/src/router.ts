@@ -1,19 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { hasStoredSession, loadCurrentUser, clearSession } from '@/lib/api'
+import { hasStoredSession, clearSession } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-
-function hasAdminAccess(user: { permissions?: string[] } | null): boolean {
-  if (!user) return false
-  return Boolean(
-    user.permissions?.some(
-      (p) =>
-        p.startsWith('products.') ||
-        p.startsWith('orders.') ||
-        p.startsWith('users.') ||
-        p.startsWith('roles.'),
-    ),
-  )
-}
 
 const router = createRouter({
   history: createWebHistory(),
@@ -223,7 +210,7 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
   if (!auth.user && hasStoredSession()) {
-    await loadCurrentUser()
+    await auth.hydrate()
   }
 
   // Admin routes carry both requiresAuth and requiresAdmin. Handle them first
@@ -232,7 +219,7 @@ router.beforeEach(async (to) => {
     if (!auth.isAuthenticated) {
       return { name: 'admin-login', query: { redirect: to.fullPath } }
     }
-    if (!hasAdminAccess(auth.user)) {
+    if (!auth.hasAdminAccess) {
       return { name: 'home' }
     }
     return true

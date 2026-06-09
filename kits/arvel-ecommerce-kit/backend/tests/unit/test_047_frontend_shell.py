@@ -136,8 +136,6 @@ def test_customer_pages_call_cart_checkout_and_account_apis() -> None:
         "'/api/checkout'",
         "authorizedJson<DetailResponse<OrderSummary[]>>",
         "'/api/account/orders'",
-        "fetch('/api/auth/login'",
-        "fetch('/api/auth/register'",
         "fetch(`/api/search?${params}`)",
     ):
         assert snippet in api
@@ -163,8 +161,10 @@ def test_protected_frontend_routes_use_stored_session_guard() -> None:
 
     assert "router.beforeEach(" in router
     assert "hasStoredSession()" in router
-    assert "loadCurrentUser()" in router
-    assert "hasAdminAccess(auth.user)" in router
+    # Guard refreshes the store via the auth store (which hits /api/auth/me),
+    # and reuses the store's admin-access check so it can't drift from the nav.
+    assert "auth.hydrate()" in router
+    assert "auth.hasAdminAccess" in router
     assert "meta: { requiresAuth: true" in router
     assert "meta: { requiresAuth: true, requiresAdmin: true }" in router
     assert "path: '/admin/login'" in router
@@ -175,12 +175,13 @@ def test_protected_frontend_routes_use_stored_session_guard() -> None:
 
 
 def test_admin_shell_uses_me_endpoint_for_sidebar_user() -> None:
-    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
+    store = _src(FRONTEND_DIR / "src" / "stores" / "auth.ts")
     layout = _src(FRONTEND_DIR / "src" / "layouts" / "AdminLayout.vue")
 
-    assert "fetchCurrentUser(" in api
-    assert "'/api/auth/me'" in api
-    assert "loadCurrentUser()" in layout
+    # The auth store hydrates from the generated /api/auth/me hook.
+    assert "authMeApiAuthMeGet(" in store
+    assert "async function hydrate(" in store
+    assert "auth.hydrate()" in layout
     assert "clearSession()" in layout
 
     for page in (
@@ -198,8 +199,10 @@ def test_admin_shell_uses_me_endpoint_for_sidebar_user() -> None:
 def test_admin_dashboard_uses_backend_rows() -> None:
     dashboard = _src(FRONTEND_DIR / "src" / "pages" / "AdminDashboard.vue")
 
-    assert "listAdminRows(token, 'orders')" in dashboard
-    assert "listAdminCatalog(token, 'products')" in dashboard
+    # KPIs/status come from the DB-aggregated stats hook; the recent-orders card
+    # pulls a small page from the orders index hook. No client-side roll-ups.
+    assert "useAdminOrdersStatsApiAdminOrdersStatsGet" in dashboard
+    assert "useAdminOrdersIndexApiAdminOrdersGet" in dashboard
     assert '@view-order="openOrder"' in dashboard
     assert "prod-linen-shirt" not in dashboard
     assert "ord-1001" not in dashboard

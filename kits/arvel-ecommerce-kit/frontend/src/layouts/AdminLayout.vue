@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import AdminSidebar from '@/components/admin/AdminSidebar.vue'
-import { loadCurrentUser, clearSession } from '@/lib/api'
+import { clearSession } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -10,7 +10,7 @@ const auth = useAuthStore()
 
 onMounted(async () => {
   if (!auth.user) {
-    await loadCurrentUser()
+    await auth.hydrate()
   }
 })
 
