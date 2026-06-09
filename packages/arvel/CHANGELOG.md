@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.24.0...arvel-v0.25.0) (2026-06-09)
+
+
+### Features
+
+* **arvon:** add fluent datetime layer over whenever ([50ea34e](https://github.com/mohamed-rekiba/arvel/commit/50ea34e2ee6ab3510105006f24245ade7a8ed8b8))
+
 ## [0.24.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.23.0...arvel-v0.24.0) (2026-06-09)
 
 
