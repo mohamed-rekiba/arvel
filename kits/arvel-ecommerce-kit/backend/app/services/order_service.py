@@ -252,9 +252,14 @@ class OrderService:
         Aggregating in SQL keeps this correct regardless of how many orders exist
         (the old dashboard summed only the first page of results).
         """
-        total_revenue = round(float(await Order.sum("total")), 2)
+        # Cancelled orders restore stock but keep their row + total, so counting
+        # them as revenue overstates earnings. Revenue and AOV are over realized
+        # (non-cancelled) orders; total_orders stays the count of all orders placed.
+        realized_sum = await Order.where(Order.status != "cancelled").sum("total")
+        total_revenue = round(float(realized_sum or 0), 2)
         total_orders = await Order.count()
-        avg_order_value = round(total_revenue / total_orders, 2) if total_orders else 0.0
+        realized_orders = await Order.where(Order.status != "cancelled").count()
+        avg_order_value = round(total_revenue / realized_orders, 2) if realized_orders else 0.0
 
         # No COUNT(DISTINCT ...) helper, so one raw aggregate row. Key matches the
         # literal expression text, same convention as best_sellers.
@@ -287,7 +292,10 @@ class OrderService:
             (start + timedelta(days=i)).date().isoformat(): 0.0 for i in range(7)
         }
         recent: list[Order] = (
-            await Order.where_null("deleted_at").where(Order.created_at >= start).all()
+            await Order.where_null("deleted_at")
+            .where(Order.status != "cancelled")
+            .where(Order.created_at >= start)
+            .all()
         )
         for o in recent:
             if o.created_at is None:
