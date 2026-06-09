@@ -74,6 +74,11 @@ async def customer_token(client: Any) -> str:
     return await _login(client, "customer@example.com", "password")
 
 
+@pytest.fixture
+async def super_admin_token(client: Any) -> str:
+    return await _login(client, "superadmin@example.com", "password")
+
+
 @pytest.mark.asyncio
 async def test_stats_requires_orders_view(client: Any, customer_token: str) -> None:
     """A customer (no orders.view) is forbidden."""
@@ -112,6 +117,43 @@ async def test_stats_shape_and_seven_day_series(client: Any, support_token: str)
     assert len(set(dates)) == 7
     # status counts never exceed the all-time order total
     assert sum(body["status_counts"].values()) <= body["total_orders"]
+
+
+@pytest.mark.asyncio
+async def test_cancelled_orders_excluded_from_revenue(
+    client: Any, super_admin_token: str, customer_token: str
+) -> None:
+    """Cancelling an order rolls its total back out of dashboard revenue."""
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+    cust = {"Authorization": f"Bearer {customer_token}"}
+
+    baseline = (await client.get("/api/admin/orders/stats", headers=sa)).json()["total_revenue"]
+
+    listing = await client.get("/api/products")
+    product_id = listing.json()["data"][0]["id"]
+    await client.post(
+        "/api/cart/items", headers=cust, json={"product_id": product_id, "quantity": 1}
+    )
+    checkout = await client.post(
+        "/api/checkout",
+        headers=cust,
+        json={
+            "shipping_address": {"name": "Pat", "street": "1 St", "city": "City", "country": "US"}
+        },
+    )
+    assert checkout.status_code == 201
+    order_id = checkout.json()["data"]["id"]
+
+    with_order = (await client.get("/api/admin/orders/stats", headers=sa)).json()["total_revenue"]
+    assert with_order > baseline
+
+    cancel = await client.patch(
+        f"/api/admin/orders/{order_id}/status", headers=sa, json={"status": "cancelled"}
+    )
+    assert cancel.status_code == 200
+
+    after_cancel = (await client.get("/api/admin/orders/stats", headers=sa)).json()["total_revenue"]
+    assert after_cancel == baseline
 
 
 async def _login(client: Any, email: str, password: str) -> str:

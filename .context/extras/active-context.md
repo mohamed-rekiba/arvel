@@ -518,6 +518,18 @@ buttons in `PermissionGate`. Order-detail (orders.update) and user-detail role/
 grant/force-delete actions were already gated, so no change needed there. This
 clears the iteration-22 review backlog. Frontend typecheck/lint/vitest green.
 
+## Iteration 33 — Exclude cancelled orders from dashboard revenue (backend)
+
+HIGH: `dashboard_stats` summed every order's `total` for revenue/AOV, while
+`best_sellers` already counted delivered-only — so the KPIs disagreed and a
+cancelled order (stock restored, row kept) still inflated earnings. Revenue and
+AOV now sum over non-cancelled orders; `total_orders` stays the count of all
+orders placed. Applied the same `status != "cancelled"` filter to the 7-day
+revenue chart for consistency. New feature test
+`test_cancelled_orders_excluded_from_revenue` places an order, asserts revenue
+rises, cancels it, asserts revenue returns to baseline. Backend ruff clean;
+dashboard + cart/checkout feature suites green (18 passed).
+
 ## Blockers
 
 None. All quality gates green.
