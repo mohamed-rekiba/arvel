@@ -610,10 +610,23 @@ re-reads status as cancelled, and skips the restore. New integration test
 `test_concurrent_cancel_restores_stock_once` places a qty-2 order and fires two
 simultaneous cancels, asserting stock rises by exactly 2. Backend ruff clean.
 
+## Iteration 41 — Catalog status enum, cart re-snapshot, force-delete UI gate
+
+Three fresh-review fixes in one batch:
+- MED: `add_item` now re-snapshots `unit_price_snapshot` to the current price when
+  incrementing an existing line, so added units aren't billed at a stale first
+  price (whole line moves to today's price). Test
+  `test_duplicate_add_resnapshots_to_current_price`.
+- MED: category/vendor `status` schemas now use `CatalogStatus =
+  Literal["draft","published"]` instead of bare `str`, so a bad value is a 422 at
+  the API, not a 500 from the DB. Regenerated Orval (status enum types). Test
+  `test_create_category_rejects_invalid_status`.
+- MED: admin catalog force-delete button now wrapped in `PermissionGate` with
+  `:min-level="100"`, matching the backend `require_role_level(...,100)` so
+  non-superadmins don't see an action that always 403s.
+Backend ruff clean; frontend typecheck/lint/vitest(18)/build green.
+
 ### Fresh review backlog (iteration-39 pass) — remaining
-- MED: admin catalog force-delete button not gated on role_level 100 in UI (backend blocks; UI 403s for non-superadmin). AdminCatalogPage.vue.
-- MED: duplicate cart add keeps old unit_price_snapshot for new units (cart_service.add_item).
-- MED: category/vendor `status` is unconstrained `str` in schemas → DB 500 on bad value; narrow to Literal.
 - MED: malformed pagination cursor silently returns page 1 (product_service) while client appends → dup rows.
 - MED: product media upload has no max-size guard (memory DoS).
 - MED: materialized catalog refresh skipped under Redis lock → stale storefront (harder; needs retry/queue).

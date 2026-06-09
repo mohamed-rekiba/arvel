@@ -6,11 +6,12 @@
  */
 import type { UpdateCategoryPayloadName } from './updateCategoryPayloadName.ts'
 import type { UpdateCategoryPayloadSlug } from './updateCategoryPayloadSlug.ts'
+import type { UpdateCategoryPayloadStatus } from './updateCategoryPayloadStatus.ts'
 
 export interface UpdateCategoryPayload {
   name?: UpdateCategoryPayloadName
   slug?: UpdateCategoryPayloadSlug
   parent_id?: string | null
-  status?: string | null
+  status?: UpdateCategoryPayloadStatus
   published_at?: string | null
 }

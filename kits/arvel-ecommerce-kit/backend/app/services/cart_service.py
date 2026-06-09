@@ -77,6 +77,9 @@ class CartService:
 
         if existing is not None:
             existing.quantity += quantity
+            # Re-snapshot to the current price so added units aren't billed at a
+            # stale price from the first add. The whole line moves to today's price.
+            existing.unit_price_snapshot = price
             await existing.save()
         else:
             await CartItem.create(

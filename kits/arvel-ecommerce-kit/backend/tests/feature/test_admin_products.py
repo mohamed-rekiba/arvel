@@ -548,6 +548,19 @@ async def test_create_product_rejects_negative_price(
 
 
 @pytest.mark.asyncio
+async def test_create_category_rejects_invalid_status(
+    client: Any, catalog_token: str
+) -> None:
+    """An unknown status is a 422 at the API, not a 500 from the DB."""
+    response = await client.post(
+        "/api/admin/categories",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+        json={"name": {"en": "Bad"}, "slug": {"en": "bad"}, "status": "live"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_category_cannot_be_its_own_parent(
     client: Any, catalog_token: str, category_id: str
 ) -> None:

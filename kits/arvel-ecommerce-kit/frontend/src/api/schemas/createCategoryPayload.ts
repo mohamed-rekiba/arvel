@@ -6,11 +6,12 @@
  */
 import type { CreateCategoryPayloadName } from './createCategoryPayloadName.ts'
 import type { CreateCategoryPayloadSlug } from './createCategoryPayloadSlug.ts'
+import type { CreateCategoryPayloadStatus } from './createCategoryPayloadStatus.ts'
 
 export interface CreateCategoryPayload {
   name: CreateCategoryPayloadName
   slug: CreateCategoryPayloadSlug
   parent_id?: string | null
-  status?: string
+  status?: CreateCategoryPayloadStatus
   published_at?: string | null
 }
