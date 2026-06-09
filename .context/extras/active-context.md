@@ -376,13 +376,13 @@ typecheck/lint/15 vitest/build + 16 contract tests green.
 
 ### Review backlog (iteration 22 findings, remaining)
 
-- MED: `shipping_address: dict[str, Any]` accepts `{}`/garbage → typed model + 422.
+- MED: `shipping_address: dict[str, Any]` accepts `{}`/garbage → typed model + 422. [done iter 25]
 - MED: AdminUserDetailPage "Permissions" shows direct grants only, not effective
   (role-derived) perms — rename or expose effective set.
 - MED: force-delete button gated on `users.manage` but API needs role level 100 →
   non-superadmins get a 403 after clicking (need a level signal in MeOut).
-- MED #6: global 401 handler always routes to storefront `login`, even for /admin.
-- MED: `/account?order=...` shows "Order placed" with no verification.
+- MED #6: global 401 handler always routes to storefront `login`, even for /admin. [done iter 24]
+- MED: `/account?order=...` shows "Order placed" with no verification. [done iter 26]
 - LOW: WishlistButton is local-only (fake); checkout delivery date hardcodes en-US;
   category parent_id allows self/cycle; admin edit pages lack per-action gates.
 
@@ -423,6 +423,13 @@ tests green; frontend typecheck/lint/vitest green; ruff clean.
 
 Note: host `node_modules` was a partial install (missing transitive `dist`);
 a `npm ci` into the (cleared) mount repaired it so `api:generate` runs locally.
+
+## Iteration 26 — Account success banner only for owned orders (frontend)
+
+MED: `/account` showed "Order placed" for any `?order=` value (`v-if="route.query.order"`),
+so a hand-typed `/account?order=anything` faked a success state. Now resolves the
+query param against the caller's loaded orders and only shows the banner when it
+matches a real owned order. Typecheck/lint green.
 
 ## Blockers
 
