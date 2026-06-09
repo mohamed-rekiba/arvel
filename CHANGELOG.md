@@ -143,6 +143,12 @@ changelog once shipped.
   `LoginAttemptStore`; pass `CacheLoginAttemptStore` to share the failed-attempt
   limit across workers instead of counting per-process. Tuning moved to
   `ThrottleLoginConfig`. `auth/middleware/throttle_login.py` + `test_throttle_login`
+- Config skeleton no longer shadows consumer apps — the observability config
+  skeleton lived at the workspace root as an importable top-level `config`
+  package, so any test/app run with the repo root ahead on `sys.path` resolved
+  `import config` to it and broke a consumer's own `config.*` (e.g. the kit's
+  `config.app`). Moved to the app scaffold (`_skeleton/config/observability.py`)
+  where it belongs; the workspace root no longer exposes a `config` package
 
 All bucket-3 feature-parity gaps triaged on 2026-06-09 (see
 `.context/research/043-feature-gap-bucket3-triage.md` and

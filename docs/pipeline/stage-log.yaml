@@ -1973,3 +1973,28 @@ events:
       other sessions, works with no cache; test_throttle_login 2 — cache store shares counter across instances,
       success clears it); mkdocs build --strict clean.
     timestamp: "2026-06-09T06:46:00Z"
+  - work_item: "WI-arvel-053"
+    stage: "execution"
+    event: "exit"
+    result: "pass"
+    role: "backend-developer"
+    note: >-
+      Deferred F7 (test-harness/packaging). Observability config skeleton shipped at the workspace root as an
+      importable top-level 'config' package (config/__init__.py + config/observability.py), shadowing a consumer
+      app's own config on sys.path under pytest prepend mode — bare 'import config' resolved to the skeleton and
+      broke 'import config.app'. Moved the skeleton into the app scaffold (_skeleton/config/observability.py),
+      deleted the workspace-root config/ package, repointed the skeleton-exists test to the scaffold path.
+    artifacts:
+      - "packages/arvel/src/arvel/_skeleton/config/observability.py"
+      - "packages/arvel/tests/observability/test_wi_030_config.py"
+      - "docs/pipeline/specs/WI-arvel-053-config-skeleton-shadow.md"
+    timestamp: "2026-06-09T06:55:00Z"
+  - work_item: "WI-arvel-053"
+    stage: "qa-post"
+    event: "exit"
+    result: "pass"
+    note: >-
+      Deterministic sys.path repro now resolves import config -> kit config and config.app OK; kit unit suite from
+      the workspace root 350 passed; application + scaffold suites 263 passed; observability 11 passed; all five
+      _skeleton/config/*.py load cleanly through the config loader; ruff + mypy clean on touched files.
+    timestamp: "2026-06-09T06:56:00Z"

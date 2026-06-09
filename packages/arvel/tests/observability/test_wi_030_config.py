@@ -96,7 +96,11 @@ class TestPublishableConfigSkeleton:
     def test_config_skeleton_file_exists(self) -> None:
         from pathlib import Path
 
-        config_path = Path("config/observability.py")
+        import arvel
+
+        # Lives in the app skeleton, not the workspace root — a top-level
+        # `config/` package there shadows a consumer app's own `config` on sys.path.
+        config_path = Path(arvel.__file__).parent / "_skeleton" / "config" / "observability.py"
         assert config_path.exists(), (
-            "config/observability.py must exist (publishable via vendor:publish)"
+            "_skeleton/config/observability.py must exist (scaffolded into new apps)"
         )
