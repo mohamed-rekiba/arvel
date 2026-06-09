@@ -183,87 +183,9 @@ export async function fetchAccountOrders(): Promise<DetailResponse<OrderSummary[
   return authorizedJson<DetailResponse<OrderSummary[]>>('/api/account/orders')
 }
 
-// ── Admin generic resources ───────────────────────────────────────────────────
+// ── Admin list resources ──────────────────────────────────────────────────────
 
 export type AdminListResource = 'orders' | 'users' | 'roles' | 'permissions' | 'translations'
-export type AdminCatalogResource = 'products' | 'categories' | 'vendors'
-
-export async function createAdminCatalog(
-  token: string,
-  resource: AdminCatalogResource,
-  payload: unknown,
-): Promise<{ data: unknown }> {
-  return json<{ data: unknown }>(`/api/admin/${resource}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  })
-}
-
-export async function updateAdminCatalog(
-  token: string,
-  resource: AdminCatalogResource,
-  id: string | number,
-  payload: unknown,
-): Promise<{ data: unknown }> {
-  return json<{ data: unknown }>(`/api/admin/${resource}/${encodeURIComponent(String(id))}`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  })
-}
-
-export async function deleteAdminCatalog(
-  token: string,
-  resource: AdminCatalogResource,
-  id: string | number,
-): Promise<void> {
-  return json<void>(`/api/admin/${resource}/${encodeURIComponent(String(id))}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
-
-export async function forceDeleteAdminCatalog(
-  token: string,
-  resource: AdminCatalogResource,
-  id: string | number,
-): Promise<void> {
-  return json<void>(`/api/admin/${resource}/${encodeURIComponent(id)}/force`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
-
-export async function getAdminCatalogRecord(
-  token: string,
-  resource: AdminCatalogResource,
-  id: string | number,
-): Promise<{ data: unknown }> {
-  return json<{ data: unknown }>(`/api/admin/${resource}/${encodeURIComponent(String(id))}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
-
-// ── Admin orders ──────────────────────────────────────────────────────────────
-
-export async function getAdminOrder(token: string, orderId: string): Promise<{ data: unknown }> {
-  return json<{ data: unknown }>(`/api/admin/orders/${encodeURIComponent(orderId)}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
-
-export async function updateAdminOrderStatus(
-  token: string,
-  orderId: string,
-  status: string,
-): Promise<unknown> {
-  return json<unknown>(`/api/admin/orders/${encodeURIComponent(orderId)}/status`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ status }),
-  })
-}
 
 // ── Product media ─────────────────────────────────────────────────────────────
 
