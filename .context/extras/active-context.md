@@ -662,9 +662,18 @@ Backend ruff clean; targeted tests green.
   ranked set, not a cursor page). Skeleton/empty states track the active mode.
   Frontend typecheck/lint/vitest(18)/build green.
 
+## Iteration 45 — Cart store errors go through i18n (frontend)
+
+- LOW: extracted the vue-i18n instance into `lib/i18n-instance.ts` so non-setup
+  code (Pinia stores) can translate via a `translate(key)` helper. `main.ts`
+  now imports the shared instance and fills messages with `setLocaleMessage`
+  instead of creating its own. Cart store fallback errors
+  (`cart.error_load/add/update/remove`) now resolve through i18n with en/ar/tr
+  keys, replacing the hardcoded English strings. Server `err.message` is still
+  shown as-is, matching the admin-page pattern. typecheck/lint/vitest(18)/build green.
+
 ### Fresh review backlog (iteration-39 pass) — remaining
 - MED: materialized catalog refresh skipped under Redis lock → stale storefront for the *scheduled* path (harder; needs retry/queue).
-- LOW: cart store error strings hardcoded English, bypass i18n.
 
 ## Blockers
 
