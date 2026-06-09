@@ -575,6 +575,18 @@ min on price/stock). Backend ruff + cart suite green (16); frontend
 typecheck/lint/vitest(18)/build green. The live `product.price` still shows on
 product cards/detail — only the cart reflects the locked-in price.
 
+## Iteration 38 — Admin suspend/reinstate UI (frontend)
+
+MED: the suspend/unsuspend APIs existed and were tested, but the user detail page
+only showed a "Suspended" label with no way to act — admins had no UI to suspend
+or reinstate. Wired the existing Orval `suspend`/`unsuspend` hooks into
+`AdminUserDetailPage`: a `users.manage`-gated button in the header card that reads
+"Reinstate" when `suspended_at` is set and "Suspend" otherwise, with optimistic
+invalidation + toasts. Added en/ar/tr strings for the labels, toasts, and error.
+Frontend typecheck/lint/vitest(18)/build green. Role assign/revoke and
+force-delete were already wired; permission grant/revoke has no per-user API
+(permissions derive from roles) so nothing to add there.
+
 ## Blockers
 
 None. All quality gates green.

@@ -10,6 +10,8 @@ import {
   useAdminUsersRolesAssignApiAdminUsersUserIdRolesPost,
   useAdminUsersRolesRevokeApiAdminUsersUserIdRolesDelete,
   useAdminUsersShowApiAdminUsersUserIdGet,
+  useAdminUsersSuspendApiAdminUsersUserIdSuspendPatch,
+  useAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch,
 } from '@/api/admin-users/admin-users'
 import { useQueryClient } from '@tanstack/vue-query'
 import { routeParam } from '@/lib/i18n'
@@ -77,7 +79,32 @@ const { mutate: forceDelete, isPending: deleting } =
     },
   })
 
+const { mutate: suspendUser, isPending: suspending } =
+  useAdminUsersSuspendApiAdminUsersUserIdSuspendPatch({
+    mutation: {
+      onSuccess: () => {
+        void invalidateUser()
+        toast.success(t('admin.user.toast_suspended'))
+      },
+      onError: (err: unknown) =>
+        toast.error(err instanceof Error ? err.message : t('admin.user.suspend_failed')),
+    },
+  })
+
+const { mutate: unsuspendUser, isPending: unsuspending } =
+  useAdminUsersUnsuspendApiAdminUsersUserIdUnsuspendPatch({
+    mutation: {
+      onSuccess: () => {
+        void invalidateUser()
+        toast.success(t('admin.user.toast_unsuspended'))
+      },
+      onError: (err: unknown) =>
+        toast.error(err instanceof Error ? err.message : t('admin.user.suspend_failed')),
+    },
+  })
+
 const saving = computed(() => assigning.value || revoking.value)
+const togglingSuspension = computed(() => suspending.value || unsuspending.value)
 </script>
 
 <template>
@@ -103,6 +130,26 @@ const saving = computed(() => assigning.value || revoking.value)
         <p v-if="user.suspended_at" class="mt-2 text-sm text-red-600">
           {{ t('admin.user.suspended') }}
         </p>
+        <PermissionGate permission="users.manage">
+          <button
+            v-if="user.suspended_at"
+            type="button"
+            class="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
+            :disabled="togglingSuspension"
+            @click="unsuspendUser({ userId: user.id })"
+          >
+            {{ t('admin.user.unsuspend') }}
+          </button>
+          <button
+            v-else
+            type="button"
+            class="mt-4 rounded-lg border border-danger px-4 py-2 text-sm text-danger hover:bg-red-50 disabled:opacity-50"
+            :disabled="togglingSuspension"
+            @click="suspendUser({ userId: user.id })"
+          >
+            {{ t('admin.user.suspend') }}
+          </button>
+        </PermissionGate>
       </div>
 
       <PermissionGate permission="roles.manage">
