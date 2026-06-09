@@ -371,6 +371,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.placeholder.col_id': 'ID',
     'admin.placeholder.col_fields': 'Fields',
     'admin.placeholder.no_translations': 'No translations',
+    'admin.placeholder.coming_soon': 'This section isn’t available in the demo yet.',
     // footer
     'footer.tagline': 'Thoughtfully designed essentials for everyday life.',
     'footer.quick_links': 'Quick Links',
@@ -738,6 +739,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.placeholder.col_id': 'المعرف',
     'admin.placeholder.col_fields': 'الحقول',
     'admin.placeholder.no_translations': 'لا توجد ترجمات',
+    'admin.placeholder.coming_soon': 'هذا القسم غير متاح في النسخة التجريبية بعد.',
     // footer
     'footer.tagline': 'أساسيات مصممة بعناية للحياة اليومية.',
     'footer.quick_links': 'روابط سريعة',
@@ -1106,6 +1108,7 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     'admin.placeholder.col_id': 'Kimlik',
     'admin.placeholder.col_fields': 'Alanlar',
     'admin.placeholder.no_translations': 'Çeviri yok',
+    'admin.placeholder.coming_soon': 'Bu bölüm demoda henüz mevcut değil.',
     // footer
     'footer.tagline': 'Günlük yaşam için özenle tasarlanmış temel ürünler.',
     'footer.quick_links': 'Hızlı Bağlantılar',

@@ -37,11 +37,12 @@ const discountPct = computed(() => {
 })
 const isOutOfStock = computed(() => (props.product.stock ?? 0) === 0)
 
-const rating = computed(() => props.product.rating ?? 4.2)
-const ratingCount = computed(() => props.product.rating_count ?? 73)
+const rating = computed(() => props.product.rating)
+const ratingCount = computed(() => props.product.rating_count)
+const hasRating = computed(() => rating.value != null)
 
-const fullStars = computed(() => Math.floor(rating.value))
-const hasHalfStar = computed(() => rating.value - fullStars.value >= 0.5)
+const fullStars = computed(() => Math.floor(rating.value ?? 0))
+const hasHalfStar = computed(() => (rating.value ?? 0) - fullStars.value >= 0.5)
 
 async function handleAddToCart(event: Event): Promise<void> {
   event.preventDefault()
@@ -102,8 +103,8 @@ async function handleAddToCart(event: Event): Promise<void> {
           {{ product.name }}
         </h3>
 
-        <!-- Star rating -->
-        <div class="mt-1.5 flex items-center gap-1">
+        <!-- Star rating — only when the backend reports real review data -->
+        <div v-if="hasRating" class="mt-1.5 flex items-center gap-1">
           <div class="flex text-sm text-rating-star">
             <span v-for="i in fullStars" :key="`full-${i}`">★</span>
             <span v-if="hasHalfStar">½</span>
@@ -114,7 +115,7 @@ async function handleAddToCart(event: Event): Promise<void> {
               >★</span
             >
           </div>
-          <span class="text-xs text-fg-muted">({{ ratingCount }})</span>
+          <span v-if="ratingCount != null" class="text-xs text-fg-muted">({{ ratingCount }})</span>
         </div>
 
         <!-- Price row -->

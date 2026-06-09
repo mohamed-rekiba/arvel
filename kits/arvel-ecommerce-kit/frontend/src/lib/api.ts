@@ -473,13 +473,6 @@ export async function revokeAdminUserPermission(
   })
 }
 
-export async function deactivateAdminUser(
-  token: string,
-  userId: string | number,
-): Promise<unknown> {
-  return runAdminUserAction(token, userId, 'deactivate')
-}
-
 export async function runAdminUserAction(
   token: string,
   userId: string | number,
