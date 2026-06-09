@@ -145,9 +145,7 @@ class TestV031CategorySlugWrapped:
         assert '"slug": c.slug or {}' in src, (
             "category slug must be returned as the JSONB locale mapping"
         )
-        assert '"slug": c.slug,' not in src, (
-            "category slug must not be returned as a bare scalar"
-        )
+        assert '"slug": c.slug,' not in src, "category slug must not be returned as a bare scalar"
 
 
 # ─── optional ProductCard fields ─────────────────────────────────────
