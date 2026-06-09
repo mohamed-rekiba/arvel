@@ -80,33 +80,38 @@ class CartService:
     ) -> dict[str, Any]:
         Log.debug("cart.item.updating", item_id=item_id, quantity=quantity)
         cart_id = await self.get_or_create_cart(user_id)
-        iid = int(item_id)
-        item: CartItem | None = await CartItem.where(
-            CartItem.id == iid, CartItem.cart_id == cart_id
-        ).first()
-        if item is not None:
-            product: ProductCatalog | None = await item.product().first()
-            if product is None:
-                raise NotFoundException(f"Product '{item.product_id}' not found.")
-            if int(product.stock_qty) < quantity:
-                raise ValidationException("Insufficient stock for cart item.")
-            item.quantity = quantity
-            await item.save()
-            Log.debug("cart.item.updated", item_id=item_id, quantity=quantity)
+        item = await self._owned_item(cart_id, item_id)
+        product: ProductCatalog | None = await item.product().first()
+        if product is None:
+            raise NotFoundException(f"Product '{item.product_id}' not found.")
+        if int(product.stock_qty) < quantity:
+            raise ValidationException("Insufficient stock for cart item.")
+        item.quantity = quantity
+        await item.save()
+        Log.debug("cart.item.updated", item_id=item_id, quantity=quantity)
         return await self.get_cart(user_id, locale=locale)
 
     async def remove_item(
         self, user_id: int, item_id: str, *, locale: str = "en"
     ) -> dict[str, Any]:
         cart_id = await self.get_or_create_cart(user_id)
-        iid = int(item_id)
+        item = await self._owned_item(cart_id, item_id)
+        await item.delete()
+        Log.debug("cart.item.removed", item_id=item_id)
+        return await self.get_cart(user_id, locale=locale)
+
+    async def _owned_item(self, cart_id: uuid.UUID, item_id: str) -> CartItem:
+        """Return the caller's cart line or 404. A bad/foreign id is not a silent no-op."""
+        try:
+            iid = int(item_id)
+        except ValueError:
+            raise NotFoundException("Cart item not found.") from None
         item: CartItem | None = await CartItem.where(
             CartItem.id == iid, CartItem.cart_id == cart_id
         ).first()
-        if item is not None:
-            await item.delete()
-            Log.debug("cart.item.removed", item_id=item_id)
-        return await self.get_cart(user_id, locale=locale)
+        if item is None:
+            raise NotFoundException("Cart item not found.")
+        return item
 
     async def get_cart_for_checkout(self, user_id: int) -> dict[str, Any]:
         """Returns flat checkout-ready cart data using price snapshots."""
