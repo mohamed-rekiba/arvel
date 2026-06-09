@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from arvel.http.exceptions import ConflictException
 from arvel.logging.facade import Log
 
+from app.models.order import Order
 from app.models.user import User
 
 
@@ -92,10 +94,16 @@ class UserService:
 
     async def force_delete(self, user_id: int) -> None:
         user: User | None = await User.with_trashed().where(User.id == user_id).first()
-        if user is not None:
-            Log.debug("user.force_deleting", user_id=user_id)
-            await user.force_delete()
-            Log.debug("user.force_deleted", user_id=user_id)
+        if user is None:
+            return
+        # orders.user_id is non-nullable with ON DELETE RESTRICT, so a hard delete
+        # would hit a raw FK violation. Surface a clear 409 instead. Count trashed
+        # too — soft-deleted orders are still real rows the FK points at.
+        if await Order.with_trashed().where(Order.user_id == user_id).count() > 0:
+            raise ConflictException("Cannot permanently delete a user with existing orders.")
+        Log.debug("user.force_deleting", user_id=user_id)
+        await user.force_delete()
+        Log.debug("user.force_deleted", user_id=user_id)
 
     async def restore(self, user_id: int) -> dict[str, Any] | None:
         user: User | None = await User.with_trashed().where(User.id == user_id).first()

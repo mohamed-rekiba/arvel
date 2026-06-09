@@ -6,6 +6,6 @@
  */
 
 export interface BodyAdminProductsMediaStoreApiAdminProductsProductIdMediaPost {
-  /** Product image (JPEG, PNG, WebP). */
+  /** Product image (JPEG, PNG, WebP, GIF). */
   file: Blob
 }
