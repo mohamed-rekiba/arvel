@@ -51,12 +51,16 @@ def test_category_listing_filters_the_published_products_view_by_category_slug()
     assert 'keyset=["published_at DESC", "id ASC"]' in service
 
 
-def test_cart_add_item_never_reads_raw_products_table() -> None:
+def test_cart_uses_catalog_for_visibility_but_locks_product_for_stock() -> None:
+    # Visibility/price come from the catalog view, but the stock guard must read
+    # the authoritative product row FOR UPDATE — the view lags writes and would
+    # otherwise green-light an oversell the cart shows until checkout rejects it.
     service = _src(CART_SERVICE)
 
-    assert "from app.models.product import Product" not in service
     assert "from app.models.product_catalog import ProductCatalog" in service
     assert "ProductCatalog.visible(" in service
+    assert "from app.models.product import Product" in service
+    assert "Product.where(Product.id == product_id).lock_for_update()" in service
 
 
 def test_checkout_validates_catalog_product_before_stock_lock() -> None:
@@ -126,10 +130,15 @@ async def test_cart_add_item_uses_catalog_price_snapshot() -> None:
         patch.object(svc, "get_or_create_cart", AsyncMock(return_value=cart_id)),
         patch.object(svc, "get_cart", AsyncMock(return_value={"items": [], "total": 0})),
         patch("app.services.cart_service.ProductCatalog") as product_catalog,
+        patch("app.services.cart_service.Product") as product_model,
         patch("app.services.cart_service.CartItem") as cart_item,
     ):
         product_catalog.id = object()
         product_catalog.visible.return_value.where.return_value = MagicMock(
+            first=AsyncMock(return_value=product)
+        )
+        # Stock now comes from the locked product row, not the catalog view.
+        product_model.where.return_value.lock_for_update.return_value = MagicMock(
             first=AsyncMock(return_value=product)
         )
         cart_item.where.return_value = MagicMock(first=AsyncMock(return_value=None))
@@ -146,7 +155,7 @@ async def test_cart_add_item_uses_catalog_price_snapshot() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cart_add_item_rejects_quantity_above_catalog_stock() -> None:
+async def test_cart_add_item_rejects_quantity_above_locked_stock() -> None:
     from app.services.cart_service import CartService
 
     svc = CartService()
@@ -158,11 +167,16 @@ async def test_cart_add_item_rejects_quantity_above_catalog_stock() -> None:
     with (
         patch.object(svc, "get_or_create_cart", AsyncMock(return_value=cart_id)),
         patch("app.services.cart_service.ProductCatalog") as product_catalog,
+        patch("app.services.cart_service.Product") as product_model,
         patch("app.services.cart_service.CartItem") as cart_item,
     ):
         cart_item.where.return_value = MagicMock(first=AsyncMock(return_value=None))
         product_catalog.id = object()
         product_catalog.visible.return_value.where.return_value = MagicMock(
+            first=AsyncMock(return_value=product)
+        )
+        # The authoritative product row only has 1 in stock, so 2 is rejected.
+        product_model.where.return_value.lock_for_update.return_value = MagicMock(
             first=AsyncMock(return_value=product)
         )
 

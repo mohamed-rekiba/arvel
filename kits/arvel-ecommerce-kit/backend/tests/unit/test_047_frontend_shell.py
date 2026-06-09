@@ -144,6 +144,10 @@ def test_customer_pages_call_cart_checkout_and_account_apis() -> None:
     account = _src(FRONTEND_DIR / "src" / "pages" / "StorefrontAccount.vue")
     assert "useAccountOrdersIndexApiAccountOrdersGet" in account
 
+    # A direct /checkout load must enforce the same unavailable-items guard the
+    # cart does — placing the order is blocked when any line is unavailable.
+    assert "cart.hasUnavailableItems" in checkout
+
     for page in (
         "StorefrontCart.vue",
         "StorefrontCheckout.vue",

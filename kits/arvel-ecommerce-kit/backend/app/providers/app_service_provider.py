@@ -50,9 +50,20 @@ class AppServiceProvider(ServiceProvider):
         self.container.instance(EcommerceAuthController, ec)
 
     async def boot(self) -> None:
+        from arvel.auth.events import Registered  # noqa: PLC0415
+        from arvel.events.dispatcher import EventDispatcher  # noqa: PLC0415
+
+        from app.listeners.assign_customer_role import AssignCustomerRole  # noqa: PLC0415
+
         Product.observe(ProductObserver)
 
         # Refresh the products_catalog view after any change to the three
         # models that feed the materialized view.
         for model in (Product, Category, Vendor):
             model.observe(ProductsCatalogRefreshObserver)
+
+        # Append (not replace) — AuthServiceProvider boots first and registers
+        # SendVerificationEmail for Registered; this provider boots last, so both
+        # listeners fire. Gives self-registered users the baseline customer role.
+        if self.container.bound(EventDispatcher):
+            self.container.make(EventDispatcher).listen(Registered, AssignCustomerRole)

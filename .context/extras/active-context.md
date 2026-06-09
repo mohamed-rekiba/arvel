@@ -995,6 +995,32 @@ Two questions answered:
   - Tests: `test_admin_cannot_delete_their_own_account` (soft+hard → 403) and
     `test_create_category_with_malformed_parent_id_returns_422`. Ruff clean; 388 unit pass;
     mypy parity (27 pre-existing, 0 added); both integration tests green (~79s).
+- **iter 70 — final r4 batch: 3 critical items + CI gate fixes (done):**
+  - **Customer role on self-registration.** New `app/listeners/assign_customer_role.py`
+    (`AssignCustomerRole(Listener[Registered])`) gives every signup the baseline `customer`
+    role; wired in `AppServiceProvider.boot()` (appends, doesn't replace the framework's
+    `SendVerificationEmail`). Gotcha: the kit container refuses to auto-wire a listener whose
+    `__init__ is object.__init__` — so the listener needs an explicit `__init__` (the
+    framework's own `SendVerificationEmail` hits the same wall and silently logs a
+    `listener_error`; left alone, it's framework-side). Test:
+    `test_self_registration_assigns_customer_role` (register → admin sees `customer` role).
+  - **Cart optimistic oversell.** `add_item`/`update_item` checked stock against the
+    `ProductCatalog` materialized view, which lags writes. Added `CartService._locked_stock`
+    that reads the authoritative `Product` row `FOR UPDATE` (same lock checkout uses) for the
+    stock guard; visibility/price still come from the catalog. Contract test rewritten
+    (`test_cart_uses_catalog_for_visibility_but_locks_product_for_stock`) + the two stock unit
+    tests now mock the locked `Product`. 23 cart/checkout integration tests pass.
+  - **Checkout-page unavailable guard.** `StorefrontCheckout.vue` Place Order now also
+    disables on `cart.hasUnavailableItems` (a direct `/checkout` load bypassed the cart's
+    guard), with a banner linking back to `/cart`. Contract assertion added to test_047.
+  - **CI gate fixes the user hit on `make pre-commit`:** ruff E501 in test_049 was already
+    resolved on disk (stale terminal). Coverage was failing two framework gates —
+    `arvel.facades` per-module floor (100%) and overall `fail_under=90` (was 89.96%). The
+    untested `Http` facade (builders/verbs/assert-failure branches) and `Hash._check_bcrypt`
+    degrade branches dropped facades below 100%. Added real tests in
+    `tests/http/test_wi047_http_facade.py` (+11) and `tests/auth/test_hash.py` (+2): coverage
+    → 90.07%, facades → 100%, 4616 framework tests pass. (Aside: `except ValueError, TypeError:`
+    in `facades/hash.py` is ugly but valid in 3.14's PEG parser — parses as a tuple handler.)
 
 ## Blockers
 

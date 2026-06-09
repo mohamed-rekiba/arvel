@@ -126,3 +126,26 @@ def test_hash_make_bcrypt_produces_bcrypt_hash() -> None:
 
     hashed = Hash.make_bcrypt("secret", rounds=4)
     assert hashed.startswith("$2")
+
+
+def test_hash_check_bcrypt_hash_without_extra_degrades_to_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A bcrypt hash can't verify without the extra — non-match, not a crash."""
+    from arvel.facades.hash import Hash
+
+    def _no_bcrypt() -> object:
+        raise ImportError("bcrypt extra not installed")
+
+    monkeypatch.setattr(Hash, "_load_bcrypt", staticmethod(_no_bcrypt))
+    # $2b$ prefix routes to the bcrypt path, which can't load the lib.
+    assert Hash.check("secret", "$2b$12$" + "x" * 53) is False
+
+
+def test_hash_check_malformed_bcrypt_hash_returns_false() -> None:
+    """A bcrypt-prefixed but malformed hash makes checkpw raise — caught as non-match."""
+    pytest.importorskip("bcrypt")
+
+    from arvel.facades.hash import Hash
+
+    assert Hash.check("secret", "$2b$12$too-short-to-be-a-real-bcrypt-hash") is False

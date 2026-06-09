@@ -296,6 +296,27 @@ async def test_translations_requires_both_product_and_category_view(
     assert resp.status_code == 403, "categories.view alone must not expose product translations"
 
 
+@pytest.mark.asyncio
+async def test_self_registration_assigns_customer_role(client: Any, super_admin_token: str) -> None:
+    """A self-registered user lands inside RBAC with the baseline customer role."""
+    email = "newbie@example.com"
+    reg = await client.post(
+        "/api/auth/register",
+        json={
+            "name": "New Bie",
+            "email": email,
+            "password": "password123",
+            "password_confirmation": "password123",
+        },
+    )
+    assert reg.status_code in (200, 201), reg.json()
+
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+    listing = await client.get(f"/api/admin/users?search={email}", headers=sa)
+    user = next(u for u in listing.json()["data"] if u["email"] == email)
+    assert "customer" in user["roles"]
+
+
 # ─── helpers ────────────────────────────────────────────────────────────────────
 
 
