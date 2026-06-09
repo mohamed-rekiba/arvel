@@ -7,6 +7,9 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Publish state for catalog entities; rejects typos at the API instead of the DB.
+CatalogStatus = Literal["draft", "published"]
+
 
 class LoginPayload(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -72,7 +75,7 @@ class CreateCategoryPayload(BaseModel):
     name: dict[str, str]
     slug: dict[str, str]
     parent_id: str | None = None
-    status: str = "draft"
+    status: CatalogStatus = "draft"
     published_at: datetime | None = None
 
 
@@ -81,7 +84,7 @@ class UpdateCategoryPayload(BaseModel):
     name: dict[str, str] | None = None
     slug: dict[str, str] | None = None
     parent_id: str | None = None
-    status: str | None = None
+    status: CatalogStatus | None = None
     published_at: datetime | None = None
 
 
@@ -90,7 +93,7 @@ class CreateVendorPayload(BaseModel):
     name: str
     slug: str
     description: str | None = None
-    status: str = "draft"
+    status: CatalogStatus = "draft"
     published_at: datetime | None = None
 
 
@@ -99,7 +102,7 @@ class UpdateVendorPayload(BaseModel):
     name: str | None = None
     slug: str | None = None
     description: str | None = None
-    status: str | None = None
+    status: CatalogStatus | None = None
     published_at: datetime | None = None
 
 

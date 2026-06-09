@@ -498,14 +498,16 @@ function handleRestore(id: string): void {
                   >
                     {{ t('admin.catalog.action_delete') }}
                   </button>
-                  <button
-                    v-if="trashedMode === 'only'"
-                    type="button"
-                    class="text-xs text-danger font-semibold hover:underline"
-                    @click="handleForceDelete(record.id)"
-                  >
-                    {{ t('admin.catalog.action_force_delete', 'Force delete') }}
-                  </button>
+                  <PermissionGate :permission="deletePermission" :min-level="100">
+                    <button
+                      v-if="trashedMode === 'only'"
+                      type="button"
+                      class="text-xs text-danger font-semibold hover:underline"
+                      @click="handleForceDelete(record.id)"
+                    >
+                      {{ t('admin.catalog.action_force_delete', 'Force delete') }}
+                    </button>
+                  </PermissionGate>
                 </PermissionGate>
               </div>
             </td>

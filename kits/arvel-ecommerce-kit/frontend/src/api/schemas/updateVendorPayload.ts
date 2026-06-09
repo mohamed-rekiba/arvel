@@ -4,11 +4,12 @@
  * FastAPI
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateVendorPayloadStatus } from './updateVendorPayloadStatus.ts'
 
 export interface UpdateVendorPayload {
   name?: string | null
   slug?: string | null
   description?: string | null
-  status?: string | null
+  status?: UpdateVendorPayloadStatus
   published_at?: string | null
 }
