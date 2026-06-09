@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.http.controllers._deps import orders, require_permission
+from app.http.controllers._deps import clamp_limit, clamp_offset, orders, require_permission
 from app.http.controllers._responses import (
     AdminOrderListOut,
     AdminOrderWrapperOut,
@@ -26,12 +26,14 @@ class AdminOrdersController(Controller):
     ) -> AdminOrderListOut:
         await require_permission(request, "orders.view")
         return AdminOrderListOut.model_validate(
-            await orders.admin_list_orders(status=status, limit=limit, offset=offset)
+            await orders.admin_list_orders(
+                status=status, limit=clamp_limit(limit), offset=clamp_offset(offset)
+            )
         )
 
     async def best_sellers(self, request: Request, limit: int = 5) -> BestSellersListOut:
         await require_permission(request, "orders.view")
-        data = await orders.best_sellers(limit=limit)
+        data = await orders.best_sellers(limit=clamp_limit(limit))
         return BestSellersListOut(data=data)
 
     async def stats(self, request: Request) -> DashboardStatsOut:

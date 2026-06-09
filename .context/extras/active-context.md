@@ -792,8 +792,20 @@ typecheck/lint/vitest(18)/build green.
 2. ~~MED: checkout bypasses unavailable-item guard~~ — verified NOT a bug:
    `checkout` raises `ProductUnavailableError` → 409 for any non-visible line.
 3. ~~MED: customer order history unbounded~~ ✅ (iter 55)
-4. MED: admin/storefront list endpoints accept unbounded `limit` (clamp helper
-   landed in iter 55; still need to wire it into admin + storefront controllers).
+4. ~~MED: admin/storefront list endpoints accept unbounded `limit`~~ ✅ (iter 56)
+5. MED: register name 255 vs DB column 120 → 500.
+6. MED: category/vendor force-delete FK RESTRICT → 500.
+7. MED: frontend admin route gate coarser than backend.
+8. MED: client permissions go stale after admin change.
+
+## Iteration 56 — Clamp page size on every list endpoint (backend, MED)
+
+- MED: every admin list (`orders`, `vendors`, `users`, `categories`, `products`)
+  and storefront list (`index`, by-category, `search`) plus `best_sellers`
+  passed the client `?limit`/`?offset` straight to the query. `?limit=10000000`
+  forced a full scan (and an N+1 on order rows). All now route through
+  `clamp_limit`/`clamp_offset` (cap 100, floor 1; offset floor 0).
+- Test: `test_060_pagination_clamp.py` (5 cases). Kit unit suite 380 pass.
 5. MED: register name 255 vs DB column 120 → 500.
 6. MED: category/vendor force-delete FK RESTRICT → 500.
 7. MED: frontend admin route gate coarser than backend.
