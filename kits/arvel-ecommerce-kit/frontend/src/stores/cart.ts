@@ -18,9 +18,8 @@ export const useCartStore = defineStore('cart', () => {
     () => cart.value?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0,
   )
 
-  const subtotal = computed(
-    () => cart.value?.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0) ?? 0,
-  )
+  // Snapshot prices (what checkout charges), not live product.price which can drift.
+  const subtotal = computed(() => cart.value?.total ?? 0)
 
   async function load(): Promise<void> {
     const auth = useAuthStore()

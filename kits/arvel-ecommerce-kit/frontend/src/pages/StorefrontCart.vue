@@ -132,7 +132,7 @@ async function remove(itemId: string): Promise<void> {
 
                 <!-- Price -->
                 <td class="px-4 py-4 text-center text-sm text-fg">
-                  {{ formatCurrency(item.product.price, currentLocale) }}
+                  {{ formatCurrency(item.unit_price, currentLocale) }}
                 </td>
 
                 <!-- Quantity stepper -->
@@ -166,7 +166,7 @@ async function remove(itemId: string): Promise<void> {
 
                 <!-- Subtotal -->
                 <td class="px-4 py-4 text-start text-sm font-bold text-fg">
-                  {{ formatCurrency(item.product.price * item.quantity, currentLocale) }}
+                  {{ formatCurrency(item.subtotal, currentLocale) }}
                 </td>
               </tr>
             </tbody>

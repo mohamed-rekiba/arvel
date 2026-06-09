@@ -561,6 +561,20 @@ order id in `?order=`, but the checkout confirmation's "View orders" link went t
 `{ path: '/account', query: { order: placedOrder.id } }` when an order was placed,
 falling back to plain `/account` otherwise. Frontend typecheck + lint green.
 
+## Iteration 37 — Cart shows charged (snapshot) prices, not live ones (full-stack)
+
+HIGH: the cart/checkout UI multiplied the live `product.price` for line and cart
+totals, but checkout charges `unit_price_snapshot` (price at add-time). After an
+admin price change the displayed total disagreed with the charged total. Backend:
+`CartItemOut` now exposes `unit_price` + `subtotal` (snapshot) and `CartOut`
+exposes `total` (already computed server-side from snapshots); `_format_item`
+populates them. Frontend: cart store `subtotal` reads `cart.total`; the cart page
+and checkout review render `item.unit_price`/`item.subtotal` instead of
+`product.price`. Regenerated the Orval client (also picked up the iter-32 `ge=0`
+min on price/stock). Backend ruff + cart suite green (16); frontend
+typecheck/lint/vitest(18)/build green. The live `product.price` still shows on
+product cards/detail — only the cart reflects the locked-in price.
+
 ## Blockers
 
 None. All quality gates green.

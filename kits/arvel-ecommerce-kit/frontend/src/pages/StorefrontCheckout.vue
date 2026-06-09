@@ -295,7 +295,7 @@ function itemShipping(index: number): string {
                           {{ item.product.category_name }}
                         </p>
                         <p class="text-xs font-medium text-brand">
-                          {{ formatCurrency(item.product.price, currentLocale) }}
+                          {{ formatCurrency(item.unit_price, currentLocale) }}
                         </p>
                       </div>
                     </div>
@@ -328,7 +328,7 @@ function itemShipping(index: number): string {
                     </div>
                   </td>
                   <td class="px-6 py-4 text-end text-sm font-semibold text-brand">
-                    {{ formatCurrency(item.product.price * item.quantity, currentLocale) }}
+                    {{ formatCurrency(item.subtotal, currentLocale) }}
                   </td>
                 </tr>
               </template>

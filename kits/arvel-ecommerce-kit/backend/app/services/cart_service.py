@@ -181,10 +181,13 @@ class CartService:
                 "vendor_name": "",
                 "vendor_slug": "",
             }
+        unit_price = float(item.unit_price_snapshot or 0)
         return {
             "id": str(item.id),
             "product_id": str(item.product_id),
             "quantity": int(item.quantity),
+            "unit_price": unit_price,
+            "subtotal": round(unit_price * int(item.quantity), 2),
             "product": product_data,
         }
 
