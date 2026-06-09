@@ -1,6 +1,6 @@
 # SAD-006 — Arvon: fluent datetime layer
 
-**Work Item**: WI-arvel-004 · **Status**: Approved (autonomous) · **Related**: [ADR-026](../adr/ADR-026-datetime-library.md), [PRD-001](../prd/PRD-001-arvon.md)
+**Status**: Approved
 
 ## Context
 
