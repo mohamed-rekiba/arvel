@@ -95,13 +95,28 @@ watch([activeQuery, currentLocale], ([query, locale]) => {
   debounceTimer = setTimeout(() => void runSearch(query, locale), SEARCH_DEBOUNCE_MS)
 })
 
-const displayed = computed(() => (activeQuery.value ? searchResults.value : products.value))
+// Search hits the whole catalog; if a category is active, keep results scoped
+// to it (slugs are already locale-resolved, same as the listing endpoint) so
+// the filter box doesn't leak products from other categories.
+const scopedResults = computed(() => {
+  if (!categorySlug.value) return searchResults.value
+  return searchResults.value.filter(
+    (p) =>
+      p.category_slug === categorySlug.value || p.parent_category_slug === categorySlug.value,
+  )
+})
+
+const displayed = computed(() => (activeQuery.value ? scopedResults.value : products.value))
 const showLoadMore = computed(() => !activeQuery.value && hasMore.value && !loading.value)
 const showSkeleton = computed(() =>
-  activeQuery.value ? searching.value && searchResults.value.length === 0 : loading.value && products.value.length === 0,
+  activeQuery.value
+    ? searching.value && scopedResults.value.length === 0
+    : loading.value && products.value.length === 0,
 )
 const showEmpty = computed(() =>
-  activeQuery.value ? !searching.value && searchResults.value.length === 0 : !loading.value && products.value.length === 0,
+  activeQuery.value
+    ? !searching.value && scopedResults.value.length === 0
+    : !loading.value && products.value.length === 0,
 )
 </script>
 

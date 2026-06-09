@@ -9,12 +9,16 @@ import { routeQuery, toSupportedLocale } from '@/lib/i18n'
 const route = useRoute()
 const { locale, t } = useI18n({ useScope: 'global' })
 
+// Backend rejects queries shorter than this; don't fire a request that 400s.
+const MIN_QUERY_LENGTH = 2
+
 const currentLocale = computed(() => toSupportedLocale(locale.value))
 const query = computed(() => routeQuery(route.query.q))
+const canSearch = computed(() => query.value.trim().length >= MIN_QUERY_LENGTH)
 
 const { data, isPending } = useStorefrontSearchApiSearchGet(
   computed(() => ({ q: query.value, locale: currentLocale.value })),
-  { query: { enabled: computed(() => !!query.value.trim()) } },
+  { query: { enabled: canSearch } },
 )
 const products = computed(() => data.value?.data ?? [])
 </script>
@@ -24,7 +28,7 @@ const products = computed(() => data.value?.data ?? [])
     <h1 class="text-3xl font-bold text-fg">
       {{ t('search.results', 'Search Results') }}
     </h1>
-    <p v-if="query" class="mt-2 text-fg-muted">
+    <p v-if="canSearch" class="mt-2 text-fg-muted">
       {{ t('search.count', { n: products.length, q: query }) }}
     </p>
 
@@ -35,7 +39,7 @@ const products = computed(() => data.value?.data ?? [])
         class="aspect-square animate-pulse rounded-xl bg-app-bg-sunken"
       />
     </div>
-    <div v-else-if="!query" class="mt-16 text-center text-fg-faint">
+    <div v-else-if="!canSearch" class="mt-16 text-center text-fg-faint">
       {{ t('search.prompt', 'Enter a search term above') }}
     </div>
     <div v-else-if="products.length === 0" class="mt-16 text-center text-fg-faint">
