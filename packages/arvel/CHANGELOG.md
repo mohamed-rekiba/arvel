@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.22.1...arvel-v0.23.0) (2026-06-09)
+
+
+### Features
+
+* **auth:** permission guards accept a list with all/any semantics ([b14a303](https://github.com/mohamed-rekiba/arvel/commit/b14a30378debbf62aa052a46f6aafc1ab439644b))
+
 ## [0.22.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.22.0...arvel-v0.22.1) (2026-06-09)
 
 
