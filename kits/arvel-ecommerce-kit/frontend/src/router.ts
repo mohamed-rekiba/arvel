@@ -2,6 +2,17 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { hasStoredSession, clearSession } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 
+declare module 'vue-router' {
+  interface RouteMeta {
+    requiresAuth?: boolean
+    requiresAdmin?: boolean
+    // Backend permission(s) the route's primary endpoint enforces. The guard
+    // mirrors the API so deep links can't render a shell the API will 403.
+    permission?: string | readonly string[]
+    permissionMatch?: 'all' | 'any'
+  }
+}
+
 const router = createRouter({
   history: createWebHistory(),
   scrollBehavior() {
@@ -96,104 +107,123 @@ const router = createRouter({
           name: 'admin-products',
           component: () => import('@/pages/AdminCatalogPage.vue'),
           props: { catalog: 'products' },
+          meta: { permission: 'products.view' },
         },
         {
           path: '/admin/categories',
           name: 'admin-categories',
           component: () => import('@/pages/AdminCatalogPage.vue'),
           props: { catalog: 'categories' },
+          meta: { permission: 'categories.view' },
         },
         {
           path: '/admin/vendors',
           name: 'admin-vendors',
           component: () => import('@/pages/AdminCatalogPage.vue'),
           props: { catalog: 'vendors' },
+          meta: { permission: 'vendors.view' },
         },
         {
           path: '/admin/products/new',
           name: 'admin-product-new',
           component: () => import('@/pages/AdminCatalogEditPage.vue'),
           props: { catalog: 'products', mode: 'create' },
+          meta: { permission: 'products.create' },
         },
         {
           path: '/admin/categories/new',
           name: 'admin-category-new',
           component: () => import('@/pages/AdminCatalogEditPage.vue'),
           props: { catalog: 'categories', mode: 'create' },
+          meta: { permission: 'categories.create' },
         },
         {
           path: '/admin/vendors/new',
           name: 'admin-vendor-new',
           component: () => import('@/pages/AdminCatalogEditPage.vue'),
           props: { catalog: 'vendors', mode: 'create' },
+          meta: { permission: 'vendors.create' },
         },
         {
           path: '/admin/products/:editId/edit',
           name: 'admin-product-edit',
           component: () => import('@/pages/AdminCatalogEditPage.vue'),
           props: (route) => ({ catalog: 'products', id: route.params.editId }),
+          meta: { permission: 'products.view' },
         },
         {
           path: '/admin/categories/:editId/edit',
           name: 'admin-category-edit',
           component: () => import('@/pages/AdminCatalogEditPage.vue'),
           props: (route) => ({ catalog: 'categories', id: route.params.editId }),
+          meta: { permission: 'categories.view' },
         },
         {
           path: '/admin/vendors/:editId/edit',
           name: 'admin-vendor-edit',
           component: () => import('@/pages/AdminCatalogEditPage.vue'),
           props: (route) => ({ catalog: 'vendors', id: route.params.editId }),
+          meta: { permission: 'vendors.view' },
         },
         {
           path: '/admin/orders',
           name: 'admin-orders',
           component: () => import('@/pages/AdminListPage.vue'),
           props: { listType: 'orders' },
+          meta: { permission: 'orders.view' },
         },
         {
           path: '/admin/orders/:orderId',
           name: 'admin-order-detail',
           component: () => import('@/pages/AdminOrderDetailPage.vue'),
+          meta: { permission: 'orders.view' },
         },
         {
           path: '/admin/users',
           name: 'admin-users',
           component: () => import('@/pages/AdminListPage.vue'),
           props: { listType: 'users' },
+          meta: { permission: 'users.manage' },
         },
         {
           path: '/admin/users/:userId',
           name: 'admin-user-detail',
           component: () => import('@/pages/AdminUserDetailPage.vue'),
+          meta: { permission: 'users.manage' },
         },
         {
           path: '/admin/roles',
           name: 'admin-roles',
           component: () => import('@/pages/AdminRolesPage.vue'),
+          meta: { permission: 'roles.manage' },
         },
         {
           path: '/admin/permissions',
           name: 'admin-permissions',
           component: () => import('@/pages/AdminPermissionsPage.vue'),
+          meta: { permission: 'roles.manage' },
         },
         {
           path: '/admin/translations',
           name: 'admin-translations',
           component: () => import('@/pages/AdminPlaceholderPage.vue'),
           props: { pageType: 'translations' },
+          // Backend requires both (match="all"); mirror it.
+          meta: { permission: ['products.view', 'categories.view'], permissionMatch: 'all' },
         },
         {
           path: '/admin/analytics',
           name: 'admin-analytics',
           component: () => import('@/pages/AdminPlaceholderPage.vue'),
           props: { pageType: 'coming-soon', title: 'Analytics' },
+          meta: { permission: 'analytics.view' },
         },
         {
           path: '/admin/settings',
           name: 'admin-settings',
           component: () => import('@/pages/AdminPlaceholderPage.vue'),
           props: { pageType: 'coming-soon', title: 'Settings' },
+          meta: { permission: 'settings.view' },
         },
         {
           // Nested so an unknown /admin/* path inherits requiresAuth + requiresAdmin
@@ -207,6 +237,17 @@ const router = createRouter({
     },
   ],
 })
+
+function satisfiesPermission(
+  auth: ReturnType<typeof useAuthStore>,
+  permission: string | readonly string[],
+  match: 'all' | 'any' = 'all',
+): boolean {
+  const perms = typeof permission === 'string' ? [permission] : permission
+  return match === 'any'
+    ? perms.some((p) => auth.hasPermission(p))
+    : perms.every((p) => auth.hasPermission(p))
+}
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
@@ -223,6 +264,11 @@ router.beforeEach(async (to) => {
     }
     if (!auth.hasAdminAccess) {
       return { name: 'home' }
+    }
+    // Per-route check mirrors the backend permission. Dashboard has none, so
+    // it's the safe fallback any admin can reach.
+    if (to.meta.permission && !satisfiesPermission(auth, to.meta.permission, to.meta.permissionMatch)) {
+      return { name: 'admin-dashboard' }
     }
     return true
   }

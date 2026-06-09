@@ -160,6 +160,31 @@ def test_customer_pages_call_cart_checkout_and_account_apis() -> None:
         assert "requireStoredAccessToken(" in src
 
 
+def test_admin_routes_enforce_per_route_permissions() -> None:
+    """The router gates each admin route by the backend permission, not just admin access.
+
+    Without this, a deep link to /admin/users (or /admin/roles, etc.) would render
+    the shell for any admin and then eat 403s from the API.
+    """
+    src = _src(FRONTEND_DIR / "src" / "router.ts")
+
+    # Per-route permission metadata mirrors the controllers' require_permission.
+    for meta in (
+        "permission: 'products.view'",
+        "permission: 'products.create'",
+        "permission: 'categories.view'",
+        "permission: 'vendors.view'",
+        "permission: 'orders.view'",
+        "permission: 'users.manage'",
+        "permission: 'roles.manage'",
+        "permission: ['products.view', 'categories.view'], permissionMatch: 'all'",
+    ):
+        assert meta in src
+    # The guard enforces it and falls back to the always-reachable dashboard.
+    assert "satisfiesPermission(auth, to.meta.permission, to.meta.permissionMatch)" in src
+    assert "return { name: 'admin-dashboard' }" in src
+
+
 def test_protected_frontend_routes_use_stored_session_guard() -> None:
     router = _src(FRONTEND_DIR / "src" / "router.ts")
     auth_page = _src(FRONTEND_DIR / "src" / "pages" / "StorefrontAuth.vue")
