@@ -82,6 +82,55 @@ class TestFakeBasics:
         assert resp.failed()
 
 
+class TestRequestBuilders:
+    """Each builder returns a fresh PendingRequest that still issues the request."""
+
+    async def test_with_headers(self) -> None:
+        with Http.fake() as fake:
+            await Http.with_headers({"X-A": "1"}).get("https://x.test/h")
+        assert fake.recorded[0].has_header("X-A", "1")
+
+    async def test_with_basic_auth(self) -> None:
+        # Basic auth is applied via httpx's auth hook at send time, not the header
+        # dict the fake records — so just assert the builder issued the request.
+        with Http.fake() as fake:
+            await Http.with_basic_auth("ada", "secret").get("https://x.test/b")
+        assert fake.recorded[0].url == "https://x.test/b"
+
+    async def test_accept(self) -> None:
+        with Http.fake() as fake:
+            await Http.accept("application/xml").get("https://x.test/a")
+        assert fake.recorded[0].has_header("Accept", "application/xml")
+
+    async def test_accept_json(self) -> None:
+        with Http.fake() as fake:
+            await Http.accept_json().get("https://x.test/j")
+        assert fake.recorded[0].has_header("Accept", "application/json")
+
+    async def test_as_form_and_timeout(self) -> None:
+        with Http.fake() as fake:
+            await Http.as_form().timeout(5).post("https://x.test/f", {"k": "v"})
+        assert fake.recorded[0].method == "POST"
+
+
+class TestVerbs:
+    async def test_head_put_patch_delete(self) -> None:
+        with Http.fake() as fake:
+            await Http.head("https://x.test/h")
+            await Http.put("https://x.test/p", {"a": 1})
+            await Http.patch("https://x.test/q", {"b": 2})
+            await Http.delete("https://x.test/d")
+        methods = [r.method for r in fake.recorded]
+        assert methods == ["HEAD", "PUT", "PATCH", "DELETE"]
+
+    async def test_recorded_returns_sent_requests(self) -> None:
+        with Http.fake():
+            await Http.get("https://x.test/r")
+            recorded = Http.recorded()
+        assert len(recorded) == 1
+        assert recorded[0].url == "https://x.test/r"
+
+
 class TestFakeRecording:
     async def test_records_method_url_and_data(self) -> None:
         with Http.fake() as fake:
@@ -121,6 +170,24 @@ class TestAssertions:
     async def test_assert_nothing_sent(self) -> None:
         with Http.fake():
             Http.assert_nothing_sent()
+
+    async def test_assert_not_sent_failure(self) -> None:
+        with Http.fake():
+            await Http.get("https://x.test/a")
+            with pytest.raises(AssertionError):
+                Http.assert_not_sent(lambda r: r.url.endswith("/a"))
+
+    async def test_assert_sent_count_mismatch(self) -> None:
+        with Http.fake():
+            await Http.get("https://x.test/a")
+            with pytest.raises(AssertionError, match="Expected 2 sent"):
+                Http.assert_sent_count(2)
+
+    async def test_assert_nothing_sent_failure(self) -> None:
+        with Http.fake():
+            await Http.get("https://x.test/a")
+            with pytest.raises(AssertionError, match="Expected no requests"):
+                Http.assert_nothing_sent()
 
     def test_assertions_require_fake_context(self) -> None:
         with pytest.raises(TypeError, match="requires an active Http.fake"):

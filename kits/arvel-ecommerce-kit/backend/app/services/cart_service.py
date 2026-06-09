@@ -11,6 +11,7 @@ from arvel.logging.facade import Log
 
 from app.models.cart import Cart
 from app.models.cart_item import CartItem
+from app.models.product import Product
 from app.models.product_catalog import ProductCatalog
 from app.services.product_service import ProductService
 
@@ -71,7 +72,11 @@ class CartService:
         )
         if product is None:
             raise NotFoundException(f"Product '{product_id}' not found.")
-        if int(product.stock_qty) < requested_quantity:
+        # The catalog view lags behind writes, so its stock_qty can green-light an
+        # oversell that checkout later rejects. Check the authoritative product row
+        # FOR UPDATE — same lock checkout uses — so the cart guard sees committed stock.
+        stock = await self._locked_stock(pid)
+        if stock < requested_quantity:
             raise ValidationException("Insufficient stock for cart item.")
         price = Decimal(str(product.price or 0))
 
@@ -100,7 +105,8 @@ class CartService:
         product: ProductCatalog | None = await item.product().first()
         if product is None:
             raise NotFoundException(f"Product '{item.product_id}' not found.")
-        if int(product.stock_qty) < quantity:
+        # Authoritative, FOR UPDATE — not the lagging catalog view (see add_item).
+        if await self._locked_stock(item.product_id) < quantity:
             raise ValidationException("Insufficient stock for cart item.")
         item.quantity = quantity
         # Re-snapshot like add_item: any quantity change re-prices the whole line
@@ -118,6 +124,19 @@ class CartService:
         await item.delete()
         Log.debug("cart.item.removed", item_id=item_id)
         return await self.get_cart(user_id, locale=locale)
+
+    async def _locked_stock(self, product_id: uuid.UUID) -> int:
+        """Committed stock from the product row, FOR UPDATE. Needs the request txn.
+
+        Concurrent adds for the same product serialize here, so each reads the
+        other's committed effect instead of a stale materialized-view snapshot.
+        """
+        product: Product | None = (
+            await Product.where(Product.id == product_id).lock_for_update().first()
+        )
+        if product is None:
+            raise NotFoundException(f"Product '{product_id}' not found.")
+        return int(product.stock_qty)
 
     async def _owned_item(self, cart_id: uuid.UUID, item_id: str) -> CartItem:
         """Return the caller's cart line or 404. A bad/foreign id is not a silent no-op."""

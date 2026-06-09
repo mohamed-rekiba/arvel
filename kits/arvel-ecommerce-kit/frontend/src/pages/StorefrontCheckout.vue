@@ -404,6 +404,19 @@ function itemShipping(index: number): string {
           </div>
         </div>
 
+        <!-- Same guard as the cart: a direct /checkout load can't place an order
+             with items that went unavailable after they were added. -->
+        <RouterLink
+          v-if="step === 2 && cart.hasUnavailableItems"
+          to="/cart"
+          class="mx-6 mb-1 mt-4 flex items-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger hover:bg-danger/20"
+        >
+          <span class="material-symbols-outlined select-none text-[16px] leading-none"
+            >warning</span
+          >
+          {{ t('cart.has_unavailable', 'Remove items that are no longer available to check out.') }}
+        </RouterLink>
+
         <p v-if="error" class="px-6 pb-2 text-sm text-danger">{{ error }}</p>
 
         <!-- Action buttons -->
@@ -427,7 +440,7 @@ function itemShipping(index: number): string {
           <button
             v-if="step === 2"
             type="button"
-            :disabled="submitting || !cart.cart?.items.length"
+            :disabled="submitting || !cart.cart?.items.length || cart.hasUnavailableItems"
             class="flex-1 rounded-xl bg-brand py-3 text-sm font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
             @click="placeOrder"
           >
