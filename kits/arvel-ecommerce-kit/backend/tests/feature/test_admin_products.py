@@ -372,6 +372,25 @@ async def test_force_delete_vendor_with_products_returns_409(
     assert blocked.status_code == 409
 
 
+@pytest.mark.asyncio
+async def test_create_category_with_malformed_parent_id_returns_422(
+    client: Any, super_admin_token: str
+) -> None:
+    """A non-UUID parent_id is a 422, not a raw 500 from uuid.UUID()."""
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+    response = await client.post(
+        "/api/admin/categories",
+        headers=sa,
+        json={
+            "name": {"en": "Bad Parent"},
+            "slug": {"en": "bad-parent"},
+            "status": "draft",
+            "parent_id": "not-a-uuid",
+        },
+    )
+    assert response.status_code == 422
+
+
 # ─── restore ────────────────────────────────────────────────────────────
 
 

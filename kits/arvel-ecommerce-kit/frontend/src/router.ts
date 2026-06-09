@@ -269,7 +269,10 @@ router.beforeEach(async (to) => {
     }
     // Per-route check mirrors the backend permission. Dashboard has none, so
     // it's the safe fallback any admin can reach.
-    if (to.meta.permission && !satisfiesPermission(auth, to.meta.permission, to.meta.permissionMatch)) {
+    if (
+      to.meta.permission &&
+      !satisfiesPermission(auth, to.meta.permission, to.meta.permissionMatch)
+    ) {
       return { name: 'admin-dashboard' }
     }
     return true

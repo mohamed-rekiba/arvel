@@ -61,6 +61,18 @@ class CategoryService:
             return await Category.with_trashed().where(Category.id == cid).first()
         return await Category.where(Category.id == cid).first()
 
+    @staticmethod
+    def _coerce_parent_id(raw: str) -> uuid.UUID:
+        # Request-layer parsing: a malformed parent_id is a 422, not a 500. Mirrors
+        # validate_product_fks' coercion so both FK paths fail the same clean way.
+        try:
+            return uuid.UUID(raw)
+        except ValueError as exc:
+            raise ValidationException(
+                "Validation failed.",
+                details=[{"field": "parent_id", "issue": "must be a valid UUID"}],
+            ) from exc
+
     async def _assert_acyclic_parent(self, category: Category, parent_id: uuid.UUID) -> None:
         """Reject self-parenting and cycles before writing parent_id."""
         if parent_id == category.id:
@@ -83,18 +95,15 @@ class CategoryService:
 
     async def create(self, payload: CreateCategoryPayload) -> Category:
         Log.debug("category.creating", name=label(payload.name))
-        if payload.parent_id:
-            parent = (
-                await Category.with_trashed()
-                .where(Category.id == uuid.UUID(payload.parent_id))
-                .first()
-            )
+        parent_uuid = self._coerce_parent_id(payload.parent_id) if payload.parent_id else None
+        if parent_uuid is not None:
+            parent = await Category.with_trashed().where(Category.id == parent_uuid).first()
             if parent is None:
                 raise ValidationException("Parent category not found.")
         category = await Category.create(
             name=payload.name,
             slug=payload.slug,
-            parent_id=uuid.UUID(payload.parent_id) if payload.parent_id else None,
+            parent_id=parent_uuid,
             status=payload.status,
             published_at=PublishableMixin.resolve_published_at(
                 payload.status, payload.published_at
@@ -109,7 +118,7 @@ class CategoryService:
         Log.debug("category.updating", category_id=str(category.id))
         for key, value in payload.model_dump(exclude_unset=True).items():
             if key == "parent_id" and value is not None:
-                new_parent = uuid.UUID(value)
+                new_parent = self._coerce_parent_id(value)
                 await self._assert_acyclic_parent(category, new_parent)
                 category.parent_id = new_parent
             else:

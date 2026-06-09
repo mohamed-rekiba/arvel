@@ -985,6 +985,16 @@ Two questions answered:
     authoritative gate), checkout-page unavailable-item guard parity, `Registered`→customer
     role listener, admin self-delete guard, category parent_id 422, JsonResource/FormRequest
     adoption on catalog mutations, dashboard revenue SQL aggregate, admin order status enum.
+- **iter 69 — re-review batch r4b: admin safety hardening (2 MED, done):**
+  - **Admin self-delete footgun.** `destroy` (soft) and `force_destroy` (hard) had no
+    self-target guard, while `suspend` did — an admin could delete their own account and
+    lose access. Added the same `int(actor.id) == user_id → 403` check `suspend` uses.
+  - **Category parent_id 500.** `create`/`update` called `uuid.UUID(parent_id)` uncaught,
+    so a malformed id raised `ValueError` → 500. Added `CategoryService._coerce_parent_id`
+    (422 on bad UUID, same error shape as `validate_product_fks`) used by both paths.
+  - Tests: `test_admin_cannot_delete_their_own_account` (soft+hard → 403) and
+    `test_create_category_with_malformed_parent_id_returns_422`. Ruff clean; 388 unit pass;
+    mypy parity (27 pre-existing, 0 added); both integration tests green (~79s).
 
 ## Blockers
 

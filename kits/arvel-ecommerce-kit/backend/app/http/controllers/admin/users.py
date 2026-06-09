@@ -59,6 +59,8 @@ class AdminUsersController(Controller):
 
     async def destroy(self, user_id: int, request: Request) -> Response:
         actor = await require_permission(request, "users.manage")
+        if int(actor.id) == user_id:
+            raise AuthorizationException("Cannot delete your own account.")
         target = await User.where(User.id == user_id).first()
         if target is None:
             raise NotFoundException("User not found.")
@@ -68,6 +70,8 @@ class AdminUsersController(Controller):
 
     async def force_destroy(self, user_id: int, request: Request) -> Response:
         actor = await require_role_level(request, "users.manage", 100)
+        if int(actor.id) == user_id:
+            raise AuthorizationException("Cannot delete your own account.")
         target = await User.with_trashed().where(User.id == user_id).first()
         if target is None:
             raise NotFoundException("User not found.")
