@@ -51,6 +51,9 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // search
     'search.placeholder': 'Search products…',
     'search.results': 'Search Results',
+    'search.count': '{n} results for "{q}"',
+    'search.prompt': 'Enter a search term above',
+    'search.none': 'No products match your search',
     // hero
     'hero.eyebrow': 'New Collection',
     'hero.browse': 'Browse All',
@@ -82,6 +85,10 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // products
     'products.all': 'All Products',
     'products.category': 'Category',
+    'products.count': '{n} items',
+    'products.filter_placeholder': 'Filter products…',
+    'products.none': 'No products found',
+    'products.load_more': 'Load more',
     // product
     'product.add_to_cart': 'Add to Cart',
     'product.adding': 'Adding…',
@@ -409,6 +416,9 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // search
     'search.placeholder': 'ابحث عن منتجات…',
     'search.results': 'نتائج البحث',
+    'search.count': '{n} نتيجة لـ "{q}"',
+    'search.prompt': 'أدخل كلمة بحث في الأعلى',
+    'search.none': 'لا توجد منتجات تطابق بحثك',
     // hero
     'hero.eyebrow': 'مجموعة جديدة',
     'hero.browse': 'تصفح الكل',
@@ -440,6 +450,10 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // products
     'products.all': 'جميع المنتجات',
     'products.category': 'الفئة',
+    'products.count': '{n} منتج',
+    'products.filter_placeholder': 'تصفية المنتجات…',
+    'products.none': 'لا توجد منتجات',
+    'products.load_more': 'تحميل المزيد',
     // product
     'product.add_to_cart': 'أضف إلى السلة',
     'product.adding': 'جارٍ الإضافة…',
@@ -767,6 +781,9 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // search
     'search.placeholder': 'Ürün ara…',
     'search.results': 'Arama Sonuçları',
+    'search.count': '"{q}" için {n} sonuç',
+    'search.prompt': 'Yukarıya bir arama terimi girin',
+    'search.none': 'Aramanızla eşleşen ürün yok',
     // hero
     'hero.eyebrow': 'Yeni Koleksiyon',
     'hero.browse': 'Tümüne Göz At',
@@ -798,6 +815,10 @@ const UI_FALLBACKS: Record<SupportedLocale, Record<string, string>> = {
     // products
     'products.all': 'Tüm Ürünler',
     'products.category': 'Kategori',
+    'products.count': '{n} ürün',
+    'products.filter_placeholder': 'Ürünleri filtrele…',
+    'products.none': 'Ürün bulunamadı',
+    'products.load_more': 'Daha fazla yükle',
     // product
     'product.add_to_cart': 'Sepete Ekle',
     'product.adding': 'Ekleniyor…',
