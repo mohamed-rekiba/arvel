@@ -325,6 +325,53 @@ async def test_force_delete_requires_super_admin(
     assert sa_response.status_code == 204
 
 
+@pytest.mark.asyncio
+async def test_force_delete_category_with_products_returns_409(
+    client: Any, super_admin_token: str, vendor_id: str
+) -> None:
+    """A category still referenced by products force-deletes to 409, not a DB 500."""
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+    category = await client.post(
+        "/api/admin/categories",
+        headers=sa,
+        json={"name": {"en": "Doomed"}, "slug": {"en": "doomed-cat"}, "status": "draft"},
+    )
+    cat_id = category.json()["data"]["id"]
+    product = await client.post(
+        "/api/admin/products",
+        headers=sa,
+        json={
+            "name": {"en": "Bound"},
+            "slug": {"en": "bound-product"},
+            "description": {"en": "."},
+            "price": 1.00,
+            "stock_qty": 0,
+            "category_id": cat_id,
+            "vendor_id": vendor_id,
+        },
+    )
+    product_id = product.json()["data"]["id"]
+
+    blocked = await client.delete(f"/api/admin/categories/{cat_id}/force", headers=sa)
+    assert blocked.status_code == 409
+
+    # Removing the product releases the FK — the category then force-deletes cleanly.
+    await client.delete(f"/api/admin/products/{product_id}", headers=sa)
+    await client.delete(f"/api/admin/products/{product_id}/force", headers=sa)
+    freed = await client.delete(f"/api/admin/categories/{cat_id}/force", headers=sa)
+    assert freed.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_force_delete_vendor_with_products_returns_409(
+    client: Any, super_admin_token: str, vendor_id: str
+) -> None:
+    """A vendor still referenced by products force-deletes to 409, not a DB 500."""
+    sa = {"Authorization": f"Bearer {super_admin_token}"}
+    blocked = await client.delete(f"/api/admin/vendors/{vendor_id}/force", headers=sa)
+    assert blocked.status_code == 409
+
+
 # ─── restore ────────────────────────────────────────────────────────────
 
 

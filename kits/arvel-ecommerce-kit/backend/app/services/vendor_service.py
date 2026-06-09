@@ -7,9 +7,11 @@ from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
 from arvel.database import PublishableMixin
+from arvel.http.exceptions import ConflictException
 from arvel.logging.facade import Log
 
 from app.http.controllers._schemas import CreateVendorPayload, UpdateVendorPayload
+from app.models.product import Product
 from app.models.vendor import Vendor
 from app.support.labels import label
 
@@ -94,6 +96,11 @@ class VendorService:
         Log.debug("vendor.deleted", vendor_id=str(vendor.id))
 
     async def force_delete(self, vendor: Vendor) -> None:
+        # products.vendor_id is FK RESTRICT. Soft-deleted products still hold the
+        # FK, so check with_trashed — otherwise the hard delete trips a DB-level
+        # violation and surfaces as a 500 instead of 409.
+        if await Product.with_trashed().where(Product.vendor_id == vendor.id).count():
+            raise ConflictException("Cannot permanently delete a vendor that has products.")
         Log.debug("vendor.force_deleting", vendor_id=str(vendor.id))
         await vendor.force_delete()
         Log.debug("vendor.force_deleted", vendor_id=str(vendor.id))

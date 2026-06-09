@@ -932,6 +932,16 @@ Two questions answered:
   framework contract: migration `length=120 → 255` (edited in place — greenfield,
   no back-compat) and model `string(120) → string(255)`. No test pinned 120; 387
   unit pass, ruff clean.
+- **iter 65 — category/vendor force-delete FK guard (MED #2, done):**
+  `products.category_id`, `products.vendor_id`, and the self-referential
+  `categories.parent_id` are all FK `RESTRICT`. Force-deleting a still-referenced
+  category/vendor hit the DB constraint → uncaught → 500. Added a pre-check in
+  `CategoryService.force_delete` / `VendorService.force_delete` that raises
+  `ConflictException` (409) when dependent products (or subcategories) exist —
+  the exact pattern `UserService.force_delete` already uses for users-with-orders.
+  Checks use `with_trashed()` because soft-deleted rows still hold the FK. Added
+  3 feature tests (category-with-products → 409 then 204 once freed; vendor → 409)
+  — all pass against real Postgres (~60s). 387 unit pass, ruff clean.
 
 ## Blockers
 
