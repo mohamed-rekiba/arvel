@@ -52,7 +52,7 @@ async function handleAddToCart(event: Event): Promise<void> {
 
 <template>
   <article
-    class="group relative flex flex-col rounded-xl border border-border bg-app-bg shadow-2xs transition duration-300 ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-1 hover:border-primary-300 hover:shadow-lg"
+    class="group relative flex flex-col rounded-xl border border-border bg-app-bg shadow-2xs transition-[translate,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1.5 hover:border-primary-300 before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-xl before:opacity-0 before:shadow-xl before:transition-opacity before:duration-300 before:ease-[cubic-bezier(0.16,1,0.3,1)] before:content-[''] hover:before:opacity-100"
   >
     <RouterLink :to="`/products/${product.slug}`" class="block">
       <!-- Image area -->
@@ -62,7 +62,7 @@ async function handleAddToCart(event: Event): Promise<void> {
           :src="productImage"
           :srcset="product.image_srcset || undefined"
           :alt="product.name"
-          class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.06]"
+          class="h-full w-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.05]"
         />
         <div
           v-else

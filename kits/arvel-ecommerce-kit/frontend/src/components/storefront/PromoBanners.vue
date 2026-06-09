@@ -57,7 +57,7 @@ const promos = computed<Promo[]>(() => [
       :key="promo.id"
       v-reveal="i * 90"
       :to="promo.to"
-      class="group relative flex min-h-[160px] flex-col justify-between overflow-hidden rounded-xl p-5 shadow-sm transition duration-300 ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-1 hover:shadow-xl"
+      class="group relative flex min-h-[160px] flex-col justify-between overflow-hidden rounded-xl p-5 shadow-md transition-[translate,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1.5 hover:shadow-xl"
       :style="{ background: promo.bg }"
     >
       <div>

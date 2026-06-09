@@ -231,9 +231,14 @@
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --duration-slow: 320ms;
+  /* Reveal/entrance durations — long enough to read as a glide, not a snap. */
+  --duration-slower: 700ms;
+  --duration-slowest: 1000ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-emphasized: cubic-bezier(0.2, 0, 0.1, 1.4);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Soft decelerate (easeOutExpo-ish) — buttery tail on entrances. */
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* ── Layout constants ────────────────────────────────────────────── */
   --header-height: 112px;
