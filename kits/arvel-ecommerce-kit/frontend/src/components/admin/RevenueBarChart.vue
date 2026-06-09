@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { AdminOrderOut } from '@/api/schemas'
+import type { DashboardRevenuePointOut } from '@/api/schemas'
 import type { SupportedLocale } from '@/types'
 import { formatCurrency } from '@/lib/i18n'
 
 const { t } = useI18n({ useScope: 'global' })
 
+// Server-computed last-7-days series — exact, not capped by the loaded page.
 const props = defineProps<{
-  orders: AdminOrderOut[]
+  series: DashboardRevenuePointOut[]
   locale: SupportedLocale
 }>()
 
@@ -22,28 +23,15 @@ const BAR_W = Math.round(SLOT_W * 0.52)
 const BAR_OFFSET = Math.round((SLOT_W - BAR_W) / 2)
 const MAX_BAR_H = CHART_H - 8 // 8px headroom above tallest bar
 
-// Last 7 calendar days — index 6 is today
+// Dates come back as YYYY-MM-DD; parse to local midnight for labels.
 const days = computed<Date[]>(() =>
-  Array.from({ length: 7 }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() - (6 - i))
-    d.setHours(0, 0, 0, 0)
-    return d
+  props.series.map((p) => {
+    const [y, m, d] = p.date.split('-').map(Number)
+    return new Date(y, m - 1, d)
   }),
 )
 
-const revenuePerDay = computed<number[]>(() =>
-  days.value.map((day) => {
-    const next = new Date(day)
-    next.setDate(next.getDate() + 1)
-    return props.orders
-      .filter((o) => {
-        const d = new Date(o.created_at)
-        return d >= day && d < next
-      })
-      .reduce((sum, o) => sum + o.total, 0)
-  }),
-)
+const revenuePerDay = computed<number[]>(() => props.series.map((p) => p.revenue))
 
 const totalPeriod = computed(() => revenuePerDay.value.reduce((a, b) => a + b, 0))
 const maxRevenue = computed(() => Math.max(...revenuePerDay.value, 1))

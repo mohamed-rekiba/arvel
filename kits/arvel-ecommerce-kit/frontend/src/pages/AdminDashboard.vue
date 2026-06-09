@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRouter } from 'vue-router'
 import BestSellingList from '@/components/admin/BestSellingList.vue'
 import RecentOrdersCard from '@/components/admin/RecentOrdersCard.vue'
 import RevenueBarChart from '@/components/admin/RevenueBarChart.vue'
 import StatCard from '@/components/admin/StatCard.vue'
-import { listAdminRows, listAdminCatalog, requireStoredAccessToken } from '@/lib/api'
+import {
+  useAdminOrdersIndexApiAdminOrdersGet,
+  useAdminOrdersStatsApiAdminOrdersStatsGet,
+} from '@/api/admin-orders/admin-orders'
 import type { AdminOrderOut } from '@/api/schemas'
 import { formatCurrency, toSupportedLocale } from '@/lib/i18n'
 
@@ -15,36 +18,25 @@ const router = useRouter()
 
 const currentLocale = computed(() => toSupportedLocale(locale.value))
 
-const orders = ref<AdminOrderOut[]>([])
-const isPending = ref(true)
-
-onMounted(async () => {
-  try {
-    const token = requireStoredAccessToken()
-    const [ordersRes, productsRes] = await Promise.all([
-      listAdminRows(token, 'orders'),
-      listAdminCatalog(token, 'products'),
-    ])
-    orders.value = ordersRes.data as AdminOrderOut[]
-    void productsRes
-  } catch {
-    orders.value = []
-  } finally {
-    isPending.value = false
-  }
+// KPIs + status breakdown are all-time aggregates from the DB; the recent list
+// is just the latest handful for the activity card.
+const { data: statsData, isPending: statsPending } = useAdminOrdersStatsApiAdminOrdersStatsGet()
+const { data: recentData, isPending: recentPending } = useAdminOrdersIndexApiAdminOrdersGet({
+  limit: 6,
 })
+
+const isPending = computed(() => statsPending.value || recentPending.value)
+const recentOrders = computed<AdminOrderOut[]>(() => recentData.value?.data ?? [])
 
 function openOrder(orderId: string): void {
   void router.push(`/admin/orders/${orderId}`)
 }
 
-// KPIs
-const totalRevenue = computed(() => orders.value.reduce((sum, o) => sum + o.total, 0))
-const totalOrders = computed(() => orders.value.length)
-const uniqueCustomers = computed(() => new Set(orders.value.map((o) => o.user_id)).size)
-const avgOrderValue = computed(() =>
-  totalOrders.value > 0 ? totalRevenue.value / totalOrders.value : 0,
-)
+const totalRevenue = computed(() => statsData.value?.total_revenue ?? 0)
+const totalOrders = computed(() => statsData.value?.total_orders ?? 0)
+const uniqueCustomers = computed(() => statsData.value?.unique_customers ?? 0)
+const avgOrderValue = computed(() => statsData.value?.avg_order_value ?? 0)
+const revenueSeries = computed(() => statsData.value?.revenue_last_7_days ?? [])
 
 // Status breakdown
 const ORDER_STATUSES = [
@@ -62,8 +54,9 @@ const statusCounts = computed<Record<OrderStatus, number>>(() => {
     OrderStatus,
     number
   >
-  for (const o of orders.value) {
-    if (o.status in counts) counts[o.status as OrderStatus]++
+  const raw = statsData.value?.status_counts ?? {}
+  for (const s of ORDER_STATUSES) {
+    counts[s] = raw[s] ?? 0
   }
   return counts
 })
@@ -226,16 +219,12 @@ const formattedDate = computed(() =>
         </div>
 
         <!-- ── Revenue chart ─────────────────────────────── -->
-        <RevenueBarChart :orders="orders" :locale="currentLocale" />
+        <RevenueBarChart :series="revenueSeries" :locale="currentLocale" />
       </div>
 
       <!-- ── Bottom row: recent orders + best sellers ────────────────── -->
       <div class="grid gap-6 lg:grid-cols-2">
-        <RecentOrdersCard
-          :orders="orders.slice(0, 6)"
-          :locale="currentLocale"
-          @view-order="openOrder"
-        />
+        <RecentOrdersCard :orders="recentOrders" :locale="currentLocale" @view-order="openOrder" />
         <BestSellingList :locale="currentLocale" />
       </div>
     </template>

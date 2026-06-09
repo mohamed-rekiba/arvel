@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
 
@@ -236,6 +237,60 @@ class OrderService:
             }
             for r in rows
         ]
+
+    async def dashboard_stats(self) -> dict[str, Any]:
+        """All-time order aggregates plus a 7-day revenue series, computed at the DB.
+
+        Live orders only — soft-deleted orders don't count toward revenue or KPIs.
+        Aggregating in SQL keeps this correct regardless of how many orders exist
+        (the old dashboard summed only the first page of results).
+        """
+        total_revenue = round(float(await Order.sum("total")), 2)
+        total_orders = await Order.count()
+        avg_order_value = round(total_revenue / total_orders, 2) if total_orders else 0.0
+
+        # No COUNT(DISTINCT ...) helper, so one raw aggregate row. Key matches the
+        # literal expression text, same convention as best_sellers.
+        _key_customers = "COUNT(DISTINCT user_id) AS unique_customers"
+        cust_rows: list[dict[str, Any]] = (
+            await Order.where_null("deleted_at").select_raw(_key_customers).all()
+        )
+        unique_customers = int(cust_rows[0][_key_customers]) if cust_rows else 0
+
+        _key_count = "COUNT(*) AS c"
+        status_qb = Order.where_null("deleted_at").group_by("status")
+        status_rows: list[dict[str, Any]] = await status_qb.select_raw(
+            f"status, {_key_count}"
+        ).all()
+        status_counts = {str(r["status"] or "pending"): int(r[_key_count]) for r in status_rows}
+
+        return {
+            "total_revenue": total_revenue,
+            "total_orders": total_orders,
+            "unique_customers": unique_customers,
+            "avg_order_value": avg_order_value,
+            "status_counts": status_counts,
+            "revenue_last_7_days": await self._revenue_last_7_days(),
+        }
+
+    async def _revenue_last_7_days(self) -> list[dict[str, Any]]:
+        today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        start = today - timedelta(days=6)
+        buckets: dict[str, float] = {
+            (start + timedelta(days=i)).date().isoformat(): 0.0 for i in range(7)
+        }
+        recent: list[Order] = (
+            await Order.where_null("deleted_at").where(Order.created_at >= start).all()
+        )
+        for o in recent:
+            if o.created_at is None:
+                continue
+            created = o.created_at
+            normalized = created.astimezone(UTC) if created.tzinfo else created
+            key = normalized.date().isoformat()
+            if key in buckets:
+                buckets[key] += float(o.total or 0)
+        return [{"date": d, "revenue": round(v, 2)} for d, v in buckets.items()]
 
     async def update_status(self, order_id: str, status: str) -> dict[str, Any] | None:
         oid = self._parse_id(order_id)

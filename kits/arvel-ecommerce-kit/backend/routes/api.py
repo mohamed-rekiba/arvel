@@ -311,6 +311,12 @@ with Route.group(prefix="/api/admin", name_prefix="admin.", middleware=DB_TX):
             name="best_sellers",
         )
         Route.get(
+            "/stats",
+            controller=AdminOrdersController,
+            action="stats",
+            name="stats",
+        )
+        Route.get(
             "/{order_id}",
             controller=AdminOrdersController,
             action="show",

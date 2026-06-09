@@ -26,6 +26,7 @@ import type {
   AdminOrdersBestSellersApiAdminOrdersBestSellersGetParams,
   AdminOrdersIndexApiAdminOrdersGetParams,
   BestSellersListOut,
+  DashboardStatsOut,
   HTTPValidationError,
   UpdateOrderStatusPayload,
 } from '../schemas'
@@ -200,6 +201,87 @@ export function useAdminOrdersBestSellersApiAdminOrdersBestSellersGet<
     params,
     options,
   )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+/**
+ * @summary Admin.Orders.Stats
+ */
+export const adminOrdersStatsApiAdminOrdersStatsGet = (
+  options?: SecondParameter<typeof request>,
+  signal?: AbortSignal,
+) => {
+  return request<DashboardStatsOut>(
+    { url: `/api/admin/orders/stats`, method: 'GET', signal },
+    options,
+  )
+}
+
+export const getAdminOrdersStatsApiAdminOrdersStatsGetQueryKey = () => {
+  return ['api', 'admin', 'orders', 'stats'] as const
+}
+
+export const getAdminOrdersStatsApiAdminOrdersStatsGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminOrdersStatsApiAdminOrdersStatsGet>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof adminOrdersStatsApiAdminOrdersStatsGet>>,
+      TError,
+      TData
+    >
+  >
+  request?: SecondParameter<typeof request>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getAdminOrdersStatsApiAdminOrdersStatsGetQueryKey()
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminOrdersStatsApiAdminOrdersStatsGet>>
+  > = ({ signal }) => adminOrdersStatsApiAdminOrdersStatsGet(requestOptions, signal)
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminOrdersStatsApiAdminOrdersStatsGet>>,
+    TError,
+    TData
+  >
+}
+
+export type AdminOrdersStatsApiAdminOrdersStatsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminOrdersStatsApiAdminOrdersStatsGet>>
+>
+export type AdminOrdersStatsApiAdminOrdersStatsGetQueryError = unknown
+
+/**
+ * @summary Admin.Orders.Stats
+ */
+
+export function useAdminOrdersStatsApiAdminOrdersStatsGet<
+  TData = Awaited<ReturnType<typeof adminOrdersStatsApiAdminOrdersStatsGet>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminOrdersStatsApiAdminOrdersStatsGet>>,
+        TError,
+        TData
+      >
+    >
+    request?: SecondParameter<typeof request>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getAdminOrdersStatsApiAdminOrdersStatsGetQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
