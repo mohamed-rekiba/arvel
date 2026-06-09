@@ -582,6 +582,53 @@ async def test_create_product_rejects_negative_price(
 
 
 @pytest.mark.asyncio
+async def test_create_product_rejects_unknown_category(
+    client: Any, catalog_token: str, vendor_id: str
+) -> None:
+    """A valid-but-missing category id is a 422, not an FK-violation 500."""
+    response = await client.post(
+        "/api/admin/products",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+        json={
+            "name": {"en": "Orphan"},
+            "price": 5.0,
+            "category_id": str(uuid.uuid4()),
+            "vendor_id": vendor_id,
+        },
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_product_rejects_malformed_category_id(
+    client: Any, catalog_token: str
+) -> None:
+    """A non-UUID category id is a 422, not a 500 from the uuid cast."""
+    response = await client.post(
+        "/api/admin/products",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+        json={"name": {"en": "Bad FK"}, "price": 5.0, "category_id": "not-a-uuid"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_product_rejects_unknown_vendor(
+    client: Any, catalog_token: str, vendor_id: str, category_id: str
+) -> None:
+    """Repointing a product at a missing vendor is a 422, not an FK 500."""
+    product_id = await _create_product(
+        client, catalog_token, vendor_id, category_id, "Reassign", "reassign-vendor"
+    )
+    response = await client.patch(
+        f"/api/admin/products/{product_id}",
+        headers={"Authorization": f"Bearer {catalog_token}"},
+        json={"vendor_id": str(uuid.uuid4())},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_create_category_rejects_invalid_status(
     client: Any, catalog_token: str
 ) -> None:

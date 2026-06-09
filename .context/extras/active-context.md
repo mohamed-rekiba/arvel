@@ -718,8 +718,19 @@ typecheck/lint/vitest(18)/build green.
   `test_force_delete_user_with_orders_returns_409`. Frontend typecheck + ruff
   clean.
 
+## Iteration 50 — Validate product category/vendor FK at the API (backend)
+
+- MED: product create/update now verify `category_id`/`vendor_id` before the
+  write. A missing-but-valid UUID used to hit the DB FK as an opaque 500; a
+  non-UUID string used to ValueError on the cast (also 500). Both are now a
+  clean 422 via `ProductService._resolve_category_id` / `_resolve_vendor_id`.
+  Existence check is `with_trashed` to mirror the FK (a soft-deleted row still
+  satisfies the constraint), matching the category-parent check.
+- Tests: `test_create_product_rejects_unknown_category`,
+  `test_create_product_rejects_malformed_category_id`,
+  `test_update_product_rejects_unknown_vendor`.
+
 ### Fresh review backlog (iteration-45 review) — remaining
-- MED: product create/update doesn't validate category/vendor FK existence → opaque 500.
 - MED: admin translations endpoint gated only on `categories.view`.
 - MED: ghost cart lines (unpublished product) → broken links, blocked quantity updates.
 - MED (tracked): scheduled catalog refresh skipped under Redis lock → stale storefront (needs retry/queue).
