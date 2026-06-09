@@ -7,13 +7,14 @@ import {
   useAdminOrdersUpdateStatusApiAdminOrdersOrderIdStatusPatch,
 } from '@/api/admin-orders/admin-orders'
 import { useQueryClient } from '@tanstack/vue-query'
-import { formatCurrency, formatDate, pickLocalized, routeParam } from '@/lib/i18n'
+import { formatCurrency, formatDate, pickLocalized, routeParam, toSupportedLocale } from '@/lib/i18n'
 import { useToastStore } from '@/stores/toast'
 import PermissionGate from '@/components/admin/PermissionGate.vue'
 import { getShippingField, isOrderStatus } from '@/types'
 import type { OrderStatus } from '@/types'
 
-const { t } = useI18n({ useScope: 'global' })
+const { locale, t } = useI18n({ useScope: 'global' })
+const currentLocale = computed(() => toSupportedLocale(locale.value))
 const toast = useToastStore()
 const route = useRoute()
 const queryClient = useQueryClient()
@@ -73,9 +74,11 @@ const statuses: OrderStatus[] = [
         <div class="flex items-start justify-between">
           <div>
             <h1 class="text-2xl font-bold text-fg">Order #{{ order.id.slice(0, 8) }}</h1>
-            <p class="mt-1 text-sm text-fg-muted">{{ formatDate(order.created_at, 'en') }}</p>
+            <p class="mt-1 text-sm text-fg-muted">
+              {{ formatDate(order.created_at, currentLocale) }}
+            </p>
           </div>
-          <p class="text-xl font-bold">{{ formatCurrency(order.total, 'en') }}</p>
+          <p class="text-xl font-bold">{{ formatCurrency(order.total, currentLocale) }}</p>
         </div>
 
         <div class="mt-6 grid gap-4 sm:grid-cols-2">
@@ -105,11 +108,13 @@ const statuses: OrderStatus[] = [
         <ul class="mt-4 divide-y divide-border-subtle">
           <li v-for="item in order.items" :key="item.id" class="flex justify-between py-3 text-sm">
             <span
-              >{{ item.product ? pickLocalized(item.product.name, 'en') : item.product_name }} ×
-              {{ item.quantity }}</span
+              >{{
+                item.product ? pickLocalized(item.product.name, currentLocale) : item.product_name
+              }}
+              × {{ item.quantity }}</span
             >
             <span class="font-medium">{{
-              formatCurrency(item.unit_price * item.quantity, 'en')
+              formatCurrency(item.unit_price * item.quantity, currentLocale)
             }}</span>
           </li>
         </ul>
