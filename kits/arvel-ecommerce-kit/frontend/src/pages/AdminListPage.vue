@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAdminOrdersIndexApiAdminOrdersGet } from '@/api/admin-orders/admin-orders'
 import { useAdminUsersIndexApiAdminUsersGet } from '@/api/admin-users/admin-users'
-import { listAdminRows, requireStoredAccessToken, type AdminListResource } from '@/lib/api'
+import type { AdminListResource } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/i18n'
 
 const props = defineProps<{
@@ -20,16 +20,6 @@ const search = ref('')
 const trashedMode = ref<'without' | 'only'>('without')
 
 const isOrders = computed(() => props.listType === 'orders')
-const resource = computed<AdminListResource>(() => props.listType as AdminListResource)
-
-onMounted(async () => {
-  try {
-    const token = requireStoredAccessToken()
-    await listAdminRows(token, resource.value)
-  } catch {
-    // Silent: Orval hooks handle actual data loading
-  }
-})
 
 watch(
   () => props.listType,

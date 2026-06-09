@@ -245,7 +245,6 @@ def test_admin_catalog_uses_translatable_inputs() -> None:
 
 def test_admin_list_pages_use_backend_read_apis() -> None:
     router = _src(FRONTEND_DIR / "src" / "router.ts")
-    api = _src(FRONTEND_DIR / "src" / "lib" / "api.ts")
     page = _src(FRONTEND_DIR / "src" / "pages" / "AdminListPage.vue")
 
     for route in (
@@ -258,20 +257,12 @@ def test_admin_list_pages_use_backend_read_apis() -> None:
         "path: '/admin/settings'",
     ):
         assert route in router
-    for snippet in (
-        "AdminListResource",
-        "'orders'",
-        "'users'",
-        "'roles'",
-        "'permissions'",
-        "'translations'",
-        "listAdminRows(",
-        "`/api/admin/${resource}`",
-    ):
-        assert snippet in api
-    assert "listAdminRows" in page
+    # Orders/users lists read straight from the generated orval index hooks —
+    # no hand-rolled lib/api fetch wrapper in between.
+    assert "useAdminOrdersIndexApiAdminOrdersGet" in page
+    assert "useAdminUsersIndexApiAdminUsersGet" in page
+    assert "listAdminRows" not in page
     assert "Bearer token" not in page
-    assert "requireStoredAccessToken(" in page
     assert (FRONTEND_DIR / "src" / "pages" / "AdminPlaceholderPage.vue").exists()
 
 

@@ -234,36 +234,6 @@ export async function fetchAccountOrders(): Promise<DetailResponse<OrderSummary[
 export type AdminListResource = 'orders' | 'users' | 'roles' | 'permissions' | 'translations'
 export type AdminCatalogResource = 'products' | 'categories' | 'vendors'
 
-export interface AdminListParams {
-  limit?: number
-  offset?: number
-  search?: string
-  trashed?: 'without' | 'only' | 'with'
-}
-
-export async function listAdminRows(
-  token: string,
-  resource: AdminListResource,
-  params?: AdminListParams,
-): Promise<{ data: unknown[]; total: number }> {
-  // URL template: `/api/admin/${resource}?${params}`
-  const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : ''
-  return json<{ data: unknown[]; total: number }>(`/api/admin/${resource}${qs}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
-
-export async function listAdminCatalog(
-  token: string,
-  resource: AdminCatalogResource,
-  params?: AdminListParams,
-): Promise<{ data: unknown[]; total: number }> {
-  const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : ''
-  return json<{ data: unknown[]; total: number }>(`/api/admin/${resource}${qs}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
-
 export async function createAdminCatalog(
   token: string,
   resource: AdminCatalogResource,
