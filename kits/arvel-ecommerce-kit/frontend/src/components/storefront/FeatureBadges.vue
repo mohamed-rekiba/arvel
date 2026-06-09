@@ -42,7 +42,7 @@ const badges = computed(() => [
         class="group flex items-center gap-4 rounded-xl p-3 transition duration-300 hover:bg-app-bg-raised"
       >
         <div
-          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-100 shadow-sm transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-110 group-hover:shadow-md"
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-100 shadow-sm transition duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110 group-hover:shadow-md"
         >
           <span
             class="material-symbols-outlined select-none text-[22px] leading-none text-primary-700"
