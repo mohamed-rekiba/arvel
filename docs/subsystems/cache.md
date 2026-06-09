@@ -53,4 +53,4 @@ class CacheLock:
 ## See also
 
 - [Scheduling](scheduling.md) — overlap/one-server locks use the cache.
-- [Configuration](../architecture/configuration.md)
+- [Configuration](../architecture/ARCH-006-configuration.md)

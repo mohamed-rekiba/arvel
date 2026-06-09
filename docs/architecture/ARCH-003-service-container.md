@@ -1,4 +1,4 @@
-# Service container
+# ARCH-003 — Service container
 
 The container is the dependency-injection core. It resolves types to instances, autowires constructors from type hints, manages lifetimes (singleton / scoped / transient), and supports async factories. Everything else in the framework is bound into it.
 
@@ -160,10 +160,10 @@ container.extend(CacheManager, lambda mgr, c: InstrumentedCache(mgr))
 
 - The `Application` owns the root container and binds itself into it.
 - Every service provider's `register()` binds into this container.
-- Facades hold references to services resolved from it (see [facades](facades.md)).
+- Facades hold references to services resolved from it (see [facades](ARCH-005-facades.md)).
 - `dep()` adapts a container binding to a FastAPI `Depends`.
 
 ## See also
 
-- [Service providers](service-providers.md) — who binds what, and when.
-- [Bootstrap & lifecycle](bootstrap-lifecycle.md) — when resolution becomes safe (`boot` vs `register`).
+- [Service providers](ARCH-004-service-providers.md) — who binds what, and when.
+- [Bootstrap & lifecycle](ARCH-002-bootstrap-lifecycle.md) — when resolution becomes safe (`boot` vs `register`).

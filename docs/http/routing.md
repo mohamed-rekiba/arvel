@@ -178,4 +178,4 @@ flowchart TD
 ## See also
 
 - [Middleware](middleware.md) · [Requests & validation](requests-validation.md) · [Resources](resources.md) · [Exceptions](exceptions.md)
-- [Bootstrap & lifecycle](../architecture/bootstrap-lifecycle.md) — where `register_with_app` runs.
+- [Bootstrap & lifecycle](../architecture/ARCH-002-bootstrap-lifecycle.md) — where `register_with_app` runs.

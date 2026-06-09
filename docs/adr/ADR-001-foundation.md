@@ -65,7 +65,7 @@ We commit one way before writing framework code.
 ### Current implementation
 
 - Dependencies: `packages/arvel/pyproject.toml` (`[project] dependencies`, `[project.optional-dependencies]`).
-- Architecture overview: `docs/architecture/overview.md`.
+- Architecture overview: `docs/architecture/ARCH-001-overview.md`.
 
 ### Notes
 
@@ -108,7 +108,7 @@ Laravel's service container is a defining feature: autowiring from type hints; s
 ### Current implementation
 
 - Code: `packages/arvel/src/arvel/container/`, `packages/arvel/src/arvel/dep.py`.
-- Docs: `docs/architecture/service-container.md`.
+- Docs: `docs/architecture/ARCH-003-service-container.md`.
 
 ### Notes
 
@@ -302,7 +302,7 @@ Changes to this layout are **breaking** per Article X §7 and require a major ve
 
 - Authoritative skeleton: `packages/arvel/src/arvel/_skeleton/` (rendered by `arvel new`).
 - Loader contract: ADR-001 § 6.
-- Docs: `docs/architecture/bootstrap-lifecycle.md`, `docs/console/cli-architecture.md`.
+- Docs: `docs/architecture/ARCH-002-bootstrap-lifecycle.md`, `docs/console/cli-architecture.md`.
 
 ### Notes
 
@@ -428,7 +428,7 @@ rather than silently inherit the leak.
 
 - Code: `packages/arvel/src/arvel/application/application.py`
   (`with_routing`, the boot-time loader) and the path-loader helper it calls.
-- Docs: `docs/architecture/bootstrap-lifecycle.md`, `docs/http/routing.md`.
+- Docs: `docs/architecture/ARCH-002-bootstrap-lifecycle.md`, `docs/http/routing.md`.
 
 ### Notes
 

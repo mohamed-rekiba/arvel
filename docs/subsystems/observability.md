@@ -57,5 +57,5 @@ Log: _LogFacade = _LogFacade()
 ## See also
 
 - [Middleware](../http/middleware.md) — `ObservabilityMiddleware` ordering.
-- [Bootstrap & lifecycle](../architecture/bootstrap-lifecycle.md) — `ObservabilityServiceProvider` in the HEAD chain.
-- [Facades](../architecture/facades.md) — `Log` and `Context`.
+- [Bootstrap & lifecycle](../architecture/ARCH-002-bootstrap-lifecycle.md) — `ObservabilityServiceProvider` in the HEAD chain.
+- [Facades](../architecture/ARCH-005-facades.md) — `Log` and `Context`.

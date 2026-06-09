@@ -2,7 +2,7 @@
 
 Most framework work fits one of a few shapes: a new subsystem, a new driver for an existing manager, a new facade, or a new CLI command. They all hang off the service container and a service provider.
 
-**Source**: see [service providers](../architecture/service-providers.md), [service container](../architecture/service-container.md), [facades](../architecture/facades.md), and [CLI architecture](../console/cli-architecture.md).
+**Source**: see [service providers](../architecture/ARCH-004-service-providers.md), [service container](../architecture/ARCH-003-service-container.md), [facades](../architecture/ARCH-005-facades.md), and [CLI architecture](../console/cli-architecture.md).
 
 ## The subsystem shape
 
@@ -59,7 +59,7 @@ Managers expose a registration hook (e.g. `SearchManager.register_driver()`, `Qu
 
 ## Adding a facade
 
-There's no dynamic `__getattr__` magic. A facade is a class with a `ClassVar` slot and explicit `@classmethod` delegates, plus a `bind()`/`set_manager()` classmethod the provider calls during `register()` or `boot()`. See [facades](../architecture/facades.md) for the exact pattern. Facades that need test doubles also expose a `fake()`.
+There's no dynamic `__getattr__` magic. A facade is a class with a `ClassVar` slot and explicit `@classmethod` delegates, plus a `bind()`/`set_manager()` classmethod the provider calls during `register()` or `boot()`. See [facades](../architecture/ARCH-005-facades.md) for the exact pattern. Facades that need test doubles also expose a `fake()`.
 
 ## Adding a CLI command
 
@@ -80,4 +80,4 @@ If your subsystem owns a table, ship a migration stub and register it with `self
 
 ## See also
 
-- [Service providers](../architecture/service-providers.md) · [Service container](../architecture/service-container.md) · [Conventions](conventions.md)
+- [Service providers](../architecture/ARCH-004-service-providers.md) · [Service container](../architecture/ARCH-003-service-container.md) · [Conventions](conventions.md)

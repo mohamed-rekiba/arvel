@@ -50,4 +50,4 @@ class Crypt:
 
 - [Casts](../orm/casts.md) — `EncryptedType` / `encrypted:` column casts.
 - [Storage](storage.md) — also derives keys from `APP_KEY` via HKDF.
-- [Facades](../architecture/facades.md) — `Crypt` is env-resolved, not container-resolved.
+- [Facades](../architecture/ARCH-005-facades.md) — `Crypt` is env-resolved, not container-resolved.

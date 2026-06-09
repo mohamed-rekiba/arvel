@@ -1,7 +1,6 @@
 # SAD-001 — Framework-level local file serving
 
-**Work Item**: WI-arvel-001 | **PRD**: `docs/prd/PRD-001-local-storage-serving.md`
-**Related ADRs**: ADR-009 § 4 (amended — HMAC temp URLs + route in `register()`)
+**Work Item**: WI-arvel-001 · **Status**: Accepted · **Related**: ADR-009 § 4 (amended — HMAC temp URLs + route in `register()`), PRD-001-local-storage-serving
 
 ---
 
@@ -33,19 +32,22 @@ Registration guard — all three must hold:
 2. `STORAGE_LOCAL_SERVE` is on
 3. `STORAGE_LOCAL_URL` is relative (starts with `/`)
 
+> **Overlap with SAD-003.** If `STORAGE_LOCAL_URL` is `/storage`, this Router-registered serve route and the `StaticFiles` mount from [SAD-003](SAD-003-storage-link-static-serving.md) both target `/storage/*`. The serve route is registered on the router *before* the static mount in `into_asgi()`, so it wins; the static mount only handles paths the router didn't claim.
+
 ### Handler flow
 
 ```
-if token and expires present:
+if token AND expires both present:
     if signer is None or not signer.verify(path, token, expires):  -> 403
 contents = LocalDriver.get(path)            # _safe_path guards traversal
 except FileNotFoundError | StoragePathError -> 404
 return 200, body, Content-Type=guess, Cache-Control
 ```
 
-- Public files (no signature) serve directly.
+- Public files (no signature) serve directly. The signature check only fires when **both** `token` and `expires` query params are present — one without the other falls through to the public path.
 - Signed URLs (from `temporary_url()`) are verified; tampered/expired → 403.
-- Traversal/missing → 404 (NFR-3: no info leak).
+- Traversal/missing → 404 (NFR-3: no info leak). The missing-file type is `StorageFileNotFoundError`, which subclasses the builtin `FileNotFoundError`, so the `except FileNotFoundError` branch catches it.
+- The route builds its own `TemporaryUrlSigner(app_key, url_path)`; `LocalDriver` builds an equivalent signer internally. Same HKDF + HMAC algorithm, two instances.
 
 ## APP_KEY wiring (story 3)
 

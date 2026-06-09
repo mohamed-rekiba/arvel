@@ -80,4 +80,4 @@ await Mail.to(address).send(mailable)
 ## See also
 
 - [Notifications](notifications.md) — the mail notification channel calls the `Mailer`.
-- [Configuration](../architecture/configuration.md)
+- [Configuration](../architecture/ARCH-006-configuration.md)

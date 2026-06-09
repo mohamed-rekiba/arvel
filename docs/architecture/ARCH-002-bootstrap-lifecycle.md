@@ -1,4 +1,4 @@
-# Bootstrap & lifecycle
+# ARCH-002 — Bootstrap & lifecycle
 
 This page traces what happens from `Application.configure(...)` to a serving ASGI app, and back down through shutdown. If you only read one internals page, read this one — the register/boot split governs the whole framework.
 
@@ -78,7 +78,7 @@ sequenceDiagram
 |---|---|
 | `with_environment(name)` | Sets the environment string (`local`, `testing`, …). |
 | `with_config_files([Cls, …])` | Registers typed `ArvelSettings` classes (calls `register(cls)`). |
-| `with_config_dir(path)` | Discovers and loads module-based `config/*.py` (see [configuration](configuration.md)). |
+| `with_config_dir(path)` | Discovers and loads module-based `config/*.py` (see [configuration](ARCH-006-configuration.md)). |
 | `with_providers(list \| path)` | A list extends the user provider chain; a `Path`/`str` defers loading from `bootstrap/providers.py`. |
 | `with_routing(web=, api=, console=)` | Route file paths; at least one is required. |
 | `create()` | Runs the full bootstrap and returns a **registered, not booted** `Application`. |
@@ -125,6 +125,8 @@ The HEAD order is dependency-driven, and the docstring in `_baseline_head_provid
 
 **Dedup rules**: if a user lists a HEAD provider, it's skipped (already in the chain). If a user lists the TAIL provider, it's forced to the end rather than running mid-chain.
 
+**Needs-based filtering**: when the app is built with `with_required_subsystems(...)` (the CLI does this), `_init_from_builder` runs the resolved chain through `filter_provider_chain()` and keeps only the providers a command actually needs, merged with the always-on foundation set. A cold `arvel migrate` boots five providers, not the whole project. See [console/CLI runtime](SAD-005-console-runtime-architecture.md) for the subsystem graph.
+
 > **Note**: HEAD providers are imported lazily inside `_baseline_head_providers()` so that pulling in `arvel` for, say, the `arvel new` command doesn't drag SQLAlchemy and FastAPI into import time.
 
 ## Register phase (sync)
@@ -149,7 +151,7 @@ When `create()` returns, all bindings exist but no `boot()` has run.
 `await app.boot()` is idempotent via `_booted`. It boots providers forward, then connects services:
 
 ```python
-async def boot(self) -> None:
+async def boot(self, *, probe_connections: bool = True) -> None:
     if self._booted:
         return
     for inst in self._provider_instances:
@@ -159,11 +161,13 @@ async def boot(self) -> None:
     self._booted = True
 ```
 
+`probe_connections` is threaded down to services that want to verify their connection at boot (e.g. ping the DB). Set it false to skip the probes — handy in tests and CLI paths that don't need a live round-trip.
+
 `BaseService`s registered via `register_service()` get `connect()` at boot (registration order) and `disconnect()` at shutdown (reverse). Registering a service after boot does **not** connect it — register before booting.
 
 ## Shutdown phase (async)
 
-`await app.shutdown()` tears down in reverse. Service disconnect failures are logged, not raised, so a flaky teardown can't mask a provider shutdown error:
+`await app.shutdown()` tears down in reverse. The two loops handle failure differently: service disconnects are log-only (a flaky teardown can't mask anything), while provider shutdowns are *all* attempted, then the first failure re-raises as `ShutdownError` — so one broken provider can't skip the rest:
 
 ```python
 async def shutdown(self) -> None:
@@ -173,15 +177,23 @@ async def shutdown(self) -> None:
         try:
             await service.disconnect()
         except Exception:
-            ...  # logged
+            ...  # logged, never raised
+
+    first_failure = None
     for inst in reversed(self._provider_instances):
-        await inst.shutdown()         # ShutdownError on failure
+        try:
+            await inst.shutdown()
+        except Exception as exc:
+            ...  # logged
+            first_failure = first_failure or (type(inst), exc)
     self._booted = False
+    if first_failure:
+        raise ShutdownError(*first_failure)
 ```
 
 ## ASGI assembly: `into_asgi()`
 
-`into_asgi(lifespan=None, **fastapi_kwargs)` builds the FastAPI app:
+`into_asgi(*, lifespan=None, **fastapi_kwargs)` builds the FastAPI app. It only wires the app — it doesn't boot. Boot/shutdown ride the ASGI lifespan, so the method works the same from a sync entrypoint or inside a uvicorn `--factory` callback.
 
 ```mermaid
 flowchart TB
@@ -191,12 +203,33 @@ flowchart TB
     Use --> FA["FastAPI(lifespan=...)"]
     Def --> FA
     FA --> State["state.arvel_container = container"]
-    State --> Exc["register HttpExceptionHandler"]
+    State --> Exc["HttpExceptionHandler.register(fa)"]
     Exc --> Rtr["Router.register_with_app(fa)"]
-    Rtr --> Health["add /healthz route"]
-    Health --> Maint["maintenance middleware (if bound)"]
-    Maint --> Stack["middleware stack<br/>(last added = outermost):<br/>ArvelScopeMiddleware, Observability,<br/>Context, DeferredTask"]
+    Rtr --> Health["_add_health_route → GET /_health"]
+    Health --> Storage["_maybe_mount_public_storage → /storage (if public/storage exists)"]
+    Storage --> Mw["middleware (see below)"]
 ```
+
+### Middleware order
+
+`fa.add_middleware` *prepends*, so the **last** call is the **outermost** layer. `into_asgi()` adds them in this order — maintenance first (if a manager is bound), then scope, then the observability trio, then trust-proxies (only when `TRUSTED_PROXIES` is set):
+
+```python
+self._maybe_add_maintenance_middleware(fa)      # MaintenanceModeMiddleware, if bound
+fa.add_middleware(ArvelScopeMiddleware, ...)
+self._maybe_add_observability_middleware(fa)    # DeferredTask, Context, Observability
+self._maybe_add_trust_proxies_middleware(fa)    # TrustProxies, if configured
+```
+
+The resulting stack, outermost request → innermost:
+
+```
+TrustProxies → Observability → Context → DeferredTask → ArvelScope → Maintenance → routes
+```
+
+- The observability trio (`DeferredTaskMiddleware`, `ContextMiddleware`, `ObservabilityMiddleware`) is skipped entirely when `ObservabilityConfig.request_middleware_enabled` is false.
+- `TrustProxies` mounts only when `HttpConfig.trusted_proxies` is non-empty.
+- `Maintenance` mounts only when a `MaintenanceModeManager` is bound — it's the innermost layer, so a maintenance response still runs inside a request scope.
 
 The default lifespan wires boot/shutdown to ASGI startup/shutdown:
 
@@ -238,6 +271,6 @@ def serve(app: Application, *, host="127.0.0.1", port=8000) -> None:
 
 ## See also
 
-- [Service providers](service-providers.md) — the per-provider contract.
-- [Service container](service-container.md) — what `register()` actually binds into.
-- [Configuration](configuration.md) — what the loader stages before providers run.
+- [Service providers](ARCH-004-service-providers.md) — the per-provider contract.
+- [Service container](ARCH-003-service-container.md) — what `register()` actually binds into.
+- [Configuration](ARCH-006-configuration.md) — what the loader stages before providers run.

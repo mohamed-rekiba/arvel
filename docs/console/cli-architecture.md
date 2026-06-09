@@ -110,7 +110,7 @@ Inside a project, `async_main()` always:
 
 `USER_PROVIDERS` is the explicit opt-in for "I need everything the user's `bootstrap/providers.py` registers". Most plug-in install commands need it; pure framework commands like `migrate` typically don't.
 
-See [bootstrap & lifecycle](../architecture/bootstrap-lifecycle.md).
+See [bootstrap & lifecycle](../architecture/ARCH-002-bootstrap-lifecycle.md).
 
 > **Note**: There is **no** `ConsoleKernel`. `app/console/kernel.py` is scheduling-only — its `Kernel.schedule(schedule)` is discovered by `SchedulerServiceProvider.boot()`, not by CLI registration. To add a command, use `ServiceProvider.commands()` or a new entry point. `routes/console.py` is stored by `with_routing(console=...)` but never loaded yet.
 
@@ -143,6 +143,6 @@ Composite commands (`migrate:fresh`, `optimize`) chain other commands in-process
 
 ## See also
 
-- [Service providers](../architecture/service-providers.md) — `commands()` contract.
+- [Service providers](../architecture/ARCH-004-service-providers.md) — `commands()` contract.
 - [Scheduling](../subsystems/scheduling.md) — `app/console/kernel.py` discovery.
 - [Source map](../reference/source-map.md)

@@ -1,10 +1,10 @@
 # SAD-004 — arvel-image
 
+**Work Item**: WI-arvel-001, WI-arvel-002 (consolidated under WI-arvel-003) · **Status**: Approved · **Related**: ADR-020, ADR-132-arvel-image
+
 **Scope**: All architecture-touching decisions for `arvel-image` made during the 1.0 polish pass (WI-arvel-001) and the post-1.0 hardening pass (WI-arvel-002). Consolidated 2026-06-05 during WI-arvel-003.
 
 **Date range**: 2026-06-04 (1.0 polish, WI-arvel-001) → 2026-06-05 (post-1.0 follow-ups, WI-arvel-002) → 2026-06-05 (this consolidation, WI-arvel-003).
-
-**Status**: Approved.
 
 > **Adapted artifact.** The schema's `planning-sa` stage canonically produces a full SAD with system design, technology choices, threat model, and OpenAPI spec. The two WIs this document subsumes were both polish/hardening passes on an existing Python library — no greenfield architecture, no OpenAPI (arvel-image is a library, not an HTTP API), no schema changes (beyond the additive `model_id` widening recorded in ADR-020 § 3.5). What this document covers: every architectural decision the package's two 1.x WIs depended on, plus what *doesn't* change.
 
@@ -17,7 +17,7 @@
 | Public package layout (`arvel_image.*`, `arvel_image.media.*`) | Unchanged | WI-arvel-001 renames affected privacy (`_` prefix) and `__all__` membership, not module structure |
 | `Media` SQLAlchemy model | Unchanged | Polymorphic `media` table stays as-is; no columns added or dropped (the `model_id` type was widened in ADR-020 § 3.5 before 1.0 and is stable since) |
 | `HasMedia` mixin's contract | Unchanged in shape | `add_image`, `get_media`, `first_media`, `last_media`, `image_url`, `media_in`, `clear_*`, `to_dict` keep their signatures |
-| Service provider boot | Unchanged | `ImageServiceProvider` keeps the same register/boot/shutdown contract |
+| Service provider boot | Unchanged | `ImageServiceProvider` implements only `boot()` (publishes the migration, registers collections from `config.image`) — no `register()` or `shutdown()`; that shape is unchanged |
 | Persistence model | Unchanged | Still polymorphic morph-id-as-string, eager-loaded via `.with_("media")` / `.load("media")` |
 | Pillow integration | Unchanged | `Image` fluent API and `ConversionRunner` worker-thread offload model stay |
 | DB schema | Unchanged in WI-arvel-001 and WI-arvel-002 | See `WI-arvel-001-no-schema-change.md`, `WI-arvel-002-no-schema-change.md`. The 1.0-era `model_id` widening is recorded in ADR-020 § 3.5. |
@@ -30,9 +30,11 @@ Three decisions drove the polish epic's structural changes. Each is recorded in 
 
 ### A.1 — Public-API rename approach
 
-**Problem.** `arvel_image.__all__` exports 31 symbols; `arvel_image.media.__all__` exports 29. Some are internal (e.g., `FileInfo`, helpers re-exported for test convenience). Externally-visible private names = brittle 1.0.
+**Problem.** Before the rename, `arvel_image.__all__` exported more symbols than the package wanted to support — some were internal (e.g., `FileInfo`, helpers re-exported for test convenience). Externally-visible private names = brittle 1.0.
 
 **Approach.** Rename internal symbols with a leading `_` and remove from `__all__`. Cross-package callers (kit, tests) update accordingly. No deprecation shim — `no-backward-compatibility.mdc` permits direct rename.
+
+**Result.** The post-rename public surface is **26** symbols in `arvel_image.__all__` and **22** in `arvel_image.media.__all__`, both pinned by `tests/test_public_surface.py` (`PACKAGE_PUBLIC` / `MEDIA_PUBLIC`).
 
 **Mechanism.** Story 2 in the WI-arvel-001 backlog. Cataloged in **ADR-020 § 5**.
 
@@ -46,17 +48,25 @@ Three decisions drove the polish epic's structural changes. Each is recorded in 
 
 ### A.3 — SSRF guard scope tightening
 
-**Problem.** Story 7 audit (and the SSRF section in `docs/threat-model.md`) identifies the URL fetcher as the highest-leverage security surface in the package. The pre-WI guard rejected `file://`/`ftp://` and blocked loopback / private-IP URLs, but the polish audit identified gaps: DNS rebinding (TOCTOU between getaddrinfo and httpx's own resolve), MIME mismatch between header and sniff.
+**Problem.** The URL fetcher (`media/url_fetcher.py`) is the highest-leverage security surface in the package — it takes a caller-supplied URL and fetches it server-side. The guard needed to block requests to internal addresses and stop a server from lying about content type.
 
-**Approach.** Close the DNS-rebinding window by overriding `Host:` and SNI to the validated IP. Add a Pillow-based MIME sniff cross-check before accepting a URL-sourced byte stream into a MIME-restricted collection.
+**What shipped.** `fetch_url` enforces, in order:
 
-**Mechanism.** Stories 7 + 8. Cataloged in **ADR-020 § 7** (which refines the original SSRF guard recorded in **ADR-020 § 4**).
+- **Scheme allowlist** — only `http`/`https`; `file://`, `ftp://`, and the rest are rejected with `MediaError`.
+- **Private-IP rejection** — `reject_private_ip` resolves the host via `getaddrinfo` and rejects any address that is private, loopback, link-local, multicast, reserved, or unspecified.
+- **No redirects** — `follow_redirects=False`, so a redirect to an internal address can't bypass the guard; callers must supply the final URL.
+- **Size cap** — streams the body and aborts past `max_bytes`, plus a fail-fast `Content-Length` header check.
+- **Opt-in MIME cross-check** — when a caller passes `expected_mime_prefix="image/"`, the bytes are sniffed with Pillow (`sniff_image_mime`) and compared to the server's `Content-Type`; a mismatch raises `InvalidMimeTypeError`.
+
+**Known limitation — DNS rebinding.** The guard resolves the host once, then httpx re-resolves it for the actual request (a TOCTOU window). The module docstring documents this; there is **no** Host/SNI pinning to the validated IP. Callers passing fully attacker-controlled URLs should treat rebinding as a residual risk.
+
+**Mechanism.** Cataloged in **ADR-020 § 7** (refines the original SSRF guard recorded in **ADR-020 § 4**).
 
 ### Threat model delta (WI-arvel-001)
 
 | Threat | Pre-WI-arvel-001 | Post-WI-arvel-001 |
 |---|---|---|
-| SSRF via user-supplied image URL | Mitigated for IPv4 loopback + RFC1918 private; **gaps**: DNS rebinding, MIME cross-check missing | Fully mitigated; DNS-rebinding window closed; MIME bytes-vs-header cross-check |
+| SSRF via user-supplied image URL | Mitigated for loopback + RFC1918 private; **gaps**: MIME cross-check missing, DNS rebinding | Scheme allowlist + broadened private-IP reject (private/loopback/link-local/multicast/reserved/unspecified) + `follow_redirects=False` + opt-in MIME bytes-vs-header cross-check. **DNS rebinding is not mitigated — documented as a residual risk.** |
 | API consumer reaches into a renamed-private symbol | N/A (currently exported) | Cleanly broken at import — fail loud (acceptable: pre-1.0, no users on PyPI yet) |
 | Silent `media` drop from `to_dict()` due to MRO mistake | User-disciplined (documented, not enforced) | `TypeError` at class definition time |
 

@@ -1,4 +1,4 @@
-# Architecture overview
+# ARCH-001 — Architecture overview
 
 Arvel is a thin coherent layer over FastAPI, Starlette, Pydantic, and SQLAlchemy. The whole framework reduces to two ideas:
 
@@ -43,7 +43,7 @@ There is exactly one `Container` per `Application`. The application binds itself
 
 Two resolution surfaces sit on top of the container:
 
-- **Facades** — process-wide static accessors (`Config`, `Cache`, `Bus`, …) that hold a reference to a resolved service. See [facades](facades.md).
+- **Facades** — process-wide static accessors (`Config`, `Cache`, `Bus`, …) that hold a reference to a resolved service. See [facades](ARCH-005-facades.md).
 - **`dep()`** — adapts any container binding into a FastAPI `Depends`, so plain `async def` routes can receive container services as parameters.
 
 ## Two-phase bootstrap
@@ -64,7 +64,7 @@ flowchart LR
 - **`boot()`** is asynchronous, runs after *every* provider has registered, and is where connections open and facades that need a live manager get bound.
 - `create()` returns a fully *registered* but *not yet booted* app. Booting happens via the ASGI lifespan (default) or an explicit `await app.boot()`.
 
-Details and ordering live in [bootstrap & lifecycle](bootstrap-lifecycle.md).
+Details and ordering live in [bootstrap & lifecycle](ARCH-002-bootstrap-lifecycle.md).
 
 ## Subsystem shape
 
