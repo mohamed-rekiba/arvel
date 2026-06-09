@@ -352,6 +352,35 @@ async def test_checkout_fails_on_insufficient_stock(
     assert checkout.status_code == 409
 
 
+@pytest.mark.asyncio
+async def test_checkout_fails_when_product_unpublished(
+    client: Any, customer_token: str, headphones_id: str
+) -> None:
+    """An item pulled from the catalog after add-to-cart 409s as unavailable, not out of stock."""
+    await client.post(
+        "/api/cart/items",
+        headers={"Authorization": f"Bearer {customer_token}"},
+        json={"product_id": headphones_id, "quantity": 1},
+    )
+
+    admin_token = await _login(client, "catalog@example.com", "password")
+    unpublished = await client.patch(
+        f"/api/admin/products/{headphones_id}/unpublish",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert unpublished.status_code == 200
+
+    checkout = await client.post(
+        "/api/checkout",
+        headers={"Authorization": f"Bearer {customer_token}"},
+        json={
+            "shipping_address": {"name": "Pat", "street": "1 St", "city": "City", "country": "US"}
+        },
+    )
+    assert checkout.status_code == 409
+    assert "no longer available" in checkout.json()["error"]["message"].lower()
+
+
 # ─── order history ────────────────────────────────────────────────────────
 
 

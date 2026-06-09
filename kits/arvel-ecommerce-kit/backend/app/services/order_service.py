@@ -32,6 +32,14 @@ class InsufficientStockError(Exception):
         self.product_id = product_id
 
 
+class ProductUnavailableError(Exception):
+    """A cart line points at a product that's no longer purchasable (unpublished/removed)."""
+
+    def __init__(self, product_id: str) -> None:
+        super().__init__(product_id)
+        self.product_id = product_id
+
+
 class InvalidOrderStatusTransitionError(Exception):
     def __init__(self, current: str, target: str) -> None:
         super().__init__(f"Cannot move order from {current!r} to {target!r}.")
@@ -70,14 +78,20 @@ class OrderService:
             published: ProductCatalog | None = await ProductCatalog.where(
                 ProductCatalog.id == pid, ProductCatalog.real_status == "visible"
             ).first()
-            if published is None or int(published.stock_qty) < item["quantity"]:
+            # No longer in the visible catalog (unpublished, soft-deleted, vendor
+            # hidden) is a different failure than "out of stock" — say so.
+            if published is None:
+                raise ProductUnavailableError(item["product_id"])
+            if int(published.stock_qty) < item["quantity"]:
                 raise InsufficientStockError(item["product_id"])
             published_products[pid] = published
 
             product: Product | None = (
                 await Product.where(Product.id == pid).lock_for_update().first()
             )
-            if product is None or int(product.stock_qty) < item["quantity"]:
+            if product is None:
+                raise ProductUnavailableError(item["product_id"])
+            if int(product.stock_qty) < item["quantity"]:
                 raise InsufficientStockError(item["product_id"])
             locked_products[pid] = product
 
