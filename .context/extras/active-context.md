@@ -587,6 +587,19 @@ Frontend typecheck/lint/vitest(18)/build green. Role assign/revoke and
 force-delete were already wired; permission grant/revoke has no per-user API
 (permissions derive from roles) so nothing to add there.
 
+## Iteration 39 — Make is_new a real recency flag (backend)
+
+LOW: `product_to_storefront` hardcoded `is_new=False`, so the "New" badge never
+showed — a dead capability. It now derives from `created_at`: true within a
+30-day window (`_NEW_WINDOW`), with a guard that treats a tz-naive `created_at`
+as UTC so the subtraction never throws. `is_bestseller` stays honestly false —
+the catalog view carries no order-count signal, and a fabricated badge violates
+the no-fake-data rule; it waits for a real metric. New unit test
+`test_059_is_new_window` covers recent → new, old → not new, and the naive-tz
+path. `FeatureBadges` (1-click returns / app / 24-7) left as-is: generic
+storefront marketing chrome, not data fabrication. Backend ruff clean; storefront
+feature suite (11) + new unit tests green.
+
 ## Blockers
 
 None. All quality gates green.
