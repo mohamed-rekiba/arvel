@@ -22,6 +22,7 @@ providers = [CacheServiceProvider, ...]
 
 ```python
 from arvel.facades import Cache
+from app.models.order import Order
 
 # miss → run callback → store for 300s
 async def load_stats() -> dict[str, int]:

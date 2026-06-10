@@ -7,6 +7,41 @@ Arvel is an API-first framework. Your handlers return [API resources](../the-bas
 
 This guide covers the contract between Arvel and those clients: how to generate a typed client from the spec, how to authenticate from a browser versus a phone, how CORS and realtime fit in, and the response shapes every client should expect.
 
+<a name="quick-start"></a>
+### Quick start
+
+```bash
+# 1. Export the contract from the backend
+arvel openapi:export --output ../frontend/openapi.yaml
+
+# 2. Generate a typed client (Orval example — see below)
+cd ../frontend && npm run api:generate
+
+# 3. Route every generated call through one mutator for auth + errors
+#    frontend/src/lib/api.ts — attach Bearer token, parse { error: { ... } }
+```
+
+```ts
+// Minimal fetch wrapper — every Orval call goes through this
+const token = localStorage.getItem('access_token')
+const res = await fetch(url, {
+  headers: token ? { Authorization: `Bearer ${token}` } : {},
+})
+if (!res.ok) {
+  const body = await res.json()
+  throw new Error(body?.error?.message ?? res.statusText)
+}
+```
+
+| Step | Doc section |
+|---|---|
+| Export + validate spec | [The OpenAPI contract](#the-openapi-contract) |
+| Generate hooks / SDK | [Generating a typed client](#generating-a-typed-client) |
+| Login + refresh | [Authentication](#authentication) |
+| SPA on another origin | [CORS](#cors) |
+| Same-origin deploy | [Serving a built SPA](#serving-a-spa) |
+| Live updates | [Realtime](#realtime) |
+
 > [!NOTE]
 > The [e-commerce kit](../kits/ecommerce-kit.md) ships a real Vue 3 + Orval frontend wired against an Arvel backend. Every snippet below is drawn from that setup — clone it if you want a working reference.
 
