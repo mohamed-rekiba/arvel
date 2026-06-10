@@ -7,6 +7,20 @@ Arvel is a web application framework with expressive, elegant syntax. A framewor
 
 Arvel strives to provide an outstanding developer experience while delivering powerful features: a full-featured async ORM, a fluent router, a service container, a CLI, queues, caching, and much more. If you know Laravel, you'll feel right at home — Arvel borrows its shape and conventions, recast for modern async Python.
 
+<a name="quick-start"></a>
+### Quick start
+
+```bash
+uv tool install arvel
+arvel new my-app
+cd my-app
+arvel key:generate
+uv run arvel serve --reload
+curl http://127.0.0.1:8000/api/healthz
+```
+
+Then follow the [Quickstart](quickstart.md) to add a model and your first data endpoint.
+
 <a name="prerequisites"></a>
 ## Prerequisites
 

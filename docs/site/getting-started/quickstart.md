@@ -7,6 +7,20 @@ Let's build a small JSON API: a route, a model, a migration, and an ORM-backed e
 
 By the end you'll expose `GET /api/items` and `GET /api/items/{item_id}`, both backed by a database table.
 
+<a name="quick-start"></a>
+### Quick start — five commands
+
+```bash
+arvel new my-app && cd my-app
+arvel make:model Item -m
+# edit app/models/item.py + database/migrations/*_create_items_table.py
+arvel migrate
+uv run arvel serve --reload
+curl http://127.0.0.1:8000/api/items   # [] until you seed or insert
+```
+
+The sections below walk through each step in detail.
+
 <a name="defining-a-route"></a>
 ## Defining a Route
 
