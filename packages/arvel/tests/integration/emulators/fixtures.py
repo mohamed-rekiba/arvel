@@ -19,6 +19,7 @@ Image pins live in :mod:`._images`. Bump versions there — the fixtures,
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import os
 import time
@@ -123,12 +124,11 @@ class PostgresEndpoint:
 
 @dataclass(frozen=True)
 class RabbitmqEndpoint:
-    """Connection details for the RabbitMQ emulator ()."""
+    """Connection details for the RabbitMQ emulator."""
 
     url: str
     host: str
     port: int
-    management_url: str
 
 
 @dataclass(frozen=True)
@@ -448,14 +448,14 @@ def mysql_endpoint() -> Iterator[MysqlEndpoint]:
 @pytest.fixture(scope="session")
 def rabbitmq_endpoint() -> Iterator[RabbitmqEndpoint]:
     """Boot a RabbitMQ container speaking AMQP, yield connection details.
-    The image is ``rabbitmq:<X>-management-alpine`` pinned in :mod:`._images`
-    as :data:`IMAGE_RABBITMQ`. Image variant ``management-alpine`` adds the
-    HTTP management plugin (port 15672) so debugging tests can poke the
-    queue browser without rebuilding the image.
+
+    The image is ``rabbitmq:<X>-alpine`` pinned in :mod:`._images` as
+    :data:`IMAGE_RABBITMQ` — no management plugin. Nothing here needs the
+    HTTP API, and dropping it shaves a chunk off the Erlang boot.
 
     Readiness is gated by the ``Server startup complete`` log line plus a
-    poll on the management API to close the gap between TCP-listening and
-    the AMQP protocol being available for connections.
+    real AMQP connect to close the gap between Erlang start and the AMQP
+    listener actually accepting connections.
     """
     _skip_if_no_docker()
 
@@ -464,16 +464,14 @@ def rabbitmq_endpoint() -> Iterator[RabbitmqEndpoint]:
         ready_log=r"Server startup complete",
         timeout=180,
     )
-    container.with_exposed_ports(5672, 15672)
+    container.with_exposed_ports(5672)
     container.start()
     try:
         host: str = container.get_container_host_ip()
         amqp_port: int = int(container.get_exposed_port(5672))
-        mgmt_port: int = int(container.get_exposed_port(15672))
         url = f"amqp://guest:guest@{host}:{amqp_port}/"
-        mgmt_url = f"http://guest:guest@{host}:{mgmt_port}"
-        _wait_for_rabbitmq(host, mgmt_port)
-        yield RabbitmqEndpoint(url=url, host=host, port=amqp_port, management_url=mgmt_url)
+        _wait_for_rabbitmq(url)
+        yield RabbitmqEndpoint(url=url, host=host, port=amqp_port)
     finally:
         container.stop()
 
@@ -542,32 +540,30 @@ def _wait_for_mysql(
     raise RuntimeError(f"MySQL at {host}:{port} did not become ready in {timeout}s: {last_exc}")
 
 
-def _wait_for_rabbitmq(host: str, mgmt_port: int, *, timeout: float = 60.0) -> None:
-    """Poll the RabbitMQ management API until it accepts requests.
-    The log strategy catches Erlang startup but the AMQP listener and the
-    management plugin can lag by a few hundred ms. Polling the management
-    health endpoint here closes the race before tests start dialling AMQP.
+def _wait_for_rabbitmq(url: str, *, timeout: float = 60.0) -> None:
+    """Poll the AMQP listener with a real aio_pika connect until it accepts a handshake.
+
+    The log strategy catches Erlang startup, but the AMQP listener can lag the
+    ``Server startup complete`` line by a few hundred ms. A real connect — not a
+    bare TCP probe — closes the race before tests start dialling AMQP.
     """
+    aio_pika: Any = importlib.import_module("aio_pika")
+
+    async def _probe() -> None:
+        connection: Any = await aio_pika.connect(url, timeout=2)
+        await connection.close()
+
     deadline = time.monotonic() + timeout
-    url = f"http://{host}:{mgmt_port}/api/overview"
-    # Public well-known emulator credentials; container is local-only.
-    auth = "Basic " + __import__("base64").b64encode(b"guest:guest").decode()
     last_exc: Exception | None = None
     while time.monotonic() < deadline:
         try:
-            req = urllib.request.Request(  # noqa: S310 — fixed scheme, controlled URL
-                url, headers={"Authorization": auth}
-            )
-            with urllib.request.urlopen(req, timeout=2) as response:  # noqa: S310
-                if 200 <= response.status < 300:
-                    return
+            asyncio.run(_probe())
         except Exception as exc:
             last_exc = exc
-        time.sleep(0.5)
-    raise RuntimeError(
-        f"RabbitMQ management API at {host}:{mgmt_port} did not become ready in {timeout}s: "
-        f"{last_exc}"
-    )
+            time.sleep(0.5)
+            continue
+        return
+    raise RuntimeError(f"RabbitMQ AMQP at {url} did not become ready in {timeout}s: {last_exc}")
 
 
 __all__ = [

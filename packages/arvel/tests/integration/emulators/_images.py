@@ -34,7 +34,7 @@ IMAGE_REDIS: Final[str] = "valkey/valkey:9.1-alpine"
 IMAGE_MAILPIT: Final[str] = "axllent/mailpit:v1.30"
 IMAGE_POSTGRES: Final[str] = "postgres:18.4-alpine"
 IMAGE_MYSQL: Final[str] = "mariadb:12.3-ubi"
-IMAGE_RABBITMQ: Final[str] = "rabbitmq:4.3-management-alpine"
+IMAGE_RABBITMQ: Final[str] = "rabbitmq:4.3-alpine"
 
 ALL_IMAGES: Final[tuple[str, ...]] = (
     IMAGE_MOTO,
