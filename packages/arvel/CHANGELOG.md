@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.25.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.25.0...arvel-v0.25.1) (2026-06-10)
+
+
+### Performance
+
+* **ci:** speed up and align the integration test suites ([fde4641](https://github.com/mohamed-rekiba/arvel/commit/fde4641a86fa7fbdfe5cf9779b69a13ebaf20e4c))
+* **test:** drop RabbitMQ management plugin from framework emulator ([c64847b](https://github.com/mohamed-rekiba/arvel/commit/c64847ba061c553fc979e12ab623a4bba75f8e41))
+
 ## [0.25.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.24.0...arvel-v0.25.0) (2026-06-09)
 
 
