@@ -28,7 +28,6 @@ class RabbitmqEndpoint(Protocol):
     url: str
     host: str
     port: int
-    management_url: str
 
 
 def _envelope(payload: str = "hello", *, priority: int = 0, delay: int = 0) -> JobEnvelope:
