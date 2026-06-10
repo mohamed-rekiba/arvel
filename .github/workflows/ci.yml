@@ -74,6 +74,7 @@ jobs:
           --cov=arvel
           --cov-report=term-missing
           --cov-report=xml
+          -n auto --dist=loadfile
           --tb=short
       - name: Upload coverage
         if: always()
@@ -302,7 +303,7 @@ jobs:
           APP_ENV: testing
         run: >-
           uv run --project ../../.. pytest tests/
-          -n auto --dist loadgroup
+          -n auto --dist loadfile
           --tb=short -q
 
   ecommerce-kit-frontend:
