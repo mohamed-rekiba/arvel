@@ -19,6 +19,31 @@ Under the hood, Arvel mounts every route onto the underlying [FastAPI](https://f
 > [!NOTE]
 > Because handlers are FastAPI routes, anything FastAPI understands in a function signature works here: Pydantic models for request bodies, `Query(...)`/`Path(...)` markers, `UploadFile`, and so on. The Arvel-specific pieces are the decorators, groups, model binding, and the `route()` / `URL` helpers documented on this page.
 
+<a name="quick-start"></a>
+### Quick start
+
+```python
+from arvel import Route
+from starlette.requests import Request
+from arvel.http.middleware import Authenticate
+
+# Single handler
+@Route.get("/api/posts/{post}", name="posts.show")
+async def show(post: Post) -> dict:
+    return post.to_dict()
+
+# Group with shared prefix + middleware
+with Route.group(prefix="/api", middleware=[Authenticate("api")]):
+    @Route.get("/me")
+    async def me(request: Request) -> dict:
+        return {"id": request.state.user.id}
+```
+
+```bash
+arvel route:list --filter posts
+arvel route:list --json
+```
+
 <a name="basic-routing"></a>
 ## Basic Routing
 

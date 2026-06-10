@@ -5,6 +5,28 @@
 
 When you start a new Arvel project, error handling is already configured for you. Arvel turns exceptions raised during request handling into consistent JSON error responses. You raise a semantic exception — "not found", "forbidden", "validation failed" — and the framework's handler serializes it with the right status code and a uniform body. You never assemble error responses by hand.
 
+<a name="quick-start"></a>
+### Quick start
+
+```python
+from arvel import NotFoundException
+from app.models.post import Post
+
+async def show(post_id: int):
+    post = await Post.find(post_id)
+    if post is None:
+        raise NotFoundException("Post not found.")
+    return post.to_dict()
+```
+
+Every error serializes to the same envelope — clients parse one shape:
+
+```json
+{"error": {"code": "NOT_FOUND", "message": "Post not found.", "details": []}}
+```
+
+See [Available exceptions](#available-exceptions) for the full status/code table.
+
 <a name="the-error-envelope"></a>
 ## The Error Envelope
 

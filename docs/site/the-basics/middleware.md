@@ -12,6 +12,29 @@ Arvel has two kinds of middleware:
 
 This page focuses on route middleware, then covers the application layer.
 
+<a name="quick-start"></a>
+### Quick start
+
+```python
+from arvel import Route, Router
+from arvel.http.middleware import Authenticate, Throttle
+
+Router.singleton().middleware_group("api", [Throttle(60), Authenticate("api")])
+
+@Route.get("/api/me", middleware=["api"])
+async def me(request): ...
+
+# Or inline on a route / group
+@Route.get("/api/posts", middleware=[Authenticate("api")])
+async def index(): ...
+
+with Route.group(middleware=[Throttle(60)]):
+    @Route.get("/api/heavy")
+    async def heavy(): ...
+```
+
+Generate custom middleware: `arvel make:middleware EnsureTokenIsValid`.
+
 <a name="defining-middleware"></a>
 ## Defining Middleware
 
