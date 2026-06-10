@@ -7,6 +7,26 @@
 
 This is an **example**, not a library you depend on. Use it as a worked example.
 
+<a name="quick-start"></a>
+### Quick start
+
+```bash
+# Scaffold a new shop from the kit tarball
+arvel new my-shop --kit ecommerce
+cd my-shop
+
+# Or run the bundled reference app in Docker
+make env && make up && make migrate && make seed
+# → http://localhost:8002  (Caddy edge — SPA + API + /media)
+```
+
+| Goal | Command / URL |
+|---|---|
+| Scaffold only | `arvel new my-shop --kit ecommerce` |
+| Full stack locally | `make up` then `make migrate && make seed` |
+| API docs | `http://localhost:8002/api/docs` |
+| Regenerate frontend client | `make api-generate` — see [Frontend integration](../frontend/integration.md) |
+
 <a name="what-it-includes"></a>
 ## What It Includes
 
