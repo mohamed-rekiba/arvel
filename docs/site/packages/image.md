@@ -8,6 +8,40 @@
 - **Image** — a fluent, Pillow-based wrapper for resize/crop/fit/format/quality. Lazy chain with both sync and `await`able terminals, no shelling out.
 - **Media library** — a polymorphic `media` table plus a runtime (`HasMedia`, collections, conversions, responsive variants) for attaching files to any model with a DX that needs almost no boilerplate.
 
+<a name="a-quick-tour"></a>
+## A Quick Tour
+
+One class attribute, one upload call — conversions and disk paths are handled for you:
+
+```bash
+uv add "arvel[image]"
+arvel vendor:publish --tag=arvel-image
+arvel migrate
+```
+
+```python
+from arvel.database import Model, Timestamps, id_, string
+from arvel_image import HasMedia
+
+
+class Product(HasMedia, Model, Timestamps):
+    __tablename__ = "products"
+    __media_collection__ = "images"
+
+    id: int = id_()
+    name: str = string(120)
+
+
+product = await Product.create(name="Mug")
+await product.add_image(file_bytes, file_name="mug.jpg")
+
+product = await Product.with_("media").find(product.id)
+product.image_url("thumbnail")    # conversion URL when registered
+```
+
+> [!IMPORTANT]
+> Put `HasMedia` **before** `Model` in the MRO so `HasMedia.to_dict()` chains into `Model.to_dict()` via `super()`.
+
 <a name="installation"></a>
 ## Installation
 
@@ -57,6 +91,15 @@ out = (
 Operations: `resize(width=, height=)`, `fit(mode, width, height)`, `crop(left=, top=, width=, height=)`, `to_width(px)`, `to_height(px)`, `quality(value)`, `format(image_format)`, `optimize()`, `strip_exif()`. Output formats: `jpeg`/`jpg`, `png`, `webp`, `gif`. `.optimize()` bakes EXIF orientation into pixels via `exif_transpose`; `.strip_exif()` zeros out the EXIF/XMP blocks on encode.
 
 Argument validation (`quality` range, `format` support, positive dimensions) fires eagerly when you call the method, so mistakes still fail fast. Building is side-effect free — calling a terminal twice replays the chain rather than mutating shared state.
+
+Pillow's decompression-bomb guard is enabled by default. Tune or disable it globally when you trust your sources:
+
+```python
+from arvel_image import set_max_pixels
+
+set_max_pixels(25_000_000)   # raise the pixel budget
+set_max_pixels(None)         # disable (only for trusted inputs)
+```
 
 > [!TIP]
 > `Image` is CPU-bound. In an async request handler, use the `*_async` terminals — they offload the whole pipeline (decode + transforms + encode) to a worker thread so you don't block the event loop:
@@ -158,6 +201,7 @@ product.image_url("thumbnail", fallback="/img/default.png")
 
 await product.first_media.delete()   # one row + its files
 await product.clear_images()         # everything in __media_collection__
+await product.delete_preserving_media()   # delete host row; media rows stay (orphaned)
 ```
 
 <a name="multi-collection"></a>
