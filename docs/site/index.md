@@ -20,7 +20,7 @@ Arvel gives Python the Laravel developer experience &mdash; expressive routing, 
 </p>
 
 <div class="arvel-hero__actions" markdown>
-[Get started](getting-started/installation.md){ .md-button .md-button--primary }
+[Get started](getting-started/index.md){ .md-button .md-button--primary }
 [View on GitHub](https://github.com/mohamed-rekiba/arvel){ .md-button }
 </div>
 
