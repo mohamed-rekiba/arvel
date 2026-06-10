@@ -27,14 +27,14 @@ from __future__ import annotations
 
 from typing import Final
 
-IMAGE_MOTO: Final[str] = "motoserver/moto:5.2.1"
+IMAGE_MOTO: Final[str] = "motoserver/moto:5.2.2"
 IMAGE_AZURITE: Final[str] = "mcr.microsoft.com/azure-storage/azurite:3.35.0"
-IMAGE_FAKE_GCS: Final[str] = "fsouza/fake-gcs-server:1.54.0"
-IMAGE_REDIS: Final[str] = "valkey/valkey:9.0.4-alpine3.23"
-IMAGE_MAILPIT: Final[str] = "axllent/mailpit:v1.30.0"
-IMAGE_POSTGRES: Final[str] = "postgres:18.3-alpine3.23"
-IMAGE_MYSQL: Final[str] = "mariadb:11.8.6"
-IMAGE_RABBITMQ: Final[str] = "rabbitmq:4.3.0-management-alpine"
+IMAGE_FAKE_GCS: Final[str] = "fsouza/fake-gcs-server:1.54"
+IMAGE_REDIS: Final[str] = "valkey/valkey:9.1-alpine"
+IMAGE_MAILPIT: Final[str] = "axllent/mailpit:v1.30"
+IMAGE_POSTGRES: Final[str] = "postgres:18.4-alpine"
+IMAGE_MYSQL: Final[str] = "mariadb:12.3-ubi"
+IMAGE_RABBITMQ: Final[str] = "rabbitmq:4.3-management-alpine"
 
 ALL_IMAGES: Final[tuple[str, ...]] = (
     IMAGE_MOTO,

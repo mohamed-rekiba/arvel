@@ -113,8 +113,20 @@ jobs:
           enable-cache: true
           ignore-nothing-to-cache: true
       - run: uv sync --all-packages --all-extras --frozen
-      - name: Pre-pull emulator images (parallel)
-        run: make pull-emulators
+      - name: Cache emulator images
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/arvel-emulator-images.tar
+          key: emulator-images-${{ hashFiles('packages/arvel/tests/integration/emulators/_images.py') }}
+      - name: Load or pull emulator images
+        run: |
+          if [ -f ~/.cache/arvel-emulator-images.tar ]; then
+            docker load -i ~/.cache/arvel-emulator-images.tar
+          else
+            make pull-emulators
+            mkdir -p ~/.cache
+            docker save -o ~/.cache/arvel-emulator-images.tar $(make print-emulators)
+          fi
       - name: Run integration suite
         run: make test-integration
 
@@ -262,12 +274,35 @@ jobs:
           enable-cache: true
           ignore-nothing-to-cache: true
       - run: uv sync --all-packages --all-extras --frozen
+      - name: Cache testcontainer images
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/testcontainer-images.tar
+          # _images.py is the single source of truth for the pins, so hashing it
+          # auto-invalidates the cache whenever an image tag changes.
+          key: tc-ecommerce-kit-${{ hashFiles('kits/arvel-ecommerce-kit/backend/tests/_images.py') }}
+      - name: Load or pull testcontainer images
+        # Hit: restore from the tarball. Miss: pull in parallel and save so the
+        # next run skips the Docker Hub layer download.
+        run: |
+          if [ -f ~/.cache/testcontainer-images.tar ]; then
+            docker load -i ~/.cache/testcontainer-images.tar
+          else
+            images="$(uv run python kits/arvel-ecommerce-kit/backend/tests/_images.py)"
+            for img in $images; do
+              docker pull --quiet "$img" &
+            done
+            wait
+            mkdir -p ~/.cache
+            docker save -o ~/.cache/testcontainer-images.tar $images
+          fi
       - name: Run ecommerce-kit integration suite
         working-directory: kits/arvel-ecommerce-kit/backend
         env:
           APP_ENV: testing
         run: >-
           uv run --project ../../.. pytest tests/
+          -n auto --dist loadscope
           --tb=short -q
 
   ecommerce-kit-frontend:
