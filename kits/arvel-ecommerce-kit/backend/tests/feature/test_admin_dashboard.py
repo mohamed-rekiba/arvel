@@ -47,7 +47,6 @@ async def app(
     from app.bootstrap import create_app
 
     application = await create_app()
-    await application.seed("catalog")
     try:
         yield application
     finally:

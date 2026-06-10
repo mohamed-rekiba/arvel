@@ -69,9 +69,8 @@ async def client(app: Any) -> Any:
 
 
 @pytest.fixture
-async def seeded_db(client: Any) -> None:
-    """Trigger the test seeder via the test-only endpoint."""
-    await client.post("/api/test/seed/catalog")
+async def seeded_db() -> None:
+    """No-op: fresh_db already clones the catalog-seeded template."""
 
 
 # ─── product listing ────────────────────────────────────────────────────
