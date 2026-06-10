@@ -7,6 +7,34 @@ When using any tool in the "real world", you feel more confident if you understa
 
 The goal of this page is to give you a good, high-level overview of how the Arvel framework boots and serves requests. The `Application` is the heart of it all — it owns the [service container](service-container.md), runs your [service providers](service-providers.md), and produces the ASGI application your server runs.
 
+<a name="quick-start"></a>
+### Quick start — the boot sequence
+
+```text
+public/asgi.py
+    └── create_application()          # bootstrap/app.py — builder chain
+            ├── load .env + config/
+            ├── load providers + routes (sync register)
+            └── return Application
+                    └── into_asgi()   # FastAPI + middleware + routes
+                            └── lifespan → await app.boot() on startup
+```
+
+In tests or one-off scripts you control boot explicitly:
+
+```python
+from bootstrap.app import create_application
+
+app = create_application()
+await app.boot()
+try:
+    users = await app.container.make(UserRepository).all()
+finally:
+    await app.shutdown()
+```
+
+When you `arvel serve`, uvicorn imports `public.asgi:asgi` — the ASGI lifespan runs `boot()` before the first request and `shutdown()` on exit.
+
 <a name="lifecycle-overview"></a>
 ## Lifecycle Overview
 

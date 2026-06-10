@@ -16,6 +16,27 @@ user = await Cache.get("user:1")
 
 Behind the scenes, `Cache` proxies to a `CacheManager` bound by `CacheServiceProvider`. The real object is still container-managed and swappable — which is exactly what the `fake()` helpers exploit in [testing](#facades-in-testing).
 
+<a name="quick-start"></a>
+### Quick start — pick the right import
+
+```python
+# Opt-in subsystems — register the provider in bootstrap/providers.py first
+from arvel.facades import Cache, Storage, Session
+from arvel.facades.mail import Mail
+from arvel.facades.auth import Auth
+
+await Cache.put("stats", payload, ttl=300)
+await Mail.to(user).send(WelcomeEmail())
+user = Auth.user()
+
+# Always available (no provider)
+from arvel.facades import Crypt, Http, Log
+from arvel.facades.hash import Hash
+
+token = Crypt.encrypt_string("secret")
+hashed = Hash.make("password")
+```
+
 <a name="how-facades-work"></a>
 ## How Facades Work
 
