@@ -72,6 +72,47 @@ def author(self):
     return self.belongs_to(User, foreign_key="author_id", owner_key="id")
 ```
 
+<a name="has-one-of-many"></a>
+### Has One of Many
+
+Sometimes a model has many related rows but you only want one of them — the *latest* order, the *highest* bid, the *oldest* membership. Calling the `has_many` relation gives you helpers that pick a single row by aggregating a column:
+
+```python
+class User(Model, Timestamps):
+    __tablename__ = "users"
+    id: int = id_()
+
+    def orders(self):
+        return self.has_many(Order)
+
+
+latest = await user.orders().latest_of_many()           # MAX(created_at)
+first = await user.orders().oldest_of_many()            # MIN(created_at)
+priciest = await user.orders().of_many("total", "max")  # MAX of any column
+```
+
+These run a one-row query each time, so for a list of users they'd be N+1. When you need to eager-load "one of many" across many parents in a single query, declare a `HasOneOfMany` **descriptor** instead:
+
+```python
+from typing import ClassVar
+from arvel.database.orm.has_one_of_many import HasOneOfMany
+
+
+class User(Model, Timestamps):
+    __tablename__ = "users"
+    id: int = id_()
+
+    latest_order: ClassVar[HasOneOfMany["Order"]] = HasOneOfMany(
+        Order, column="created_at", aggregate="max"
+    )
+
+
+users = await User.with_("latest_order").get()
+order = await user.latest_order      # awaitable accessor; served from cache after with_()
+```
+
+The descriptor eager-loads with a single grouped subquery (`MAX(created_at) … GROUP BY user_id`) rather than one query per user. Ties on the aggregate column are broken by the larger primary key, so the result is deterministic.
+
 <a name="querying-relationships"></a>
 ## Querying Relationships
 
@@ -295,7 +336,13 @@ tree = await category.descendants().with_max_depth(5).all()
 nodes = await category.descendants().as_tree()   # nested TreeNode structure
 ```
 
-Eager-load a whole tree with `with_tree(...)` — see below.
+Eager-load a whole tree with `with_tree(...)`:
+
+```python
+roots = await Category.where_null("parent_id").with_tree("descendants", max_depth=5).get()
+for root in roots:
+    forest = await root.descendants().as_tree()   # served from cache, no re-query
+```
 
 <a name="eager-loading"></a>
 ## Eager Loading
@@ -327,6 +374,28 @@ To constrain the rows that are eager-loaded, pass a mapping of relation name to 
 users = await User.with_({
     "posts": lambda q: q.where(Post.published == True),
 }).get()
+```
+
+<a name="selecting-and-dropping-eager-loads"></a>
+### Selecting & Dropping Eager Loads
+
+`with_only` replaces any pending eager loads with exactly the relations you name — handy when a base query or scope already adds some you don't want here. `without` drops named relations from the pending set:
+
+```python
+base = User.with_("posts", "profile", "roles")
+
+await base.with_only("posts").get()   # only posts is loaded
+await base.without("roles").get()     # posts + profile, no roles
+```
+
+<a name="hydrating-the-inverse"></a>
+### Hydrating the Inverse
+
+When you eager-load children and then walk back to the parent from each child, that back-reference is another N+1. `chaperone()` — used inside a `with_` closure — hydrates each child's inverse parent with the already-loaded instance, so `comment.post` returns the in-memory post without a query:
+
+```python
+posts = await Post.with_({"comments": lambda q: q.chaperone()}).get()
+# now comment.post is the same Post object, no extra query
 ```
 
 <a name="lazy-eager-loading"></a>
@@ -369,6 +438,9 @@ users = await User.with_count("posts").get()
 # each user now carries posts_count
 
 await User.with_sum("orders", "total").get()
+await User.with_avg("orders", "total").get()
+await User.with_min("orders", "total").get()
+await User.with_max("orders", "total").get()
 await User.with_exists("posts").get()
 ```
 
@@ -407,6 +479,13 @@ await User.where_has("posts.comments").get()
 
 ```python
 await User.where_relation("posts", "status", "published").get()
+```
+
+To filter the children of a known parent, `where_belongs_to` takes the parent instance and scopes by its foreign key — no need to remember the column name:
+
+```python
+await Post.where_belongs_to(current_user).get()        # posts of this user
+await Post.where_belongs_to(current_user, "author").get()   # name the relation explicitly
 ```
 
 For polymorphic existence, use `where_has_morph` and `has_morph`. See the [query builder](query-builder.md) for the full filtering surface.

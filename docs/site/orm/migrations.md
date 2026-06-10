@@ -43,6 +43,29 @@ async def down(schema: Schema) -> None:
 > [!WARNING]
 > Although `up` and `down` are declared `async`, the `Schema` operations inside them are **synchronous** — you do not `await` them. The runner drives the coroutine in a single step, so performing a real `await` inside a migration body raises `RuntimeError`. Keep migration bodies to schema operations only.
 
+A migration with foreign keys and indexes reads the same way — the relationships in your [models](models.md) map directly onto the schema:
+
+```python
+async def up(schema: Schema) -> None:
+    def build(table: Blueprint) -> None:
+        table.id()
+        table.foreign_id("user_id").constrained().cascade_on_delete()
+        table.string("title", length=200)
+        table.text("body")
+        table.string("status", length=20).server_default("draft")
+        table.timestamps()
+        table.soft_deletes()
+
+        table.index("title")
+        table.index(["status", "created_at"])      # composite index
+
+    Schema.create("posts", build)
+
+
+async def down(schema: Schema) -> None:
+    Schema.drop_if_exists("posts")
+```
+
 <a name="running-migrations"></a>
 ## Running Migrations
 
@@ -201,6 +224,21 @@ table.rename_column("old_name", "new_name")
 
 Standalone (outside a `build` callback): `Schema.create_index(...)` and `Schema.create_expression_index(...)`.
 
+<a name="pivot-tables"></a>
+### Pivot Tables
+
+A [many-to-many](relationships.md#many-to-many) relationship needs a pivot table. It's an ordinary table with two foreign keys and a composite primary key:
+
+```python
+async def up(schema: Schema) -> None:
+    def build(table: Blueprint) -> None:
+        table.foreign_id("post_id").constrained().cascade_on_delete().primary()
+        table.foreign_id("tag_id").constrained().cascade_on_delete().primary()
+        table.string("added_by", length=50).nullable()    # extra pivot column
+
+    Schema.create("post_tag", build)
+```
+
 <a name="views-and-extensions"></a>
 ## Views & Extensions
 
@@ -214,7 +252,13 @@ Schema.create_materialized_view("revenue", "SELECT ...", with_data=True)
 Schema.refresh_materialized_view("revenue", concurrently=True)
 ```
 
-Async introspection helpers — `has_table`, `has_column`, `get_columns`, `has_view` — let a migration branch on the current schema state.
+Async introspection helpers — `has_table`, `has_column`, `get_columns`, `has_view` — let a migration branch on the current schema state:
+
+```python
+async def up(schema: Schema) -> None:
+    if not await schema.has_column("users", "phone"):
+        Schema.table("users", lambda t: t.string("phone").nullable())
+```
 
 <a name="database-connections"></a>
 ## Database Connections
@@ -264,6 +308,15 @@ class DatabaseSeeder(Seeder):
         await ProductSeeder().run()
 ```
 
+Seeders pair naturally with [factories](#factories) for bulk fake data:
+
+```python
+class DatabaseSeeder(Seeder):
+    async def run(self) -> None:
+        await UserFactory().count(50).create()
+        await UserFactory().has("posts", PostFactory(), count=3).count(10).create()
+```
+
 > [!WARNING]
 > Don't call `session.commit()` inside a seeder — the `db:seed` runner owns the transaction and commits after `run()` returns. Also note that `self.call(other_seeder)` is a composition helper that returns the seeder unchanged; it does **not** execute it. To run another seeder, await its `run()` directly.
 
@@ -305,6 +358,30 @@ admin = await UserFactory().state({"is_admin": True}).create()
 draft = UserFactory().make()           # not persisted
 ```
 
+<a name="unique-and-sequenced-data"></a>
+### Unique & Sequenced Data
+
+A fixed `definition` produces duplicate emails when you create many rows. Give each instance a distinct value with `sequence`, which calls a function with an incrementing counter, or read the per-factory counter directly with `seq`:
+
+```python
+users = await (
+    UserFactory()
+    .count(3)
+    .sequence("email", lambda n: f"user{n}@example.com")
+    .create()
+)
+# user1@…, user2@…, user3@…
+```
+
+`state` also accepts a **callable** when the override needs to be computed per build:
+
+```python
+await UserFactory().count(5).state(lambda: {"token": secrets.token_hex(8)}).create()
+```
+
+<a name="factory-relationships"></a>
+### Relationships
+
 Build relationships, attach pivots, and run callbacks:
 
 ```python
@@ -317,6 +394,19 @@ await UserFactory().has_attached(
 
 await UserFactory().after_creating(lambda u, faker: notify(u)).create()
 ```
+
+<a name="factory-states-and-connections"></a>
+### Trashed Rows, Quiet Builds & Connections
+
+A few modifiers cover the less common cases:
+
+```python
+await PostFactory().count(5).trashed().create()        # rows start soft-deleted
+await UserFactory().count(10).create_quietly()         # skip lifecycle events
+await UserFactory().connection("analytics").create()   # persist on a named connection
+```
+
+`trashed()` requires the model to use [`SoftDeletes`](models.md#soft-deleting); it raises otherwise.
 
 > [!NOTE]
 > Faker is an optional dependency. When installed, it's passed as the second argument to `after_making` / `after_creating` callbacks. Without it, those callbacks receive `None` for the faker.
