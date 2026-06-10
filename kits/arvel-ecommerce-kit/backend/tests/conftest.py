@@ -48,6 +48,7 @@ _POSTGRES_USER = "arvel"
 _POSTGRES_PASSWORD = "arvel"  # well-known test credential; container is local-only
 _POSTGRES_BASE_DB = "arvel_ecommerce_test"
 _TEMPLATE_DB_NAME = "arvel_ecommerce_template"
+_SEEDED_TEMPLATE_DB_NAME = "arvel_ecommerce_seeded"
 
 
 @dataclass(frozen=True)
@@ -137,11 +138,12 @@ def _docker_container(image: str, *, ready_log: str, timeout: int = 120) -> Any:
 
 # Containers are session-scoped, so each xdist worker boots its own stack on the
 # first emulator test it runs. Across workers they hit *different* containers, so
-# the shared default DB/vhost/bucket is safe without per-test isolation. Run under
-# --dist loadfile, NOT load: load spreads emulator tests to every worker, so all of
-# them boot a full 5-container stack (20 containers on a 4-vCPU runner) and the
-# resource contention bloats per-test setup. loadfile keeps a file on one worker,
-# so fewer stacks boot — measurably faster despite the looser balance.
+# the shared default DB/vhost/bucket is safe without per-test isolation.
+#
+# The catalog seed (14 image downloads + conversion generation) is the expensive
+# part, ~12s. It used to run per test (about 93 times). Now it runs once per worker
+# into the seeded template DB; every test's `fresh_db` is a CREATE DATABASE ...
+# TEMPLATE clone of it (~0.03s). That's the whole speedup: seed once, clone cheaply.
 
 
 @pytest.fixture(scope="session")
@@ -201,10 +203,68 @@ def template_db(postgres_endpoint: PostgresEndpoint) -> str:
     return template_dsn
 
 
+@pytest.fixture(scope="session")
+def seeded_template_db(
+    postgres_endpoint: PostgresEndpoint,
+    template_db: str,
+    redis_endpoint: RedisEndpoint,
+    rabbitmq_endpoint: RabbitmqEndpoint,
+    s3_endpoint: S3Endpoint,
+    mailpit_endpoint: MailpitEndpoint,
+) -> str:
+    """Build the catalog-seeded template once per worker; fresh_db clones it.
+
+    Boots the app against a throwaway DB, runs the catalog seed (the costly bit),
+    then leaves that DB untouched so it can serve as a CREATE DATABASE template.
+    Images land in the shared session S3, which every clone references.
+    """
+    import asyncio
+
+    _create_database(postgres_endpoint, _SEEDED_TEMPLATE_DB_NAME, template=_TEMPLATE_DB_NAME)
+
+    env = {
+        "DB_URL": postgres_endpoint.dsn_asyncpg(_SEEDED_TEMPLATE_DB_NAME),
+        "CACHE_URL": redis_endpoint.url,
+        "AMQP_URL": rabbitmq_endpoint.amqp_url,
+        "STORAGE_S3_ENDPOINT": s3_endpoint.endpoint_url,
+        "STORAGE_S3_KEY": s3_endpoint.access_key,
+        "STORAGE_S3_SECRET": s3_endpoint.secret_key,
+        "STORAGE_S3_BUCKET": s3_endpoint.bucket,
+        "MAIL_HOST": mailpit_endpoint.smtp_host,
+        "MAIL_PORT": str(mailpit_endpoint.smtp_port),
+        "APP_ENV": "local",
+        "APP_KEY": "seeded-template-key-must-be-32-bytes-or-more!",
+    }
+    saved = {k: os.environ.get(k) for k in env}
+    os.environ.update(env)
+
+    async def _seed() -> None:
+        from app.bootstrap import create_app
+
+        app = await create_app()
+        try:
+            await app.seed("catalog")
+        finally:
+            await app.shutdown()
+
+    try:
+        asyncio.run(_seed())
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    return _SEEDED_TEMPLATE_DB_NAME
+
+
 @pytest.fixture
-async def fresh_db(postgres_endpoint: PostgresEndpoint, template_db: str) -> AsyncIterator[str]:
+async def fresh_db(
+    postgres_endpoint: PostgresEndpoint, seeded_template_db: str
+) -> AsyncIterator[str]:
     dbname = f"test_{uuid.uuid4().hex[:8]}"
-    _create_database(postgres_endpoint, dbname, template=_TEMPLATE_DB_NAME)
+    _create_database(postgres_endpoint, dbname, template=seeded_template_db)
     try:
         yield postgres_endpoint.dsn_asyncpg(dbname)
     finally:
