@@ -17,6 +17,9 @@ items = await (
 
 `Item.where(...)` returns a `QueryBuilder`. Builder methods like `where`, `order_by`, and `limit` return the builder so you can chain. Terminal methods — `get`, `first`, `count`, `paginate` — execute against the active database session and must be awaited.
 
+> [!NOTE]
+> Builder methods return a **new** builder rather than mutating in place, so a partially-built query is safe to reuse as a base for several variations.
+
 <a name="running-queries"></a>
 ## Running Queries
 
@@ -40,13 +43,21 @@ first = await Item.where(is_active=True).first()
 names = await Item.pluck("name")
 ```
 
+`sole()` is the right tool when a query *must* match exactly one row — it raises `ModelNotFoundError` for zero and `MultipleResultsError` for more than one, so an ambiguous result fails loudly instead of silently picking the first:
+
+```python
+user = await User.where(email="ada@example.com").sole()
+```
+
 <a name="aggregates"></a>
 ### Aggregates
 
 ```python
 total = await Item.where(is_active=True).count()
 revenue = await Item.sum("price")     # empty result → 0
+average = await Item.avg("price")
 top = await Item.max("price")
+floor = await Item.min("price")
 exists = await Item.where(sku="ABC").exists()
 none = await Item.where(sku="ABC").doesnt_exist()
 ```
@@ -101,14 +112,24 @@ The builder offers a wide range of where variants. Most have an `or_*` sibling:
 | `where_between` / `where_not_between` | `where_between("age", 18, 65)` |
 | `where_null` / `where_not_null` | `where_null("deleted_at")` |
 | `where_like` / `where_not_like` | `where_like("name", "%ada%", case_sensitive=False)` |
-| `where_date` / `where_year` / `where_month` / `where_day` | date-part filters |
+| `where_date` / `where_time` / `where_year` / `where_month` / `where_day` | date-part filters |
 | `where_column` | compare two columns |
-| `where_raw` | `where_raw("price > tax * 10")` |
+| `where_raw` | `where_raw("price > tax * :m", {"m": 10})` |
 | `where_exists` | correlated `EXISTS` subquery |
 | `where_json_path` / `where_json_contains` | PostgreSQL JSON filters |
 | `where_full_text` | full-text search |
 | `where_any` / `where_all` / `where_none` | apply an operator across several columns |
 | `has` / `where_has` / `doesnt_have` / `where_relation` | filter by [related rows](relationships.md#querying-relationship-existence) |
+
+`where_any` / `where_all` / `where_none` apply one operator across several columns — useful for a multi-column search box:
+
+```python
+# match the term in ANY of these columns
+await Item.where_any(["name", "sku", "description"], "ilike", f"%{term}%").get()
+
+# require a condition across ALL of them
+await Order.where_all(["paid", "shipped"], "=", True).get()
+```
 
 <a name="logical-grouping"></a>
 ### Logical Grouping
@@ -165,16 +186,62 @@ Select specific columns, or run joins with SQLAlchemy expressions:
 
 A `select()` of specific columns (or `select_raw`) returns a `Collection` of dict rows rather than a `ModelCollection` of models.
 
+<a name="subqueries"></a>
+## Subqueries
+
+The builder composes with itself: build a query, then feed it into another as a subquery. `select_sub` adds a correlated scalar column, `from_sub` queries from a derived table, and `join_sub` joins against one:
+
+```python
+# correlated scalar: each user's latest post timestamp as a column
+latest = Post.where_column("posts.user_id", "users.id").select_raw("MAX(created_at)")
+users = await User.select("id", "name").select_sub(latest, "last_post_at").get()
+
+# query from a derived table of pre-aggregated rows (comes back as dicts)
+totals = (
+    Order.select("user_id")
+    .select_raw("SUM(total) AS revenue")
+    .group_by("user_id")
+    .having("revenue", ">", 1000)
+)
+big_spenders = await User.from_sub(totals, "t").get()
+
+# join against a subquery — `on` receives the aliased subquery
+await User.join_sub(totals, "t", lambda t: User.id == t.c.user_id).get()
+```
+
+For existence rather than a value, `where_exists` takes a closure that builds the correlated subquery:
+
+```python
+await User.where_exists(lambda q: q.where_column("orders.user_id", "users.id")).get()
+```
+
 <a name="conditional-clauses"></a>
 ## Conditional Clauses
 
-Build queries from runtime conditions without breaking the chain. `when` runs the callback when the condition is truthy; `unless` runs it when falsy:
+Build queries from runtime conditions without breaking the chain. `when` runs the callback when the condition is truthy; `unless` runs it when falsy. This keeps request-driven filtering flat instead of a tangle of `if` statements:
 
 ```python
-query = Item.query()
-query = query.when(search, lambda q: q.where_like("name", f"%{search}%"))
-query = query.unless(include_inactive, lambda q: q.where(is_active=True))
-items = await query.get()
+async def index(request):
+    search = request.query_params.get("q")
+    sort = request.query_params.get("sort")
+    include_inactive = request.query_params.get("all") == "1"
+
+    items = await (
+        Item.query()
+        .when(search, lambda q, value: q.where_like("name", f"%{value}%"))
+        .when(sort, lambda q, value: q.order_by(value))
+        .unless(include_inactive, lambda q: q.where(is_active=True))
+        .paginate(15)
+    )
+    return items
+```
+
+The truthy value is passed as the second argument to the callback, so you don't have to close over it.
+
+`tap` runs a side effect on the builder (logging, conditional mutation) and returns it so the chain continues:
+
+```python
+Item.query().tap(lambda q: logger.debug(q.to_sql())).where(is_active=True)
 ```
 
 <a name="pagination"></a>
@@ -236,9 +303,15 @@ async for item in Item.lazy():
 # process in batches; return False from the callback to stop early
 await Item.chunk(500, process_batch)
 
+# run a callback once per row across the whole result set
+await Item.where(is_active=True).each(process_one)
+
 # stable when the callback mutates rows that would shift offsets
 await Item.chunk_by_id(500, process_batch)
 ```
+
+> [!WARNING]
+> When the callback **modifies** the column the query orders/filters on, plain `chunk` can skip or repeat rows as offsets shift. Reach for `chunk_by_id`, which paginates by the primary key instead of `OFFSET`.
 
 <a name="bulk-writes"></a>
 ## Bulk Writes
@@ -255,10 +328,78 @@ await Item.where(...).decrement("stock", 2)
 await Item.where(...).delete()        # soft delete if SoftDeletes, else hard
 ```
 
+`update`, `delete`, `increment`, and `decrement` return the number of affected rows.
+
 Get-or-create helpers cover the common idioms: `first_or_create`, `first_or_new`, `update_or_create`, `update_or_insert`.
 
 > [!WARNING]
 > Bulk writes operate at the SQL level and do **not** fire [model events](models.md#model-events) or run per-row casts. When you need events, load the models and save them individually.
+
+<a name="transactions"></a>
+## Database Transactions
+
+Wrap several writes in a single atomic unit with `DB.transaction()`. If the block raises, everything rolls back; if it returns normally, it commits:
+
+```python
+from arvel.database import DB
+
+
+async with DB.transaction():
+    order = await Order.create(user_id=user.id, total=total)
+    await user.decrement("credit", total)   # both land, or neither does
+```
+
+Nested `DB.transaction()` blocks open **savepoints** rather than a second physical transaction, so an inner failure can be caught and rolled back without aborting the outer one.
+
+When you need automatic retries on a deadlock or serialization failure, use `DB.transactional` — each attempt runs in a fresh transaction:
+
+```python
+async def settle(session):
+    await ledger.save()
+    await payment.save()
+
+await DB.transactional(settle, attempts=3)
+```
+
+To run work only after the transaction actually commits — dispatching an email, busting a cache — register it with `DB.after_commit`. The callback is skipped entirely if the transaction rolls back, and inside a savepoint it's deferred to the outermost commit:
+
+```python
+async with DB.transaction():
+    user = await User.create(**data)
+    DB.after_commit(lambda: send_welcome_email(user))
+```
+
+> [!NOTE]
+> Inside an HTTP request wrapped by the `DatabaseTransaction` middleware you're already in a transaction, so `DB.after_commit(...)` works without an explicit `DB.transaction()` block.
+
+<a name="raw-queries"></a>
+## Raw Queries & the DB Facade
+
+When you need to drop below the model layer — a reporting query, a table with no model, a one-off statement — the `DB` facade runs parameterized SQL and offers a lightweight table builder.
+
+```python
+from arvel.database import DB
+
+rows = await DB.select(
+    "SELECT status, COUNT(*) AS n FROM orders WHERE total > :min GROUP BY status",
+    {"min": 100},
+)                                           # list[dict]
+count = await DB.scalar("SELECT COUNT(*) FROM orders")
+await DB.statement("REINDEX TABLE orders")
+```
+
+> [!WARNING]
+> Always pass values as **bindings** (`:name` placeholders + a dict), never by string-formatting them into the SQL. Bindings are escaped by the driver; interpolation opens a SQL-injection hole.
+
+The table builder works on a bare table name without a model:
+
+```python
+await DB.table("audit_log").insert([{"action": "login", "user_id": 1}])
+recent = await DB.table("audit_log").where("user_id", 1).order_by("created_at").limit(10).get()
+await DB.table("sessions").where("expired", True).delete()
+```
+
+For a named connection, go through `DB.connection("analytics").select(...)`.
 
 <a name="scopes"></a>
 ## Scopes
@@ -383,4 +524,25 @@ Inspect the compiled SQL and bindings without running the query, or get the data
 print(Item.where(is_active=True).to_sql())        # SQL string
 print(Item.where(is_active=True).get_bindings())   # bound parameters
 plan = await Item.where(is_active=True).explain()  # EXPLAIN output
+```
+
+To audit what a whole block of code emits, turn on the query log. Every statement is captured with its bindings and timing:
+
+```python
+from arvel.database import DB
+
+DB.enable_query_log()
+await Item.where(is_active=True).get()
+await Order.create(total=10)
+
+DB.get_query_log()    # [{"sql": ..., "bindings": ..., "time_ms": ...}, ...]
+DB.flush_query_log()  # clear it
+DB.disable_query_log()
+```
+
+`DB.pretend` runs a block, captures the SQL it *would* emit, and rolls everything back so nothing persists — a dry run for a migration-like script or a risky bulk write:
+
+```python
+log = await DB.pretend(lambda: Item.where(is_active=False).delete())
+# log holds the captured statements; the rows are untouched
 ```

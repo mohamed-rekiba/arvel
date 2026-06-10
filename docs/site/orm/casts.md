@@ -39,6 +39,15 @@ class Doc(Model):
 
 Now `doc.meta` reads as a `dict`, and assigning a `dict` serializes back to the column. `doc.flag` reads as a `bool`. Casts run on attribute read and write, and again (via a `serialize` step) when the model is converted with `to_dict()`.
 
+```python
+doc = await Doc.create(code="A1", meta='{"tags": ["x"]}', flag="1", price="9.5")
+
+doc.meta            # {"tags": ["x"]} — a real dict
+doc.meta["tags"].append("y")
+doc.flag            # True
+doc.price           # Decimal("9.50") — quantized to 2 places
+```
+
 <a name="built-in-cast-strings"></a>
 ### Built-in Cast Strings
 
@@ -57,7 +66,11 @@ Now `doc.meta` reads as a `dict`, and assigning a `dict` serializes back to the 
 | `hashed` | — (read passes through) | hashed via the `Hash` facade |
 
 > [!NOTE]
-> The `hashed` cast hashes the value on write but does not transform it on read — so an assigned plaintext password becomes a one-way hash in the column, and reading returns the stored hash. This is the right behavior for password columns.
+> The `hashed` cast hashes the value on write but does not transform it on read — so an assigned plaintext password becomes a one-way hash in the column, and reading returns the stored hash. This is the right behavior for password columns:
+> ```python
+> __casts__ = {"password": "hashed"}
+> user.password = "secret"   # stored as a bcrypt/argon hash
+> ```
 
 <a name="parameterized-casts"></a>
 ### Parameterized Casts
@@ -105,6 +118,13 @@ class Post(Model):
     __casts__: ClassVar[dict[str, Any]] = {"status": Status}
 ```
 
+```python
+post.status = Status.published   # stored as "published"
+post.status                      # Status.published — compare with `is`
+if post.status is Status.draft:
+    ...
+```
+
 <a name="encrypted-casting"></a>
 ## Encrypted Casting
 
@@ -136,6 +156,9 @@ account.ssn                    # reads back decrypted
 
 > [!WARNING]
 > Encrypted casts require `APP_KEY` to be set — they raise `MissingAppKeyError` otherwise. Generate one with `arvel key:generate`. Note that **rotating** the key makes existing ciphertext unreadable; plan key rotation carefully. See [Encryption](../features/encryption.md).
+
+> [!NOTE]
+> An encrypted column can't be filtered with a `WHERE` clause — the database only sees ciphertext, and each write produces different bytes. If you need to look a value up, store a separate deterministic hash column to query on, or use `EncryptedType(key, deterministic=True)` below.
 
 <a name="custom-casts"></a>
 ## Custom Casts
@@ -169,7 +192,7 @@ class Doc(Model):
     __casts__: ClassVar[dict[str, Any]] = {"code": AsUpper()}   # or AsUpper
 ```
 
-Generate a cast scaffold with `arvel make:cast`.
+A custom cast is the right home for a value object — money, coordinates, a typed identifier — where `get` builds the object and `set` flattens it back to a storable primitive. Generate a cast scaffold with `arvel make:cast`.
 
 <a name="column-level-types"></a>
 ## Column-Level Types
@@ -195,8 +218,24 @@ class Secret(Model):
     profile: Profile | None = column(PydanticType(Profile), nullable=True, default=None)
 ```
 
+`PydanticType` is the clean way to store a structured blob — validation runs on the way in and out, so a malformed row surfaces as a `ValidationError` instead of a stray dict:
+
+```python
+from pydantic import BaseModel
+
+
+class Profile(BaseModel):
+    bio: str
+    links: list[str] = []
+
+
+secret.profile = Profile(bio="hi", links=["https://x.test"])
+await secret.save()
+secret.profile.bio    # validated Profile instance
+```
+
 > [!NOTE]
-> `EncryptedType` takes a raw 32-byte key in its constructor — it is **not** wired to `APP_KEY` automatically, unlike the `encrypted:*` attribute casts. Use the attribute cast when you want the app key; use `EncryptedType` when you manage the key yourself.
+> `EncryptedType` takes a raw 32-byte key in its constructor — it is **not** wired to `APP_KEY` automatically, unlike the `encrypted:*` attribute casts. Use the attribute cast when you want the app key; use `EncryptedType` when you manage the key yourself. Pass `deterministic=True` when you need the same plaintext to encrypt to the same ciphertext so the column is searchable (at a small confidentiality cost).
 
 <a name="accessors-and-mutators"></a>
 ## Accessors & Mutators
@@ -244,6 +283,11 @@ class User(Model):
         return value.strip().lower()
 ```
 
+```python
+user.email = "  Ada@Example.COM "
+user.email   # "ada@example.com"
+```
+
 <a name="attribute-objects"></a>
 ### Attribute Objects
 
@@ -268,6 +312,12 @@ class User(Model):
         get=lambda m: f"{m.first_name} {m.last_name}".strip(),
         set=_split_name,
     )
+```
+
+```python
+user.full_name = "Grace Hopper"
+user.first_name   # "Grace"
+user.last_name    # "Hopper"
 ```
 
 Call `.should_cache()` on the attribute to memoize the computed value per instance.
@@ -297,3 +347,30 @@ Every name in `__appends__` must resolve to an accessor — `to_dict()` reads ea
 user.append("full_name")
 user.to_dict()    # now includes "full_name"
 ```
+
+<a name="translatable-fields"></a>
+## Translatable Fields
+
+When a column holds per-locale values in a single JSONB blob — `{"en": "Chair", "ar": "كرسي"}` — the `TranslatableMixin` gives you locale-aware reads and writes without unpacking the dict by hand:
+
+```python
+from typing import Any
+from arvel.database import Model, TranslatableMixin, id_, jsonb
+
+
+class Category(TranslatableMixin, Model):
+    __tablename__ = "categories"
+    id: int = id_()
+    name: dict[str, Any] = jsonb(default=dict)
+```
+
+```python
+category.set_translation("name", "fr", "Mobilier")
+category.get_translation("name", "ar")    # Arabic name, or falls back to "en"
+await category.save()
+```
+
+`get_translation(field, locale)` returns the requested locale, falling back to `"en"` when it's missing. `set_translation(field, locale, value)` patches a single key without clobbering the others. For a plain dict that isn't on a model, the static `TranslatableMixin.translate_dict(data, locale)` does the same resolution.
+
+> [!NOTE]
+> Store the JSONB column with `jsonb(...)` so PostgreSQL can index and query inside it (see [Migrations](migrations.md#available-column-types)). On non-PostgreSQL dialects the column degrades to plain JSON, and the mixin still works.

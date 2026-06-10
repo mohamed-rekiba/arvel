@@ -10,6 +10,41 @@ A model is a Python class. Its instances represent rows; its class methods build
 > [!NOTE]
 > Every persistence and read method on a model — `create`, `save`, `delete`, `find`, `all`, `first` — is an `async` coroutine and must be awaited. The fluent builder methods (`where`, `order_by`, `with_`) are synchronous and return a query builder; only the terminal method touches the database.
 
+<a name="a-quick-tour"></a>
+## A Quick Tour
+
+Before the details, here's the whole loop — define a model, migrate the table, then read and write rows. Everything below expands on these five lines.
+
+```python
+from arvel.database import Model, Timestamps, id_, string, boolean
+
+
+class Flight(Model, Timestamps):
+    __tablename__ = "flights"
+
+    id: int = id_()
+    name: str = string(255)
+    is_active: bool = boolean(default=True)
+```
+
+```python
+# create
+flight = await Flight.create(name="London to Paris")
+
+# read
+flight = await Flight.find_or_fail(flight.id)
+active = await Flight.where(is_active=True).order_by("-created_at").get()
+
+# update
+flight.name = "Paris to London"
+await flight.save()
+
+# delete
+await flight.delete()
+```
+
+The migration that backs this model is one command and a few lines — see [Migrations](migrations.md). The query methods (`where`, `order_by`, …) are covered in depth in the [Query Builder](query-builder.md).
+
 <a name="defining-models"></a>
 ## Defining Models
 
@@ -90,6 +125,14 @@ class Booking(Model):
 
 Both default to `init=False` — the value is provided by the database (integer) or a default factory (UUID), so you never pass it to the constructor. Composite primary keys are supported; `find` accepts a tuple in that case.
 
+Read the key off an instance with `get_key()` — it returns the scalar value, or a tuple for composite keys:
+
+```python
+flight.get_key()          # 1
+booking.get_key()         # UUID('018f…')
+order_line.get_key()      # (order_id, line_no) for a composite key
+```
+
 <a name="column-helpers"></a>
 ### Column Helpers
 
@@ -165,12 +208,39 @@ class Flight(Model, Timestamps):
     id: int = id_()
 ```
 
-To bump `updated_at` without otherwise changing the row, call `await model.touch()`. To run a block of work without touching timestamps:
+To bump `updated_at` without otherwise changing the row, call `await model.touch()`. Pass a column name to bump a different timestamp:
+
+```python
+await flight.touch()                  # updated_at = now()
+await flight.touch("published_at")    # any timestamp column
+```
+
+To run a block of work without touching timestamps:
 
 ```python
 async with Flight.without_timestamps():
     await flight.save()
 ```
+
+<a name="touching-parent-timestamps"></a>
+### Touching Parent Timestamps
+
+When a child model is saved, you often want its parent's `updated_at` to move too — so a cached "post last changed at" reflects a new comment. List the [relationships](relationships.md) to bump in `__touches__`:
+
+```python
+class Comment(Model, Timestamps):
+    __tablename__ = "comments"
+    __touches__ = ("post",)        # saving a comment touches its post
+
+    id: int = id_()
+    post_id: int = foreign_id("posts.id")
+    body: str = text()
+
+    def post(self):
+        return self.belongs_to(Post)
+```
+
+Each name in `__touches__` must be a relationship method that resolves to a single parent. After every `save()`, Arvent loads each named parent and calls `touch()` on it.
 
 <a name="default-attribute-values"></a>
 ### Default Attribute Values
@@ -178,7 +248,7 @@ async with Flight.without_timestamps():
 A column without a default becomes a **required** keyword argument in the model's generated constructor (models are keyword-only dataclasses). Supply a `default=` to make it optional:
 
 ```python
-name: str = string(255)                    # required: Flight(name=...)
+name: str = string(255)                        # required: Flight(name=...)
 slug: str | None = string(255, default=None)   # optional
 ```
 
@@ -215,6 +285,7 @@ flights = await Flight.where(active=True).get()
 
 names = flights.pluck("name")
 grounded = flights.filter(lambda f: not f.active)
+by_origin = flights.group_by(lambda f: f.origin)
 ```
 
 See [Collections](query-builder.md#collections) for the full method list.
@@ -225,7 +296,7 @@ See [Collections](query-builder.md#collections) for the full method list.
 In addition to retrieving all rows matching a query, you can fetch single records with `find`, `first`, and `first_where`:
 
 ```python
-flight = await Flight.find(1)                       # by primary key, or None
+flight = await Flight.find(1)                        # by primary key, or None
 flight = await Flight.where(active=True).first()     # first match, or None
 flight = await Flight.first_where(name="LA")         # shorthand
 ```
@@ -233,7 +304,7 @@ flight = await Flight.first_where(name="LA")         # shorthand
 `pluck`, `value`, and aggregates pull single columns or scalars:
 
 ```python
-names = await Flight.pluck("name")                  # list of one column
+names = await Flight.pluck("name")                   # list of one column
 total = await Flight.where(active=True).count()
 ```
 
@@ -398,6 +469,70 @@ Bulk restore must pair with `only_trashed` — otherwise the default scope hides
 await Flight.only_trashed().restore()
 ```
 
+> [!NOTE]
+> When the trashed mode comes from an HTTP request (`?trashed=with`), `parse_trashed_mode(request)` turns the query parameter into a `"without" | "with" | "only"` value you can branch on — no manual string parsing.
+
+<a name="refreshing-models"></a>
+## Refreshing Models
+
+When the row may have changed underneath you, pull the current state back. `fresh()` returns a **new** instance loaded from the database and leaves your copy untouched; `refresh()` reloads attributes **in place** on the existing instance:
+
+```python
+flight = await Flight.find_or_fail(1)
+
+latest = await flight.fresh()    # new instance; `flight` is unchanged
+await flight.refresh()           # re-hydrates `flight` itself from the DB
+```
+
+`fresh()` routes through the query builder, so global scopes still apply — a soft-deleted row comes back as `None`. Pass attribute names to `refresh()` to reload only those columns:
+
+```python
+await flight.refresh("price", "is_active")
+```
+
+<a name="replicating-models"></a>
+## Replicating Models
+
+`replicate()` returns an **unsaved** copy with the primary key and timestamps stripped — handy for "duplicate this record" features. The clone fires the `replicating` event before it's returned:
+
+```python
+copy = await flight.replicate()
+copy.name = "London to Paris (copy)"
+await copy.save()
+```
+
+Exclude extra columns with `except_`:
+
+```python
+copy = await flight.replicate(except_=["external_ref", "slug"])
+```
+
+<a name="comparing-models"></a>
+## Comparing Models
+
+To check whether two instances point at the same row — same model class, same key — use `is_same` (and its inverse `is_not`):
+
+```python
+flight.is_same(other)    # True when both are Flight rows with the same key
+flight.is_not(other)
+```
+
+This is safer than `==` for "are these the same record" checks: it compares the model type and primary key rather than object identity, and returns `False` when either key is `None`.
+
+<a name="pushing-related-changes"></a>
+## Pushing Related Changes
+
+`save()` persists a single model. `push()` saves the model **and** every already-loaded relation (and their loaded relations), so pending edits across a graph go down in one call:
+
+```python
+user = await User.with_("posts.comments").find_or_fail(1)
+user.name = "Ada"
+user.posts[0].title = "Edited"
+await user.push()       # saves the user, the post, and the comment
+```
+
+Only loaded relations are visited, and the cascade is cycle-safe — a `user.posts ↔ post.author` loop won't recurse forever.
+
 <a name="dirty-tracking"></a>
 ## Dirty Tracking
 
@@ -418,6 +553,13 @@ flight.was_changed("name")     # changed by the save just performed?
 flight.get_changes()           # {attr: new_value} from the last save
 ```
 
+To throw away pending edits without hitting the database, call `discard_changes()` — it reverts every changed column back to its last-saved value:
+
+```python
+flight.name = "Oops"
+flight.discard_changes()       # name is back to what it was
+```
+
 <a name="model-mixins"></a>
 ## Model Mixins
 
@@ -430,6 +572,8 @@ Compose behavior by inheriting mixins alongside `Model`:
 | `HasUuids` | Auto-fills a string primary key with a UUID on insert |
 | `HasUlids` | Auto-fills a string primary key with a ULID on insert |
 | `Prunable` | Marks stale rows for pruning (you implement `prunable_query`) |
+| `TranslatableMixin` | Locale-aware get/set for JSONB i18n columns (see [Casts](casts.md#translatable-fields)) |
+| `PublishableMixin` | Helper to resolve a `published_at` from a status transition |
 
 > [!NOTE]
 > `Prunable.prunable_query()` raises `NotImplementedError` by default — you must override it to declare which rows are eligible for pruning.
@@ -483,7 +627,7 @@ async with Flight.without_events():
     await flight.save()
 ```
 
-The `*_quietly` helpers (`save_quietly`, `delete_quietly`, `force_delete_quietly`, `restore_quietly`, `update_quietly`) do the same for a single operation.
+The `*_quietly` helpers (`save_quietly`, `delete_quietly`, `force_delete_quietly`, `restore_quietly`, `update_quietly`, `touch_quietly`) do the same for a single operation.
 
 <a name="serializing-models"></a>
 ## Serializing Models
