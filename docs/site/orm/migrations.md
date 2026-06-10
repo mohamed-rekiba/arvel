@@ -5,6 +5,9 @@
 
 Migrations are version control for your database. They let you define and share the application's schema as code. Arvel's schema DSL — `Schema` plus `Blueprint` — describes tables in Python and compiles them to Alembic operations under the hood, while a Laravel-style runner tracks which migrations have run and supports batch rollback.
 
+> [!NOTE]
+> Pair migrations with [models](models.md) — `arvel make:model Post -m` generates both. CLI reference: [migrate commands](../cli/commands.md#migrate).
+
 <a name="generating-migrations"></a>
 ## Generating Migrations
 

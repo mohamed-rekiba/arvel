@@ -182,16 +182,19 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started:
+      - getting-started/index.md
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
       - Directory Structure: getting-started/project-structure.md
   - Core Concepts:
+      - core-concepts/index.md
       - Request Lifecycle: core-concepts/lifecycle.md
       - Service Container: core-concepts/service-container.md
       - Service Providers: core-concepts/service-providers.md
       - Configuration: core-concepts/configuration.md
       - Facades: core-concepts/facades.md
   - The Basics:
+      - the-basics/index.md
       - Routing: the-basics/routing.md
       - Controllers: the-basics/controllers.md
       - Validation: the-basics/validation.md
@@ -199,12 +202,14 @@ nav:
       - Middleware: the-basics/middleware.md
       - Error Handling: the-basics/error-handling.md
   - Arvent ORM:
+      - orm/index.md
       - Models & CRUD: orm/models.md
       - Relationships: orm/relationships.md
       - Query Builder: orm/query-builder.md
       - Migrations: orm/migrations.md
       - Casts, Accessors & Mutators: orm/casts.md
   - Features:
+      - features/index.md
       - Date & Time: features/datetime.md
       - Authentication: features/authentication.md
       - Authorization: features/authorization.md
@@ -224,19 +229,23 @@ nav:
       - Maintenance Mode: features/maintenance-mode.md
       - Testing: features/testing.md
   - Frontend:
+      - frontend/index.md
       - Frontend Integration: frontend/integration.md
   - CLI:
+      - cli/index.md
       - Command Reference: cli/commands.md
   - Packages:
-      - Overview: packages/README.md
+      - packages/README.md
       - Arvel OAuth2/OIDC: packages/oauth.md
       - Arvel Permission: packages/permission.md
       - Arvel Image: packages/image.md
       - Arvel Search: packages/search.md
       - Arvel Audit: packages/audit.md
   - Kits:
+      - kits/index.md
       - Arvel Ecommerce Kit: kits/ecommerce-kit.md
   - Reference:
+      - reference/index.md
       - API Reference: reference/api.md
       - Release Notes: releases.md
       - Upgrade Guide: upgrade.md
