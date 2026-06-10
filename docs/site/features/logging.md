@@ -7,6 +7,33 @@ To help you learn more about what's happening within your application, Arvel pro
 
 The observability subsystem is **auto-registered** — `Log` works out of the box, no provider to add.
 
+<a name="quick-start"></a>
+### Quick start
+
+```python
+from arvel.facades import Log
+
+Log.info("user.created", user_id=42)
+Log.warning("rate.limited", ip="203.0.113.5")
+
+try:
+    await charge(card)
+except PaymentError as e:
+    Log.error("charge.failed", exc=e, amount=99)
+```
+
+Module-scoped logger (idiomatic across the framework):
+
+```python
+from arvel.facades import Log
+
+logger = Log.channel(__name__)
+logger.info("order.placed", order_id=order.id)
+```
+
+> [!NOTE]
+> `Log` is the same object whether you import from `arvel.facades` or `arvel.logging`. See [Facades](../core-concepts/facades.md#the-arvel-facades-package).
+
 <a name="writing-log-messages"></a>
 ## Writing Log Messages
 

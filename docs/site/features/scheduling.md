@@ -5,13 +5,43 @@
 
 In the past, you may have written a cron entry for each task you needed to schedule. Arvel's command scheduler offers a fresh approach: you define your task schedule in code with a fluent, readable API, and a single long-running process executes due tasks. You only need one cron entry on your server — to keep that process alive.
 
+<a name="quick-start"></a>
+### Quick start
+
+Scheduling is wired in automatically — no provider to add. Create a kernel and define tasks:
+
+```python
+# app/console/kernel.py  (also accepts app/Console/Kernel.py)
+from arvel.scheduling import Schedule
+
+
+class Kernel:
+    def schedule(self, schedule: Schedule) -> None:
+        schedule.call(self.prune_old_records).daily()
+        schedule.command("cache:clear").hourly()
+
+    async def prune_old_records(self) -> None:
+        ...
+```
+
+Run the scheduler:
+
+```bash
+arvel schedule:work          # long-lived — one cron entry keeps this alive
+arvel schedule:run           # run due tasks once and exit (Laravel parity)
+arvel schedule:list          # inspect registered tasks
+```
+
+> [!NOTE]
+> `SchedulerServiceProvider` auto-discovers `app/console/kernel.py` on boot (PascalCase `app/Console/Kernel.py` also works). The kernel's `schedule()` method receives the container-bound `Schedule` singleton.
+
 <a name="registering-the-provider"></a>
 ## Registering the Provider
 
-Scheduling is wired in automatically — `SchedulerServiceProvider` is one of the framework's baseline providers, so there's nothing to add to `bootstrap/providers.py`. It binds the `Schedule` as a container singleton, registers the scheduler CLI commands, and auto-discovers `app/console/kernel.py`.
+Scheduling is wired in automatically — `SchedulerServiceProvider` is one of the framework's baseline providers, so there's nothing to add to `bootstrap/providers.py`. It binds `Schedule` as a container singleton, registers the scheduler CLI commands, and auto-discovers `app/console/kernel.py` (or `app/Console/Kernel.py`).
 
 > [!NOTE]
-> `Schedule` is a container singleton, not a facade. Define tasks by implementing a `schedule(self, schedule)` method on a `Kernel` class in `app/console/kernel.py` — the provider discovers and calls it on boot.
+> `Schedule` is a container singleton, not a facade. Define tasks by implementing a `schedule(self, schedule)` method on a `Kernel` class in your console kernel — the provider discovers and calls it on boot.
 
 <a name="defining-schedules"></a>
 ## Defining Schedules

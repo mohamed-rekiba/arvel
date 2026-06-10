@@ -19,6 +19,32 @@ Arvon.of(2026, 6, 15).at(9, 30)   # …with a time
 
 `whenever` is only imported inside Arvon — application code never touches it directly.
 
+<a name="quick-start"></a>
+### Quick start
+
+```python
+from arvel.support import Arvon, now, today
+
+expires = now().add_days(7)
+deadline = Arvon.parse("2026-06-15T09:30:00Z")
+assert deadline.is_future
+
+# Deterministic tests
+with Arvon.freeze(Arvon.of(2026, 6, 15).at(12, 0, 0)):
+    assert now() == Arvon.of(2026, 6, 15).at(12, 0, 0)
+```
+
+| Need | API |
+|---|---|
+| Current instant / start of day | `now()` / `today()` |
+| Parse user or API input | `Arvon.parse(iso_string)` — raises `ArvonParseError` |
+| ORM datetime column as `Arvon` | `"arvon"` cast — see [ORM cast](#orm) |
+| Pydantic request/response field | annotate as `Arvon` — see [Pydantic fields](#pydantic) |
+| Freeze clock in tests | `Arvon.freeze(...)` or `Arvon.travel(...)` / `travel_back()` |
+
+> [!WARNING]
+> Every transform returns a **new** `Arvon`. Assign the result — `d.add_days(1)` does not mutate `d`.
+
 <a name="construction"></a>
 ## Construction
 

@@ -5,6 +5,57 @@
 
 While building your application, some tasks — parsing an uploaded file, sending email — take too long to do during a typical web request. Arvel lets you push these onto a queue so they run in a background worker, keeping requests fast. **Jobs** describe the work; the `Bus` facade dispatches them; a **worker** processes them.
 
+<a name="quick-start"></a>
+### Quick start
+
+Register the provider, define a job, dispatch it, and run a worker:
+
+```python
+# bootstrap/providers.py
+from arvel.queue.providers.queue_service_provider import QueueServiceProvider
+
+providers = [QueueServiceProvider, ...]
+```
+
+```python
+# app/jobs/process_podcast.py
+from arvel.queue.job import Job
+
+
+class ProcessPodcast(Job):
+    podcast_id: int
+
+    async def handle(self) -> None:
+        ...
+```
+
+```python
+from arvel.facades.bus import Bus
+
+await Bus.dispatch(ProcessPodcast(podcast_id=1))
+```
+
+```bash
+# database driver — publish migrations, migrate, then work
+arvel vendor:publish --tag=arvel-queue
+arvel migrate
+arvel queue:work
+```
+
+> [!NOTE]
+> The default connection is `sync`, which runs jobs inline — fine for local dev and tests. Switch to `database` or `redis` when you need a real worker. See [Configuration](#configuration).
+
+Typical request → queue flow:
+
+```python
+async def upload_podcast(request: UploadRequest) -> PodcastResponse:
+    podcast = await Podcast.create(...)
+    await Bus.dispatch(ProcessPodcast(podcast_id=podcast.id))
+    return PodcastResponse(id=podcast.id, status="processing")
+```
+
+The HTTP response returns immediately; `ProcessPodcast.handle()` runs in a worker process.
+
 <a name="configuration"></a>
 ## Configuration
 
@@ -27,7 +78,7 @@ QUEUE_CONNECTION=database
 <a name="registering-the-provider"></a>
 ### Registering the Provider
 
-Queues are **opt-in**. Add `QueueServiceProvider` to `bootstrap/providers.py`. It binds the `Bus` facade and registers the queue CLI commands.
+Queues are **opt-in**. Add `QueueServiceProvider` to `bootstrap/providers.py`. It binds the `Bus` facade, registers the queue CLI commands, and publishes the jobs / failed-jobs migrations (`arvel vendor:publish --tag=arvel-queue`). See [Service Providers](../core-concepts/service-providers.md#opt-in-providers).
 
 <a name="creating-jobs"></a>
 ## Creating Jobs
@@ -117,7 +168,8 @@ For any backend other than `sync`, run a worker process to pull and execute jobs
 
 ```bash
 arvel queue:work
-arvel queue:work --queue=media       # only the media queue
+arvel queue:work --queue=media              # only the media queue
+arvel queue:work --stop-when-empty          # drain the queue once, then exit (CI / one-shot)
 ```
 
 ### Graceful restart after a deploy
@@ -128,7 +180,10 @@ After a code change, running workers still hold the **old** code in memory. Trig
 arvel queue:restart
 ```
 
-That bumps a shared signal that every `queue:work` process checks between jobs. Workers finish whatever they're running and exit cleanly; your process manager (systemd, supervisor, k8s) brings them back up on the new code. No jobs are lost or duplicated — they go back on the queue if the worker exits mid-handle.
+That writes a UTC timestamp to a cache key (`arvel:queue:restart`) that every `queue:work` process checks between jobs. Workers finish whatever they're running and exit cleanly; your process manager (systemd, supervisor, k8s) brings them back up on the new code. No jobs are lost or duplicated — they go back on the queue if the worker exits mid-handle.
+
+> [!WARNING]
+> `queue:restart` needs a bound [cache](../features/cache.md) store so the signal reaches workers. Without `CacheServiceProvider`, the command still runs but the marker is a no-op and workers won't restart.
 
 Cancelling a worker (task cancellation, `SIGINT`) is **not** a job failure. The cancellation propagates and the worker stops — the in-flight job is never sent to the dead-letter queue or counted as a failed attempt. Only a real exception from `handle()` or a per-job `timeout` marks a job as failed.
 
@@ -162,3 +217,28 @@ arvel queue:forget <uuid>     # delete a single failed job
 arvel queue:flush             # clear the failed-job table
 arvel queue:size              # count pending jobs on a queue
 ```
+
+<a name="testing"></a>
+## Testing
+
+`Bus.fake()` records dispatches without executing jobs — use it to assert side effects were queued, not run:
+
+```python
+from arvel.facades.bus import Bus
+
+with Bus.fake():
+    await upload_podcast(request)
+    Bus.assert_dispatched(ProcessPodcast)
+    Bus.assert_dispatched_on(ProcessPodcast, "media")
+    Bus.assert_not_dispatched(DeletePodcast)
+```
+
+For chains:
+
+```python
+with Bus.fake():
+    await Bus.chain([NormalizeAudio(podcast_id=1), Transcode(podcast_id=1)])
+    Bus.assert_chained(NormalizeAudio, Transcode)
+```
+
+See also [Events](events.md#queued-listeners) (queued listeners dispatch via `Bus`) and [Scheduling](scheduling.md#scheduling-jobs-and-commands) (`schedule.job(...)` dispatches through the same bus).

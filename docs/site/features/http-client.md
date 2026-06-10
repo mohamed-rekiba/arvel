@@ -15,6 +15,35 @@ if resp.successful():
     users = resp.json()
 ```
 
+<a name="quick-start"></a>
+### Quick start
+
+```python
+from arvel.facades import Http
+
+# Outbound call
+resp = await Http.with_token(token).accept_json().get("https://api.example.com/me")
+if resp.failed():
+    resp.raise_for_status()
+profile = resp.json()
+
+# Test without network I/O
+with Http.fake({"api.example.com/*": Http.response({"id": 1}, 200)}):
+    resp = await Http.get("https://api.example.com/users/1")
+    assert resp.json() == {"id": 1}
+    Http.assert_sent_count(1)
+```
+
+| Need | API |
+|---|---|
+| JSON API with auth | `Http.with_token(...).accept_json().get/post(...)` |
+| Form body instead of JSON | chain `.as_form()` before `post` / `put` / `patch` |
+| Relative paths against a base | `.base_url("https://api.example.com/v1").get("users")` |
+| Stub + assert in tests | `Http.fake(stubs)` — see [Testing](#testing) and [Testing](testing.md#faking-services) |
+
+> [!NOTE]
+> `Http` is always available — no service provider to register. See [Facades](../core-concepts/facades.md#quick-start).
+
 <a name="making-requests"></a>
 ## Making Requests
 

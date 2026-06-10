@@ -2,6 +2,33 @@
 
 When you're shipping a risky migration or hot-fix, you don't want users hitting a half-deployed app. `arvel down` flips a marker file that the maintenance middleware reads on every request — non-bypass traffic gets `503`, with a clear retry window and (optionally) a branded HTML page. `arvel up` removes the marker and traffic resumes immediately.
 
+<a name="quick-start"></a>
+### Quick start
+
+```bash
+arvel down --retry 60 --secret deploy-2026          # 503 + Retry-After; prints bypass token
+curl "https://app.example.com/?bypass=deploy-2026"  # sets arvel_bypass cookie, then browse normally
+arvel up                                              # delete marker; traffic resumes (~1s per worker)
+```
+
+```python
+# bootstrap/app.py — middleware must be on the stack (skeleton includes this)
+from arvel.maintenance.middleware import MaintenanceModeMiddleware
+from arvel.maintenance.manager import MaintenanceModeManager
+
+app.add_middleware(MaintenanceModeMiddleware, manager=MaintenanceModeManager())
+```
+
+| Need | Command / API |
+|---|---|
+| Flip downtime on/off | `arvel down` / `arvel up` |
+| Branded HTML while down | `arvel down --render storage/framework/maintenance.html` |
+| Keep a scheduled job running | `.inMaintenanceMode()` on the task — see [Task Scheduling](scheduling.md) |
+| Programmatic toggle (tests, deploy hooks) | `MaintenanceModeManager().down(...)` / `.up()` |
+
+> [!WARNING]
+> Rotating the bypass secret invalidates every existing `arvel_bypass` cookie. The middleware compares cookie values to the marker's `secret` with a constant-time check.
+
 ## Enabling maintenance mode
 
 `MaintenanceModeMiddleware` ships with the framework. Add it to your ASGI middleware stack (the skeleton already does this in `bootstrap/app.py`):
@@ -37,7 +64,7 @@ The bypass secret is the escape hatch for operators and CI checks:
 curl https://app.example.com/?bypass=deploy-2026
 ```
 
-Subsequent requests just need the cookie (`arvel_bypass`) — no query string required. The cookie's value is checked against the marker's `secret`, so rotating the secret invalidates every existing bypass.
+Subsequent requests just need the `arvel_bypass` cookie — no query string required. The cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` on HTTPS. Its value must match the marker's `secret`.
 
 ## Custom maintenance page
 

@@ -5,6 +5,49 @@
 
 Arvel provides a unified filesystem abstraction over local disks and cloud object stores. The same async API works whether files live on the local disk, S3, Google Cloud Storage, or Azure Blob Storage — swap the driver via configuration without touching your code.
 
+<a name="quick-start"></a>
+### Quick start
+
+Register the provider, then use the default disk:
+
+```python
+# bootstrap/providers.py
+from arvel.providers.storage_provider import StorageServiceProvider
+
+providers = [StorageServiceProvider, ...]
+```
+
+```python
+from arvel.facades import Storage
+
+disk = Storage.disk()  # default local disk
+
+await disk.put("avatars/42.png", image_bytes)
+if await disk.exists("avatars/42.png"):
+    public_url = disk.url("avatars/42.png")
+    data = await disk.get("avatars/42.png")
+await disk.delete("avatars/42.png")
+```
+
+Local disk defaults (`.env`):
+
+```ini
+STORAGE_DEFAULT=local
+STORAGE_LOCAL_ROOT=storage/app
+STORAGE_LOCAL_URL=/storage
+STORAGE_LOCAL_SERVE=true
+```
+
+With `STORAGE_LOCAL_SERVE=true`, the app registers `GET /storage/{path}` automatically — no symlink required. See [Serving local files](#serving-local-files) for the `storage:link` alternative and signed URLs via `disk.temporary_url(...)`.
+
+| Operation | Method |
+|---|---|
+| Upload | `await disk.put(path, bytes \| str \| file)` |
+| Download | `await disk.get(path)` → `bytes` |
+| Public URL | `disk.url(path)` |
+| Time-limited URL | `disk.temporary_url(path, expiry=300)` |
+| List directory | `await disk.list("avatars")` |
+
 <a name="configuration"></a>
 ## Configuration
 
@@ -70,7 +113,7 @@ contents = await disk.get("avatars/1.png")   # bytes
 exists = await disk.exists("avatars/1.png")
 ```
 
-`get` and `size` raise `StorageFileNotFoundError` when the file is missing — the same type on every disk. It subclasses the builtin `FileNotFoundError`, so `except FileNotFoundError` works too.
+`get` raises `StorageFileNotFoundError` when the file is missing — the same type on every disk. It subclasses the builtin `FileNotFoundError`, so `except FileNotFoundError` works too. The `local` and `memory` drivers also expose `await disk.size(path)`; it is not part of the `StorageDisk` protocol.
 
 <a name="storing-files"></a>
 ## Storing Files

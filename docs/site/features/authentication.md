@@ -8,6 +8,61 @@ Many web applications provide a way for their users to authenticate and "log in"
 > [!NOTE]
 > Arvel's `Auth` facade is intentionally smaller than Laravel's. It covers the essential operations — `attempt`, `login`, `logout`, `user`, `check`, `id` — and every one of them takes the current `request` as an argument, because guards resolve state from the request rather than from global helpers. Laravel conveniences like `Auth.guest()`, `Auth.once()`, `via_remember`, and `login_using_id` are not implemented.
 
+<a name="quick-start"></a>
+### Quick start
+
+Install auth stubs, register the provider, migrate, then log users in or protect routes:
+
+```bash
+arvel auth:install
+arvel migrate
+```
+
+```python
+# bootstrap/providers.py
+from arvel.auth.provider import AuthServiceProvider
+
+providers = [
+    AuthServiceProvider,
+    # ...
+]
+```
+
+```python
+from starlette.requests import Request
+
+from arvel import Route, UnauthenticatedException
+from arvel.facades.auth import Auth
+from arvel.http.middleware import Authenticate
+
+
+@Route.post("/login")
+async def login(request: Request) -> dict[str, str]:
+    body = await request.json()
+    ok = await Auth.attempt(
+        {"email": body["email"], "password": body["password"]},
+        request,
+    )
+    if not ok:
+        raise UnauthenticatedException()
+    return {"status": "ok"}
+
+
+@Route.get("/me", middleware=[Authenticate("api")])
+async def me(request: Request) -> dict[str, str]:
+    user = request.state.user
+    return {"email": user.email}
+```
+
+Prefer batteries-included JSON endpoints? With `config.routes.enabled` true (the default), [`AuthServiceProvider`](#registering-the-provider) mounts [built-in `/api/auth/*` routes](#built-in-auth-routes) — register, login, refresh, logout, and `me` without writing handlers.
+
+| Goal | Read next |
+|---|---|
+| Cookie / session login | [Session guard](#session-guard) + [Session](session.md) |
+| Bearer JWT | [JWT guard](#jwt-guard) |
+| Password hashing | [Password hashing](#password-hashing) |
+| Who can do what | [Authorization](authorization.md) |
+
 <a name="registering-the-provider"></a>
 ## Registering the Provider
 
