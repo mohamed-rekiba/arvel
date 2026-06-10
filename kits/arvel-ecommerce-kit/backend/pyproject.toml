@@ -26,7 +26,6 @@ dependencies = [
 dev = [
     "arvel[shell]",
     "faker>=40.22.0",
-    "filelock>=3.16.1",
     "httpx2>=2.3.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
