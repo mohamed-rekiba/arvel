@@ -21,25 +21,24 @@ from typing import Any
 
 import pytest
 
+# pytest puts this conftest's directory on sys.path before executing it, so the
+# sibling _images module (single source of truth for image pins) imports here.
+from _images import (
+    IMAGE_MAILPIT,
+    IMAGE_MOTO,
+    IMAGE_POSTGRES,
+    IMAGE_RABBITMQ,
+    IMAGE_REDIS,
+)
+
 _BACKEND_ROOT = str(Path(__file__).resolve().parents[1])
 if _BACKEND_ROOT not in sys.path:
     sys.path.insert(0, _BACKEND_ROOT)
-
-IMAGE_POSTGRES = "postgres:18-alpine"
-IMAGE_REDIS = "redis:7-alpine"
-IMAGE_RABBITMQ = "rabbitmq:3.13-management-alpine"
-# minio/minio and minio/mc cut releases independently — don't assume the
-# tag date matches across the two repos. Verify both via Docker Hub before
-# bumping. See packages/arvel-image/tests/conftest.py for the matching pin.
-IMAGE_MINIO = "minio/minio:RELEASE.2025-09-07T16-13-09Z"  # web-verified 2026-06-04
-IMAGE_MAILPIT = "axllent/mailpit:v1.21"
 
 _POSTGRES_USER = "arvel"
 _POSTGRES_PASSWORD = "arvel"  # well-known test credential; container is local-only
 _POSTGRES_BASE_DB = "arvel_ecommerce_test"
 _TEMPLATE_DB_NAME = "arvel_ecommerce_template"
-_MINIO_ROOT_USER = "minioadmin"
-_MINIO_ROOT_PASSWORD = "minioadmin"  # well-known test credential
 
 
 @dataclass(frozen=True)
@@ -85,7 +84,7 @@ class RabbitmqEndpoint:
 
 
 @dataclass(frozen=True)
-class MinioEndpoint:
+class S3Endpoint:
     endpoint_url: str
     region: str
     access_key: str
@@ -241,33 +240,34 @@ def rabbit_vhost(rabbitmq_endpoint: RabbitmqEndpoint) -> Iterator[str]:
 
 
 @pytest.fixture(scope="session")
-def minio_endpoint() -> Iterator[MinioEndpoint]:
+def s3_endpoint() -> Iterator[S3Endpoint]:
+    """Boot a motoserver/moto container speaking the S3 wire protocol."""
     _skip_if_no_docker()
     bucket = "arvel-ecommerce"
-    container = _docker_container(IMAGE_MINIO, ready_log=r"API: http://")
-    container.with_command("server /data --console-address :9001")
-    container.with_env("MINIO_ROOT_USER", _MINIO_ROOT_USER)
-    container.with_env("MINIO_ROOT_PASSWORD", _MINIO_ROOT_PASSWORD)
-    container.with_exposed_ports(9000, 9001)
+    region = "us-east-1"
+    access_key = "testing"
+    secret_key = "testing"  # moto accepts any credential
+    container = _docker_container(IMAGE_MOTO, ready_log=r"Running on http://")
+    container.with_exposed_ports(5000)
     container.start()
     try:
         host: str = container.get_container_host_ip()
-        port: int = int(container.get_exposed_port(9000))
+        port: int = int(container.get_exposed_port(5000))
         endpoint_url = f"http://{host}:{port}"
         boto3: Any = importlib.import_module("boto3")
         client: Any = boto3.client(
             "s3",
             endpoint_url=endpoint_url,
-            region_name="us-east-1",
-            aws_access_key_id=_MINIO_ROOT_USER,
-            aws_secret_access_key=_MINIO_ROOT_PASSWORD,
+            region_name=region,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
         )
         client.create_bucket(Bucket=bucket)
-        yield MinioEndpoint(
+        yield S3Endpoint(
             endpoint_url=endpoint_url,
-            region="us-east-1",
-            access_key=_MINIO_ROOT_USER,
-            secret_key=_MINIO_ROOT_PASSWORD,
+            region=region,
+            access_key=access_key,
+            secret_key=secret_key,
             bucket=bucket,
         )
     finally:
@@ -275,15 +275,15 @@ def minio_endpoint() -> Iterator[MinioEndpoint]:
 
 
 @pytest.fixture
-def minio_bucket(minio_endpoint: MinioEndpoint) -> Iterator[str]:
+def s3_bucket(s3_endpoint: S3Endpoint) -> Iterator[str]:
     bucket = f"test-{uuid.uuid4().hex[:8]}"
     boto3: Any = importlib.import_module("boto3")
     client: Any = boto3.client(
         "s3",
-        endpoint_url=minio_endpoint.endpoint_url,
-        region_name=minio_endpoint.region,
-        aws_access_key_id=minio_endpoint.access_key,
-        aws_secret_access_key=minio_endpoint.secret_key,
+        endpoint_url=s3_endpoint.endpoint_url,
+        region_name=s3_endpoint.region,
+        aws_access_key_id=s3_endpoint.access_key,
+        aws_secret_access_key=s3_endpoint.secret_key,
     )
     client.create_bucket(Bucket=bucket)
     try:
@@ -441,19 +441,19 @@ def _empty_and_delete_bucket(client: Any, bucket: str) -> None:
 
 __all__ = [
     "MailpitEndpoint",
-    "MinioEndpoint",
     "PostgresEndpoint",
     "RabbitmqEndpoint",
     "RedisEndpoint",
+    "S3Endpoint",
     "fresh_db",
     "mailpit_endpoint",
     "mailpit_inbox_clear",
-    "minio_bucket",
-    "minio_endpoint",
     "postgres_endpoint",
     "rabbit_vhost",
     "rabbitmq_endpoint",
     "redis_endpoint",
     "redis_namespace",
+    "s3_bucket",
+    "s3_endpoint",
     "template_db",
 ]

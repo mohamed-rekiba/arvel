@@ -17,9 +17,9 @@ pytestmark = pytest.mark.integration
 if TYPE_CHECKING:
     from tests.conftest import (
         MailpitEndpoint,
-        MinioEndpoint,
         RabbitmqEndpoint,
         RedisEndpoint,
+        S3Endpoint,
     )
 
 
@@ -28,17 +28,17 @@ async def app(
     fresh_db: str,
     redis_endpoint: RedisEndpoint,
     rabbitmq_endpoint: RabbitmqEndpoint,
-    minio_endpoint: MinioEndpoint,
+    s3_endpoint: S3Endpoint,
     mailpit_endpoint: MailpitEndpoint,
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
     monkeypatch.setenv("DB_URL", fresh_db)
     monkeypatch.setenv("CACHE_URL", redis_endpoint.url)
     monkeypatch.setenv("AMQP_URL", rabbitmq_endpoint.amqp_url)
-    monkeypatch.setenv("STORAGE_S3_ENDPOINT", minio_endpoint.endpoint_url)
-    monkeypatch.setenv("STORAGE_S3_KEY", minio_endpoint.access_key)
-    monkeypatch.setenv("STORAGE_S3_SECRET", minio_endpoint.secret_key)
-    monkeypatch.setenv("STORAGE_S3_BUCKET", minio_endpoint.bucket)
+    monkeypatch.setenv("STORAGE_S3_ENDPOINT", s3_endpoint.endpoint_url)
+    monkeypatch.setenv("STORAGE_S3_KEY", s3_endpoint.access_key)
+    monkeypatch.setenv("STORAGE_S3_SECRET", s3_endpoint.secret_key)
+    monkeypatch.setenv("STORAGE_S3_BUCKET", s3_endpoint.bucket)
     monkeypatch.setenv("MAIL_HOST", mailpit_endpoint.smtp_host)
     monkeypatch.setenv("MAIL_PORT", str(mailpit_endpoint.smtp_port))
     monkeypatch.setenv("APP_ENV", "local")
