@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.12.2...arvel-ecommerce-kit-v1.12.3) (2026-06-10)
+
+
+### Performance
+
+* **test:** restore loadfile for kit emulator suite ([785181e](https://github.com/mohamed-rekiba/arvel/commit/785181ef4b1cf13cdb1e2258860f17746e319805))
+* **test:** revert kit to per-worker emulator stacks ([9fde33a](https://github.com/mohamed-rekiba/arvel/commit/9fde33aa93f69dd69ac2cdf8426d99025c1b46b7))
+* **test:** seed ecommerce-kit catalog once via template DB ([26a0ac5](https://github.com/mohamed-rekiba/arvel/commit/26a0ac57cb812dd2deea60087727d49c471c582d))
+* **test:** share one emulator stack across kit xdist workers ([2bf779e](https://github.com/mohamed-rekiba/arvel/commit/2bf779ec089c29989e1a949fd00c8bd18fe4a128))
+
 ## [1.12.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.12.1...arvel-ecommerce-kit-v1.12.2) (2026-06-10)
 
 
