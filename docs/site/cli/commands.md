@@ -11,6 +11,35 @@ arvel --help
 arvel <command> --help
 ```
 
+<a name="quick-start"></a>
+### Quick start
+
+```bash
+# Scaffold a project (runs outside any existing app)
+arvel new my-api --kit api
+cd my-api
+
+# Local dev loop
+arvel migrate
+arvel db:seed
+arvel serve --reload
+
+# Inspect what you built
+arvel route:list
+arvel about
+```
+
+Common one-liners you'll reach for daily:
+
+| Goal | Command |
+|---|---|
+| Fresh DB + seed data | `arvel migrate:fresh --seed` |
+| Run tests | `arvel test` or `arvel test tests/feature/test_posts.py -k create` |
+| Open a REPL with the app booted | `arvel shell` (alias `tinker`) |
+| Export the live OpenAPI spec | `arvel openapi:export -o docs/api/openapi.yaml` |
+| Scaffold model + migration + factory | `arvel make:model Post -mf` |
+| See what a config key resolves to | `arvel config:show database.default` |
+
 > [!NOTE]
 > Most commands need a project — they look for `bootstrap/app.py` in the current directory tree. The exceptions that run anywhere: `about`, `key:generate`, `new`, and any `make:*` command, plus `--help` / `--version`.
 
@@ -47,12 +76,169 @@ Plug-in commands (`auth:install`, `oauth:install`, `audit:install`, `reverb:star
 
 Some commands only register when their provider is installed: most `queue:*` commands need `QueueServiceProvider` (`queue:restart` is always available, but `queue:clear` and `queue:prune-failed` still need a booted app with the queue manager bound), `auth:install` needs `AuthServiceProvider`, and `reverb:start` needs the `[broadcasting]` extra.
 
+<a name="custom-commands"></a>
+## Writing Custom Commands
+
+Generate a stub:
+
+```bash
+arvel make:command SendWeeklyReport
+# → app/console/commands/send_weekly_report.py  (name: send:weekly:report)
+```
+
+A minimal command implements `handle()` and returns an exit code (`0` = success):
+
+```python
+from typing import ClassVar
+
+from arvel.console import Command, Context
+
+
+class SendWeeklyReportCommand(Command):
+    name: ClassVar[str] = "report:weekly"
+    help: ClassVar[str] = "Email the weekly digest"
+
+    def handle(self, ctx: Context) -> int:
+        ctx.info("Queued weekly report.")
+        return 0
+```
+
+Commands are discovered from `app/console/commands/` and from any provider's `commands()` hook (see [Service Providers](../core-concepts/service-providers.md)).
+
+### Typed flags — override `register()`
+
+When the command needs arguments or options, override `register()` and wire Typer directly (same pattern as `migrate` and `make:model`):
+
+```python
+from typing import Annotated, ClassVar
+
+import typer
+
+from arvel.console import Command, Context
+from arvel.console._t import Argument as _Argument
+from arvel.console._t import Option as _Option
+
+
+class GreetCommand(Command):
+    name: ClassVar[str] = "greet"
+    help: ClassVar[str] = "Say hello"
+
+    def register(self, app: typer.Typer) -> None:
+        cmd_self = self
+
+        def _callback(
+            name: Annotated[str, _Argument(help="Who to greet")],
+            *,
+            loud: Annotated[bool, _Option("--loud", help="SHOUT")] = False,
+        ) -> None:
+            ctx = Context()
+            message = f"Hello, {name}!"
+            if loud:
+                message = message.upper()
+            ctx.info(message)
+
+        app.command(name=self.name, help=self.help)(_callback)
+
+    def handle(self, ctx: Context) -> int:
+        raise NotImplementedError
+```
+
+```bash
+arvel greet Alice
+arvel greet Alice --loud
+```
+
+### Async work — use `schedule_async`
+
+Database, cache, queue, and most I/O commands run on the CLI's single event loop. **Don't** call `asyncio.run()` inside a Typer callback — nest it on the running loop and crash. Schedule your coroutine instead:
+
+```python
+from typing import ClassVar
+
+import typer
+
+from arvel.console import Command, Context
+from arvel.console import schedule_async
+from arvel.console._subsystem import CliSubsystem
+
+
+class PurgeStaleCommand(Command):
+    name: ClassVar[str] = "purge:stale"
+    help: ClassVar[str] = "Delete expired rows"
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.DATABASE})
+
+    def register(self, app: typer.Typer) -> None:
+        cmd_self = self
+
+        def _callback() -> None:
+            schedule_async(cmd_self._run())
+
+        app.command(name=self.name, help=self.help)(_callback)
+
+    async def _run(self) -> None:
+        from sqlalchemy.ext.asyncio import AsyncSession
+
+        session = self.app.container.make(AsyncSession)
+        async with session:
+            # await YourModel.query().where(...).delete()
+            typer.echo("Purged.")
+
+    def handle(self, ctx: Context) -> int:
+        raise NotImplementedError
+```
+
+The entrypoint awaits the scheduled coroutine after Typer returns. A `typer.Exit(code=…)` raised inside it becomes the process exit code.
+
+Commands that manage their own loop (`serve`, `shell`) set `owns_process = True` so the entrypoint skips the shared loop wrapper.
+
+### Framework DI — declare `requires`
+
+List the subsystems your command touches on `requires`. The entrypoint boots only those providers and binds `self.app`:
+
+```python
+from arvel.console._subsystem import CliSubsystem
+
+requires: ClassVar[frozenset[CliSubsystem]] = frozenset({
+    CliSubsystem.DATABASE,
+    CliSubsystem.QUEUE,
+})
+```
+
+`QUEUE` pulls in `DATABASE` transitively. Foundation subsystems (`CONFIG`, `LOG`, `LANG`, `CONTEXT`) always load. Leave `requires` empty for pure generators (`make:*`, `new`) — they skip provider boot entirely.
+
+Resolve services from the container inside `handle()` or your async body:
+
+```python
+from arvel.facades.cache import Cache
+
+async def _run(self) -> None:
+    await Cache.forget("dashboard:stats")
+```
+
+### Calling other commands in-process
+
+When `self.app` is bound, chain commands without spawning a subprocess:
+
+```python
+def handle(self, ctx: Context) -> int:
+    code = self.call("migrate")
+    if code != 0:
+        return code
+    return self.call_silently("db:seed")
+```
+
 <a name="top-level"></a>
 ## Top-Level Commands
 
 | Command | Description | Key options |
 |---|---|---|
 | `new NAME` | Scaffold a new project from the skeleton | `--no-install`, `--python`, `--kit` (default `api`) |
+
+```bash
+arvel new blog --kit api          # API skeleton (default)
+arvel new shop --kit ecommerce    # E-commerce kit — see [E-commerce Kit](../kits/ecommerce-kit.md)
+arvel new demo --no-install       # Skip `uv sync`; install deps yourself
+```
 | `serve` | Run the app under uvicorn | `--host` (`127.0.0.1`), `--port` (`8000`), `--workers`, `--reload` |
 | `about` | Print framework info | — |
 | `shell` | Interactive REPL with the app booted | `--dry-run` |
@@ -101,6 +287,14 @@ Every `make:*` command takes a class `name` and supports `--force` to overwrite.
 | `make:channel` | Broadcast channel auth callback | — |
 | `make:view` | Jinja template | — |
 
+Companion flags on `make:model` stack — generate the whole vertical slice in one shot:
+
+```bash
+arvel make:model Article -mfcsR --all   # model + migration + factory + controller + JsonResource + …
+arvel make:controller Post --resource --requests --policy
+arvel make:migration add_status_to_posts --table=posts
+```
+
 <a name="migrate"></a>
 ## `migrate:` Schema Migrations
 
@@ -115,6 +309,21 @@ Every `make:*` command takes a class `name` and supports `--force` to overwrite.
 > [!WARNING]
 > `migrate:fresh` and `migrate:refresh` are destructive. In production they refuse to run unless `ARVEL_ALLOW_DESTRUCTIVE=1` is set.
 
+Exit codes for migration commands:
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | Migration body failed (bad file, SQL error) |
+| `2` | Bootstrap failed or database unreachable |
+
+Preview pending migrations without applying:
+
+```bash
+arvel migrate --dry-run
+arvel migrate:status
+```
+
 <a name="db"></a>
 ## `db:` Database
 
@@ -124,6 +333,12 @@ Every `make:*` command takes a class `name` and supports `--force` to overwrite.
 | `db:show` | Print connection + table summary | — |
 | `db:table TABLE` | Print a table's columns and indexes | — |
 
+```bash
+arvel db:show
+arvel db:table users
+arvel db:seed --seeder=DemoSeeder
+```
+
 <a name="model"></a>
 ## `model:` Models
 
@@ -131,6 +346,11 @@ Every `make:*` command takes a class `name` and supports `--force` to overwrite.
 |---|---|
 | `model:show PATH` | Print model metadata (e.g. `model:show app.models.User`) |
 | `model:prune` | Delete stale rows for all `Prunable` models |
+
+```bash
+arvel model:show app.models.User
+arvel model:prune   # runs Model.prune() on every Prunable model
+```
 
 <a name="config"></a>
 ## `config:` Configuration
@@ -141,6 +361,14 @@ Every `make:*` command takes a class `name` and supports `--force` to overwrite.
 | `config:publish` | Publish package config into the app | `--provider`, `--tag`, `--force` |
 | `config:cache` | Serialize config to `bootstrap/cache/config.json` | — |
 | `config:clear` | Delete the cached config file | — |
+
+Production boot reads `bootstrap/cache/config.json` when present — build it after changing `config/*.py`:
+
+```bash
+arvel config:cache
+arvel config:show app.debug
+arvel vendor:publish --provider=SomePackageProvider --tag=config
+```
 
 <a name="cache"></a>
 ## `cache:` Cache
@@ -165,6 +393,15 @@ Every `make:*` command takes a class `name` and supports `--force` to overwrite.
 | `queue:clear` | Remove pending jobs from a queue | `--queue` (`default`), `--connection` |
 | `queue:restart` | Signal workers to restart gracefully | — |
 
+Typical worker loop:
+
+```bash
+arvel queue:work --queue=default,emails
+arvel queue:failed
+arvel queue:retry --all
+arvel queue:restart   # graceful reload after deploy (workers pick this up)
+```
+
 <a name="schedule"></a>
 ## `schedule:` Task Scheduler
 
@@ -176,6 +413,19 @@ Every `make:*` command takes a class `name` and supports `--force` to overwrite.
 | `schedule:interrupt` | Stop the scheduler at the next tick | — |
 | `schedule:pause` | Pause dispatching | — |
 | `schedule:continue` | Resume dispatching | — |
+
+Cron-style one-shot (what you'd put in crontab):
+
+```bash
+arvel schedule:run
+```
+
+Long-running scheduler process:
+
+```bash
+arvel schedule:work --sleep=60
+arvel schedule:list
+```
 
 <a name="route"></a>
 ## `route:` Routing
