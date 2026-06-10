@@ -18,6 +18,38 @@ A form request ties both layers together and adds an authorization check.
 > [!TIP]
 > Both layers are valid choices for shape and type checks. Pydantic shines when the payload is already a typed model (FastAPI route handlers); rule strings shine when validation is dynamic or driven by config. Pick whichever fits the call site — the rules layer now covers the common Laravel rules (`string`, `integer`, `numeric`, `email`, `url`, `min`, `max`, `in`, `regex`, `confirmed`, etc.) without falling back to "Unknown validation rule".
 
+<a name="quick-start"></a>
+### Quick start
+
+```bash
+arvel make:request StorePostRequest
+```
+
+```python
+from pydantic import BaseModel, Field
+from arvel.http.requests import FormRequest
+from arvel.routing import Route
+
+
+class StorePostPayload(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+
+
+class StorePostRequest(FormRequest[StorePostPayload]):
+    async def authorize(self, request) -> bool:
+        return True
+
+    def rules(self) -> dict[str, str]:
+        return {"title": "required|unique:posts,title"}
+
+
+@Route.post("/api/posts")
+async def store(form: StorePostRequest) -> dict:
+    return form.validated().model_dump()
+```
+
+Invalid input returns `422` with the standard [error envelope](error-handling.md#the-error-envelope) before your handler runs.
+
 <a name="form-request-validation"></a>
 ## Form Request Validation
 

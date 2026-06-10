@@ -7,6 +7,32 @@ When building an API, you often need a transformation layer that sits between yo
 
 You can always return a plain `dict`, `list`, or Pydantic model from a handler and let FastAPI serialize it. Resources are for when you want a *reusable, explicit* mapping from a model to its JSON shape, kept out of your handlers.
 
+<a name="quick-start"></a>
+### Quick start
+
+```bash
+arvel make:resource PostResource
+```
+
+```python
+from arvel.http.resources import JsonResource
+from arvel.routing import Route
+from starlette.requests import Request
+from app.models.post import Post
+
+
+class PostResource(JsonResource[Post]):
+    def to_dict(self, request) -> dict:
+        return {"id": self.resource.id, "title": self.resource.title}
+
+
+@Route.get("/api/posts/{post}")
+async def show(post: Post, request: Request):
+    return PostResource(post).response(request)
+```
+
+For lists, wrap in `ResourceCollection` — see [Resource collections](#resource-collections).
+
 <a name="generating-resources"></a>
 ## Generating Resources
 

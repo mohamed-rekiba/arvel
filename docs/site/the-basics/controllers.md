@@ -9,6 +9,32 @@ Controllers are entirely optional. A plain `async def` route handler is perfectl
 
 Every controller in Arvel is resolved through the [service container](../core-concepts/service-container.md), so its constructor dependencies are wired automatically.
 
+<a name="quick-start"></a>
+### Quick start
+
+```bash
+arvel make:controller Post --resource --requests
+# → app/http/controllers/post_controller.py + form requests + routes stub
+```
+
+```python
+from arvel.http.controller import Controller
+from arvel.routing import Route
+from app.models.post import Post
+
+
+class PostController(Controller):
+    async def index(self) -> list[dict]:
+        posts = await Post.all()
+        return [p.to_dict() for p in posts]
+
+    async def show(self, post: Post) -> dict:
+        return post.to_dict()
+
+
+Route.resource("/api/posts", PostController)
+```
+
 <a name="writing-controllers"></a>
 ## Writing Controllers
 
