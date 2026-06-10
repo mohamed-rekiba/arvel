@@ -14,6 +14,26 @@ docstrings and type signatures, so it always matches the version you have.
 > version bump. Import from `arvel` (e.g. `from arvel import Route`), not from
 > deep submodules, unless a guide tells you otherwise.
 
+<a name="quick-start"></a>
+### Quick start
+
+```python
+# Prefer top-level imports — everything in this reference is on `arvel`
+from arvel import Application, Route, Controller, FormRequest, JsonResource
+from arvel import dep, Container, ServiceProvider
+from arvel import UnauthenticatedException, ValidationException
+```
+
+| Symbol group | Typical use |
+|---|---|
+| `Application`, `serve` | Boot and run the app — [Lifecycle](../core-concepts/lifecycle.md) |
+| `Route`, `Router`, `URL` | HTTP routing — [Routing](../the-basics/routing.md) |
+| `Container`, `dep` | Dependency injection — [Service container](../core-concepts/service-container.md) |
+| `FormRequest`, `JsonResource` | Validation + API shape — [Validation](../the-basics/validation.md), [Resources](../the-basics/resources.md) |
+| `*Exception` | Semantic HTTP errors — [Error handling](../the-basics/error-handling.md) |
+
+Concept guides explain *how* to use these; this page is the exhaustive symbol list with signatures from source.
+
 ## Application & lifecycle
 
 ::: arvel.Application
