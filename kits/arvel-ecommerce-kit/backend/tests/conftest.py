@@ -8,8 +8,8 @@ Container images are pinned — update via web search before each WI bump.
 
 from __future__ import annotations
 
-import contextlib
 import importlib
+import os
 import sys
 import time
 import urllib.request
@@ -20,6 +20,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+# Every fixture below cleans up via try/finally: container.stop(), so the Ryuk
+# reaper is redundant. Disabling it also drops the implicit testcontainers/ryuk
+# pull from Docker Hub — that pull isn't in our pinned image set and stalls on
+# CI runners that Docker Hub rate-limits, which looks like a hang at "bringing up
+# nodes...". setdefault so a host override wins. Must run before
+# testcontainers.core.config is imported (it reads this once); conftest loads at
+# session start, ahead of the lazy import in _docker_container.
+os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 # pytest puts this conftest's directory on sys.path before executing it, so the
 # sibling _images module (single source of truth for image pins) imports here.
@@ -126,34 +135,13 @@ def _docker_container(image: str, *, ready_log: str, timeout: int = 120) -> Any:
     return container
 
 
-# Session-scoped containers boot once *per xdist worker*. Every emulator-backed
-# test needs the full stack, so without this each worker would boot all five
-# (RabbitMQ included) — the boot storm dwarfs any parallelism win. Pinning them
-# to one group lands them on a single worker (one container set) while unit
-# tests still spread across the rest. Safe because each test already isolates
-# via a unique DB/vhost/bucket/namespace. Requires --dist loadgroup.
-_EMULATOR_FIXTURES = frozenset(
-    {
-        "postgres_endpoint",
-        "template_db",
-        "fresh_db",
-        "redis_endpoint",
-        "redis_namespace",
-        "rabbitmq_endpoint",
-        "rabbit_vhost",
-        "s3_endpoint",
-        "s3_bucket",
-        "mailpit_endpoint",
-        "mailpit_inbox_clear",
-    }
-)
-
-
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    for item in items:
-        fixturenames: frozenset[str] = frozenset(getattr(item, "fixturenames", ()))
-        if _EMULATOR_FIXTURES & fixturenames:
-            item.add_marker(pytest.mark.xdist_group("emulators"))
+# Containers are session-scoped, so each xdist worker boots its own stack on the
+# first emulator test it runs. Within a worker tests run serially against that
+# worker's containers; across workers they hit *different* containers — so the
+# shared default DB/vhost/bucket is safe without per-test isolation, and emulator
+# tests parallelize across the pool instead of serializing on one worker. The
+# per-worker boot is cheap now: images are cached and Ryuk is off (no Docker Hub
+# pulls). Run under --dist loadfile so a file's tests share one worker's stack.
 
 
 @pytest.fixture(scope="session")
@@ -237,11 +225,6 @@ def redis_endpoint() -> Iterator[RedisEndpoint]:
         container.stop()
 
 
-@pytest.fixture
-def redis_namespace(request: pytest.FixtureRequest) -> str:
-    return f"test:{request.node.nodeid.replace(':', '_').replace('/', '_')}:"
-
-
 @pytest.fixture(scope="session")
 def rabbitmq_endpoint() -> Iterator[RabbitmqEndpoint]:
     _skip_if_no_docker()
@@ -257,16 +240,6 @@ def rabbitmq_endpoint() -> Iterator[RabbitmqEndpoint]:
         yield endpoint
     finally:
         container.stop()
-
-
-@pytest.fixture
-def rabbit_vhost(rabbitmq_endpoint: RabbitmqEndpoint) -> Iterator[str]:
-    vhost = f"vh_{uuid.uuid4().hex[:8]}"
-    _create_rabbit_vhost(rabbitmq_endpoint, vhost)
-    try:
-        yield vhost
-    finally:
-        _delete_rabbit_vhost(rabbitmq_endpoint, vhost)
 
 
 @pytest.fixture(scope="session")
@@ -304,24 +277,6 @@ def s3_endpoint() -> Iterator[S3Endpoint]:
         container.stop()
 
 
-@pytest.fixture
-def s3_bucket(s3_endpoint: S3Endpoint) -> Iterator[str]:
-    bucket = f"test-{uuid.uuid4().hex[:8]}"
-    boto3: Any = importlib.import_module("boto3")
-    client: Any = boto3.client(
-        "s3",
-        endpoint_url=s3_endpoint.endpoint_url,
-        region_name=s3_endpoint.region,
-        aws_access_key_id=s3_endpoint.access_key,
-        aws_secret_access_key=s3_endpoint.secret_key,
-    )
-    client.create_bucket(Bucket=bucket)
-    try:
-        yield bucket
-    finally:
-        _empty_and_delete_bucket(client, bucket)
-
-
 @pytest.fixture(scope="session")
 def mailpit_endpoint() -> Iterator[MailpitEndpoint]:
     _skip_if_no_docker()
@@ -337,16 +292,6 @@ def mailpit_endpoint() -> Iterator[MailpitEndpoint]:
         )
     finally:
         container.stop()
-
-
-@pytest.fixture
-def mailpit_inbox_clear(mailpit_endpoint: MailpitEndpoint) -> None:
-    req = urllib.request.Request(  # noqa: S310 # nosec B310 — controlled URL, fixed scheme
-        f"{mailpit_endpoint.api_url}/api/v1/messages", method="DELETE"
-    )
-    with urllib.request.urlopen(req, timeout=2) as response:  # noqa: S310 # nosec B310
-        if response.status not in {200, 204}:
-            pytest.skip(f"mailpit DELETE returned {response.status}")
 
 
 def _wait_for_postgres(endpoint: PostgresEndpoint, *, timeout: float = 30.0) -> None:
@@ -437,38 +382,6 @@ def _wait_for_rabbitmq(endpoint: RabbitmqEndpoint, *, timeout: float = 60.0) -> 
     raise RuntimeError(msg)
 
 
-def _create_rabbit_vhost(endpoint: RabbitmqEndpoint, vhost: str) -> None:
-    auth = "Basic " + __import__("base64").b64encode(b"guest:guest").decode()
-    req = urllib.request.Request(  # noqa: S310 # nosec B310
-        f"{endpoint.management_url}/api/vhosts/{vhost}",
-        method="PUT",
-        headers={"Authorization": auth},
-    )
-    with urllib.request.urlopen(req, timeout=5) as response:  # noqa: S310 # nosec B310
-        if response.status not in {201, 204}:
-            msg = f"failed to create vhost {vhost}: status={response.status}"
-            raise RuntimeError(msg)
-
-
-def _delete_rabbit_vhost(endpoint: RabbitmqEndpoint, vhost: str) -> None:
-    auth = "Basic " + __import__("base64").b64encode(b"guest:guest").decode()
-    req = urllib.request.Request(  # noqa: S310 # nosec B310
-        f"{endpoint.management_url}/api/vhosts/{vhost}",
-        method="DELETE",
-        headers={"Authorization": auth},
-    )
-    with contextlib.suppress(Exception):
-        urllib.request.urlopen(req, timeout=5).close()  # noqa: S310 # nosec B310
-
-
-def _empty_and_delete_bucket(client: Any, bucket: str) -> None:
-    with contextlib.suppress(Exception):
-        objects = client.list_objects_v2(Bucket=bucket).get("Contents", [])
-        for obj in objects:
-            client.delete_object(Bucket=bucket, Key=obj["Key"])
-        client.delete_bucket(Bucket=bucket)
-
-
 __all__ = [
     "MailpitEndpoint",
     "PostgresEndpoint",
@@ -477,13 +390,9 @@ __all__ = [
     "S3Endpoint",
     "fresh_db",
     "mailpit_endpoint",
-    "mailpit_inbox_clear",
     "postgres_endpoint",
-    "rabbit_vhost",
     "rabbitmq_endpoint",
     "redis_endpoint",
-    "redis_namespace",
-    "s3_bucket",
     "s3_endpoint",
     "template_db",
 ]
