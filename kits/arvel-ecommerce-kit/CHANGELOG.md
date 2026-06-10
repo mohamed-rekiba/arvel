@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.12.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.12.1...arvel-ecommerce-kit-v1.12.2) (2026-06-10)
+
+
+### Bug Fixes
+
+* **ci:** pin kit emulator tests to one xdist worker ([2e732d9](https://github.com/mohamed-rekiba/arvel/commit/2e732d9a0908517ff2819c4ac5f4873d012fad1e))
+
+
+### Performance
+
+* **ci:** parallelize test suites and unblock ecommerce-kit emulators ([0a5614b](https://github.com/mohamed-rekiba/arvel/commit/0a5614bdcd722316262a255d6bf91e8a36a501cd))
+* **ci:** speed up and align the integration test suites ([fde4641](https://github.com/mohamed-rekiba/arvel/commit/fde4641a86fa7fbdfe5cf9779b69a13ebaf20e4c))
+
 ## [1.12.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.12.0...arvel-ecommerce-kit-v1.12.1) (2026-06-10)
 
 
