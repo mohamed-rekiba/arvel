@@ -5,6 +5,35 @@
 
 All of the configuration for an Arvel application is driven by environment variables and the config files in your project. Arvel offers two complementary ways to read configuration: a Laravel-style file registry accessed with `config("dotted.key")`, and typed `ArvelSettings` classes validated by Pydantic. This page covers both and when to reach for each.
 
+<a name="quick-start"></a>
+### Quick start
+
+```python
+# In application code — prefer config() or Config.of()
+from arvel.config import config, Config
+from arvel.config.db_config import DbConfig
+
+app_name = config("app.name")
+db = Config.of(DbConfig)
+if db.enabled:
+    dsn = db.async_url()
+```
+
+```bash
+# Inspect at runtime
+arvel config:show app.env
+arvel config:show database.default
+
+# Production — cache the file registry after deploy
+arvel config:cache
+```
+
+| Need | Reach for |
+|---|---|
+| App-level toggles in `config/*.py` | `config("section.key")` |
+| Validated subsystem config (DB, cache, queue) | `Config.of(SomeConfig)` |
+| Raw env in a config file only | `env("KEY", default)` from `arvel.support.env` |
+
 <a name="environment-configuration"></a>
 ## Environment Configuration
 

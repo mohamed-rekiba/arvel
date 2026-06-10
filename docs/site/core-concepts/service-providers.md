@@ -9,6 +9,34 @@ But what do we mean by "bootstrapped"? In general, we mean **registering** thing
 
 If you open `bootstrap/providers.py`, you'll see your application's providers list. Each provider gives you a place to wire one slice of your application together.
 
+<a name="quick-start"></a>
+### Quick start — a minimal provider
+
+```python
+# app/providers/app_service_provider.py
+from arvel.providers import ServiceProvider
+from app.repositories.post_repository import PostRepository
+from app.services.post_service import PostService
+
+
+class AppServiceProvider(ServiceProvider):
+    def register(self) -> None:
+        self.container.singleton(PostRepository)
+        self.container.singleton(PostService)
+
+    async def boot(self) -> None:
+        pass
+```
+
+```python
+# bootstrap/providers.py
+from app.providers.app_service_provider import AppServiceProvider
+
+providers: list[type[ServiceProvider]] = [
+    AppServiceProvider,
+]
+```
+
 <a name="writing-service-providers"></a>
 ## Writing Service Providers
 

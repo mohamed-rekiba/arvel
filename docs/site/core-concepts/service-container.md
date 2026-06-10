@@ -25,6 +25,26 @@ svc = container.make(UserService)   # Mailer is auto-wired
 
 The `Application` owns a root container. In practice you interact with it through [service providers](service-providers.md), the [`dep()`](#resolving-in-routes-with-dep) helper in routes, and [facades](facades.md) — but understanding the container directly makes all of those clearer.
 
+<a name="quick-start"></a>
+### Quick start
+
+Register bindings in a provider's `register()`, resolve in routes with `dep()`, or call `container.make()` / `await container.amake()` in services:
+
+```python
+# bootstrap/providers.py — register once
+self.container.singleton(UserRepository)
+
+# routes/api.py — inject per request
+@Route.get("/users")
+async def index(repo: UserRepository = Depends(dep(UserRepository))):
+    return await repo.all()
+
+# app/services/report_service.py — constructor injection
+class ReportService:
+    def __init__(self, repo: UserRepository) -> None:
+        self.repo = repo
+```
+
 <a name="binding"></a>
 ## Binding
 
@@ -83,6 +103,14 @@ container.singleton(HttpClient, lambda: HttpClient(timeout=30))
 ```
 
 For async factories, register normally but resolve with [`amake`](#the-make-method) — resolving an async factory through the synchronous `make` raises `AsyncBindingError`.
+
+```python
+async def build_engine() -> AsyncEngine:
+    return create_async_engine(database_url)
+
+container.singleton(AsyncEngine, build_engine)
+engine = await container.amake(AsyncEngine)
+```
 
 <a name="resolving"></a>
 ## Resolving
