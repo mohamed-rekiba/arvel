@@ -5,6 +5,19 @@
 
 The default Arvel application structure is intended to provide a great starting point for both large and small applications. `arvel new` generates a Laravel-shaped layout — here's what each directory holds and how the app boots.
 
+<a name="quick-start"></a>
+### Quick start — where to put things
+
+| I need to… | File or directory |
+|---|---|
+| Add an API route | `routes/api.py` |
+| Register services | `app/providers/` + `bootstrap/providers.py` |
+| Change DB / cache settings | `config/*.py` + `.env` |
+| Run migrations | `database/migrations/` → `arvel migrate` |
+| Serve the app | `public/asgi.py` → `arvel serve` |
+
+Boot flow: `bootstrap/app.py` builds the app → `public/asgi.py` calls `into_asgi()` → uvicorn serves `public.asgi:asgi`. See [Application lifecycle](../core-concepts/lifecycle.md).
+
 <a name="the-generated-layout"></a>
 ## The Generated Layout
 
