@@ -303,7 +303,6 @@ jobs:
           APP_ENV: testing
         run: >-
           uv run --project ../../.. pytest tests/
-          -n auto --dist loadfile
           --tb=short -q
 
   ecommerce-kit-frontend:
