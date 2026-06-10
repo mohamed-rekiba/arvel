@@ -8,6 +8,50 @@ Since HTTP-driven applications are stateless, sessions provide a way to store in
 > [!NOTE]
 > Unlike Laravel, the `Session` facade is intentionally thin — it exposes only `Session.manager()`. The day-to-day read/write API lives on the per-request `SessionData` object, which you reach through `request.state.session`.
 
+<a name="quick-start"></a>
+### Quick start
+
+Register the provider and wire `StartSession` as ASGI middleware (not route middleware — see [Enabling sessions](#enabling-sessions)):
+
+```python
+# bootstrap/providers.py
+from arvel.providers.session_provider import SessionServiceProvider
+
+providers = [SessionServiceProvider, ...]
+```
+
+```python
+from starlette.middleware import Middleware
+
+from arvel.facades.session import Session
+from arvel.session.middleware import StartSession
+
+middleware = [
+    Middleware(StartSession, store=Session.manager().store(), lifetime=7200),
+]
+```
+
+Read and write session data on any request that passes through that stack:
+
+```python
+from starlette.requests import Request
+
+
+async def set_theme(request: Request) -> dict[str, str]:
+    session = request.state.session
+    session.put("theme", "dark")
+    session.flash("status", "Preference saved")
+    return {"theme": session.get("theme")}
+```
+
+The [session guard](authentication.md#session-guard) stores the authenticated user id in this same session — `SessionGuard.login()` calls `session.regenerate()` for you after a successful login.
+
+| Task | API |
+|---|---|
+| Read / write | `session.get(...)`, `session.put(...)` |
+| One-request messages | `session.flash(...)` — [Flash data](#flash-data) |
+| After login | `session.regenerate()` — [Regenerating the session ID](#regenerating-the-session-id) |
+
 <a name="configuration"></a>
 ## Configuration
 

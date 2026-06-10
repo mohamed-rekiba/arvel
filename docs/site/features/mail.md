@@ -5,6 +5,52 @@
 
 Sending email doesn't have to be complicated. Arvel provides a clean, simple email API powered by **mailables** — small classes that describe a single message. Each mailable defines its envelope (sender, recipient, subject), its content (HTML and/or plain-text body), and any attachments. The `Mail` facade then renders and delivers it through a configured driver.
 
+<a name="quick-start"></a>
+### Quick start
+
+Register the provider, point the driver at `log` for local dev, define a mailable, send:
+
+```python
+# bootstrap/providers.py
+from arvel.mail.providers.mail_service_provider import MailServiceProvider
+
+providers = [MailServiceProvider, ...]
+```
+
+```ini
+# .env — local dev: rendered messages go to the log
+MAIL_DEFAULT=log
+MAIL_FROM_ADDRESS=hello@example.com
+MAIL_FROM_NAME="Arvel App"
+```
+
+```python
+from arvel.facades.mail import Mail
+from arvel.mail.content import Content
+from arvel.mail.envelope import Envelope
+from arvel.mail.mailable import Mailable
+
+
+class WelcomeMail(Mailable):
+    def envelope(self) -> Envelope:
+        return Envelope(to=["user@example.com"], subject="Welcome!")
+
+    def content(self) -> Content:
+        return Content(html="<p>Thanks for signing up.</p>")
+
+
+await Mail.to("user@example.com").send(WelcomeMail())
+```
+
+`Mail.to()` accepts an email string or any object with an `.email` attribute. Override recipients with the fluent chain — `send()` renders the mailable and delivers through the active driver.
+
+| Piece | Responsibility |
+|---|---|
+| `envelope()` | To, subject, optional from/cc/bcc — [Configuring the envelope](#configuring-the-envelope) |
+| `content()` | Inline HTML/text or Jinja2 views — [Configuring the content](#configuring-the-content) |
+| `attachments()` | Optional files — [Attachments](#attachments) |
+| Tests | `with Mail.fake() as mailbox:` — [Testing](#testing) |
+
 <a name="configuration"></a>
 ## Configuration
 

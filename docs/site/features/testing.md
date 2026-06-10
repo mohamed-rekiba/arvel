@@ -5,6 +5,44 @@
 
 Arvel is built with testing in mind. Tests run the real app in-process over ASGI — no network, no separate server — and the framework ships fluent response assertions plus fakes for every external-facing service. Tests are async; use `pytest` with `pytest-asyncio` in auto mode.
 
+<a name="quick-start"></a>
+### Quick start
+
+```python
+from arvel.testing import ArvelTestCase, TestResponse, create_test_app
+
+# Functional — wrap an existing Application
+async def test_health(app) -> None:
+    async with create_test_app(app) as client:
+        TestResponse(await client.get("/health")).assert_ok()
+
+# Class-style — minimal app booted for you
+class TestApi(ArvelTestCase):
+    async def test_create(self) -> None:
+        response = await self.post_json("/users", {"email": "a@b.com"})
+        response.assert_status(201).assert_json_path("data.email", "a@b.com")
+```
+
+```python
+from arvel.facades import Cache, Http
+
+with Cache.fake():
+    await Cache.put("k", "v")
+    Cache.assert_stored("k")
+
+with Http.fake({"*": Http.response({"ok": True})}):
+    resp = await Http.get("https://api.example.com/x")
+    assert resp.json() == {"ok": True}
+```
+
+| Need | Reach for |
+|---|---|
+| Hit your app in-process | `create_test_app(app)` or `ArvelTestCase` |
+| Fluent HTTP assertions | `TestResponse(...).assert_ok()` / `post_json` helpers |
+| Clean DB between tests | `RefreshDatabase` mixin — see [Database Testing](#database-testing) |
+| Stub outbound HTTP | [HTTP Client](http-client.md#testing) `Http.fake()` |
+| Stub cache, mail, queue, … | [Faking Services](#faking-services) and [Facades](../core-concepts/facades.md#facades-in-testing) |
+
 <a name="creating-a-test-app"></a>
 ## Creating a Test App
 

@@ -8,6 +8,68 @@ In addition to [authentication](authentication.md), Arvel provides a way to auth
 > [!NOTE]
 > Authorization in Arvel is deliberately minimal — a `Gate` class, a `Policy` base, and a `CanMiddleware`. There is no `Gate` facade and no `Auth.user()`-style implicit user; you pass the user explicitly. Roles and permissions are not in core (see [Roles & Permissions](#roles-and-permissions)).
 
+<a name="quick-start"></a>
+### Quick start
+
+The `Gate` singleton is bound by [`AuthServiceProvider`](authentication.md#registering-the-provider). Define abilities in a provider's `boot()`, then authorize in a handler or attach [`CanMiddleware`](#enforcing-authorization-in-routes):
+
+```python
+from typing import Any
+
+from starlette.requests import Request
+
+from arvel.auth.gate import Gate
+from arvel.auth.policy import Policy
+from arvel.providers import ServiceProvider
+from app.models.post import Post
+
+
+class AuthorizationServiceProvider(ServiceProvider):
+    async def boot(self) -> None:
+        gate = self.container.make(Gate)
+        gate.define("edit-post", lambda user, post: user.id == post.user_id)
+        gate.policy(Post, PostPolicy())
+
+
+class PostPolicy(Policy[Post]):
+    def update(self, user: Any, post: Post) -> bool:
+        return post.user_id == user.id
+
+
+async def update_post(request: Request, post: Post) -> dict[str, str]:
+    gate = request.app.state.arvel_container.make(Gate)
+    user = request.state.user
+    await gate.authorize("update", user, post)
+    post.title = (await request.json())["title"]
+    await post.save()
+    return {"status": "ok"}
+```
+
+Route middleware for abilities that don't need a loaded model:
+
+```python
+from starlette.requests import Request
+
+from arvel import Route
+from arvel.auth.middleware.can import CanMiddleware
+from arvel.http.middleware import Authenticate
+
+
+@Route.get(
+    "/admin",
+    middleware=[Authenticate("web"), CanMiddleware("admin-only")],
+)
+async def admin(request: Request) -> dict[str, str]:
+    return {"area": "admin"}
+```
+
+| Pattern | When to use |
+|---|---|
+| `gate.define(...)` | One-off ability with a closure |
+| `gate.policy(Model, Policy())` | CRUD-style rules grouped on a model |
+| `CanMiddleware("ability", model_param="id")` | Enforce at the route; passes the path param as the resource argument |
+| Role / permission tables | [`arvel-permission`](../packages/permission.md) |
+
 <a name="registering-the-provider"></a>
 ## Registering the Provider
 
@@ -144,9 +206,11 @@ class PostPolicy(Policy[Post]):
 Attach `CanMiddleware` to require an ability. It checks the gate for the authenticated user and raises an unauthenticated error (401) when no user is present, or an authorization error (403) when the check fails:
 
 ```python
+from starlette.requests import Request
+
 from arvel import Route
-from arvel.http.middleware import Authenticate
 from arvel.auth.middleware.can import CanMiddleware
+from arvel.http.middleware import Authenticate
 
 
 @Route.get(

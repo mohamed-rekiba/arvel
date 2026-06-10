@@ -8,6 +8,54 @@ Some data retrieval or processing tasks are CPU-intensive or take several second
 > [!NOTE]
 > The `Cache` facade covers the common operations: `get`, `put`, `forget`, `has`, `flush`, `forever`, and `remember`. Some Laravel conveniences — `add`, `increment`, `decrement`, `pull`, `remember_forever`, `many`/`put_many` — are **not** on the facade. `many`/`put_many` exist on the store, reachable via `Cache.store().many(...)`.
 
+<a name="quick-start"></a>
+### Quick start
+
+Register the provider, then read and write through the facade:
+
+```python
+# bootstrap/providers.py
+from arvel.providers.cache_provider import CacheServiceProvider
+
+providers = [CacheServiceProvider, ...]
+```
+
+```python
+from arvel.facades import Cache
+
+# miss → run callback → store for 300s
+async def load_stats() -> dict[str, int]:
+    return {"total": await Order.count()}
+
+stats = await Cache.remember("dashboard:stats", ttl=300, callback=load_stats)
+await Cache.put("feature:on", True, ttl=3600)
+await Cache.forget("feature:on")
+```
+
+Point at Redis when you need a shared store across workers (also required for [atomic locks](#atomic-locks)):
+
+```bash
+# .env
+CACHE_CONNECTION=redis
+CACHE_HOST=127.0.0.1
+CACHE_PORT=6379
+CACHE_PREFIX=arvel_cache
+```
+
+For the `database` driver, publish the migration first:
+
+```bash
+arvel vendor:publish --tag=arvel-cache
+arvel migrate
+```
+
+| Pattern | API |
+|---|---|
+| Tagged invalidation | `Cache.tags(["posts"]).flush()` — [Cache tags](#cache-tags) |
+| Distributed lock | `async with Cache.lock("job", ttl=60) as acquired:` — [Atomic locks](#atomic-locks) |
+| Throttle by key | `Cache.rate_limiter().attempt(...)` — [Rate limiting](#rate-limiting) |
+| Tests | `with Cache.fake():` — [Testing](#testing) |
+
 <a name="configuration"></a>
 ## Configuration
 

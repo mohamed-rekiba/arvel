@@ -7,6 +7,40 @@ Arvel's encryption services provide a simple, convenient interface for encryptin
 
 The `Crypt` facade is the entry point. It's also what powers the [`encrypted:*` model casts](../orm/casts.md#encrypted-casting).
 
+<a name="quick-start"></a>
+### Quick start
+
+```python
+from arvel.database.exceptions import DecryptionError
+from arvel.facades import Crypt
+
+token = Crypt.encrypt_string("api-secret")
+assert Crypt.decrypt_string(token) == "api-secret"
+
+payload = Crypt.encrypt({"user_id": 1, "scopes": ["read"]})
+assert Crypt.decrypt(payload) == {"user_id": 1, "scopes": ["read"]}
+
+try:
+    Crypt.decrypt_string(untrusted_token)
+except DecryptionError:
+    ...  # malformed base64, wrong key, tampered tag — one type for all
+```
+
+```bash
+arvel key:generate          # write APP_KEY=base64:... to .env
+arvel key:generate --show   # print a key without writing
+```
+
+| Need | Reach for |
+|---|---|
+| Encrypt a model column | [`encrypted:*` cast](../orm/casts.md#encrypted-casting) |
+| Raw string in app code | `Crypt.encrypt_string` / `decrypt_string` |
+| Dict, list, or other JSON value | `Crypt.encrypt` / `decrypt` |
+| Tests without a real `.env` | `Crypt.set_encrypter(encrypter)` — pass `None` to restore |
+
+> [!NOTE]
+> `Crypt` is always available — no service provider to register. See [Facades](../core-concepts/facades.md#quick-start).
+
 <a name="configuration"></a>
 ## Configuration
 
@@ -35,6 +69,8 @@ from arvel.facades import Crypt
 ciphertext = Crypt.encrypt_string("secret message")
 plaintext = Crypt.decrypt_string(ciphertext)
 ```
+
+Wrap untrusted ciphertext in a single `except DecryptionError` — the encrypter raises it for every invalid payload (malformed base64, unknown version byte, wrong key, tampered tag).
 
 <a name="encrypting-values"></a>
 ### Encrypting Values
