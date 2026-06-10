@@ -550,7 +550,7 @@ requires-dist = [
 
 [[package]]
 name = "arvel-ecommerce-kit"
-version = "1.12.1"
+version = "1.12.2"
 source = { virtual = "kits/arvel-ecommerce-kit/backend" }
 dependencies = [
     { name = "arvel", extra = ["bcrypt", "broadcasting", "image", "jwt", "mail", "permission", "postgres", "queue", "queue-amqp", "redis", "s3"] },
@@ -560,6 +560,7 @@ dependencies = [
 dev = [
     { name = "arvel", extra = ["shell"] },
     { name = "faker" },
+    { name = "filelock" },
     { name = "httpx2" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -575,6 +576,7 @@ requires-dist = [{ name = "arvel", extras = ["postgres", "redis", "queue", "queu
 dev = [
     { name = "arvel", extras = ["shell"], editable = "packages/arvel" },
     { name = "faker", specifier = ">=40.22.0" },
+    { name = "filelock", specifier = ">=3.16.1" },
     { name = "httpx2", specifier = ">=2.3.0" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
