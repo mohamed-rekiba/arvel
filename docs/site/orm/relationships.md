@@ -7,6 +7,9 @@ Database tables are often related to one another. A blog post may have many comm
 
 In Arvent, a relationship is declared as a **zero-argument method** that returns a relationship builder. The framework detects these methods, wires them for querying, and makes them eager-loadable.
 
+> [!NOTE]
+> Define your [models](models.md) and run [migrations](migrations.md) before adding foreign keys. Load related rows with `with_()` — see [Eager loading](#eager-loading) below.
+
 <a name="defining-relationships"></a>
 ## Defining Relationships
 

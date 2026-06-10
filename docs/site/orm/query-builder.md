@@ -18,7 +18,7 @@ items = await (
 `Item.where(...)` returns a `QueryBuilder`. Builder methods like `where`, `order_by`, and `limit` return the builder so you can chain. Terminal methods — `get`, `first`, `count`, `paginate` — execute against the active database session and must be awaited.
 
 > [!NOTE]
-> Builder methods return a **new** builder rather than mutating in place, so a partially-built query is safe to reuse as a base for several variations.
+> New to Arvent? Read [Models & CRUD](models.md) first, then [Relationships](relationships.md) for eager loading ([section overview](index.md)). Builder methods return a **new** builder rather than mutating in place, so a partially-built query is safe to reuse as a base for several variations.
 
 <a name="running-queries"></a>
 ## Running Queries

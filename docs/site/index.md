@@ -223,6 +223,21 @@ Arvel ships the parts a real app needs, behind one consistent, typed surface:
 
 And the work that doesn't belong in core lives in companion packages: [OAuth login](packages/oauth.md), [roles & permissions](packages/permission.md), [image processing](packages/image.md), [full-text search](packages/search.md), and [audit trails](packages/audit.md). Want a full reference app? Read the [e-commerce kit](kits/ecommerce-kit.md).
 
+## Documentation map
+
+Pick a track based on what you're building:
+
+| Track | Start here | Then |
+|---|---|---|
+| **New project** | [Installation](getting-started/installation.md) → [Quickstart](getting-started/quickstart.md) | [Directory structure](getting-started/project-structure.md), [Lifecycle](core-concepts/lifecycle.md) |
+| **HTTP API** | [Routing](the-basics/routing.md) → [Validation](the-basics/validation.md) | [Resources](the-basics/resources.md), [Error handling](the-basics/error-handling.md) |
+| **Database** | [Models & CRUD](orm/models.md) → [Migrations](orm/migrations.md) | [Relationships](orm/relationships.md), [Query builder](orm/query-builder.md) |
+| **Background work** | [Queues](features/queues.md) → [Scheduling](features/scheduling.md) | [Events](features/events.md), [CLI workers](cli/commands.md#queue) |
+| **SPA / mobile client** | [Frontend integration](frontend/integration.md) | [Authentication](features/authentication.md), export with `arvel openapi:export` |
+| **Full-stack reference** | [E-commerce kit](kits/ecommerce-kit.md) | [Companion packages](packages/README.md) |
+
+Every major section has an overview page — click the section name in the sidebar (Getting Started, Core Concepts, Features, …) for a reading order and page index.
+
 ## Ready to build?
 
 Install Arvel, scaffold your first app, and ship a typed route in minutes.

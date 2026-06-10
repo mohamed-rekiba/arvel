@@ -2,6 +2,9 @@
 
 Arvel is pre-1.0. The core subsystems are complete and working; the public API may still shift before `1.0`. This page covers the versioning scheme, the support policy, and a high-level map of what's in the box. For the full, per-release changelog, see [`CHANGELOG.md`](https://github.com/mohamed-rekiba/arvel/blob/main/CHANGELOG.md).
 
+> [!TIP]
+> New to the docs? Use the [documentation map](index.md#documentation-map) on the home page or section overviews ([Features](features/index.md), [ORM](orm/index.md), …) to find the right guide. This page is a release-oriented summary, not a tutorial.
+
 <a name="versioning-scheme"></a>
 ## Versioning Scheme
 

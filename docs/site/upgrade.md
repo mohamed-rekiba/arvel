@@ -2,6 +2,18 @@
 
 This page documents breaking changes and migration steps between Arvel releases. When a change requires updating your code, you'll find it here with before/after examples.
 
+<a name="pre-upgrade-checklist"></a>
+## Pre-Upgrade Checklist
+
+Before bumping `arvel` in any environment:
+
+1. Read the target version in [Release Notes](releases.md) and [`CHANGELOG.md`](https://github.com/mohamed-rekiba/arvel/blob/main/CHANGELOG.md).
+2. Run your test suite and `arvel openapi:validate` if you ship a typed client.
+3. Update lockfiles (`uv lock --upgrade-package arvel` or equivalent).
+4. Run pending migrations (`arvel migrate`) after deploy — never assume schema is current.
+5. Re-export OpenAPI and regenerate frontend clients when routes or form requests changed.
+6. Re-run `arvel config:cache` in production after config file changes.
+
 <a name="versioning-policy"></a>
 ## Versioning Policy
 

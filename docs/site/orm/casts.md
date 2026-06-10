@@ -7,6 +7,9 @@ Accessors, mutators, and attribute casting let you transform model attribute val
 
 These three mechanisms overlap with what plain Python types and SQLAlchemy already give you. Reach for them when you want behavior the column type alone can't express: a fixed-scale decimal, an encrypted value, a derived attribute, or input normalization.
 
+> [!NOTE]
+> Encrypted casts require `APP_KEY` — see [Encryption](../features/encryption.md). Translatable fields use `TranslatableMixin`; see [#translatable-fields](#translatable-fields) below.
+
 <a name="attribute-casting"></a>
 ## Attribute Casting
 
