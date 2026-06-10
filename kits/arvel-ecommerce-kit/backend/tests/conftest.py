@@ -137,11 +137,11 @@ def _docker_container(image: str, *, ready_log: str, timeout: int = 120) -> Any:
 
 # Containers are session-scoped, so each xdist worker boots its own stack on the
 # first emulator test it runs. Across workers they hit *different* containers, so
-# the shared default DB/vhost/bucket is safe without per-test isolation. Crucially,
-# per-worker Postgres means each worker's per-test CREATE/DROP DATABASE runs on its
-# own instance — concentrating that DDL on one shared Postgres serializes it and is
-# measurably slower. Run under --dist load so the heavy app-boot tests spread evenly
-# across workers (loadfile lumps a whole file onto one worker and imbalances).
+# the shared default DB/vhost/bucket is safe without per-test isolation. Run under
+# --dist loadfile, NOT load: load spreads emulator tests to every worker, so all of
+# them boot a full 5-container stack (20 containers on a 4-vCPU runner) and the
+# resource contention bloats per-test setup. loadfile keeps a file on one worker,
+# so fewer stacks boot — measurably faster despite the looser balance.
 
 
 @pytest.fixture(scope="session")

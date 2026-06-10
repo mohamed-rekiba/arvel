@@ -303,7 +303,7 @@ jobs:
           APP_ENV: testing
         run: >-
           uv run --project ../../.. pytest tests/
-          --durations=15 --tb=short -q
+          --tb=short -q
 
   ecommerce-kit-frontend:
     name: E-commerce Kit Frontend (format + lint + test + build)
