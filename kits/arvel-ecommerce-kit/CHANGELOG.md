@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.12.0...arvel-ecommerce-kit-v1.12.1) (2026-06-10)
+
+
+### Bug Fixes
+
+* **ecommerce-kit:** point integration tests at testcontainers MinIO ([88aac60](https://github.com/mohamed-rekiba/arvel/commit/88aac6011b2a2508c91e74542bdbfde21a32ba52))
+
 ## [1.12.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.11.1...arvel-ecommerce-kit-v1.12.0) (2026-06-09)
 
 
