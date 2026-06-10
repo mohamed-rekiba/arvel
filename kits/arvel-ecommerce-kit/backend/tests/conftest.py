@@ -126,6 +126,36 @@ def _docker_container(image: str, *, ready_log: str, timeout: int = 120) -> Any:
     return container
 
 
+# Session-scoped containers boot once *per xdist worker*. Every emulator-backed
+# test needs the full stack, so without this each worker would boot all five
+# (RabbitMQ included) — the boot storm dwarfs any parallelism win. Pinning them
+# to one group lands them on a single worker (one container set) while unit
+# tests still spread across the rest. Safe because each test already isolates
+# via a unique DB/vhost/bucket/namespace. Requires --dist loadgroup.
+_EMULATOR_FIXTURES = frozenset(
+    {
+        "postgres_endpoint",
+        "template_db",
+        "fresh_db",
+        "redis_endpoint",
+        "redis_namespace",
+        "rabbitmq_endpoint",
+        "rabbit_vhost",
+        "s3_endpoint",
+        "s3_bucket",
+        "mailpit_endpoint",
+        "mailpit_inbox_clear",
+    }
+)
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    for item in items:
+        fixturenames: frozenset[str] = frozenset(getattr(item, "fixturenames", ()))
+        if _EMULATOR_FIXTURES & fixturenames:
+            item.add_marker(pytest.mark.xdist_group("emulators"))
+
+
 @pytest.fixture(scope="session")
 def postgres_endpoint() -> Iterator[PostgresEndpoint]:
     _skip_if_no_docker()
