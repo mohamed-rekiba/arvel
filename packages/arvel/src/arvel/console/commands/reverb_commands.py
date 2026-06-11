@@ -64,7 +64,7 @@ def build_reverb_runtime(
     """Construct the ReverbServer + resolve effective host/port.
 
     With ``REVERB_SCALING_ENABLED`` set, wire a RedisBus so this process picks
-    up broadcasts published by other processes (ADR-013 §4).
+    up broadcasts published by other processes.
     """
     from arvel.reverb.server import ReverbServer
 
