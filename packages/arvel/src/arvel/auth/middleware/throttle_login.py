@@ -17,16 +17,23 @@ import json
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from arvel.auth.config import AuthConfig
+from arvel.contracts.middleware import GlobalMiddleware
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+    from arvel.container import Container
+
 _DEFAULT_LOGIN_PATH = "/api/auth/login"
 _DEFAULT_MAX_ATTEMPTS = 5
 _DEFAULT_WINDOW = 60  # seconds
-_HTTP_ERROR_MIN = 400
-_HTTP_ERROR_MAX = 600
+_HTTP_UNAUTHORIZED = 401
 _HTTP_SUCCESS_MAX = 300
 
 
@@ -112,7 +119,7 @@ class ThrottleLoginConfig:
     store: LoginAttemptStore | None = None
 
 
-class ThrottleLoginMiddleware:
+class ThrottleLoginMiddleware(GlobalMiddleware):
     """ASGI-native login-throttle middleware.
 
     Keyed on ``(email, ip)`` to avoid blocking one user's email from
@@ -131,6 +138,27 @@ class ThrottleLoginMiddleware:
         self._window = cfg.window_seconds
         self._key_fn: Callable[[str, str], str] = cfg.key_fn or _default_key
         self._store: LoginAttemptStore = cfg.store or InMemoryLoginAttemptStore()
+
+    @classmethod
+    def boot(cls, app: FastAPI, container: Container) -> None:
+        """Mount when auth is registered and rate limiting is enabled."""
+        # No default AuthConfig exists (it needs a guard name), so only mount
+        # when AuthServiceProvider explicitly bound one.
+        if not container.bound(AuthConfig):
+            return
+        config = container.make(AuthConfig)
+        rate_limit = config.rate_limit
+        if not rate_limit.enabled:
+            return
+        prefix = config.routes.prefix.rstrip("/")
+        app.add_middleware(
+            cls,
+            config=ThrottleLoginConfig(
+                login_path=f"{prefix}/login",
+                max_attempts=rate_limit.max_attempts,
+                window_seconds=rate_limit.decay_seconds,
+            ),
+        )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -177,7 +205,10 @@ class ThrottleLoginMiddleware:
             self._app, scope, replay_receive
         )
 
-        if _HTTP_ERROR_MIN <= status_code < _HTTP_ERROR_MAX:
+        # Only bad credentials (401) count toward the lockout. A 422 (email not
+        # verified), 403 (suspended), or 5xx isn't a guessing attempt and must
+        # not lock the account out.
+        if status_code == _HTTP_UNAUTHORIZED:
             await self._store.increment(key, window_seconds=self._window)
         elif status_code < _HTTP_SUCCESS_MAX:
             await self._store.reset(key)

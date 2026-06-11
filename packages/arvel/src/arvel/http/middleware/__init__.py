@@ -19,11 +19,13 @@ from arvel.http._middleware_core import (
 )
 from arvel.http.exceptions import CsrfMismatchException
 from arvel.http.middleware.method_spoof import MethodSpoofMiddleware
+from arvel.http.middleware.scope import ArvelScopeMiddleware
 from arvel.http.middleware.security_headers import SecurityHeadersMiddleware
 from arvel.http.middleware.signed import SignedMiddleware
 from arvel.http.middleware.trust_proxies import TrustProxiesMiddleware
 
 __all__ = [
+    "ArvelScopeMiddleware",
     "Authenticate",
     "CallNext",
     "Cors",

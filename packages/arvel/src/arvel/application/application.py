@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from starlette.types import Lifespan
 
     from arvel.config.settings import ArvelSettings
+    from arvel.contracts import GlobalMiddleware
     from arvel.providers import ServiceProvider
     from arvel.routing import MiddlewareRef
     from arvel.services import BaseService
@@ -92,6 +93,59 @@ def _baseline_tail_providers() -> list[type[ServiceProvider]]:
     from arvel.console.providers.console_service_provider import ConsoleServiceProvider
 
     return [ConsoleServiceProvider]
+
+
+def _default_middleware_stack() -> list[type[GlobalMiddleware]]:
+    """The framework's default global ASGI stack, outer→inner.
+
+    Used when the app doesn't declare its own ``bootstrap/middleware.py``. New
+    projects ship this exact list so it's visible and reorderable; here it's
+    the fallback that keeps a bare ``into_asgi()`` behaving like a configured
+    app. Each entry self-gates on config in its ``boot()`` (e.g. throttle only
+    when auth is bound), so listing one doesn't force it on.
+
+    Imported lazily to keep ``arvel`` core free of FastAPI/Starlette at import
+    time.
+    """
+    from arvel.auth.middleware.csrf_double_submit import CsrfDoubleSubmitMiddleware
+    from arvel.auth.middleware.throttle_login import ThrottleLoginMiddleware
+    from arvel.context import ContextMiddleware, DeferredTaskMiddleware
+    from arvel.http.middleware import ArvelScopeMiddleware, TrustProxiesMiddleware
+    from arvel.maintenance import MaintenanceModeMiddleware
+    from arvel.observability import ObservabilityMiddleware
+
+    return [
+        TrustProxiesMiddleware,
+        MaintenanceModeMiddleware,
+        ThrottleLoginMiddleware,
+        CsrfDoubleSubmitMiddleware,
+        ObservabilityMiddleware,
+        ContextMiddleware,
+        DeferredTaskMiddleware,
+        ArvelScopeMiddleware,
+    ]
+
+
+def _resolve_middleware_chain(
+    user_middleware: list[type[GlobalMiddleware]],
+) -> list[type[GlobalMiddleware]]:
+    """Compose the global middleware chain (outer→inner), deduped.
+
+    ``ArvelScopeMiddleware`` is pinned as the innermost layer regardless of
+    where (or whether) the user lists it — the per-request DI scope must wrap
+    the route handler, so an edited ``bootstrap/middleware.py`` can't strand it.
+    """
+    from arvel.http.middleware import ArvelScopeMiddleware
+
+    seen: set[type[GlobalMiddleware]] = set()
+    chain: list[type[GlobalMiddleware]] = []
+    for mw_cls in user_middleware:
+        if mw_cls is ArvelScopeMiddleware or mw_cls in seen:
+            continue
+        seen.add(mw_cls)
+        chain.append(mw_cls)
+    chain.append(ArvelScopeMiddleware)
+    return chain
 
 
 def filter_provider_chain(
@@ -162,6 +216,7 @@ class Application:
         self._base_path: Path | None = None
         self._provider_classes: list[type[ServiceProvider]] = []
         self._provider_instances: list[ServiceProvider] = []
+        self._middleware_classes: list[type[GlobalMiddleware]] = []
         self._services: list[BaseService] = []
         self._booted: bool = False
         self._probe_connections: bool = True
@@ -321,11 +376,13 @@ class Application:
         base_path: Path,
         environment: str,
         providers: list[type[ServiceProvider]],
+        middleware: list[type[GlobalMiddleware]] | None = None,
         required_subsystems: frozenset[CliSubsystem] | None = None,
     ) -> None:
         self._base_path = base_path
         self._environment = environment
         self._required_subsystems = required_subsystems
+        self._middleware_classes = list(middleware) if middleware else []
         full_chain = self._resolve_provider_chain(providers)
         self._provider_classes = (
             full_chain
@@ -455,7 +512,6 @@ class Application:
         from fastapi import FastAPI
 
         from arvel.http.exceptions import HttpExceptionHandler
-        from arvel.http.middleware.scope import ArvelScopeMiddleware
         from arvel.routing import Router
 
         effective_lifespan = lifespan if lifespan is not None else self._default_lifespan()
@@ -468,14 +524,23 @@ class Application:
         router.register_with_app(fa)
         self._add_health_route(fa)
         self._maybe_mount_public_storage(fa)
-        self._maybe_add_maintenance_middleware(fa)
-        # add_middleware prepends, so the LAST call is the OUTERMOST layer.
-        # Desired outer→inner: TrustProxies → Observability → Context → DeferredTask → ArvelScope.
-        fa.add_middleware(ArvelScopeMiddleware, container=self.container)
-        self._maybe_add_observability_middleware(fa)
-        self._maybe_add_login_throttle_middleware(fa)
-        self._maybe_add_trust_proxies_middleware(fa)
+        self._mount_middleware(fa)
         return fa
+
+    def _mount_middleware(self, fa: FastAPI) -> None:
+        """Mount the resolved global middleware chain onto ``fa``.
+
+        The chain is the app's ``bootstrap/middleware.py`` list (or the
+        framework default when none was declared), with ``ArvelScopeMiddleware``
+        pinned innermost. List order is outer→inner; ``add_middleware`` prepends,
+        so we mount in reverse to make the first entry the outermost layer. Each
+        entry's ``boot()`` self-gates on config, so a listed middleware may
+        choose not to mount.
+        """
+        declared = self._middleware_classes or _default_middleware_stack()
+        chain = _resolve_middleware_chain(declared)
+        for mw_cls in reversed(chain):
+            mw_cls.boot(fa, self.container)
 
     def _add_health_route(self, fa: FastAPI) -> None:
         from arvel.container.errors import BindingResolutionError
@@ -492,72 +557,6 @@ class Application:
             allowed_cidrs=config.health_allowed_cidrs,
             trusted_proxies=config.trusted_proxies,
         )
-
-    def _maybe_add_observability_middleware(self, fa: FastAPI) -> None:
-        """Mount the context + observability middleware unless explicitly disabled."""
-        from arvel.container.errors import BindingResolutionError
-        from arvel.context import ContextMiddleware, DeferredTaskMiddleware
-        from arvel.observability import ObservabilityMiddleware
-        from arvel.observability.config import ObservabilityConfig
-
-        try:
-            config = self.container.make(ObservabilityConfig)
-        except BindingResolutionError:
-            config = ObservabilityConfig()
-        if not config.request_middleware_enabled:
-            return
-
-        fa.add_middleware(DeferredTaskMiddleware)
-        fa.add_middleware(ContextMiddleware)
-        fa.add_middleware(
-            ObservabilityMiddleware,
-            service=config.service_name,
-            log_requests=not config.log_uvicorn_access,
-        )
-
-    def _maybe_add_login_throttle_middleware(self, fa: FastAPI) -> None:
-        """Mount the login throttle when auth is registered and rate_limit is on.
-
-        Added inner to TrustProxies so it sees the real client IP, but outer to
-        the request-context layers so a throttled request short-circuits early.
-        """
-        from arvel.auth.config import AuthConfig
-        from arvel.auth.middleware.throttle_login import (
-            ThrottleLoginConfig,
-            ThrottleLoginMiddleware,
-        )
-
-        # Only when AuthServiceProvider explicitly bound it — there's no valid
-        # default AuthConfig (it needs a guard name), so don't auto-construct.
-        if not self.container.bound(AuthConfig):
-            return
-        config = self.container.make(AuthConfig)
-        rate_limit = config.rate_limit
-        if not rate_limit.enabled:
-            return
-        prefix = config.routes.prefix.rstrip("/")
-        fa.add_middleware(
-            ThrottleLoginMiddleware,
-            config=ThrottleLoginConfig(
-                login_path=f"{prefix}/login",
-                max_attempts=rate_limit.max_attempts,
-                window_seconds=rate_limit.decay_seconds,
-            ),
-        )
-
-    def _maybe_add_trust_proxies_middleware(self, fa: FastAPI) -> None:
-        """Mount TrustProxies as the outermost layer when TRUSTED_PROXIES is set."""
-        from arvel.container.errors import BindingResolutionError
-        from arvel.http.config import HttpConfig
-        from arvel.http.middleware.trust_proxies import TrustProxiesMiddleware
-
-        try:
-            config = self.container.make(HttpConfig)
-        except BindingResolutionError:
-            config = HttpConfig.from_environment()
-        if not config.trusted_proxies:
-            return
-        fa.add_middleware(TrustProxiesMiddleware, trusted_proxies=config.trusted_proxies)
 
     def _maybe_mount_public_storage(self, fa: FastAPI) -> None:
         """Serve the `storage:link` symlink (public/storage) at /storage.
@@ -578,20 +577,6 @@ class Application:
             StaticFiles(directory=storage_dir),
             name="storage.public",
         )
-
-    def _maybe_add_maintenance_middleware(self, fa: FastAPI) -> None:
-        """Attach the maintenance middleware if a manager is bound."""
-        from arvel.container.errors import BindingResolutionError
-        from arvel.maintenance import (
-            MaintenanceModeManager,
-            MaintenanceModeMiddleware,
-        )
-
-        try:
-            manager = self.container.make(MaintenanceModeManager)
-        except BindingResolutionError:
-            return
-        fa.add_middleware(MaintenanceModeMiddleware, manager=manager)
 
     def _default_lifespan(self) -> Lifespan[FastAPI]:
         @asynccontextmanager
@@ -630,6 +615,8 @@ class ApplicationBuilder:
         self._env_file: Path | None = None
         self._providers: list[type[ServiceProvider]] = []
         self._providers_path: Path | None = None
+        self._middleware: list[type[GlobalMiddleware]] = []
+        self._middleware_path: Path | None = None
         self._environment: str | None = None
         self._config_classes: list[type[ArvelSettings]] = []
         self._config_dir: Path | None = None
@@ -657,6 +644,24 @@ class ApplicationBuilder:
         # skeleton where bootstrap/providers.py declares `providers = [...]` at
         # module scope.
         self._providers_path = Path(providers) if isinstance(providers, str) else providers
+        return self
+
+    def with_middleware(self, middleware: list[type[GlobalMiddleware]] | Path | str) -> Self:
+        """Declare the global ASGI middleware stack (outer→inner).
+
+        Accepts a list of :class:`~arvel.contracts.GlobalMiddleware` classes, or
+        a path to a ``bootstrap/middleware.py`` that declares
+        ``middleware: list[type[GlobalMiddleware]] = [...]`` at module scope —
+        the same shape as ``bootstrap/providers.py``.
+
+        When never called, the framework's default stack is used.
+        ``ArvelScopeMiddleware`` is always pinned innermost regardless of the
+        list, so removing it from ``bootstrap/middleware.py`` can't break DI.
+        """
+        if isinstance(middleware, list):
+            self._middleware.extend(middleware)
+            return self
+        self._middleware_path = Path(middleware) if isinstance(middleware, str) else middleware
         return self
 
     def with_environment(self, name: str) -> Self:
@@ -726,6 +731,8 @@ class ApplicationBuilder:
             self._load_config_dir()
         if self._providers_path is not None:
             self._load_providers_from_path()
+        if self._middleware_path is not None:
+            self._load_middleware_from_path()
 
         # Routing files are loaded before providers run their register() pass so
         # that Router.reset_singleton() (called inside _load_routing_files) cannot
@@ -742,6 +749,7 @@ class ApplicationBuilder:
             base_path=self._base_path,
             environment=self._resolve_environment(),
             providers=list(self._providers),
+            middleware=list(self._middleware),
             required_subsystems=self._required_subsystems,
         )
         return app
@@ -829,6 +837,43 @@ class ApplicationBuilder:
             if path is None:
                 continue
             load_module_from_path(path, f"{NAMESPACE_PREFIX}.routes.{key}")
+
+    def _load_middleware_from_path(self) -> None:
+        from arvel.application._loader import NAMESPACE_PREFIX, load_module_from_path
+        from arvel.contracts import GlobalMiddleware as _GlobalMiddleware
+
+        if self._middleware_path is None:
+            msg = "_load_middleware_from_path called before with_middleware(path)"
+            raise RuntimeError(msg)
+        path = self._middleware_path
+        module = load_module_from_path(path, f"{NAMESPACE_PREFIX}.bootstrap.middleware")
+        if not hasattr(module, "middleware"):
+            msg = (
+                f"middleware module at {path} does not declare a top-level "
+                f"`middleware` attribute. Expected: "
+                f"middleware: list[type[GlobalMiddleware]] = [...]"
+            )
+            raise RuntimeError(msg)
+        raw_value: object = module.middleware
+        if not isinstance(raw_value, list):
+            msg = (
+                f"middleware attribute in {path} is {raw_value!r}; "
+                f"expected list[type[GlobalMiddleware]]."
+            )
+            raise TypeError(msg)
+        validated: list[type[_GlobalMiddleware]] = []
+        # isinstance(raw_value, list) narrows to list[Unknown] under pyright; the
+        # explicit annotation widens for the loop body, hence the local ignore.
+        raw_items: list[Any] = raw_value  # pyright: ignore[reportUnknownVariableType]
+        for item in raw_items:
+            if not (isinstance(item, type) and issubclass(item, _GlobalMiddleware)):
+                msg = (
+                    f"middleware attribute in {path} is {raw_value!r}; "
+                    f"expected list[type[GlobalMiddleware]]."
+                )
+                raise TypeError(msg)
+            validated.append(item)
+        self._middleware.extend(validated)
 
     def _load_providers_from_path(self) -> None:
         from arvel.application._loader import NAMESPACE_PREFIX, load_module_from_path

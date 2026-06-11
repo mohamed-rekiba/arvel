@@ -50,6 +50,22 @@ def test_middleware_composition_order(tmp_path: Path) -> None:
     )
 
 
+def test_maintenance_middleware_is_outermost(tmp_path: Path) -> None:
+    # add_middleware prepends, so a smaller index means a more outer layer.
+    # Maintenance must short-circuit before the inner request stack runs.
+    app = Application.configure(tmp_path).with_environment("testing").with_providers([]).create()
+    fa = app.into_asgi()
+
+    names = [getattr(mw.cls, "__name__", type(mw.cls).__name__) for mw in fa.user_middleware]
+
+    assert "MaintenanceModeMiddleware" in names
+    assert (
+        _index(names, "MaintenanceModeMiddleware")
+        < _index(names, "ObservabilityMiddleware")
+        < _index(names, "ArvelScopeMiddleware")
+    )
+
+
 def test_request_id_in_headers_and_logs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Disable the SDK so the provider doesn't swap the global logger out from
     # under FakeObservability; request-id binding still runs.
@@ -105,6 +121,35 @@ def test_login_throttle_respects_disabled_flag(tmp_path: Path) -> None:
     fa = app.into_asgi()
 
     assert "ThrottleLoginMiddleware" not in _middleware_names(fa)
+
+
+def test_auth_csrf_mounted_when_auth_bound(tmp_path: Path) -> None:
+    from arvel.auth.config import AuthConfig
+
+    app = Application.configure(tmp_path).with_environment("testing").with_providers([]).create()
+    app.container.instance(AuthConfig, AuthConfig(default="web"))
+    fa = app.into_asgi()
+
+    assert "CsrfDoubleSubmitMiddleware" in _middleware_names(fa)
+
+
+def test_auth_csrf_absent_without_auth(tmp_path: Path) -> None:
+    app = Application.configure(tmp_path).with_environment("testing").with_providers([]).create()
+    fa = app.into_asgi()
+
+    assert "CsrfDoubleSubmitMiddleware" not in _middleware_names(fa)
+
+
+def test_auth_csrf_respects_disabled_flag(tmp_path: Path) -> None:
+    from arvel.auth.config import AuthConfig, RefreshConfig
+
+    app = Application.configure(tmp_path).with_environment("testing").with_providers([]).create()
+    app.container.instance(
+        AuthConfig, AuthConfig(default="web", refresh=RefreshConfig(csrf_protection=False))
+    )
+    fa = app.into_asgi()
+
+    assert "CsrfDoubleSubmitMiddleware" not in _middleware_names(fa)
 
 
 async def test_shutdown_disconnects_in_reverse_order(tmp_path: Path) -> None:

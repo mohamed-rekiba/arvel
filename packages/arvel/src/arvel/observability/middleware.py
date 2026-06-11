@@ -7,6 +7,7 @@ buffers streaming responses and causes Content-Length mismatches.
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl
 
 from opentelemetry import trace as otel_trace
@@ -15,6 +16,7 @@ from opentelemetry.trace import StatusCode
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from arvel.contracts.middleware import GlobalMiddleware
 from arvel.database.paginator import (
     PaginationRequest,
     reset_pagination_request,
@@ -28,10 +30,15 @@ from arvel.observability.context import (
     validate_request_id,
 )
 
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+    from arvel.container import Container
+
 _SERVER_ERROR_THRESHOLD = 500
 
 
-class ObservabilityMiddleware:
+class ObservabilityMiddleware(GlobalMiddleware):
     """Outermost middleware — sets request context, opens span, logs 5xx errors.
 
     Must be registered before any other middleware so it wraps the full lifecycle.
@@ -43,6 +50,23 @@ class ObservabilityMiddleware:
         # When uvicorn's own access log is off, this middleware emits the access
         # line instead — richer (duration, request_id, trace context) and one line.
         self._log_requests = log_requests
+
+    @classmethod
+    def boot(cls, app: FastAPI, container: Container) -> None:
+        from arvel.container.errors import BindingResolutionError
+        from arvel.observability.config import ObservabilityConfig
+
+        try:
+            config = container.make(ObservabilityConfig)
+        except BindingResolutionError:
+            config = ObservabilityConfig()
+        if not config.request_middleware_enabled:
+            return
+        app.add_middleware(
+            cls,
+            service=config.service_name,
+            log_requests=not config.log_uvicorn_access,
+        )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":

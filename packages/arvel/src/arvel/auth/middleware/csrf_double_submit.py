@@ -15,12 +15,20 @@ cookie or don't need CSRF protection.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from arvel.auth.config import AuthConfig
+from arvel.contracts.middleware import GlobalMiddleware
 from arvel.http.exceptions import CsrfMismatchException
 from arvel.support.secure_compare import constant_time_equals
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+    from arvel.container import Container
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 _DEFAULT_CSRF_COOKIE = "_csrf"
@@ -40,7 +48,7 @@ _DEFAULT_EXEMPT: tuple[str, ...] = (
 )
 
 
-class CsrfDoubleSubmitMiddleware:
+class CsrfDoubleSubmitMiddleware(GlobalMiddleware):
     """ASGI-native double-submit CSRF middleware for the auth cookie flow.
 
     Add to the Starlette app stack, not as a route-level middleware, so it
@@ -60,6 +68,34 @@ class CsrfDoubleSubmitMiddleware:
         self._csrf_header = csrf_header
         self._exempt: tuple[str, ...] = (
             tuple(exempt_paths) if exempt_paths is not None else _DEFAULT_EXEMPT
+        )
+
+    @classmethod
+    def boot(cls, app: FastAPI, container: Container) -> None:
+        """Mount for the cookie auth flow when auth is registered.
+
+        Exempt paths and the header/cookie names track the auth config.
+        Bearer requests are exempt inside the middleware, so this is safe for
+        token-only APIs.
+        """
+        if not container.bound(AuthConfig):
+            return
+        config = container.make(AuthConfig)
+        if not config.routes.enabled or not config.refresh.csrf_protection:
+            return
+        prefix = config.routes.prefix.rstrip("/")
+        exempt = (
+            f"{prefix}/login",
+            f"{prefix}/register",
+            f"{prefix}/forgot-password",
+            f"{prefix}/reset-password",
+            f"{prefix}/verify/",
+        )
+        app.add_middleware(
+            cls,
+            csrf_cookie=config.refresh.csrf_cookie_name,
+            csrf_header=config.refresh.csrf_header,
+            exempt_paths=exempt,
         )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

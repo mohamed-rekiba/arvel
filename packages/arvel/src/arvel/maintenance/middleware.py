@@ -9,20 +9,24 @@ from urllib.parse import parse_qs
 
 from starlette.responses import HTMLResponse, PlainTextResponse, Response
 
+from arvel.container.errors import BindingResolutionError
+from arvel.contracts.middleware import GlobalMiddleware
 from arvel.logging.facade import Log
+from arvel.maintenance.manager import MaintenanceModeManager
 from arvel.support.secure_compare import constant_time_equals
 
 if TYPE_CHECKING:
+    from fastapi import FastAPI
     from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-    from arvel.maintenance.manager import MaintenanceModeManager
+    from arvel.container import Container
 
 
 _BYPASS_COOKIE = "arvel_bypass"
 _CACHE_TTL_SECONDS = 1.0
 
 
-class MaintenanceModeMiddleware:
+class MaintenanceModeMiddleware(GlobalMiddleware):
     """Return 503 for HTTP requests when the maintenance marker is present.
 
     The marker file is read at most once per second per worker (TTL cache) to
@@ -46,6 +50,15 @@ class MaintenanceModeMiddleware:
         self._cached_state: (
             tuple[float, bool, str | None, int | None, int | None, str | None] | None
         ) = None
+
+    @classmethod
+    def boot(cls, app: FastAPI, container: Container) -> None:
+        """Mount just inside TrustProxies when a maintenance manager is bound."""
+        try:
+            manager = container.make(MaintenanceModeManager)
+        except BindingResolutionError:
+            return
+        app.add_middleware(cls, manager=manager)
 
     def _read_state(
         self,
