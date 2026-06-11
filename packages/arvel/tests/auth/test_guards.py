@@ -61,7 +61,10 @@ class TestRequireAuth:
     async def test_returns_user_for_valid_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
         user = SimpleNamespace(id=7)
         _bind_service(monkeypatch, _FakeService(user=user))
-        assert await require_auth(_request(authorization="Bearer t")) is user
+        # Annotate object: require_auth returns the Authenticatable contract; this
+        # asserts it hands back the exact instance me() resolved.
+        result: object = await require_auth(_request(authorization="Bearer t"))
+        assert result is user
 
     async def test_invalid_credentials_becomes_unauthenticated(
         self, monkeypatch: pytest.MonkeyPatch

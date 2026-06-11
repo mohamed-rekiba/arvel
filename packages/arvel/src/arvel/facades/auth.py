@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 if TYPE_CHECKING:
     from arvel.auth.guard import Guard
     from arvel.auth.manager import AuthManager
+    from arvel.auth.mixins import Authenticatable
 
 
 class Auth:
@@ -30,8 +31,10 @@ class Auth:
         return cls._mgr().guard(name)
 
     @classmethod
-    async def user(cls, request: Any) -> Any | None:
-        return await cls._mgr().user(request)
+    async def user(cls, request: Any) -> Authenticatable | None:
+        # The guard resolves the app's configured user model (Authenticatable by
+        # contract); its concrete type is dynamic, so narrow at this boundary.
+        return cast("Authenticatable | None", await cls._mgr().user(request))
 
     @classmethod
     async def check(cls, request: Any) -> bool:

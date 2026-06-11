@@ -42,12 +42,13 @@ async def test_auth_facade_user_delegates_to_default_guard() -> None:
     from arvel.auth.manager import AuthManager
     from arvel.facades.auth import Auth
 
-    guard = _FakeGuard(user={"id": "u1"})
+    sentinel = object()
+    guard = _FakeGuard(user=sentinel)
     manager = AuthManager(guards={"web": guard}, default="web")
     Auth.set_manager(manager)
 
     result = await Auth.user(_FakeRequest())
-    assert result == {"id": "u1"}
+    assert result is sentinel
 
 
 def test_auth_facade_raises_when_unbound() -> None:
