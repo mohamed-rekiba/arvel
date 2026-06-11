@@ -23,6 +23,8 @@ Driver from `SessionConfig` (`SESSION_*`, default `cookie`):
 | `database` | `DatabaseSessionStore` | `SESSION_DATABASE_URL` (persistent) |
 | `file` | `FileSessionStore` | `SESSION_FILES_PATH` |
 
+`SessionConfig.driver` is a `SessionDriver` `StrEnum` (parity with `CacheDriver`), so an unknown `SESSION_DRIVER` fails at config validation rather than deep inside `SessionManager.store()`.
+
 ## Cookie store always encrypts
 
 `CookieStore` uses an AES-256-GCM + HMAC-SHA256 envelope, with enc/mac keys derived from `app_key` (`SESSION_SECRET_KEY`) via HKDF.
@@ -34,12 +36,15 @@ Driver from `SessionConfig` (`SESSION_*`, default `cookie`):
 `StartSession` parses the cookie, reads the store, attaches `SessionData` to `scope["state"]["session"]`, and writes back on the final response chunk. The `Set-Cookie` header is built from the middleware's config:
 
 ```python
-StartSession(app, store, lifetime=7200, secure=False, same_site="lax")
+from arvel.config.session_config import SameSite
+from arvel.session.middleware import SessionCookie, StartSession
+
+StartSession(app, store, SessionCookie(lifetime=7200, secure=False, same_site=SameSite.LAX))
 # -> arvel_session=...; Max-Age=7200; Path=/; HttpOnly; SameSite=Lax
-# secure=True appends "; Secure"; same_site="none" forces Secure on.
+# secure=True appends "; Secure"; same_site=SameSite.NONE forces Secure on.
 ```
 
-The cookie is always `HttpOnly`. Pass `secure` and `same_site` (sourced from `SESSION_SECURE`/`SESSION_SAME_SITE`) when registering the middleware to control the remaining flags. `same_site` accepts `lax`/`strict`/`none` (case-insensitive); anything else falls back to `Lax`, and `none` forces `Secure` on since browsers reject `SameSite=None` without it.
+The cookie knobs are bundled in a `SessionCookie` options object (sourced from `SESSION_*`). The cookie is always `HttpOnly`. `SameSite` is a `StrEnum` (`LAX`/`STRICT`/`NONE`); `SessionConfig.same_site` coerces the `SESSION_SAME_SITE` string case-insensitively, falling back to `LAX` for anything unrecognized, and `NONE` forces `Secure` on since browsers reject `SameSite=None` without it.
 
 ## Provider
 
