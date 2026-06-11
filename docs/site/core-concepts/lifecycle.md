@@ -102,7 +102,7 @@ Once built and booted, the application becomes an ASGI app via `into_asgi()`:
 asgi = app.into_asgi()
 ```
 
-`into_asgi()` returns a FastAPI application with the [exception handler](../the-basics/error-handling.md) registered, your [routes](../the-basics/routing.md) mounted, a health route added, and the middleware stack installed. The request scope middleware is always present; observability, context, deferred-task, and maintenance middleware are added when enabled.
+`into_asgi()` returns a FastAPI application with the [exception handler](../the-basics/error-handling.md) registered, your [routes](../the-basics/routing.md) mounted, a health route added, and the [global middleware stack](../the-basics/middleware.md#global-middleware-stack) installed. The stack comes from your `bootstrap/middleware.py` (or the framework default when you don't declare one). Each entry self-gates on config, so observability, context, deferred-task, maintenance, and the rest mount only when they apply. `ArvelScopeMiddleware` is always pinned innermost so the per-request DI scope wraps your handlers.
 
 <a name="the-application-builder"></a>
 ## The Application Builder
@@ -115,6 +115,7 @@ asgi = app.into_asgi()
 | Method | Purpose |
 |---|---|
 | `with_providers(list \| Path)` | Your [service providers](service-providers.md), as a class list or a path to a module that exposes a `providers` list. |
+| `with_middleware(list \| Path)` | The [global ASGI middleware stack](../the-basics/middleware.md#global-middleware-stack), as a class list or a path to a module that exposes a `middleware` list. Falls back to the framework default when omitted. |
 | `with_environment(name)` | Force the environment (`"production"`, `"testing"`, …). |
 | `with_config_dir(path)` | A directory of `config/*.py` modules, enabling dotted-key [`config()`](configuration.md) lookups. |
 | `with_config_files([...])` | Register typed [`ArvelSettings`](configuration.md) classes explicitly. |
@@ -122,7 +123,7 @@ asgi = app.into_asgi()
 | `create()` | Build and return the `Application`. |
 
 > [!NOTE]
-> There is no `with_settings` or `with_middleware` on the builder. Settings come from `with_config_dir` / `with_config_files`, and middleware is attached to [routes and groups](../the-basics/middleware.md) or added to the ASGI app.
+> There is no `with_settings` on the builder — settings come from `with_config_dir` / `with_config_files`. *Global* middleware is declared via `with_middleware`; *route* middleware is attached to [routes and groups](../the-basics/middleware.md).
 
 <a name="what-create-does"></a>
 ### What create() Does

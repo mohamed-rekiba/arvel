@@ -131,6 +131,9 @@ providers: list[type[ServiceProvider]] = [
 
 Your providers run after the framework's baseline providers, so framework services are already bound by the time your `register()` runs.
 
+> [!NOTE]
+> Global ASGI middleware has its own parallel file, `bootstrap/middleware.py`, which exposes a `middleware` list the same shape as `providers`. See [The Global Middleware Stack](../the-basics/middleware.md#global-middleware-stack).
+
 <a name="contributing-cli-commands"></a>
 ## Contributing CLI Commands
 
