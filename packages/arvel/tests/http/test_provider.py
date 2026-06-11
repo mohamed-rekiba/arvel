@@ -61,7 +61,7 @@ async def test_http_service_provider_binds_default_ratelimit_store(tmp_path: Pat
         .create()
     )
     await app.boot()
-    store = app.container.make(RateLimiterStore)  # type: ignore[type-abstract]
+    store = app.container.make(RateLimiterStore)
     assert isinstance(store, InMemoryStore)
 
 

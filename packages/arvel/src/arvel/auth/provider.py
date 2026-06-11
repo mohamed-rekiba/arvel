@@ -14,6 +14,7 @@ from arvel.auth.guards.jwt import JwtGuard
 from arvel.auth.guards.session import SessionGuard
 from arvel.auth.guards.token import TokenGuard
 from arvel.auth.manager import AuthManager
+from arvel.auth.repositories import ArventTokenRepository, MorphUserRepository
 from arvel.auth.providers.arvent import ArventUserProvider
 from arvel.console._subsystem import CliSubsystem
 from arvel.providers.service_provider import ServiceProvider
@@ -389,9 +390,10 @@ class AuthServiceProvider(ServiceProvider):
                 jwt=config.jwt,
             )
         if driver == "token":
-            token_repo = self.app.make("auth.token_repository")
-            user_repo = self.app.make("auth.user_repository")
-            return TokenGuard(token_repository=token_repo, user_repository=user_repo)
+            return TokenGuard(
+                token_repository=ArventTokenRepository(),
+                user_repository=MorphUserRepository(),
+            )
         msg = f"Unknown auth guard driver: '{driver}'."
         raise AuthConfigError(msg)
 

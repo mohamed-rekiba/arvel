@@ -93,6 +93,15 @@ You may bind an existing object instance into the container with `instance`. The
 container.instance(Clock, system_clock)
 ```
 
+<a name="binding-if-not-bound"></a>
+### Binding Only If Unbound
+
+`bind_if`, `singleton_if`, and `scoped_if` register a binding only when nothing is already bound for that type. Use them to provide a default a downstream provider can override:
+
+```python
+container.singleton_if(CacheStore, ArrayCacheStore)   # no-op if already bound
+```
+
 <a name="binding-a-factory"></a>
 ### Binding a Factory
 
@@ -137,8 +146,10 @@ result = await container.acall(ReportBuilder, "build_async")
 
 Check container state with `bound(abstract)` and `resolved(abstract)`.
 
+Because `make`/`amake` accept the same key type as `bind`, you can resolve a bound interface or `Protocol` directly — `make(Mailer)` is type-checked as returning a `Mailer` with no `# type: ignore` at the call site.
+
 > [!NOTE]
-> `Application.make(...)` delegates to the container's `make`. Despite its type hint suggesting a string key, pass a **type** — for example, `app.make(Router)`.
+> `Application.make(...)` forwards to the root container's `make` and shares its signature: `app.make(Router)` is typed as returning a `Router`.
 
 <a name="automatic-injection"></a>
 ### Automatic Injection

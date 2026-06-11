@@ -24,6 +24,10 @@ from arvel.container.scopes import Scope
 
 T = TypeVar("T")
 
+# Distinguishes "no contextual binding" from a contextual value that is itself
+# falsy/None, so the parent-scope walk in _find_contextual can't be fooled.
+_MISSING: Any = object()
+
 
 def _get_method_hints(fn: Any) -> dict[str, Any]:
     """Extract type hints from a method.
@@ -101,7 +105,6 @@ class Container:
 
         # Bindings: in scopes, fall through to parent bindings.
         self._bindings: dict[AbstractKey, _Binding] = {}
-        self._aliases: dict[str, type] = {}
         self._contextual: dict[tuple[type, type], Any] = {}
         self._tags: dict[str, list[type]] = {}
         self._extensions: dict[type, list[Decorator]] = {}
@@ -146,11 +149,33 @@ class Container:
     ) -> None:
         self.bind(abstract, concrete, scope=Scope.SCOPED)
 
+    def bind_if(
+        self,
+        abstract: type[T] | Callable[..., T],
+        concrete: type[T] | Callable[..., T] | Callable[..., Awaitable[T]] | None = None,
+        *,
+        scope: Scope = Scope.TRANSIENT,
+    ) -> None:
+        # Laravel's bindIf — register only when nothing is bound yet.
+        if not self.bound(abstract):
+            self.bind(abstract, concrete, scope=scope)
+
+    def singleton_if(
+        self,
+        abstract: type[T] | Callable[..., T],
+        concrete: type[T] | Callable[..., T] | Callable[..., Awaitable[T]] | None = None,
+    ) -> None:
+        self.bind_if(abstract, concrete, scope=Scope.SINGLETON)
+
+    def scoped_if(
+        self,
+        abstract: type[T] | Callable[..., T],
+        concrete: type[T] | Callable[..., T] | Callable[..., Awaitable[T]] | None = None,
+    ) -> None:
+        self.bind_if(abstract, concrete, scope=Scope.SCOPED)
+
     def instance(self, abstract: type[T], obj: T) -> None:
         self._instances[abstract] = obj
-
-    def alias(self, abstract: type, alias_name: str) -> None:
-        self._aliases[alias_name] = abstract
 
     # ───────────────────────── Advanced ──────────────────────────
 
@@ -171,18 +196,39 @@ class Container:
 
     def extend(self, abstract: type[T], decorator: Callable[[T, Container], T]) -> None:
         self._extensions.setdefault(abstract, []).append(decorator)
-        # If the singleton is already cached, invalidate so the decorator runs on next make().
+        # Drop any cached instance so the decorator runs on next make() — both the
+        # shared singleton cache and this container's per-scope cache.
         self._singletons.pop(abstract, None)
+        self._scope_cache.pop(abstract, None)
+
+    def _find_contextual(self, requestor: type, abstract: type) -> Any:
+        # Walk the scope chain so contextual rules registered on a parent still
+        # apply when resolving through a child scope (mirrors _find_binding).
+        key = (requestor, abstract)
+        container: Container | None = self
+        while container is not None:
+            if key in container._contextual:
+                return container._contextual[key]
+            container = container._parent
+        return _MISSING
 
     # ───────────────────────── Resolution ──────────────────────────
 
-    def make(self, abstract: type[T], **overrides: object) -> T:
+    def make(self, abstract: type[T] | Callable[..., T], **overrides: object) -> T:
+        # Mirror bind()'s key type: accepting Callable[..., T] lets callers resolve
+        # an interface/Protocol they bound without a `# type: ignore[type-abstract]`.
         return self._resolve(
-            abstract, overrides=overrides, path=(), requestor=None, allow_async=False
+            cast("type[T]", abstract),
+            overrides=overrides,
+            path=(),
+            requestor=None,
+            allow_async=False,
         )
 
-    async def amake(self, abstract: type[T], **overrides: object) -> T:
-        return await self._aresolve(abstract, overrides=overrides, path=(), requestor=None)
+    async def amake(self, abstract: type[T] | Callable[..., T], **overrides: object) -> T:
+        return await self._aresolve(
+            cast("type[T]", abstract), overrides=overrides, path=(), requestor=None
+        )
 
     def call(
         self,
@@ -322,13 +368,14 @@ class Container:
         if abstract in self._instances:
             return cast("T", self._instances[abstract])
 
-        # Contextual binding when there's a requestor.
-        if requestor is not None and (requestor, abstract) in self._contextual:
-            contextual = self._contextual[(requestor, abstract)]
-            return cast(
-                "T",
-                self._invoke(contextual, abstract, path, allow_async=allow_async),
-            )
+        # Contextual binding when there's a requestor (walks parent scopes).
+        if requestor is not None:
+            contextual = self._find_contextual(requestor, abstract)
+            if contextual is not _MISSING:
+                return cast(
+                    "T",
+                    self._invoke(contextual, abstract, path, allow_async=allow_async),
+                )
 
         binding = self._find_binding(abstract)
 
@@ -509,18 +556,19 @@ class Container:
             return cast("T", self._instances[abstract])
 
         instance: Any
-        if requestor is not None and (requestor, abstract) in self._contextual:
-            contextual = self._contextual[(requestor, abstract)]
-            if callable(contextual) and is_async_callable(contextual):
-                async_call: Any = contextual
-                instance = await async_call()
-                return cast("T", self._apply_extensions(abstract, instance))
-            if is_concrete_class(contextual):
-                instance = await self._ainstantiate(
-                    cast("type[Any]", contextual), {}, abstract, path=path
-                )
-                return cast("T", self._apply_extensions(abstract, instance))
-            return cast("T", self._invoke(contextual, abstract, path, allow_async=True))
+        if requestor is not None:
+            contextual = self._find_contextual(requestor, abstract)
+            if contextual is not _MISSING:
+                if callable(contextual) and is_async_callable(contextual):
+                    async_call: Any = contextual
+                    instance = await async_call()
+                    return cast("T", self._apply_extensions(abstract, instance))
+                if is_concrete_class(contextual):
+                    instance = await self._ainstantiate(
+                        cast("type[Any]", contextual), {}, abstract, path=path
+                    )
+                    return cast("T", self._apply_extensions(abstract, instance))
+                return cast("T", self._invoke(contextual, abstract, path, allow_async=True))
 
         binding = self._find_binding(abstract)
         if binding is None:

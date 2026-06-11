@@ -1,4 +1,4 @@
-"""Container basic API — bind, singleton, scoped, instance, alias, introspection."""
+"""Container basic API — bind, singleton, scoped, instance, introspection."""
 
 from __future__ import annotations
 
@@ -101,3 +101,40 @@ def test_make_unbound_abstract_raises_binding_error() -> None:
     c = Container()
     with pytest.raises(BindingResolutionError):
         c.make(IFoo)
+
+
+def test_bind_if_only_binds_when_unbound() -> None:
+    from arvel.container import Container
+
+    class FooSub(Foo):
+        pass
+
+    c = Container()
+    c.bind(Foo, FooSub)
+    c.bind_if(Foo, Foo)  # no-op — already bound
+    assert isinstance(c.make(Foo), FooSub)
+
+    c2 = Container()
+    c2.bind_if(Foo, Foo)  # binds — nothing there yet
+    assert isinstance(c2.make(Foo), Foo)
+
+
+def test_singleton_if_registers_shared_only_when_absent() -> None:
+    from arvel.container import Container
+
+    c = Container()
+    c.singleton_if(Foo)
+    first = c.make(Foo)
+    c.singleton_if(Foo)  # no-op
+    assert c.make(Foo) is first
+
+
+def test_scoped_if_registers_scoped_only_when_absent() -> None:
+    from arvel.container import Container
+
+    c = Container()
+    c.scoped_if(Foo)
+    with c.scope() as scoped:
+        a = scoped.make(Foo)
+        b = scoped.make(Foo)
+        assert a is b

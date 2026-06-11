@@ -141,7 +141,7 @@ def test_abstract_class_is_rejected() -> None:
 
     c = Container()
     with pytest.raises(BindingResolutionError):
-        c.make(Iface)  # type: ignore[type-abstract]
+        c.make(Iface)
 
 
 def test_amake_falls_back_to_sync_resolve_when_unbound() -> None:
