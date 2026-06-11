@@ -78,22 +78,30 @@ SESSION_FILES_PATH=storage/framework/sessions
 <a name="enabling-sessions"></a>
 ### Enabling Sessions
 
-Sessions are **opt-in**. Register `SessionServiceProvider` (it binds the `Session` facade), then add `StartSession` to the ASGI middleware stack. `StartSession` is pure ASGI middleware — it loads the session at the start of the request, attaches it to `request.state.session`, and writes it back when the response finishes. It takes a `store` (from `Session.manager().store()`) plus `lifetime` and `cookie_name`:
+Sessions are **opt-in**. Register `SessionServiceProvider` (it binds the `Session` facade), then add `StartSession` to the ASGI middleware stack. `StartSession` is pure ASGI middleware — it loads the session at the start of the request, attaches it to `request.state.session`, and writes it back when the response finishes. It takes a `store` (from `Session.manager().store()`) plus a `SessionCookie` describing the Set-Cookie flags:
 
 ```python
 from starlette.middleware import Middleware
+from arvel.config import Config, SessionConfig
 from arvel.facades.session import Session
-from arvel.session.middleware import StartSession
+from arvel.session.middleware import SessionCookie, StartSession
 
+cfg = Config.of(SessionConfig)
 store = Session.manager().store()
-middleware = [Middleware(StartSession, store=store, lifetime=7200)]
+cookie = SessionCookie(
+    name=cfg.cookie_name,
+    lifetime=cfg.lifetime,
+    secure=cfg.secure,
+    same_site=cfg.same_site,
+)
+middleware = [Middleware(StartSession, store=store, options=cookie)]
 ```
 
 > [!NOTE]
 > `StartSession` is not a route-level middleware alias — there's no `"session"` group registered by the provider. Wire it as ASGI middleware on the app.
 
 > [!NOTE]
-> The session id cookie is set with `HttpOnly`, `Path=/`, and `SameSite=Lax`. It is **not** marked `Secure`, so serve session-bearing routes over HTTPS in production and terminate TLS in front of the app.
+> The session id cookie is always `HttpOnly` with `Path=/`. Pass `secure` and `same_site` via `SessionCookie` (from `SESSION_SECURE`/`SESSION_SAME_SITE`) to control the rest. `same_site="none"` forces `Secure` on, since browsers reject `SameSite=None` cookies without it.
 
 <a name="interacting-with-the-session"></a>
 ## Interacting With the Session

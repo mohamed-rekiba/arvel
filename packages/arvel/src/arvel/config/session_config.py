@@ -2,10 +2,43 @@
 
 from __future__ import annotations
 
-from pydantic import SecretStr
+from enum import StrEnum
+
+from pydantic import SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
 
 from arvel.config.settings import ArvelSettings
+
+
+class SessionDriver(StrEnum):
+    ARRAY = "array"
+    COOKIE = "cookie"
+    REDIS = "redis"
+    DATABASE = "database"
+    FILE = "file"
+
+
+class SameSite(StrEnum):
+    """Cookie ``SameSite`` policy. Values are the lowercase config form."""
+
+    LAX = "lax"
+    STRICT = "strict"
+    NONE = "none"
+
+    @property
+    def cookie_attr(self) -> str:
+        """The canonical Set-Cookie attribute casing (``Lax``/``Strict``/``None``)."""
+        return self.value.capitalize()
+
+    @classmethod
+    def coerce(cls, value: SameSite | str) -> SameSite:
+        """Parse a config string case-insensitively; unknown values fall back to Lax."""
+        if isinstance(value, cls):
+            return value
+        try:
+            return cls(value.strip().lower())
+        except ValueError:
+            return cls.LAX
 
 
 class SessionConfig(ArvelSettings):
@@ -30,12 +63,12 @@ class SessionConfig(ArvelSettings):
     model_config = SettingsConfigDict(env_prefix="SESSION_")
     __config_path__ = "session"
 
-    driver: str = "cookie"
+    driver: SessionDriver = SessionDriver.COOKIE
     lifetime: int = 7200
     encrypt: bool = True
     cookie_name: str = "arvel_session"
     secure: bool = False
-    same_site: str = "lax"
+    same_site: SameSite = SameSite.LAX
     files_path: str = "storage/framework/sessions"
     gc_probability: int = 2
     secret_key: SecretStr = SecretStr("")
@@ -43,5 +76,16 @@ class SessionConfig(ArvelSettings):
     redis_prefix: str = "arvel:"
     database_url: str = "sqlite+aiosqlite:///sessions.db"
 
+    @field_validator("driver", mode="before")
+    @classmethod
+    def _lower_driver(cls, value: object) -> object:
+        # Accept SESSION_DRIVER=Cookie / COOKIE; enum values are lowercase.
+        return value.strip().lower() if isinstance(value, str) else value
 
-__all__ = ["SessionConfig"]
+    @field_validator("same_site", mode="before")
+    @classmethod
+    def _coerce_same_site(cls, value: object) -> SameSite:
+        return SameSite.coerce(value) if isinstance(value, (str, SameSite)) else SameSite.LAX
+
+
+__all__ = ["SameSite", "SessionConfig", "SessionDriver"]

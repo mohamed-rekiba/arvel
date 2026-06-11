@@ -20,7 +20,6 @@ These are behaviors that read as gaps or inconsistencies in the source. Each is 
 
 | Topic | Question | Page |
 |---|---|---|
-| Session cookie flags | `StartSession` hardcodes `HttpOnly`/`SameSite=Lax`; `SESSION_SECURE`/`SESSION_SAME_SITE`/`SESSION_ENCRYPT` are unused. Intended? | [session](../subsystems/session.md) |
 | Storage `app_key` | Provider doesn't pass `app_key`, so local `temporary_url()` raises. Wire `APP_KEY` in? | [storage](../subsystems/storage.md) |
 | Azure temporary URLs | `AzureDriver.temporary_url` raises `NotImplementedError`. | [storage](../subsystems/storage.md) |
 | Scheduler fields | `inMaintenanceMode()` / `outputTo()` stored but never read by the kernel. | [scheduling](../subsystems/scheduling.md) |
