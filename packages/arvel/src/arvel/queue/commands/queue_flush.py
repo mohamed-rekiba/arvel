@@ -8,12 +8,18 @@ import typer
 
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
+from arvel.console._subsystem import CliSubsystem
 from arvel.queue.failed_job_store import FailedJobStore
 
 
 class QueueFlushCommand(Command):
     name: ClassVar[str] = "queue:flush"
     help: ClassVar[str] = "Delete all failed queue jobs."
+    # Provider-attached (DI __init__), so not an entry point; keep in sync with
+    # PROVIDER_COMMAND_REQUIRES (drift-guarded).
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.QUEUE, CliSubsystem.USER_PROVIDERS}
+    )
 
     def __init__(self, store: FailedJobStore) -> None:
         self._store = store

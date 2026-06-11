@@ -19,6 +19,7 @@ import typer
 
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Option as _Option
 from arvel.queue.manager import QueueManager
 from arvel.queue.restart import QueueRestartSignal
@@ -28,6 +29,11 @@ from arvel.queue.worker import Worker
 class QueueWorkCommand(Command):
     name: ClassVar[str] = "queue:work"
     help: ClassVar[str] = "Start the queue worker."
+    # CACHE backs the restart signal; without it queue:restart can't reach this
+    # worker. Keep in sync with PROVIDER_COMMAND_REQUIRES (drift-guarded).
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.QUEUE, CliSubsystem.CACHE, CliSubsystem.USER_PROVIDERS}
+    )
 
     def __init__(
         self,
