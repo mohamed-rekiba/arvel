@@ -24,7 +24,6 @@ These are behaviors that read as gaps or inconsistencies in the source. Each is 
 | Image alter migration | `001_alter_media_model_id.py` not in `publishes()` — upgrade path easy to miss. | [image](../packages/image.md) |
 | Encrypter vs `EncryptedType` | Two wire formats (v2 app-level vs v1 column cast). Confirm both are intended. | [encryption](../subsystems/encryption.md) |
 | Kit + permission | The kit uses permission models without `PermissionServiceProvider`, so the Gate bridge doesn't run. | [kit](../kits/ecommerce-kit.md) |
-| Broadcasting bridge | No built-in bridge from `redis-pubsub` publishing to the Reverb WebSocket server. | [broadcasting](../subsystems/broadcasting.md) |
 
 ## The old `docs/` tree
 

@@ -1,67 +1,55 @@
-"""RedisBus — cross-process fan-out for Reverb."""
+"""RedisBus — cross-process fan-out for Reverb.
+
+Per ADR-013 §4: ``RedisBroadcaster`` PUBLISHes one message per channel under
+``arvel.broadcasting.<channel>``; every Reverb process PSUBSCRIBEs to
+``arvel.broadcasting.*`` and forwards each matching message to its locally
+connected sockets. This bus is the subscribe half — the publish half is
+``arvel.broadcasting.drivers.redis.RedisBroadcaster``.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import json
-import secrets
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, cast
 
 from arvel.broadcasting.config import ReverbConfig
 
+# Must match RedisBroadcaster._CHANNEL_PREFIX — the two are a publish/subscribe pair.
+_CHANNEL_PREFIX = "arvel.broadcasting."
+_PATTERN = f"{_CHANNEL_PREFIX}*"
+
+#: (channel, event, data, except_socket_id) — the originating socket is excluded
+#: from fan-out so the publisher's own client doesn't get an echo.
+OnMessage = Callable[[str, str, dict[str, object], "str | None"], Awaitable[None]]
+
 
 class _AsyncPubSub(Protocol):
-    async def subscribe(self, *channels: str) -> None: ...
+    async def psubscribe(self, *patterns: str) -> None: ...
 
     async def get_message(
         self, *, ignore_subscribe_messages: bool = True, timeout: float | None = None
     ) -> Any: ...
 
 
-class _AsyncRedis(Protocol):
+class AsyncRedis(Protocol):
+    """Subset of ``redis.asyncio.Redis`` the bus needs — just ``pubsub()``."""
+
     def pubsub(self) -> _AsyncPubSub: ...
-
-    async def publish(self, channel: str, message: str) -> int: ...
-
-
-_PATTERN = "arvel.reverb.broadcast"
 
 
 class RedisBus:
-    """Pub/Sub bridge so multiple Reverb processes share the same fan-out."""
+    """Subscribe side of the cross-process fan-out: PSUBSCRIBE ``arvel.broadcasting.*``."""
 
-    def __init__(self, *, redis: _AsyncRedis, config: ReverbConfig) -> None:
-        self._redis: _AsyncRedis = redis
+    def __init__(self, *, redis: AsyncRedis, config: ReverbConfig) -> None:
+        self._redis = redis
         self._config: ReverbConfig = config
-        self._origin: str = secrets.token_hex(8)
         self._tasks: list[asyncio.Task[None]] = []
 
-    async def publish(
-        self,
-        channel: str,
-        event: str,
-        data: dict[str, object],
-        *,
-        except_socket_id: str | None = None,
-    ) -> None:
-        body = json.dumps(
-            {
-                "origin": self._origin,
-                "channel": channel,
-                "event": event,
-                "data": data,
-                "except_socket_id": except_socket_id,
-            }
-        )
-        await self._redis.publish(_PATTERN, body)
-
-    async def subscribe(
-        self,
-        on_message: Callable[[str, str, dict[str, object]], Awaitable[None]],
-    ) -> None:
+    async def subscribe(self, on_message: OnMessage) -> None:
         pubsub = self._redis.pubsub()
-        await pubsub.subscribe(_PATTERN)
+        await pubsub.psubscribe(_PATTERN)
 
         async def _pump() -> None:
             while True:
@@ -69,55 +57,67 @@ class RedisBus:
                 if msg is None:
                     await asyncio.sleep(0)
                     continue
-                envelope = _parse_envelope(msg)
-                if envelope is None or envelope.get("origin") == self._origin:
+                parsed = _parse_message(msg)
+                if parsed is None:
                     continue
-                args = _extract_callback_args(envelope)
-                if args is None:
-                    continue
-                channel_v, event_v, payload_dict = args
-                await on_message(channel_v, event_v, payload_dict)
+                channel, event, data, except_socket_id = parsed
+                await on_message(channel, event, data, except_socket_id)
 
         self._tasks.append(asyncio.create_task(_pump()))
 
 
-def _parse_envelope(msg: object) -> dict[str, object] | None:
-    """Decode a raw pubsub message into the envelope dict, or ``None`` on bad shape."""
+def _decode(value: object) -> str | None:
+    if isinstance(value, bytes | bytearray):
+        return bytes(value).decode()
+    if isinstance(value, str):
+        return value
+    return None
+
+
+def _decode_envelope(msg: object) -> tuple[str, dict[str, object]] | None:
+    """Pull (broadcast channel, JSON body) from a raw pmessage, or None on bad shape."""
     if not isinstance(msg, dict):
         return None
     msg_typed = cast("dict[Any, Any]", msg)  # type: ignore[redundant-cast]
-    raw_payload: object = msg_typed.get("data")
-    if isinstance(raw_payload, bytes | bytearray):
-        payload_str = bytes(raw_payload).decode()
-    elif isinstance(raw_payload, str):
-        payload_str = raw_payload
-    else:
+
+    redis_channel = _decode(msg_typed.get("channel"))
+    if redis_channel is None or not redis_channel.startswith(_CHANNEL_PREFIX):
+        return None
+
+    payload_str = _decode(msg_typed.get("data"))
+    if payload_str is None:
         return None
     try:
         body_raw: object = json.loads(payload_str)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     if not isinstance(body_raw, dict):
         return None
-    body_typed = cast("dict[Any, Any]", body_raw)  # type: ignore[redundant-cast]
-    return {str(k): v for k, v in body_typed.items()}
+    body = {str(k): v for k, v in cast("dict[Any, Any]", body_raw).items()}  # type: ignore[redundant-cast]
+    return redis_channel[len(_CHANNEL_PREFIX) :], body
 
 
-def _extract_callback_args(
-    body: dict[str, object],
-) -> tuple[str, str, dict[str, object]] | None:
-    """Pull (channel, event, payload) from a validated envelope, or ``None``."""
-    channel_v = body.get("channel")
-    event_v = body.get("event")
-    data_v = body.get("data", {})
-    if not (isinstance(channel_v, str) and isinstance(event_v, str)):
+def _parse_message(
+    msg: object,
+) -> tuple[str, str, dict[str, object], str | None] | None:
+    """Decode a pmessage into (channel, event, data, except_socket_id), or None on bad shape."""
+    envelope = _decode_envelope(msg)
+    if envelope is None:
         return None
-    if isinstance(data_v, dict):
-        data_typed = cast("dict[Any, Any]", data_v)  # type: ignore[redundant-cast]
-        payload_dict: dict[str, object] = {str(k): v for k, v in data_typed.items()}
-    else:
-        payload_dict = {}
-    return channel_v, event_v, payload_dict
+    channel, body = envelope
+
+    event = body.get("event")
+    if not isinstance(event, str):
+        return None
+    data_v = body.get("data", {})
+    data: dict[str, object] = (
+        {str(k): v for k, v in cast("dict[Any, Any]", data_v).items()}  # type: ignore[redundant-cast]
+        if isinstance(data_v, dict)
+        else {}
+    )
+    except_v = body.get("except_socket_id")
+    except_socket_id = except_v if isinstance(except_v, str) else None
+    return channel, event, data, except_socket_id
 
 
-__all__ = ["RedisBus"]
+__all__ = ["AsyncRedis", "OnMessage", "RedisBus"]

@@ -173,8 +173,13 @@ class ReverbServer:
         if self._redis_bus is None:
             return
 
-        async def _bridge(channel: str, event: str, payload: dict[str, object]) -> None:
-            await self.channels.publish(channel, event, payload)
+        async def _bridge(
+            channel: str,
+            event: str,
+            payload: dict[str, object],
+            except_socket_id: str | None,
+        ) -> None:
+            await self.channels.publish(channel, event, payload, except_socket_id=except_socket_id)
 
         await self._redis_bus.subscribe(_bridge)
 

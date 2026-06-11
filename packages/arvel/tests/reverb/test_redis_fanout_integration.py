@@ -1,9 +1,9 @@
-"""Real-Redis integration test for ``RedisBus``
-The existing ``test_redis_fanout.py`` uses ``fakeredis`` to assert in-process
-behaviour. This file boots the real Redis container and verifies the
-cross-process fan-out actually traverses Redis pub/sub: two ``RedisBus``
-instances on the same channel, one publishes, the other's subscriber
-callback fires with the original envelope.
+"""Real-Redis integration test for the broadcast → Reverb fan-out.
+
+``test_redis_fanout.py`` uses ``fakeredis`` for in-process behaviour. This
+file boots the real Redis container and verifies the ADR-013 §4 contract end
+to end: a ``RedisBroadcaster`` PUBLISHes under ``arvel.broadcasting.<channel>``
+and a ``RedisBus`` PSUBSCRIBEd to ``arvel.broadcasting.*`` observes it.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ import pytest_asyncio
 redis_asyncio = pytest.importorskip("redis.asyncio", reason="arvel[redis] not installed")
 
 from arvel.broadcasting.config import ReverbConfig  # noqa: E402
+from arvel.broadcasting.drivers.redis import RedisBroadcaster  # noqa: E402
 from arvel.reverb.redis_bus import RedisBus  # noqa: E402
 
 
@@ -37,11 +38,10 @@ def _config() -> ReverbConfig:
 @pytest.mark.integration
 class TestReverbRedisBusFanout:
     @pytest_asyncio.fixture
-    async def publisher(self, redis_endpoint: RedisEndpoint) -> AsyncIterator[RedisBus]:
+    async def publisher(self, redis_endpoint: RedisEndpoint) -> AsyncIterator[RedisBroadcaster]:
         client: Any = redis_asyncio.Redis(host=redis_endpoint.host, port=redis_endpoint.port, db=0)
-        bus = RedisBus(redis=client, config=_config())
         try:
-            yield bus
+            yield RedisBroadcaster(redis=client)
         finally:
             await client.aclose()
 
@@ -54,45 +54,27 @@ class TestReverbRedisBusFanout:
         finally:
             await client.aclose()
 
-    async def test_publish_reaches_a_different_subscriber(
-        self, publisher: RedisBus, subscriber: RedisBus
+    async def test_broadcast_reaches_a_subscriber(
+        self, publisher: RedisBroadcaster, subscriber: RedisBus
     ) -> None:
-        received: list[tuple[str, str, dict[str, object]]] = []
+        received: list[tuple[str, str, dict[str, object], str | None]] = []
         done = asyncio.Event()
 
-        async def on_message(channel: str, event: str, data: dict[str, object]) -> None:
-            received.append((channel, event, data))
+        async def on_message(
+            channel: str, event: str, data: dict[str, object], except_socket_id: str | None
+        ) -> None:
+            received.append((channel, event, data, except_socket_id))
             done.set()
 
         await subscriber.subscribe(on_message)
-        # Give the SUBSCRIBE round-trip a moment to register before the publish
-        # lands; without this the message can hit Redis before the subscriber's
-        # pump task has actually subscribed.
+        # Let the PSUBSCRIBE round-trip register before the publish lands.
         await asyncio.sleep(0.2)
 
-        await publisher.publish("orders", "order.placed", {"id": 7})
+        await publisher.broadcast(["orders"], "order.placed", {"id": 7}, except_socket_id="9.9")
 
         try:
             await asyncio.wait_for(done.wait(), timeout=3.0)
         except TimeoutError:
             pytest.fail("expected the subscriber to observe the published event")
 
-        assert received == [("orders", "order.placed", {"id": 7})]
-
-    async def test_subscriber_filters_own_origin(self, publisher: RedisBus) -> None:
-        # Publishing on the same bus must not fan back to its own subscriber
-        # callback — the envelope carries an origin token that suppresses
-        # the self-loop.
-        received: list[tuple[str, str, dict[str, object]]] = []
-
-        async def on_message(channel: str, event: str, data: dict[str, object]) -> None:
-            received.append((channel, event, data))
-
-        await publisher.subscribe(on_message)
-        await asyncio.sleep(0.2)
-
-        await publisher.publish("orders", "order.placed", {"id": 11})
-
-        # Give pubsub a moment to deliver; if the self-loop fires we'll see it.
-        await asyncio.sleep(0.5)
-        assert received == []
+        assert received == [("orders", "order.placed", {"id": 7}, "9.9")]
