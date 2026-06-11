@@ -303,13 +303,13 @@ class TestSessionFacade:
             type.__setattr__(Session, "_manager", previous)
 
     def test_manager_returns_bound_manager(self) -> None:
-        from arvel.config.session_config import SessionConfig
+        from arvel.config.session_config import SessionConfig, SessionDriver
         from arvel.container import Container
         from arvel.facades.session import Session
         from arvel.session import SessionManager
 
         container = Container()
-        manager = SessionManager(SessionConfig(driver="file"))
+        manager = SessionManager(SessionConfig(driver=SessionDriver.FILE))
         container.instance(SessionManager, manager)
 
         previous = type.__getattribute__(Session, "_manager")
