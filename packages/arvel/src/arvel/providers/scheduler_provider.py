@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import shlex
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
@@ -63,10 +64,18 @@ class SchedulerServiceProvider(ServiceProvider):
             if c.bound(ConsoleApplication):
                 console_app = c.make(ConsoleApplication)
 
-                async def _run(name: str) -> None:
-                    code = console_app.run(name)
+                async def _run(command_string: str) -> None:
+                    # Laravel parity: command("emails:send --queue=default") carries
+                    # flags. Split into name + args and dispatch through Typer so the
+                    # command's real (often async) callback runs, not a stub handle().
+                    parts = shlex.split(command_string)
+                    if not parts:
+                        msg = "Scheduled command string is empty"
+                        raise RuntimeError(msg)
+                    name, args = parts[0], parts[1:]
+                    code = await console_app.adispatch(name, args)
                     if code != 0:
-                        msg = f"Scheduled command {name!r} exited with code {code}"
+                        msg = f"Scheduled command {command_string!r} exited with code {code}"
                         raise RuntimeError(msg)
 
                 run_command_cb = _run

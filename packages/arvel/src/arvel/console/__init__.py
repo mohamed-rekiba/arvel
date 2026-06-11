@@ -2,21 +2,36 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import io
 import logging
 from abc import abstractmethod
 from typing import TYPE_CHECKING, ClassVar
 
+import click
 import typer
+from typer.main import get_command
 
+from arvel.console._async import clear_pending_task, get_pending_task
 from arvel.console._async import schedule_async as schedule_async
 from arvel.console._subsystem import CliSubsystem
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from arvel.application import Application as FrameworkApplication
 
 _log = logging.getLogger("arvel.console")
+
+
+def _coerce_exit_code(code: int | str | None) -> int:
+    """Map a SystemExit code (int | str | None) to a process exit code."""
+    if code is None:
+        return 0
+    if isinstance(code, int):
+        return code
+    return 1
 
 
 class Context:
@@ -121,22 +136,23 @@ class Command:
     def handle(self, ctx: Context) -> int:
         """Execute the command. Return 0 for success, non-zero for failure."""
 
-    def call(self, name: str) -> int:
+    async def call(self, name: str, *args: str) -> int:
         """Invoke another registered command in-process and return its exit code.
 
-        In-process dispatch is name-only: it runs the target's ``handle(ctx)``.
-        Commands that take CLI flags own them through Typer at the real
-        entrypoint, not via this path. Requires a bound framework Application
-        (``self.app``). Use ``call_silently`` to suppress the invoked command's
-        stdout.
+        Dispatches through the target's real Typer callback, so ``args`` are
+        parsed as CLI flags and an async command's deferred coroutine is awaited
+        — same path the entrypoint uses. Requires a bound framework Application
+        (``self.app``). Await it from a coroutine (composite commands defer their
+        body via ``schedule_async``). Use ``call_silently`` to swallow the
+        invoked command's stdout.
         """
-        return self._invoke_via_console(name, silent=False)
+        return await self._invoke_via_console(name, args, silent=False)
 
-    def call_silently(self, name: str) -> int:
+    async def call_silently(self, name: str, *args: str) -> int:
         """Same as :meth:`call`, but stdout from the invoked command is discarded."""
-        return self._invoke_via_console(name, silent=True)
+        return await self._invoke_via_console(name, args, silent=True)
 
-    def _invoke_via_console(self, name: str, *, silent: bool) -> int:
+    async def _invoke_via_console(self, name: str, args: Sequence[str], *, silent: bool) -> int:
         if self.app is None:
             msg = (
                 f"Command.call({name!r}) requires a bound framework Application; "
@@ -145,9 +161,12 @@ class Command:
             raise RuntimeError(msg)
         console_app: Application = self.app.container.make(Application)
         if silent:
+            # Redirect spans the await: _run_click runs the callback synchronously
+            # and the deferred coroutine writes here too. Fine for sequential CLI
+            # dispatch; a sibling coroutine running concurrently would also be caught.
             with contextlib.redirect_stdout(io.StringIO()):
-                return console_app.run(name)
-        return console_app.run(name)
+                return await console_app.adispatch(name, args)
+        return await console_app.adispatch(name, args)
 
 
 class Application:
@@ -202,22 +221,69 @@ class Application:
         self._commands[cmd.name] = cmd
         cmd.register(self.typer_app)
 
-    def run(self, name: str) -> int:
-        """Invoke a registered command by name and return its exit code.
+    async def adispatch(self, name: str, args: Sequence[str] = ()) -> int:
+        """Run a registered command through Typer with ``args``; return its exit code.
 
-        Bypasses Typer's CLI parsing — this is the in-process programmatic
-        entry-point used by composite commands and the scheduler kernel's
-        ``run_command`` hook. It runs the target's ``handle(ctx)`` directly, so
-        dispatch is name-only; flag-bearing commands own their args through
-        Typer at the real entrypoint.
+        The single programmatic dispatch core — used by :meth:`run`, the
+        scheduler's ``run_command`` hook, and :meth:`Command.call`. It drives the
+        command's real ``register()``-installed Typer callback (so ``args`` parse
+        as flags) and then awaits the coroutine that callback deferred via
+        ``schedule_async`` — the same two-step the entrypoint runs after Typer
+        returns. That's why scheduling or calling an async command (``migrate``,
+        ``queue:*``) finally works: their real work lives in the deferred
+        coroutine, not in ``handle()``.
 
-        Raises ``KeyError`` when ``name`` does not match any registered
-        command.
+        Runs on the caller's event loop. Raises ``KeyError`` for an unknown name
+        (kept separate from Typer's "no such command" so callers can distinguish
+        a typo from a usage error).
         """
-        try:
-            command = self._commands[name]
-        except KeyError as exc:
+        if name not in self._commands:
             msg = f"Unknown command: {name!r}"
-            raise KeyError(msg) from exc
-        ctx = Context()
-        return command.handle(ctx)
+            raise KeyError(msg)
+        # Isolate this invocation's deferral slot from any caller (e.g. a
+        # composite command whose own coroutine is mid-flight).
+        clear_pending_task()
+        try:
+            code = self._invoke_click([name, *args])
+            coro = get_pending_task()
+            if coro is not None:
+                try:
+                    await coro
+                except typer.Exit as exc:
+                    code = exc.exit_code
+                except typer.Abort:
+                    code = 1
+        finally:
+            clear_pending_task()
+        return code
+
+    def _invoke_click(self, argv: list[str]) -> int:
+        """Invoke the Typer/Click command non-standalone and normalise the exit code.
+
+        ``standalone_mode=False`` keeps Click from calling ``sys.exit`` — a
+        ``typer.Exit`` from a synchronous (``handle``-based) command comes back
+        as the return value on some Click versions and as a raised ``Exit`` on
+        others, so handle both. Usage errors are shown and mapped to their code.
+        """
+        command = get_command(self.typer_app)
+        try:
+            result = command(args=argv, standalone_mode=False)
+        except typer.Exit as exc:
+            return exc.exit_code
+        except click.exceptions.Abort:
+            return 1
+        except click.ClickException as exc:
+            exc.show()
+            return exc.exit_code
+        except SystemExit as exc:
+            return _coerce_exit_code(exc.code)
+        return result if isinstance(result, int) else 0
+
+    def run(self, name: str, args: Sequence[str] = ()) -> int:
+        """Synchronous wrapper over :meth:`adispatch` for callers without a loop.
+
+        Spins a fresh event loop via ``asyncio.run``, so it must NOT be called
+        from inside a running loop — use ``await adispatch(...)`` there. Raises
+        ``KeyError`` when ``name`` is unknown.
+        """
+        return asyncio.run(self.adispatch(name, args))

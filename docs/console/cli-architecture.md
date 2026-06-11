@@ -75,7 +75,7 @@ class Command:
 
     def register(self, app: typer.Typer) -> None: ...     # default wraps handle(ctx)
     def handle(self, ctx: Context) -> int: ...            # 0 = success
-    async def call(self, name, args=()) -> int: ...       # in-process dispatch
+    async def call(self, name, *args) -> int: ...         # in-process dispatch (via Typer)
 ```
 
 - Commands with empty `requires` and `requires_project_context = False` get `self.app is None` — they run without a framework boot at all. `make:*` generators, `new`, `about`, `key:generate` fit here.
@@ -136,9 +136,9 @@ A non-exhaustive catalog (see the source map for the full list and registration 
 | Ops / introspection | `about`, `test`, `down` / `up`, `key:generate` | — (no framework) or project context |
 | Vendor / install | `vendor:publish`, `auth:install`, `oauth:install`, `audit:install` | User providers |
 
-Composite commands (`migrate:fresh`, `optimize`) chain other commands in-process via `Command.call()` → `Application.run(name)`.
+Programmatic dispatch — `Application.adispatch(name, args)` (async), its sync shim `Application.run(name, args)`, `Command.call(name, *args)`, and the scheduler's `Schedule.command("name --flags")` hook — all funnel through one core: it invokes the command's real `register()`-installed Typer callback (so flags parse) and then awaits whatever coroutine that callback deferred via `schedule_async`. That's why scheduling or calling an async command (`migrate`, `queue:*`) works — their real work lives in the deferred coroutine, not in `handle()`. `run()` spins its own loop via `asyncio.run`, so inside a running loop (the scheduler, another command) use `await adispatch(...)`.
 
-In-process dispatch (`Application.run(name)`, `Command.call(name)`) is **name-only by design**: it runs the target's `handle(ctx)` directly. Flag-bearing commands own their args through Typer at the real entrypoint, not via this path — so there's no `args` passthrough (the model is `handle(ctx)`-only, and async commands use the deferred coroutine pattern). `key:rotate` is an honest deferred stub: it exits 2 with an actionable message and a production guard until column re-encryption ships. `optimize`'s `route:cache`/`event:cache` lines are intentional **n/a on Python** (routes and listeners are live callables, not serializable string actions), not unfinished work.
+`key:rotate` is an honest deferred stub: it exits 2 with an actionable message and a production guard until column re-encryption ships. `optimize`'s `route:cache`/`event:cache` lines are intentional **n/a on Python** (routes and listeners are live callables, not serializable string actions), not unfinished work.
 
 ## See also
 

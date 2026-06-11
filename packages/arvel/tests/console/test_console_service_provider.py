@@ -193,7 +193,8 @@ async def test_console_service_provider_boot_collects_type_backed_commands() -> 
     await app.boot()
 
     console_app: ConsoleApplication = app.container.make(ConsoleApplication)
-    assert console_app.run("hello") == 0, (
+    # adispatch (not run) — we're already on a running loop here.
+    assert await console_app.adispatch("hello") == 0, (
         "_HelloCmd returned by _TypeBackedProvider as a type must be instantiated and dispatchable"
     )
 
@@ -210,7 +211,7 @@ async def test_console_service_provider_boot_collects_instance_backed_commands()
     await app.boot()
 
     console_app: ConsoleApplication = app.container.make(ConsoleApplication)
-    assert console_app.run("stateful") == 0, (
+    assert await console_app.adispatch("stateful") == 0, (
         "Pre-built _StatefulCmd instance from _InstanceBackedProvider must be registered as-is"
     )
 
@@ -232,7 +233,7 @@ async def test_console_service_provider_boot_tolerates_raising_provider(
 
     # The raising provider is skipped — but the OTHER provider's commands are registered.
     console_app: ConsoleApplication = app.container.make(ConsoleApplication)
-    assert console_app.run("hello") == 0, (
+    assert await console_app.adispatch("hello") == 0, (
         "Other providers' commands must still be registered when one provider raises"
     )
 
