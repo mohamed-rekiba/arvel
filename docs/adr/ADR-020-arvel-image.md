@@ -125,7 +125,7 @@ This is the same layout the broader PHP ecosystem standardised on for polymorphi
 
 **3.4 `HasMedia` aliases and `HasMediaMixin` re-export.** Add `attach_media(source, *, file_name, collection)` as a one-call alias chaining `add_media().to_media_collection(collection)`. Add `delete_media(collection)` as an alias for `clear_media_collection(collection)`. Export `HasMediaMixin = HasMedia` from `arvel_image/__init__.py`.
 
-**3.5 `media.model_id` type.** `String(36)` in the SQLAlchemy model, with an additive migration (`001_alter_media_model_id.py`: `ALTER TABLE media MODIFY model_id VARCHAR(36)`). `HasMedia.host_pk()` returns `str(self.id)` so integer PKs store as `"1"`, `"2"`, still unique and filterable. This supports UUID-PK host models (e.g., the e-commerce kit's `Product` uses `uuid4()` PKs); INTEGER would silently truncate.
+**3.5 `media.model_id` type.** `String(36)` — defined directly in `create_media_table.py` (`t.string("model_id", length=36)`), so there's no separate alter migration to publish. `HasMedia.host_pk()` returns `str(self.id)` so integer PKs store as `"1"`, `"2"`, still unique and filterable. This supports UUID-PK host models (e.g., the e-commerce kit's `Product` uses `uuid4()` PKs); INTEGER would silently truncate.
 
 ### Consequences
 

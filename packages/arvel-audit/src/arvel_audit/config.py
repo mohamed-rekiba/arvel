@@ -18,4 +18,23 @@ class AuditConfig(BaseSettings):
     encrypt_values: bool = Field(default=False, alias="AUDIT_ENCRYPT_VALUES")
 
 
-__all__ = ["AuditConfig"]
+# Process-wide active config. The provider sets it to the same instance it binds
+# to the container, so observers read one object (no per-write .env reload) and
+# toggling `audit_config().enabled = False` takes effect immediately.
+class _ConfigHolder:
+    active: AuditConfig | None = None
+
+
+def set_audit_config(config: AuditConfig) -> None:
+    """Make *config* the active audit config that observers consult."""
+    _ConfigHolder.active = config
+
+
+def audit_config() -> AuditConfig:
+    """Return the active audit config, env-loading a default on first use."""
+    if _ConfigHolder.active is None:
+        _ConfigHolder.active = AuditConfig()
+    return _ConfigHolder.active
+
+
+__all__ = ["AuditConfig", "audit_config", "set_audit_config"]

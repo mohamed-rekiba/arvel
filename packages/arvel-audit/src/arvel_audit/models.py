@@ -13,12 +13,13 @@ from arvel.database import column, field, json
 from arvel.database.model import Model
 from sqlalchemy import Index
 
-from arvel_audit.config import AuditConfig
+from arvel_audit.config import audit_config
 from arvel_audit.types import AuditValues
 
-# Resolved once: whether old/new value blobs are encrypted at rest. Reading env
-# at import is fine — the column type is fixed for the table's lifetime.
-_ENCRYPT_VALUES = AuditConfig().encrypt_values
+# Schema-lifetime decision, deliberately read once: a column's at-rest encryption
+# can't flip at runtime or existing rows become undecryptable. Unlike `enabled`
+# (a live toggle), this is baked into the table type for good.
+_ENCRYPT_VALUES = audit_config().encrypt_values
 
 AUDIT_ACTIONS: tuple[str, ...] = ("created", "updated", "deleted")
 

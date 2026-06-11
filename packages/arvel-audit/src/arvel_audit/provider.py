@@ -15,7 +15,7 @@ from arvel.providers.service_provider import ServiceProvider
 
 from arvel_audit.auditable import wire_all_auditable
 from arvel_audit.commands import AuditInstallCommand
-from arvel_audit.config import AuditConfig
+from arvel_audit.config import AuditConfig, set_audit_config
 
 if TYPE_CHECKING:
     from arvel.console import Command
@@ -25,7 +25,10 @@ class AuditServiceProvider(ServiceProvider):
     """Boot arvel-audit inside an Arvel application."""
 
     def register(self) -> None:
-        self.container.instance(AuditConfig, AuditConfig())
+        config = AuditConfig()
+        self.container.instance(AuditConfig, config)
+        # Same instance the observers read, so the container binding is authoritative.
+        set_audit_config(config)
 
     async def boot(self) -> None:
         from arvel_audit import migrations as audit_migrations  # noqa: PLC0415

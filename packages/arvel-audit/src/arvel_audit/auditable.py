@@ -14,7 +14,7 @@ from arvel.context.facade import Context
 from arvel.database.session import get_active_session
 
 from arvel_audit._identity import model_key, morph_type
-from arvel_audit.config import AuditConfig
+from arvel_audit.config import audit_config
 from arvel_audit.models import AuditEntry
 
 if TYPE_CHECKING:
@@ -27,7 +27,8 @@ _AUDITABLE_MODELS: set[type[Auditable]] = set()
 
 
 def _audit_enabled() -> bool:
-    return AuditConfig().enabled
+    # Reads the provider-bound singleton — no per-write .env reload on this hot path.
+    return audit_config().enabled
 
 
 class Auditable:
