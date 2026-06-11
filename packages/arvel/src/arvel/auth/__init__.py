@@ -42,12 +42,12 @@ from arvel.auth.http.controller import AuthController
 from arvel.auth.http.routes import register_auth_routes
 from arvel.auth.models import RefreshToken
 from arvel.auth.password_service import PasswordService
-from arvel.auth.repositories import ArventTokenRepository, MorphUserRepository
 from arvel.auth.refresh_tokens import (
     generate_refresh_token,
     hash_refresh_token,
     refresh_token_expires_at,
 )
+from arvel.auth.repositories import ArventTokenRepository, MorphUserRepository
 from arvel.auth.token_pair import TokenPair
 
 if TYPE_CHECKING:
