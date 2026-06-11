@@ -25,25 +25,15 @@ class StorageDisk(Protocol):
 | `memory` | in-memory signer |
 | `s3` | `boto3.generate_presigned_url` |
 | `gcs` | GCS signed URL |
-| `azure` | **`NotImplementedError`** |
+| `azure` | SAS token via `generate_blob_sas` — **requires `STORAGE_AZURE_KEY`** |
 
 The local signer derives its HMAC key from `app_key` via HKDF (`info=b"arvel-storage-tmp-url"`).
 
-## A wiring gap
-
-`StorageServiceProvider` constructs `StorageManager` **without** passing `app_key`:
-
-```python
-manager = StorageManager(config=config, local_config=..., s3_config=..., ...)  # no app_key
-```
-
-> **Warning**: Because the provider doesn't pass `app_key`, `temporary_url()` on the default local disk raises `RuntimeError("LocalDriver requires app_key to generate temporary URLs")` unless something supplies the key manually (tests do). `TODO/QUESTION:` Should the provider wire `APP_KEY` into `StorageManager`?
-
-> **Warning**: `AzureDriver.temporary_url` is not implemented — it raises. Use a different driver if you need signed URLs on Azure.
+`AzureDriver.temporary_url` signs a read-only SAS token from the shared account key (`STORAGE_AZURE_ACCOUNT` + `STORAGE_AZURE_KEY`). Without a key it raises `ValueError` — the account-URL-only path has nothing to sign with.
 
 ## Provider
 
-`StorageServiceProvider.register()` resolves `StorageConfig` plus per-driver configs, builds the manager, and binds the `Storage` facade. `boot()` is a no-op. Ships the `storage:link` command. Not a baseline provider.
+`StorageServiceProvider.register()` resolves `StorageConfig` plus per-driver configs, builds the manager, and binds the `Storage` facade. It reads `APP_KEY` from the process env (the same key source as the `Crypt` facade) and passes it into `StorageManager`, so `temporary_url()` on the default local disk works out of the box once `APP_KEY` is set. `boot()` is a no-op. Ships the `storage:link` command. Not a baseline provider.
 
 ## See also
 

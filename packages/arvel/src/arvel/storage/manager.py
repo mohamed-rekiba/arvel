@@ -61,6 +61,8 @@ class StorageManager:
                 return AzureDriver(
                     container=self._azure_config.container,
                     account_url=account_url,
+                    account=self._azure_config.account,
+                    account_key=self._azure_config.key.get_secret_value(),
                 )
             case _:
                 raise ValueError(f"Unsupported storage driver: {driver!r}")

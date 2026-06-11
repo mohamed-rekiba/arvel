@@ -37,6 +37,31 @@ class AzuriteEndpoint(Protocol):
     blob_endpoint: str
 
 
+class TestAzureTemporaryUrl:
+    """SAS signing is local crypto — no emulator round-trip needed."""
+
+    def _driver(self, *, key: str) -> AzureDriver:
+        return AzureDriver(
+            container="c",
+            account_url="https://acct.blob.core.windows.net",
+            account="acct",
+            account_key=key,
+        )
+
+    def test_temporary_url_appends_sas_token(self) -> None:
+        # A real shared key, base64-encoded — generate_blob_sas needs valid b64.
+        driver = self._driver(key="dGVzdGtleWZvcnNhc2dlbmVyYXRpb24=")
+        url = driver.temporary_url("ops/file.txt", expiry=60)
+        assert url.startswith("https://acct.blob.core.windows.net/c/ops/file.txt?")
+        assert "sig=" in url
+        assert "se=" in url
+
+    def test_temporary_url_requires_account_key(self) -> None:
+        driver = self._driver(key="")
+        with pytest.raises(ValueError, match="account name and key"):
+            driver.temporary_url("ops/file.txt", expiry=60)
+
+
 class TestAzureDriverImportError:
     def test_helpful_import_error_without_extra(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """helpful ImportError when arvel[azure] not installed.
@@ -75,10 +100,3 @@ class TestAzureDriverOps:
         assert await driver.get("ops/put_and_get.txt") == b"hello azurite"
         assert await driver.delete("ops/put_and_get.txt") is True
         assert await driver.exists("ops/put_and_get.txt") is False
-
-    async def test_temporary_url(self, driver: AzureDriver) -> None:
-        # AzureDriver.temporary_url would need a SAS token generator; the
-        # driver documents this as NotImplementedError for now. The contract
-        # is verified without round-tripping to Azurite.
-        with pytest.raises(NotImplementedError, match="SAS token"):
-            driver.temporary_url("ops/temporary_url.txt", expiry=60)
