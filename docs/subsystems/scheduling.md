@@ -35,7 +35,7 @@ flowchart TD
 
 `is_due` uses `croniter` with a one-minute Laravel-style tolerance window. `serve_forever` loops on a sleep interval, honoring interrupt/pause markers (via `SchedulerSignal` in the cache). The CLI `schedule:work` runs `serve_forever` (or `--once`).
 
-> **Warning**: `inMaintenanceMode()` and `outputTo()` are stored on `ScheduledTask` but the kernel never reads them. `TODO/QUESTION:` Are these intended to be honored, or builder placeholders?
+`inMaintenanceMode()` and `outputTo()` are honored by the kernel. When the app is down (`MaintenanceModeManager.is_down()`), `_invoke` skips tasks that didn't opt in (`reason="in_maintenance_mode"`) and runs the ones that did — Laravel's `evenInMaintenanceMode` semantics. `outputTo` tees the task's stdout/stderr to the target file via a `_Tee` redirect; a failed redirect logs a warning and the task still runs. The provider wires the `MaintenanceModeManager` into the kernel factory.
 
 ## Provider
 
