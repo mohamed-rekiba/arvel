@@ -54,7 +54,7 @@ class Guard(ABC):
 |---|---|---|
 | `SessionGuard` | session key `_auth_id` → resolver | yes — `attempt` checks `Hash.check`, `login` regenerates the session |
 | `JwtGuard` | `Authorization: Bearer` JWT → `sub` claim → resolver | no |
-| `TokenGuard` | bearer personal access token → SHA-256 → DB | no — `can(ability)` against token abilities |
+| `TokenGuard` | bearer personal access token → SHA-256 → DB | no — attaches the token to the resolved user; check scopes via `user.token_can(ability)` |
 
 Guards look users up through a `UserResolver` (`by_id`, `by_credentials`); the built-in `ArventUserProvider` (driver `"database"`) resolves against an Arvent model. The HTTP `Authenticate` middleware drives a guard and sets `request.state.user` — see [middleware](../http/middleware.md).
 

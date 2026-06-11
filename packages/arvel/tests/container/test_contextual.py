@@ -59,3 +59,29 @@ def test_contextual_with_instance() -> None:
 
     mk = c.make(MarketingNotifier)
     assert mk.mailer is sentinel
+
+
+def test_contextual_binding_inherited_in_child_scope() -> None:
+    # Contextual rules live on the parent but resolution happens through a
+    # per-request child scope; the rule must still apply.
+    from arvel.container import Container
+
+    c = Container()
+    c.bind(IMailer, SmtpMailer)
+    c.when(MarketingNotifier).needs(IMailer).give(SesMailer)
+
+    with c.scope() as scoped:
+        mk = scoped.make(MarketingNotifier)
+        assert isinstance(mk.mailer, SesMailer)
+
+
+async def test_contextual_binding_inherited_in_async_child_scope() -> None:
+    from arvel.container import Container
+
+    c = Container()
+    c.bind(IMailer, SmtpMailer)
+    c.when(MarketingNotifier).needs(IMailer).give(SesMailer)
+
+    async with c.ascope() as scoped:
+        mk = await scoped.amake(MarketingNotifier)
+        assert isinstance(mk.mailer, SesMailer)

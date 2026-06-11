@@ -32,6 +32,9 @@ class _FakeToken:
         self.expires_at = expires_at
         self.last_used_at: Any = None
 
+    def can(self, ability: str) -> bool:
+        return "*" in self.abilities or ability in self.abilities
+
 
 class _FakeTokenRepository:
     def __init__(self, tokens: dict[str, _FakeToken] | None = None) -> None:
@@ -182,14 +185,46 @@ async def test_token_guard_updates_last_used_at_on_success() -> None:
     assert len(updated) == 1
 
 
-# can() checks abilities
+# abilities ride on the per-request user (Sanctum-style), not the guard
 
 
 @pytest.mark.asyncio
-async def test_token_guard_can_passes_for_wildcard_ability() -> None:
+async def test_token_guard_attaches_token_and_user_scopes_abilities() -> None:
+    from arvel.auth.guards.token import TokenGuard
+    from arvel.auth.mixins import HasApiTokens
+
+    class _User(HasApiTokens):
+        def __init__(self, uid: str) -> None:
+            self.id = uid
+
+    plain = "arvel_read_only_token"
+    hashed = _sha256(plain)
+    tok = _FakeToken(
+        token=hashed,
+        tokenable_type="app.Models.User.User",
+        tokenable_id="1",
+        abilities=["read"],
+    )
+    user = _User("1")
+    token_repo = _FakeTokenRepository({hashed: tok})
+    user_repo = _FakeUserRepository({"app.Models.User.User:1": user})
+    guard = TokenGuard(token_repository=token_repo, user_repository=user_repo)
+
+    resolved = await guard.user(_FakeRequest(authorization=f"Bearer {plain}"))
+
+    assert resolved is not None
+    assert resolved is user
+    assert resolved.current_access_token() is not None
+    assert resolved.token_can("read") is True
+    assert resolved.token_can("write") is False
+
+
+@pytest.mark.asyncio
+async def test_token_guard_user_without_mixin_still_resolves() -> None:
+    """A user object lacking HasApiTokens resolves fine; token just isn't attached."""
     from arvel.auth.guards.token import TokenGuard
 
-    plain = "arvel_wildcard_token"
+    plain = "arvel_plain_user_token"
     hashed = _sha256(plain)
     tok = _FakeToken(
         token=hashed,
@@ -201,30 +236,8 @@ async def test_token_guard_can_passes_for_wildcard_ability() -> None:
     user_repo = _FakeUserRepository({"app.Models.User.User:1": {"id": "1"}})
     guard = TokenGuard(token_repository=token_repo, user_repository=user_repo)
 
-    request = _FakeRequest(authorization=f"Bearer {plain}")
-    await guard.user(request)
-    assert guard.can("write") is True
-
-
-@pytest.mark.asyncio
-async def test_token_guard_can_fails_for_unlisted_ability() -> None:
-    from arvel.auth.guards.token import TokenGuard
-
-    plain = "arvel_read_only_token"
-    hashed = _sha256(plain)
-    tok = _FakeToken(
-        token=hashed,
-        tokenable_type="app.Models.User.User",
-        tokenable_id="1",
-        abilities=["read"],
-    )
-    token_repo = _FakeTokenRepository({hashed: tok})
-    user_repo = _FakeUserRepository({"app.Models.User.User:1": {"id": "1"}})
-    guard = TokenGuard(token_repository=token_repo, user_repository=user_repo)
-
-    request = _FakeRequest(authorization=f"Bearer {plain}")
-    await guard.user(request)
-    assert guard.can("write") is False
+    resolved = await guard.user(_FakeRequest(authorization=f"Bearer {plain}"))
+    assert resolved == {"id": "1"}
 
 
 # token stored as SHA-256 (not plain text)

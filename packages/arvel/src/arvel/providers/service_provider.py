@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
 
 from arvel.console._subsystem import CliSubsystem
+from arvel.container.errors import BindingResolutionError
 
 if TYPE_CHECKING:
     from arvel.application import Application
@@ -33,14 +34,16 @@ class ServiceProvider:
         self.container = app.container
 
     def safe_config(self, cls: type[_T], *, default: _T) -> _T:
-        """Resolve a config class from the container; return ``default`` on any failure.
+        """Resolve a config class from the container; return ``default`` when unbound.
 
         Use this when config is optional — the provider falls back to a safe
-        default when the application hasn't registered the settings class.
+        default when the application hasn't registered the settings class. A
+        bound-but-invalid config still raises: misconfiguration should fail loud,
+        not silently degrade to defaults.
         """
         try:
             return self.container.make(cls)
-        except Exception:
+        except BindingResolutionError:
             return default
 
     def register(self) -> None:

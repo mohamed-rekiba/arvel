@@ -34,7 +34,6 @@ class TokenGuard:
     ) -> None:
         self._token_repo = token_repository
         self._user_repo = user_repository
-        self._current_token: Any = None
 
     async def user(self, request: Any) -> Any | None:
         plain = self._extract_bearer(request)
@@ -42,11 +41,14 @@ class TokenGuard:
             return None
 
         token_hash = hashlib.sha256(plain.encode()).hexdigest()
-        # timing-safe: compare_digest is used here to find the token by hash.
-        # The DB lookup is by exact SHA-256 hash; compare_digest guards any
-        # secondary in-memory comparison if the repository does one.
         record = await self._token_repo.find_by_hash(token_hash)
         if record is None:
+            return None
+
+        # Constant-time confirm the stored digest matches the presented one.
+        # Defence-in-depth on the actual secret (the token), regardless of how
+        # the repository performed its lookup.
+        if not hmac.compare_digest(str(getattr(record, "token", "")), token_hash):
             return None
 
         if self._is_expired(record):
@@ -56,18 +58,14 @@ class TokenGuard:
         if user is None:
             return None
 
-        self._current_token = record
         await self._token_repo.touch(record)
-        return user
 
-    def can(self, ability: str) -> bool:
-        if self._current_token is None:
-            return False
-        abilities: list[str] = getattr(self._current_token, "abilities", [])
-        if "*" in abilities:
-            return True
-        # Use compare_digest to avoid timing side-channels when iterating abilities.
-        return any(hmac.compare_digest(a.encode(), ability.encode()) for a in abilities)
+        # Hang the token off the per-request user (Sanctum-style). Each request
+        # resolves its own user object, so abilities stay request-scoped — no
+        # shared state on the singleton guard. Check via user.token_can(...).
+        if hasattr(user, "with_access_token"):
+            user.with_access_token(record)
+        return user
 
     @staticmethod
     def _is_expired(record: Any) -> bool:

@@ -6,7 +6,11 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from arvel.console import Application as ConsoleApplication
-from arvel.console.commands.optimize import OptimizeClearCommand, OptimizeCommand
+from arvel.console.commands.optimize import (
+    CONFIG_CACHE_REL,
+    OptimizeClearCommand,
+    OptimizeCommand,
+)
 from typer.testing import CliRunner
 
 
@@ -104,10 +108,35 @@ class TestOptimizeClearCommand:
             patch("arvel.console.commands.optimize.clear_bytecode_cache"),
             patch("arvel.console.commands.optimize.reset_cache"),
             patch("arvel.console.commands.optimize.reset"),
-            patch("arvel.console.commands.optimize._CONFIG_CACHE_REL", cache),
+            patch("arvel.console.commands.optimize.CONFIG_CACHE_REL", cache),
         ):
             result = CliRunner().invoke(cli.typer_app, ["optimize:clear"])
 
         assert result.exit_code == 0, result.output
         assert not cache.exists()
         assert "removed" in result.output.lower()
+
+    def test_clears_cache_under_base_path_not_cwd(self, tmp_path: Path) -> None:
+        # Symmetric with OptimizeCommand: clear must resolve the cache under the
+        # project base_path, not relative to the cwd.
+        base = tmp_path / "project"
+        cache = base / CONFIG_CACHE_REL
+        cache.parent.mkdir(parents=True)
+        cache.write_text("{}")
+
+        cmd = OptimizeClearCommand()
+        app_mock = MagicMock()
+        app_mock.base_path.return_value = base
+        cmd.app = app_mock
+        cli = ConsoleApplication([cmd])
+
+        with (
+            patch("arvel.console.commands.optimize.clear_bytecode_cache"),
+            patch("arvel.console.commands.optimize.reset_cache"),
+            patch("arvel.console.commands.optimize.reset"),
+        ):
+            result = CliRunner().invoke(cli.typer_app, ["optimize:clear"])
+
+        assert result.exit_code == 0, result.output
+        assert not cache.exists()
+        assert str(base) in result.output

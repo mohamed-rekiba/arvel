@@ -197,9 +197,9 @@ class Application:
         if not self.container.bound(Gate):
             self.container.singleton(Gate, Gate)
 
-    def make(self, key: str, **overrides: object) -> Any:
-        """Resolve a named binding from the container."""
-        return self.container.make(key, **overrides)  # type: ignore[arg-type]
+    def make[T](self, abstract: type[T], **overrides: object) -> T:
+        """Resolve a binding from the container by its type."""
+        return self.container.make(abstract, **overrides)
 
     def middleware_group(self, name: str, middleware: Sequence[MiddlewareRef]) -> None:
         from arvel.routing import Router

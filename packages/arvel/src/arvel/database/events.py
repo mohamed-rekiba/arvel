@@ -214,7 +214,7 @@ def _resolve_observer(observer: type[Any] | Any) -> Any:
         return observer()
     container = _ObserverRuntime.container
     if container is not None:
-        return cast("Any", container.make(observer))
+        return container.make(observer)
     return observer()
 
 
