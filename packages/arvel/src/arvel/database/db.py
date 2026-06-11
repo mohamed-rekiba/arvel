@@ -33,6 +33,7 @@ from arvel.database.session import (
     get_optional_session,
     reset_active_session,
     reset_after_commit_queue,
+    session_scope,
     set_active_session,
     set_after_commit_queue,
 )
@@ -104,16 +105,29 @@ class TableQueryBuilder:
         self._limit_val: int | None = None
         self._order_col: str | None = None
 
-    def _session(self) -> AsyncSession:
+    @asynccontextmanager
+    async def _scoped(self, *, commit: bool) -> AsyncGenerator[AsyncSession]:
+        """Yield a session, autocommitting writes when no transaction is active.
+
+        Honours a named connection's maker; otherwise defers to ``session_scope``
+        on the default connection (reuse-or-autocommit, Laravel parity).
+        """
+        if self._session_maker is None:
+            async with session_scope(commit=commit) as session:
+                yield session
+            return
         existing = get_optional_session()
         if existing is not None:
-            return existing
-        if self._session_maker is not None:
-            raise RuntimeError(
-                "TableQueryBuilder.get/insert/update requires an active DB session. "
-                "Use inside a DB.transaction() context or an HTTP request."
-            )
-        raise RuntimeError("No active session for TableQueryBuilder.")
+            yield existing
+            return
+        async with self._session_maker() as session:
+            token = set_active_session(session)
+            try:
+                yield session
+                if commit:
+                    await session.commit()
+            finally:
+                reset_active_session(token)
 
     def _table_clause(self, *extra_columns: str) -> TableClause:
         col_names = {c for c, _ in self._where_clauses}
@@ -160,36 +174,33 @@ class TableQueryBuilder:
             stmt = stmt.order_by(tbl.c[self._order_col])
         if self._limit_val is not None:
             stmt = stmt.limit(self._limit_val)
-        session = self._session()
-        result = await session.execute(stmt)
-        return [dict(row) for row in result.mappings().all()]
+        async with self._scoped(commit=False) as session:
+            result = await session.execute(stmt)
+            return [dict(row) for row in result.mappings().all()]
 
     async def insert(self, rows: list[dict[str, Any]]) -> None:
         if not rows:
             return
         cols: list[ColumnClause[Any]] = [sqla_column(c) for c in rows[0]]
         tbl = sqla_table(self._table_name, *cols)
-        session = self._session()
-        await session.execute(sqla_insert(tbl), rows)
-        await session.flush()
+        async with self._scoped(commit=True) as session:
+            await session.execute(sqla_insert(tbl), rows)
 
     async def update(self, values: dict[str, Any]) -> int:
         tbl = self._table_clause(*values.keys())
         stmt = sqla_update(tbl).values(**values)
         stmt = self._apply_where(stmt, tbl)
-        session = self._session()
-        result = cast("CursorResult[Any]", await session.execute(stmt))
-        await session.flush()
-        return result.rowcount
+        async with self._scoped(commit=True) as session:
+            result = cast("CursorResult[Any]", await session.execute(stmt))
+            return result.rowcount
 
     async def delete(self) -> int:
         tbl = self._table_clause()
         stmt = sqla_delete(tbl)
         stmt = self._apply_where(stmt, tbl)
-        session = self._session()
-        result = cast("CursorResult[Any]", await session.execute(stmt))
-        await session.flush()
-        return result.rowcount
+        async with self._scoped(commit=True) as session:
+            result = cast("CursorResult[Any]", await session.execute(stmt))
+            return result.rowcount
 
 
 class _DBProxy:
@@ -213,7 +224,7 @@ class _DBProxy:
     async def statement(self, sql: str, bindings: dict[str, Any] | None = None) -> None:
         async with self._session_maker() as session:
             await session.execute(text(sql).bindparams(**(bindings or {})))
-            await session.flush()
+            await session.commit()
 
     def table(self, table_name: str) -> TableQueryBuilder:
         return TableQueryBuilder(table_name, self._session_maker)
@@ -222,7 +233,8 @@ class _DBProxy:
 class DB:
     """Facade for explicit transaction management and raw SQL execution.
 
-    Typical usage::
+    Single ORM operations autocommit on their own (PDO parity) — you only need
+    this facade to group **multiple** writes into one atomic unit::
 
         async with DB.transaction():
             await user.save()
@@ -312,55 +324,30 @@ class DB:
     @classmethod
     async def select(cls, sql: str, bindings: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Execute a raw SELECT and return list of dicts."""
-        session = get_optional_session()
-        if session is None and cls._session_maker is not None:
-            async with cls._session_maker() as s:
-                result = await s.execute(text(sql).bindparams(**(bindings or {})))
-                rows = result.mappings().all()
-                cls._fire_listeners(sql, bindings or {})
-                return [dict(row) for row in rows]
-        if session is None:
-            raise RuntimeError(
-                "DB.select() requires an active session or configured session maker."
-            )
-        result = await session.execute(text(sql).bindparams(**(bindings or {})))
-        cls._fire_listeners(sql, bindings or {})
-        return [dict(row) for row in result.mappings().all()]
+        async with session_scope(commit=False) as session:
+            result = await session.execute(text(sql).bindparams(**(bindings or {})))
+            rows = result.mappings().all()
+            cls._fire_listeners(sql, bindings or {})
+            return [dict(row) for row in rows]
 
     @classmethod
     async def scalar(cls, sql: str, bindings: dict[str, Any] | None = None) -> Any:
         """Execute a raw SQL statement and return the first column of the first row."""
-        session = get_optional_session()
-        if session is None and cls._session_maker is not None:
-            async with cls._session_maker() as s:
-                result = await s.execute(text(sql).bindparams(**(bindings or {})))
-                cls._fire_listeners(sql, bindings or {})
-                return result.scalar()
-        if session is None:
-            raise RuntimeError(
-                "DB.scalar() requires an active session or configured session maker."
-            )
-        result = await session.execute(text(sql).bindparams(**(bindings or {})))
-        cls._fire_listeners(sql, bindings or {})
-        return result.scalar()
+        async with session_scope(commit=False) as session:
+            result = await session.execute(text(sql).bindparams(**(bindings or {})))
+            cls._fire_listeners(sql, bindings or {})
+            return result.scalar()
 
     @classmethod
     async def statement(cls, sql: str, bindings: dict[str, Any] | None = None) -> None:
-        """Execute a raw SQL statement with no return value."""
-        session = get_optional_session()
-        if session is None and cls._session_maker is not None:
-            async with cls._session_maker() as s:
-                await s.execute(text(sql).bindparams(**(bindings or {})))
-                await s.flush()
-                cls._fire_listeners(sql, bindings or {})
-                return
-        if session is None:
-            raise RuntimeError(
-                "DB.statement() requires an active session or configured session maker."
-            )
-        await session.execute(text(sql).bindparams(**(bindings or {})))
-        await session.flush()
-        cls._fire_listeners(sql, bindings or {})
+        """Execute a raw SQL statement with no return value.
+
+        Commits immediately when no transaction is active (Laravel autocommit);
+        inside a ``DB.transaction()`` the boundary owns the commit.
+        """
+        async with session_scope(commit=True) as session:
+            await session.execute(text(sql).bindparams(**(bindings or {})))
+            cls._fire_listeners(sql, bindings or {})
 
     @classmethod
     def listen(cls, handler: Any) -> None:

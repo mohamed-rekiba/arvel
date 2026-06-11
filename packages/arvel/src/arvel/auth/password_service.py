@@ -114,15 +114,13 @@ class PasswordService:
         # Phase 2 — expired-row cleanup. Commit the DELETE before raising
         # so retries with the same plaintext stop matching.
         if row.is_expired(self._ttl):
-            async with DB.transaction():
-                await PasswordReset.where(token_hash=digest).delete()
+            await PasswordReset.where(token_hash=digest).delete()
             msg = "reset token expired"
             raise PasswordResetTokenInvalidError(msg)
 
         user = await self._user_cls.where(email=normalised_email).first()
         if user is None:
-            async with DB.transaction():
-                await PasswordReset.where(token_hash=digest).delete()
+            await PasswordReset.where(token_hash=digest).delete()
             msg = "user no longer exists"
             raise PasswordResetTokenInvalidError(msg)
 

@@ -81,7 +81,7 @@ from arvel.database.exceptions import (
     UnknownRelationError,
 )
 from arvel.database.query_mixin import QueryMixin
-from arvel.database.session import get_active_session
+from arvel.database.session import session_scope
 from arvel.support.str import Str
 
 if TYPE_CHECKING:
@@ -93,6 +93,7 @@ if TYPE_CHECKING:
         HasMany,
         HasOne,
     )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 ModelT = TypeVar("ModelT", bound="Model")
 RelatedT = TypeVar("RelatedT", bound="Model")
@@ -931,13 +932,13 @@ class ActiveRecord(QueryMixin):
         instance = cast("Any", cls)(**attrs)
         await fire_async(cls, "saving", instance)
         await fire_cancellable(cls, "creating", instance)
-        session = get_active_session()
-        session.add(instance)
-        instance._arvel_snapshot_changes()
-        await session.flush()
-        await fire_async(cls, "created", instance)
-        await fire_async(cls, "saved", instance)
-        fire_after_commit(cls, instance)
+        async with session_scope(commit=True) as session:
+            session.add(instance)
+            instance._arvel_snapshot_changes()
+            await session.flush()
+            await fire_async(cls, "created", instance)
+            await fire_async(cls, "saved", instance)
+            fire_after_commit(cls, instance)
         return instance
 
     @classmethod
@@ -1080,20 +1081,23 @@ class ActiveRecord(QueryMixin):
         from arvel.database.events import fire_after_commit, fire_async, fire_cancellable
 
         await fire_async(type(self), "saving", self)
-        session = get_active_session()
         # Snapshot before add() moves a transient instance to pending state.
         _state = sqla_inspect(self)
         is_new = _state is None or _state.transient or not _state.has_identity
         before_event = "creating" if is_new else "updating"
         await fire_cancellable(type(self), before_event, self)
-        session.add(self)
-        self._arvel_snapshot_changes()
-        await session.flush()
-        after_event = "created" if is_new else "updated"
-        await fire_async(type(self), after_event, self)
-        await fire_async(type(self), "saved", self)
-        fire_after_commit(type(self), self)
-        await self._touch_parents()
+        async with session_scope(commit=True) as session:
+            # add() re-attaches a detached-but-persistent instance (one a prior
+            # autocommit left with an identity) as persistent → UPDATE on flush,
+            # not a duplicate INSERT. Only transient instances INSERT.
+            session.add(self)
+            self._arvel_snapshot_changes()
+            await session.flush()
+            after_event = "created" if is_new else "updated"
+            await fire_async(type(self), after_event, self)
+            await fire_async(type(self), "saved", self)
+            fire_after_commit(type(self), self)
+            await self._touch_parents()
         return self
 
     async def _touch_parents(self) -> None:
@@ -1141,40 +1145,47 @@ class ActiveRecord(QueryMixin):
                 if isinstance(item, Model):
                     await item._push(visited)
 
+    async def _attach_for_delete(self, session: AsyncSession) -> Any:
+        """Return a session-bound instance to delete; merge if a prior autocommit detached it."""
+        state = sqla_inspect(self)
+        if state is not None and state.detached:
+            return await session.merge(self)
+        return self
+
     async def delete(self) -> Any:
         from arvel.database.events import fire_after_commit, fire_async, fire_cancellable
 
         soft_field = getattr(type(self), "__arvel_soft_delete_column__", None)
-        session = get_active_session()
         await fire_cancellable(type(self), "deleting", self)
-        if soft_field:
-            setattr(self, soft_field, _datetime.now(UTC))
-            session.add(self)
+        async with session_scope(commit=True) as session:
+            if soft_field:
+                setattr(self, soft_field, _datetime.now(UTC))
+                session.add(self)
+                await session.flush()
+                # `trashed` distinguishes a soft delete from a hard one; `deleted` fires for both.
+                await fire_async(type(self), "trashed", self)
+                await fire_async(type(self), "deleted", self)
+                fire_after_commit(type(self), self)
+                return self
+            await session.delete(await self._attach_for_delete(session))
             await session.flush()
-            # `trashed` distinguishes a soft delete from a hard one; `deleted` fires for both.
-            await fire_async(type(self), "trashed", self)
             await fire_async(type(self), "deleted", self)
             fire_after_commit(type(self), self)
-            return self
-        await session.delete(self)
-        await session.flush()
-        await fire_async(type(self), "deleted", self)
-        fire_after_commit(type(self), self)
         return self
 
     async def force_delete(self) -> Any:
         from arvel.database.events import fire_after_commit, fire_async, fire_cancellable
 
-        session = get_active_session()
         # Laravel order: force_deleting, deleting, hard delete, deleted, force_deleted.
         # Either before-hook can abort. `trashed` never fires — this is a hard delete.
         await fire_cancellable(type(self), "force_deleting", self)
         await fire_cancellable(type(self), "deleting", self)
-        await session.delete(self)
-        await session.flush()
-        await fire_async(type(self), "deleted", self)
-        await fire_async(type(self), "force_deleted", self)
-        fire_after_commit(type(self), self)
+        async with session_scope(commit=True) as session:
+            await session.delete(await self._attach_for_delete(session))
+            await session.flush()
+            await fire_async(type(self), "deleted", self)
+            await fire_async(type(self), "force_deleted", self)
+            fire_after_commit(type(self), self)
         return self
 
     def trashed(self) -> bool:
@@ -1190,11 +1201,11 @@ class ActiveRecord(QueryMixin):
             raise AttributeError(f"{type(self).__name__} does not use SoftDeletes.")
         await fire_cancellable(type(self), "restoring", self)
         setattr(self, soft_field, None)
-        session = get_active_session()
-        session.add(self)
-        await session.flush()
-        await fire_async(type(self), "restored", self)
-        fire_after_commit(type(self), self)
+        async with session_scope(commit=True) as session:
+            session.add(self)
+            await session.flush()
+            await fire_async(type(self), "restored", self)
+            fire_after_commit(type(self), self)
         return self
 
     async def save_quietly(self) -> Any:
@@ -1241,8 +1252,11 @@ class ActiveRecord(QueryMixin):
         return await qb.first()
 
     async def refresh(self, *attrs: str) -> Any:
-        session = get_active_session()
-        await session.refresh(self, attrs or None)
+        async with session_scope(commit=False) as session:
+            state = sqla_inspect(self)
+            if state is not None and state.detached:
+                session.add(self)
+            await session.refresh(self, attrs or None)
         return self
 
     async def touch(self, attribute: str | None = None) -> Any:
@@ -1323,18 +1337,23 @@ class ActiveRecord(QueryMixin):
         async_rels = [r for r in relations if is_async_relation(type(self), r)]
         sa_rels = [r for r in relations if r not in async_rels]
 
-        for rel in async_rels:
-            await load_async_relation_path(type(self), [self], rel, None)
+        async with session_scope(commit=False) as session:
+            for rel in async_rels:
+                await load_async_relation_path(type(self), [self], rel, None)
 
-        if not sa_rels:
-            return
+            if sa_rels:
+                await self._load_sa_relations(session, sa_rels)
 
+    async def _load_sa_relations(self, session: AsyncSession, sa_rels: list[str]) -> None:
+        """Refetch this row with the given SQLAlchemy relations eager-loaded."""
         from sqlalchemy.orm import selectinload
 
-        session = get_active_session()
         mapper = sqla_inspect(type(self))
         if mapper is None:
             return
+        state = sqla_inspect(self)
+        if state is not None and state.detached:
+            session.add(self)
         # Expire the requested relations so SQLAlchemy's selectinload will
         # replace them even when expire_on_commit=False is in use.
         session.expire(self, sa_rels)
@@ -1349,11 +1368,12 @@ class ActiveRecord(QueryMixin):
                 stmt = stmt.options(selectinload(rel_attr))
         result = await session.execute(stmt)
         fresh = result.scalars().first()
-        if fresh is not None:
-            for rel in sa_rels:
-                loaded = getattr(fresh, rel, None)
-                if loaded is not None:
-                    object.__setattr__(self, rel, loaded)
+        if fresh is None:
+            return
+        for rel in sa_rels:
+            loaded = getattr(fresh, rel, None)
+            if loaded is not None:
+                object.__setattr__(self, rel, loaded)
 
     async def load_missing(self, *relations: str) -> None:
         """Load each relation only if not already populated on this instance."""

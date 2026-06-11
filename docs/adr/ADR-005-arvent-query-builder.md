@@ -798,6 +798,37 @@ post.comments().recursive("parent_id").as_tree()
 
 ---
 
+## § 19 — Per-operation autocommit (PDO parity)
+
+**Date**: 2026-06-11
+
+### Context
+
+The original design bound an `AsyncSession` to the request (or test) and required every ORM operation to run inside it. A single write flushed but didn't commit — only an explicit `DB.transaction()` or the request middleware committed. Outside a request you had to wrap even one `save()` in `DB.transaction()`, and operations with no active session raised `NoActiveSessionError`. That diverges from Laravel, where each query runs on a PDO connection in autocommit mode and a single write is atomic on its own.
+
+### Decision
+
+ORM terminals manage their own session through one primitive, `session_scope(*, commit)`:
+
+- If a session is already bound (inside `DB.transaction()` or a `db_tx` request), reuse it and let that boundary own the COMMIT.
+- Otherwise open a fresh session, run the operation, and — for writes — commit immediately.
+
+Read terminals use `commit=False`; write and compound terminals use `commit=True`, applied via the `autocommit(write=...)` decorator (async generators wrap their body in `session_scope` directly). `DB.select/scalar/statement` and `TableQueryBuilder` route through the same primitive, which also fixes a latent bug where standalone `DB.statement()` flushed without committing.
+
+### Consequences
+
+- A single write is atomic without ceremony; `DB.transaction()` is reserved for grouping **multiple** writes. Nested terminals inside a transaction reuse the open session, so a compound op (e.g. `sync`) stays atomic.
+- After a standalone autocommit, the ORM instance is detached. `save`/`delete`/`restore`/`force_delete` re-attach via `session.add()`/`merge()` before operating. The framework's session maker uses `expire_on_commit=False`, so a detached instance keeps its loaded attributes.
+- A write scope that opens its own session also owns the after-commit queue, so model `after_commit` observers still fire on a standalone write.
+- Operations with neither a bound session nor a configured default now raise `"DB not configured"` (from `session_maker_for`) instead of `NoActiveSessionError`.
+
+### Alternatives Rejected
+
+- **Keep the always-bound-session model**: forces `DB.transaction()` around every single write and breaks Laravel parity. Rejected.
+- **Commit on every flush**: would break multi-write atomicity inside `DB.transaction()`. The reuse-or-open check in `session_scope` is what preserves it.
+
+---
+
 ## Subsumes
 
 This ADR absorbs the following ADRs in the WI-arvel-005 consolidation pass (2026-06-07). The original files are deleted; their decision text is preserved verbatim above in the corresponding `§` sections.

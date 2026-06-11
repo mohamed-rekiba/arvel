@@ -81,32 +81,35 @@ class ModelCollection(Collection[T]):
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
 
-        from arvel.database.session import get_active_session
+        from arvel.database.session import session_scope
 
         model = self._model()
         mapper = sqla_inspect(model)
         pk_col = mapper.primary_key[0]
         keys = self.model_keys()
-        session = get_active_session()
-        # Expire just the requested relations so selectinload replaces them even
-        # under expire_on_commit=False; leave loaded column values intact.
-        for member in self:
-            session.expire(member, sa_rels)
-        stmt = select(model).where(pk_col.in_(keys))
-        for rel in sa_rels:
-            attr = getattr(model, rel, None)
-            if attr is not None:
-                stmt = stmt.options(selectinload(attr))
-        result = await session.execute(stmt)
-        by_key = {fresh.get_key(): fresh for fresh in result.scalars().all()}
-        for member in self:
-            fresh = by_key.get(member.get_key())
-            if fresh is None:
-                continue
+        async with session_scope(commit=False) as session:
+            # Expire just the requested relations so selectinload replaces them even
+            # under expire_on_commit=False; leave loaded column values intact.
+            for member in self:
+                state = sqla_inspect(member)
+                if state.detached:
+                    session.add(member)
+                session.expire(member, sa_rels)
+            stmt = select(model).where(pk_col.in_(keys))
             for rel in sa_rels:
-                loaded = getattr(fresh, rel, None)
-                if loaded is not None:
-                    object.__setattr__(member, rel, loaded)
+                attr = getattr(model, rel, None)
+                if attr is not None:
+                    stmt = stmt.options(selectinload(attr))
+            result = await session.execute(stmt)
+            by_key = {fresh.get_key(): fresh for fresh in result.scalars().all()}
+            for member in self:
+                fresh = by_key.get(member.get_key())
+                if fresh is None:
+                    continue
+                for rel in sa_rels:
+                    loaded = getattr(fresh, rel, None)
+                    if loaded is not None:
+                        object.__setattr__(member, rel, loaded)
 
     def find(self, key: Any) -> T | None:
         """Return the member whose primary key matches *key* (or a model's key)."""
@@ -158,21 +161,25 @@ class ModelCollection(Collection[T]):
             return ModelCollection()
         from sqlalchemy import inspect as sqla_inspect
 
-        from arvel.database.session import get_active_session
+        from arvel.database.session import session_scope
 
         model = self._model()
         pk_col = sqla_inspect(model).primary_key[0]
         ordered_keys = self.model_keys()
 
-        # Bulk writes bypass the identity map; expire so the re-query reads DB values.
-        session = get_active_session()
-        for member in self:
-            session.expire(member)
+        async with session_scope(commit=False):
+            # Bulk writes bypass the identity map; expire so the re-query reads DB values.
+            for member in self:
+                state = sqla_inspect(member)
+                if not state.detached:
+                    member_session = state.session
+                    if member_session is not None:
+                        member_session.expire(member)
 
-        qb = model.query().where(pk_col.in_(ordered_keys))
-        for rel in relations:
-            qb = qb.with_(rel)
-        reloaded = await qb.get()
+            qb = model.query().where(pk_col.in_(ordered_keys))
+            for rel in relations:
+                qb = qb.with_(rel)
+            reloaded = await qb.get()
         by_key = {m.get_key(): m for m in reloaded}
         return ModelCollection(by_key[k] for k in ordered_keys if k in by_key)
 

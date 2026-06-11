@@ -516,24 +516,53 @@ async def test_db_raw_sql_uses_configured_session_maker_without_active_session(
         type.__setattr__(DB, "_session_maker", previous)
 
 
-async def test_db_connection_proxy_scalar_statement_and_table_error(
+async def test_db_connection_proxy_scalar_statement_and_table(
+    engine: AsyncEngine,
     session_maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """A named-connection proxy runs scalar/statement and a table read on its own maker."""
+    await _setup(engine)
     previous = type.__getattribute__(DB, "_session_maker")
     try:
         DB.configure(session_maker)
         proxy = DB.connection()
         assert await proxy.scalar("SELECT 1") == 1
         await proxy.statement("SELECT 1")
-        with pytest.raises(RuntimeError, match="active DB session"):
-            await proxy.table("authors_s2").get()
+        # Proxy-built tables carry the named maker, so they open their own session.
+        assert await proxy.table("authors_s2").get() == []
     finally:
         type.__setattr__(DB, "_session_maker", previous)
 
 
-async def test_db_table_requires_active_session_without_connection_maker() -> None:
-    with pytest.raises(RuntimeError, match="No active session"):
-        await DB.table("authors_s2").get()
+async def test_db_table_reads_on_default_connection_without_active_session(
+    engine: AsyncEngine,
+    session_maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """DB.table().get() autocommits on the default connection — no bound session needed."""
+    await _setup(engine)
+    previous = type.__getattribute__(DB, "_session_maker")
+    try:
+        DB.configure(session_maker)
+        async with engine.begin() as conn:
+            await conn.execute(
+                text("INSERT INTO authors_s2 (name, score) VALUES (:name, :score)"),
+                {"name": "no-session", "score": 3},
+            )
+        rows = await DB.table("authors_s2").where("score", 3).get()
+        assert rows == [{"id": rows[0]["id"], "name": "no-session", "score": 3}]
+    finally:
+        type.__setattr__(DB, "_session_maker", previous)
+
+
+async def test_db_table_unconfigured_reports_missing_db() -> None:
+    """With neither a builder maker nor a configured default, the missing config surfaces."""
+    previous = type.__getattribute__(DB, "_session_maker")
+    type.__setattr__(DB, "_session_maker", None)
+    try:
+        with pytest.raises(RuntimeError, match="DB not configured"):
+            await DB.table("authors_s2").get()
+    finally:
+        type.__setattr__(DB, "_session_maker", previous)
 
 
 async def test_db_unconfigured_errors_without_active_session() -> None:
@@ -546,11 +575,13 @@ async def test_db_unconfigured_errors_without_active_session() -> None:
             DB.connection()
         with pytest.raises(RuntimeError, match="No named connection"):
             DB.connection("missing")
-        with pytest.raises(RuntimeError, match="DB.select"):
+        # Raw SQL now autocommits on the default connection; without one the
+        # session_scope reports the missing configuration.
+        with pytest.raises(RuntimeError, match="DB not configured"):
             await DB.select("SELECT 1")
-        with pytest.raises(RuntimeError, match="DB.scalar"):
+        with pytest.raises(RuntimeError, match="DB not configured"):
             await DB.scalar("SELECT 1")
-        with pytest.raises(RuntimeError, match="DB.statement"):
+        with pytest.raises(RuntimeError, match="DB not configured"):
             await DB.statement("SELECT 1")
         with pytest.raises(RuntimeError, match="DB.transaction"):
             async with DB.transaction():

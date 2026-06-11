@@ -18,7 +18,7 @@ from sqlalchemy.orm import Mapper, aliased
 
 from arvel.database.orm._eager import get_eager_relation
 from arvel.database.query import QueryBuilder
-from arvel.database.session import get_active_session
+from arvel.database.session import autocommit, get_active_session
 from arvel.database.tree import TreeNode, assemble_forest
 
 if TYPE_CHECKING:
@@ -206,6 +206,7 @@ class _Recursive(QueryBuilder[T], Generic[T]):
         # predicate over the model's columns, applied to both CTE members.
         return self.apply_global_scopes().whereclause
 
+    @autocommit(write=False)
     async def _fetch_rows(self, roots: Iterable[Any]) -> list[Any]:
         distinct = [r for r in roots if r is not None]
         if not distinct:
@@ -579,6 +580,7 @@ class HasManyThrough(QueryBuilder[T], Generic[T]):
             .join(spec.owner_cls, through_fk_col == owner_local_col)
         )
 
+    @autocommit(write=False)
     async def all(self) -> Any:
         from arvel.support.collections import Collection
 
@@ -589,6 +591,7 @@ class HasManyThrough(QueryBuilder[T], Generic[T]):
 class HasOneThrough(HasManyThrough[T], Generic[T]):
     """HasOne via an intermediate model."""
 
+    @autocommit(write=False)
     async def first(self) -> T | None:
         stmt = self.apply_global_scopes().limit(1)
         result = await get_active_session().execute(stmt)

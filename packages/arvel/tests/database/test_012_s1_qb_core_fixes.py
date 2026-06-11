@@ -8,6 +8,7 @@ import pytest
 from arvel.database import Model, QueryBuilder, boolean, id_, integer, string
 from arvel.database.columns import datetime as datetime_col
 from arvel.database.scope import scope
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 # ─── Test models ─────────────────────────────────────────────────────────────
@@ -308,12 +309,38 @@ async def test_qb_delete_returns_rowcount(engine: AsyncEngine, session: AsyncSes
     assert await ItemS1.count() == 0
 
 
-async def test_qb_write_no_session_raises(engine: AsyncEngine) -> None:
-    """Write ops without an active session raise ``NoActiveSessionError``."""
-    from arvel.database.session import NoActiveSessionError
+async def test_qb_write_without_session_or_config_raises(engine: AsyncEngine) -> None:
+    """A write with no active session and no configured default reports the missing config."""
+    from arvel.database.db import DB
 
-    with pytest.raises(NoActiveSessionError):
-        await ItemS1.insert([{"name": "fail", "score": 0}])
+    previous = type.__getattribute__(DB, "_session_maker")
+    type.__setattr__(DB, "_session_maker", None)
+    try:
+        with pytest.raises(RuntimeError, match="DB not configured"):
+            await ItemS1.insert([{"name": "fail", "score": 0}])
+    finally:
+        type.__setattr__(DB, "_session_maker", previous)
+
+
+async def test_qb_write_autocommits_on_default_connection(engine: AsyncEngine) -> None:
+    """No bound session: the write opens its own session and commits (Laravel parity)."""
+    from arvel.database.db import DB
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    await _setup(engine)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    previous = type.__getattribute__(DB, "_session_maker")
+    try:
+        DB.configure(maker)
+        await ItemS1.insert([{"name": "committed", "score": 7}])
+        # A fresh session sees the committed row — proof the write didn't just flush.
+        async with maker() as verify:
+            count = await verify.scalar(
+                text("SELECT COUNT(*) FROM items_s1 WHERE name = :n"), {"n": "committed"}
+            )
+        assert count == 1
+    finally:
+        type.__setattr__(DB, "_session_maker", previous)
 
 
 # ───  Extra aggregates ─────────────────────────────────────────────

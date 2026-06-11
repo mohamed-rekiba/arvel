@@ -60,7 +60,7 @@ from arvel.database.paginator import (
     resolve_page,
     resolve_path,
 )
-from arvel.database.session import get_active_session
+from arvel.database.session import autocommit, get_active_session, session_scope
 
 if TYPE_CHECKING:
     from sqlalchemy.sql.expression import CTE
@@ -753,7 +753,8 @@ async def load_aggregate_for(
     column = _aggregate_column(model, target, agg, col, constraint)
     pk_col = _primary_key_column(model)
     stmt = select(column.label(label)).select_from(model).where(pk_col == instance.get_key())
-    result = await get_active_session().execute(stmt)
+    async with session_scope(commit=False) as session:
+        result = await session.execute(stmt)
     value = result.scalar()
     with contextlib.suppress(AttributeError, TypeError):
         object.__setattr__(instance, label, value)
@@ -2637,6 +2638,7 @@ class QueryBuilder(Generic[T]):
         compiled = stmt.compile(dialect=_resolve_sqla_dialect(dialect))
         return list(compiled.params.values())
 
+    @autocommit(write=False)
     async def explain(self) -> list[dict[str, Any]]:
         """Return the dialect's query plan rows (``EXPLAIN`` / ``EXPLAIN QUERY PLAN`` on SQLite)."""
         session = get_active_session()
@@ -2683,6 +2685,7 @@ class QueryBuilder(Generic[T]):
         for instance in instances:
             await fire_async(self._model, "retrieved", instance)
 
+    @autocommit(write=False)
     async def first(self) -> T | None:
         stmt = self.apply_global_scopes().limit(1)
         if self._lock_for_update:
@@ -2713,7 +2716,12 @@ class QueryBuilder(Generic[T]):
     async def first_or_create(
         self, attributes: dict[str, Any], values: dict[str, Any] | None = None
     ) -> T:
-        """Return the first row matching *attributes*, or create it with *attributes* + *values*."""
+        """Return the first row matching *attributes*, or create it with *attributes* + *values*.
+
+        Not wrapped in a transaction (Laravel parity) — the read and the create each
+        autocommit on their own. Wrap the call in ``DB.transaction()`` if you need the
+        find-or-create to be atomic against a concurrent insert.
+        """
         instance = await self.where(**attributes).first()
         if instance is not None:
             return instance
@@ -2730,7 +2738,11 @@ class QueryBuilder(Generic[T]):
         return cast("T", cast("Any", self._model)(**{**attributes, **(values or {})}))
 
     async def update_or_create(self, attributes: dict[str, Any], values: dict[str, Any]) -> T:
-        """Update the first row matching attributes, or create it."""
+        """Update the first row matching attributes, or create it.
+
+        Read + write run as separate autocommitting statements (Laravel parity).
+        Wrap in ``DB.transaction()`` for atomicity against a concurrent writer.
+        """
         instance = await self.where(**attributes).first()
         if instance is None:
             model_factory = cast("_ModelFactory", self._model)
@@ -2769,6 +2781,7 @@ class QueryBuilder(Generic[T]):
         """Alias of ``restore_or_create`` — Eloquent ships both spellings."""
         return await self.restore_or_create(attributes, values)
 
+    @autocommit(write=False)
     async def sole(self) -> T:
         """Return exactly one row. Raises if zero or more than one row matches."""
         stmt = self.apply_global_scopes()
@@ -2811,6 +2824,7 @@ class QueryBuilder(Generic[T]):
             raise ModelNotFoundError(self._model.__name__, pk)
         return instance
 
+    @autocommit(write=False)
     async def all(self) -> Any:
         from arvel.database.collection import ModelCollection
         from arvel.support.collections import Collection
@@ -2865,6 +2879,7 @@ class QueryBuilder(Generic[T]):
     async def get(self) -> Any:
         return await self.all()
 
+    @autocommit(write=False)
     async def count(self, column: str | None = None) -> int:
         stmt = self.apply_global_scopes()
         sub = stmt.subquery()
@@ -2874,6 +2889,7 @@ class QueryBuilder(Generic[T]):
         result = await get_active_session().execute(count_stmt)
         return int(result.scalar_one())
 
+    @autocommit(write=False)
     async def exists(self) -> bool:
         from sqlalchemy import exists as sqla_exists
 
@@ -2887,12 +2903,14 @@ class QueryBuilder(Generic[T]):
     async def doesnt_exist(self) -> bool:
         return not await self.exists()
 
+    @autocommit(write=False)
     async def value(self, col: str) -> Any:
         column = _resolve_column(self._model, col)
         stmt = self.apply_global_scopes().with_only_columns(column).limit(1)
         result = await get_active_session().execute(stmt)
         return result.scalar()
 
+    @autocommit(write=False)
     async def pluck(self, col: str, key: str | None = None) -> list[Any] | dict[Any, Any]:
         """Return a flat list of one column, or ``{key: value}`` when ``key`` is given."""
         column = _resolve_column(self._model, col)
@@ -2907,6 +2925,7 @@ class QueryBuilder(Generic[T]):
 
     # ------------------------------------------------------------------ aggregates
 
+    @autocommit(write=False)
     async def sum(self, col: str) -> Any:
         column = _resolve_column(self._model, col)
         stmt = self.apply_global_scopes().with_only_columns(func.sum(column))
@@ -2915,18 +2934,21 @@ class QueryBuilder(Generic[T]):
         value = result.scalar_one_or_none()
         return value if value is not None else 0
 
+    @autocommit(write=False)
     async def avg(self, col: str) -> Any:
         column = _resolve_column(self._model, col)
         stmt = self.apply_global_scopes().with_only_columns(func.avg(column))
         result = await get_active_session().execute(stmt)
         return result.scalar_one_or_none()
 
+    @autocommit(write=False)
     async def max(self, col: str) -> Any:
         column = _resolve_column(self._model, col)
         stmt = self.apply_global_scopes().with_only_columns(func.max(column))
         result = await get_active_session().execute(stmt)
         return result.scalar_one_or_none()
 
+    @autocommit(write=False)
     async def min(self, col: str) -> Any:
         column = _resolve_column(self._model, col)
         stmt = self.apply_global_scopes().with_only_columns(func.min(column))
@@ -2935,6 +2957,7 @@ class QueryBuilder(Generic[T]):
 
     # ------------------------------------------------------------------ pagination
 
+    @autocommit(write=False)
     async def paginate(
         self, per_page: int = 15, *, page: int | None = None, page_name: str = "page"
     ) -> Paginator[T]:
@@ -2956,6 +2979,7 @@ class QueryBuilder(Generic[T]):
             path=resolve_path(),
         )
 
+    @autocommit(write=False)
     async def simple_paginate(
         self, per_page: int = 15, *, page: int | None = None, page_name: str = "page"
     ) -> SimplePaginator[T]:
@@ -2979,6 +3003,7 @@ class QueryBuilder(Generic[T]):
             path=resolve_path(),
         )
 
+    @autocommit(write=False)
     async def cursor_paginate(
         self,
         per_page: int = 15,
@@ -3090,22 +3115,24 @@ class QueryBuilder(Generic[T]):
         """
         col = _resolve_column(self._model, column)
         last_id: Any = None
-        while True:
-            stmt = self.apply_global_scopes()
-            if last_id is not None:
-                stmt = stmt.where(col < last_id if descending else col > last_id)
-            stmt = stmt.order_by(col.desc() if descending else col).limit(size)
-            result = await get_active_session().execute(stmt)
-            batch: list[T] = cast("list[T]", list(result.scalars().all()))
-            if not batch:
-                return
-            await self._fire_retrieved(batch)
-            await self._eager_load_async(batch)
-            yield batch
-            if len(batch) < size:
-                return
-            last_id = getattr(batch[-1], column)
+        async with session_scope(commit=False) as session:
+            while True:
+                stmt = self.apply_global_scopes()
+                if last_id is not None:
+                    stmt = stmt.where(col < last_id if descending else col > last_id)
+                stmt = stmt.order_by(col.desc() if descending else col).limit(size)
+                result = await session.execute(stmt)
+                batch: list[T] = cast("list[T]", list(result.scalars().all()))
+                if not batch:
+                    return
+                await self._fire_retrieved(batch)
+                await self._eager_load_async(batch)
+                yield batch
+                if len(batch) < size:
+                    return
+                last_id = getattr(batch[-1], column)
 
+    @autocommit(write=False)
     async def chunk(self, size: int, callback: Callable[[list[T]], Awaitable[bool | None]]) -> None:
         """Process rows in OFFSET batches. Return ``False`` from the callback to stop."""
         base = self._ordered_for_offset()
@@ -3187,11 +3214,12 @@ class QueryBuilder(Generic[T]):
         if unstreamable:
             raise EagerLoadNotStreamableError(self._model.__name__, unstreamable)
         stmt = self.apply_global_scopes().execution_options(yield_per=batch_size)
-        result = await get_active_session().stream_scalars(stmt)
-        async for row in result:
-            typed = cast("T", row)
-            await self._fire_retrieved((typed,))
-            yield typed
+        async with session_scope(commit=False) as session:
+            result = await session.stream_scalars(stmt)
+            async for row in result:
+                typed = cast("T", row)
+                await self._fire_retrieved((typed,))
+                yield typed
 
     async def each(self, callback: Callable[[T], Awaitable[bool | None]]) -> None:
         """Process rows one at a time. Return ``False`` from the callback to stop."""
@@ -3213,6 +3241,7 @@ class QueryBuilder(Generic[T]):
 
             raise ReadOnlyModelError(self._model.__name__, operation)
 
+    @autocommit(write=True)
     async def insert(self, rows: list[dict[str, Any]]) -> None:
         self._assert_writable("insert")
         from sqlalchemy import insert as sqla_insert
@@ -3222,6 +3251,7 @@ class QueryBuilder(Generic[T]):
         await session.execute(stmt)
         await session.flush()
 
+    @autocommit(write=True)
     async def insert_get_id(self, row: dict[str, Any]) -> Any:
         self._assert_writable("insert_get_id")
         from sqlalchemy import insert as sqla_insert
@@ -3241,6 +3271,7 @@ class QueryBuilder(Generic[T]):
             return {**values, "updated_at": datetime.now(UTC)}
         return values
 
+    @autocommit(write=True)
     async def update(self, values: dict[str, Any]) -> int:
         self._assert_writable("update")
         from sqlalchemy import update as sqla_update
@@ -3257,7 +3288,11 @@ class QueryBuilder(Generic[T]):
         return result.rowcount
 
     async def update_or_insert(self, *, where: dict[str, Any], values: dict[str, Any]) -> None:
-        """Update matching row or insert if absent."""
+        """Update matching row or insert if absent.
+
+        The existence check and the write each autocommit separately (Laravel parity).
+        Wrap in ``DB.transaction()`` for atomicity against a concurrent writer.
+        """
         self._assert_writable("update_or_insert")
         existing_count = await type(self)(self._model).where(**where).count()
         if existing_count > 0:
@@ -3277,6 +3312,7 @@ class QueryBuilder(Generic[T]):
                 cols.update(col.name for col in constraint.columns)
         return cols
 
+    @autocommit(write=True)
     async def insert_or_ignore(self, rows: list[dict[str, Any]]) -> int:
         """INSERT rows, skipping any that violate a unique constraint. Returns rows inserted.
 
@@ -3312,6 +3348,7 @@ class QueryBuilder(Generic[T]):
         await session.flush()
         return int(result.rowcount) if result.rowcount != -1 else len(rows)
 
+    @autocommit(write=True)
     async def upsert(
         self,
         rows: list[dict[str, Any]],
@@ -3380,6 +3417,7 @@ class QueryBuilder(Generic[T]):
                 affected += 1
         return affected
 
+    @autocommit(write=True)
     async def insert_using(self, columns: list[str], query: QueryBuilder[Any]) -> int:
         """INSERT INTO … (columns) SELECT … — populate from another query. Returns rows inserted."""
         self._assert_writable("insert_using")
@@ -3392,6 +3430,7 @@ class QueryBuilder(Generic[T]):
         await session.flush()
         return int(result.rowcount) if result.rowcount != -1 else 0
 
+    @autocommit(write=True)
     async def truncate(self) -> None:
         """Empty the mapped table.
 
@@ -3412,6 +3451,7 @@ class QueryBuilder(Generic[T]):
             await session.execute(sqla_delete(table))
         await session.flush()
 
+    @autocommit(write=True)
     async def increment(
         self, col: str, amount: int = 1, *, extra: dict[str, Any] | None = None
     ) -> int:
@@ -3437,6 +3477,7 @@ class QueryBuilder(Generic[T]):
         """Decrement ``col`` by ``amount``, set any ``extra`` columns, return rows affected."""
         return await self.increment(col, -amount, extra=extra)
 
+    @autocommit(write=True)
     async def increment_each(
         self, amounts: dict[str, int], *, extra: dict[str, Any] | None = None
     ) -> int:
@@ -3463,6 +3504,7 @@ class QueryBuilder(Generic[T]):
         """Decrement several columns in one UPDATE: ``{col: delta}``. Returns rows affected."""
         return await self.increment_each({c: -d for c, d in amounts.items()}, extra=extra)
 
+    @autocommit(write=True)
     async def delete(self) -> int:
         """Delete matching rows. Soft-deletes (UPDATE deleted_at) when the model
         uses SoftDeletes; otherwise issues a hard DELETE."""
@@ -3485,6 +3527,7 @@ class QueryBuilder(Generic[T]):
             return int(result.rowcount)
         return await self._hard_delete()
 
+    @autocommit(write=True)
     async def force_delete(self) -> int:
         """Permanently remove matching rows, including already-trashed ones."""
         self._assert_writable("force_delete")
@@ -3505,6 +3548,7 @@ class QueryBuilder(Generic[T]):
         await session.flush()
         return int(result.rowcount)
 
+    @autocommit(write=True)
     async def restore(self) -> int:
         """Clear ``deleted_at`` on matching rows in one UPDATE. Returns rows affected.
 
