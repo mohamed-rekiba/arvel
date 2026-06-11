@@ -201,3 +201,27 @@ async def test_cache_store_success_clears_shared_counter() -> None:
         assert await store.count("k") == 2
         await store.reset("k")
         assert await store.count("k") == 0
+
+
+@pytest.mark.asyncio
+async def test_non_credential_failures_do_not_count() -> None:
+    """422 (unverified) / 403 (suspended) must not lock the account out."""
+
+    async def _handler_422(request: Request) -> JSONResponse:
+        del request
+        return JSONResponse({"error": {"code": "EMAIL_NOT_VERIFIED"}}, status_code=422)
+
+    inner = Starlette(routes=[Route("/api/auth/login", _handler_422, methods=["POST"])])
+    mw = ThrottleLoginMiddleware(
+        inner,
+        ThrottleLoginConfig(login_path="/api/auth/login", max_attempts=3, window_seconds=60),
+    )
+    async with AsyncClient(transport=ASGITransport(app=mw), base_url="http://test") as client:
+        # Ten 422s never trip the 3-attempt lockout.
+        for _ in range(10):
+            r = await client.post(
+                "/api/auth/login",
+                content=json.dumps({"email": "u@test.com", "password": "wrong"}),
+                headers={"content-type": "application/json"},
+            )
+            assert r.status_code == 422

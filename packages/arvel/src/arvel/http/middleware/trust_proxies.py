@@ -12,10 +12,18 @@ Mounted as the outermost layer so every downstream middleware and handler
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from arvel.contracts.middleware import GlobalMiddleware
 from arvel.observability.forwarded import ip_in_cidrs, resolve_client_ip
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+    from arvel.container import Container
 
 # "*" means trust every peer; expands to the IPv4 + IPv6 "any" networks.
 _TRUST_ALL_CIDRS = ("0.0.0.0/0", "::/0")
@@ -56,12 +64,26 @@ def _with_host_header(
     return rewritten
 
 
-class TrustProxiesMiddleware:
+class TrustProxiesMiddleware(GlobalMiddleware):
     """Rewrite the ASGI scope from ``X-Forwarded-*`` when the peer is trusted."""
 
     def __init__(self, app: ASGIApp, *, trusted_proxies: list[str]) -> None:
         self._app = app
         self._cidrs, self._trust_all = _expand_proxies(trusted_proxies)
+
+    @classmethod
+    def boot(cls, app: FastAPI, container: Container) -> None:
+        """Mount as the outermost layer when TRUSTED_PROXIES is set."""
+        from arvel.container.errors import BindingResolutionError
+        from arvel.http.config import HttpConfig
+
+        try:
+            config = container.make(HttpConfig)
+        except BindingResolutionError:
+            config = HttpConfig.from_environment()
+        if not config.trusted_proxies:
+            return
+        app.add_middleware(cls, trusted_proxies=config.trusted_proxies)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] not in ("http", "websocket"):

@@ -32,6 +32,7 @@ def create_application(
         Application.configure(_BASE_PATH)
         .with_config_dir(_BASE_PATH / "config")
         .with_providers(_BASE_PATH / "bootstrap" / "providers.py")
+        .with_middleware(_BASE_PATH / "bootstrap" / "middleware.py")
         .with_routing(
             web=routes_dir / "web.py",
             api=routes_dir / "api.py",

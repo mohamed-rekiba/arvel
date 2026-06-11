@@ -16,24 +16,44 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING
 
+from arvel.container.errors import BindingResolutionError
 from arvel.context.repository import (
     ContextRepository,
     bind_repository,
     current_repository,
     reset_repository,
 )
+from arvel.contracts.middleware import GlobalMiddleware
 from arvel.logging.facade import Log
+from arvel.observability.config import ObservabilityConfig
 from arvel.observability.context import get_request_context
 
 if TYPE_CHECKING:
+    from fastapi import FastAPI
     from starlette.types import ASGIApp, Receive, Scope, Send
 
+    from arvel.container import Container
 
-class ContextMiddleware:
+
+def _request_middleware_enabled(container: Container) -> bool:
+    """Whether the request-scoped middleware layer is on (tracks observability)."""
+    try:
+        config = container.make(ObservabilityConfig)
+    except BindingResolutionError:
+        config = ObservabilityConfig()
+    return config.request_middleware_enabled
+
+
+class ContextMiddleware(GlobalMiddleware):
     """Bind a fresh ``ContextRepository`` for the lifetime of each request."""
 
     def __init__(self, app: ASGIApp) -> None:
         self._app = app
+
+    @classmethod
+    def boot(cls, app: FastAPI, container: Container) -> None:
+        if _request_middleware_enabled(container):
+            app.add_middleware(cls)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -54,11 +74,16 @@ class ContextMiddleware:
             repo.add("request_id", ctx.request_id)
 
 
-class DeferredTaskMiddleware:
+class DeferredTaskMiddleware(GlobalMiddleware):
     """Drain ``defer()`` callbacks after the response, isolating each failure."""
 
     def __init__(self, app: ASGIApp) -> None:
         self._app = app
+
+    @classmethod
+    def boot(cls, app: FastAPI, container: Container) -> None:
+        if _request_middleware_enabled(container):
+            app.add_middleware(cls)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
