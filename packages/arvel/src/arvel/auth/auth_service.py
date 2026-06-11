@@ -150,13 +150,13 @@ class AuthService:
             msg = "invalid credentials"
             raise InvalidCredentialsError(msg)
 
-        if getattr(user, "suspended_at", None) is not None:
+        if user.is_suspended:
             await self._dispatch_login_failed(normalised, user_id=str(user.id))
             Log.debug("auth.login.failed", user_id=str(user.id), reason="suspended")
             msg = "account suspended"
             raise AccountSuspendedError(msg)
 
-        if getattr(user, "email_verified_at", None) is None:
+        if not user.is_verified:
             await self._dispatch_login_failed(normalised, user_id=str(user.id))
             Log.debug("auth.login.failed", user_id=str(user.id), reason="email_unverified")
             msg = "email not verified"
@@ -197,7 +197,9 @@ class AuthService:
         Log.debug("auth.refreshing")
 
         async with DB.transaction():
-            row = await RefreshToken.where(token_hash=digest).first()
+            # Lock the row so two concurrent refreshes can't both observe
+            # revoked_at is None and each mint a fresh rotation pair (TOCTOU).
+            row = await RefreshToken.where(token_hash=digest).lock_for_update().first()
             if row is None:
                 Log.debug("auth.refresh.rejected", reason="unknown_token")
                 msg = "refresh token unknown"
@@ -328,7 +330,7 @@ class AuthService:
         if user is None:
             msg = "user no longer exists"
             raise InvalidCredentialsError(msg)
-        if getattr(user, "suspended_at", None) is not None:
+        if user.is_suspended:
             msg = "account suspended"
             raise AccountSuspendedError(msg)
         return user

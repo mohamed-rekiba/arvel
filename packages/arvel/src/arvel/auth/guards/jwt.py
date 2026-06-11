@@ -27,6 +27,7 @@ from typing import Any, Protocol, cast
 
 from arvel.auth.config import JwtConfig
 from arvel.auth.guard import Guard, UserResolver
+from arvel.auth.mixins import Authenticatable
 
 _MIN_HMAC_SECRET_BYTES = 32
 _HMAC_ALGS = frozenset({"HS256", "HS384", "HS512"})
@@ -145,7 +146,8 @@ class JwtGuard(Guard):
             issued_at=_as_int(payload.get("iat")),
         ):
             return None
-        return await self._resolver.by_id(sub)
+        user = await self._resolver.by_id(sub)
+        return None if isinstance(user, Authenticatable) and user.is_suspended else user
 
     async def issue_token(
         self,

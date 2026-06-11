@@ -29,6 +29,7 @@ from arvel.auth.http.requests import (
     ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
+    ResendVerificationRequest,
     ResetPasswordRequest,
 )
 from arvel.auth.http.resources import AuthEnvelope, LoginResponse, UserResource
@@ -232,39 +233,29 @@ class AuthController(Controller):
 
     async def verify_email_resend(
         self,
-        request: Any,
+        payload: ResendVerificationRequest,
     ) -> dict[str, str]:
         """``POST /auth/verify/resend`` — re-issue a verification email.
 
-        Rate-limited per user: returns 429 if called more than once within
-        the configured window (default 60 s).
-
-        The caller must be authenticated (bearer JWT present).
+        Public and email-based: unverified accounts can't obtain a JWT, so this
+        can't be bearer-gated. Throttled per email (once per 60 s) and always
+        answered with a uniform 202, so callers can't probe which emails exist.
         """
-        from arvel.auth.exceptions import InvalidCredentialsError  # noqa: PLC0415
         from arvel.http.exceptions import ThrottleException  # noqa: PLC0415
 
-        token = _extract_bearer(request)
-        if token is None:
-            raise UnauthenticatedException("Bearer token missing.")
-        try:
-            user = await self._auth.me(access_token=token)
-        except InvalidCredentialsError as exc:
-            raise UnauthenticatedException("Invalid bearer token.") from exc
-
-        user_id = str(getattr(user, "id", ""))
-        email = str(getattr(user, "email", ""))
+        email = str(payload.email).strip().lower()
         if self._resend_store is None:
             from arvel.http.ratelimit import InMemoryStore  # noqa: PLC0415
 
             self._resend_store = InMemoryStore()
 
-        attempt = await self._resend_store.hit(f"resend:{user_id}", decay_seconds=60)
+        attempt = await self._resend_store.hit(f"resend:{email}", decay_seconds=60)
         if attempt.count > 1:
             raise ThrottleException("Too many resend requests.", retry_after_seconds=60)
 
-        signed = self._email_verification.issue(user_id=user_id, email=email)
-        await self._dispatch_verification_email(email=email, signed=signed)
+        signed = await self._email_verification.issue_for_email(email)
+        if signed is not None:
+            await self._dispatch_verification_email(email=email, signed=signed)
         return {"status": "queued"}
 
     # ─── mail helpers ──────────────────────────────────────────────────────

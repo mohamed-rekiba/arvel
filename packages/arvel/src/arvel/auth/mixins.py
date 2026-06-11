@@ -12,13 +12,25 @@ from arvel.auth.models.personal_access_token import PersonalAccessToken
 class Authenticatable:
     """Mixin that marks an ORM model as usable with authentication guards."""
 
-    _auth_password_field: ClassVar[str] = "password_hash"  # noqa: S105
+    # Matches the User model's column and SessionGuard's default, so custom
+    # models that forget to override still resolve their hash.
+    _auth_password_field: ClassVar[str] = "password"  # noqa: S105
 
     def get_auth_id(self) -> str:
         return str(getattr(self, "id", ""))
 
     def get_auth_password(self) -> str:
         return str(getattr(self, self._auth_password_field, ""))
+
+    @property
+    def is_verified(self) -> bool:
+        """True once the email is confirmed. Models without the column read as unverified."""
+        return getattr(self, "email_verified_at", None) is not None
+
+    @property
+    def is_suspended(self) -> bool:
+        """True while suspended. Models without the column are never suspended."""
+        return getattr(self, "suspended_at", None) is not None
 
 
 class _TokenRecord:

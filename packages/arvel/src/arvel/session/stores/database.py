@@ -22,8 +22,11 @@ _sessions_table = sa.Table(
 class DatabaseSessionStore:
     """Session store backed by an SQL ``sessions`` table."""
 
-    def __init__(self, session_maker: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(
+        self, session_maker: async_sessionmaker[AsyncSession], lifetime: int = 7200
+    ) -> None:
         self.session_maker = session_maker
+        self.lifetime = lifetime
 
     async def create_table(self, engine: AsyncEngine) -> None:
         """Create the sessions table if it doesn't exist."""
@@ -37,6 +40,9 @@ class DatabaseSessionStore:
             )
             record = row.first()
         if record is None:
+            return {}
+        # Expire on read so a stale row is treated as empty before GC sweeps it.
+        if self.lifetime > 0 and record.last_activity < int(time.time()) - self.lifetime:
             return {}
         try:
             raw: Any = json.loads(record.payload)

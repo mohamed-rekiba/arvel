@@ -281,3 +281,51 @@ async def test_token_guard_ignores_non_bearer_auth_scheme() -> None:
     )
     request = _FakeRequest(authorization="Basic dXNlcjpwYXNz")
     assert await guard.user(request) is None
+
+
+# suspended users are rejected on the next request, not at token expiry
+
+
+@pytest.mark.asyncio
+async def test_token_guard_rejects_suspended_user() -> None:
+    from datetime import datetime
+
+    from arvel.auth.guards.token import TokenGuard
+    from arvel.auth.mixins import Authenticatable
+
+    class _SuspendedUser(Authenticatable):
+        def __init__(self, uid: str) -> None:
+            self.id = uid
+            self.suspended_at = datetime(2020, 1, 1, tzinfo=UTC)
+
+    plain = "arvel_suspended_token"
+    hashed = _sha256(plain)
+    tok = _FakeToken(
+        token=hashed,
+        tokenable_type="app.Models.User.User",
+        tokenable_id="1",
+        abilities=["*"],
+    )
+    token_repo = _FakeTokenRepository({hashed: tok})
+    user_repo = _FakeUserRepository({"app.Models.User.User:1": _SuspendedUser("1")})
+    guard = TokenGuard(token_repository=token_repo, user_repository=user_repo)
+
+    assert await guard.user(_FakeRequest(authorization=f"Bearer {plain}")) is None
+
+
+# stateless guard: login/logout are inherited no-ops, not AttributeErrors
+
+
+@pytest.mark.asyncio
+async def test_token_guard_login_logout_are_noops() -> None:
+    from arvel.auth.guard import Guard
+    from arvel.auth.guards.token import TokenGuard
+
+    guard = TokenGuard(
+        token_repository=_FakeTokenRepository(),
+        user_repository=_FakeUserRepository(),
+    )
+    assert isinstance(guard, Guard)
+    # Would raise AttributeError if TokenGuard didn't extend Guard.
+    await guard.login({"id": "1"}, _FakeRequest())
+    await guard.logout(_FakeRequest())

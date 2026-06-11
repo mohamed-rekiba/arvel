@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from arvel.auth.mixins import Authenticatable
 
 
 class _FakeSessionData:
@@ -189,3 +190,38 @@ async def test_session_guard_returns_none_when_request_has_no_state_session() ->
     guard = SessionGuard(resolver=_FakeResolver())
     result = await guard.user(_NoSessionRequest())
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_session_guard_rejects_suspended_user() -> None:
+    from datetime import UTC, datetime
+
+    from arvel.auth.guards.session import SessionGuard
+
+    class _SuspendedUser(Authenticatable):
+        id = "u1"
+        suspended_at = datetime(2020, 1, 1, tzinfo=UTC)
+
+    session = _FakeSessionData({"_auth_id": "u1"})
+    request = _FakeRequest(session)
+    guard = SessionGuard(resolver=_FakeResolver({"u1": _SuspendedUser()}))
+
+    assert await guard.user(request) is None
+
+
+@pytest.mark.asyncio
+async def test_session_guard_attempt_fails_without_a_session() -> None:
+    """Valid credentials can't yield a session login when no session exists."""
+    from arvel.auth.guards.session import SessionGuard
+    from arvel.facades.hash import Hash
+
+    class _NoSessionRequest:
+        class state:  # noqa: N801
+            pass  # no .session attribute
+
+    plain = "correct-password"
+    user = {"id": "u1", "email": "a@example.com", "password": Hash.make(plain)}
+    guard = SessionGuard(resolver=_FakeResolver({"a@example.com": user}))
+
+    ok = await guard.attempt({"email": "a@example.com", "password": plain}, _NoSessionRequest())
+    assert ok is False

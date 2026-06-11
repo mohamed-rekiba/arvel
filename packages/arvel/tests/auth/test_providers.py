@@ -100,7 +100,7 @@ def test_authenticatable_mixin_exposes_get_auth_password() -> None:
     from arvel.auth.mixins import Authenticatable
 
     class User(Authenticatable):
-        password_hash = "bcrypt_hashed"
+        password = "bcrypt_hashed"
 
     u = User()
     assert u.get_auth_password() == "bcrypt_hashed"

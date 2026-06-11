@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from arvel.auth.exceptions import AuthorizationException, UnauthenticatedException
+from arvel.auth.mixins import Authenticatable
 
 
 class VerifiedMiddleware:
@@ -14,6 +15,6 @@ class VerifiedMiddleware:
         # 403 — re-authenticating won't help; the user has to verify their email.
         if user is None:
             raise UnauthenticatedException("Not authenticated.")
-        if not getattr(user, "email_verified_at", None):
+        if not (isinstance(user, Authenticatable) and user.is_verified):
             raise AuthorizationException("Email address is not verified.")
         return await call_next(request)

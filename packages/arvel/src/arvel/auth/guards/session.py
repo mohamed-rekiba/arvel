@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from arvel.auth.guard import Guard, UserResolver
+from arvel.auth.mixins import Authenticatable
 from arvel.facades.hash import Hash
 
 
@@ -29,9 +30,17 @@ class SessionGuard(Guard):
         user_id = session.get(self._session_key)
         if not isinstance(user_id, str):
             return None
-        return await self._resolver.by_id(user_id)
+        user = await self._resolver.by_id(user_id)
+        if isinstance(user, Authenticatable) and user.is_suspended:
+            return None
+        return user
 
     async def attempt(self, credentials: dict[str, object], request: Any) -> bool:
+        # Can't authenticate via session if there's no session to write to —
+        # don't report success the caller can't act on.
+        if self._get_session(request) is None:
+            return False
+
         user = await self._resolver.by_credentials(credentials)
         if user is None:
             return False

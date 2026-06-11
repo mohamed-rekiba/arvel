@@ -51,6 +51,19 @@ class EmailVerificationService:
         payload = {"id": user_id, "h": _email_hash(email)}
         return self._serializer.dumps(payload)
 
+    async def issue_for_email(self, email: str) -> str | None:
+        """Mint a token for an unverified user by email, or None if there's nothing to do.
+
+        Returns None when no matching user exists or they're already verified.
+        Callers must respond uniformly regardless, so a missing account is
+        indistinguishable from a verified one.
+        """
+        normalised = email.strip().lower()
+        user = await self._user_cls.where(email=normalised).first()
+        if user is None or user.is_verified:
+            return None
+        return self.issue(user_id=str(user.id), email=str(getattr(user, "email", normalised)))
+
     def build_url(self, *, base_url: str, signed: str) -> str:
         """Compose ``{base_url}/{signed}`` with no trailing slash on the base."""
         return f"{base_url.rstrip('/')}/{signed}"
@@ -91,7 +104,7 @@ class EmailVerificationService:
         """
         user_id, email_hash = self.peek(signed)
 
-        user = await self._user_cls.find(user_id)
+        user = await self._user_cls.find(_coerce_pk(user_id))
         if user is None:
             msg = "verification target no longer exists"
             raise EmailVerificationInvalidError(msg)
@@ -108,6 +121,11 @@ class EmailVerificationService:
             EmailVerified(user_id=user_id, email=email, occurred_at=datetime.now(tz=UTC))
         )
         return user
+
+
+def _coerce_pk(value: str) -> int | str:
+    """Cast a numeric PK string to int so integer-PK models match on find()."""
+    return int(value) if value.isdigit() else value
 
 
 def _email_hash(email: str) -> str:
