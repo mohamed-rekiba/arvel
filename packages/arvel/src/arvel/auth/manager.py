@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from arvel.auth.exceptions import AuthConfigError
 from arvel.auth.guard import Guard
+
+
+@runtime_checkable
+class _SupportsAttempt(Protocol):
+    """Guards that authenticate credentials directly (e.g. SessionGuard)."""
+
+    async def attempt(self, credentials: dict[str, object], request: Any) -> bool: ...
 
 
 class AuthManager:
@@ -27,7 +34,7 @@ class AuthManager:
     async def check(self, request: Any) -> bool:
         return await self.user(request) is not None
 
-    async def id(self, request: Any) -> Any | None:
+    async def id(self, request: Any) -> str | None:
         user = await self.user(request)
         if user is None:
             return None
@@ -35,8 +42,8 @@ class AuthManager:
 
     async def attempt(self, credentials: dict[str, object], request: Any) -> bool:
         g = self.guard()
-        if hasattr(g, "attempt"):
-            return await g.attempt(credentials, request)  # type: ignore[no-any-return]
+        if isinstance(g, _SupportsAttempt):
+            return await g.attempt(credentials, request)
         return False
 
     async def login(self, user: Any, request: Any) -> None:

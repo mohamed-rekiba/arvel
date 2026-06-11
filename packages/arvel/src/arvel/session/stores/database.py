@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+
+if TYPE_CHECKING:
+    from arvel.session.cipher import SessionCipher
 
 _sessions_table = sa.Table(
     "sessions",
@@ -23,10 +26,15 @@ class DatabaseSessionStore:
     """Session store backed by an SQL ``sessions`` table."""
 
     def __init__(
-        self, session_maker: async_sessionmaker[AsyncSession], lifetime: int = 7200
+        self,
+        session_maker: async_sessionmaker[AsyncSession],
+        lifetime: int = 7200,
+        *,
+        cipher: SessionCipher | None = None,
     ) -> None:
         self.session_maker = session_maker
         self.lifetime = lifetime
+        self._cipher = cipher
 
     async def create_table(self, engine: AsyncEngine) -> None:
         """Create the sessions table if it doesn't exist."""
@@ -45,14 +53,16 @@ class DatabaseSessionStore:
         if self.lifetime > 0 and record.last_activity < int(time.time()) - self.lifetime:
             return {}
         try:
+            if self._cipher is not None:
+                return self._cipher.decrypt(record.payload)
             raw: Any = json.loads(record.payload)
             return cast("dict[str, Any]", raw) if isinstance(raw, dict) else {}
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError, TypeError):
             return {}
 
     async def write(self, session_id: str, data: dict[str, Any], lifetime: int) -> None:
         now = int(time.time())
-        payload = json.dumps(data)
+        payload = self._cipher.encrypt(data) if self._cipher is not None else json.dumps(data)
         async with self.session_maker() as session, session.begin():
             existing = await session.execute(
                 sa.select(_sessions_table).where(_sessions_table.c.id == session_id)

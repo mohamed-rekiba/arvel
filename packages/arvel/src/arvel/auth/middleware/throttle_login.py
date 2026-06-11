@@ -157,6 +157,10 @@ class ThrottleLoginMiddleware(GlobalMiddleware):
                 login_path=f"{prefix}/login",
                 max_attempts=rate_limit.max_attempts,
                 window_seconds=rate_limit.decay_seconds,
+                # Cache-backed by default so the limit holds across workers
+                # (Redis in prod). The in-memory store is only the bare
+                # constructor fallback for tests / single-process use.
+                store=CacheLoginAttemptStore(),
             ),
         )
 

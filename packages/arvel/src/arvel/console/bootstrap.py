@@ -19,6 +19,7 @@ import importlib.util
 import inspect
 import logging
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -95,25 +96,45 @@ def bootstrap_framework_application(
             module_path,
         )
         return None
+    if not callable(factory):
+        msg = f"{module_path}: create_application must be callable, got {type(factory).__name__!r}."
+        raise TypeError(msg)
 
     return _call_factory(factory, required_subsystems)
 
 
 def _call_factory(
-    factory: object,
+    factory: Callable[..., object],
     required_subsystems: frozenset[CliSubsystem] | None,
-) -> Application | None:
+) -> Application:
+    result = _invoke_factory(factory, required_subsystems)
+
+    from arvel.application import Application  # noqa: PLC0415 — avoid import cycle at load
+
+    if not isinstance(result, Application):
+        msg = (
+            "create_application() must return an arvel.application.Application, "
+            f"got {type(result).__name__!r}."
+        )
+        raise TypeError(msg)
+    return result
+
+
+def _invoke_factory(
+    factory: Callable[..., object],
+    required_subsystems: frozenset[CliSubsystem] | None,
+) -> object:
     if required_subsystems is None:
-        return factory()  # type: ignore[no-any-return,operator]
+        return factory()
 
     try:
-        sig = inspect.signature(factory)  # type: ignore[arg-type]
+        sig = inspect.signature(factory)
     except TypeError, ValueError:
-        return factory()  # type: ignore[no-any-return,operator]
+        return factory()
 
     if "required_subsystems" in sig.parameters:
-        return factory(required_subsystems=required_subsystems)  # type: ignore[no-any-return,operator]
-    return factory()  # type: ignore[no-any-return,operator]
+        return factory(required_subsystems=required_subsystems)
+    return factory()
 
 
 __all__ = ["bootstrap_framework_application", "find_project_root"]
