@@ -270,7 +270,7 @@ async def test_gate_policy_resolves_by_subclass() -> None:
 
     class PostPolicy(Policy[Post]):
         async def update(self, user: Any, post: Post) -> bool:
-            return user.id == post.owner_id
+            return bool(user.id == post.owner_id)
 
     gate = Gate()
     gate.policy(Post, PostPolicy())
