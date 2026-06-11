@@ -144,6 +144,9 @@ result = await container.acall(ReportBuilder, "build_async")
 
 `amake` resolves async bindings **at any depth** — auto-wiring a class whose constructor needs an async-bound dependency (directly or transitively) works, as long as you start the resolution with `amake`/`acall`. The synchronous `make` still raises `AsyncBindingError` the moment it meets an async binding anywhere in the graph.
 
+> [!WARNING]
+> `call`/`acall` inject a method parameter only when its annotated type is already **bound** — unbound concrete types are not auto-wired the way constructor dependencies are (pass them via `overrides=`). And when a parameter's annotation arrives as a string (a locally-scoped type under [PEP 649](https://peps.python.org/pep-0649/)), the container matches it against bound types by class `__name__` alone, so two bound classes that share a name can resolve to the wrong one. Annotate `call` targets with module-level, uniquely-named types.
+
 Check container state with `bound(abstract)` and `resolved(abstract)`.
 
 Because `make`/`amake` accept the same key type as `bind`, you can resolve a bound interface or `Protocol` directly — `make(Mailer)` is type-checked as returning a `Mailer` with no `# type: ignore` at the call site.
