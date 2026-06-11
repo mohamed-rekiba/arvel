@@ -64,6 +64,8 @@ class AzureDriver:
         connection_string: str | None = None,
         account_url: str | None = None,
         prefix: str = "",
+        account: str = "",
+        account_key: str = "",
         **kwargs: Any,
     ) -> None:
         try:
@@ -76,7 +78,14 @@ class AzureDriver:
 
         if config is not None:
             container = config.container
+            account = config.account
+            account_key = config.key.get_secret_value()
             account_url = f"https://{config.account}.blob.core.windows.net"
+
+        # Kept for SAS generation in temporary_url(); empty when only a public
+        # account_url was supplied (no shared key available to sign with).
+        self._account = account
+        self._account_key = account_key
 
         # Use getattr to keep the constructor as Any; cast per-branch to the Protocol.
         _blob_svc_cls = _azure_mod.BlobServiceClient
@@ -142,10 +151,31 @@ class AzureDriver:
         return f"{account_url.rstrip('/')}/{self._container}/{self._blob_name(path)}"
 
     def temporary_url(self, path: str, expiry: int) -> str:
-        raise NotImplementedError(
-            "AzureDriver.temporary_url requires generating a SAS token"
-            " — not implemented in this version"
+        """Return a read-only URL with a SAS token that expires after *expiry* seconds.
+
+        Requires a shared account key (``STORAGE_AZURE_KEY``); signing is a local
+        crypto op, so this stays synchronous like the S3/GCS equivalents.
+        """
+        import datetime
+
+        if not self._account or not self._account_key:
+            raise ValueError(
+                "AzureDriver.temporary_url requires an account name and key "
+                "(set STORAGE_AZURE_ACCOUNT and STORAGE_AZURE_KEY)"
+            )
+
+        # azure-storage-blob ships no complete stubs; Any at this boundary mirrors
+        # the aio client handling above.
+        _blob: Any = importlib.import_module("azure.storage.blob")
+        sas: str = _blob.generate_blob_sas(
+            account_name=self._account,
+            container_name=self._container,
+            blob_name=self._blob_name(path),
+            account_key=self._account_key,
+            permission=_blob.BlobSasPermissions(read=True),
+            expiry=datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiry),
         )
+        return f"{self.url(path)}?{sas}"
 
 
 __all__ = ["AzureDriver"]
