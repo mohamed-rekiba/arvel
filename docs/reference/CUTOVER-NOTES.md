@@ -22,9 +22,6 @@ These are behaviors that read as gaps or inconsistencies in the source. Each is 
 |---|---|---|
 | Audit config | Container-bound `AuditConfig` is unused at runtime; `encrypt_values` fixed at import. | [audit](../packages/audit.md) |
 | Image alter migration | `001_alter_media_model_id.py` not in `publishes()` — upgrade path easy to miss. | [image](../packages/image.md) |
-| CLI async loops | `cache:*` and `schedule:run` run a nested `asyncio.run()` inside the outer loop. | [CLI architecture](../console/cli-architecture.md) |
-| `Application.run(args)` | Ignores `args` — scheduled/programmatic invocation can't pass flags. | [CLI architecture](../console/cli-architecture.md) |
-| Stub commands | `key:rotate`, parts of `optimize` (`route:cache`, `event:cache`) are honest stubs. | [CLI architecture](../console/cli-architecture.md) |
 | Encrypter vs `EncryptedType` | Two wire formats (v2 app-level vs v1 column cast). Confirm both are intended. | [encryption](../subsystems/encryption.md) |
 | Kit + permission | The kit uses permission models without `PermissionServiceProvider`, so the Gate bridge doesn't run. | [kit](../kits/ecommerce-kit.md) |
 | Broadcasting bridge | No built-in bridge from `redis-pubsub` publishing to the Reverb WebSocket server. | [broadcasting](../subsystems/broadcasting.md) |

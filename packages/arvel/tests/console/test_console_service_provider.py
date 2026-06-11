@@ -1,7 +1,7 @@
 """ConsoleServiceProvider + Application.run + scheduler auto-wire.
 
 Tests for:
- Application.run(name, args) -> int (programmatic invocation)
+ Application.run(name) -> int (programmatic invocation)
  Application.register_command(cmd) (post-construction registration)
  ConsoleServiceProvider.register binds Application in container
  ConsoleServiceProvider.boot collects provider commands (both shapes)
@@ -86,7 +86,7 @@ class _EmptyProvider(ServiceProvider):
         return []
 
 
-# ─── : Application.run(name, args) -> int ────────────────────────────
+# ─── : Application.run(name) -> int ────────────────────────────
 
 
 def test_application_run_invokes_command_by_name_returns_exit_code() -> None:

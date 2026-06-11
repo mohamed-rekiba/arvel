@@ -121,20 +121,22 @@ class Command:
     def handle(self, ctx: Context) -> int:
         """Execute the command. Return 0 for success, non-zero for failure."""
 
-    def call(self, name: str, args: list[str] | None = None) -> int:
+    def call(self, name: str) -> int:
         """Invoke another registered command in-process and return its exit code.
 
-        Requires a bound framework Application (``self.app``) — typically set
-        by the entrypoint when ``requires`` is non-empty. Use ``call_silently``
-        to suppress stdout from the invoked command.
+        In-process dispatch is name-only: it runs the target's ``handle(ctx)``.
+        Commands that take CLI flags own them through Typer at the real
+        entrypoint, not via this path. Requires a bound framework Application
+        (``self.app``). Use ``call_silently`` to suppress the invoked command's
+        stdout.
         """
-        return self._invoke_via_console(name, args, silent=False)
+        return self._invoke_via_console(name, silent=False)
 
-    def call_silently(self, name: str, args: list[str] | None = None) -> int:
+    def call_silently(self, name: str) -> int:
         """Same as :meth:`call`, but stdout from the invoked command is discarded."""
-        return self._invoke_via_console(name, args, silent=True)
+        return self._invoke_via_console(name, silent=True)
 
-    def _invoke_via_console(self, name: str, args: list[str] | None, *, silent: bool) -> int:
+    def _invoke_via_console(self, name: str, *, silent: bool) -> int:
         if self.app is None:
             msg = (
                 f"Command.call({name!r}) requires a bound framework Application; "
@@ -144,8 +146,8 @@ class Command:
         console_app: Application = self.app.container.make(Application)
         if silent:
             with contextlib.redirect_stdout(io.StringIO()):
-                return console_app.run(name, args)
-        return console_app.run(name, args)
+                return console_app.run(name)
+        return console_app.run(name)
 
 
 class Application:
@@ -200,19 +202,18 @@ class Application:
         self._commands[cmd.name] = cmd
         cmd.register(self.typer_app)
 
-    def run(self, name: str, args: list[str] | None = None) -> int:
+    def run(self, name: str) -> int:
         """Invoke a registered command by name and return its exit code.
 
         Bypasses Typer's CLI parsing — this is the in-process programmatic
-        entry-point used by the scheduler kernel's ``run_command`` hook. The
-        ``args`` parameter is accepted for forward compatibility but is not
-        currently passed through, because the wired use case (scheduled
-        commands by name) has no positional/keyword arguments.
+        entry-point used by composite commands and the scheduler kernel's
+        ``run_command`` hook. It runs the target's ``handle(ctx)`` directly, so
+        dispatch is name-only; flag-bearing commands own their args through
+        Typer at the real entrypoint.
 
         Raises ``KeyError`` when ``name`` does not match any registered
         command.
         """
-        _ = args  # reserved for future argv passthrough
         try:
             command = self._commands[name]
         except KeyError as exc:
