@@ -20,7 +20,6 @@ These are behaviors that read as gaps or inconsistencies in the source. Each is 
 
 | Topic | Question | Page |
 |---|---|---|
-| Cache `database` store | Hardcoded to in-memory SQLite — should it use the app DB / a `CACHE_DATABASE_URL`? | [cache](../subsystems/cache.md) |
 | Session cookie flags | `StartSession` hardcodes `HttpOnly`/`SameSite=Lax`; `SESSION_SECURE`/`SESSION_SAME_SITE`/`SESSION_ENCRYPT` are unused. Intended? | [session](../subsystems/session.md) |
 | Storage `app_key` | Provider doesn't pass `app_key`, so local `temporary_url()` raises. Wire `APP_KEY` in? | [storage](../subsystems/storage.md) |
 | Azure temporary URLs | `AzureDriver.temporary_url` raises `NotImplementedError`. | [storage](../subsystems/storage.md) |

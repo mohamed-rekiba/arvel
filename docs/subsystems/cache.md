@@ -14,7 +14,7 @@ flowchart LR
     S --> File["file (JSON per key)"]
     S --> Null["null (no-op)"]
     S --> Redis["redis"]
-    S --> DBs["database (in-memory SQLite)"]
+    S --> DBs["database (app DB connection)"]
 ```
 
 Stores implement a `CacheStore` protocol (`put`/`get`/`forget`/`has`/`flush`/`forever`/`many`/`put_many`). `ttl=None` means forever. `CacheManager` lazily builds and caches one store per driver.
@@ -27,9 +27,9 @@ The driver comes from `CacheConfig` (`CACHE_*`, default `array`):
 | `file` | files (SHA-256 names) | JSON per key |
 | `null` | nothing | no-op |
 | `redis` | `redis.asyncio` | `setex`/`set` |
-| `database` | **in-memory SQLite** | hardcoded `:memory:` |
+| `database` | app DB connection | `cache_entries` table |
 
-> **Warning**: The `database` store is wired to `sqlite+aiosqlite:///:memory:`, so it does **not** persist across processes. The `DatabaseStore` class is a real SQL-backed store, but the manager never points it at the app DB. `TODO/QUESTION:` Should the database cache use `CACHE_DATABASE_URL` / the app engine instead of in-memory SQLite?
+The `database` store shares the application's default DB connection via `DB.session_maker_for()`, so cached values persist across processes and survive restarts. Publish and run the cache migration (`vendor:publish --tag=arvel-cache`, then `arvel migrate`) to create the `cache_entries` table before selecting this driver.
 
 ## Locks
 
