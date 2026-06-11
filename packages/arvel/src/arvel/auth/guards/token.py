@@ -13,6 +13,9 @@ import hmac
 from datetime import UTC, datetime
 from typing import Any, Protocol, runtime_checkable
 
+from arvel.auth.guard import Guard
+from arvel.auth.mixins import Authenticatable
+
 
 @runtime_checkable
 class TokenRepository(Protocol):
@@ -25,7 +28,7 @@ class UserRepository(Protocol):
     async def find(self, type_: str, id_: str) -> Any | None: ...
 
 
-class TokenGuard:
+class TokenGuard(Guard):
     def __init__(
         self,
         *,
@@ -40,22 +43,17 @@ class TokenGuard:
         if plain is None:
             return None
 
-        token_hash = hashlib.sha256(plain.encode()).hexdigest()
-        record = await self._token_repo.find_by_hash(token_hash)
+        record = await self._resolve_record(plain)
         if record is None:
-            return None
-
-        # Constant-time confirm the stored digest matches the presented one.
-        # Defence-in-depth on the actual secret (the token), regardless of how
-        # the repository performed its lookup.
-        if not hmac.compare_digest(str(getattr(record, "token", "")), token_hash):
-            return None
-
-        if self._is_expired(record):
             return None
 
         user = await self._user_repo.find(record.tokenable_type, record.tokenable_id)
         if user is None:
+            return None
+        # `resolved` carries the isinstance narrowing so `user` stays broad for
+        # the HasApiTokens call below (a token owner is both contracts).
+        resolved = user
+        if isinstance(resolved, Authenticatable) and resolved.is_suspended:
             return None
 
         await self._token_repo.touch(record)
@@ -66,6 +64,21 @@ class TokenGuard:
         if hasattr(user, "with_access_token"):
             user.with_access_token(record)
         return user
+
+    async def _resolve_record(self, plain: str) -> Any | None:
+        """Look up the access-token record, then verify its digest and expiry."""
+        token_hash = hashlib.sha256(plain.encode()).hexdigest()
+        record = await self._token_repo.find_by_hash(token_hash)
+        if record is None:
+            return None
+        # Constant-time confirm the stored digest matches the presented one.
+        # Defence-in-depth on the actual secret (the token), regardless of how
+        # the repository performed its lookup.
+        if not hmac.compare_digest(str(getattr(record, "token", "")), token_hash):
+            return None
+        if self._is_expired(record):
+            return None
+        return record
 
     @staticmethod
     def _is_expired(record: Any) -> bool:

@@ -4,12 +4,21 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from typing import Any
+from typing import Any, cast
 
 _FLASH_NEW = "_flash_new"
 _FLASH_OLD = "_flash_old"
 _SESSION_ID = "_session_id"
 _CSRF_KEY = "_csrf_token"
+
+
+def _as_list(value: Any) -> list[Any]:
+    """Coerce a stored value into a list, wrapping non-lists."""
+    # Alias the check so mypy doesn't narrow `value` at the cast site (which
+    # would make the cast redundant); pyright still needs the cast to know the
+    # element type after isinstance launders the Any.
+    is_list = isinstance(value, list)
+    return cast("list[Any]", value) if is_list else [value]
 
 
 class SessionData:
@@ -46,6 +55,26 @@ class SessionData:
         self._data.pop(key, None)
         if _FLASH_OLD in self._data:
             self._data[_FLASH_OLD].pop(key, None)
+
+    def pull(self, key: str, default: Any = None) -> Any:
+        """Read a value and remove it in one step."""
+        value = self.get(key, default)
+        self.forget(key)
+        return value
+
+    def push(self, key: str, value: Any) -> None:
+        """Append to the list stored at ``key`` (creating it if absent)."""
+        items = _as_list(self.get(key, []))
+        items.append(value)
+        self.put(key, items)
+
+    def increment(self, key: str, amount: int = 1) -> int:
+        new = int(self.get(key, 0)) + amount
+        self.put(key, new)
+        return new
+
+    def decrement(self, key: str, amount: int = 1) -> int:
+        return self.increment(key, -amount)
 
     def flush(self) -> None:
         session_id = self._data.get(_SESSION_ID)
@@ -120,6 +149,13 @@ class SessionData:
         merged = {**old, **existing_new}
         if merged:
             self._data[_FLASH_NEW] = merged
+
+    def keep(self, *keys: str) -> None:
+        """Keep only the named old-flash keys alive for one more request."""
+        old = self._data.get(_FLASH_OLD, {})
+        kept = {k: old[k] for k in keys if k in old}
+        if kept:
+            self._data.setdefault(_FLASH_NEW, {}).update(kept)
 
     def finalize_flash(self) -> None:
         """Called by StartSession on each request transition.

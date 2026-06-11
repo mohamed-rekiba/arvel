@@ -67,3 +67,20 @@ async def test_session_manager_create_and_save_session(tmp_path: Path) -> None:
 
     restored = await manager.create_session(session.get_id())
     assert restored.get("user_id") == 123
+
+
+async def test_save_session_destroys_rotated_id(tmp_path: Path) -> None:
+    # regenerate() queues the old id; save_session must drop that record so a
+    # pre-login session can't outlive the rotation.
+    path = tmp_path / "sessions"
+    manager = SessionManager(SessionConfig(driver=SessionDriver.FILE, files_path=str(path)))
+
+    session = await manager.create_session()
+    session.put("user_id", 123)
+    await manager.save_session(session)
+    old_id = session.get_id()
+
+    session.regenerate()
+    await manager.save_session(session)
+
+    assert await manager.store().read(old_id) == {}

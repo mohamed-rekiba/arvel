@@ -70,8 +70,9 @@ async def test_guest_middleware_allows_unauthenticated_through() -> None:
 @pytest.mark.asyncio
 async def test_verified_middleware_allows_verified_user() -> None:
     from arvel.auth.middleware.verified import VerifiedMiddleware
+    from arvel.auth.mixins import Authenticatable
 
-    class VerifiedUser:
+    class VerifiedUser(Authenticatable):
         email_verified_at = "2026-01-01"
 
     mw = VerifiedMiddleware()
@@ -86,8 +87,9 @@ async def test_verified_middleware_blocks_unverified_user_with_403() -> None:
     """A logged-in but unverified user is a 403 (authorization), not a 401."""
     from arvel.auth.exceptions import AuthorizationException
     from arvel.auth.middleware.verified import VerifiedMiddleware
+    from arvel.auth.mixins import Authenticatable
 
-    class UnverifiedUser:
+    class UnverifiedUser(Authenticatable):
         email_verified_at = None
 
     mw = VerifiedMiddleware()

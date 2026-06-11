@@ -76,11 +76,11 @@ class SessionManager:
 
                 engine = create_async_engine(self._config.database_url)
                 maker = async_sessionmaker(engine, expire_on_commit=False)
-                return DatabaseSessionStore(session_maker=maker)
+                return DatabaseSessionStore(session_maker=maker, lifetime=self._config.lifetime)
             case SessionDriver.FILE:
                 from arvel.session.stores.file import FileSessionStore
 
-                return FileSessionStore(self._config.files_path)
+                return FileSessionStore(self._config.files_path, lifetime=self._config.lifetime)
 
     async def create_session(self, session_id: str | None = None) -> SessionData:
         """Load session data from the default store and wrap in SessionData."""
@@ -97,6 +97,10 @@ class SessionManager:
         """Persist session data back to the store."""
         store = self.store()
         await store.write(session.get_id(), session.to_dict(), self._config.lifetime)
+        # Drop ids rotated out by regenerate() so the old record can't outlive the
+        # new one — mirrors StartSession._persist for the facade-driven path.
+        for old_id in session.drain_pending_destroy():
+            await store.destroy(old_id)
 
 
 __all__ = ["SessionManager"]

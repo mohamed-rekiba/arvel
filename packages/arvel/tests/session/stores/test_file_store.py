@@ -51,6 +51,18 @@ class TestFileSessionStore:
         assert deleted >= 1
 
     @pytest.mark.asyncio
+    async def test_expired_file_reads_as_empty(
+        self, store: FileSessionStore, tmp_path: Path
+    ) -> None:
+        """A stale file is treated as empty on read, before GC ever runs."""
+        import os
+
+        await store.write("stale", {"k": "v"}, lifetime=120)
+        for session_file in tmp_path.glob("*.session"):
+            os.utime(session_file, (0, 0))
+        assert await store.read("stale") == {}
+
+    @pytest.mark.asyncio
     async def test_traversal_id_does_not_escape_session_dir(
         self, store: FileSessionStore, tmp_path: Path
     ) -> None:

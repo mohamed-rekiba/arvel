@@ -74,6 +74,9 @@ class RefreshConfig(BaseModel):
     csrf_cookie_name: str = "_csrf"
     csrf_cookie_secure: bool = True
     csrf_header: str = "X-CSRF-TOKEN"
+    csrf_protection: bool = True
+    """Mount the double-submit CSRF guard on cookie refresh/logout. Bearer
+    requests are exempt, so leaving this on is safe for token-only APIs too."""
 
 
 class RoutesConfig(BaseModel):
@@ -104,6 +107,8 @@ class AuthConfig(BaseModel):
     refresh: RefreshConfig = RefreshConfig()
     routes: RoutesConfig = RoutesConfig()
     rate_limit: RateLimitConfig = RateLimitConfig()
+    verification_ttl_seconds: int = 60 * 60
+    """How long a signed email-verification link stays valid."""
     reset_page_url: str = ""
     """Base URL of the front-end password-reset page (not the full link).
 

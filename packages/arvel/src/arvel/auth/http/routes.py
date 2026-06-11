@@ -27,6 +27,7 @@ from arvel.auth.http.requests import (
     ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
+    ResendVerificationRequest,
     ResetPasswordRequest,
 )
 from arvel.auth.http.resources import AuthEnvelope, LoginResponse, UserResource
@@ -74,8 +75,8 @@ def register_auth_routes(
     async def handle_verify_email(signed: str) -> Any:
         return await controller.verify_email(signed)
 
-    async def handle_verify_email_resend(request: Request) -> Any:
-        return await controller.verify_email_resend(request)
+    async def handle_verify_email_resend(payload: ResendVerificationRequest) -> Any:
+        return await controller.verify_email_resend(payload)
 
     router.add_api_route(
         f"{p}/register",
@@ -133,7 +134,7 @@ def register_auth_routes(
         f"{p}/verify/resend",
         handle_verify_email_resend,
         methods=["POST"],
-        status_code=status.HTTP_200_OK,
+        status_code=status.HTTP_202_ACCEPTED,
     )
 
 

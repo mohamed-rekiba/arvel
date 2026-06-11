@@ -26,7 +26,7 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
 @pytest_asyncio.fixture
 async def store(db_engine: AsyncEngine) -> DatabaseSessionStore:
     maker = async_sessionmaker(db_engine, expire_on_commit=False)
-    s = DatabaseSessionStore(session_maker=maker)
+    s = DatabaseSessionStore(session_maker=maker, lifetime=120)
     await s.create_table(db_engine)
     return s
 
@@ -60,3 +60,14 @@ class TestDatabaseSessionStore:
         deleted = await store.gc(max_lifetime=120)
         assert deleted >= 1
         assert await store.read("old_sid") == {}
+
+    @pytest.mark.asyncio
+    async def test_expired_row_reads_as_empty(self, store: DatabaseSessionStore) -> None:
+        """A stale row is treated as empty on read, before GC sweeps it."""
+        from sqlalchemy import text
+
+        await store.write("stale", {"k": "v"}, lifetime=120)
+        async with store.session_maker() as db:
+            await db.execute(text("UPDATE sessions SET last_activity = 1 WHERE id = 'stale'"))
+            await db.commit()
+        assert await store.read("stale") == {}

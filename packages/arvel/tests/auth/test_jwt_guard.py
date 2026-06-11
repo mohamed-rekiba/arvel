@@ -256,3 +256,21 @@ async def test_jwt_guard_rejects_token_without_sub() -> None:
     guard = JwtGuard(resolver=_FakeResolver(), jwt=_jwt_config())
     request = _FakeRequest(authorization=f"Bearer {token}")
     assert await guard.user(request) is None
+
+
+@pytest.mark.asyncio
+async def test_jwt_guard_rejects_suspended_user() -> None:
+    """A valid, unexpired token for a suspended account resolves to None."""
+    from datetime import UTC, datetime
+
+    from arvel.auth.guards.jwt import JwtGuard
+    from arvel.auth.mixins import Authenticatable
+
+    class _SuspendedUser(Authenticatable):
+        id = "u1"
+        suspended_at = datetime(2020, 1, 1, tzinfo=UTC)
+
+    token = _make_token("u1")
+    guard = JwtGuard(resolver=_FakeResolver({"u1": _SuspendedUser()}), jwt=_jwt_config())
+    request = _FakeRequest(authorization=f"Bearer {token}")
+    assert await guard.user(request) is None

@@ -452,18 +452,23 @@ async def test_verify_email_resend_throttled_returns_429(
     test_app: FastAPI,
     event_fake: EventFake,
 ) -> None:
-    """second resend within window → 429."""
+    """Resend is public + email-based (unverified users can't get a JWT);
+    a second resend within the window → 429."""
     async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as c:
-        await _register_verified(c)
-        login = await c.post(
-            "/api/auth/login",
-            json={"email": _EMAIL, "password": _PASSWORD},
+        # Register but do NOT verify — exactly the user who needs a resend.
+        reg = await c.post(
+            "/api/auth/register",
+            json={
+                "name": "Alice",
+                "email": _EMAIL,
+                "password": _PASSWORD,
+                "password_confirmation": _PASSWORD,
+            },
         )
-        token = login.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
+        assert reg.status_code == 201
 
-        r1 = await c.post("/api/auth/verify/resend", headers=headers)
-        assert r1.status_code == 200
+        r1 = await c.post("/api/auth/verify/resend", json={"email": _EMAIL})
+        assert r1.status_code == 202
 
-        r2 = await c.post("/api/auth/verify/resend", headers=headers)
+        r2 = await c.post("/api/auth/verify/resend", json={"email": _EMAIL})
         assert r2.status_code == 429

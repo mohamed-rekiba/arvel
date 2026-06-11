@@ -186,6 +186,9 @@ class AuthServiceProvider(ServiceProvider):
             "refresh",
             "routes",
             "rate_limit",
+            "verification_ttl_seconds",
+            "reset_page_url",
+            "broker_class",
         )
         data: dict[str, object] = {}
         for field in fields:
@@ -266,6 +269,7 @@ class AuthServiceProvider(ServiceProvider):
         )
         email_verification_service = EmailVerificationService(
             secret=jwt.secret,
+            ttl_seconds=config.verification_ttl_seconds,
             user_model=user_model_cls,
         )
         controller = AuthController(
@@ -301,6 +305,7 @@ class AuthServiceProvider(ServiceProvider):
             ForgotPasswordRequest,
             LoginRequest,
             RegisterRequest,
+            ResendVerificationRequest,
             ResetPasswordRequest,
         )
         from arvel.http.middleware.database_transaction import DatabaseTransaction  # noqa: PLC0415
@@ -337,8 +342,8 @@ class AuthServiceProvider(ServiceProvider):
         async def handle_verify_email(signed: str) -> Any:
             return await container.make(AuthController).verify_email(signed)
 
-        async def handle_verify_resend(request: FastAPIRequest) -> Any:
-            return await container.make(AuthController).verify_email_resend(request)
+        async def handle_verify_resend(payload: ResendVerificationRequest) -> Any:
+            return await container.make(AuthController).verify_email_resend(payload)
 
         Route.post(f"{p}/register", name="auth.register", status_code=201, middleware=db_tx)(
             handle_register
@@ -366,9 +371,12 @@ class AuthServiceProvider(ServiceProvider):
         Route.get(f"{p}/verify/{{signed}}", name="auth.verify_email", middleware=db_tx)(
             handle_verify_email
         )
-        Route.post(f"{p}/verify/resend", name="auth.verify_resend", middleware=db_tx)(
-            handle_verify_resend
-        )
+        Route.post(
+            f"{p}/verify/resend",
+            name="auth.verify_resend",
+            status_code=202,
+            middleware=db_tx,
+        )(handle_verify_resend)
 
     # ─── guard/provider builders (existing code) ───────────────────────────
 

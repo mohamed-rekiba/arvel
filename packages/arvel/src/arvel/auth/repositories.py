@@ -39,7 +39,9 @@ class MorphUserRepository:
         model = self._resolve_model(type_)
         if model is None:
             return None
-        return await model.find(id_)
+        # Coerce numeric ids so integer-PK models match (tokenable_id is stored as text).
+        pk: int | str = int(id_) if id_.isdigit() else id_
+        return await model.find(pk)
 
     @staticmethod
     def _resolve_model(type_: str) -> type[Any] | None:

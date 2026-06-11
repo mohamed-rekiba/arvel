@@ -64,16 +64,6 @@ class User(Model, Timestamps, SoftDeletes, Authenticatable, HasApiTokens):
     suspended_at: _datetime | None = None
     locale: str | None = text(nullable=True, default=None)
 
-    @property
-    def is_verified(self) -> bool:
-        """``True`` when the email has been confirmed."""
-        return self.email_verified_at is not None
-
-    @property
-    def is_suspended(self) -> bool:
-        """``True`` when the account is currently suspended."""
-        return self.suspended_at is not None
-
     def suspend(self) -> User:
         """Mark the account as suspended (caller must ``await user.save()``)."""
         self.suspended_at = _datetime.now(tz=UTC)

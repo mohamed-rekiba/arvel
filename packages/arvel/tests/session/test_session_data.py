@@ -39,6 +39,38 @@ class TestSessionDataBasicOps:
         assert "name" in data
 
 
+class TestSessionDataStoreHelpers:
+    def test_pull_reads_and_removes(self, session_with_data: SessionData) -> None:
+        assert session_with_data.pull("user_id") == 42
+        assert session_with_data.has("user_id") is False
+
+    def test_pull_missing_returns_default(self, empty_session: SessionData) -> None:
+        assert empty_session.pull("missing", default="x") == "x"
+
+    def test_push_appends_to_list(self, empty_session: SessionData) -> None:
+        empty_session.push("items", "a")
+        empty_session.push("items", "b")
+        assert empty_session.get("items") == ["a", "b"]
+
+    def test_push_wraps_scalar(self, empty_session: SessionData) -> None:
+        empty_session.put("items", "first")
+        empty_session.push("items", "second")
+        assert empty_session.get("items") == ["first", "second"]
+
+    def test_increment_and_decrement(self, empty_session: SessionData) -> None:
+        assert empty_session.increment("count") == 1
+        assert empty_session.increment("count", 4) == 5
+        assert empty_session.decrement("count", 2) == 3
+
+    def test_keep_promotes_named_old_flash(self, empty_session: SessionData) -> None:
+        empty_session.now("keep_me", 1)
+        empty_session.now("drop_me", 2)
+        empty_session.keep("keep_me")
+        empty_session.finalize_flash()
+        assert empty_session.get("keep_me") == 1
+        assert empty_session.get("drop_me") is None
+
+
 class TestSessionDataRegenerate:
     def test_regenerate_changes_session_id(self, empty_session: SessionData) -> None:
         old_id = empty_session.get_id()

@@ -27,13 +27,17 @@ class FileSessionStore:
 
     async def read(self, session_id: str) -> dict[str, Any]:
         file = self._session_file(session_id)
+        cutoff = time.time() - self.lifetime if self.lifetime > 0 else None
 
         def _read() -> dict[str, Any]:
-            if not file.exists():
-                return {}
             try:
+                # Expire on read so a stale file is treated as empty before GC runs.
+                if cutoff is not None and file.stat().st_mtime < cutoff:
+                    return {}
                 raw: Any = json.loads(file.read_text())
                 return cast("dict[str, Any]", raw) if isinstance(raw, dict) else {}
+            except FileNotFoundError:
+                return {}
             except json.JSONDecodeError, OSError:
                 return {}
 

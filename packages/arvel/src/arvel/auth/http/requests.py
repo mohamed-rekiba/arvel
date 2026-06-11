@@ -64,9 +64,16 @@ class ResetPasswordRequest(BaseModel):
 
 
 class ResendVerificationRequest(BaseModel):
-    """``POST /auth/verify/resend`` body — empty; auth from bearer."""
+    """``POST /auth/verify/resend`` body.
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    Public + email-based (not bearer-gated): unverified users can't get a JWT,
+    so they need an unauthenticated way to re-request the link. Always answered
+    with a uniform 202 to avoid account enumeration.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    email: EmailStr
 
 
 __all__ = [
