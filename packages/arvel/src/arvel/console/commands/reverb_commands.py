@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import typer
 
@@ -12,6 +12,7 @@ from arvel.console._t import Option
 
 if TYPE_CHECKING:
     from arvel.broadcasting.config import ReverbConfig
+    from arvel.reverb.redis_bus import RedisBus
     from arvel.reverb.server import ReverbServer
 
 logger = logging.getLogger(__name__)
@@ -60,13 +61,38 @@ def build_reverb_runtime(
     host_override: str | None,
     port_override: int | None,
 ) -> tuple[ReverbServer, str, int]:
-    """Construct the ReverbServer + resolve effective host/port."""
+    """Construct the ReverbServer + resolve effective host/port.
+
+    With ``REVERB_SCALING_ENABLED`` set, wire a RedisBus so this process picks
+    up broadcasts published by other processes (ADR-013 §4).
+    """
     from arvel.reverb.server import ReverbServer
 
-    server = ReverbServer(config=config)
+    server = ReverbServer(config=config, redis_bus=_build_redis_bus(config))
     host = host_override if host_override is not None else config.host
     port = port_override if port_override is not None else config.port
     return server, host, port
+
+
+def _build_redis_bus(config: ReverbConfig) -> RedisBus | None:
+    """Return a RedisBus when scaling is on; None for single-process mode."""
+    if not config.scaling_enabled:
+        return None
+    import importlib
+
+    try:
+        aioredis = importlib.import_module("redis.asyncio")
+    except ImportError as exc:
+        msg = (
+            "REVERB_SCALING_ENABLED requires arvel[redis]. "
+            "Install with: pip install 'arvel[redis]'"
+        )
+        raise RuntimeError(msg) from exc
+    from arvel.reverb.redis_bus import AsyncRedis, RedisBus
+
+    # Default localhost client — same connection source as RedisBroadcaster.
+    client = cast("AsyncRedis", aioredis.Redis())
+    return RedisBus(redis=client, config=config)
 
 
 def log_reverb_started(config: ReverbConfig) -> None:

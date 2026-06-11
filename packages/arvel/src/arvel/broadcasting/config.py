@@ -57,6 +57,7 @@ class ReverbConfig(ArvelSettings):
     - ``REVERB_MAX_CONNECTIONS_PER_IP``(default: 100; 1..10000)
     - ``REVERB_ALLOWED_ORIGINS``       (default: [] = same-origin only; ``["*"]`` opts into any)
     - ``REVERB_TRUSTED_PROXIES``       (default: []; only then ``X-Forwarded-For`` is honoured)
+    - ``REVERB_SCALING_ENABLED``       (default: false; true PSUBSCRIBEs to the Redis fan-out)
     """
 
     model_config = SettingsConfigDict(
@@ -74,6 +75,10 @@ class ReverbConfig(ArvelSettings):
     max_connections_per_ip: Annotated[int, Field(ge=1, le=10000)] = 100
     allowed_origins: list[HttpUrl] | list[str] = []
     trusted_proxies: list[str] = []
+    # Multi-process fan-out: when true, reverb:start PSUBSCRIBEs to the same Redis
+    # channels RedisBroadcaster publishes on. Off by default so single-process
+    # dev needs no Redis. Mirrors Laravel's REVERB_SCALING_ENABLED.
+    scaling_enabled: bool = False
 
 
 # Keep both pydantic ConfigDict and SettingsConfigDict references alive for

@@ -18,7 +18,7 @@ flowchart LR
     subgraph realtime ["Realtime side (Reverb)"]
         WS["ReverbServer (WebSocket)"] --> CM["ChannelManager"]
     end
-    Redis -. "no built-in bridge" .-> WS
+    Redis -- "PSUBSCRIBE arvel.broadcasting.*<br/>(REVERB_SCALING_ENABLED)" --> WS
 ```
 
 ## The driver contract
@@ -109,20 +109,21 @@ Inbound frames handled: `pusher:ping` (→ `pong`), `pusher:subscribe`, `pusher:
 
 `ChannelManager` tracks `channel → set[connection]` and fans out event frames, skipping the originating `socket_id` when asked.
 
-## Wiring gaps to know
+## Cross-process fan-out
 
 ```mermaid
 flowchart LR
-    RB["RedisBroadcaster<br/>(arvel.broadcasting.*)"] -. "not connected" .-> RBus["RedisBus<br/>(arvel.reverb.broadcast)"]
-    RBus --> Bridge["ReverbServer.start_redis_bridge<br/>(opt-in)"]
-    Bridge --> CM["ChannelManager.publish"]
+    RB["RedisBroadcaster<br/>PUBLISH arvel.broadcasting.&lt;channel&gt;"] --> RBus["RedisBus<br/>PSUBSCRIBE arvel.broadcasting.*"]
+    RBus --> Bridge["ReverbServer.start_redis_bridge"]
+    Bridge --> CM["ChannelManager.publish<br/>(honors except_socket_id)"]
 ```
 
-- `BroadcastAuthController` is **not** auto-mounted. `BroadcastConfig.auth_endpoint` (default `/broadcasting/auth`) is config-only — you mount the route yourself with session/auth middleware.
-- `RedisBroadcaster` publishes to `arvel.broadcasting.*`; Reverb's `RedisBus` listens on `arvel.reverb.broadcast`. They're **different channels** and not bridged in framework code. For cross-process fan-out you wire `RedisBus` (or publish to the channel Reverb subscribes to) yourself.
-- `BroadcastServiceProvider` is not a baseline provider — add it to `bootstrap/providers.py`. It binds the manager and facade and ships the `reverb:start` command.
+`RedisBroadcaster` PUBLISHes one message per channel under `arvel.broadcasting.<channel>` with `{event, data, except_socket_id}`. When `REVERB_SCALING_ENABLED=true`, `reverb:start` wires a `RedisBus` that PSUBSCRIBEs to `arvel.broadcasting.*`, decodes the channel from the Redis channel name, and fans each message out to its local sockets — skipping the originating `socket_id`. This is the ADR-013 §4 contract. Scaling is **off by default**, so single-process dev needs no Redis; enable it (and install `arvel[redis]`) when running multiple Reverb processes.
 
-> `TODO/QUESTION:` ADR-013 § 4 describes Reverb subscribing to `arvel.broadcasting.*`, but the code uses a separate `arvel.reverb.broadcast` channel via `RedisBus`. Which is the intended contract?
+Still wire-it-yourself:
+
+- `BroadcastAuthController` is **not** auto-mounted. `BroadcastConfig.auth_endpoint` (default `/broadcasting/auth`) is config-only — you mount the route yourself with session/auth middleware.
+- `BroadcastServiceProvider` is not a baseline provider — add it to `bootstrap/providers.py`. It binds the manager and facade and ships the `reverb:start` command.
 
 ## See also
 
