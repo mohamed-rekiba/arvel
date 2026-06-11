@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.26.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.25.1...arvel-v0.26.0) (2026-06-11)
+
+
+### Features
+
+* **session:** honor SESSION_SECURE/SESSION_SAME_SITE and add typed enums ([b92004e](https://github.com/mohamed-rekiba/arvel/commit/b92004ef4df3a25293347a568c6b4ac1231dc193))
+* **storage:** implement AzureDriver.temporary_url via SAS token ([fa979c0](https://github.com/mohamed-rekiba/arvel/commit/fa979c087eb98888ff8c2d556c47303c536711df))
+
+
+### Bug Fixes
+
+* **reverb:** wire the Redis broadcast→Reverb fan-out per ADR-013 §4 ([6bf914f](https://github.com/mohamed-rekiba/arvel/commit/6bf914f9e18518058cdfb661bb0e7521c1d44dbb))
+
+
+### Refactors
+
+* **console:** drop unused args param from in-process command dispatch ([29d8a8a](https://github.com/mohamed-rekiba/arvel/commit/29d8a8ac30f419015340be54efc4c3acdbfe1303))
+
+
+### Documentation
+
+* **type-safety:** clarify usage of Literal, Enum, and str for closed value sets ([3b94d42](https://github.com/mohamed-rekiba/arvel/commit/3b94d42beaabbfc0fd46d8219b67598a285f11b6))
+
 ## [0.25.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.25.0...arvel-v0.25.1) (2026-06-10)
 
 
