@@ -6,7 +6,7 @@ Public surface: ``Application``, ``ApplicationBuilder``. Builder is fluent; call
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Iterator, Sequence
+from collections.abc import AsyncGenerator, Callable, Iterator, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
@@ -197,8 +197,13 @@ class Application:
         if not self.container.bound(Gate):
             self.container.singleton(Gate, Gate)
 
-    def make[T](self, abstract: type[T], **overrides: object) -> T:
-        """Resolve a binding from the container by its type."""
+    def make[T](self, abstract: type[T] | Callable[..., T], **overrides: object) -> T:
+        """Resolve a binding from the container by its type.
+
+        Mirrors ``Container.make``'s key type: accepting ``Callable[..., T]``
+        lets callers resolve an interface/Protocol they bound without a
+        ``# type: ignore[type-abstract]`` at the call site.
+        """
         return self.container.make(abstract, **overrides)
 
     def middleware_group(self, name: str, middleware: Sequence[MiddlewareRef]) -> None:
