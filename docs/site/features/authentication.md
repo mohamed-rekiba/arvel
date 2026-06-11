@@ -391,7 +391,7 @@ if Hash.needs_rehash(hashed):
 `Hash.check` and `Hash.needs_rehash` are algorithm-aware: they dispatch on the hash's own prefix (`$argon2…` vs bcrypt's `$2…`). So a bcrypt hash — including a `$2y$` column imported from an existing Laravel app — verifies through `Hash.check` without any extra wiring, and `Hash.needs_rehash` returns `True` for it so the next successful login transparently upgrades it to argon2id.
 
 > [!NOTE]
-> Although a `HashConfig` exists with a `bcrypt` default, the `Hash` facade does not read it — it uses argon2id directly. Ignore the `hashing` block in the published config stub.
+> There's no hashing config knob. `Hash.make` always uses argon2id (the secure default); use `Hash.make_bcrypt` when you specifically need bcrypt. `config/auth.py` has no `hashing` block.
 
 <a name="built-in-auth-routes"></a>
 ## Built-in Auth Routes
@@ -411,6 +411,9 @@ With [`AuthServiceProvider` registered](#registering-the-provider) and `config.r
 | `POST` | `/api/auth/verify/resend` | Resend verification (rate-limited) |
 
 These are backed by `AuthService` (register/login/refresh/logout/me), `PasswordService` (forgot/reset), and `EmailVerificationService`. Access tokens are JWTs; refresh tokens are opaque, stored as SHA-256 digests in a `refresh_tokens` table and rotated on use.
+
+> [!NOTE]
+> The password-reset email links to your front-end reset page, not the API. Set `auth.reset_page_url` (or `AUTH_RESET_PAGE_URL`) to that page's URL; the listener appends `?token=…&email=…`. When unset it falls back to `{app.url}/reset-password`. Your page then POSTs the `token` to `/api/auth/reset-password`.
 
 <a name="revoking-tokens"></a>
 ### Revoking access tokens

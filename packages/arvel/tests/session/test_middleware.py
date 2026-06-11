@@ -85,6 +85,52 @@ class TestStartSessionMiddleware:
         assert asyncio.run(store.read(old_id)) == {}
         assert asyncio.run(store.read(new_id)).get("_auth_id") == "u1"
 
+    def test_login_persists_via_cookie_after_regenerate(self) -> None:
+        """The post-login Set-Cookie must carry the regenerated id, or the next
+        request reads an empty session and auth appears lost (S-01)."""
+        store = ArraySessionStore(lifetime=120)
+
+        async def login(request: Request) -> Response:
+            session = cast("SessionData", request.state.session)
+            session.regenerate()
+            session.put("_auth_id", "u1")
+            return Response("ok")
+
+        async def me(request: Request) -> Response:
+            session = cast("SessionData", request.state.session)
+            return Response(str(session.get("_auth_id")))
+
+        app = Starlette(
+            routes=[Route("/login", login, methods=["POST"]), Route("/me", me)],
+            middleware=[Middleware(StartSession, store=store, options=SessionCookie(lifetime=120))],
+        )
+        client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
+
+        client.post("/login")
+        assert client.get("/me").text == "u1"
+
+    def test_cookie_driver_persists_through_middleware(self) -> None:
+        """The default cookie driver must round-trip through StartSession (S-02)."""
+        from arvel.session.stores.cookie import CookieStore
+
+        store = CookieStore(app_key=b"0" * 32)
+
+        async def handler(request: Request) -> Response:
+            session = cast("SessionData", request.state.session)
+            value = session.get("counter", default=0)
+            session.put("counter", int(value) + 1)
+            return Response(str(value))
+
+        app = Starlette(
+            routes=[Route("/", handler)],
+            middleware=[Middleware(StartSession, store=store, options=SessionCookie(lifetime=120))],
+        )
+        client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
+
+        assert client.get("/").text == "0"
+        assert client.get("/").text == "1"
+        assert client.get("/").text == "2"
+
     def test_cookie_honors_secure_and_same_site(self) -> None:
         store = ArraySessionStore(lifetime=120)
 

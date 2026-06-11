@@ -65,6 +65,34 @@ class TestSessionDataRegenerate:
         assert "_pending_destroy" not in session_with_data.to_dict()
 
 
+class TestSessionDataInvalidate:
+    def test_invalidate_clears_data(self, session_with_data: SessionData) -> None:
+        session_with_data.invalidate()
+        assert session_with_data.all() == {}
+
+    def test_invalidate_rotates_id_and_queues_old(self, session_with_data: SessionData) -> None:
+        old_id = session_with_data.get_id()
+        session_with_data.invalidate()
+        assert session_with_data.get_id() != old_id
+        assert session_with_data.drain_pending_destroy() == [old_id]
+
+
+class TestSessionDataCsrfToken:
+    def test_token_is_stable_within_session(self, empty_session: SessionData) -> None:
+        first = empty_session.token()
+        assert first
+        assert empty_session.token() == first
+
+    def test_regenerate_token_rotates(self, empty_session: SessionData) -> None:
+        first = empty_session.token()
+        empty_session.regenerate_token()
+        assert empty_session.token() != first
+
+    def test_token_not_exposed_via_all(self, empty_session: SessionData) -> None:
+        empty_session.token()
+        assert "_csrf_token" not in empty_session.all()
+
+
 class TestSessionDataSerialization:
     def test_to_dict_and_from_dict(self, session_with_data: SessionData) -> None:
         serialized = session_with_data.to_dict()

@@ -256,6 +256,48 @@ async def test_gate_policy_before_none_falls_through_to_method() -> None:
 
 
 @pytest.mark.asyncio
+async def test_gate_policy_resolves_by_subclass() -> None:
+    # A policy registered on a base class must cover subclass instances.
+    from arvel.auth.gate import Gate
+    from arvel.auth.policy import Policy
+
+    class Post:
+        def __init__(self, owner_id: str) -> None:
+            self.owner_id = owner_id
+
+    class FeaturedPost(Post):
+        pass
+
+    class PostPolicy(Policy[Post]):
+        async def update(self, user: Any, post: Post) -> bool:
+            return user.id == post.owner_id
+
+    gate = Gate()
+    gate.policy(Post, PostPolicy())
+
+    user = _FakeUser("u1")
+    assert await gate.allows("update", user, FeaturedPost(owner_id="u1")) is True
+    assert await gate.allows("update", user, FeaturedPost(owner_id="u2")) is False
+
+
+@pytest.mark.asyncio
+async def test_gate_policy_denies_when_ability_method_missing() -> None:
+    # A registered policy is authoritative — a missing ability method denies
+    # rather than raising "not registered" or falling through to a global ability.
+    from arvel.auth.gate import Gate
+    from arvel.auth.policy import Policy
+
+    class PostPolicy(Policy[dict[str, Any]]):
+        async def view(self, _user: Any, _resource: dict[str, Any]) -> bool:
+            return True
+
+    gate = Gate()
+    gate.policy(dict, PostPolicy())
+
+    assert await gate.allows("delete", _FakeUser("u1"), {"id": "p1"}) is False
+
+
+@pytest.mark.asyncio
 async def test_policy_check_honours_before() -> None:
     from arvel.auth.policy import Policy
 

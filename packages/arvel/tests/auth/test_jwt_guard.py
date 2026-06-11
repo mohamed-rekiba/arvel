@@ -160,20 +160,20 @@ async def test_jwt_guard_rejects_token_signed_with_different_secret() -> None:
     assert await guard.user(request) is None
 
 
-# Python-2 except syntax is gone
+# Multi-exception handler uses the bare tuple form (parens not required in 3.14)
 
 
-def test_jwt_guard_module_compiles_with_python3_except_syntax() -> None:
-    """Ensure the old `except TypeError, ValueError:` syntax was fixed."""
-    import ast
+def test_jwt_guard_uses_bare_except_tuple() -> None:
+    """jwt.py uses the bare `except A, B:` form — a valid tuple-catch in Python
+    3.14, so the parentheses are not required."""
     import importlib.util
     from pathlib import Path
 
     spec = importlib.util.find_spec("arvel.auth.guards.jwt")
     assert spec is not None and spec.origin is not None
-    source = Path(spec.origin).read_text()
-    # This will raise SyntaxError if Python-2 except syntax is present
-    ast.parse(source)
+    source = Path(spec.origin).read_text(encoding="utf-8")
+    assert "except TypeError, ValueError:" in source
+    assert "except (TypeError, ValueError):" not in source
 
 
 # malformed authorization header returns None

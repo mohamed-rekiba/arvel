@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from arvel.auth.events import PasswordResetRequested, Registered
 from arvel.events.listener import Listener
@@ -57,13 +58,34 @@ class SendPasswordResetEmail(Listener[PasswordResetRequested]):
         if event.reset_token is None:
             return
         try:
-            mailable = PasswordResetMailable(
-                user_email=event.email,
-                reset_url=event.reset_token,
-            )
+            reset_url = _build_reset_url(token=event.reset_token, email=event.email)
+            mailable = PasswordResetMailable(user_email=event.email, reset_url=reset_url)
             await Mail.to(event.email).send(mailable)
         except Exception:  # noqa: BLE001
             _log.exception("SendPasswordResetEmail: failed to send for %s", event.email)
 
 
-__all__ = ["SendPasswordResetEmail", "SendVerificationEmail", "_set_ev_service"]
+def _build_reset_url(*, token: str, email: str) -> str:
+    """Compose the front-end reset link, appending token + email query params.
+
+    Base comes from ``auth.reset_page_url``; empty falls back to ``{app.url}/reset-password``.
+    """
+    from arvel.config import config  # noqa: PLC0415
+
+    base = config("auth.reset_page_url", "")
+    if not base:
+        base = f"{config('app.url', 'http://localhost:8000')}/reset-password"
+
+    parts = urlsplit(base)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["token"] = token
+    query["email"] = email
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+__all__ = [
+    "SendPasswordResetEmail",
+    "SendVerificationEmail",
+    "_build_reset_url",
+    "_set_ev_service",
+]

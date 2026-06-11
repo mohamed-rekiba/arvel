@@ -473,6 +473,7 @@ class Application:
         # Desired outer→inner: TrustProxies → Observability → Context → DeferredTask → ArvelScope.
         fa.add_middleware(ArvelScopeMiddleware, container=self.container)
         self._maybe_add_observability_middleware(fa)
+        self._maybe_add_login_throttle_middleware(fa)
         self._maybe_add_trust_proxies_middleware(fa)
         return fa
 
@@ -512,6 +513,36 @@ class Application:
             ObservabilityMiddleware,
             service=config.service_name,
             log_requests=not config.log_uvicorn_access,
+        )
+
+    def _maybe_add_login_throttle_middleware(self, fa: FastAPI) -> None:
+        """Mount the login throttle when auth is registered and rate_limit is on.
+
+        Added inner to TrustProxies so it sees the real client IP, but outer to
+        the request-context layers so a throttled request short-circuits early.
+        """
+        from arvel.auth.config import AuthConfig
+        from arvel.auth.middleware.throttle_login import (
+            ThrottleLoginConfig,
+            ThrottleLoginMiddleware,
+        )
+
+        # Only when AuthServiceProvider explicitly bound it — there's no valid
+        # default AuthConfig (it needs a guard name), so don't auto-construct.
+        if not self.container.bound(AuthConfig):
+            return
+        config = self.container.make(AuthConfig)
+        rate_limit = config.rate_limit
+        if not rate_limit.enabled:
+            return
+        prefix = config.routes.prefix.rstrip("/")
+        fa.add_middleware(
+            ThrottleLoginMiddleware,
+            config=ThrottleLoginConfig(
+                login_path=f"{prefix}/login",
+                max_attempts=rate_limit.max_attempts,
+                window_seconds=rate_limit.decay_seconds,
+            ),
         )
 
     def _maybe_add_trust_proxies_middleware(self, fa: FastAPI) -> None:

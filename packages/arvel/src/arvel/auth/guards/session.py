@@ -70,12 +70,22 @@ class SessionGuard(Guard):
             return
         # Prevent session fixation — regenerate ID before writing the user key.
         session.regenerate()
+        # Rotate the CSRF token so a pre-login token can't be replayed post-login.
+        if hasattr(session, "regenerate_token"):
+            session.regenerate_token()
         user_id = str(getattr(user, "id", ""))
         session.put(self._session_key, user_id)
 
     async def logout(self, request: Any) -> None:
         session = self._get_session(request)
-        if session is not None:
+        if session is None:
+            return
+        # Flush + rotate the id so nothing (auth key, flash, CSRF token) survives
+        # logout under the old session id. Falls back to forget for dict-like
+        # sessions that don't implement invalidate().
+        if hasattr(session, "invalidate"):
+            session.invalidate()
+        else:
             session.forget(self._session_key)
 
     @staticmethod

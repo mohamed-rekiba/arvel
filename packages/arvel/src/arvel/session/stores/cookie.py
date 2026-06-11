@@ -54,6 +54,10 @@ class CookieStore:
     async def write(self, session_id: str, data: dict[str, Any], lifetime: int) -> None:
         self.last_written_cookie = self._encode(data)
 
+    def encode(self, data: dict[str, Any]) -> str:
+        """Encrypt + sign the payload into the value StartSession puts in the cookie."""
+        return self._encode(data)
+
     async def destroy(self, session_id: str) -> None:
         pass
 

@@ -74,6 +74,39 @@ def test_request_id_in_headers_and_logs(tmp_path: Path, monkeypatch: pytest.Monk
     assert "request_id" in records[0].attributes
 
 
+def _middleware_names(fa: FastAPI) -> list[str]:
+    return [getattr(mw.cls, "__name__", type(mw.cls).__name__) for mw in fa.user_middleware]
+
+
+def test_login_throttle_mounted_when_auth_bound(tmp_path: Path) -> None:
+    from arvel.auth.config import AuthConfig, RateLimitConfig
+
+    app = Application.configure(tmp_path).with_environment("testing").with_providers([]).create()
+    app.container.instance(AuthConfig, AuthConfig(default="web", rate_limit=RateLimitConfig()))
+    fa = app.into_asgi()
+
+    assert "ThrottleLoginMiddleware" in _middleware_names(fa)
+
+
+def test_login_throttle_absent_without_auth(tmp_path: Path) -> None:
+    app = Application.configure(tmp_path).with_environment("testing").with_providers([]).create()
+    fa = app.into_asgi()
+
+    assert "ThrottleLoginMiddleware" not in _middleware_names(fa)
+
+
+def test_login_throttle_respects_disabled_flag(tmp_path: Path) -> None:
+    from arvel.auth.config import AuthConfig, RateLimitConfig
+
+    app = Application.configure(tmp_path).with_environment("testing").with_providers([]).create()
+    app.container.instance(
+        AuthConfig, AuthConfig(default="web", rate_limit=RateLimitConfig(enabled=False))
+    )
+    fa = app.into_asgi()
+
+    assert "ThrottleLoginMiddleware" not in _middleware_names(fa)
+
+
 async def test_shutdown_disconnects_in_reverse_order(tmp_path: Path) -> None:
     log: list[str] = []
 

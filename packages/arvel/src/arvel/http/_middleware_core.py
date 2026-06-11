@@ -190,6 +190,28 @@ async def _submitted_csrf_token(request: Any) -> str | None:
     return None
 
 
+def _stored_csrf_token(request: Any) -> str | None:
+    """The token to compare against, preferring Arvel's SessionData.
+
+    ``StartSession`` puts a :class:`~arvel.session.data.SessionData` on
+    ``request.state.session`` (it exposes ``token()``). Falls back to Starlette's
+    ``request.session`` dict so apps on ``SessionMiddleware`` still work.
+    """
+    state = getattr(request, "state", None)
+    session = getattr(state, "session", None) if state is not None else None
+    token_getter: Any = getattr(session, "token", None)
+    if callable(token_getter):
+        return str(token_getter())
+
+    raw_session: object = getattr(request, "session", None) or {}
+    if isinstance(raw_session, dict):
+        # isinstance narrows dict params to Unknown under pyright; widen here.
+        typed: dict[str, Any] = raw_session  # pyright: ignore[reportUnknownVariableType]
+        value = typed.get(_CSRF_SESSION_KEY)
+        return str(value) if value is not None else None
+    return None
+
+
 class VerifyCsrf:
     """Double-submit CSRF check. Skips safe methods and ``except_paths``.
 
@@ -205,16 +227,7 @@ class VerifyCsrf:
         if method in _CSRF_SAFE_METHODS or any(path.startswith(p) for p in self._except):
             return await call_next(request)
 
-        # Starlette's request.session is dict-like but untyped; the explicit
-        # branch annotation pins the dict's type parameters so .get() doesn't
-        # leak Unknown.
-        raw_session: object = getattr(request, "session", None) or {}
-        if isinstance(raw_session, dict):
-            # isinstance narrows dict params to Unknown under pyright; widen here.
-            session: dict[str, Any] = raw_session  # pyright: ignore[reportUnknownVariableType]
-        else:
-            session = {}
-        token: Any = session.get(_CSRF_SESSION_KEY)
+        token = _stored_csrf_token(request)
         sent = await _submitted_csrf_token(request)
 
         if not token or not sent or not constant_time_equals(str(token), str(sent)):

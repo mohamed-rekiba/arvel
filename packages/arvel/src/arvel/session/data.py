@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from typing import Any
 
 _FLASH_NEW = "_flash_new"
 _FLASH_OLD = "_flash_old"
 _SESSION_ID = "_session_id"
+_CSRF_KEY = "_csrf_token"
 
 
 class SessionData:
@@ -73,6 +75,29 @@ class SessionData:
         ids = self._pending_destroy
         self._pending_destroy = []
         return ids
+
+    def invalidate(self) -> None:
+        """Flush everything and rotate the id — Laravel's logout/invalidate.
+
+        Clears all data (including the auth key) and queues the old id for
+        destruction so nothing survives a logout under the prior id.
+        """
+        self.flush()
+        self.regenerate()
+
+    # ── CSRF token ────────────────────────────────────────────────────────────
+
+    def token(self) -> str:
+        """Return the CSRF token, minting one on first access."""
+        tok = self._data.get(_CSRF_KEY)
+        if not isinstance(tok, str) or not tok:
+            tok = secrets.token_urlsafe(32)
+            self._data[_CSRF_KEY] = tok
+        return tok
+
+    def regenerate_token(self) -> None:
+        """Rotate the CSRF token — done on login to bind it to the new session."""
+        self._data[_CSRF_KEY] = secrets.token_urlsafe(32)
 
     # ── Flash operations ──────────────────────────────────────────────────────
 
