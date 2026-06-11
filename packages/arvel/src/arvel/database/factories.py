@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Generic, Self, TypeIs, TypeVar
 from arvel.database.session import (
     get_active_session,
     reset_active_session,
+    session_scope,
     set_active_session,
 )
 
@@ -214,7 +215,10 @@ class Factory(Generic[T]):
 
     async def create(self) -> T | list[T]:
         if self._connection is None:
-            return await self._create_in_active_session()
+            # Reuses an active transaction; otherwise opens a fresh autocommitting
+            # session so a standalone create() persists immediately (Laravel parity).
+            async with session_scope(commit=True):
+                return await self._create_in_active_session()
         from arvel.database.db import DB
 
         maker = DB.session_maker_for(self._connection)

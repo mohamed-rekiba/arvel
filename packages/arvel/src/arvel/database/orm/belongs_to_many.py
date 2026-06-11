@@ -14,7 +14,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Mapper
 
 from arvel.database.orm._eager import clear_eager_relation, get_eager_relation
-from arvel.database.session import get_active_session
+from arvel.database.session import autocommit, get_active_session
 
 if TYPE_CHECKING:
     from arvel.database.model import Model
@@ -121,6 +121,7 @@ class BelongsToManyAccessor(Generic[T]):
             items.append(cast("T", obj))
         return items
 
+    @autocommit(write=False)
     async def _fetch(
         self, *predicates: Any, order_col: str | None = None, order_desc: bool = False
     ) -> list[T]:
@@ -213,6 +214,7 @@ class BelongsToManyAccessor(Generic[T]):
         values.setdefault(self._pivot.updated_at, now)
         return values
 
+    @autocommit(write=True)
     async def attach(self, related_id: int, **pivot_kwargs: Any) -> bool:
         """Insert pivot row. Returns True if new, False if already existed (upsert)."""
         session = get_active_session()
@@ -232,6 +234,7 @@ class BelongsToManyAccessor(Generic[T]):
         self._invalidate_cache()
         return True
 
+    @autocommit(write=True)
     async def detach(self, related_id: int) -> None:
         """Remove the pivot row for related_id. No-op if absent."""
         session = get_active_session()
@@ -243,6 +246,7 @@ class BelongsToManyAccessor(Generic[T]):
         await session.flush()
         self._invalidate_cache()
 
+    @autocommit(write=True)
     async def update_pivot(self, related_id: int, attrs: Mapping[str, Any]) -> bool:
         """Update pivot columns on an existing row. Returns True if a row changed."""
         if not attrs:
@@ -261,12 +265,14 @@ class BelongsToManyAccessor(Generic[T]):
         await session.flush()
         return int(result.rowcount) > 0
 
+    @autocommit(write=True)
     async def create(self, pivot: Mapping[str, Any] | None = None, **attributes: Any) -> T:
         """Create a related model and attach it to this owner. Returns the new model."""
         related = await cast("Any", self._related_model).create(**attributes)
         await self.attach(related.get_key(), **dict(pivot or {}))
         return cast("T", related)
 
+    @autocommit(write=True)
     async def save(self, instance: T, pivot: Mapping[str, Any] | None = None) -> T:
         """Persist ``instance`` if needed, then attach it to this owner."""
         model = cast("Any", instance)
@@ -276,6 +282,7 @@ class BelongsToManyAccessor(Generic[T]):
         await self.attach(model.get_key(), **dict(pivot or {}))
         return instance
 
+    @autocommit(write=True)
     async def sync(self, related_ids: SyncIds) -> SyncResult:
         """Replace pivot rows so they match related_ids, returning what changed.
 
@@ -297,6 +304,7 @@ class BelongsToManyAccessor(Generic[T]):
                 result["updated"].append(rid)
         return result
 
+    @autocommit(write=True)
     async def sync_without_detaching(self, related_ids: SyncIds) -> SyncResult:
         """Attach/update related_ids without removing existing rows; report changes."""
         session = get_active_session()
@@ -312,6 +320,7 @@ class BelongsToManyAccessor(Generic[T]):
                 result["updated"].append(rid)
         return result
 
+    @autocommit(write=False)
     async def where_pivot(self, column: str, value: Any) -> list[T]:
         """Filter the pivot table by a column value and return related records."""
         session = get_active_session()
@@ -328,6 +337,7 @@ class BelongsToManyAccessor(Generic[T]):
         result = await session.execute(stmt)
         return list(result.scalars())
 
+    @autocommit(write=False)
     async def pivot(self, related_id: int) -> dict[str, Any] | None:
         """Return the pivot row as a dict, or None if the row doesn't exist."""
         session = get_active_session()
@@ -341,6 +351,7 @@ class BelongsToManyAccessor(Generic[T]):
             return None
         return dict(row)
 
+    @autocommit(write=True)
     async def toggle(self, related_id: int) -> str:
         """Attach if absent, detach if present. Returns 'attached' or 'detached'."""
         session = get_active_session()

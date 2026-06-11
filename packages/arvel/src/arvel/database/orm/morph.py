@@ -32,7 +32,7 @@ from arvel.database.orm._eager import (
     set_eager_relation,
 )
 from arvel.database.orm.morph_map import get_morph_alias, resolve_morph_class
-from arvel.database.session import get_active_session
+from arvel.database.session import autocommit, get_active_session
 
 if TYPE_CHECKING:
     from arvel.database.model import Model
@@ -221,6 +221,7 @@ class MorphToAccessor(Generic[T]):
     def __await__(self) -> Generator[Any, None, T | None]:
         return self.query().__await__()
 
+    @autocommit(write=False)
     async def query(self) -> T | None:
         if self._attr_name is not None:
             cached = get_eager_relation(self._owner, self._attr_name)

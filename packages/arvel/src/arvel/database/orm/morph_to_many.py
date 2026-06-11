@@ -26,7 +26,7 @@ from sqlalchemy.orm import Mapper
 from arvel.database.orm._eager import clear_eager_relation, get_eager_relation
 from arvel.database.orm.belongs_to_many import SyncIds, SyncResult, normalize_sync_ids
 from arvel.database.orm.morph_map import get_morph_alias
-from arvel.database.session import get_active_session
+from arvel.database.session import autocommit, get_active_session, session_scope
 
 if TYPE_CHECKING:
     from arvel.database.model import Model
@@ -115,7 +115,6 @@ class MorphToManyAccessor(Generic[T]):
                 for row in cached:
                     yield cast("T", row)
                 return
-        session = get_active_session()
         mapper = sa_inspect(self._related_model)
         if mapper is None:
             raise TypeError(f"{self._related_model} is not a mapped SQLAlchemy class")
@@ -130,9 +129,10 @@ class MorphToManyAccessor(Generic[T]):
         scope_where = _related_global_scope(self._related_model)
         if scope_where is not None:
             stmt = stmt.where(scope_where)
-        result = await session.execute(stmt)
-        for row in result.scalars():
-            yield row
+        async with session_scope(commit=False) as session:
+            result = await session.execute(stmt)
+            for row in result.scalars():
+                yield row
 
     async def all(self) -> list[T]:
         """Return all related rows attached to this owner."""
@@ -140,6 +140,7 @@ class MorphToManyAccessor(Generic[T]):
 
     # ── pivot operations ────────────────────────────────────────────────────
 
+    @autocommit(write=True)
     async def attach(self, related_id: int, **pivot_kwargs: Any) -> bool:
         """Insert pivot row. Returns True if new, False if already existed (upsert)."""
         session = get_active_session()
@@ -167,6 +168,7 @@ class MorphToManyAccessor(Generic[T]):
         self._invalidate_cache()
         return True
 
+    @autocommit(write=True)
     async def detach(self, related_id: int) -> None:
         """Remove the pivot row for related_id. No-op if absent."""
         session = get_active_session()
@@ -180,6 +182,7 @@ class MorphToManyAccessor(Generic[T]):
         await session.flush()
         self._invalidate_cache()
 
+    @autocommit(write=True)
     async def update_pivot(self, related_id: int, attrs: Mapping[str, Any]) -> bool:
         """Update pivot columns on an existing row. Returns True if a row changed."""
         if not attrs:
@@ -205,6 +208,7 @@ class MorphToManyAccessor(Generic[T]):
         stmt = select(self._table.c[self._rfk]).where(type_pred).where(id_pred)
         return set((await session.execute(stmt)).scalars())
 
+    @autocommit(write=True)
     async def sync(self, related_ids: SyncIds) -> SyncResult:
         """Replace pivot rows so they match related_ids, returning what changed."""
         desired = normalize_sync_ids(related_ids)
@@ -221,6 +225,7 @@ class MorphToManyAccessor(Generic[T]):
                 result["updated"].append(rid)
         return result
 
+    @autocommit(write=True)
     async def sync_without_detaching(self, related_ids: SyncIds) -> SyncResult:
         """Attach/update related_ids without removing existing rows; report changes."""
         desired = normalize_sync_ids(related_ids)
@@ -234,6 +239,7 @@ class MorphToManyAccessor(Generic[T]):
                 result["updated"].append(rid)
         return result
 
+    @autocommit(write=True)
     async def toggle(self, related_id: int) -> str:
         """Attach if absent, detach if present. Returns 'attached' or 'detached'."""
         if related_id in await self._current_ids():
@@ -242,6 +248,7 @@ class MorphToManyAccessor(Generic[T]):
         await self.attach(related_id)
         return "attached"
 
+    @autocommit(write=False)
     async def where_pivot(self, column: str, value: Any) -> list[T]:
         """Filter the pivot table by a column value and return related records."""
         session = get_active_session()
@@ -263,6 +270,7 @@ class MorphToManyAccessor(Generic[T]):
         result = await session.execute(stmt)
         return list(result.scalars())
 
+    @autocommit(write=False)
     async def pivot(self, related_id: int) -> dict[str, Any] | None:
         """Return the pivot row as a dict, or None if the row doesn't exist."""
         session = get_active_session()
@@ -443,7 +451,6 @@ class MorphedByManyAccessor(Generic[T]):
                 for row in cached:
                     yield cast("T", row)
                 return
-        session = get_active_session()
         pk_col = self._related_pk_col()
         owner_pred, type_pred = self._owner_where()
         stmt = (
@@ -455,14 +462,16 @@ class MorphedByManyAccessor(Generic[T]):
         scope_where = _related_global_scope(self._related_model)
         if scope_where is not None:
             stmt = stmt.where(scope_where)
-        result = await session.execute(stmt)
-        for row in result.scalars():
-            yield row
+        async with session_scope(commit=False) as session:
+            result = await session.execute(stmt)
+            for row in result.scalars():
+                yield row
 
     async def all(self) -> list[T]:
         """Return all related rows linked to this owner through the morph pivot."""
         return [row async for row in self]
 
+    @autocommit(write=True)
     async def attach(self, related_id: int, **pivot_kwargs: Any) -> bool:
         """Insert pivot row. Returns True if new, False if already present."""
         session = get_active_session()
@@ -489,6 +498,7 @@ class MorphedByManyAccessor(Generic[T]):
         self._invalidate_cache()
         return True
 
+    @autocommit(write=True)
     async def detach(self, related_id: int) -> None:
         """Remove the pivot row for related_id. No-op if absent."""
         session = get_active_session()
@@ -508,6 +518,7 @@ class MorphedByManyAccessor(Generic[T]):
         stmt = select(self._table.c[self._id_col]).where(owner_pred).where(type_pred)
         return {int(v) for v in (await session.execute(stmt)).scalars()}
 
+    @autocommit(write=True)
     async def sync(self, related_ids: SyncIds) -> SyncResult:
         """Replace pivot rows so they match related_ids, returning what changed."""
         desired = normalize_sync_ids(related_ids)
@@ -522,6 +533,7 @@ class MorphedByManyAccessor(Generic[T]):
                 result["attached"].append(rid)
         return result
 
+    @autocommit(write=True)
     async def toggle(self, related_id: int) -> str:
         """Attach if absent, detach if present. Returns 'attached' or 'detached'."""
         if related_id in await self._current_ids():

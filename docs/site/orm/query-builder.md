@@ -338,7 +338,14 @@ Get-or-create helpers cover the common idioms: `first_or_create`, `first_or_new`
 <a name="transactions"></a>
 ## Database Transactions
 
-Wrap several writes in a single atomic unit with `DB.transaction()`. If the block raises, everything rolls back; if it returns normally, it commits:
+A single write commits on its own — `await user.save()`, `await Order.create(...)`, `await Post.where(...).delete()` each open a session, run, and commit immediately. You don't wrap one operation in a transaction, the same way you wouldn't in Laravel:
+
+```python
+await user.save()                 # committed
+await Order.create(user_id=user.id, total=total)   # committed
+```
+
+Reach for `DB.transaction()` when **two or more** writes must land together (or not at all). If the block raises, everything rolls back; if it returns normally, it commits — and the nested operations reuse the open transaction instead of committing on their own:
 
 ```python
 from arvel.database import DB

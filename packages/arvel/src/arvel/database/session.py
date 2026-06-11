@@ -16,9 +16,13 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from contextvars import ContextVar, Token
-from typing import Any
+from functools import wraps
+from typing import Any, ParamSpec, TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 _ACTIVE_SESSION: ContextVar[AsyncSession | None] = ContextVar("arvel_active_session", default=None)
 
@@ -75,6 +79,74 @@ async def use_session(session: AsyncSession) -> AsyncGenerator[AsyncSession]:
         reset_active_session(token)
 
 
+@asynccontextmanager
+async def session_scope(*, commit: bool) -> AsyncGenerator[AsyncSession]:
+    """Yield a session for one ORM operation, autocommitting when none is active.
+
+    The Laravel-parity primitive. If a session is already bound — inside a
+    ``DB.transaction()`` block or a ``db_tx`` request — reuse it and let that
+    boundary own the COMMIT. Otherwise open a fresh session, run the operation,
+    and (for writes) commit immediately, mirroring PDO autocommit.
+
+    A write scope that opens its own session also owns the after-commit queue,
+    so model ``after_commit`` observers still fire on a standalone write.
+
+    Scopes nest safely: a compound op (e.g. ``sync``) can open a write scope and
+    call primitives that each open their own — the inner ones see the bound
+    session and skip the commit, so the outermost commits once.
+    """
+    existing = get_optional_session()
+    if existing is not None:
+        yield existing
+        return
+
+    from arvel.database.db import DB
+
+    owns_queue = commit and get_after_commit_queue() is None
+    callbacks: list[Callable[[], Awaitable[Any]]] = []
+    q_token = set_after_commit_queue(callbacks) if owns_queue else None
+    committed = False
+    try:
+        async with DB.session_maker_for()() as session:
+            s_token = set_active_session(session)
+            try:
+                yield session
+                if commit:
+                    await session.commit()
+                    committed = True
+            finally:
+                reset_active_session(s_token)
+    finally:
+        if q_token is not None:
+            reset_after_commit_queue(q_token)
+    if committed and owns_queue:
+        for cb in callbacks:
+            await cb()
+
+
+def autocommit(
+    *, write: bool
+) -> Callable[[Callable[_P, Awaitable[_R]]], Callable[_P, Awaitable[_R]]]:
+    """Decorate a terminal coroutine to run inside :func:`session_scope`.
+
+    Autocommits when no transaction is active; reuses the bound session inside a
+    ``DB.transaction()`` or ``db_tx`` request and lets that boundary commit.
+    Nested terminals reuse the outer scope, so a compound op decorated
+    ``write=True`` is atomic. Async generators can't use this — wrap their body
+    in ``async with session_scope(...)`` directly.
+    """
+
+    def decorate(fn: Callable[_P, Awaitable[_R]]) -> Callable[_P, Awaitable[_R]]:
+        @wraps(fn)
+        async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+            async with session_scope(commit=write):
+                return await fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorate
+
+
 # ── after-commit queue ─────────────────────────────────────────────────────
 
 
@@ -115,12 +187,14 @@ def enqueue_after_commit(fn: Callable[[], Awaitable[Any]]) -> None:
 
 __all__ = [
     "NoActiveSessionError",
+    "autocommit",
     "enqueue_after_commit",
     "get_active_session",
     "get_after_commit_queue",
     "get_optional_session",
     "reset_active_session",
     "reset_after_commit_queue",
+    "session_scope",
     "set_active_session",
     "set_after_commit_queue",
     "use_session",

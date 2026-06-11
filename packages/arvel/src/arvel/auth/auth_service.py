@@ -108,18 +108,17 @@ class AuthService:
         password_hash = Hash.make(password)
         normalised = email.strip().lower()
         Log.debug("auth.registering")
-        async with DB.transaction():
-            try:
-                user = await user_cls.create(
-                    name=name,
-                    email=normalised,
-                    password=password_hash,
-                    locale=locale,
-                )
-            except IntegrityError as exc:
-                Log.debug("auth.register.rejected", reason="email_taken")
-                msg = f"email {email!r} is already registered"
-                raise EmailAlreadyRegisteredError(msg) from exc
+        try:
+            user = await user_cls.create(
+                name=name,
+                email=normalised,
+                password=password_hash,
+                locale=locale,
+            )
+        except IntegrityError as exc:
+            Log.debug("auth.register.rejected", reason="email_taken")
+            msg = f"email {email!r} is already registered"
+            raise EmailAlreadyRegisteredError(msg) from exc
         await EventFacade.dispatch(
             Registered(user_id=str(user.id), email=normalised, occurred_at=_now())
         )
@@ -223,8 +222,7 @@ class AuthService:
             raise InvalidCredentialsError(msg)
 
         if expired:
-            async with DB.transaction():
-                await RefreshToken.where(token_hash=digest).delete()
+            await RefreshToken.where(token_hash=digest).delete()
             Log.debug("auth.refresh.rejected", reason="expired_token")
             msg = "refresh token expired"
             raise InvalidCredentialsError(msg)
@@ -245,8 +243,7 @@ class AuthService:
         when any rows were deleted.
         """
         user_cls = self._user_cls
-        async with DB.transaction():
-            count = await RefreshToken.where(user_id=user_id).delete()
+        count = await RefreshToken.where(user_id=user_id).delete()
         if count:
             user = await user_cls.find(_coerce_pk(user_id))
             email = str(getattr(user, "email", ""))
@@ -272,12 +269,11 @@ class AuthService:
         if not refresh_token:
             return
         digest = hash_refresh_token(refresh_token)
-        async with DB.transaction():
-            row = await RefreshToken.where(token_hash=digest).first()
-            if row is None:
-                return
-            user_id_str = row.user_id
-            await row.delete()
+        row = await RefreshToken.where(token_hash=digest).first()
+        if row is None:
+            return
+        user_id_str = row.user_id
+        await row.delete()
 
         user = await user_cls.find(_coerce_pk(user_id_str))
         email = str(getattr(user, "email", ""))
@@ -342,12 +338,11 @@ class AuthService:
         plain_refresh = generate_refresh_token()
         digest = hash_refresh_token(plain_refresh)
         csrf = secrets.token_urlsafe(32)
-        async with DB.transaction():
-            await RefreshToken.create(
-                user_id=user_id,
-                token_hash=digest,
-                expires_at=refresh_token_expires_at(self._refresh_ttl),
-            )
+        await RefreshToken.create(
+            user_id=user_id,
+            token_hash=digest,
+            expires_at=refresh_token_expires_at(self._refresh_ttl),
+        )
         return TokenPair(
             access_token=access_jwt,
             refresh_token=plain_refresh,
