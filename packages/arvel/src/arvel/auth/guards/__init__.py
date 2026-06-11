@@ -17,7 +17,7 @@ does not gain a hard dependency on it.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from arvel.auth import get_auth_service
 from arvel.auth.exceptions import AccountSuspendedError, InvalidCredentialsError
@@ -25,6 +25,8 @@ from arvel.http.exceptions import AuthorizationException, UnauthenticatedExcepti
 
 if TYPE_CHECKING:
     from starlette.requests import Request
+
+    from arvel.auth.mixins import Authenticatable
 
 # A guard accepts either one permission or several. With several, ``match``
 # picks the semantics: "all" (default) requires every permission, "any" one of.
@@ -60,7 +62,7 @@ def _extract_bearer(request: Request) -> str | None:
     return token.strip()
 
 
-async def require_auth(request: Request) -> Any:
+async def require_auth(request: Request) -> Authenticatable:
     """Resolve the bearer JWT and return the authenticated user object.
 
     Raises :class:`UnauthenticatedException` when the token is missing or invalid.
@@ -70,11 +72,14 @@ async def require_auth(request: Request) -> Any:
     if not token:
         raise UnauthenticatedException("Bearer token missing.")
     try:
-        return await get_auth_service().me(access_token=token)
+        user = await get_auth_service().me(access_token=token)
     except InvalidCredentialsError as exc:
         raise UnauthenticatedException("Invalid bearer token.") from exc
     except AccountSuspendedError as exc:
         raise AuthorizationException("Account suspended.") from exc
+    # me() returns an instance of the app's configured user model — Authenticatable
+    # by contract, but its concrete type is dynamic, so narrow at this boundary.
+    return cast("Authenticatable", user)
 
 
 def make_permission_guard(user_model: type) -> Callable[..., Any]:
@@ -97,7 +102,9 @@ def make_permission_guard(user_model: type) -> Callable[..., Any]:
         request: Request, perm: PermissionSpec, *, match: MatchMode = "all"
     ) -> Any:
         perms = _normalize_perms(perm)
-        user = await require_auth(request)
+        # Re-widen to Any: the permission traits (has_*_permission) and ORM reload
+        # below live on the app's dynamic user model, not the Authenticatable contract.
+        user: Any = await require_auth(request)
         # me() already loads the configured user model; only reload when the auth
         # service is wired with a different model than this guard captured.
         if not isinstance(user, user_model):
