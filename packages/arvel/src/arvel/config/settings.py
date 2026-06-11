@@ -123,4 +123,5 @@ class ArvelSettings(BaseSettings):
 
 
 def _is_no_prefix(marker: object) -> bool:
-    return marker is NoPrefix or (isinstance(marker, type) and marker is NoPrefix)
+    # NoPrefix is only ever used as the bare class in Annotated[T, NoPrefix].
+    return marker is NoPrefix
