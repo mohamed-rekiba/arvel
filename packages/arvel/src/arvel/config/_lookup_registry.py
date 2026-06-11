@@ -101,6 +101,11 @@ def lookup(key: str) -> Any:
                 raise ConfigKeyError(
                     f"Cannot resolve {key!r}: no key {segment!r} on {walked_path}",
                 )
+        elif isinstance(cursor, (list, tuple)):
+            # Numeric segments index sequences (Laravel data_get 'providers.0').
+            # Like dicts, never fall through to attributes — 'append'/'count' etc.
+            # must not resolve to bound methods.
+            cursor = _index_sequence(cursor, segment, key, walked)  # pyright: ignore[reportUnknownArgumentType]
         elif hasattr(cursor, segment):  # pyright: ignore[reportUnknownArgumentType]
             cursor = getattr(cursor, segment)  # pyright: ignore[reportUnknownArgumentType]
         else:
@@ -111,6 +116,35 @@ def lookup(key: str) -> Any:
         walked.append(segment)
 
     return cursor  # pyright: ignore[reportUnknownVariableType]
+
+
+def _is_int_index(segment: str) -> bool:
+    return segment.removeprefix("-").isdigit()
+
+
+def _index_sequence(
+    seq: list[Any] | tuple[Any, ...], segment: str, key: str, walked: list[str]
+) -> Any:
+    walked_path = ".".join(walked)
+    if not _is_int_index(segment):
+        raise ConfigKeyError(
+            f"Cannot resolve {key!r}: {segment!r} is not a list index on {walked_path}",
+        )
+    idx = int(segment)
+    if not -len(seq) <= idx < len(seq):
+        raise ConfigKeyError(
+            f"Cannot resolve {key!r}: index {idx} out of range on {walked_path}",
+        )
+    return seq[idx]
+
+
+def has(key: str) -> bool:
+    """True when the dotted key resolves — Laravel's ``Config::has``."""
+    try:
+        lookup(key)
+    except ConfigKeyError:
+        return False
+    return True
 
 
 @overload

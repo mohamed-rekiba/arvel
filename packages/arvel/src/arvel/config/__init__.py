@@ -1,6 +1,6 @@
 """Typed configuration layer (pydantic-settings v2 based)."""
 
-from arvel.config._lookup_registry import ConfigKeyError, config, lookup
+from arvel.config._lookup_registry import ConfigKeyError, config, has, lookup
 from arvel.config.cache_config import CacheConfig, CacheDriver
 from arvel.config.db_config import DbConfig
 from arvel.config.errors import ConfigError, ConfigNotRegisteredError
@@ -36,6 +36,7 @@ __all__ = [
     "SessionDriver",
     "StorageConfig",
     "config",
+    "has",
     "lookup",
     "register",
     "registered_configs",

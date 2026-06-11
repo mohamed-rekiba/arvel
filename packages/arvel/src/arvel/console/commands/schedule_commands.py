@@ -124,11 +124,27 @@ async def run_loop(
         await kernel.run_due_tasks(datetime.now(UTC))
         return
     await kernel.serve_forever(sleep_seconds=sleep, max_failures=max_failures)
+    # serve_forever returns cleanly on interrupt, but also when it gives up after
+    # --max-failures. Surface the give-up as a non-zero exit so a supervisor
+    # restarts/alerts instead of treating the dead loop as a clean shutdown.
+    if max_failures is not None and kernel.consecutive_failures >= max_failures:
+        raise typer.Exit(1)
+
+
+# Control signals coordinate through the cache, so the cache subsystem must be
+# booted — otherwise the signal silently no-ops and the operator thinks the
+# running scheduler was paused/interrupted when nothing happened.
+_CONTROL_REQUIRES: frozenset[CliSubsystem] = frozenset({CliSubsystem.CACHE})
+
+_NO_CACHE_MSG = (
+    "arvel: scheduler control signals need a configured cache store; the signal was not delivered."
+)
 
 
 class ScheduleInterruptCommand(Command):
     name: ClassVar[str] = "schedule:interrupt"
     help: ClassVar[str] = "Signal the running scheduler to exit at the next tick boundary."
+    requires: ClassVar[frozenset[CliSubsystem]] = _CONTROL_REQUIRES
 
     def register(self, app: typer.Typer) -> None:
         def _callback() -> None:
@@ -143,6 +159,7 @@ class ScheduleInterruptCommand(Command):
 class SchedulePauseCommand(Command):
     name: ClassVar[str] = "schedule:pause"
     help: ClassVar[str] = "Stop the scheduler from dispatching tasks each tick."
+    requires: ClassVar[frozenset[CliSubsystem]] = _CONTROL_REQUIRES
 
     def register(self, app: typer.Typer) -> None:
         def _callback() -> None:
@@ -157,6 +174,7 @@ class SchedulePauseCommand(Command):
 class ScheduleContinueCommand(Command):
     name: ClassVar[str] = "schedule:continue"
     help: ClassVar[str] = "Resume task dispatching after schedule:pause."
+    requires: ClassVar[frozenset[CliSubsystem]] = _CONTROL_REQUIRES
 
     def register(self, app: typer.Typer) -> None:
         def _callback() -> None:
@@ -171,21 +189,27 @@ class ScheduleContinueCommand(Command):
 async def _send_interrupt() -> None:
     from arvel.scheduling.signal import SchedulerSignal
 
-    await SchedulerSignal().send_interrupt()
+    if not await SchedulerSignal().send_interrupt():
+        typer.echo(_NO_CACHE_MSG, err=True)
+        raise typer.Exit(2)
     typer.echo("Interrupt signal sent.")
 
 
 async def _pause_scheduler() -> None:
     from arvel.scheduling.signal import SchedulerSignal
 
-    await SchedulerSignal().pause()
+    if not await SchedulerSignal().pause():
+        typer.echo(_NO_CACHE_MSG, err=True)
+        raise typer.Exit(2)
     typer.echo("Scheduler paused.")
 
 
 async def _resume_scheduler() -> None:
     from arvel.scheduling.signal import SchedulerSignal
 
-    await SchedulerSignal().resume()
+    if not await SchedulerSignal().resume():
+        typer.echo(_NO_CACHE_MSG, err=True)
+        raise typer.Exit(2)
     typer.echo("Scheduler resumed.")
 
 

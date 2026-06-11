@@ -237,3 +237,30 @@ class TestConfigClearCommand:
         result = CliRunner().invoke(app.typer_app, ["config:clear"])
         assert result.exit_code == 0
         assert "nothing to clear" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# _config_cache_path — cache and clear must agree on the same base_path file
+# ---------------------------------------------------------------------------
+
+
+class TestConfigCachePathResolution:
+    def test_cache_and_clear_resolve_same_base_path_file(self, tmp_path: Path) -> None:
+        from arvel.console.commands.config_commands import _config_cache_path
+
+        app = types.SimpleNamespace(base_path=lambda: tmp_path)
+
+        cache_target = ConfigCacheCommand()
+        cache_target.app = app  # type: ignore[assignment]
+        clear_target = ConfigClearCommand()
+        clear_target.app = app  # type: ignore[assignment]
+
+        expected = tmp_path / "bootstrap" / "cache" / "config.json"
+        assert cache_target.cache_path() == expected
+        assert _config_cache_path(clear_target.app) == expected  # type: ignore[arg-type]
+
+    def test_falls_back_to_cwd_without_app(self) -> None:
+        from arvel.console.commands.config_commands import _config_cache_path
+
+        p = _config_cache_path(None)
+        assert p.parts[-3:] == ("bootstrap", "cache", "config.json")
