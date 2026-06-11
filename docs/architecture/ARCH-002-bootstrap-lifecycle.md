@@ -212,24 +212,25 @@ flowchart TB
 
 ### Middleware order
 
-`fa.add_middleware` *prepends*, so the **last** call is the **outermost** layer. `into_asgi()` adds them in this order — maintenance first (if a manager is bound), then scope, then the observability trio, then trust-proxies (only when `TRUSTED_PROXIES` is set):
+The global ASGI stack is **declared**, not hardcoded. `into_asgi()` calls `_mount_middleware`, which walks the app's `bootstrap/middleware.py` list (or `_default_middleware_stack()` when none is declared) and boots each entry. Each entry is a `GlobalMiddleware` (`arvel.contracts.middleware`) that mounts itself via `app.add_middleware(...)` from its `boot(app, container)` classmethod — or skips when its config doesn't apply.
+
+The list is **outer→inner**. `fa.add_middleware` *prepends*, so `_mount_middleware` boots the resolved chain in **reverse** to make list order hold:
 
 ```python
-self._maybe_add_maintenance_middleware(fa)      # MaintenanceModeMiddleware, if bound
-fa.add_middleware(ArvelScopeMiddleware, ...)
-self._maybe_add_observability_middleware(fa)    # DeferredTask, Context, Observability
-self._maybe_add_trust_proxies_middleware(fa)    # TrustProxies, if configured
+declared = self._middleware_classes or _default_middleware_stack()
+chain = _resolve_middleware_chain(declared)  # dedupe; ArvelScope pinned innermost
+for mw_cls in reversed(chain):
+    mw_cls.boot(fa, self.container)           # self-gates, then add_middleware
 ```
 
-The resulting stack, outermost request → innermost:
+The default stack, outermost request → innermost:
 
 ```
-TrustProxies → Observability → Context → DeferredTask → ArvelScope → Maintenance → routes
+TrustProxies → Maintenance → ThrottleLogin → CsrfDoubleSubmit → Observability → Context → DeferredTask → ArvelScope → routes
 ```
 
-- The observability trio (`DeferredTaskMiddleware`, `ContextMiddleware`, `ObservabilityMiddleware`) is skipped entirely when `ObservabilityConfig.request_middleware_enabled` is false.
-- `TrustProxies` mounts only when `HttpConfig.trusted_proxies` is non-empty.
-- `Maintenance` mounts only when a `MaintenanceModeManager` is bound — it's the innermost layer, so a maintenance response still runs inside a request scope.
+- `_resolve_middleware_chain` always appends `ArvelScopeMiddleware` last (innermost), regardless of where — or whether — the app lists it. The per-request DI scope must wrap the handler, so an edited `bootstrap/middleware.py` can't strand it.
+- Each entry self-gates in `boot()`: the observability trio (`DeferredTaskMiddleware`, `ContextMiddleware`, `ObservabilityMiddleware`) skips when `ObservabilityConfig.request_middleware_enabled` is false; `TrustProxies` mounts only when `HttpConfig.trusted_proxies` is non-empty; `Maintenance` only when a `MaintenanceModeManager` is bound; the auth middleware only when auth is registered and the relevant feature is enabled.
 
 The default lifespan wires boot/shutdown to ASGI startup/shutdown:
 

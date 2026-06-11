@@ -132,4 +132,4 @@ Exception text captured via `exc=` (the message and stack trace) is logged as-is
 <a name="configuration"></a>
 ## Configuration
 
-Logging is configured through `ObservabilityConfig` (the `OTEL_*` environment variables), shared with tracing and metrics. The `ObservabilityServiceProvider` is auto-registered and mounts the `ObservabilityMiddleware`, so request context is attached to logs automatically.
+Logging is configured through `ObservabilityConfig` (the `OTEL_*` environment variables), shared with tracing and metrics. The `ObservabilityServiceProvider` is auto-registered, and `ObservabilityMiddleware` ships in the default [global middleware stack](../the-basics/middleware.md#global-middleware-stack) — it self-gates on `ObservabilityConfig`, so request context is attached to logs automatically when request middleware is enabled.

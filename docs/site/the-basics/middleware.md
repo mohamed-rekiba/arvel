@@ -137,7 +137,7 @@ async def posts() -> list[dict]:
 Named groups can include other named groups; they're expanded recursively with cycle detection.
 
 > [!NOTE]
-> There's no global middleware stack and no kernel-style priority list. Ordering is the order of the middleware tuple, composed left-to-right. Build the order you want explicitly per route or group.
+> *Route* middleware has no global stack and no kernel-style priority list. Ordering is the order of the middleware tuple, composed left-to-right. Build the order you want explicitly per route or group. (Application-layer middleware *does* have a declared global stack — see [The Global Middleware Stack](#global-middleware-stack).)
 
 <a name="built-in-middleware"></a>
 ## Built-in Middleware
@@ -205,6 +205,97 @@ VerifyCsrf(except_paths=["/api/webhooks/"])
 
 Application middleware operates at the ASGI layer and wraps the whole app rather than individual routes.
 
+<a name="global-middleware-stack"></a>
+### The Global Middleware Stack
+
+Your app's global ASGI middleware is declared in `bootstrap/middleware.py`, the same way [service providers](../core-concepts/service-providers.md) are declared in `bootstrap/providers.py`. The file exposes a `middleware` list, ordered **outer→inner** — the first entry is the outermost layer, the last is closest to your route handlers:
+
+```python
+# bootstrap/middleware.py
+from arvel.auth.middleware.csrf_double_submit import CsrfDoubleSubmitMiddleware
+from arvel.auth.middleware.throttle_login import ThrottleLoginMiddleware
+from arvel.context import ContextMiddleware, DeferredTaskMiddleware
+from arvel.contracts import GlobalMiddleware
+from arvel.http.middleware import ArvelScopeMiddleware, TrustProxiesMiddleware
+from arvel.maintenance import MaintenanceModeMiddleware
+from arvel.observability import ObservabilityMiddleware
+
+middleware: list[type[GlobalMiddleware]] = [
+    TrustProxiesMiddleware,
+    MaintenanceModeMiddleware,
+    ThrottleLoginMiddleware,
+    CsrfDoubleSubmitMiddleware,
+    ObservabilityMiddleware,
+    ContextMiddleware,
+    DeferredTaskMiddleware,
+    ArvelScopeMiddleware,
+]
+```
+
+Reorder, add, or remove entries by editing the list — exactly like editing `bootstrap/providers.py`. `bootstrap/app.py` wires the file through the builder:
+
+```python
+Application.configure(base_path)
+    .with_providers(base_path / "bootstrap" / "providers.py")
+    .with_middleware(base_path / "bootstrap" / "middleware.py")
+    ...
+```
+
+`with_middleware` also accepts a list of classes directly, if you prefer to declare the stack inline rather than from a file.
+
+> [!NOTE]
+> If you don't declare a `bootstrap/middleware.py`, the framework falls back to this exact default stack — so a bare `into_asgi()` still behaves like a configured app.
+
+<a name="middleware-self-gating"></a>
+#### Each Entry Self-Gates
+
+Listing a middleware doesn't force it on. Each framework middleware reads its own config when the app boots and skips mounting when it doesn't apply:
+
+| Middleware | Mounts only when |
+|---|---|
+| `TrustProxiesMiddleware` | `TRUSTED_PROXIES` is set |
+| `MaintenanceModeMiddleware` | a maintenance manager is bound |
+| `ThrottleLoginMiddleware` | auth is registered and login rate limiting is enabled |
+| `CsrfDoubleSubmitMiddleware` | auth is registered and CSRF protection is enabled |
+| `ObservabilityMiddleware`, `ContextMiddleware`, `DeferredTaskMiddleware` | request middleware is enabled in `ObservabilityConfig` |
+
+So you can leave the full list in place across environments — each layer turns itself on or off from config.
+
+<a name="arvel-scope-pinned"></a>
+#### `ArvelScopeMiddleware` Is Pinned
+
+`ArvelScopeMiddleware` sets up the per-request DI scope that `dep(...)` reads, so it has to wrap your handlers. The framework pins it as the **innermost** layer regardless of where — or whether — you list it. An edited `bootstrap/middleware.py` can't strand it.
+
+<a name="writing-global-middleware"></a>
+### Writing Global Middleware
+
+A global middleware is a normal ASGI middleware that also knows how to mount itself. Subclass `GlobalMiddleware` and implement the `boot` classmethod: the framework hands it the FastAPI app and the root [container](../core-concepts/service-container.md), and `boot` reads its config and calls `app.add_middleware(...)` — or returns without mounting when it doesn't apply:
+
+```python
+import os
+
+from arvel.contracts import GlobalMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+
+class ForceHttpsMiddleware(GlobalMiddleware):
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        # ... standard ASGI middleware body ...
+        await self.app(scope, receive, send)
+
+    @classmethod
+    def boot(cls, app, container) -> None:
+        # Gate on your own config — read a setting off the container,
+        # or skip mounting entirely when it doesn't apply.
+        if os.environ.get("FORCE_HTTPS") == "1":
+            app.add_middleware(cls)
+```
+
+Add the class to your `bootstrap/middleware.py` list in the position you want it to run.
+
 <a name="cors"></a>
 ### CORS
 
@@ -229,7 +320,7 @@ app.add_middleware(
 <a name="other-asgi-middleware"></a>
 ### Other ASGI Middleware
 
-Arvel ships several ASGI middleware you can add to the stack, including `SecurityHeadersMiddleware` (HSTS, CSP, and friends) and `MethodSpoofMiddleware` (turns a `POST` with a `_method` field into `PUT`/`PATCH`/`DELETE`). The framework also installs request-scope, [context](../features/logging.md), deferred-task, and observability middleware automatically when the app boots.
+Arvel ships several plain ASGI middleware that aren't in the [default stack](#global-middleware-stack), including `SecurityHeadersMiddleware` (HSTS, CSP, and friends) and `MethodSpoofMiddleware` (turns a `POST` with a `_method` field into `PUT`/`PATCH`/`DELETE`). These aren't `GlobalMiddleware` subclasses, so mount them with `app.add_middleware(...)` (like [CORS](#cors) above), or wrap them in a `GlobalMiddleware` to add them to the declared stack. The request-scope, [context](../features/logging.md), deferred-task, and observability middleware *are* in the default stack (and self-gate on config), so a new app gets them without any wiring.
 
 <a name="trusting-proxies"></a>
 ### Trusting Proxies
