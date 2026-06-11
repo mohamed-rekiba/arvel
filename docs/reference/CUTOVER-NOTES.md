@@ -20,7 +20,6 @@ These are behaviors that read as gaps or inconsistencies in the source. Each is 
 
 | Topic | Question | Page |
 |---|---|---|
-| Scheduler fields | `inMaintenanceMode()` / `outputTo()` stored but never read by the kernel. | [scheduling](../subsystems/scheduling.md) |
 | Audit config | Container-bound `AuditConfig` is unused at runtime; `encrypt_values` fixed at import. | [audit](../packages/audit.md) |
 | Image alter migration | `001_alter_media_model_id.py` not in `publishes()` — upgrade path easy to miss. | [image](../packages/image.md) |
 | CLI async loops | `cache:*` and `schedule:run` run a nested `asyncio.run()` inside the outer loop. | [CLI architecture](../console/cli-architecture.md) |
