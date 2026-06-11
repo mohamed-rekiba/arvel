@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/mohamed-rekiba/arvel/compare/arvel-audit-v0.6.1...arvel-audit-v0.6.2) (2026-06-11)
+
+
+### Bug Fixes
+
+* **audit:** read provider-bound AuditConfig instead of reloading .env per write ([93336ba](https://github.com/mohamed-rekiba/arvel/commit/93336ba97e1611a8c65754c146a3bac0249f1699))
+
 ## [0.6.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-audit-v0.6.0...arvel-audit-v0.6.1) (2026-06-07)
 
 
