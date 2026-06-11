@@ -91,11 +91,10 @@ Typer callbacks are sync, so async work uses one of three patterns:
 
 | Pattern | Used by | Mechanism |
 |---|---|---|
-| Deferred coroutine (preferred) | `migrate`, `queue:work`, `schedule:work`, `db:seed`, `reverb:start` | `schedule_async(coro)` — entrypoint awaits it after Typer returns |
-| Nested `asyncio.run()` | `cache:clear`, `cache:forget`, `schedule:run` | second loop inside the outer loop |
-| Sync blocking | `serve` | `uvicorn.run()` directly |
+| Deferred coroutine (preferred) | `migrate`, `queue:work`, `schedule:work`, `schedule:run`, `cache:clear`, `cache:forget`, `db:seed`, `reverb:start` | `schedule_async(coro)` — entrypoint awaits it after Typer returns |
+| Owns process | `serve`, `shell`/`tinker` | runs its own loop outside the `asyncio.run` wrapper (`owns_process = True`) |
 
-> **Warning**: The nested-`asyncio.run()` commands run a second event loop inside the already-running outer loop from `async_main()`. This is inconsistent with the single-loop intent of the deferred pattern. `TODO/QUESTION:` Should `cache:*` and `schedule:run` move to `schedule_async`?
+All async CLI commands run on the single outer loop via `schedule_async`; `cache:*` and `schedule:run` use the same deferred pattern as `migrate`. Commands that must own their own loop (uvicorn, the REPL) set `owns_process = True` so the entrypoint dispatches them outside its wrapper.
 
 ## Bootstrap for the CLI
 
@@ -139,7 +138,7 @@ A non-exhaustive catalog (see the source map for the full list and registration 
 
 Composite commands (`migrate:fresh`, `optimize`) chain other commands in-process via `Command.call()` → `Application.run(name)`.
 
-> **Warning**: `Application.run(name, args)` ignores `args` today — programmatic/scheduled invocation can't pass flags. `key:rotate` and parts of `optimize` (`route:cache`, `event:cache`) are honest stubs. `TODO/QUESTION:` confirm intended timelines for these.
+In-process dispatch (`Application.run(name)`, `Command.call(name)`) is **name-only by design**: it runs the target's `handle(ctx)` directly. Flag-bearing commands own their args through Typer at the real entrypoint, not via this path — so there's no `args` passthrough (the model is `handle(ctx)`-only, and async commands use the deferred coroutine pattern). `key:rotate` is an honest deferred stub: it exits 2 with an actionable message and a production guard until column re-encryption ships. `optimize`'s `route:cache`/`event:cache` lines are intentional **n/a on Python** (routes and listeners are live callables, not serializable string actions), not unfinished work.
 
 ## See also
 
