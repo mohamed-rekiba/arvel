@@ -19,13 +19,35 @@ Every feature, change, and code addition must be fully type-safe. Types are not 
 - Prefer precise types over permissive ones:
   - `Sequence[str]` over `list`
   - `Mapping[str, int]` over `dict`
-  - `Literal[...]` for fixed value sets
+  - `Literal[...]`, an `Enum`, or `str` for value sets — see "Closed value sets" below for which
   - `TypedDict` or dataclasses over loose dicts
   - `NewType` for domain primitives that shouldn't be mixed (e.g. `UserId` vs `int`)
 - Use generics (`TypeVar`, `Generic`, `ParamSpec`) when a function or class is genuinely polymorphic. Don't collapse to `Any` to avoid generics.
 - Public APIs must pass under a strict type checker (`mypy --strict` or `pyright` in strict mode) with **zero errors and zero warnings**.
 - Runtime behavior and static types must agree. If you use `cast()`, the cast must be provably correct, not wishful.
 - No untyped `**kwargs` or `*args` in public APIs unless typed via `Unpack[TypedDict]` or `ParamSpec`.
+
+## Closed value sets: `str`, `Literal`, or `Enum`
+
+A fixed set of known values ("array", "redis", "lax", …) does **not** automatically mean an enum. Walk the ladder:
+
+```
+Is the set closed (you own every valid value)?
+├─ No  → str          (users extend it at runtime, or it's unbounded)
+└─ Yes → Does the type need behavior, iteration, or identity?
+         ├─ No  → Literal[...]
+         └─ Yes → Enum
+```
+
+- **`str`** — the set is open. Manager/registry driver keys that support `extend()`-style plugins (storage, queue, mail, search drivers), or inherently unbounded domains (region, hostname, prefix, table name). A `Literal` or enum here would block extension and go stale.
+- **`Literal[...]`** — closed set of plain values consumed at a boundary. You only `==` or `match` on it; no methods, no iteration. Examples: `addressing_style: Literal["auto", "virtual", "path"]`, `callback_kind: Literal["call", "command", "job"]`.
+- **`Enum`** (`StrEnum` for string-valued) — the set does more than name values:
+  - carries **behavior** — a property/method (`SameSite.cookie_attr` maps `lax`→`Lax`)
+  - is **iterated or collected** — `for x in T`, `frozenset[T]`, `dict.fromkeys(T)` (`CliSubsystem`)
+  - is a **domain type** passed around and referenced by member name (`HealthStatus`, `Scope`)
+  - needs **attached parsing** — a `.coerce()` classmethod
+
+Gut check for the middle two: *would I ever write a method on this, loop over it, or import it just to reference one member?* No → `Literal`. Yes → `Enum`. Don't convert a working enum to `Literal` (or vice versa) for uniformity's sake — the use case decides each one.
 
 ## Use Pydantic When Applicable
 

@@ -89,7 +89,7 @@ def _decode_envelope(msg: object) -> tuple[str, dict[str, object]] | None:
         return None
     try:
         body_raw: object = json.loads(payload_str)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not isinstance(body_raw, dict):
         return None

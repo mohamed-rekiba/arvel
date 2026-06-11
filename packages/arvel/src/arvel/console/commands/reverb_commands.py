@@ -84,8 +84,7 @@ def _build_redis_bus(config: ReverbConfig) -> RedisBus | None:
         aioredis = importlib.import_module("redis.asyncio")
     except ImportError as exc:
         msg = (
-            "REVERB_SCALING_ENABLED requires arvel[redis]. "
-            "Install with: pip install 'arvel[redis]'"
+            "REVERB_SCALING_ENABLED requires arvel[redis]. Install with: pip install 'arvel[redis]'"
         )
         raise RuntimeError(msg) from exc
     from arvel.reverb.redis_bus import AsyncRedis, RedisBus
