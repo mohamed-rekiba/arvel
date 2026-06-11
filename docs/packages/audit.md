@@ -43,7 +43,9 @@ flowchart TB
 | `AUDIT_ENABLED` | `enabled` | `true` |
 | `AUDIT_ENCRYPT_VALUES` | `encrypt_values` | `false` |
 
-> **Warning**: The container-bound `AuditConfig` singleton isn't consulted at runtime — `auditable.py` and `models.py` instantiate `AuditConfig()` fresh, and `encrypt_values` is read **once at import**. Changing the env after import won't change column behavior. `TODO/QUESTION:` should the mixin/models resolve `AuditConfig` from the container instead?
+The observers read a single process-wide `AuditConfig` via `audit_config()`. `AuditServiceProvider.register()` binds that instance to the container *and* installs it as the active config, so the container binding is authoritative and there's no `.env` reload on every model write. Toggle recording at runtime by mutating it: `audit_config().enabled = False`.
+
+`encrypt_values` is the one exception — it's read once when `models.py` defines the `AuditValues` column type. That's deliberate: a column's at-rest encryption is schema-lifetime, and flipping it after rows exist would make them undecryptable. `AUDIT_ENABLED` is a live toggle; `AUDIT_ENCRYPT_VALUES` is a build-time decision.
 
 ## See also
 

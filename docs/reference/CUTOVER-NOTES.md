@@ -16,14 +16,14 @@ It covers: architecture (container, providers, bootstrap, config, facades), HTTP
 
 ## Open questions for SMEs
 
-These are behaviors that read as gaps or inconsistencies in the source. Each is flagged inline on its page as `TODO/QUESTION:`. They need a maintainer's call — bug, intentional, or doc-only:
+The behaviors that originally read as gaps have been triaged and resolved — either fixed in code or confirmed intentional and documented in place:
 
-| Topic | Question | Page |
+| Topic | Resolution | Page |
 |---|---|---|
-| Audit config | Container-bound `AuditConfig` is unused at runtime; `encrypt_values` fixed at import. | [audit](../packages/audit.md) |
-| Image alter migration | `001_alter_media_model_id.py` not in `publishes()` — upgrade path easy to miss. | [image](../packages/image.md) |
-| Encrypter vs `EncryptedType` | Two wire formats (v2 app-level vs v1 column cast). Confirm both are intended. | [encryption](../subsystems/encryption.md) |
-| Kit + permission | The kit uses permission models without `PermissionServiceProvider`, so the Gate bridge doesn't run. | [kit](../kits/ecommerce-kit.md) |
+| Audit config | Fixed: observers read the provider-bound `AuditConfig` via `audit_config()` (no per-write `.env` reload). `encrypt_values` stays import-time by design — column encryption is schema-lifetime. | [audit](../packages/audit.md) |
+| Image alter migration | Stale note: `model_id` is `String(36)` directly in `create_media_table.py`; no separate alter migration exists. | [image](../packages/image.md) |
+| Encrypter vs `EncryptedType` | Intentional: two separate paths — versioned column cast (`EncryptedType`) vs app-level `Crypt`. The cast format is deliberately versioned for rotation. | [encryption](../subsystems/encryption.md) |
+| Kit + permission | Intentional: the kit does RBAC through the `HasRoles`/`HasPermissions` traits directly (`require_permission` → `has_permission_to`), not the Gate bridge. Test-enforced. | [kit](../kits/ecommerce-kit.md) |
 
 ## The old `docs/` tree
 

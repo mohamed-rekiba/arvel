@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from arvel_audit.auditable import REDACTED, Auditable
 from arvel_audit.commands import AuditInstallCommand
-from arvel_audit.config import AuditConfig
+from arvel_audit.config import AuditConfig, audit_config, set_audit_config
 from arvel_audit.exceptions import (
     AuditError,
     InvalidAuditAction,
@@ -39,4 +39,6 @@ __all__ = [
     "InvalidAuditAction",
     "MissingActivityDescription",
     "activity",
+    "audit_config",
+    "set_audit_config",
 ]
