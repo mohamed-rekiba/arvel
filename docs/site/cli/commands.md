@@ -217,15 +217,29 @@ async def _run(self) -> None:
 
 ### Calling other commands in-process
 
-When `self.app` is bound, chain commands without spawning a subprocess:
+When `self.app` is bound, chain commands without spawning a subprocess. `call` /
+`call_silently` are async and dispatch through the target's real Typer callback,
+so you can pass flags and the target's async work runs (not a stub `handle()`).
+Defer your composite body the same way any async command does:
 
 ```python
-def handle(self, ctx: Context) -> int:
-    code = self.call("migrate")
+def register(self, app: typer.Typer) -> None:
+    cmd_self = self
+
+    def _callback() -> None:
+        schedule_async(cmd_self._run())
+
+    app.command(name=self.name, help=self.help)(_callback)
+
+async def _run(self) -> int:
+    code = await self.call("migrate", "--dry-run")
     if code != 0:
         return code
-    return self.call_silently("db:seed")
+    return await self.call_silently("db:seed")
 ```
+
+Extra positional args become CLI tokens on the target — `self.call("migrate", "--dry-run")`
+parses exactly like `arvel migrate --dry-run`.
 
 <a name="top-level"></a>
 ## Top-Level Commands

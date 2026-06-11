@@ -19,9 +19,7 @@ from __future__ import annotations
 from arvel.console._subsystem import CliSubsystem
 
 PROVIDER_COMMAND_REQUIRES: dict[str, frozenset[CliSubsystem]] = {
-    "queue:work": frozenset(
-        {CliSubsystem.QUEUE, CliSubsystem.CACHE, CliSubsystem.USER_PROVIDERS}
-    ),
+    "queue:work": frozenset({CliSubsystem.QUEUE, CliSubsystem.CACHE, CliSubsystem.USER_PROVIDERS}),
     "queue:failed": frozenset({CliSubsystem.QUEUE, CliSubsystem.USER_PROVIDERS}),
     "queue:retry": frozenset({CliSubsystem.QUEUE, CliSubsystem.USER_PROVIDERS}),
     "queue:flush": frozenset({CliSubsystem.QUEUE, CliSubsystem.USER_PROVIDERS}),

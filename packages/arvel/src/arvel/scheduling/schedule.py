@@ -152,6 +152,8 @@ class Schedule:
         return ScheduledTaskBuilder(self, pending)
 
     def command(self, name: str) -> ScheduledTaskBuilder:
+        # Accepts flags too — "emails:send --queue=default". The run_command hook
+        # shlex-splits and dispatches through Typer so the flags actually apply.
         pending = _PendingTask(name=f"command:{name}", callback=name, callback_kind="command")
         self._pending.append(pending)
         return ScheduledTaskBuilder(self, pending)

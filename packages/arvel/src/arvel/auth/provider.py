@@ -14,8 +14,8 @@ from arvel.auth.guards.jwt import JwtGuard
 from arvel.auth.guards.session import SessionGuard
 from arvel.auth.guards.token import TokenGuard
 from arvel.auth.manager import AuthManager
-from arvel.auth.repositories import ArventTokenRepository, MorphUserRepository
 from arvel.auth.providers.arvent import ArventUserProvider
+from arvel.auth.repositories import ArventTokenRepository, MorphUserRepository
 from arvel.console._subsystem import CliSubsystem
 from arvel.providers.service_provider import ServiceProvider
 

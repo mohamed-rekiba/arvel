@@ -74,12 +74,15 @@ schedule.call(prune_old_records).everyFifteenMinutes()
 <a name="scheduling-jobs-and-commands"></a>
 ### Scheduling Jobs & Commands
 
-`schedule.job()` dispatches a [queued job](queues.md); `schedule.command()` runs a [console command](../cli/commands.md) by name:
+`schedule.job()` dispatches a [queued job](queues.md); `schedule.command()` runs a [console command](../cli/commands.md), flags and all:
 
 ```python
 schedule.job(GenerateReports).daily()
 schedule.command("queue:flush").weeklyOn(0, "03:00")
+schedule.command("emails:send --queue=default").hourly()
 ```
+
+The command string is split like a shell line and dispatched through Typer, so flags apply exactly as they would on the CLI.
 
 > [!NOTE]
 > `schedule.job(...)` needs `QueueServiceProvider` bound to dispatch, and `schedule.command(...)` needs the console application (`ConsoleServiceProvider`). When the dependency isn't registered, the scheduler skips that task rather than failing.

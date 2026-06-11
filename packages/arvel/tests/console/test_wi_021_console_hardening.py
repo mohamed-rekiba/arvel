@@ -231,7 +231,7 @@ class TestContextExpansion:
 
 
 class TestCommandCall:
-    def test_call_raises_when_app_not_bound(self) -> None:
+    async def test_call_raises_when_app_not_bound(self) -> None:
         from arvel.console import Command, Context
 
         class _Plain(Command):
@@ -241,9 +241,9 @@ class TestCommandCall:
                 return 0
 
         with pytest.raises(RuntimeError, match="requires a bound framework Application"):
-            _Plain().call("other")
+            await _Plain().call("other")
 
-    def test_call_silently_raises_when_app_not_bound(self) -> None:
+    async def test_call_silently_raises_when_app_not_bound(self) -> None:
         from arvel.console import Command, Context
 
         class _Plain(Command):
@@ -253,9 +253,9 @@ class TestCommandCall:
                 return 0
 
         with pytest.raises(RuntimeError, match="requires a bound framework Application"):
-            _Plain().call_silently("other")
+            await _Plain().call_silently("other")
 
-    def test_call_delegates_to_console_application_run(self) -> None:
+    async def test_call_dispatches_target_through_console(self) -> None:
         from arvel.console import Application, Command, Context
 
         invoked: dict[str, int] = {"count": 0}
@@ -272,7 +272,7 @@ class TestCommandCall:
             requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.CONFIG})
 
             def handle(self, ctx: Context) -> int:
-                return self.call("target")
+                raise NotImplementedError
 
         framework_app = MagicMock()
         console_app = Application(commands=[_Target(), _Caller()])
@@ -281,11 +281,11 @@ class TestCommandCall:
         caller = _Caller()
         caller.app = framework_app  # set as entrypoint would
 
-        code = caller.handle(Context())
+        code = await caller.call("target")
         assert code == 0
         assert invoked["count"] == 1
 
-    def test_call_silently_suppresses_stdout(self) -> None:
+    async def test_call_silently_suppresses_stdout(self) -> None:
         from arvel.console import Application, Command, Context
 
         class _Loud(Command):
@@ -301,7 +301,7 @@ class TestCommandCall:
             requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.CONFIG})
 
             def handle(self, ctx: Context) -> int:
-                return self.call_silently("loud")
+                raise NotImplementedError
 
         framework_app = MagicMock()
         console_app = Application(commands=[_Loud(), _Caller()])
@@ -312,7 +312,7 @@ class TestCommandCall:
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            code = caller.handle(Context())
+            code = await caller.call_silently("loud")
         assert code == 0
         assert "LOUD OUTPUT" not in buf.getvalue()
 
