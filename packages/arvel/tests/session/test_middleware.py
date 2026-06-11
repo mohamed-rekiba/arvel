@@ -6,8 +6,9 @@ import asyncio
 from typing import cast
 
 import httpx2 as httpx
+from arvel.config.session_config import SameSite
 from arvel.session import SessionData
-from arvel.session.middleware import StartSession
+from arvel.session.middleware import SessionCookie, StartSession
 from arvel.session.stores.array import ArraySessionStore
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
@@ -24,7 +25,7 @@ def make_app(store: ArraySessionStore) -> Starlette:
         session.put("counter", int(value) + 1)
         return Response(str(value))
 
-    middleware = [Middleware(StartSession, store=store, lifetime=120)]
+    middleware = [Middleware(StartSession, store=store, options=SessionCookie(lifetime=120))]
     return Starlette(routes=[Route("/", handler)], middleware=middleware)
 
 
@@ -71,7 +72,7 @@ class TestStartSessionMiddleware:
 
         app = Starlette(
             routes=[Route("/guest", guest), Route("/login", login)],
-            middleware=[Middleware(StartSession, store=store, lifetime=120)],
+            middleware=[Middleware(StartSession, store=store, options=SessionCookie(lifetime=120))],
         )
         client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
 
@@ -83,6 +84,56 @@ class TestStartSessionMiddleware:
         # Old record is gone; only the authenticated session remains.
         assert asyncio.run(store.read(old_id)) == {}
         assert asyncio.run(store.read(new_id)).get("_auth_id") == "u1"
+
+    def test_cookie_honors_secure_and_same_site(self) -> None:
+        store = ArraySessionStore(lifetime=120)
+
+        async def handler(request: Request) -> Response:
+            request.state.session.put("k", "v")
+            return Response("ok")
+
+        app = Starlette(
+            routes=[Route("/", handler)],
+            middleware=[
+                Middleware(
+                    StartSession,
+                    store=store,
+                    options=SessionCookie(lifetime=120, secure=True, same_site=SameSite.STRICT),
+                )
+            ],
+        )
+        client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
+        set_cookie = client.get("/").headers["set-cookie"]
+        assert "SameSite=Strict" in set_cookie
+        assert "Secure" in set_cookie
+
+    def test_same_site_none_forces_secure(self) -> None:
+        store = ArraySessionStore(lifetime=120)
+
+        async def handler(request: Request) -> Response:
+            request.state.session.put("k", "v")
+            return Response("ok")
+
+        app = Starlette(
+            routes=[Route("/", handler)],
+            middleware=[
+                Middleware(
+                    StartSession, store=store, options=SessionCookie(same_site=SameSite.NONE)
+                )
+            ],
+        )
+        client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
+        set_cookie = client.get("/").headers["set-cookie"]
+        assert "SameSite=None" in set_cookie
+        assert "Secure" in set_cookie
+
+    def test_default_cookie_is_lax_without_secure(self) -> None:
+        store = ArraySessionStore(lifetime=120)
+        app = make_app(store)
+        client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
+        set_cookie = client.get("/").headers["set-cookie"]
+        assert "SameSite=Lax" in set_cookie
+        assert "Secure" not in set_cookie
 
     def test_accessing_session_without_middleware_raises(self) -> None:
         """Accessing request.state.session without StartSession gives a clear error."""

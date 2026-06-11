@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-from arvel.config.session_config import SessionConfig
+from arvel.config.session_config import SessionConfig, SessionDriver
 from arvel.session.data import SessionData
 from arvel.session.store import SessionStore
 
@@ -15,24 +15,24 @@ class SessionManager:
 
     def __init__(self, config: SessionConfig) -> None:
         self._config = config
-        self._stores: dict[str, SessionStore] = {}
+        self._stores: dict[SessionDriver, SessionStore] = {}
 
-    def store(self, name: str | None = None) -> SessionStore:
-        driver = name or self._config.driver
+    def store(self, name: SessionDriver | str | None = None) -> SessionStore:
+        driver = self._config.driver if name is None else SessionDriver(name)
         if driver not in self._stores:
             self._stores[driver] = self._create(driver)
         return self._stores[driver]
 
-    def _create(self, driver: str) -> SessionStore:
+    def _create(self, driver: SessionDriver) -> SessionStore:
         match driver:
-            case "array":
+            case SessionDriver.ARRAY:
                 # Test-only. Loses all sessions on process exit; never use in
                 # production. Registered so config('session.driver', 'array')
                 # produces a real in-memory store instead of raising.
                 from arvel.session.stores.array import ArraySessionStore
 
                 return ArraySessionStore(lifetime=self._config.lifetime)
-            case "cookie":
+            case SessionDriver.COOKIE:
                 from arvel.session.stores.cookie import CookieStore
 
                 return CookieStore(
@@ -40,7 +40,7 @@ class SessionManager:
                     lifetime=self._config.lifetime,
                     cookie_name=self._config.cookie_name,
                 )
-            case "redis":
+            case SessionDriver.REDIS:
                 from typing import Any as _Any
 
                 from arvel.session.stores.redis import RedisSessionStore
@@ -59,7 +59,7 @@ class SessionManager:
                     prefix=f"{self._config.redis_prefix}session:",
                     lifetime=self._config.lifetime,
                 )
-            case "database":
+            case SessionDriver.DATABASE:
                 from sqlalchemy.ext.asyncio import (
                     async_sessionmaker,
                     create_async_engine,
@@ -70,12 +70,10 @@ class SessionManager:
                 engine = create_async_engine(self._config.database_url)
                 maker = async_sessionmaker(engine, expire_on_commit=False)
                 return DatabaseSessionStore(session_maker=maker)
-            case "file":
+            case SessionDriver.FILE:
                 from arvel.session.stores.file import FileSessionStore
 
                 return FileSessionStore(self._config.files_path)
-            case _:
-                raise ValueError(f"Unsupported session driver: {driver!r}")
 
     async def create_session(self, session_id: str | None = None) -> SessionData:
         """Load session data from the default store and wrap in SessionData."""

@@ -7,7 +7,7 @@ from arvel.config.errors import ConfigError, ConfigNotRegisteredError
 from arvel.config.no_prefix import NoPrefix
 from arvel.config.registry import register, registered_configs
 from arvel.config.repository import Config
-from arvel.config.session_config import SessionConfig
+from arvel.config.session_config import SameSite, SessionConfig, SessionDriver
 from arvel.config.settings import ArvelSettings
 from arvel.config.storage_config import (
     AzureConfig,
@@ -31,7 +31,9 @@ __all__ = [
     "LocalConfig",
     "NoPrefix",
     "S3Config",
+    "SameSite",
     "SessionConfig",
+    "SessionDriver",
     "StorageConfig",
     "config",
     "lookup",

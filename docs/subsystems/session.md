@@ -27,19 +27,19 @@ Driver from `SessionConfig` (`SESSION_*`, default `cookie`):
 
 `CookieStore` uses an AES-256-GCM + HMAC-SHA256 envelope, with enc/mac keys derived from `app_key` (`SESSION_SECRET_KEY`) via HKDF.
 
-> **Warning**: `SESSION_ENCRYPT` exists on the config but is never read — the cookie store **always** encrypts.
+> **Note**: The cookie store **always** encrypts. `SESSION_ENCRYPT` only governs the cookie driver here; the server-side stores (`redis`/`database`/`file`) persist JSON payloads, so put them behind a private network or encrypted backend rather than relying on this flag.
 
 ## Middleware
 
+`StartSession` parses the cookie, reads the store, attaches `SessionData` to `scope["state"]["session"]`, and writes back on the final response chunk. The `Set-Cookie` header is built from the middleware's config:
+
 ```python
-# the Set-Cookie header is hardcoded:
-cookie_value = (f"{name}={session_id}; Max-Age={lifetime}; "
-                f"Path=/; HttpOnly; SameSite=Lax")
+StartSession(app, store, lifetime=7200, secure=False, same_site="lax")
+# -> arvel_session=...; Max-Age=7200; Path=/; HttpOnly; SameSite=Lax
+# secure=True appends "; Secure"; same_site="none" forces Secure on.
 ```
 
-`StartSession` parses the cookie, reads the store, attaches `SessionData` to `scope["state"]["session"]`, and writes back on the final response chunk.
-
-> **Warning**: The cookie is always `HttpOnly` with `SameSite=Lax`. `SESSION_SECURE` and `SESSION_SAME_SITE` on the config are **not** applied by `StartSession`. `TODO/QUESTION:` Should the middleware honor `SESSION_SECURE`/`SESSION_SAME_SITE` (e.g. add `Secure` in production)?
+The cookie is always `HttpOnly`. Pass `secure` and `same_site` (sourced from `SESSION_SECURE`/`SESSION_SAME_SITE`) when registering the middleware to control the remaining flags. `same_site` accepts `lax`/`strict`/`none` (case-insensitive); anything else falls back to `Lax`, and `none` forces `Secure` on since browsers reject `SameSite=None` without it.
 
 ## Provider
 
