@@ -8,6 +8,7 @@ import typer
 
 from arvel.console import Command, Context
 from arvel.console import _async as _arvel_async
+from arvel.console._subsystem import CliSubsystem
 from arvel.console._t import Argument as _Argument
 from arvel.console._t import Option as _Option
 from arvel.queue.bus import Bus
@@ -20,6 +21,11 @@ from arvel.queue.registry import deserialize_job
 class QueueRetryCommand(Command):
     name: ClassVar[str] = "queue:retry"
     help: ClassVar[str] = "Re-dispatch a failed job by UUID."
+    # Provider-attached (DI __init__), so not an entry point; keep in sync with
+    # PROVIDER_COMMAND_REQUIRES (drift-guarded).
+    requires: ClassVar[frozenset[CliSubsystem]] = frozenset(
+        {CliSubsystem.QUEUE, CliSubsystem.USER_PROVIDERS}
+    )
 
     def __init__(self, manager: QueueManager, store: FailedJobStore) -> None:
         self._store = store

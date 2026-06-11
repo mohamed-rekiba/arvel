@@ -40,6 +40,7 @@ from arvel.console import Application, Command
 from arvel.console._async import get_pending_task
 from arvel.console._command_meta import COMMAND_HELP
 from arvel.console._loader import discover_commands, entry_point_names, load_command
+from arvel.console._provider_command_meta import PROVIDER_COMMAND_REQUIRES
 from arvel.console._spinner import boot_spinner
 from arvel.console._subsystem import CliSubsystem, closure
 from arvel.console._venv import maybe_reexec_into_project_venv
@@ -267,6 +268,12 @@ def _required_subsystems_for(command: str | None) -> frozenset[CliSubsystem] | N
         return None
     cmd = load_command(command)
     if cmd is None:
+        # Provider-attached commands (e.g. queue:work) aren't entry points, so
+        # load_command can't resolve them. Fall back to their static manifest so
+        # they boot just their subsystems instead of the full chain.
+        manifest_requires = PROVIDER_COMMAND_REQUIRES.get(command)
+        if manifest_requires is not None:
+            return closure(manifest_requires)
         return None
     cls = type(cmd)
     if not cls.needs_framework():
