@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 CONFIG_CACHE_REL = Path("bootstrap") / "cache" / "config.json"
 
 
-def _config_cache_path(app: FrameworkApplication | None) -> Path:
+def config_cache_path(app: FrameworkApplication | None) -> Path:
     """Where the config cache lives — under base_path when the app is bound."""
     if app is not None:
         with contextlib.suppress(AttributeError, TypeError):
@@ -118,7 +118,7 @@ class ConfigCacheCommand(Command):
         raise NotImplementedError
 
     def cache_path(self) -> Path:
-        return _config_cache_path(self.app)
+        return config_cache_path(self.app)
 
 
 class ConfigClearCommand(Command):
@@ -132,7 +132,7 @@ class ConfigClearCommand(Command):
         cmd_self = self
 
         def _callback() -> None:
-            dest = _config_cache_path(cmd_self.app)
+            dest = config_cache_path(cmd_self.app)
             if dest.exists():
                 dest.unlink()
                 typer.echo(f"Removed {dest}")

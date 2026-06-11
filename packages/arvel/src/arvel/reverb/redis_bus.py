@@ -1,6 +1,6 @@
 """RedisBus — cross-process fan-out for Reverb.
 
-Per ADR-013 §4: ``RedisBroadcaster`` PUBLISHes one message per channel under
+``RedisBroadcaster`` PUBLISHes one message per channel under
 ``arvel.broadcasting.<channel>``; every Reverb process PSUBSCRIBEs to
 ``arvel.broadcasting.*`` and forwards each matching message to its locally
 connected sockets. This bus is the subscribe half — the publish half is
