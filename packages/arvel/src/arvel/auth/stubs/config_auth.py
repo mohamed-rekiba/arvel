@@ -27,11 +27,6 @@ providers: dict[str, dict[str, str]] = {
     },
 }
 
-hashing: dict[str, str | int] = {
-    "driver": "bcrypt",
-    "rounds": 12,
-}
-
 jwt: dict[str, str | int] = {
     # Must be at least 32 characters. Generate one with `arvel key:generate`.
     "secret": env("JWT_SECRET", ""),
@@ -51,3 +46,8 @@ routes: dict[str, str | bool] = {
     "enabled": True,
     "prefix": "/api/auth",
 }
+
+# Base URL of your front-end password-reset page (not the full link). The reset
+# email appends ?token=...&email=... to this. Empty falls back to
+# {app.url}/reset-password.
+reset_page_url: str = env("AUTH_RESET_PAGE_URL", "")

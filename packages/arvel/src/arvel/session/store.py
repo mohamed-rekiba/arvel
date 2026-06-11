@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 
 class SessionStore(Protocol):
@@ -14,4 +14,17 @@ class SessionStore(Protocol):
     async def gc(self, max_lifetime: int) -> int: ...
 
 
-__all__ = ["SessionStore"]
+@runtime_checkable
+class CookieBackedStore(Protocol):
+    """A store whose cookie carries the encrypted payload itself.
+
+    Server-side stores key on an opaque session id; this kind packs the whole
+    session into the cookie value. ``StartSession`` checks for this to read the
+    payload from the cookie and write the ciphertext back as the cookie value.
+    """
+
+    async def read_from_cookie(self, cookie_value: str) -> dict[str, Any]: ...
+    def encode(self, data: dict[str, Any]) -> str: ...
+
+
+__all__ = ["CookieBackedStore", "SessionStore"]

@@ -30,6 +30,14 @@ def test_session_manager_creates_cookie_store() -> None:
     assert isinstance(manager.store(), CookieStore)
 
 
+def test_cookie_driver_requires_secret_key() -> None:
+    # Empty SESSION_SECRET_KEY would derive crypto keys from empty material —
+    # fail fast instead of silently shipping a weak cookie store.
+    manager = SessionManager(SessionConfig(driver=SessionDriver.COOKIE, secret_key=SecretStr("")))
+    with pytest.raises(ValueError, match="SESSION_SECRET_KEY is required"):
+        manager.store()
+
+
 def test_session_manager_creates_array_store_for_tests() -> None:
     from arvel.session.stores.array import ArraySessionStore
 

@@ -35,8 +35,15 @@ class SessionManager:
             case SessionDriver.COOKIE:
                 from arvel.session.stores.cookie import CookieStore
 
+                secret = self._config.secret_key.get_secret_value()
+                if not secret:
+                    raise ValueError(
+                        "SESSION_SECRET_KEY is required for the cookie session driver — "
+                        "it derives the AES/HMAC keys that encrypt the cookie payload. "
+                        "Set SESSION_SECRET_KEY (or switch SESSION_DRIVER to file/redis/database)."
+                    )
                 return CookieStore(
-                    app_key=self._config.secret_key.get_secret_value().encode(),
+                    app_key=secret.encode(),
                     lifetime=self._config.lifetime,
                     cookie_name=self._config.cookie_name,
                 )

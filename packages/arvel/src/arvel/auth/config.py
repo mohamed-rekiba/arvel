@@ -40,11 +40,6 @@ class ProviderConfig(BaseModel):
         return v
 
 
-class HashConfig(BaseModel):
-    driver: str = "bcrypt"
-    rounds: int = 12
-
-
 class JwtConfig(BaseModel):
     """JWT access-token settings."""
 
@@ -88,14 +83,34 @@ class RoutesConfig(BaseModel):
     prefix: str = "/api/auth"
 
 
+class RateLimitConfig(BaseModel):
+    """Login-throttle settings.
+
+    Drives ``ThrottleLoginMiddleware``, mounted on the login route when
+    ``enabled``. Keyed on ``(email, ip)``: after ``max_attempts`` failures in
+    ``decay_seconds`` the route returns 429.
+    """
+
+    enabled: bool = True
+    max_attempts: int = 5
+    decay_seconds: int = 60
+
+
 class AuthConfig(BaseModel):
     default: str
     guards: dict[str, GuardConfig] = {}
     providers: dict[str, ProviderConfig] = {}
-    hash: HashConfig = HashConfig()
     jwt: JwtConfig = JwtConfig()
     refresh: RefreshConfig = RefreshConfig()
     routes: RoutesConfig = RoutesConfig()
+    rate_limit: RateLimitConfig = RateLimitConfig()
+    reset_page_url: str = ""
+    """Base URL of the front-end password-reset page (not the full link).
+
+    The ``SendPasswordResetEmail`` listener appends ``token`` and ``email``
+    query params to this to form the emailed link. Empty → falls back to
+    ``{app.url}/reset-password``.
+    """
     broker_class: str | None = None
     """Dotted import path to a custom auth broker class.
 

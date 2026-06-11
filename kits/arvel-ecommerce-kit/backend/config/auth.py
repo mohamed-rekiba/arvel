@@ -31,13 +31,6 @@ providers: dict[str, dict[str, object]] = {
     },
 }
 
-hash: dict[str, object] = {  # noqa: A001 — framework config contract; see arvel.auth.config.AuthConfig.hash
-    "driver": "argon2id",
-    "memory_cost": 65536,
-    "time_cost": 3,
-    "parallelism": 4,
-}
-
 _secure: bool = env("REFRESH_COOKIE_SECURE", default=True)
 
 jwt: dict[str, object] = {
@@ -67,6 +60,9 @@ routes: dict[str, object] = {
     "enabled": False,
     "prefix": "/api/auth",
 }
+
+# Front-end reset page base; the reset email appends ?token=...&email=... to it.
+reset_page_url: str = env("AUTH_RESET_PAGE_URL", "")
 
 rate_limit: dict[str, object] = {
     "max_attempts": env("AUTH_RL_MAX", 5),

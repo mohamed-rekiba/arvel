@@ -182,6 +182,57 @@ async def test_csrf_treats_non_dict_session_as_empty() -> None:
         await VerifyCsrf().handle(request, call_next)
 
 
+@pytest.mark.asyncio
+async def test_csrf_reads_token_from_arvel_session_data() -> None:
+    """StartSession puts SessionData on request.state.session — VerifyCsrf reads it."""
+    from types import SimpleNamespace
+
+    from arvel.http.middleware import VerifyCsrf
+    from arvel.session import SessionData
+
+    session = SessionData({})
+    token = session.token()
+    request = SimpleNamespace(
+        method="POST",
+        url=SimpleNamespace(path="/x"),
+        state=SimpleNamespace(session=session),
+        headers={"X-CSRF-Token": token},
+    )
+
+    async def call_next(_: object) -> dict[str, bool]:
+        return {"ok": True}
+
+    assert await VerifyCsrf().handle(request, call_next) == {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_csrf_session_data_takes_precedence_over_starlette_session() -> None:
+    from types import SimpleNamespace
+
+    from arvel.http.middleware import CsrfMismatchException, VerifyCsrf
+    from arvel.session import SessionData
+
+    session = SessionData({})
+    token = session.token()
+    # request.session (Starlette) carries a stale token; SessionData must win.
+    request = SimpleNamespace(
+        method="POST",
+        url=SimpleNamespace(path="/x"),
+        state=SimpleNamespace(session=session),
+        session={"_csrf_token": "stale"},
+        headers={"X-CSRF-Token": "stale"},
+    )
+
+    async def call_next(_: object) -> dict[str, bool]:
+        return {"ok": True}
+
+    with pytest.raises(CsrfMismatchException):
+        await VerifyCsrf().handle(request, call_next)
+
+    request.headers = {"X-CSRF-Token": token}
+    assert await VerifyCsrf().handle(request, call_next) == {"ok": True}
+
+
 def test_csrf_except_paths_bypasses_check() -> None:
     from arvel.http.exceptions import HttpExceptionHandler
     from arvel.http.middleware import VerifyCsrf

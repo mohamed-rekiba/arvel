@@ -104,7 +104,7 @@ class Hash:
 
 Consumers: `AuthService.register`, `PasswordService.reset`, `SessionGuard.attempt`. The model `"hashed"` cast passes `$argon2`/`$2` prefixes through unchanged.
 
-> **Warning**: `AuthConfig.hash` (`HashConfig(driver="bcrypt", rounds=12)`) is schema-only — nothing wires it to `Hash.make` vs `Hash.make_bcrypt` at runtime, and the actual default is argon2id. The published `config/auth.py` stub uses a key named `hashing`, but `AuthConfig` reads `hash`, so the stub value is ignored either way. `TODO/QUESTION:` Is the `hashing`→`hash` mismatch a stub bug or an intended rename, and should `HashConfig.driver` actually drive the hasher?
+There's no hashing config to set — `Hash.make` always uses argon2id, and bcrypt is an explicit opt-in via `Hash.make_bcrypt`. (Laravel keeps hashing config separate from `config/auth.py`; Arvel just hard-defaults the secure choice.)
 
 ## Password reset
 
@@ -130,7 +130,7 @@ sequenceDiagram
 
 `forgot` is anti-enumeration: unknown or throttled emails return silently. Tokens are stored hashed; expiry deletes the row and raises `PasswordResetTokenInvalidError`.
 
-> **Warning**: The default `SendPasswordResetEmail` listener emails the **raw token**, not a full reset URL. `TODO/QUESTION:` Should the default build a reset URL instead?
+The `SendPasswordResetEmail` listener builds a real reset link: it takes the base from `auth.reset_page_url` (falling back to `{app.url}/reset-password`) and appends `?token=…&email=…`. Point `auth.reset_page_url` at your front-end reset page; that page POSTs the `token` to `/api/auth/reset-password`.
 
 ## Email verification
 

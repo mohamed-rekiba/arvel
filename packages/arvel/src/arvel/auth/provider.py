@@ -57,6 +57,8 @@ class AuthServiceProvider(ServiceProvider):
         from arvel.auth.gate import Gate  # noqa: PLC0415
 
         config = self._load_config()
+        # Bind so create_asgi() can read rate_limit to mount the login throttle.
+        self.container.instance(AuthConfig, config)
         self._validate_jwt_config(config)
         self._register_manager(config)
         self._register_services(config)
@@ -180,7 +182,6 @@ class AuthServiceProvider(ServiceProvider):
             "default",
             "guards",
             "providers",
-            "hash",
             "jwt",
             "refresh",
             "routes",

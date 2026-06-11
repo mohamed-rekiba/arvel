@@ -40,9 +40,9 @@ class Gate:
             if result is not None:
                 return bool(result)
 
-        # policy lookup: if a policy is registered for the first argument's type
-        if args and type(args[0]) in self._policies:
-            policy = self._policies[type(args[0])]
+        # policy lookup: resolve by the first argument's type or any base class
+        policy = self._resolve_policy(args[0]) if args else None
+        if policy is not None:
             # Policy-level before() runs first: True grants all, False denies all,
             # None falls through to the ability method (Laravel policy filters).
             before = getattr(policy, "before", None)
@@ -56,6 +56,11 @@ class Gate:
                 result = await self._invoke(method, user, *args)
                 await self._run_after(user, ability, result=bool(result))
                 return bool(result)
+            # The policy owns this model but defines no such ability — deny,
+            # matching Laravel (a registered policy is authoritative). Don't fall
+            # through to the global ability registry.
+            await self._run_after(user, ability, result=False)
+            return False
 
         if ability not in self._abilities:
             # Fail-closed
@@ -71,6 +76,14 @@ class Gate:
     async def authorize(self, ability: str, user: Any, *args: Any) -> None:
         if not await self.allows(ability, user, *args):
             raise AuthorizationException(f"Not authorized to '{ability}'.")
+
+    def _resolve_policy(self, target: Any) -> Any | None:
+        # Walk the MRO so a policy registered on a base class covers subclasses.
+        for klass in type(target).__mro__:
+            policy = self._policies.get(klass)
+            if policy is not None:
+                return policy
+        return None
 
     async def _invoke(self, callback: Callable[..., Any], *args: Any) -> Any:
         result = callback(*args)

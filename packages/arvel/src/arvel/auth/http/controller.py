@@ -273,9 +273,18 @@ class AuthController(Controller):
         """Queue a verification email — no-op when mail is not configured."""
         try:
             from arvel.auth.mail import VerifyEmailMailable  # noqa: PLC0415
+            from arvel.config import config  # noqa: PLC0415
             from arvel.facades.mail import Mail  # noqa: PLC0415
 
-            mailable = VerifyEmailMailable(user_email=email, verify_url=signed)
+            # Build the clickable link the same way SendVerificationEmail does —
+            # the mailable templates verify_url verbatim, so it must be a real URL,
+            # not the raw signed blob.
+            app_url = config("app.url", "http://localhost:8000")
+            verify_url = self._email_verification.build_url(
+                base_url=f"{app_url}/api/auth/verify",
+                signed=signed,
+            )
+            mailable = VerifyEmailMailable(user_email=email, verify_url=verify_url)
             await Mail.to(email).send(mailable)
         except Exception:  # noqa: BLE001
             import logging  # noqa: PLC0415
