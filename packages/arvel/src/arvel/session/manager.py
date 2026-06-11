@@ -6,6 +6,7 @@ import importlib
 from typing import Any
 
 from arvel.config.session_config import SessionConfig, SessionDriver
+from arvel.session.cipher import SessionCipher
 from arvel.session.data import SessionData
 from arvel.session.store import SessionStore
 
@@ -22,6 +23,23 @@ class SessionManager:
         if driver not in self._stores:
             self._stores[driver] = self._create(driver)
         return self._stores[driver]
+
+    def _payload_cipher(self) -> SessionCipher | None:
+        """Cipher for at-rest server-side payloads, or None when encryption is off.
+
+        Honors ``SESSION_ENCRYPT`` for file/database/redis the same way the cookie
+        driver always encrypts — so the flag means the same thing everywhere.
+        """
+        if not self._config.encrypt:
+            return None
+        secret = self._config.secret_key.get_secret_value()
+        if not secret:
+            raise ValueError(
+                "SESSION_SECRET_KEY is required when SESSION_ENCRYPT is true — "
+                "it derives the keys that encrypt the session payload at rest. "
+                "Set SESSION_SECRET_KEY (or set SESSION_ENCRYPT=false)."
+            )
+        return SessionCipher.from_app_key(secret.encode())
 
     def _create(self, driver: SessionDriver) -> SessionStore:
         match driver:
@@ -65,6 +83,7 @@ class SessionManager:
                     redis=client,
                     prefix=f"{self._config.redis_prefix}session:",
                     lifetime=self._config.lifetime,
+                    cipher=self._payload_cipher(),
                 )
             case SessionDriver.DATABASE:
                 from sqlalchemy.ext.asyncio import (
@@ -76,11 +95,19 @@ class SessionManager:
 
                 engine = create_async_engine(self._config.database_url)
                 maker = async_sessionmaker(engine, expire_on_commit=False)
-                return DatabaseSessionStore(session_maker=maker, lifetime=self._config.lifetime)
+                return DatabaseSessionStore(
+                    session_maker=maker,
+                    lifetime=self._config.lifetime,
+                    cipher=self._payload_cipher(),
+                )
             case SessionDriver.FILE:
                 from arvel.session.stores.file import FileSessionStore
 
-                return FileSessionStore(self._config.files_path, lifetime=self._config.lifetime)
+                return FileSessionStore(
+                    self._config.files_path,
+                    lifetime=self._config.lifetime,
+                    cipher=self._payload_cipher(),
+                )
 
     async def create_session(self, session_id: str | None = None) -> SessionData:
         """Load session data from the default store and wrap in SessionData."""

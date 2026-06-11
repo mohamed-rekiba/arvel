@@ -2,16 +2,9 @@
 
 from __future__ import annotations
 
-import base64
-import hashlib
-import hmac
-import json
-import os
-from typing import Any, cast
+from typing import Any
 
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives.hashes import SHA256
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from arvel.session.cipher import SessionCipher
 
 
 class CookieStore:
@@ -27,12 +20,7 @@ class CookieStore:
     ) -> None:
         self.cookie_name = cookie_name
         self.lifetime = lifetime
-        self._enc_key = HKDF(
-            algorithm=SHA256(), length=32, salt=None, info=b"arvel-session-enc"
-        ).derive(app_key)
-        self._mac_key = HKDF(
-            algorithm=SHA256(), length=32, salt=None, info=b"arvel-session-mac"
-        ).derive(app_key)
+        self._cipher = SessionCipher.from_app_key(app_key)
         # Stores the last written cookie value for test introspection
         self.last_written_cookie: str = ""
 
@@ -67,38 +55,10 @@ class CookieStore:
     # ── Cookie helpers ────────────────────────────────────────────────────────
 
     def _encode(self, payload: dict[str, Any]) -> str:
-        plaintext = json.dumps(payload).encode()
-        nonce = os.urandom(12)
-        ciphertext = AESGCM(self._enc_key).encrypt(nonce, plaintext, None)
-        envelope = nonce + ciphertext
-        mac = hmac.new(self._mac_key, envelope, hashlib.sha256).digest()
-        return base64.urlsafe_b64encode(mac + envelope).decode()
+        return self._cipher.encrypt(payload)
 
     def _decode(self, cookie_value: str) -> dict[str, Any]:
-        try:
-            raw = base64.urlsafe_b64decode(cookie_value.encode())
-        except Exception as exc:
-            raise ValueError("Malformed cookie value") from exc
-
-        if len(raw) < 32 + 12 + 16:
-            raise ValueError("Cookie value too short")
-
-        mac, envelope = raw[:32], raw[32:]
-        expected_mac = hmac.new(self._mac_key, envelope, hashlib.sha256).digest()
-        if not hmac.compare_digest(mac, expected_mac):
-            raise ValueError("Cookie signature mismatch — possible tampering")
-
-        nonce, ciphertext = envelope[:12], envelope[12:]
-        try:
-            plaintext = AESGCM(self._enc_key).decrypt(nonce, ciphertext, None)
-        except Exception as exc:
-            raise ValueError("Cookie decryption failed") from exc
-
-        parsed: Any = json.loads(plaintext)
-        if not isinstance(parsed, dict):
-            raise TypeError("Cookie payload must be a JSON object")
-        data: dict[str, Any] = cast("dict[str, Any]", parsed)
-        return data
+        return self._cipher.decrypt(cookie_value)
 
 
 __all__ = ["CookieStore"]

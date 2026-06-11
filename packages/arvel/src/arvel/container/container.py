@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 from collections.abc import (
     AsyncGenerator,
@@ -19,7 +20,12 @@ from arvel.container.errors import (
     BindingResolutionError,
     CircularDependencyError,
 )
-from arvel.container.inspect import init_hints, is_async_callable, is_concrete_class
+from arvel.container.inspect import (
+    init_hints,
+    is_async_callable,
+    is_concrete_class,
+    optional_init_params,
+)
 from arvel.container.scopes import Scope
 
 T = TypeVar("T")
@@ -112,6 +118,10 @@ class Container:
         # Per-scope cache; only used when this container is a scope.
         self._scope_cache: dict[type, Any] = {}
 
+        # Per-abstract build locks for concurrent async resolution of shared
+        # scopes; (loop, lock) so a container reused across loops re-locks.
+        self._async_locks: dict[AbstractKey, tuple[asyncio.AbstractEventLoop, asyncio.Lock]] = {}
+
         # Bind self so make(Container) works.
         if parent is None:
             self._instances[Container] = self
@@ -134,6 +144,12 @@ class Container:
             raise TypeError(msg)
         is_async = is_async_callable(impl) if not is_concrete_class(impl) else False
         self._bindings[abstract] = _Binding(abstract, impl, scope, is_async)
+        # Laravel's dropStaleInstances: a re-bind must not keep serving the
+        # instance built from the previous binding. Caches are type-keyed; a
+        # non-type abstract (a bare callable) was never cached.
+        if isinstance(abstract, type):
+            self._singletons.pop(abstract, None)
+            self._scope_cache.pop(abstract, None)
 
     def singleton(
         self,
@@ -191,7 +207,8 @@ class Container:
         for name in tag_names:
             self._tags.setdefault(name, []).extend(abstracts)
 
-    def tagged(self, tag_name: str) -> list[Any]:
+    def tagged(self, tag_name: str) -> list[object]:
+        # Heterogeneous by design — one tag groups unrelated types; callers narrow.
         return [self.make(abstract) for abstract in self._tags.get(tag_name, [])]
 
     def extend(self, abstract: type[T], decorator: Callable[[T, Container], T]) -> None:
@@ -235,13 +252,14 @@ class Container:
         cls: type[Any],
         method: str,
         *,
-        overrides: dict[str, Any] | None = None,
-    ) -> Any:
+        overrides: dict[str, object] | None = None,
+    ) -> object:
         """Resolve *cls* from the container, then call *method* with injected params.
 
         Parameters are resolved from the container; *overrides* bypass injection
         for the specified parameter names. If *cls* is not bound, instantiates
-        it directly (no-arg constructor assumed).
+        it directly (no-arg constructor assumed). The return is reflective — the
+        caller knows the method's type and narrows.
         """
         try:
             instance: object = self.make(cls)
@@ -273,8 +291,8 @@ class Container:
         cls: type[Any],
         method: str,
         *,
-        overrides: dict[str, Any] | None = None,
-    ) -> Any:
+        overrides: dict[str, object] | None = None,
+    ) -> object:
         """Async variant of call() — supports async methods and async-resolved deps."""
         try:
             instance: object = await self.amake(cls)
@@ -434,6 +452,7 @@ class Container:
         path: tuple[type, ...] = (),
     ) -> T:
         hints = init_hints(abstract)
+        optional = optional_init_params(abstract)
         kwargs: dict[str, Any] = {}
         for name, dep_type in hints.items():
             if name in overrides:
@@ -451,6 +470,9 @@ class Container:
                 # Re-raise with parent class in the trail.
                 if isinstance(exc, CircularDependencyError):
                     raise
+                # An unresolvable dep with a default falls back to it.
+                if name in optional:
+                    continue
                 raise BindingResolutionError(
                     (*path, abstract, dep_type),
                     reason=f"required by {abstract.__qualname__}.__init__",
@@ -474,6 +496,7 @@ class Container:
         # Async twin of _instantiate: each constructor dep goes through _aresolve
         # so a transitive async-bound dependency resolves instead of raising.
         hints = init_hints(abstract)
+        optional = optional_init_params(abstract)
         kwargs: dict[str, Any] = {}
         for name, dep_type in hints.items():
             if name in overrides:
@@ -489,6 +512,8 @@ class Container:
             except BindingResolutionError as exc:
                 if isinstance(exc, CircularDependencyError):
                     raise
+                if name in optional:
+                    continue
                 raise BindingResolutionError(
                     (*path, abstract, dep_type),
                     reason=f"required by {abstract.__qualname__}.__init__",
@@ -567,7 +592,8 @@ class Container:
                         cast("type[Any]", contextual), {}, abstract, path=path
                     )
                     return cast("T", self._apply_extensions(abstract, instance))
-                return cast("T", self._invoke(contextual, abstract, path, allow_async=True))
+                instance = self._invoke(contextual, abstract, path, allow_async=True)
+                return cast("T", self._apply_extensions(abstract, instance))
 
         binding = self._find_binding(abstract)
         if binding is None:
@@ -587,24 +613,50 @@ class Container:
             instance = await self._ainstantiate(abstract, overrides, abstract, path=path)
             return cast("T", self._apply_extensions(abstract, instance))
 
-        if binding.scope is Scope.SINGLETON and abstract in self._singletons:
-            return cast("T", self._singletons[abstract])
-        if binding.scope is Scope.SCOPED and abstract in self._scope_cache:
-            return cast("T", self._scope_cache[abstract])
+        # Shared scopes need a build lock: _abuild awaits, so two concurrent
+        # amake() of the same singleton/scoped binding could both miss the cache
+        # and build twice (doubled side effects — e.g. a second engine pool).
+        if binding.scope in (Scope.SINGLETON, Scope.SCOPED):
+            cache = self._singletons if binding.scope is Scope.SINGLETON else self._scope_cache
+            if abstract in cache:
+                return cast("T", cache[abstract])
+            async with self._async_lock_for(abstract):
+                if abstract in cache:  # someone built it while we waited
+                    return cast("T", cache[abstract])
+                instance = self._apply_extensions(
+                    abstract, await self._abuild(binding, abstract, overrides, path)
+                )
+                cache[abstract] = instance
+                return cast("T", instance)
 
+        instance = await self._abuild(binding, abstract, overrides, path)
+        return cast("T", self._apply_extensions(abstract, instance))
+
+    async def _abuild(
+        self,
+        binding: _Binding,
+        abstract: type,
+        overrides: dict[str, object],
+        path: tuple[type, ...],
+    ) -> Any:
         if binding.is_async:
             async_factory: Any = binding.concrete
-            instance = await async_factory()
-        elif is_concrete_class(binding.concrete):
+            return await async_factory()
+        if is_concrete_class(binding.concrete):
             concrete_cls: type[Any] = binding.concrete  # type: ignore[assignment]
-            instance = await self._ainstantiate(concrete_cls, overrides, abstract, path=path)
-        else:
-            sync_factory: Any = binding.concrete
-            instance = sync_factory()
+            return await self._ainstantiate(concrete_cls, overrides, abstract, path=path)
+        sync_factory: Any = binding.concrete
+        return sync_factory()
 
-        instance = self._apply_extensions(abstract, instance)
-        if binding.scope is Scope.SINGLETON:
-            self._singletons[abstract] = instance
-        elif binding.scope is Scope.SCOPED:
-            self._scope_cache[abstract] = instance
-        return cast("T", instance)
+    def _async_lock_for(self, abstract: AbstractKey) -> asyncio.Lock:
+        # Locks bind to the running loop on first await, so a long-lived container
+        # reused across loops (tests, separate asyncio.run calls) must get a fresh
+        # lock when the loop changes. Caching is only for the cold-build window;
+        # once cached, resolution never reaches here.
+        loop = asyncio.get_running_loop()
+        entry = self._async_locks.get(abstract)
+        if entry is None or entry[0] is not loop:
+            lock = asyncio.Lock()
+            self._async_locks[abstract] = (loop, lock)
+            return lock
+        return entry[1]

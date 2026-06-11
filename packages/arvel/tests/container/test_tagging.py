@@ -63,4 +63,5 @@ def test_tagged_instances_are_resolved_via_container() -> None:
 
     alerts = c.tagged("alerts")
     assert len(alerts) == 2
-    assert all(isinstance(a.logger, Logger) for a in alerts)
+    # tagged() returns list[object] by design — narrow before touching attrs.
+    assert all(isinstance(a, (AlertA, AlertB)) and isinstance(a.logger, Logger) for a in alerts)

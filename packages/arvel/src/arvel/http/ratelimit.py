@@ -47,6 +47,29 @@ class InMemoryStore:
         return Attempt(count=count, reset_at=reset_at)
 
 
+class CacheStore:
+    """Cache-facade-backed store — shared across workers when cache is Redis.
+
+    Routes through the framework's configured cache, so it needs no direct redis
+    client. The get-then-put isn't atomic, so a burst can undercount by a few —
+    acceptable for a throttle. Each hit refreshes the TTL, which extends the
+    window under sustained abuse (the behavior you want for a lockout).
+    """
+
+    def __init__(self, *, key_prefix: str = "arvel:rl:") -> None:
+        self._key_prefix = key_prefix
+
+    async def hit(self, key: str, *, decay_seconds: int) -> Attempt:
+        from arvel.facades.cache import Cache
+
+        scoped = f"{self._key_prefix}{key}"
+        raw = await Cache.get(scoped, 0)
+        count = (raw if isinstance(raw, int) and not isinstance(raw, bool) else 0) + 1
+        await Cache.put(scoped, count, ttl=max(decay_seconds, 1))
+        reset_at = datetime.fromtimestamp(time.time() + max(decay_seconds, 0), tz=UTC)
+        return Attempt(count=count, reset_at=reset_at)
+
+
 class RedisStore:
     """Redis-backed store for multi-process deployments.
 
@@ -85,6 +108,7 @@ async def _await_if_needed(value: Any) -> Any:
 
 __all__ = [
     "Attempt",
+    "CacheStore",
     "InMemoryStore",
     "RateLimiterStore",
     "RedisStore",

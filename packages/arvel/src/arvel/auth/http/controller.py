@@ -245,9 +245,11 @@ class AuthController(Controller):
 
         email = str(payload.email).strip().lower()
         if self._resend_store is None:
-            from arvel.http.ratelimit import InMemoryStore  # noqa: PLC0415
+            # Cache-backed so the resend limit holds across workers (Redis in
+            # prod); degrades to per-process only when the cache itself is.
+            from arvel.http.ratelimit import CacheStore  # noqa: PLC0415
 
-            self._resend_store = InMemoryStore()
+            self._resend_store = CacheStore()
 
         attempt = await self._resend_store.hit(f"resend:{email}", decay_seconds=60)
         if attempt.count > 1:
