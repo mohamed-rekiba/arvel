@@ -33,11 +33,13 @@ class SchedulerSignal:
         self._interrupt_key = interrupt_key
         self._paused_key = paused_key
 
-    async def send_interrupt(self) -> None:
-        """Write the interrupt marker. Expires in 120 s to avoid stale signals."""
+    async def send_interrupt(self) -> bool:
+        """Write the interrupt marker (TTL 120 s). False when no cache store is bound."""
         store = self._resolve_store()
-        if store is not None:
-            await store.put(self._interrupt_key, "1", ttl=120)
+        if store is None:
+            return False
+        await store.put(self._interrupt_key, "1", ttl=120)
+        return True
 
     async def check_and_clear_interrupt(self) -> bool:
         """Return True (and delete the marker) when an interrupt was signalled."""
@@ -50,17 +52,21 @@ class SchedulerSignal:
             return True
         return False
 
-    async def pause(self) -> None:
-        """Write the pause marker (no TTL — stays until resume())."""
+    async def pause(self) -> bool:
+        """Write the pause marker (no TTL — stays until resume()). False when unbound."""
         store = self._resolve_store()
-        if store is not None:
-            await store.put(self._paused_key, "1")
+        if store is None:
+            return False
+        await store.put(self._paused_key, "1")
+        return True
 
-    async def resume(self) -> None:
-        """Delete the pause marker."""
+    async def resume(self) -> bool:
+        """Delete the pause marker. False when no cache store is bound."""
         store = self._resolve_store()
-        if store is not None:
-            await store.forget(self._paused_key)
+        if store is None:
+            return False
+        await store.forget(self._paused_key)
+        return True
 
     async def is_paused(self) -> bool:
         """True when the pause marker is present in the cache."""

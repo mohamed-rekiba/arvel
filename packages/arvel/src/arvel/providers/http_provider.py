@@ -27,8 +27,19 @@ class HttpServiceProvider(ServiceProvider):
             lambda: HttpExceptionHandler(translators=default_translators()),
         )
         c.singleton(RateLimiterStore, InMemoryStore)
-        c.singleton(MaintenanceModeManager, lambda: MaintenanceModeManager())
+        c.singleton(MaintenanceModeManager, self._maintenance_manager)
         c.singleton(HttpConfig, lambda: HttpConfig.from_environment())
+
+    def _maintenance_manager(self) -> MaintenanceModeManager:
+        # Root the marker at the project base_path so `arvel down` (CLI) and the
+        # running app agree on the file location regardless of CWD.
+        from arvel.application.errors import EnvironmentNotSetError
+
+        try:
+            root = self.app.base_path()
+        except EnvironmentNotSetError:
+            return MaintenanceModeManager()
+        return MaintenanceModeManager(marker_path=root / "storage" / "framework" / "down")
 
 
 def default_translators() -> Mapping[type[Exception], ExceptionTranslator]:

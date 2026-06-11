@@ -372,10 +372,8 @@ class Container:
         if requestor is not None:
             contextual = self._find_contextual(requestor, abstract)
             if contextual is not _MISSING:
-                return cast(
-                    "T",
-                    self._invoke(contextual, abstract, path, allow_async=allow_async),
-                )
+                instance = self._invoke(contextual, abstract, path, allow_async=allow_async)
+                return cast("T", self._apply_extensions(abstract, instance))
 
         binding = self._find_binding(abstract)
 
@@ -424,7 +422,8 @@ class Container:
                 ),
             )
 
-        return self._instantiate(abstract, overrides, abstract, path=path)
+        instance = self._instantiate(abstract, overrides, abstract, path=path)
+        return cast("T", self._apply_extensions(abstract, instance))
 
     def _instantiate(
         self,
@@ -585,7 +584,8 @@ class Container:
                         f"and is not bound; call container.bind({abstract.__qualname__}, ...)"
                     ),
                 )
-            return await self._ainstantiate(abstract, overrides, abstract, path=path)
+            instance = await self._ainstantiate(abstract, overrides, abstract, path=path)
+            return cast("T", self._apply_extensions(abstract, instance))
 
         if binding.scope is Scope.SINGLETON and abstract in self._singletons:
             return cast("T", self._singletons[abstract])

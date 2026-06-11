@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import json
 from pathlib import Path
-from typing import Annotated, ClassVar
+from typing import TYPE_CHECKING, Annotated, ClassVar
 
 import typer
 
@@ -17,7 +17,18 @@ from arvel.console._t import Argument as _Argument
 from arvel.console._t import Option as _Option
 from arvel.console.commands.vendor_publish import VendorPublishCommand
 
+if TYPE_CHECKING:
+    from arvel.application import Application as FrameworkApplication
+
 CONFIG_CACHE_REL = Path("bootstrap") / "cache" / "config.json"
+
+
+def _config_cache_path(app: FrameworkApplication | None) -> Path:
+    """Where the config cache lives — under base_path when the app is bound."""
+    if app is not None:
+        with contextlib.suppress(AttributeError, TypeError):
+            return app.base_path() / CONFIG_CACHE_REL
+    return Path.cwd() / CONFIG_CACHE_REL
 
 
 def _format_config_value(value: object) -> str:
@@ -107,19 +118,21 @@ class ConfigCacheCommand(Command):
         raise NotImplementedError
 
     def cache_path(self) -> Path:
-        if self.app is not None:
-            with contextlib.suppress(AttributeError, TypeError):
-                return self.app.base_path() / CONFIG_CACHE_REL
-        return Path.cwd() / CONFIG_CACHE_REL
+        return _config_cache_path(self.app)
 
 
 class ConfigClearCommand(Command):
     name: ClassVar[str] = "config:clear"
     help: ClassVar[str] = "Delete the cached config file so the next boot reads config/*.py."
+    # Resolve the same base_path-rooted path config:cache writes to; without
+    # project context the clear would look under the CWD and miss the file.
+    requires_project_context: ClassVar[bool] = True
 
     def register(self, app: typer.Typer) -> None:
+        cmd_self = self
+
         def _callback() -> None:
-            dest = Path.cwd() / CONFIG_CACHE_REL
+            dest = _config_cache_path(cmd_self.app)
             if dest.exists():
                 dest.unlink()
                 typer.echo(f"Removed {dest}")

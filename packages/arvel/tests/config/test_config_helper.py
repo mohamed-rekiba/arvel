@@ -19,6 +19,7 @@ def app_with_config(tmp_path: Path) -> None:
     cfg.mkdir()
     (cfg / "app.py").write_text(
         'timezone = "UTC"\nname = "arvel-test"\ndebug = False\nmax_upload_mb = 10\n'
+        'providers = ["Auth", "Cache", "Queue"]\n'
     )
     (cfg / "database.py").write_text(
         'DEFAULT = "sqlite"\nCONNECTIONS = {"sqlite": {"url": "sqlite+aiosqlite:///./test.db"}}\n'
@@ -77,6 +78,43 @@ def test_config_returns_default_for_missing_module(app_with_config: None) -> Non
     from arvel import config
 
     assert config("cache.store", "array") == "array"
+
+
+def test_config_indexes_into_list(app_with_config: None) -> None:
+    from arvel import config
+
+    assert config("app.providers.0") == "Auth"
+    assert config("app.providers.2") == "Queue"
+    assert config("app.providers.-1") == "Queue"
+
+
+def test_config_list_index_out_of_range_returns_default(app_with_config: None) -> None:
+    from arvel import config
+
+    assert config("app.providers.9", "fallback") == "fallback"
+
+
+def test_config_non_numeric_list_segment_returns_default(app_with_config: None) -> None:
+    from arvel import config
+
+    # A list never exposes its methods via dotted access.
+    assert config("app.providers.append", "safe") == "safe"
+
+
+def test_has_true_for_existing_key(app_with_config: None) -> None:
+    from arvel.config import has
+
+    assert has("app.timezone") is True
+    assert has("app.providers.0") is True
+    assert has("database.CONNECTIONS.sqlite.url") is True
+
+
+def test_has_false_for_missing_key_or_module(app_with_config: None) -> None:
+    from arvel.config import has
+
+    assert has("app.nonexistent") is False
+    assert has("cache.store") is False
+    assert has("app.providers.9") is False
 
 
 def test_config_is_importable_from_top_level_arvel() -> None:

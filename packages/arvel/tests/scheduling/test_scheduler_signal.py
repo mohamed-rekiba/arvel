@@ -27,10 +27,17 @@ class TestSchedulerSignalNoop:
     """All signal methods degrade gracefully when cache facade is unbound."""
 
     @pytest.mark.asyncio
-    async def test_send_interrupt_without_cache_is_noop(self) -> None:
+    async def test_send_interrupt_without_cache_returns_false(self) -> None:
         with patch.object(SchedulerSignal, "_resolve_store", return_value=None):
             sig = SchedulerSignal()
-            await sig.send_interrupt()  # must not raise
+            assert await sig.send_interrupt() is False
+
+    @pytest.mark.asyncio
+    async def test_pause_resume_without_cache_return_false(self) -> None:
+        with patch.object(SchedulerSignal, "_resolve_store", return_value=None):
+            sig = SchedulerSignal()
+            assert await sig.pause() is False
+            assert await sig.resume() is False
 
     @pytest.mark.asyncio
     async def test_check_interrupt_without_cache_returns_false(self) -> None:
@@ -54,7 +61,7 @@ class TestSchedulerSignalWithCache:
         sig = SchedulerSignal(interrupt_key="arvel:test:interrupt")
         with patch.object(SchedulerSignal, "_resolve_store", return_value=store):
             assert await sig.check_and_clear_interrupt() is False
-            await sig.send_interrupt()
+            assert await sig.send_interrupt() is True
             assert await sig.check_and_clear_interrupt() is True
             # cleared after first check
             assert await sig.check_and_clear_interrupt() is False
@@ -65,9 +72,9 @@ class TestSchedulerSignalWithCache:
         sig = SchedulerSignal(paused_key="arvel:test:paused")
         with patch.object(SchedulerSignal, "_resolve_store", return_value=store):
             assert await sig.is_paused() is False
-            await sig.pause()
+            assert await sig.pause() is True
             assert await sig.is_paused() is True
-            await sig.resume()
+            assert await sig.resume() is True
             assert await sig.is_paused() is False
 
 

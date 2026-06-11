@@ -802,11 +802,29 @@ class TestSchedulerHonoursUserApp:
         kernel = MagicMock()
         kernel.run_due_tasks = AsyncMock(return_value=None)
         kernel.serve_forever = AsyncMock(return_value=None)
+        # Clean interrupt-driven return (loop didn't give up on failures).
+        kernel.consecutive_failures = 0
 
         asyncio.run(run_loop(kernel, once=False, sleep=1.0, max_failures=3))
 
         kernel.serve_forever.assert_awaited_once_with(sleep_seconds=1.0, max_failures=3)
         kernel.run_due_tasks.assert_not_called()
+
+    def test_run_loop_exits_nonzero_when_serve_forever_gives_up(self) -> None:
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        import typer
+        from arvel.console.commands.schedule_commands import run_loop
+
+        kernel = MagicMock()
+        kernel.serve_forever = AsyncMock(return_value=None)
+        # serve_forever returned because it hit the failure ceiling.
+        kernel.consecutive_failures = 3
+
+        with pytest.raises(typer.Exit) as excinfo:
+            asyncio.run(run_loop(kernel, once=False, sleep=1.0, max_failures=3))
+        assert excinfo.value.exit_code == 1
 
 
 # ─────────────────────────────────────────────────────────────────────────────
