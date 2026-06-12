@@ -61,7 +61,7 @@ async def store(
 @pytest.mark.integration
 class TestDatabaseSessionStoreSql:
     async def test_read_write_roundtrip(self, store: DatabaseSessionStore) -> None:
-        await store.write("sid1", {"user_id": 1, "flash": "ok"}, lifetime=120)
+        await store.write("sid1", {"user_id": 1, "flash": "ok"})
         data = await store.read("sid1")
         assert data == {"user_id": 1, "flash": "ok"}
 
@@ -69,17 +69,17 @@ class TestDatabaseSessionStoreSql:
         assert await store.read("nonexistent") == {}
 
     async def test_write_updates_existing_row(self, store: DatabaseSessionStore) -> None:
-        await store.write("sid-update", {"v": 1}, lifetime=120)
-        await store.write("sid-update", {"v": 2}, lifetime=120)
+        await store.write("sid-update", {"v": 1})
+        await store.write("sid-update", {"v": 2})
         assert (await store.read("sid-update"))["v"] == 2
 
     async def test_destroy_removes_session(self, store: DatabaseSessionStore) -> None:
-        await store.write("sid-del", {"k": "v"}, lifetime=120)
+        await store.write("sid-del", {"k": "v"})
         await store.destroy("sid-del")
         assert await store.read("sid-del") == {}
 
     async def test_gc_purges_stale_rows(self, store: DatabaseSessionStore) -> None:
-        await store.write("sid-stale", {"k": "v"}, lifetime=1)
+        await store.write("sid-stale", {"k": "v"})
         # Backdate the row by an hour so gc(max_lifetime=10) sees it as stale.
         async with store.session_maker() as session:
             await session.execute(

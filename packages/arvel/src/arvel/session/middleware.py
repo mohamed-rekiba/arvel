@@ -117,7 +117,7 @@ class StartSession:
         if cookie_store is not None:
             # Self-contained cookie: nothing server-side to write or destroy.
             return
-        await self._store.write(session.get_id(), session.to_dict(), self._options.lifetime)
+        await self._store.write(session.get_id(), session.to_dict())
         # Drop ids rotated out by regenerate() so the old record can't outlive
         # the new one (session-fixation hygiene).
         for old_id in session.drain_pending_destroy():

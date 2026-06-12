@@ -306,29 +306,35 @@ async def async_main(project_root: Path, command: str | None) -> None:
     """
     required = _required_subsystems_for(command)
     provider_cmds: dict[str, Command] = {}
-    with boot_spinner(f"Booting {command or 'arvel'}\u2026"):
-        framework_app = bootstrap_framework_application(project_root, required_subsystems=required)
-        if framework_app is not None:
-            await framework_app.boot()
-            provider_cmds = _provider_commands(framework_app)
-
-    commands_by_name = _select_in_project_commands(command, framework_app, provider_cmds)
-
-    # Project root exists but bootstrap/app.py yielded no Application (missing/None
-    # create_application). A framework-needing command would crash later with
-    # `cmd.app is None`; fail loud now with exit 2 instead.
-    if framework_app is None and command is not None:
-        target = commands_by_name.get(command)
-        if target is not None and target.needs_framework():
-            _print_incomplete_bootstrap_message(command, project_root)
-            raise SystemExit(2)
-
-    # Typer/Click raises SystemExit(0) after a successful command in standalone
-    # mode. We must catch it so get_pending_task() can still run — otherwise
-    # schedule_async() coroutines (scheduler loop, migrations, etc.) are
-    # GC'd without ever being awaited.
-    _deferred_exit: SystemExit | None = None
+    framework_app: FrameworkApplication | None = None
     try:
+        # boot() lives inside this try so a partial boot (some providers booted,
+        # DB engine connected) still hits the finally and tears down — otherwise
+        # the connection pool leaks until process exit.
+        with boot_spinner(f"Booting {command or 'arvel'}\u2026"):
+            framework_app = bootstrap_framework_application(
+                project_root, required_subsystems=required
+            )
+            if framework_app is not None:
+                await framework_app.boot()
+                provider_cmds = _provider_commands(framework_app)
+
+        commands_by_name = _select_in_project_commands(command, framework_app, provider_cmds)
+
+        # Project root exists but bootstrap/app.py yielded no Application (missing/None
+        # create_application). A framework-needing command would crash later with
+        # `cmd.app is None`; fail loud now with exit 2 instead.
+        if framework_app is None and command is not None:
+            target = commands_by_name.get(command)
+            if target is not None and target.needs_framework():
+                _print_incomplete_bootstrap_message(command, project_root)
+                raise SystemExit(2)
+
+        # Typer/Click raises SystemExit(0) after a successful command in standalone
+        # mode. We must catch it so get_pending_task() can still run — otherwise
+        # schedule_async() coroutines (scheduler loop, migrations, etc.) are
+        # GC'd without ever being awaited.
+        _deferred_exit: SystemExit | None = None
         app = Application(list(commands_by_name.values()))
         try:
             app.typer_app()

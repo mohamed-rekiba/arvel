@@ -110,6 +110,41 @@ async def test_boot_retry_after_partial_failure_does_not_reboot_providers(
     await app.shutdown()
 
 
+async def test_shutdown_tears_down_partially_booted_providers(tmp_path: Path) -> None:
+    """A boot that fails partway still leaves a usable shutdown for what booted."""
+    from arvel import Application, ServiceProvider
+
+    events: list[str] = []
+
+    class Ok(ServiceProvider):
+        async def boot(self) -> None:
+            events.append("ok.boot")
+
+        async def shutdown(self) -> None:
+            events.append("ok.shutdown")
+
+    class Boom(ServiceProvider):
+        async def boot(self) -> None:
+            raise RuntimeError("kaboom")
+
+        async def shutdown(self) -> None:
+            events.append("boom.shutdown")  # must NOT run: never booted
+
+    app = (
+        Application.configure(tmp_path)
+        .with_environment("testing")
+        .with_providers([Ok, Boom])
+        .create()
+    )
+
+    with pytest.raises(Exception, match="kaboom"):
+        await app.boot()
+
+    # _booted never flipped true, but Ok booted and must be torn down.
+    await app.shutdown()
+    assert events == ["ok.boot", "ok.shutdown"]
+
+
 async def test_shutdown_runs_in_reverse_order(tmp_path: Path) -> None:
     from arvel import Application, ServiceProvider
 

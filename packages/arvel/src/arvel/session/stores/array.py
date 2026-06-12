@@ -23,8 +23,8 @@ class ArraySessionStore:
             return {}
         return dict(data)
 
-    async def write(self, session_id: str, data: dict[str, Any], lifetime: int) -> None:
-        expires_at = time.time() + lifetime if lifetime > 0 else 0.0
+    async def write(self, session_id: str, data: dict[str, Any]) -> None:
+        expires_at = time.time() + self.lifetime if self.lifetime > 0 else 0.0
         self._store[session_id] = (dict(data), expires_at)
 
     async def destroy(self, session_id: str) -> None:

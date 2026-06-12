@@ -9,7 +9,14 @@ if TYPE_CHECKING:
 
 
 class BootError(RuntimeError):
-    """Raised when a provider fails during register() or boot()."""
+    """Raised when a provider or service fails during the boot lifecycle.
+
+    ``provider`` is the failing provider class, or ``None`` for failures not tied
+    to a provider (see :class:`ServiceConnectError`). Always present so callers
+    can read it off any caught ``BootError`` without an attribute check.
+    """
+
+    provider: type[ServiceProvider] | None
 
     def __init__(
         self,
@@ -29,13 +36,15 @@ class BootError(RuntimeError):
 class ServiceConnectError(BootError):
     """Raised when a registered ``BaseService.connect()`` fails during boot.
 
-    Subclasses ``BootError`` so callers can catch either with one ``except``.
+    Subclasses ``BootError`` so callers can catch either with one ``except``;
+    ``provider`` is ``None`` since the failure is a service, not a provider.
     """
 
     def __init__(self, service_name: str, original: BaseException) -> None:
         self.service_name = service_name
         self.original = original
         self.phase = "boot"
+        self.provider = None
         RuntimeError.__init__(
             self,
             f"Service {service_name!r} failed to connect during boot: {original!r}",

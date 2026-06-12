@@ -39,7 +39,7 @@ class CookieStore:
         except Exception:
             return {}
 
-    async def write(self, session_id: str, data: dict[str, Any], lifetime: int) -> None:
+    async def write(self, session_id: str, data: dict[str, Any]) -> None:
         self.last_written_cookie = self._encode(data)
 
     def encode(self, data: dict[str, Any]) -> str:

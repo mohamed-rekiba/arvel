@@ -24,6 +24,27 @@ def test_scoped_caches_within_scope_and_evicts_on_exit() -> None:
         assert d is not a
 
 
+def test_rebind_on_parent_evicts_open_child_scope_cache() -> None:
+    from arvel.container import Container
+
+    class V1(Service): ...
+
+    class V2(Service): ...
+
+    c = Container()
+    c.scoped(Service, V1)
+
+    with c.scope() as scoped:
+        first = scoped.make(Service)
+        assert isinstance(first, V1)
+
+        # Rebinding on the parent mid-scope must invalidate the child's cached
+        # scoped instance, not keep serving the stale one until the scope exits.
+        c.scoped(Service, V2)
+        second = scoped.make(Service)
+        assert isinstance(second, V2)
+
+
 def test_singleton_persists_across_scopes() -> None:
     from arvel.container import Container
 

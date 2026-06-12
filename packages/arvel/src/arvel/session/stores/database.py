@@ -57,10 +57,10 @@ class DatabaseSessionStore:
                 return self._cipher.decrypt(record.payload)
             raw: Any = json.loads(record.payload)
             return cast("dict[str, Any]", raw) if isinstance(raw, dict) else {}
-        except (json.JSONDecodeError, ValueError, TypeError):
+        except json.JSONDecodeError, ValueError, TypeError:
             return {}
 
-    async def write(self, session_id: str, data: dict[str, Any], lifetime: int) -> None:
+    async def write(self, session_id: str, data: dict[str, Any]) -> None:
         now = int(time.time())
         payload = self._cipher.encrypt(data) if self._cipher is not None else json.dumps(data)
         async with self.session_maker() as session, session.begin():

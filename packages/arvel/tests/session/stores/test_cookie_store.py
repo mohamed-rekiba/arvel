@@ -25,7 +25,7 @@ class TestCookieStoreEncryption:
     async def test_write_and_read_roundtrip(self, store: CookieStore) -> None:
         session_id = "test-session-id"
         data: dict[str, Any] = {"user_id": 42, "name": "Alice"}
-        await store.write(session_id, data, lifetime=120)
+        await store.write(session_id, data)
         # Read back using the same store (simulates next request cookie)
         cookie_value = store.last_written_cookie
         read_data = await store.read_from_cookie(cookie_value)
@@ -34,7 +34,7 @@ class TestCookieStoreEncryption:
     @pytest.mark.asyncio
     async def test_tampered_cookie_returns_empty_session(self, store: CookieStore) -> None:
         session_id = "tamper-me"
-        await store.write(session_id, {"secret": "data"}, lifetime=120)
+        await store.write(session_id, {"secret": "data"})
         tampered = "garbage_not_valid_base64_aead"
         result = await store.read_from_cookie(tampered)
         assert result == {}
@@ -49,14 +49,14 @@ class TestCookieStoreEncryption:
         store1 = CookieStore(app_key=app_key, lifetime=120)
         store2 = CookieStore(app_key=os.urandom(32), lifetime=120)
 
-        await store1.write("s1", {"user": 1}, lifetime=120)
+        await store1.write("s1", {"user": 1})
         cookie = store1.last_written_cookie
         result = await store2.read_from_cookie(cookie)
         assert result == {}
 
     @pytest.mark.asyncio
     async def test_payload_is_not_plaintext(self, store: CookieStore) -> None:
-        await store.write("s", {"secret_data": "top_secret"}, lifetime=120)
+        await store.write("s", {"secret_data": "top_secret"})
         cookie = store.last_written_cookie
         # The raw cookie value must not contain the plaintext key
         try:

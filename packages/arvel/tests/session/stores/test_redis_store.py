@@ -20,7 +20,7 @@ async def store() -> RedisSessionStore:
 class TestRedisSessionStore:
     @pytest.mark.asyncio
     async def test_read_write_roundtrip(self, store: RedisSessionStore) -> None:
-        await store.write("sid1", {"user_id": 1}, lifetime=120)
+        await store.write("sid1", {"user_id": 1})
         data = await store.read("sid1")
         assert data["user_id"] == 1
 
@@ -31,7 +31,7 @@ class TestRedisSessionStore:
 
     @pytest.mark.asyncio
     async def test_destroy_removes_session(self, store: RedisSessionStore) -> None:
-        await store.write("sid2", {"k": "v"}, lifetime=120)
+        await store.write("sid2", {"k": "v"})
         await store.destroy("sid2")
         assert await store.read("sid2") == {}
 
@@ -53,7 +53,7 @@ class TestRedisSessionStore:
         redis = fakeredis.aioredis.FakeRedis()
         store = RedisSessionStore(redis=redis, prefix="enc:", lifetime=120, cipher=cipher)
 
-        await store.write("sid", {"user_id": 7}, lifetime=120)
+        await store.write("sid", {"user_id": 7})
         raw = await redis.get("enc:sid")
         assert isinstance(raw, bytes) and b"user_id" not in raw  # actually encrypted
         assert (await store.read("sid"))["user_id"] == 7

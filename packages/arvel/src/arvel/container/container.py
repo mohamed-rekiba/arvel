@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import weakref
 from collections.abc import (
     AsyncGenerator,
     Awaitable,
@@ -118,6 +119,10 @@ class Container:
         # Per-scope cache; only used when this container is a scope.
         self._scope_cache: dict[type, Any] = {}
 
+        # Open child scopes, so a rebind here can also drop their stale scoped
+        # instances. Weak so an abandoned scope doesn't keep the child alive.
+        self._children: weakref.WeakSet[Container] = weakref.WeakSet()
+
         # Per-abstract build locks for concurrent async resolution of shared
         # scopes; (loop, lock) so a container reused across loops re-locks.
         self._async_locks: dict[AbstractKey, tuple[asyncio.AbstractEventLoop, asyncio.Lock]] = {}
@@ -151,6 +156,7 @@ class Container:
             self._instances.pop(abstract, None)
             self._singletons.pop(abstract, None)
             self._scope_cache.pop(abstract, None)
+            self._evict_scoped_in_descendants(abstract)
 
     def singleton(
         self,
@@ -221,6 +227,14 @@ class Container:
         self._extensions.setdefault(abstract, []).append(decorator)
         self._singletons.pop(abstract, None)
         self._scope_cache.pop(abstract, None)
+        self._evict_scoped_in_descendants(abstract)
+
+    def _evict_scoped_in_descendants(self, abstract: type) -> None:
+        # A rebind/extend on a parent must invalidate any scoped instance an
+        # open child already cached, or the child keeps serving the stale one.
+        for child in self._children:
+            child._scope_cache.pop(abstract, None)
+            child._evict_scoped_in_descendants(abstract)
 
     def _find_contextual(self, requestor: type, abstract: type) -> Any:
         # Walk the scope chain so contextual rules registered on a parent still
@@ -342,18 +356,22 @@ class Container:
     @contextmanager
     def scope(self) -> Generator[Container]:
         child = Container(parent=self)
+        self._children.add(child)
         try:
             yield child
         finally:
             child._scope_cache.clear()
+            self._children.discard(child)
 
     @asynccontextmanager
     async def ascope(self) -> AsyncGenerator[Container]:
         child = Container(parent=self)
+        self._children.add(child)
         try:
             yield child
         finally:
             child._scope_cache.clear()
+            self._children.discard(child)
 
     # ───────────────────────── Internals ──────────────────────────
 
@@ -566,7 +584,7 @@ class Container:
             return {}
         try:
             params = inspect.signature(factory).parameters
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return {}
         if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
             return dict(overrides)

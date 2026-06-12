@@ -46,7 +46,7 @@ class TestRedisSessionStoreOps:
             await client.aclose()
 
     async def test_read_write_roundtrip(self, store: RedisSessionStore) -> None:
-        await store.write("sid1", {"user_id": 1, "flash": "saved"}, lifetime=120)
+        await store.write("sid1", {"user_id": 1, "flash": "saved"})
         data = await store.read("sid1")
         assert data == {"user_id": 1, "flash": "saved"}
 
@@ -54,7 +54,7 @@ class TestRedisSessionStoreOps:
         assert await store.read("nonexistent") == {}
 
     async def test_destroy_removes_session(self, store: RedisSessionStore) -> None:
-        await store.write("sid2", {"k": "v"}, lifetime=120)
+        await store.write("sid2", {"k": "v"})
         await store.destroy("sid2")
         assert await store.read("sid2") == {}
 
@@ -65,14 +65,14 @@ class TestRedisSessionStoreOps:
     async def test_short_ttl_session_expires(
         self, store: RedisSessionStore, redis_endpoint: RedisEndpoint
     ) -> None:
-        # Confirm TTL is actually applied by asking Redis directly.
-        await store.write("sid-ttl", {"k": "v"}, lifetime=99)
+        # Confirm the store's configured lifetime lands as a real Redis TTL.
+        await store.write("sid-ttl", {"k": "v"})
         client: Any = redis_asyncio.Redis(host=redis_endpoint.host, port=redis_endpoint.port, db=0)
         try:
             # Per-test prefix is set in the fixture; matching on the id
             # suffix is enough to pull the row Redis just stored.
             full_key = next(iter(await client.keys("*sid-ttl*")))
             ttl: int = await client.ttl(full_key)
-            assert 0 < ttl <= 99
+            assert 0 < ttl <= 120
         finally:
             await client.aclose()
