@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from arvel.config.session_config import SessionConfig, SessionDriver
@@ -17,6 +18,9 @@ class SessionManager:
     def __init__(self, config: SessionConfig) -> None:
         self._config = config
         self._stores: dict[SessionDriver, SessionStore] = {}
+        # Resources the manager owns (DB engine, Redis client) so shutdown() can
+        # drain their connection pools instead of leaking them until process exit.
+        self._closers: list[Callable[[], Awaitable[None]]] = []
 
     def store(self, name: SessionDriver | str | None = None) -> SessionStore:
         driver = self._config.driver if name is None else SessionDriver(name)
@@ -79,6 +83,7 @@ class SessionManager:
                     ) from exc
 
                 client: _Any = _aioredis.from_url(self._config.redis_url)
+                self.register_closer(client.aclose)
                 return RedisSessionStore(
                     redis=client,
                     prefix=f"{self._config.redis_prefix}session:",
@@ -94,6 +99,7 @@ class SessionManager:
                 from arvel.session.stores.database import DatabaseSessionStore
 
                 engine = create_async_engine(self._config.database_url)
+                self.register_closer(engine.dispose)
                 maker = async_sessionmaker(engine, expire_on_commit=False)
                 return DatabaseSessionStore(
                     session_maker=maker,
@@ -128,6 +134,17 @@ class SessionManager:
         # new one — mirrors StartSession._persist for the facade-driven path.
         for old_id in session.drain_pending_destroy():
             await store.destroy(old_id)
+
+    def register_closer(self, cb: Callable[[], Awaitable[None]]) -> None:
+        """Register a coroutine that disposes an owned resource on shutdown."""
+        self._closers.append(cb)
+
+    async def shutdown(self) -> None:
+        """Dispose owned connection pools (DB engine, Redis client)."""
+        for close in self._closers:
+            await close()
+        self._closers.clear()
+        self._stores.clear()
 
 
 __all__ = ["SessionManager"]

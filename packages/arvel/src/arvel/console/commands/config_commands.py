@@ -61,7 +61,7 @@ class ConfigShowCommand(Command):
 class ConfigPublishCommand(Command):
     name: ClassVar[str] = "config:publish"
     help: ClassVar[str] = "Publish package config files into the app"
-    # Publishables come from providers' register() pass.
+    # Publishables register in providers' boot() pass, so user providers must boot.
     requires: ClassVar[frozenset[CliSubsystem]] = frozenset({CliSubsystem.USER_PROVIDERS})
 
     def register(self, app: typer.Typer) -> None:

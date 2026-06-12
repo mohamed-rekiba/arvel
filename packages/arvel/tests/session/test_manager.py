@@ -27,6 +27,29 @@ def test_session_manager_caches_store_instances(tmp_path: Path) -> None:
     assert isinstance(first, FileSessionStore)
 
 
+@pytest.mark.asyncio
+async def test_session_manager_shutdown_drains_owned_connections() -> None:
+    # The db/redis drivers create a pool the manager owns; shutdown() must drain
+    # every registered closer and clear caches so nothing leaks past teardown.
+    manager = SessionManager(
+        SessionConfig(driver=SessionDriver.COOKIE, secret_key=SecretStr("0" * 32))
+    )
+    closed = {"n": 0}
+
+    async def _close() -> None:
+        closed["n"] += 1
+
+    manager.register_closer(_close)
+    manager.store()
+
+    await manager.shutdown()
+
+    # closer was called exactly once; a second shutdown() must be safe too.
+    assert closed["n"] == 1
+    await manager.shutdown()
+    assert closed["n"] == 1
+
+
 def test_session_manager_creates_cookie_store() -> None:
     manager = SessionManager(
         SessionConfig(driver=SessionDriver.COOKIE, secret_key=SecretStr("0" * 32))

@@ -14,7 +14,9 @@ class SessionStore(Protocol):
     async def gc(self, max_lifetime) -> int: ...
 ```
 
-Session lifetime is configured on the store at construction (`SessionConfig.lifetime` from `SESSION_LIFETIME`) — not passed per `write()`. That matches Laravel's `SessionHandlerInterface::write()`, which also takes no TTL argument. `StartSession` sets the cookie `Max-Age` from `SessionCookie.lifetime`; server-side stores use the same configured value for expiry (file mtime, DB `last_activity`, Redis TTL).
+Session lifetime is configured on the store at construction (`SessionConfig.lifetime` from `SESSION_LIFETIME`) — not passed per `write()`. That matches Laravel's `SessionHandlerInterface::write()`, which also takes no TTL argument. `StartSession` sets the cookie `Max-Age` from `SessionCookie.lifetime`; server-side stores use the same configured value for expiry (file mtime, DB `last_activity`, Redis TTL). `CookieStore` enforces it too — the encrypted payload carries an `expires` stamp checked on read, so a replayed cookie can't outlive `SESSION_LIFETIME` even though the browser's `Max-Age` is client-controlled (Laravel `CookieSessionHandler` parity). `SESSION_LIFETIME=0` means never-expire.
+
+The `redis` and `database` drivers create a connection pool the manager owns. `SessionManager.shutdown()` disposes it and `SessionServiceProvider.shutdown()` calls that on teardown, so the pool drains instead of leaking until process exit.
 
 Driver from `SessionConfig` (`SESSION_*`, default `cookie`):
 

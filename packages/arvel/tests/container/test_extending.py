@@ -135,6 +135,39 @@ def test_extend_applies_to_prebuilt_instance_immediately() -> None:
     assert c.make(Greeter).greet() == "HI!"
 
 
+def test_extend_on_root_applies_through_child_scope() -> None:
+    # A decorator registered on the root must still run when the type is resolved
+    # through a scope() child, which holds its own empty _extensions dict.
+    from arvel.container import Container
+
+    c = Container()
+    c.bind(Greeter)
+
+    def loud(g: Greeter, _c: Container) -> Greeter:
+        g.greet = lambda: "HI!"  # type: ignore[method-assign]
+        return g
+
+    c.extend(Greeter, loud)
+    with c.scope() as child:
+        assert child.make(Greeter).greet() == "HI!"
+
+
+async def test_extend_on_root_applies_through_async_child_scope() -> None:
+    from arvel.container import Container
+
+    c = Container()
+    c.bind(Greeter)
+
+    def loud(g: Greeter, _c: Container) -> Greeter:
+        g.greet = lambda: "HI!"  # type: ignore[method-assign]
+        return g
+
+    c.extend(Greeter, loud)
+    async with c.ascope() as child:
+        resolved = await child.amake(Greeter)
+        assert resolved.greet() == "HI!"
+
+
 def test_rebind_drops_stale_instance() -> None:
     # Laravel dropStaleInstances: a later bind() must not keep serving the object
     # registered via instance().

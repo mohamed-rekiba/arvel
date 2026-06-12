@@ -103,6 +103,23 @@ async def test_session_guard_login_stores_user_id_in_session() -> None:
 
 
 @pytest.mark.asyncio
+async def test_session_guard_login_fails_closed_on_null_id() -> None:
+    # A user with id=None must not persist a bogus "_auth_id" — mirrors
+    # AuthManager.id() returning None instead of the string "None".
+    from arvel.auth.guards.session import SessionGuard
+
+    session = _FakeSessionData()
+    request = _FakeRequest(session)
+    guard = SessionGuard(resolver=_FakeResolver())
+
+    class _User:
+        id = None
+
+    await guard.login(_User(), request)
+    assert session.get("_auth_id") is None
+
+
+@pytest.mark.asyncio
 async def test_session_guard_login_regenerates_session_to_prevent_fixation() -> None:
     from arvel.auth.guards.session import SessionGuard
 

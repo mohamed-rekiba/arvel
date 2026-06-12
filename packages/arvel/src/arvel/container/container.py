@@ -591,8 +591,14 @@ class Container:
         return {name: overrides[name] for name in params if name in overrides}
 
     def _apply_extensions(self, abstract: type, instance: Any) -> Any:
-        for decorator in self._extensions.get(abstract, ()):
-            instance = decorator(instance, self)
+        # Walk the parent chain like _find_binding/_find_contextual — a decorator
+        # registered with extend() on the root must still apply when the type is
+        # resolved through a scope() child, which holds its own empty _extensions.
+        container: Container | None = self
+        while container is not None:
+            for decorator in container._extensions.get(abstract, ()):
+                instance = decorator(instance, self)
+            container = container._parent
         return instance
 
     # ───────────────────────── Async resolution ──────────────────────────
