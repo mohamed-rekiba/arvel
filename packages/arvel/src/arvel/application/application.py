@@ -458,24 +458,32 @@ class Application:
         return chain
 
     async def shutdown(self) -> None:
-        if not self._booted:
+        # Tear down exactly what booted/connected — not what merely registered.
+        # A boot() that failed partway leaves some providers booted and maybe a
+        # service connected (e.g. the DB engine pool); those must still be drained
+        # even though self._booted never flipped true.
+        if not self._booted_providers and not self._connected_services:
             return
         from arvel.logging.facade import Log
 
         # Disconnect services first (reverse registration). A failing disconnect
         # is logged, not raised, so the remaining services still tear down.
         for service in reversed(self._services):
+            if id(service) not in self._connected_services:
+                continue
             try:
                 await service.disconnect()
             except Exception as exc:  # noqa: BLE001 — one bad disconnect must not strand the rest
                 Log.error("service.disconnect_failed", exc=exc, service=service.name)
 
-        # Shut down providers in reverse. Drain every one even if a teardown
+        # Shut down booted providers in reverse. Drain every one even if a teardown
         # raises — otherwise a failing provider strands the ones after it (e.g.
         # the DB provider never disposes its engine -> leaked pool). Surface the
         # first failure once all have run, so shutdown is both complete and loud.
         first_failure: tuple[type[ServiceProvider], BaseException] | None = None
         for inst in reversed(self._provider_instances):
+            if id(inst) not in self._booted_providers:
+                continue
             try:
                 await inst.shutdown()
             except Exception as exc:  # noqa: BLE001 — drain the rest; first failure re-raised below

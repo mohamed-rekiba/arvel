@@ -41,12 +41,12 @@ class RedisSessionStore:
                 return self._cipher.decrypt(payload)
             parsed: Any = json.loads(payload)
             return cast("dict[str, Any]", parsed) if isinstance(parsed, dict) else {}
-        except (json.JSONDecodeError, ValueError, TypeError):
+        except json.JSONDecodeError, ValueError, TypeError:
             return {}
 
-    async def write(self, session_id: str, data: dict[str, Any], lifetime: int) -> None:
+    async def write(self, session_id: str, data: dict[str, Any]) -> None:
         payload = self._cipher.encrypt(data) if self._cipher is not None else json.dumps(data)
-        await self._client.setex(self._key(session_id), lifetime, payload)
+        await self._client.setex(self._key(session_id), self._lifetime, payload)
 
     async def destroy(self, session_id: str) -> None:
         await self._client.delete(self._key(session_id))

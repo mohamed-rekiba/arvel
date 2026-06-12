@@ -65,6 +65,9 @@ async def test_connect_failure_raises_boot_error_with_name(tmp_path: Path) -> No
 
     assert isinstance(excinfo.value, ServiceConnectError)
     assert "boom" in str(excinfo.value)
+    # Honors the BootError contract: provider is always present, None for a
+    # service-level failure (no provider class to point at).
+    assert excinfo.value.provider is None
 
 
 async def test_disconnect_failure_is_isolated(tmp_path: Path) -> None:

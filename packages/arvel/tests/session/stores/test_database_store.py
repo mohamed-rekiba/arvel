@@ -34,7 +34,7 @@ async def store(db_engine: AsyncEngine) -> DatabaseSessionStore:
 class TestDatabaseSessionStore:
     @pytest.mark.asyncio
     async def test_read_write_roundtrip(self, store: DatabaseSessionStore) -> None:
-        await store.write("sid1", {"user_id": 99}, lifetime=120)
+        await store.write("sid1", {"user_id": 99})
         data = await store.read("sid1")
         assert data["user_id"] == 99
 
@@ -44,13 +44,13 @@ class TestDatabaseSessionStore:
 
     @pytest.mark.asyncio
     async def test_destroy_removes_session(self, store: DatabaseSessionStore) -> None:
-        await store.write("sid2", {"k": "v"}, lifetime=120)
+        await store.write("sid2", {"k": "v"})
         await store.destroy("sid2")
         assert await store.read("sid2") == {}
 
     @pytest.mark.asyncio
     async def test_gc_removes_stale_sessions(self, store: DatabaseSessionStore) -> None:
-        await store.write("old_sid", {"k": "v"}, lifetime=1)
+        await store.write("old_sid", {"k": "v"})
         from sqlalchemy import text
 
         async with store.session_maker() as db:
@@ -66,7 +66,7 @@ class TestDatabaseSessionStore:
         """A stale row is treated as empty on read, before GC sweeps it."""
         from sqlalchemy import text
 
-        await store.write("stale", {"k": "v"}, lifetime=120)
+        await store.write("stale", {"k": "v"})
         async with store.session_maker() as db:
             await db.execute(text("UPDATE sessions SET last_activity = 1 WHERE id = 'stale'"))
             await db.commit()

@@ -65,10 +65,20 @@ class PublishRegistry:
 
     def __init__(self) -> None:
         self._items: list[Publishable] = []
+        self._seen: set[Publishable] = set()
 
     def add(self, items: list[Publishable]) -> None:
-        """Append publishables to the registry. Order is preserved."""
-        self._items.extend(items)
+        """Append publishables, skipping exact duplicates. Order is preserved.
+
+        Dedup keeps a boot retry (after a later provider failed) from publishing
+        the same file twice — a duplicated migration stub would land as two
+        timestamped files.
+        """
+        for item in items:
+            if item in self._seen:
+                continue
+            self._seen.add(item)
+            self._items.append(item)
 
     def all(self) -> list[Publishable]:
         """Return every registered publishable (defensive copy)."""

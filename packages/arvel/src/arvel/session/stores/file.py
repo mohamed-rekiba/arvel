@@ -61,7 +61,7 @@ class FileSessionStore:
 
         return await anyio.to_thread.run_sync(_read)
 
-    async def write(self, session_id: str, data: dict[str, Any], lifetime: int) -> None:
+    async def write(self, session_id: str, data: dict[str, Any]) -> None:
         file = self._session_file(session_id)
         payload = self._cipher.encrypt(data) if self._cipher is not None else json.dumps(data)
 

@@ -109,7 +109,9 @@ class SchedulerServiceProvider(ServiceProvider):
 
         spec = importlib.util.spec_from_file_location("_app_console_kernel", kernel_file)
         if spec is None or spec.loader is None:
-            return
+            # The file exists but Python can't build a loader for it — a real
+            # environment fault, not "no schedule". Fail loud like a broken import.
+            raise RuntimeError(f"Could not load console kernel from {kernel_file}")
         module = importlib.util.module_from_spec(spec)
         # A broken Kernel is a developer error — fail loud (Laravel parity) instead
         # of booting with a silently empty schedule. Import/schedule() errors

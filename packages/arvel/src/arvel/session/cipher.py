@@ -35,12 +35,12 @@ class SessionCipher:
 
     @classmethod
     def from_app_key(cls, app_key: bytes) -> SessionCipher:
-        enc_key = HKDF(
-            algorithm=SHA256(), length=32, salt=None, info=b"arvel-session-enc"
-        ).derive(app_key)
-        mac_key = HKDF(
-            algorithm=SHA256(), length=32, salt=None, info=b"arvel-session-mac"
-        ).derive(app_key)
+        enc_key = HKDF(algorithm=SHA256(), length=32, salt=None, info=b"arvel-session-enc").derive(
+            app_key
+        )
+        mac_key = HKDF(algorithm=SHA256(), length=32, salt=None, info=b"arvel-session-mac").derive(
+            app_key
+        )
         return cls(enc_key, mac_key)
 
     def encrypt(self, payload: dict[str, Any]) -> str:

@@ -123,7 +123,7 @@ class SessionManager:
     async def save_session(self, session: SessionData) -> None:
         """Persist session data back to the store."""
         store = self.store()
-        await store.write(session.get_id(), session.to_dict(), self._config.lifetime)
+        await store.write(session.get_id(), session.to_dict())
         # Drop ids rotated out by regenerate() so the old record can't outlive the
         # new one — mirrors StartSession._persist for the facade-driven path.
         for old_id in session.drain_pending_destroy():
