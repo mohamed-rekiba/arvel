@@ -36,7 +36,12 @@ class _FakeResolver:
 
 
 def _make_token(
-    sub: str, secret: str = _SECRET, algorithm: str = "HS256", exp_offset: int = 3600
+    sub: str,
+    secret: str = _SECRET,
+    algorithm: str = "HS256",
+    exp_offset: int = 3600,
+    *,
+    typ: str = "access",
 ) -> str:
     import importlib
     import time
@@ -44,7 +49,7 @@ def _make_token(
     _jwt = importlib.import_module("jwt")
     return str(
         _jwt.encode(
-            {"sub": sub, "exp": int(time.time()) + exp_offset},
+            {"sub": sub, "exp": int(time.time()) + exp_offset, "typ": typ},
             secret,
             algorithm=algorithm,
         )
@@ -272,5 +277,51 @@ async def test_jwt_guard_rejects_suspended_user() -> None:
 
     token = _make_token("u1")
     guard = JwtGuard(resolver=_FakeResolver({"u1": _SuspendedUser()}), jwt=_jwt_config())
+    request = _FakeRequest(authorization=f"Bearer {token}")
+    assert await guard.user(request) is None
+
+
+# ── A2: JwtGuard rejects tokens where typ claim is missing ────────────────────
+
+
+@pytest.mark.asyncio
+async def test_jwt_guard_rejects_token_with_missing_typ_claim() -> None:
+    """A token without a typ claim must be rejected (not just a wrong typ)."""
+    import importlib
+    import time
+
+    from arvel.auth.guards.jwt import JwtGuard
+
+    _jwt = importlib.import_module("jwt")
+    # Valid token but no typ claim at all — must be rejected.
+    token = str(
+        _jwt.encode(
+            {"sub": "u1", "exp": int(time.time()) + 3600},
+            _SECRET,
+            algorithm="HS256",
+        )
+    )
+    guard = JwtGuard(resolver=_FakeResolver({"u1": {"id": "u1"}}), jwt=_jwt_config())
+    request = _FakeRequest(authorization=f"Bearer {token}")
+    assert await guard.user(request) is None
+
+
+@pytest.mark.asyncio
+async def test_jwt_guard_rejects_refresh_token_as_access() -> None:
+    """A refresh token (typ='refresh') must not authenticate a request."""
+    import importlib
+    import time
+
+    from arvel.auth.guards.jwt import JwtGuard
+
+    _jwt = importlib.import_module("jwt")
+    token = str(
+        _jwt.encode(
+            {"sub": "u1", "exp": int(time.time()) + 3600, "typ": "refresh"},
+            _SECRET,
+            algorithm="HS256",
+        )
+    )
+    guard = JwtGuard(resolver=_FakeResolver({"u1": {"id": "u1"}}), jwt=_jwt_config())
     request = _FakeRequest(authorization=f"Bearer {token}")
     assert await guard.user(request) is None

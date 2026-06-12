@@ -18,14 +18,21 @@ from starlette.routing import Route
 from starlette.testclient import TestClient
 
 
-def make_app(store: ArraySessionStore) -> Starlette:
+def make_app(store: ArraySessionStore, gc_probability: int = 2) -> Starlette:
     async def handler(request: Request) -> Response:
         session: SessionData = request.state.session
         value = session.get("counter", default=0)
         session.put("counter", int(value) + 1)
         return Response(str(value))
 
-    middleware = [Middleware(StartSession, store=store, options=SessionCookie(lifetime=120))]
+    middleware = [
+        Middleware(
+            StartSession,
+            store=store,
+            options=SessionCookie(lifetime=120),
+            gc_probability=gc_probability,
+        )
+    ]
     return Starlette(routes=[Route("/", handler)], middleware=middleware)
 
 
@@ -194,3 +201,25 @@ class TestStartSessionMiddleware:
         client = cast("httpx.Client", TestClient(app, raise_server_exceptions=False))
         response = client.get("/")
         assert response.status_code == 500
+
+    def test_gc_probability_100_always_runs_gc(self) -> None:
+        """With gc_probability=100, gc() must be called on every request."""
+        from unittest.mock import AsyncMock, patch
+
+        store = ArraySessionStore(lifetime=120)
+        with patch.object(store, "gc", new_callable=AsyncMock) as mock_gc:
+            app = make_app(store, gc_probability=100)
+            client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
+            client.get("/")
+        mock_gc.assert_awaited_once()
+
+    def test_gc_probability_0_never_runs_gc(self) -> None:
+        """With gc_probability=0, gc() must never be called."""
+        from unittest.mock import AsyncMock, patch
+
+        store = ArraySessionStore(lifetime=120)
+        with patch.object(store, "gc", new_callable=AsyncMock) as mock_gc:
+            app = make_app(store, gc_probability=0)
+            client = cast("httpx.Client", TestClient(app, raise_server_exceptions=True))
+            client.get("/")
+        mock_gc.assert_not_awaited()

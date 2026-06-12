@@ -37,4 +37,9 @@ class ArventUserProvider:
         username = credentials.get(self._username_field)
         if username is None or getattr(self._model, self._username_field, None) is None:
             return None
+        # Normalize string usernames (email addresses) so "User@Example.COM"
+        # matches "user@example.com" in the database — mirrors Laravel's
+        # EloquentUserProvider which lowercases before the query.
+        if isinstance(username, str):
+            username = username.strip().lower()
         return await self._model.where(**{self._username_field: username}).first()

@@ -123,9 +123,16 @@ class Container:
         # instances. Weak so an abandoned scope doesn't keep the child alive.
         self._children: weakref.WeakSet[Container] = weakref.WeakSet()
 
-        # Per-abstract build locks for concurrent async resolution of shared
-        # scopes; (loop, lock) so a container reused across loops re-locks.
-        self._async_locks: dict[AbstractKey, tuple[asyncio.AbstractEventLoop, asyncio.Lock]] = {}
+        # Per-abstract build locks for concurrent async resolution. Shared with
+        # the parent so root and child scopes don't double-build the same singleton
+        # concurrently (child shares _singletons/_instances with root, so the lock
+        # must also be shared to guard that shared state correctly).
+        if parent is None:
+            self._async_locks: dict[
+                AbstractKey, tuple[asyncio.AbstractEventLoop, asyncio.Lock]
+            ] = {}
+        else:
+            self._async_locks = parent._async_locks
 
         # Bind self so make(Container) works.
         if parent is None:
@@ -216,7 +223,17 @@ class Container:
 
     def tagged(self, tag_name: str) -> list[object]:
         # Heterogeneous by design — one tag groups unrelated types; callers narrow.
-        return [self.make(abstract) for abstract in self._tags.get(tag_name, [])]
+        # Walk the parent chain so tags registered on root are visible from child scopes.
+        seen: set[type] = set()
+        abstracts: list[type] = []
+        container: Container | None = self
+        while container is not None:
+            for t in container._tags.get(tag_name, []):
+                if t not in seen:
+                    seen.add(t)
+                    abstracts.append(t)
+            container = container._parent
+        return [self.make(abstract) for abstract in abstracts]
 
     def extend(self, abstract: type[T], decorator: Callable[[T, Container], T]) -> None:
         # A pre-built instance() can't be rebuilt, so (like Laravel) apply the
@@ -294,12 +311,22 @@ class Container:
                 continue
             param_type = raw_hints.get(param_name)
             # Python 3.14 (PEP 649) may give string annotations for local types.
-            # Resolve by matching the string name against bound types.
+            # Resolve by matching the string name against bound types — walk the
+            # parent chain so a type bound only on the root is still injectable.
             if isinstance(param_type, str):
-                param_type = next(
-                    (t for t in self._bindings if t.__name__ == param_type),
-                    None,
-                )
+                name_to_find = param_type
+                param_type = None
+                c: Container | None = self
+                while c is not None and param_type is None:
+                    param_type = next(
+                        (
+                            t
+                            for t in c._bindings
+                            if isinstance(t, type) and t.__name__ == name_to_find
+                        ),
+                        None,
+                    )
+                    c = c._parent
             if isinstance(param_type, type) and self.bound(param_type):
                 kwargs[param_name] = self.make(param_type)
         return fn(**kwargs)
@@ -327,10 +354,19 @@ class Container:
                 continue
             param_type = raw_hints.get(param_name)
             if isinstance(param_type, str):
-                param_type = next(
-                    (t for t in self._bindings if t.__name__ == param_type),
-                    None,
-                )
+                name_to_find = param_type
+                param_type = None
+                c: Container | None = self
+                while c is not None and param_type is None:
+                    param_type = next(
+                        (
+                            t
+                            for t in c._bindings
+                            if isinstance(t, type) and t.__name__ == name_to_find
+                        ),
+                        None,
+                    )
+                    c = c._parent
             if isinstance(param_type, type) and self.bound(param_type):
                 kwargs[param_name] = await self.amake(param_type)
         if is_async_callable(fn):

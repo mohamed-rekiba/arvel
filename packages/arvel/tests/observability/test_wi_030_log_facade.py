@@ -69,7 +69,8 @@ class TestLogFacadeApi:
             Log.critical("test.critical")
         obs.assert_logged("test.critical")
 
-    def test_debug_emits_log_record(self) -> None:
+    def test_debug_emits_log_record(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LOG_LEVEL", "debug")
         from arvel.facades import Log
         from arvel.testing.observability import FakeObservability
 
@@ -113,10 +114,10 @@ class TestLogFacadeApi:
 
     def test_channel_returns_scoped_logger(self) -> None:
         from arvel.facades import Log
-        from arvel.logging.otel_logger import OtelLogger
+        from arvel.logging.channels.otel_channel import OtelChannel
 
         audit = Log.channel("audit")
-        assert isinstance(audit, OtelLogger)
+        assert isinstance(audit, OtelChannel)
 
     def test_channel_logger_name_prefix(self) -> None:
         from arvel.facades import Log

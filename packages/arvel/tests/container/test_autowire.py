@@ -83,3 +83,25 @@ def test_make_with_overrides_uses_supplied_kwarg() -> None:
     c = Container()
     obj = c.make(B, a=explicit_a)
     assert obj.a is explicit_a
+
+
+def test_autowire_annotated_hint_is_unwrapped() -> None:
+    # Annotated[T, metadata] must be treated as T by the container so that
+    # params decorated with metadata (e.g. Annotated[Service, Inject()]) still
+    # get injected rather than silently skipped.
+    from typing import Annotated
+
+    from arvel.container import Container
+
+    class Service:
+        value = 42
+
+    class Consumer:
+        def __init__(self, svc: Annotated[Service, "some-metadata"]) -> None:
+            self.svc = svc
+
+    c = Container()
+    c.singleton(Service)
+    obj = c.make(Consumer)
+    assert isinstance(obj.svc, Service)
+    assert obj.svc.value == 42

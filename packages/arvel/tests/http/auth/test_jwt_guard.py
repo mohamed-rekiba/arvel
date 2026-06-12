@@ -36,11 +36,16 @@ def _jwt_config(
     return JwtConfig(secret=secret, algorithm=algorithm)
 
 
-def _make_token(payload: dict[str, Any], secret: str = "k" * 32, alg: str = "HS256") -> str:
+def _make_token(
+    payload: dict[str, Any],
+    secret: str = "k" * 32,
+    alg: str = "HS256",
+    typ: str = "access",
+) -> str:
     import importlib
 
     _jwt = importlib.import_module("jwt")
-    return str(_jwt.encode(payload, secret, algorithm=alg))
+    return str(_jwt.encode({**payload, "typ": typ}, secret, algorithm=alg))
 
 
 @pytest.mark.asyncio
