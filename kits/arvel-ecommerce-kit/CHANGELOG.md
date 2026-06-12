@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.12.4](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.12.3...arvel-ecommerce-kit-v1.12.4) (2026-06-12)
+
+
+### Bug Fixes
+
+* **auth,session:** harden guards, gate, CSRF, and session lifecycle ([acd160c](https://github.com/mohamed-rekiba/arvel/commit/acd160cd04246b202cdb1ec9faad1c7330846a26))
+
+
+### Refactors
+
+* **http:** declare global ASGI middleware like service providers ([3b5ddf3](https://github.com/mohamed-rekiba/arvel/commit/3b5ddf361a19a3fa7f3b5f2eade3d30a8a69fe2e))
+
 ## [1.12.3](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.12.2...arvel-ecommerce-kit-v1.12.3) (2026-06-10)
 
 
