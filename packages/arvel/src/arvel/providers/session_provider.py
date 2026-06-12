@@ -26,7 +26,19 @@ class SessionServiceProvider(ServiceProvider):
         c = self.app.container
         config = c.make(SessionConfig) if c.bound(SessionConfig) else SessionConfig()
         c.instance(SessionConfig, config)
-        manager = SessionManager(config)
+
+        # Share the app's DB engine when one is already bound so the database
+        # session driver doesn't open a second connection pool.
+        engine = None
+        try:
+            from sqlalchemy.ext.asyncio import AsyncEngine
+
+            if c.bound(AsyncEngine):
+                engine = c.make(AsyncEngine)
+        except ImportError:
+            pass
+
+        manager = SessionManager(config, engine=engine)
         c.instance(SessionManager, manager)
         Session.bind(c)
 

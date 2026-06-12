@@ -31,6 +31,26 @@ class ObservabilityServiceProvider(ServiceProvider):
         config: ObservabilityConfig = self.container.make(ObservabilityConfig)
         self.boot_providers(config)
 
+    async def shutdown(self) -> None:
+        # Flush queued log records and spans before the process exits.
+        import opentelemetry._logs._internal as _logs_internal
+        import opentelemetry.metrics._internal as _metrics_internal
+        import opentelemetry.trace as _trace_mod
+
+        lp = getattr(_logs_internal, "_LOGGER_PROVIDER", None)
+        if lp is not None and hasattr(lp, "force_flush"):
+            lp.force_flush()
+        if lp is not None and hasattr(lp, "shutdown"):
+            lp.shutdown()
+
+        tp = getattr(_trace_mod, "_TRACER_PROVIDER", None)
+        if tp is not None and hasattr(tp, "shutdown"):
+            tp.shutdown()
+
+        mp = getattr(_metrics_internal, "_METER_PROVIDER", None)
+        if mp is not None and hasattr(mp, "shutdown"):
+            mp.shutdown()
+
     def boot_providers(self, config: ObservabilityConfig | None = None) -> None:
         """Bootstrap OTel providers — callable without a full container for testing."""
         if config is None:
@@ -137,7 +157,16 @@ def _attach_log_processors(provider: LoggerProvider, config: ObservabilityConfig
         )
         provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
     except ImportError:
-        pass
+        # OTLP exporter not installed — fall back to stdout so logs are never
+        # silently dropped just because the gRPC package is missing.
+        import sys as _sys
+
+        from arvel.observability.stdout_log_exporter import formatter_for
+
+        stdout_exporter = ConsoleLogRecordExporter(
+            out=_sys.stdout, formatter=formatter_for(config.log_format)
+        )
+        provider.add_log_record_processor(SimpleLogRecordProcessor(stdout_exporter))
 
 
 def _bootstrap_metrics(config: ObservabilityConfig, resource: Resource) -> None:

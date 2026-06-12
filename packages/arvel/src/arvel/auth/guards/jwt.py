@@ -130,8 +130,10 @@ class JwtGuard(Guard):
         except _invalid_token_error:
             return None
 
-        typ_claim = payload.get("typ")
-        if typ_claim is not None and typ_claim != _JWT_ACCESS_CLAIM:
+        # Reject tokens with a wrong or absent typ claim. Refresh tokens carry
+        # typ="refresh" and must not be usable as access credentials — matching
+        # AuthService._decode_access() which also requires typ=="access".
+        if payload.get("typ") != _JWT_ACCESS_CLAIM:
             return None
 
         sub = payload.get("sub")

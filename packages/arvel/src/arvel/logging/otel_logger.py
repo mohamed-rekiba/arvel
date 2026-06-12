@@ -40,8 +40,21 @@ _DEFAULT_REDACT_FIELDS = frozenset(
 )
 
 
+# Populated by LogServiceProvider when ObservabilityConfig is available.
+# Falls back to env-based lookup when empty. Using a list avoids `global`.
+_configured_redact: list[frozenset[str]] = []
+
+
+def configure_redact_fields(fields: list[str] | frozenset[str]) -> None:
+    """Called by LogServiceProvider to set the redact list from config."""
+    _configured_redact.clear()
+    _configured_redact.append(frozenset(f.strip().lower() for f in fields))
+
+
 def _get_redact_set() -> frozenset[str]:
-    """Read redact list from env on every call so test monkeypatching works."""
+    """Return the active redact set — config-supplied when available, else env."""
+    if _configured_redact:
+        return _configured_redact[0]
     raw = os.environ.get("LOG_REDACT_FIELDS", "")
     if not raw:
         return _DEFAULT_REDACT_FIELDS
@@ -140,8 +153,9 @@ class OtelLogger:
         context: dict[str, object],
         exc: BaseException | None = None,
     ) -> None:
-        # Level gating — reads LOG_LEVEL from env so monkeypatching in tests works
-        configured_level = os.environ.get("LOG_LEVEL", "debug").lower()
+        # Level gating — reads LOG_LEVEL from env so monkeypatching in tests works.
+        # Default is "info" (not "debug") so production deployments are quiet by default.
+        configured_level = os.environ.get("LOG_LEVEL", "info").lower()
         if _LEVEL_ORDER.get(level, 0) < _LEVEL_ORDER.get(configured_level, 1):
             return
 
@@ -173,10 +187,12 @@ class OtelLogger:
         self._emit("warning", message, context)
 
     def error(self, message: str, *, exc: BaseException | None = None, **context: object) -> None:
-        # exc_info=True means "capture the currently active exception", same as stdlib logging
-        if context.pop("exc_info", False) and exc is None:
+        # Copy before pop so we don't mutate the caller's **context dict.
+        # exc_info=True means "capture the currently active exception" (stdlib compat).
+        ctx = dict(context)
+        if ctx.pop("exc_info", False) and exc is None:
             exc = sys.exc_info()[1]
-        self._emit("error", message, context, exc=exc)
+        self._emit("error", message, ctx, exc=exc)
 
     def critical(self, message: str, **context: object) -> None:
         self._emit("critical", message, context)
@@ -199,4 +215,4 @@ class OtelLogger:
         return OtelLogger(scoped, bound=dict(self._bound))
 
 
-__all__ = ["OtelLogger"]
+__all__ = ["OtelLogger", "configure_redact_fields"]

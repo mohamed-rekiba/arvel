@@ -79,3 +79,14 @@ async def test_acall_skips_unbound_param_uses_override() -> None:
     c = Container()
     result = await c.acall(UnboundHandler, "run", overrides={"missing": Service()})
     assert result == "got:Service"
+
+
+async def test_async_locks_are_shared_with_child_scope() -> None:
+    # Child scopes share _singletons/_instances with root; _async_locks must also
+    # be shared so concurrent amake() calls on both containers don't double-build.
+    from arvel.container import Container
+
+    c = Container()
+    with c.scope() as child:
+        # Accessing the private attr intentionally to verify the contract.
+        assert child._async_locks is c._async_locks  # pyright: ignore[reportPrivateUsage]

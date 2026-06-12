@@ -4,19 +4,30 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from arvel.config.session_config import SessionConfig, SessionDriver
 from arvel.session.cipher import SessionCipher
 from arvel.session.data import SessionData
 from arvel.session.store import SessionStore
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncEngine
+
 
 class SessionManager:
     """Creates and caches session store instances keyed by driver name."""
 
-    def __init__(self, config: SessionConfig) -> None:
+    def __init__(
+        self,
+        config: SessionConfig,
+        engine: AsyncEngine | None = None,
+    ) -> None:
         self._config = config
+        # Injected by SessionServiceProvider when a DB engine is already bound
+        # (i.e., DatabaseServiceProvider registered first). Reusing it avoids
+        # a second connection pool for the session database store.
+        self._engine = engine
         self._stores: dict[SessionDriver, SessionStore] = {}
         # Resources the manager owns (DB engine, Redis client) so shutdown() can
         # drain their connection pools instead of leaking them until process exit.
@@ -98,8 +109,12 @@ class SessionManager:
 
                 from arvel.session.stores.database import DatabaseSessionStore
 
-                engine = create_async_engine(self._config.database_url)
-                self.register_closer(engine.dispose)
+                if self._engine is not None:
+                    # Reuse the app's engine — no extra pool, no extra closer needed.
+                    engine = self._engine
+                else:
+                    engine = create_async_engine(self._config.database_url)
+                    self.register_closer(engine.dispose)
                 maker = async_sessionmaker(engine, expire_on_commit=False)
                 return DatabaseSessionStore(
                     session_maker=maker,

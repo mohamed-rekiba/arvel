@@ -6,6 +6,7 @@ buffers streaming responses and causes Content-Length mismatches.
 
 from __future__ import annotations
 
+import random
 import uuid
 from dataclasses import dataclass
 
@@ -46,10 +47,14 @@ class StartSession:
         app: ASGIApp,
         store: SessionStore,
         options: SessionCookie | None = None,
+        gc_probability: int = 2,
     ) -> None:
         self._app = app
         self._store = store
         self._options = options or SessionCookie()
+        # Probability (0-100) that GC runs on this request — mirrors Laravel's
+        # session lottery. 0 disables GC entirely; 100 runs it on every request.
+        self._gc_probability = max(0, min(100, gc_probability))
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -122,6 +127,10 @@ class StartSession:
         # the new one (session-fixation hygiene).
         for old_id in session.drain_pending_destroy():
             await self._store.destroy(old_id)
+        # GC lottery — mirrors Laravel's collectGarbage(). Runs probabilistically
+        # so expired rows/files don't accumulate indefinitely. 0 = disabled.
+        if self._gc_probability > 0 and random.randint(1, 100) <= self._gc_probability:  # noqa: S311 # nosec B311: non-crypto GC lottery
+            await self._store.gc(self._options.lifetime)
 
 
 def _cookie_header(scope: Scope) -> str:

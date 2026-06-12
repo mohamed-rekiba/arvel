@@ -65,3 +65,31 @@ def test_tagged_instances_are_resolved_via_container() -> None:
     assert len(alerts) == 2
     # tagged() returns list[object] by design — narrow before touching attrs.
     assert all(isinstance(a, (AlertA, AlertB)) and isinstance(a.logger, Logger) for a in alerts)
+
+
+def test_tagged_walks_parent_chain() -> None:
+    from arvel.container import Container
+
+    c = Container()
+    c.bind(SmsChannel)
+    c.tag([SmsChannel], "channels")
+
+    with c.scope() as child:
+        # Tag registered on root must be visible from child scope.
+        out = child.tagged("channels")
+    assert len(out) == 1
+    assert isinstance(out[0], SmsChannel)
+
+
+def test_tagged_deduplicates_when_both_parent_and_child_register_same_tag() -> None:
+    from arvel.container import Container
+
+    c = Container()
+    c.bind(SmsChannel)
+    c.tag([SmsChannel], "channels")
+
+    with c.scope() as child:
+        # Re-registering the same abstract on the child must not produce a duplicate.
+        child.tag([SmsChannel], "channels")
+        out = child.tagged("channels")
+    assert len(out) == 1

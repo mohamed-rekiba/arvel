@@ -6,10 +6,18 @@ import inspect as _inspect
 import sys
 import types
 from collections.abc import Callable
-from typing import Any, Union, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, Union, get_args, get_origin, get_type_hints
 
 _HINT_CACHE: dict[Any, dict[str, type]] = {}
 _OPTIONAL_PARAMS_CACHE: dict[Any, frozenset[str]] = {}
+
+
+def _unwrap_annotated(hint: Any) -> Any:
+    """``Annotated[T, metadata]`` → ``T``; pass-through otherwise."""
+    if get_origin(hint) is Annotated:
+        args = get_args(hint)
+        return args[0] if args else hint
+    return hint
 
 
 def _unwrap_optional(hint: Any) -> Any:
@@ -81,7 +89,7 @@ def init_hints(cls: type) -> dict[str, type]:
     for name, hint in raw.items():
         if name not in valid:
             continue
-        unwrapped = _unwrap_optional(hint)
+        unwrapped = _unwrap_annotated(_unwrap_optional(hint))
         if isinstance(unwrapped, type):
             cleaned[name] = unwrapped
     _HINT_CACHE[cls] = cleaned

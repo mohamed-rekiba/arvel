@@ -159,3 +159,54 @@ def test_has_api_tokens_plain_token_is_not_the_stored_hash() -> None:
     plain = u.create_token_sync("tok", abilities=["read"])
     assert plain != u.token_records[0].token
     assert u.token_records[0].token == hashlib.sha256(plain.encode()).hexdigest()
+
+
+# ── A1: ArventUserProvider.by_credentials() normalizes usernames ──────────────
+
+
+class _FakeModel:
+    """Minimal stand-in for an Arvent model class."""
+
+    last_where: dict[str, object] | None = None
+    return_user: Any = None
+
+    email: str = ""
+
+    @classmethod
+    def where(cls, **kwargs: object) -> _FakeModel:
+        cls.last_where = dict(kwargs)
+        return cls()
+
+    async def first(self) -> Any:
+        return _FakeModel.return_user
+
+
+@pytest.mark.asyncio
+async def test_arvent_user_provider_normalizes_email_case() -> None:
+    from arvel.auth.providers.arvent import ArventUserProvider
+
+    _FakeModel.return_user = object()
+    provider = ArventUserProvider(model=_FakeModel, username_field="email")
+    await provider.by_credentials({"email": "USER@EXAMPLE.COM"})
+    assert _FakeModel.last_where == {"email": "user@example.com"}
+
+
+@pytest.mark.asyncio
+async def test_arvent_user_provider_strips_whitespace_from_email() -> None:
+    from arvel.auth.providers.arvent import ArventUserProvider
+
+    _FakeModel.return_user = object()
+    provider = ArventUserProvider(model=_FakeModel, username_field="email")
+    await provider.by_credentials({"email": "  user@example.com  "})
+    assert _FakeModel.last_where == {"email": "user@example.com"}
+
+
+@pytest.mark.asyncio
+async def test_arvent_user_provider_non_string_username_not_normalized() -> None:
+    from arvel.auth.providers.arvent import ArventUserProvider
+
+    _FakeModel.return_user = object()
+    provider = ArventUserProvider(model=_FakeModel, username_field="email")
+    # Non-string credentials are passed through unchanged.
+    await provider.by_credentials({"email": 12345})
+    assert _FakeModel.last_where == {"email": 12345}
