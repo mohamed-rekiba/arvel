@@ -8,13 +8,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from arvel.console._subsystem import CliSubsystem
-from arvel.logging.facade import Log
 from arvel.providers.service_provider import ServiceProvider
 
 if TYPE_CHECKING:
     from arvel.console import Command
-
-logger = Log.channel(__name__)
+    from arvel.queue.job import Job
+    from arvel.scheduling.kernel import DispatchJob, RunCommand
 
 
 class SchedulerServiceProvider(ServiceProvider):
@@ -23,8 +22,6 @@ class SchedulerServiceProvider(ServiceProvider):
     subsystem: ClassVar[CliSubsystem | None] = CliSubsystem.SCHEDULER
 
     def register(self) -> None:
-        from typing import Any
-
         from arvel.cache import CacheManager
         from arvel.maintenance.manager import MaintenanceModeManager
         from arvel.scheduling import Schedule, SchedulerKernel
@@ -47,11 +44,11 @@ class SchedulerServiceProvider(ServiceProvider):
             # Wire Schedule.job() to actually dispatch via Bus
             # when the queue subsystem is registered. Apps without the queue
             # bound continue to get "skipped: no_dispatch_job_callback".
-            dispatch_job_cb: Any = None
+            dispatch_job_cb: DispatchJob | None = None
             if c.bound(Bus):
                 bus = c.make(Bus)
 
-                async def _dispatch(job: Any) -> None:
+                async def _dispatch(job: Job) -> None:
                     await bus.dispatch(job)
 
                 dispatch_job_cb = _dispatch
@@ -60,7 +57,7 @@ class SchedulerServiceProvider(ServiceProvider):
             # registered console command when ConsoleServiceProvider has bound
             # the Application. Apps without the console provider continue to
             # get "skipped: no_run_command_callback".
-            run_command_cb: Any = None
+            run_command_cb: RunCommand | None = None
             if c.bound(ConsoleApplication):
                 console_app = c.make(ConsoleApplication)
 
@@ -106,33 +103,27 @@ class SchedulerServiceProvider(ServiceProvider):
         # Both 'console' (snake_case) and 'Console' (PascalCase) accepted
         if not kernel_file.exists():
             kernel_file = base / "app" / "Console" / "Kernel.py"
+        # No kernel at all is fine — the app just has no schedule.
         if not kernel_file.exists():
             return
-        try:
-            spec = importlib.util.spec_from_file_location("_app_console_kernel", kernel_file)
-            if spec is None or spec.loader is None:
-                return
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            cls = getattr(module, "Kernel", None)
-            if cls is None:
-                return
-            instance = cls()
-            schedule_method = getattr(instance, "schedule", None)
-            if schedule_method is None:
-                return
-            schedule = self.app.container.make(Schedule)
-            schedule_method(schedule)
-        except Exception as exc:
-            # User-defined Kernel may raise during import; scheduler boot must be
-            # tolerant so the rest of the app still starts. Log so failures are
-            # observable rather than silently swallowed.
-            logger.warning(
-                "scheduler_kernel_discovery_failed",
-                kernel_file=str(kernel_file),
-                error=str(exc),
-                error_type=type(exc).__name__,
-            )
+
+        spec = importlib.util.spec_from_file_location("_app_console_kernel", kernel_file)
+        if spec is None or spec.loader is None:
+            return
+        module = importlib.util.module_from_spec(spec)
+        # A broken Kernel is a developer error — fail loud (Laravel parity) instead
+        # of booting with a silently empty schedule. Import/schedule() errors
+        # propagate; only a missing Kernel/schedule is treated as "no schedule".
+        spec.loader.exec_module(module)
+        cls = getattr(module, "Kernel", None)
+        if cls is None:
+            return
+        instance = cls()
+        schedule_method = getattr(instance, "schedule", None)
+        if schedule_method is None:
+            return
+        schedule = self.app.container.make(Schedule)
+        schedule_method(schedule)
 
     def commands(self) -> list[type[Command] | Command]:
         from arvel.console.commands.schedule_commands import (

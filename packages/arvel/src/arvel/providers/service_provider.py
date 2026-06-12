@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
 
@@ -26,12 +26,25 @@ class ServiceProvider:
     #: the loader if they leave this as ``None``.
     subsystem: ClassVar[CliSubsystem | None] = None
 
+    #: Declarative shortcuts (Laravel's ``$bindings`` / ``$singletons``). Applied
+    #: right after register(), so a provider that only wires simple
+    #: abstract→concrete bindings doesn't need a register() body at all.
+    bindings: ClassVar[Mapping[type, type | Callable[..., object]]] = {}
+    singletons: ClassVar[Mapping[type, type | Callable[..., object]]] = {}
+
     app: Application
     container: Container
 
     def __init__(self, app: Application) -> None:
         self.app = app
         self.container = app.container
+
+    def apply_declared_bindings(self) -> None:
+        """Register the class-level ``bindings`` / ``singletons`` into the container."""
+        for abstract, concrete in self.bindings.items():
+            self.container.bind(abstract, concrete)
+        for abstract, concrete in self.singletons.items():
+            self.container.singleton(abstract, concrete)
 
     def safe_config(self, cls: type[_T], *, default: _T) -> _T:
         """Resolve a config class from the container; return ``default`` when unbound.

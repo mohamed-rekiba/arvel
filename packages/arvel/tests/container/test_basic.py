@@ -65,6 +65,31 @@ def test_instance_returns_same_object() -> None:
     assert c.make(Foo) is pre_built
 
 
+def test_factory_binding_receives_make_overrides() -> None:
+    # make(**overrides) must forward to a factory that declares the parameter
+    # (Laravel passes explicit params to the binding closure).
+    from arvel.container import Container
+
+    class Widget:
+        def __init__(self, color: str) -> None:
+            self.color = color
+
+    c = Container()
+    c.bind(Widget, lambda color="default": Widget(color))
+    assert c.make(Widget, color="red").color == "red"
+    assert c.make(Widget).color == "default"
+
+
+def test_zero_arg_factory_ignores_overrides() -> None:
+    # A zero-arg factory (the common convention) must keep working even when
+    # overrides are passed — they simply don't apply.
+    from arvel.container import Container
+
+    c = Container()
+    c.bind(Foo, lambda: Foo())
+    assert c.make(Foo, unused="x").created is True
+
+
 def test_bound_returns_true_after_bind() -> None:
     from arvel.container import Container
 

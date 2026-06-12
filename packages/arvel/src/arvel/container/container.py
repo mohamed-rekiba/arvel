@@ -148,6 +148,7 @@ class Container:
         # instance built from the previous binding. Caches are type-keyed; a
         # non-type abstract (a bare callable) was never cached.
         if isinstance(abstract, type):
+            self._instances.pop(abstract, None)
             self._singletons.pop(abstract, None)
             self._scope_cache.pop(abstract, None)
 
@@ -212,9 +213,12 @@ class Container:
         return [self.make(abstract) for abstract in self._tags.get(tag_name, [])]
 
     def extend(self, abstract: type[T], decorator: Callable[[T, Container], T]) -> None:
+        # A pre-built instance() can't be rebuilt, so (like Laravel) apply the
+        # decorator to it right now and keep the result. Cached singleton/scoped
+        # values are dropped instead so the decorator runs on the next make().
+        if abstract in self._instances:
+            self._instances[abstract] = decorator(self._instances[abstract], self)
         self._extensions.setdefault(abstract, []).append(decorator)
-        # Drop any cached instance so the decorator runs on next make() — both the
-        # shared singleton cache and this container's per-scope cache.
         self._singletons.pop(abstract, None)
         self._scope_cache.pop(abstract, None)
 
@@ -549,7 +553,24 @@ class Container:
             # Sync path can't await; caller in amake handles separately.
             msg = "Async factory invoked through sync path."
             raise RuntimeError(msg)
-        return concrete()
+        return concrete(**self._factory_kwargs(concrete, overrides))
+
+    @staticmethod
+    def _factory_kwargs(
+        factory: Callable[..., Any], overrides: dict[str, object] | None
+    ) -> dict[str, object]:
+        # Laravel passes make()'s explicit params to the binding closure. Arvel
+        # factories are zero-arg by convention (they capture), so only forward
+        # overrides the factory actually declares — keeps zero-arg factories intact.
+        if not overrides:
+            return {}
+        try:
+            params = inspect.signature(factory).parameters
+        except (TypeError, ValueError):
+            return {}
+        if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+            return dict(overrides)
+        return {name: overrides[name] for name in params if name in overrides}
 
     def _apply_extensions(self, abstract: type, instance: Any) -> Any:
         for decorator in self._extensions.get(abstract, ()):
@@ -641,12 +662,12 @@ class Container:
     ) -> Any:
         if binding.is_async:
             async_factory: Any = binding.concrete
-            return await async_factory()
+            return await async_factory(**self._factory_kwargs(async_factory, overrides))
         if is_concrete_class(binding.concrete):
             concrete_cls: type[Any] = binding.concrete  # type: ignore[assignment]
             return await self._ainstantiate(concrete_cls, overrides, abstract, path=path)
         sync_factory: Any = binding.concrete
-        return sync_factory()
+        return sync_factory(**self._factory_kwargs(sync_factory, overrides))
 
     def _async_lock_for(self, abstract: AbstractKey) -> asyncio.Lock:
         # Locks bind to the running loop on first await, so a long-lived container

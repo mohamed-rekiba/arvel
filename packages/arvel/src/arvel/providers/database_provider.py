@@ -105,10 +105,12 @@ class DatabaseServiceProvider(ServiceProvider):
         self.app.register_service(DatabaseService(self.app.container))
 
     async def shutdown(self) -> None:
-        try:
-            engine = self.app.container.make(AsyncEngine)
-        except Exception:  # pragma: no cover
+        # Dispose only when the engine was actually built. resolved() avoids both
+        # building a pool just to tear it down and the broad except that used to
+        # swallow real dispose errors.
+        if not self.app.container.resolved(AsyncEngine):
             return
+        engine = self.app.container.make(AsyncEngine)
         await engine.dispose()
 
     # ------------------------------------------------------------------ helpers

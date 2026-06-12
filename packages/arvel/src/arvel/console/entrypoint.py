@@ -194,6 +194,22 @@ def _print_outside_project_message(command: str | None) -> None:
     )
 
 
+def _print_incomplete_bootstrap_message(command: str | None, project_root: Path) -> None:
+    typer.echo(
+        f"ERROR: {project_root / 'bootstrap' / 'app.py'} did not produce an "
+        "Application.\n"
+        "\n"
+        f"The command '{command or ''}' needs the framework, but bootstrap/app.py "
+        "doesn't export a working create_application() factory.\n"
+        "\n"
+        "Define it like:\n"
+        "\n"
+        "    def create_application(required_subsystems=None):\n"
+        "        return Application.configure(base_path=...).create()",
+        err=True,
+    )
+
+
 def _provider_commands(framework_app: FrameworkApplication) -> dict[str, Command]:
     """Commands registered by providers during boot, keyed by name (``app`` bound).
 
@@ -202,14 +218,13 @@ def _provider_commands(framework_app: FrameworkApplication) -> dict[str, Command
     Application isn't bound (provider not registered) so the CLI still works
     with entry-point commands only.
     """
-    try:
-        console_app: Application = framework_app.container.make(Application)
-    except Exception as exc:  # noqa: BLE001
-        _log.warning(
-            "ConsoleServiceProvider not bound; provider commands unavailable (%s).",
-            exc,
-        )
+    # Provider not registered → entry-point commands only (legitimate). If it IS
+    # bound but make() fails, that's a real bug — let it surface, don't silently
+    # drop every provider command (queue:*, schedule:*, …).
+    if not framework_app.container.bound(Application):
+        _log.warning("ConsoleServiceProvider not bound; provider commands unavailable.")
         return {}
+    console_app: Application = framework_app.container.make(Application)
 
     out: dict[str, Command] = {}
     for cmd in console_app.iter_commands():
@@ -298,6 +313,15 @@ async def async_main(project_root: Path, command: str | None) -> None:
             provider_cmds = _provider_commands(framework_app)
 
     commands_by_name = _select_in_project_commands(command, framework_app, provider_cmds)
+
+    # Project root exists but bootstrap/app.py yielded no Application (missing/None
+    # create_application). A framework-needing command would crash later with
+    # `cmd.app is None`; fail loud now with exit 2 instead.
+    if framework_app is None and command is not None:
+        target = commands_by_name.get(command)
+        if target is not None and target.needs_framework():
+            _print_incomplete_bootstrap_message(command, project_root)
+            raise SystemExit(2)
 
     # Typer/Click raises SystemExit(0) after a successful command in standalone
     # mode. We must catch it so get_pending_task() can still run — otherwise

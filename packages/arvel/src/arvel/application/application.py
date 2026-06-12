@@ -218,6 +218,11 @@ class Application:
         self._provider_instances: list[ServiceProvider] = []
         self._middleware_classes: list[type[GlobalMiddleware]] = []
         self._services: list[BaseService] = []
+        # Identity-tracked so a retry after a partial boot resumes from the
+        # failed provider/service instead of re-running side effects (a second
+        # DatabaseService, doubled schedule tasks, a re-connected pool).
+        self._booted_providers: set[int] = set()
+        self._connected_services: set[int] = set()
         self._booted: bool = False
         self._probe_connections: bool = True
         self._required_subsystems: frozenset[CliSubsystem] | None = None
@@ -317,19 +322,25 @@ class Application:
         # Provider instances + sync register() ran at create-time; this is
         # just the async boot pass.
         for inst in self._provider_instances:
+            if id(inst) in self._booted_providers:
+                continue
             try:
                 await inst.boot()
             except Exception as exc:
                 raise BootError(type(inst), exc) from exc
+            self._booted_providers.add(id(inst))
 
         from arvel.logging.facade import Log
         from arvel.routing import Router
 
         for service in self._services:
+            if id(service) in self._connected_services:
+                continue
             try:
                 await service.connect()
             except Exception as exc:
                 raise ServiceConnectError(service.name, exc) from exc
+            self._connected_services.add(id(service))
             Log.info("service.connected", service=service.name)
 
         self._booted = True
@@ -401,8 +412,9 @@ class Application:
         for inst in instances:
             try:
                 inst.register()
+                inst.apply_declared_bindings()
             except Exception as exc:
-                raise BootError(type(inst), exc) from exc
+                raise BootError(type(inst), exc, phase="register") from exc
 
     @classmethod
     def _resolve_provider_chain(
@@ -472,6 +484,8 @@ class Application:
                     first_failure = (type(inst), exc)
 
         self._booted = False
+        self._booted_providers.clear()
+        self._connected_services.clear()
         if first_failure is not None:
             provider_cls, original = first_failure
             raise ShutdownError(provider_cls, original) from original

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+import pytest
 from arvel.providers.scheduler_provider import SchedulerServiceProvider
 from arvel.scheduling import Schedule
 
@@ -46,7 +47,8 @@ async def test_scheduler_provider_boot_returns_without_kernel_class(tmp_path: Pa
     await _provider(tmp_path).boot()
 
 
-async def test_scheduler_provider_boot_logs_kernel_errors(tmp_path: Path) -> None:
+async def test_scheduler_provider_boot_propagates_kernel_errors(tmp_path: Path) -> None:
+    """A broken Kernel.schedule() fails boot loudly instead of an empty schedule."""
     kernel_dir = tmp_path / "app" / "Console"
     kernel_dir.mkdir(parents=True)
     (kernel_dir / "Kernel.py").write_text(
@@ -55,7 +57,8 @@ async def test_scheduler_provider_boot_logs_kernel_errors(tmp_path: Path) -> Non
         "        raise RuntimeError('bad kernel')\n"
     )
 
-    await _provider(tmp_path).boot()
+    with pytest.raises(RuntimeError, match="bad kernel"):
+        await _provider(tmp_path).boot()
 
 
 def test_scheduler_provider_commands() -> None:

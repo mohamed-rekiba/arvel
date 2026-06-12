@@ -33,10 +33,13 @@ class RedisSessionStore:
         raw = await self._client.get(self._key(session_id))
         if raw is None:
             return {}
+        # redis-py returns bytes unless the client sets decode_responses=True;
+        # the cipher token is text and json.loads is happier with str.
+        payload = raw.decode() if isinstance(raw, bytes) else raw
         try:
             if self._cipher is not None:
-                return self._cipher.decrypt(raw)
-            parsed: Any = json.loads(raw)
+                return self._cipher.decrypt(payload)
+            parsed: Any = json.loads(payload)
             return cast("dict[str, Any]", parsed) if isinstance(parsed, dict) else {}
         except (json.JSONDecodeError, ValueError, TypeError):
             return {}

@@ -19,12 +19,8 @@ time ``commands`` is called.
 
 from __future__ import annotations
 
-import logging
-
 from arvel.console import Application
 from arvel.providers.service_provider import ServiceProvider
-
-_log = logging.getLogger("arvel.console")
 
 
 class ConsoleServiceProvider(ServiceProvider):
@@ -37,33 +33,18 @@ class ConsoleServiceProvider(ServiceProvider):
     async def boot(self) -> None:
         """Walk every provider, collect commands, register each on the Application.
 
-        A provider whose ``commands()`` raises is logged and skipped — other
-        providers' commands still register. Items returned as ``type`` are
-        instantiated with no args; items returned as ``Command`` instances are
-        registered as-is.
+        A faulty ``commands()`` (bad lazy import, container resolution error, …)
+        is a developer error — it propagates and fails boot loudly rather than
+        silently hiding every command that provider would have registered. Items
+        returned as ``type`` are instantiated with no args; ``Command`` instances
+        register as-is.
         """
         console_app: Application = self.app.container.make(Application)
 
         for provider in self.app.iter_providers():
             if provider is self:
                 continue
-            try:
-                items = provider.commands()
-            except Exception as exc:  # noqa: BLE001
-                # Provider commands() runs arbitrary user code that may raise
-                # any subclass of Exception (ImportError on lazy imports, container
-                # resolution failures, validation errors, ...). Catching broadly is
-                # intentional: a single faulty provider must not take down the rest
-                # of the CLI bootstrap.
-                _log.warning(
-                    "%s.commands() raised %s; skipping its console commands. Reason: %s",
-                    type(provider).__name__,
-                    type(exc).__name__,
-                    exc,
-                )
-                continue
-
-            for item in items:
+            for item in provider.commands():
                 cmd = item() if isinstance(item, type) else item
                 console_app.register_command(cmd)
 
