@@ -174,21 +174,22 @@ serve(app, host="127.0.0.1", port=8000)
 <a name="shutdown"></a>
 ## Shutdown
 
-On shutdown, the application disconnects registered services and runs each provider's `shutdown()` in **reverse** registration order:
+On shutdown, the application disconnects **connected** services and runs each **booted** provider's `shutdown()` in **reverse** registration order:
 
 ```python
 await app.shutdown()
 ```
 
-Under ASGI this fires automatically on lifespan shutdown.
+Under ASGI this fires automatically on lifespan shutdown. The CLI runs the same call in a `finally` block after `boot()`, so a boot failure still tears down anything that connected (the database engine pool, for example) instead of leaking until process exit.
 
-Teardown is best-effort: every provider's `shutdown()` runs even if an earlier one raises, so a single failing provider can't strand the others (the database provider still disposes its connection pool, for example). The first failure is re-raised as `ShutdownError` once all providers have run, and the app is always left un-booted.
+Teardown is best-effort: every booted provider's `shutdown()` runs even if an earlier one raises, so a single failing provider can't strand the others. The first failure is re-raised as `ShutdownError` once all booted providers have run, and the app is always left un-booted. Providers that never completed `boot()` are skipped.
 
 <a name="lifecycle-errors"></a>
 ## Lifecycle Errors
 
 | Exception | Raised when |
 |---|---|
-| `BootError` | A provider's `register()` or `boot()` raises. |
-| `ShutdownError` | A provider's `shutdown()` raises — surfaced for the first failure after every provider has torn down. |
+| `BootError` | A provider's `register()` or `boot()` raises. Carries `provider`, `original`, and `phase` (`"register"` or `"boot"`). |
+| `ServiceConnectError` | A registered `BaseService.connect()` fails during boot. Subclass of `BootError`; `provider` is `None`. |
+| `ShutdownError` | A provider's `shutdown()` raises — surfaced for the first failure after every booted provider has torn down. |
 | `EnvironmentNotSetError` | `environment()` or `base_path()` is called before the app is configured. |

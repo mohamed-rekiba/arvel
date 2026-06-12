@@ -73,6 +73,15 @@ def register(self) -> None:
     self.container.singleton(PaymentGateway, StripeGateway)
 ```
 
+For simple wiring, declare bindings at class level instead (Laravel's `$bindings` / `$singletons` parity). The framework calls `apply_declared_bindings()` right after `register()`:
+
+```python
+class PaymentServiceProvider(ServiceProvider):
+    singletons = {
+        PaymentGateway: StripeGateway,
+    }
+```
+
 <a name="the-boot-method"></a>
 ### The Boot Method
 
@@ -106,6 +115,8 @@ async def shutdown(self) -> None:
 | `self.app` | The `Application`. |
 | `self.container` | The root [container](service-container.md). |
 | `subsystem` | `ClassVar[CliSubsystem \| None]`. Tags the provider for the [needs-based CLI bootstrap](../cli/commands.md#needs-based-bootstrap). Baseline framework providers set this explicitly; user providers leave it `None` and behave as the `USER_PROVIDERS` bucket. |
+| `bindings` | `ClassVar` map of abstract → concrete for transient bindings. Applied automatically after `register()` — a provider that only wires simple pairs can omit `register()` entirely. |
+| `singletons` | `ClassVar` map of abstract → concrete for singleton bindings. Same auto-apply as `bindings`. |
 | `register()` | Sync. Register container bindings only. |
 | `boot()` | Async. Startup wiring after all providers register. |
 | `shutdown()` | Async. Teardown, reverse order. |
