@@ -74,8 +74,11 @@ def test_factory_binding_receives_make_overrides() -> None:
         def __init__(self, color: str) -> None:
             self.color = color
 
+    def make_widget(color: str = "default") -> Widget:
+        return Widget(color)
+
     c = Container()
-    c.bind(Widget, lambda color="default": Widget(color))
+    c.bind(Widget, make_widget)
     assert c.make(Widget, color="red").color == "red"
     assert c.make(Widget).color == "default"
 
