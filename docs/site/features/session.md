@@ -24,10 +24,14 @@ providers = [SessionServiceProvider, ...]
 from starlette.middleware import Middleware
 
 from arvel.facades.session import Session
-from arvel.session.middleware import StartSession
+from arvel.session.middleware import SessionCookie, StartSession
 
 middleware = [
-    Middleware(StartSession, store=Session.manager().store(), lifetime=7200),
+    Middleware(
+        StartSession,
+        store=Session.manager().store(),
+        options=SessionCookie(lifetime=7200),
+    ),
 ]
 ```
 

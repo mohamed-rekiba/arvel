@@ -19,7 +19,7 @@ def __init__(self) -> None:
     self._booted = False
 ```
 
-Key state: the ordered provider classes, their instances, lifecycle-managed `BaseService`s, and a `_booted` flag that makes `boot()`/`shutdown()` idempotent.
+Key state: the ordered provider classes, their instances, lifecycle-managed `BaseService`s, a `_booted` flag (successful full boot), and identity sets `_booted_providers` / `_connected_services` that track what actually ran so a failed boot can be retried without double-running providers or tearing down providers that never booted.
 
 ## Two phases, one rule
 
@@ -148,16 +148,22 @@ When `create()` returns, all bindings exist but no `boot()` has run.
 
 ## Boot phase (async)
 
-`await app.boot()` is idempotent via `_booted`. It boots providers forward, then connects services:
+`await app.boot()` is idempotent via `_booted`. On a **retry after partial failure**, providers already in `_booted_providers` and services already in `_connected_services` are skipped — so a transient error mid-chain doesn't re-run earlier `boot()` side effects. It boots providers forward, then connects services:
 
 ```python
 async def boot(self, *, probe_connections: bool = True) -> None:
     if self._booted:
         return
     for inst in self._provider_instances:
+        if id(inst) in self._booted_providers:
+            continue
         await inst.boot()             # BootError on failure
+        self._booted_providers.add(id(inst))
     for service in self._services:
+        if id(service) in self._connected_services:
+            continue
         await service.connect()       # ServiceConnectError on failure
+        self._connected_services.add(id(service))
     self._booted = True
 ```
 
@@ -167,13 +173,17 @@ async def boot(self, *, probe_connections: bool = True) -> None:
 
 ## Shutdown phase (async)
 
-`await app.shutdown()` tears down in reverse. The two loops handle failure differently: service disconnects are log-only (a flaky teardown can't mask anything), while provider shutdowns are *all* attempted, then the first failure re-raises as `ShutdownError` — so one broken provider can't skip the rest:
+`await app.shutdown()` tears down **only what booted or connected** — keyed on `_booted_providers` and `_connected_services`, not `_booted`. A boot that fails partway (e.g. the DB engine connected but a later provider's `boot()` raised) still disposes the pool when shutdown runs; the CLI wraps `boot()` in a `try/finally` so that path always executes.
+
+The two loops handle failure differently: service disconnects are log-only (a flaky teardown can't mask anything), while provider shutdowns are *all attempted among booted providers*, then the first failure re-raises as `ShutdownError` — so one broken provider can't skip the rest:
 
 ```python
 async def shutdown(self) -> None:
-    if not self._booted:
+    if not self._booted_providers and not self._connected_services:
         return
     for service in reversed(self._services):
+        if id(service) not in self._connected_services:
+            continue
         try:
             await service.disconnect()
         except Exception:
@@ -181,12 +191,16 @@ async def shutdown(self) -> None:
 
     first_failure = None
     for inst in reversed(self._provider_instances):
+        if id(inst) not in self._booted_providers:
+            continue
         try:
             await inst.shutdown()
         except Exception as exc:
             ...  # logged
             first_failure = first_failure or (type(inst), exc)
     self._booted = False
+    self._booted_providers.clear()
+    self._connected_services.clear()
     if first_failure:
         raise ShutdownError(*first_failure)
 ```
@@ -261,8 +275,8 @@ def serve(app: Application, *, host="127.0.0.1", port=8000) -> None:
 
 | Exception | Raised when | Carries |
 |---|---|---|
-| `BootError` | A provider's `register()` or `boot()` raises | `provider`, `original` |
-| `ServiceConnectError` (subclass of `BootError`) | A `BaseService.connect()` fails during boot | the service |
+| `BootError` | A provider's `register()` or `boot()` raises | `provider` (class), `original`, `phase` (`"register"` or `"boot"`) |
+| `ServiceConnectError` (subclass of `BootError`) | A `BaseService.connect()` fails during boot | `service_name`, `original`; `provider` is `None` (catchable as `BootError`) |
 | `ShutdownError` | A provider's `shutdown()` raises | the provider |
 | `EnvironmentNotSetError` | `environment()` / `base_path()` called before the builder set them | — |
 

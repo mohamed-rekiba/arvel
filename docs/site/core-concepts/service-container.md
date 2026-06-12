@@ -127,12 +127,20 @@ engine = await container.amake(AsyncEngine)
 <a name="the-make-method"></a>
 ### The make Method
 
-Use `make` to resolve a class instance out of the container. It takes the type you want, plus optional keyword overrides for individual constructor parameters:
+Use `make` to resolve a class instance out of the container. It takes the type you want, plus optional keyword overrides for individual constructor parameters — or for parameters a **factory binding** declares:
 
 ```python
 svc = container.make(UserService)
 svc = container.make(UserService, mailer=test_mailer)   # override one dependency
+
+def make_widget(color: str = "default") -> Widget:
+    return Widget(color)
+
+container.bind(Widget, make_widget)
+container.make(Widget, color="red")   # forwards to the factory's declared params
 ```
+
+Overrides apply only to parameters the factory's signature actually declares; zero-arg factories ignore stray kwargs.
 
 For bindings backed by an async factory, use `amake`. To resolve a class and call one of its methods with injected parameters, use `call` / `acall`:
 
@@ -208,7 +216,7 @@ reporters = container.tagged("reporters")   # list of resolved instances
 <a name="extending-bindings"></a>
 ## Extending Bindings
 
-The `extend` method allows the modification of a resolved service. It takes a decorator that receives the instance (and the container) and returns the instance to use. Extending a singleton invalidates its cached instance so the decorator applies:
+The `extend` method allows the modification of a resolved service. It takes a decorator that receives the instance (and the container) and returns the instance to use. Extending a singleton invalidates its cached instance so the decorator applies. A pre-built `instance()` is decorated in place. `bind()` and `extend()` also evict stale entries from singleton, instance, and scoped caches — including scoped instances cached in any **open child scope**:
 
 ```python
 container.extend(Mailer, lambda mailer, c: LoggingMailer(mailer))
