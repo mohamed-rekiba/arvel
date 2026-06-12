@@ -40,6 +40,13 @@ class SessionServiceProvider(ServiceProvider):
             is_migrations=True,
         )
 
+    async def shutdown(self) -> None:
+        from arvel.session import SessionManager
+
+        c = self.app.container
+        if c.resolved(SessionManager):
+            await c.make(SessionManager).shutdown()
+
     def commands(self) -> list[type[Command] | Command]:
         return []
 

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
+import time
+from typing import Any, cast
 
 from arvel.session.cipher import SessionCipher
 
@@ -55,10 +56,22 @@ class CookieStore:
     # ── Cookie helpers ────────────────────────────────────────────────────────
 
     def _encode(self, payload: dict[str, Any]) -> str:
-        return self._cipher.encrypt(payload)
+        # Stamp an expiry into the envelope so a stolen/replayed cookie can't be
+        # decrypted forever — the browser's Max-Age only governs what it sends.
+        # Mirrors Laravel's CookieSessionHandler, which wraps data + expires.
+        envelope: dict[str, Any] = {"data": payload}
+        if self.lifetime > 0:
+            envelope["expires"] = int(time.time()) + self.lifetime
+        return self._cipher.encrypt(envelope)
 
     def _decode(self, cookie_value: str) -> dict[str, Any]:
-        return self._cipher.decrypt(cookie_value)
+        # decrypt() raises on a tampered/garbage cookie; read_from_cookie catches it.
+        envelope = self._cipher.decrypt(cookie_value)
+        expires = envelope.get("expires")
+        if isinstance(expires, int | float) and time.time() > expires:
+            return {}
+        data = envelope.get("data", {})
+        return cast("dict[str, Any]", data) if isinstance(data, dict) else {}
 
 
 __all__ = ["CookieStore"]

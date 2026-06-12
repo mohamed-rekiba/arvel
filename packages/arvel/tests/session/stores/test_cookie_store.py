@@ -68,3 +68,32 @@ class TestCookieStoreEncryption:
     @pytest.mark.asyncio
     async def test_destroy_is_noop_for_cookie_store(self, store: CookieStore) -> None:
         await store.destroy("any_session_id")  # should not raise
+
+    @pytest.mark.asyncio
+    async def test_expired_cookie_reads_as_empty(
+        self, store: CookieStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A replayed cookie past its lifetime must decrypt to {} — the browser's
+        # Max-Age can't be trusted, so the server enforces the embedded expiry.
+        # cookie.py does `import time`, so patching the stdlib module hits it too.
+        import time
+
+        await store.write("s", {"user_id": 7})
+        cookie = store.last_written_cookie
+        # Capture now before patching to avoid the fake recursing into itself.
+        future = time.time() + 3600
+        monkeypatch.setattr(time, "time", lambda: future)
+        assert await store.read_from_cookie(cookie) == {}
+
+    @pytest.mark.asyncio
+    async def test_unexpired_cookie_still_reads(self, store: CookieStore) -> None:
+        await store.write("s", {"user_id": 7})
+        cookie = store.last_written_cookie
+        assert (await store.read_from_cookie(cookie))["user_id"] == 7
+
+    @pytest.mark.asyncio
+    async def test_zero_lifetime_never_expires(self, app_key: bytes) -> None:
+        # lifetime <= 0 means no embedded expiry — the cookie stays readable.
+        forever = CookieStore(app_key=app_key, lifetime=0)
+        await forever.write("s", {"user_id": 7})
+        assert (await forever.read_from_cookie(forever.last_written_cookie))["user_id"] == 7

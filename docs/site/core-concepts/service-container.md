@@ -216,7 +216,7 @@ reporters = container.tagged("reporters")   # list of resolved instances
 <a name="extending-bindings"></a>
 ## Extending Bindings
 
-The `extend` method allows the modification of a resolved service. It takes a decorator that receives the instance (and the container) and returns the instance to use. Extending a singleton invalidates its cached instance so the decorator applies. A pre-built `instance()` is decorated in place. `bind()` and `extend()` also evict stale entries from singleton, instance, and scoped caches — including scoped instances cached in any **open child scope**:
+The `extend` method allows the modification of a resolved service. It takes a decorator that receives the instance (and the container) and returns the instance to use. Extending a singleton invalidates its cached instance so the decorator applies. A pre-built `instance()` is decorated in place. `bind()` and `extend()` also evict stale entries from singleton, instance, and scoped caches — including scoped instances cached in any **open child scope**. A decorator registered on a parent (or the root) container still applies when the type is resolved through a child scope:
 
 ```python
 container.extend(Mailer, lambda mailer, c: LoggingMailer(mailer))

@@ -82,8 +82,12 @@ class SessionGuard(Guard):
         # Rotate the CSRF token so a pre-login token can't be replayed post-login.
         if hasattr(session, "regenerate_token"):
             session.regenerate_token()
-        user_id = str(getattr(user, "id", ""))
-        session.put(self._session_key, user_id)
+        user_id = getattr(user, "id", None)
+        if user_id is None:
+            # Fail closed: a null id would persist a bogus "_auth_id" that later
+            # resolves to no user — mirrors AuthManager.id() returning None.
+            return
+        session.put(self._session_key, str(user_id))
 
     async def logout(self, request: Any) -> None:
         session = self._get_session(request)

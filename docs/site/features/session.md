@@ -73,11 +73,13 @@ SESSION_FILES_PATH=storage/framework/sessions
 
 | Driver | Backing store | Notes |
 |---|---|---|
-| `cookie` | The cookie itself | Default; stateless, size-limited |
+| `cookie` | The cookie itself | Default; stateless, size-limited. Server-enforced expiry: the encrypted payload embeds an `expires` stamp, so a replayed cookie past `SESSION_LIFETIME` reads as empty regardless of the browser's `Max-Age` |
 | `file` | Files on disk | Server-side, good for local dev |
 | `redis` | Redis | Requires `arvel[redis]` |
 | `database` | A `sessions` table | Ship the bundled migration |
 | `array` | An in-process dict | **Test-only**; resets per process, leaves no on-disk state |
+
+The `redis` and `database` drivers own a connection pool. `SessionServiceProvider.shutdown()` disposes it on application teardown (via `SessionManager.shutdown()`), so it's drained instead of leaking until process exit.
 
 <a name="enabling-sessions"></a>
 ### Enabling Sessions
