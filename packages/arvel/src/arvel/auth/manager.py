@@ -38,7 +38,8 @@ class AuthManager:
         user = await self.user(request)
         if user is None:
             return None
-        return str(getattr(user, "id", None))
+        user_id = getattr(user, "id", None)
+        return None if user_id is None else str(user_id)
 
     async def attempt(self, credentials: dict[str, object], request: Any) -> bool:
         g = self.guard()

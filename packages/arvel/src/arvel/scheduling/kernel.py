@@ -32,8 +32,9 @@ if TYPE_CHECKING:
 DispatchJob = Callable[[Any], Awaitable[None]]
 """Hook invoked for ``Schedule.job(MyJob)``. Receives the instantiated Job."""
 
-RunCommand = Callable[[str], Awaitable[int] | int]
-"""Hook invoked for ``Schedule.command("name")``. Receives the command name."""
+RunCommand = Callable[[str], Awaitable[int | None] | int | None]
+"""Hook for ``Schedule.command("name")``. Gets the command name; the return
+(exit code or None) is ignored — failures are signalled by raising."""
 
 
 class _Tee(io.TextIOBase):

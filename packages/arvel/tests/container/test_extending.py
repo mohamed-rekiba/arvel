@@ -116,3 +116,37 @@ def test_extend_invalidates_cached_scoped_instance() -> None:
 
     c.extend(Greeter, loud)
     assert c.make(Greeter).greet() == "HI!"
+
+
+def test_extend_applies_to_prebuilt_instance_immediately() -> None:
+    # extend() on an instance() registration applies the decorator in place —
+    # there's no binding to rebuild from, so it must mutate the stored object.
+    from arvel.container import Container
+
+    c = Container()
+    base = Greeter()
+    c.instance(Greeter, base)
+
+    def loud(g: Greeter, _c: Container) -> Greeter:
+        g.greet = lambda: "HI!"  # type: ignore[method-assign]
+        return g
+
+    c.extend(Greeter, loud)
+    assert c.make(Greeter).greet() == "HI!"
+
+
+def test_rebind_drops_stale_instance() -> None:
+    # Laravel dropStaleInstances: a later bind() must not keep serving the object
+    # registered via instance().
+    from arvel.container import Container
+
+    class Loud(Greeter):
+        def greet(self) -> str:
+            return "HI!"
+
+    c = Container()
+    c.instance(Greeter, Greeter())
+    assert c.make(Greeter).greet() == "hi"
+
+    c.bind(Greeter, Loud)
+    assert c.make(Greeter).greet() == "HI!"

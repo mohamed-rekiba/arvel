@@ -75,6 +75,41 @@ def test_provider_raising_in_register_yields_boot_error_at_create(tmp_path: Path
     assert excinfo.value.provider is Broken
 
 
+async def test_boot_retry_after_partial_failure_does_not_reboot_providers(
+    tmp_path: Path,
+) -> None:
+    """A failed boot can be retried; already-booted providers don't run twice."""
+    from arvel import Application, ServiceProvider
+
+    boots: list[str] = []
+
+    class Ok(ServiceProvider):
+        async def boot(self) -> None:
+            boots.append("ok")
+
+    class Flaky(ServiceProvider):
+        attempts = 0
+
+        async def boot(self) -> None:
+            Flaky.attempts += 1
+            if Flaky.attempts == 1:
+                raise RuntimeError("transient")
+
+    app = (
+        Application.configure(tmp_path)
+        .with_environment("testing")
+        .with_providers([Ok, Flaky])
+        .create()
+    )
+
+    with pytest.raises(Exception, match="transient"):
+        await app.boot()
+
+    await app.boot()  # retry succeeds
+    assert boots == ["ok"], "Ok.boot() must run exactly once across the failed + retried boot"
+    await app.shutdown()
+
+
 async def test_shutdown_runs_in_reverse_order(tmp_path: Path) -> None:
     from arvel import Application, ServiceProvider
 

@@ -577,9 +577,10 @@ class TestInProjectBootstrap:
             assert cmd.app is framework_app
             typer_app_mock.assert_called_once()
 
-    def test_main_inside_project_bootstrap_returns_none_does_not_attach(
+    def test_main_inside_project_without_factory_exits_2_for_framework_command(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """Project found but no Application built: a framework-needing command exits 2."""
         from arvel.console import entrypoint
         from arvel.console.commands.migrate import MigrateCommand
 
@@ -594,9 +595,11 @@ class TestInProjectBootstrap:
         ):
             typer_app_mock = MagicMock()
             console_cls.return_value = MagicMock(typer_app=typer_app_mock)
-            entrypoint.main()
+            with pytest.raises(SystemExit) as excinfo:
+                entrypoint.main()
 
-            typer_app_mock.assert_called_once()
+            assert excinfo.value.code == 2
+            typer_app_mock.assert_not_called()
 
     def test_main_attaches_provider_commands_from_container(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -661,7 +664,9 @@ class TestInProjectBootstrap:
 
         framework_app.boot = _async_noop
         framework_app.shutdown = _async_noop
-        framework_app.container.make.side_effect = RuntimeError("not bound")
+        # Provider not registered → Application unbound. _provider_commands detects
+        # this via bound() and warns; make() is never reached.
+        framework_app.container.bound.return_value = False
 
         with (
             patch.object(entrypoint, "discover_commands", return_value=[MigrateCommand()]),

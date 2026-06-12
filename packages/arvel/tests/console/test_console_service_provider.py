@@ -217,10 +217,9 @@ async def test_console_service_provider_boot_collects_instance_backed_commands()
 
 
 @pytest.mark.asyncio
-async def test_console_service_provider_boot_tolerates_raising_provider(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """a provider whose commands raises is skipped with a warning."""
+async def test_console_service_provider_boot_propagates_raising_provider() -> None:
+    """A provider whose commands() raises fails boot loudly (no silent drop)."""
+    from arvel.application.errors import BootError
     from arvel.console.providers.console_service_provider import ConsoleServiceProvider
 
     builder = FrameworkApplication.configure(Path.cwd())
@@ -228,19 +227,9 @@ async def test_console_service_provider_boot_tolerates_raising_provider(
     builder.with_providers([_RaisingProvider, _TypeBackedProvider, ConsoleServiceProvider])
     app = builder.create()
 
-    with caplog.at_level(logging.WARNING, logger="arvel.console"):
+    with pytest.raises(BootError) as excinfo:
         await app.boot()
-
-    # The raising provider is skipped — but the OTHER provider's commands are registered.
-    console_app: ConsoleApplication = app.container.make(ConsoleApplication)
-    assert await console_app.adispatch("hello") == 0, (
-        "Other providers' commands must still be registered when one provider raises"
-    )
-
-    assert any(
-        "_RaisingProvider" in record.message or "RuntimeError" in record.message
-        for record in caplog.records
-    ), "A warning naming the failing provider must be emitted"
+    assert isinstance(excinfo.value.original, RuntimeError)
 
 
 # ─── / 07: SchedulerServiceProvider auto-wires run_command ─────────

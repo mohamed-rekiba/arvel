@@ -40,3 +40,20 @@ class TestRedisSessionStore:
         # Redis handles TTL natively; gc() should return 0 without error
         result = await store.gc(max_lifetime=120)
         assert result == 0
+
+    @pytest.mark.asyncio
+    async def test_encrypted_roundtrip_handles_bytes_payload(self) -> None:
+        # redis-py returns bytes by default; the encrypted read path must decode
+        # before handing the token to the cipher (regression: AttributeError on
+        # bytes.encode()).
+        import fakeredis.aioredis
+        from arvel.session.cipher import SessionCipher
+
+        cipher = SessionCipher.from_app_key(b"0" * 32)
+        redis = fakeredis.aioredis.FakeRedis()
+        store = RedisSessionStore(redis=redis, prefix="enc:", lifetime=120, cipher=cipher)
+
+        await store.write("sid", {"user_id": 7}, lifetime=120)
+        raw = await redis.get("enc:sid")
+        assert isinstance(raw, bytes) and b"user_id" not in raw  # actually encrypted
+        assert (await store.read("sid"))["user_id"] == 7

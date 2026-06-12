@@ -223,3 +223,18 @@ async def test_auth_facade_id_returns_none_when_not_authenticated() -> None:
     Auth.set_manager(manager)
 
     assert await Auth.id(_FakeRequest()) is None
+
+
+@pytest.mark.asyncio
+async def test_auth_facade_id_returns_none_when_user_id_is_none() -> None:
+    """A logged-in user with id=None yields None, not the string 'None'."""
+    from arvel.auth.manager import AuthManager
+    from arvel.facades.auth import Auth
+
+    class _UserNoId:
+        id = None
+
+    manager = AuthManager(guards={"web": _FakeGuard(user=_UserNoId())}, default="web")
+    Auth.set_manager(manager)
+
+    assert await Auth.id(_FakeRequest()) is None

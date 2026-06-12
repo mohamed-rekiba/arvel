@@ -130,6 +130,13 @@ def _invoke_factory(
     try:
         sig = inspect.signature(factory)
     except TypeError, ValueError:
+        # Can't introspect (e.g. a C-callable) — boot the full chain, but say so:
+        # the requested subsystem filtering is silently lost otherwise.
+        _log.warning(
+            "Could not introspect create_application(); booting the full provider "
+            "chain instead of just %s.",
+            sorted(s.name for s in required_subsystems),
+        )
         return factory()
 
     if "required_subsystems" in sig.parameters:

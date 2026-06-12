@@ -67,7 +67,13 @@ class ScheduleWorkCommand(Command):
                 _Option("--max-failures", help="Stop after N consecutive failures (0=disabled)"),
             ] = 0,
         ) -> None:
-            kernel = resolve_kernel(cmd_self)
+            # Mirror handle()/schedule:list: a missing kernel exits 2 with a clear
+            # message instead of escaping as a traceback.
+            try:
+                kernel = resolve_kernel(cmd_self)
+            except Exception as exc:
+                typer.echo(f"schedule:work failed to resolve scheduler kernel: {exc}", err=True)
+                raise typer.Exit(2) from exc
             _arvel_async.schedule_async(
                 run_loop(kernel, once=once, sleep=sleep, max_failures=max_failures or None)
             )

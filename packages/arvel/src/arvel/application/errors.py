@@ -11,11 +11,18 @@ if TYPE_CHECKING:
 class BootError(RuntimeError):
     """Raised when a provider fails during register() or boot()."""
 
-    def __init__(self, provider: type[ServiceProvider], original: BaseException) -> None:
+    def __init__(
+        self,
+        provider: type[ServiceProvider],
+        original: BaseException,
+        *,
+        phase: str = "boot",
+    ) -> None:
         self.provider = provider
         self.original = original
+        self.phase = phase
         super().__init__(
-            f"Provider {provider.__qualname__} failed during boot: {original!r}",
+            f"Provider {provider.__qualname__} failed during {phase}: {original!r}",
         )
 
 
@@ -28,6 +35,7 @@ class ServiceConnectError(BootError):
     def __init__(self, service_name: str, original: BaseException) -> None:
         self.service_name = service_name
         self.original = original
+        self.phase = "boot"
         RuntimeError.__init__(
             self,
             f"Service {service_name!r} failed to connect during boot: {original!r}",
