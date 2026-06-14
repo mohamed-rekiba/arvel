@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.27.0...arvel-v0.27.1) (2026-06-14)
+
+
+### Bug Fixes
+
+* **arvel:** correct SyslogChannel handler type under mypy platform pruning ([faa6b34](https://github.com/mohamed-rekiba/arvel/commit/faa6b34f95ed1bcbe0058979bc93f5087e1ec742))
+
 ## [0.27.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.26.0...arvel-v0.27.0) (2026-06-14)
 
 
