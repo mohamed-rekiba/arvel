@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRouter } from 'vue-router'
 import SalesBadge from '@/components/storefront/SalesBadge.vue'
-import WishlistButton from '@/components/storefront/WishlistButton.vue'
+// import WishlistButton from '@/components/storefront/WishlistButton.vue'
 import { formatCurrency, toSupportedLocale } from '@/lib/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
@@ -52,22 +52,13 @@ async function handleAddToCart(event: Event): Promise<void> {
 
 <template>
   <article
-    class="group relative flex flex-col rounded-xl border border-border bg-app-bg shadow-2xs transition-[translate,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1.5 hover:border-primary-300 before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-xl before:opacity-0 before:shadow-xl before:transition-opacity before:duration-300 before:ease-[cubic-bezier(0.16,1,0.3,1)] before:content-[''] hover:before:opacity-100"
-  >
+    class="group relative flex flex-col rounded-xl border border-border bg-app-bg shadow-2xs transition-[translate,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1.5 hover:border-primary-300 before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-xl before:opacity-0 before:shadow-xl before:transition-opacity before:duration-300 before:ease-[cubic-bezier(0.16,1,0.3,1)] before:content-[''] hover:before:opacity-100">
     <RouterLink :to="`/products/${product.slug}`" class="block">
       <!-- Image area -->
       <div class="relative aspect-square overflow-hidden rounded-t-xl bg-app-bg-sunken">
-        <img
-          v-if="productImage"
-          :src="productImage"
-          :srcset="product.image_srcset || undefined"
-          :alt="product.name"
-          class="h-full w-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.05]"
-        />
-        <div
-          v-else
-          class="flex h-full w-full items-center justify-center bg-app-bg-sunken text-5xl"
-        >
+        <img v-if="productImage" :src="productImage" :srcset="product.image_srcset || undefined" :alt="product.name"
+          class="h-full w-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.05]" />
+        <div v-else class="flex h-full w-full items-center justify-center bg-app-bg-sunken text-5xl">
           🖥️
         </div>
 
@@ -75,21 +66,16 @@ async function handleAddToCart(event: Event): Promise<void> {
         <SalesBadge v-if="discountPct" class="absolute start-3 top-3" :discount="discountPct" />
 
         <!-- Out of stock overlay -->
-        <div
-          v-if="isOutOfStock"
-          class="absolute inset-0 flex items-center justify-center bg-black/40"
-        >
-          <span
-            class="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-fg"
-          >
+        <div v-if="isOutOfStock" class="absolute inset-0 flex items-center justify-center bg-black/40">
+          <span class="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-fg">
             {{ t('product.out_of_stock', 'Out of Stock') }}
           </span>
         </div>
 
-        <WishlistButton
+        <!-- <WishlistButton
           :product-id="product.id"
           class="absolute end-3 top-3 opacity-0 group-hover:opacity-100"
-        />
+        /> -->
       </div>
 
       <!-- Info -->
@@ -103,22 +89,15 @@ async function handleAddToCart(event: Event): Promise<void> {
           <div class="flex text-sm text-rating-star">
             <span v-for="i in fullStars" :key="`full-${i}`">★</span>
             <span v-if="hasHalfStar">½</span>
-            <span
-              v-for="i in 5 - fullStars - (hasHalfStar ? 1 : 0)"
-              :key="`empty-${i}`"
-              class="text-rating-empty"
-              >★</span
-            >
+            <span v-for="i in 5 - fullStars - (hasHalfStar ? 1 : 0)" :key="`empty-${i}`"
+              class="text-rating-empty">★</span>
           </div>
           <span v-if="ratingCount != null" class="text-xs text-fg-muted">({{ ratingCount }})</span>
         </div>
 
         <!-- Price row -->
         <div class="mt-2 flex items-baseline gap-2">
-          <span
-            class="text-base font-extrabold"
-            :class="isDiscounted ? 'text-price-sale' : 'text-fg'"
-          >
+          <span class="text-base font-extrabold" :class="isDiscounted ? 'text-price-sale' : 'text-fg'">
             {{ formatCurrency(product.price, currentLocale) }}
           </span>
           <span v-if="isDiscounted && originalPrice" class="text-xs text-fg-muted line-through">
@@ -130,17 +109,11 @@ async function handleAddToCart(event: Event): Promise<void> {
 
     <!-- Add to Cart — always visible -->
     <div class="mt-auto px-3 pb-3">
-      <button
-        type="button"
-        class="w-full rounded-lg py-2 text-sm font-bold transition duration-200 active:scale-[0.98]"
-        :class="
-          isOutOfStock
+      <button type="button" class="w-full rounded-lg py-2 text-sm font-bold transition duration-200 active:scale-[0.98]"
+        :class="isOutOfStock
             ? 'cursor-not-allowed bg-app-bg-sunken text-fg-faint'
             : 'bg-cart-cta text-white hover:bg-cart-cta-hover'
-        "
-        :disabled="isOutOfStock"
-        @click="handleAddToCart"
-      >
+          " :disabled="isOutOfStock" @click="handleAddToCart">
         {{
           isOutOfStock
             ? t('product.out_of_stock', 'Out of Stock')

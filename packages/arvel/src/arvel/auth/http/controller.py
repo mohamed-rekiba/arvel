@@ -49,6 +49,8 @@ if TYPE_CHECKING:
     from arvel.auth.password_service import PasswordService
     from arvel.http.ratelimit import RateLimiterStore
 
+from arvel.http.ratelimit import InMemoryStore
+
 
 @dataclass
 class CookieConfig:
@@ -78,6 +80,7 @@ class AuthController(Controller):
         passwords: PasswordService,
         email_verification: EmailVerificationService,
         cookies: CookieConfig | None = None,
+        resend_store: RateLimiterStore | None = None,
     ) -> None:
         self._auth = auth
         self._passwords = passwords
@@ -89,7 +92,10 @@ class AuthController(Controller):
         self._cookie_secure = cfg.secure
         self._user_resource_cls: type[Any] = cfg.user_resource_class or UserResource
         self._verify_redirect_url = cfg.verify_redirect_url
-        self._resend_store: RateLimiterStore | None = None
+        # InMemoryStore is the safe default (always available, no deps).
+        # AuthServiceProvider injects CacheStore in production so the limit
+        # holds across workers.
+        self._resend_store: RateLimiterStore = resend_store or InMemoryStore()
 
     # ─── Register ──────────────────────────────────────────────────────────
 
@@ -244,13 +250,6 @@ class AuthController(Controller):
         from arvel.http.exceptions import ThrottleException  # noqa: PLC0415
 
         email = str(payload.email).strip().lower()
-        if self._resend_store is None:
-            # Cache-backed so the resend limit holds across workers (Redis in
-            # prod); degrades to per-process only when the cache itself is.
-            from arvel.http.ratelimit import CacheStore  # noqa: PLC0415
-
-            self._resend_store = CacheStore()
-
         attempt = await self._resend_store.hit(f"resend:{email}", decay_seconds=60)
         if attempt.count > 1:
             raise ThrottleException("Too many resend requests.", retry_after_seconds=60)

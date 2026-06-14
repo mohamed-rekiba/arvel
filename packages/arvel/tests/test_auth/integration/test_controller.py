@@ -472,3 +472,40 @@ async def test_verify_email_resend_throttled_returns_429(
 
         r2 = await c.post("/api/auth/verify/resend", json={"email": _EMAIL})
         assert r2.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_resend_uses_cache_store_when_cache_bound(
+    setup_db: AsyncSession,
+    event_fake: EventFake,
+) -> None:
+    """With a CacheManager bound, the provider wires a cache-backed resend limiter.
+
+    Unknown email still gets a uniform 202, but the limiter records its hit in the
+    shared cache — proof the CacheStore branch (not InMemoryStore) was selected.
+    """
+    from arvel.application import Application
+    from arvel.auth.config import AuthConfig, RoutesConfig
+    from arvel.auth.http.controller import AuthController
+    from arvel.auth.http.requests import ResendVerificationRequest
+    from arvel.auth.provider import AuthServiceProvider
+    from arvel.facades.cache import Cache
+    from arvel.support.publishing import PublishRegistry
+
+    app = Application()
+    app.container.instance(PublishRegistry, PublishRegistry())
+    app.container.instance(
+        AuthConfig,
+        AuthConfig(
+            default="web",
+            jwt=JwtConfig(secret=_JWT_SECRET),
+            routes=RoutesConfig(enabled=False),
+        ),
+    )
+    provider = AuthServiceProvider(app)
+
+    with Cache.fake():
+        provider.register()
+        controller = app.container.make(AuthController)
+        await controller.verify_email_resend(ResendVerificationRequest(email="ghost@example.com"))
+        assert await Cache.has("arvel:rl:resend:ghost@example.com")
