@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+import logging.handlers
+import sys
+from typing import TYPE_CHECKING
+
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestNullChannel:
@@ -184,3 +192,168 @@ class TestOtelChannel:
             ch = OtelChannel("arvel").with_context(trace_id="abc")
             ch.info("with.ctx")
         obs.assert_logged("with.ctx", trace_id="abc")
+
+
+class TestFileChannel:
+    def test_single_writes_message_to_file(self, tmp_path: Path) -> None:
+        from arvel.logging.channels.file_channel import SingleFileChannel
+
+        log_path = tmp_path / "logs" / "app.log"
+        ch = SingleFileChannel(str(log_path), level="debug")
+        ch.info("single.file.write", request_id="r-1")
+
+        # _ensure_parent created the nested dir; the handler flushed on emit.
+        assert log_path.exists()
+        contents = log_path.read_text(encoding="utf-8")
+        assert "single.file.write" in contents
+        assert "request_id" in contents
+
+    def test_daily_writes_message_to_file(self, tmp_path: Path) -> None:
+        from arvel.logging.channels.file_channel import DailyFileChannel
+
+        log_path = tmp_path / "daily.log"
+        ch = DailyFileChannel(str(log_path), days=3, level="debug")
+        ch.warning("daily.file.write")
+
+        assert log_path.read_text(encoding="utf-8").find("daily.file.write") != -1
+
+    def test_build_file_channel_defaults_to_single(self, tmp_path: Path) -> None:
+        from arvel.logging.channels.file_channel import SingleFileChannel, build_file_channel
+
+        ch = build_file_channel({"path": str(tmp_path / "x.log")})
+        assert isinstance(ch, SingleFileChannel)
+
+    def test_build_file_channel_selects_daily(self, tmp_path: Path) -> None:
+        from arvel.logging.channels.file_channel import DailyFileChannel, build_file_channel
+
+        ch = build_file_channel(
+            {"driver": "daily", "path": str(tmp_path / "y.log"), "days": 5, "level": "warning"}
+        )
+        assert isinstance(ch, DailyFileChannel)
+
+
+class _FakeSysLogHandler(logging.Handler):
+    """Stand-in that records the address it was constructed with."""
+
+    last_address: object = None
+
+    def __init__(self, address: object = None, facility: int = 0) -> None:
+        super().__init__()
+        type(self).last_address = address
+
+    def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - no-op sink
+        pass
+
+
+class TestSyslogChannel:
+    def test_falls_back_to_stream_handler_on_oserror(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        def raise_oserror(*_args: object, **_kwargs: object) -> object:
+            raise OSError("no syslog socket")
+
+        monkeypatch.setattr(logging.handlers, "SysLogHandler", raise_oserror)
+
+        from arvel.logging.channels.syslog_channel import SyslogChannel
+
+        ch = SyslogChannel(level="debug")
+        ch.info("syslog.fallback")
+        assert "syslog.fallback" in capsys.readouterr().err
+
+    def test_uses_darwin_address(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(logging.handlers, "SysLogHandler", _FakeSysLogHandler)
+        monkeypatch.setattr(sys, "platform", "darwin")
+
+        from arvel.logging.channels.syslog_channel import SyslogChannel
+
+        SyslogChannel()
+        assert _FakeSysLogHandler.last_address == (
+            "/var/run/syslog",
+            logging.handlers.SYSLOG_UDP_PORT,
+        )
+
+    def test_uses_dev_log_address_on_linux(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(logging.handlers, "SysLogHandler", _FakeSysLogHandler)
+        monkeypatch.setattr(sys, "platform", "linux")
+
+        from arvel.logging.channels.syslog_channel import SyslogChannel
+
+        SyslogChannel()
+        assert _FakeSysLogHandler.last_address == "/dev/log"
+
+
+class _RecordingChannel:
+    """LogChannel double that records every call as ``level:message``."""
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def debug(self, message: str, **context: object) -> None:
+        self.calls.append(f"debug:{message}")
+
+    def info(self, message: str, **context: object) -> None:
+        self.calls.append(f"info:{message}")
+
+    def warning(self, message: str, **context: object) -> None:
+        self.calls.append(f"warning:{message}")
+
+    def error(self, message: str, *, exc: object = None, **context: object) -> None:
+        self.calls.append(f"error:{message}")
+
+    def critical(self, message: str, **context: object) -> None:
+        self.calls.append(f"critical:{message}")
+
+    def exception(self, message: str, **context: object) -> None:
+        self.calls.append(f"exception:{message}")
+
+    def with_context(self, **fields: object) -> _RecordingChannel:
+        return self
+
+
+class TestStackChannelFanOut:
+    """Covers the fan-out for every level plus error-path exception handling."""
+
+    def test_every_level_fans_out(self) -> None:
+        from arvel.logging.channels.stack_channel import StackChannel
+
+        rec = _RecordingChannel()
+        stack = StackChannel([rec])
+        stack.debug("d")
+        stack.warning("w")
+        stack.error("e")
+        stack.critical("c")
+        stack.exception("x")
+        assert rec.calls == ["debug:d", "warning:w", "error:e", "critical:c", "exception:x"]
+
+    def test_error_swallows_when_ignore_exceptions(self) -> None:
+        from arvel.logging.channels.stack_channel import StackChannel
+
+        stack = StackChannel([_ErrorBoom()], ignore_exceptions=True)
+        stack.error("no raise")  # must not raise
+
+    def test_error_propagates_by_default(self) -> None:
+        from arvel.logging.channels.stack_channel import StackChannel
+
+        stack = StackChannel([_ErrorBoom()], ignore_exceptions=False)
+        with pytest.raises(RuntimeError, match="err boom"):
+            stack.error("should raise")
+
+
+class _ErrorBoom:
+    """LogChannel double whose ``error`` raises; other levels are no-ops."""
+
+    def debug(self, message: str, **context: object) -> None: ...
+
+    def info(self, message: str, **context: object) -> None: ...
+
+    def warning(self, message: str, **context: object) -> None: ...
+
+    def error(self, message: str, *, exc: object = None, **context: object) -> None:
+        raise RuntimeError("err boom")
+
+    def critical(self, message: str, **context: object) -> None: ...
+
+    def exception(self, message: str, **context: object) -> None: ...
+
+    def with_context(self, **fields: object) -> _ErrorBoom:
+        return self

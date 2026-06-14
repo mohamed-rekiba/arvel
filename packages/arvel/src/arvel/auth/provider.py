@@ -272,6 +272,16 @@ class AuthServiceProvider(ServiceProvider):
             ttl_seconds=config.verification_ttl_seconds,
             user_model=user_model_cls,
         )
+        from arvel.facades.cache import Cache as _Cache  # noqa: PLC0415
+        from arvel.http.ratelimit import CacheStore, InMemoryStore  # noqa: PLC0415
+
+        # Cache-backed when a CacheManager is bound (shared across workers in
+        # prod); otherwise per-process InMemoryStore so the controller still
+        # throttles without requiring the Cache facade.
+        resend_store: CacheStore | InMemoryStore = (
+            CacheStore() if _Cache.manager is not None else InMemoryStore()
+        )
+
         controller = AuthController(
             auth=auth_service,
             passwords=password_service,
@@ -283,6 +293,7 @@ class AuthServiceProvider(ServiceProvider):
                 secure=refresh.cookie_secure,
                 user_resource_class=user_resource_cls,
             ),
+            resend_store=resend_store,
         )
 
         self.container.instance(AuthService, auth_service)

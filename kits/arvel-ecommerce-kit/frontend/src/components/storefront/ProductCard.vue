@@ -86,10 +86,10 @@ async function handleAddToCart(event: Event): Promise<void> {
           </span>
         </div>
 
-        <WishlistButton
+        <!-- <WishlistButton
           :product-id="product.id"
           class="absolute end-3 top-3 opacity-0 group-hover:opacity-100"
-        />
+        /> -->
       </div>
 
       <!-- Info -->
