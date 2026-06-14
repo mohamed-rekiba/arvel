@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.13.0...arvel-ecommerce-kit-v1.13.1) (2026-06-14)
+
+
+### Refactors
+
+* **ProductCard:** improve template structure and readability ([09153a9](https://github.com/mohamed-rekiba/arvel/commit/09153a9607282866bb9c98079563171a375f3cc4))
+
 ## [1.13.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.12.4...arvel-ecommerce-kit-v1.13.0) (2026-06-14)
 
 
