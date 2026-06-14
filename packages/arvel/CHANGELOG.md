@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.27.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.26.0...arvel-v0.27.0) (2026-06-14)
+
+
+### Features
+
+* **arvel:** port LogManager + harden Container, Session, and Auth ([072a5e5](https://github.com/mohamed-rekiba/arvel/commit/072a5e5c145e438d2a6d5e00d8fe16363deca486))
+
+
+### Bug Fixes
+
+* **arvel:** harden container extend, session guard, cookie expiry, and session lifecycle ([bcfe75e](https://github.com/mohamed-rekiba/arvel/commit/bcfe75e811439353e594f8ad5c089e0aa3f63237))
+* **arvel:** inject resend rate-limit store into AuthController ([a82565d](https://github.com/mohamed-rekiba/arvel/commit/a82565d958057c2304b59fc92072659ff3865383))
+
 ## [0.26.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.25.1...arvel-v0.26.0) (2026-06-11)
 
 
