@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.13.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.12.4...arvel-ecommerce-kit-v1.13.0) (2026-06-14)
+
+
+### Features
+
+* **arvel:** port LogManager + harden Container, Session, and Auth ([072a5e5](https://github.com/mohamed-rekiba/arvel/commit/072a5e5c145e438d2a6d5e00d8fe16363deca486))
+
+
+### Bug Fixes
+
+* **arvel:** inject resend rate-limit store into AuthController ([a82565d](https://github.com/mohamed-rekiba/arvel/commit/a82565d958057c2304b59fc92072659ff3865383))
+
 ## [1.12.4](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.12.3...arvel-ecommerce-kit-v1.12.4) (2026-06-12)
 
 
