@@ -21,9 +21,10 @@ class SyslogChannel(StdlibChannel):
         level: str = "info",
         bound: dict[str, object] | None = None,
     ) -> None:
+        handler: logging.Handler
         try:
             if sys.platform == "darwin":
-                handler: logging.Handler = logging.handlers.SysLogHandler(
+                handler = logging.handlers.SysLogHandler(
                     address=("/var/run/syslog", logging.handlers.SYSLOG_UDP_PORT),
                     facility=facility,
                 )
@@ -33,9 +34,7 @@ class SyslogChannel(StdlibChannel):
                     facility=facility,
                 )
         except OSError:
-            import logging as _std
-
-            handler = _std.StreamHandler()
+            handler = logging.StreamHandler()
         super().__init__(handler, name="syslog", level=level, bound=bound)
 
 
