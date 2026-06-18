@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.13.1...arvel-ecommerce-kit-v1.14.0) (2026-06-18)
+
+
+### Features
+
+* **application:** add metrics route if metrics are enabled ([dc1848c](https://github.com/mohamed-rekiba/arvel/commit/dc1848c58339265daacacc315dab896df054430d))
+
 ## [1.13.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-ecommerce-kit-v1.13.0...arvel-ecommerce-kit-v1.13.1) (2026-06-14)
 
 
