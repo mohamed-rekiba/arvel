@@ -1,0 +1,144 @@
+name: Ecommerce container images
+
+# Builds production images for the ecommerce kit and bumps homelab-gitops tags.
+#
+# Triggers on kit release tags (e.g. arvel-ecommerce-kit-v1.5.1) or manual dispatch.
+#
+# Required secrets:
+#   DOCKERHUB_USERNAME
+#   DOCKERHUB_TOKEN
+#   HOMELAB_GITOPS_TOKEN — fine-grained PAT with contents:write on homelab-gitops
+
+on:
+  push:
+    tags:
+      - "arvel-ecommerce-kit-v[0-9]+.[0-9]+.[0-9]+"
+      - "arvel-ecommerce-kit-v[0-9]+.[0-9]+.[0-9]+-*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Image tag (semver, without v prefix)"
+        required: true
+        type: string
+
+env:
+  DOCKERHUB_REPO_APP: rekiba/ecommerce-app
+  DOCKERHUB_REPO_SCHEDULER: rekiba/ecommerce-scheduler
+  GITOPS_REPO: mohamed-rekiba/homelab-gitops
+  GITOPS_VALUES_PATH: ecommerce/chart/values.yaml
+
+jobs:
+  build-and-push:
+    name: Build and push images
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME#arvel-ecommerce-kit-v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push ecommerce-app
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: kits/arvel-ecommerce-kit/deploy/Dockerfile
+          target: app
+          push: true
+          tags: |
+            docker.io/${{ env.DOCKERHUB_REPO_APP }}:${{ steps.version.outputs.tag }}
+            docker.io/${{ env.DOCKERHUB_REPO_APP }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push ecommerce-scheduler
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: kits/arvel-ecommerce-kit/deploy/Dockerfile
+          target: scheduler
+          push: true
+          tags: |
+            docker.io/${{ env.DOCKERHUB_REPO_SCHEDULER }}:${{ steps.version.outputs.tag }}
+            docker.io/${{ env.DOCKERHUB_REPO_SCHEDULER }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  bump-gitops:
+    name: Bump homelab-gitops image tags
+    needs: build-and-push
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Resolve image tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME#arvel-ecommerce-kit-v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          token: ${{ secrets.HOMELAB_GITOPS_TOKEN }}
+          path: gitops
+
+      - name: Update Helm values image tags
+        working-directory: gitops
+        env:
+          IMAGE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          tag = os.environ["IMAGE_TAG"]
+          path = pathlib.Path("${{ env.GITOPS_VALUES_PATH }}")
+          text = path.read_text()
+          text = re.sub(
+              r'(repository: docker\.io/rekiba/ecommerce-app\n\s+tag: )"[^"]*"',
+              rf'\1"{tag}"',
+              text,
+              count=1,
+          )
+          text = re.sub(
+              r'(repository: docker\.io/rekiba/ecommerce-scheduler\n\s+tag: )"[^"]*"',
+              rf'\1"{tag}"',
+              text,
+              count=1,
+          )
+          path.write_text(text)
+          PY
+
+      - name: Commit and push GitOps tag bump
+        working-directory: gitops
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${{ env.GITOPS_VALUES_PATH }}"
+          if git diff --cached --quiet; then
+            echo "No tag changes needed"
+            exit 0
+          fi
+          git commit -m "chore(ecommerce): bump images to ${{ steps.version.outputs.tag }}"
+          git push
