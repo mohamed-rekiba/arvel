@@ -22,8 +22,8 @@ on:
         type: string
 
 env:
-  DOCKERHUB_REPO_APP: rekiba/ecommerce-app
-  DOCKERHUB_REPO_SCHEDULER: rekiba/ecommerce-scheduler
+  DOCKERHUB_REPO_APP: rekiba/arvel-ecommerce-app
+  DOCKERHUB_REPO_SCHEDULER: rekiba/arvel-ecommerce-scheduler
   GITOPS_REPO: mohamed-rekiba/homelab-gitops
   GITOPS_VALUES_PATH: ecommerce/chart/values.yaml
 
