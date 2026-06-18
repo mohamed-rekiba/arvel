@@ -579,6 +579,14 @@ class Application:
             allowed_cidrs=config.health_allowed_cidrs,
             trusted_proxies=config.trusted_proxies,
         )
+        if config.metrics_enabled:
+            from arvel.observability.metrics_route import add_metrics_route
+
+            add_metrics_route(
+                fa,
+                allowed_cidrs=config.metrics_allowed_cidrs,
+                trusted_proxies=config.trusted_proxies,
+            )
 
     def _maybe_mount_public_storage(self, fa: FastAPI) -> None:
         """Serve the `storage:link` symlink (public/storage) at /storage.
