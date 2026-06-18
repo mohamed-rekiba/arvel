@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.27.1...arvel-v0.28.0) (2026-06-18)
+
+
+### Features
+
+* **application:** add metrics route if metrics are enabled ([dc1848c](https://github.com/mohamed-rekiba/arvel/commit/dc1848c58339265daacacc315dab896df054430d))
+
 ## [0.27.1](https://github.com/mohamed-rekiba/arvel/compare/arvel-v0.27.0...arvel-v0.27.1) (2026-06-14)
 
 
