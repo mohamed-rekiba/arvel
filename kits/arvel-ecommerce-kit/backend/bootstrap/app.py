@@ -73,8 +73,24 @@ def create_asgi(app: Application) -> FastAPI:
         "frame-ancestors 'none'; "
         "form-action 'self'"
     )
+    # Storefront SPA loads Google Fonts and applies Vue inline styles. JSON API
+    # responses get the same header; browsers ignore CSP on non-document types.
+    _storefront_csp = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; "
+        "style-src-elem 'self' https://fonts.googleapis.com 'unsafe-inline'; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "style-src 'self' https://static.cloudflareinsights.com 'unsafe-inline'; "
+        "style-src-elem 'self' https://static.cloudflareinsights.com 'unsafe-inline'; "
+        "img-src 'self' data: blob: https:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "form-action 'self'"
+    )
     asgi_app.add_middleware(
         SecurityHeadersMiddleware,
+        csp=_storefront_csp,
         path_csp_overrides={
             "/api/docs": _docs_csp,
             "/api/redoc": _docs_csp,

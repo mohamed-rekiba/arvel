@@ -8,6 +8,8 @@ ARG NODE_VERSION=24.15.0-alpine3.23
 ARG PYTHON_VERSION=3.14.5-slim-bookworm
 ARG UV_VERSION=0.11.16
 
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
+
 FROM node:${NODE_VERSION} AS frontend
 WORKDIR /src/kits/arvel-ecommerce-kit/frontend
 COPY kits/arvel-ecommerce-kit/frontend/package.json kits/arvel-ecommerce-kit/frontend/package-lock.json ./
@@ -16,22 +18,22 @@ COPY kits/arvel-ecommerce-kit/frontend/ ./
 RUN npm run build
 
 FROM python:${PYTHON_VERSION} AS python-deps
-ARG UV_VERSION
-COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /uvx /bin/
-WORKDIR /src
+COPY --from=uv /uv /uvx /bin/
+WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY packages/ packages/
 COPY kits/arvel-ecommerce-kit/ kits/arvel-ecommerce-kit/
-ENV UV_LINK_MODE=copy
-RUN uv sync --frozen --all-packages --all-extras --no-dev
+ENV UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
+RUN uv sync --frozen --all-packages --all-extras --no-dev --no-editable
 
 FROM python:${PYTHON_VERSION} AS runtime
 WORKDIR /app/kits/arvel-ecommerce-kit/backend
 ENV PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:${PATH}" \
     UV_PROJECT_ENVIRONMENT=/app/.venv
-COPY --from=python-deps /src/.venv /app/.venv
-COPY --from=python-deps /src/kits/arvel-ecommerce-kit/backend /app/kits/arvel-ecommerce-kit/backend
+COPY --from=python-deps /app/.venv /app/.venv
+COPY --from=python-deps /app/kits/arvel-ecommerce-kit/backend /app/kits/arvel-ecommerce-kit/backend
 COPY --from=frontend /src/kits/arvel-ecommerce-kit/frontend/dist /app/kits/arvel-ecommerce-kit/frontend/dist
 RUN groupadd --system arvel && useradd --system --gid arvel --home-dir /app arvel \
     && chown -R arvel:arvel /app
