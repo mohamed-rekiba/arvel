@@ -123,27 +123,48 @@ jobs:
         working-directory: gitops
         env:
           IMAGE_TAG: ${{ steps.version.outputs.tag }}
+          APP_REPOSITORY: docker.io/${{ env.DOCKERHUB_REPO_APP }}
+          SCHEDULER_REPOSITORY: docker.io/${{ env.DOCKERHUB_REPO_SCHEDULER }}
         run: |
           python3 - <<'PY'
           import os
           import pathlib
           import re
+          import sys
 
           tag = os.environ["IMAGE_TAG"]
+          app_repo = os.environ["APP_REPOSITORY"]
+          scheduler_repo = os.environ["SCHEDULER_REPOSITORY"]
           path = pathlib.Path("${{ env.GITOPS_VALUES_PATH }}")
           text = path.read_text()
-          text = re.sub(
-              r'(repository: docker\.io/rekiba/arvel-ecommerce-app\n\s+tag: )"[^"]*"',
-              rf'\1"{tag}"',
-              text,
-              count=1,
-          )
-          text = re.sub(
-              r'(repository: docker\.io/rekiba/arvel-ecommerce-scheduler\n\s+tag: )"[^"]*"',
-              rf'\1"{tag}"',
-              text,
-              count=1,
-          )
+
+          def bump_block(block_name: str, repo: str, content: str) -> tuple[str, bool]:
+              pattern = (
+                  rf"(^{block_name}:\n"
+                  rf"(?:  .+\n)*?"
+                  rf"  image:\n"
+                  rf"    repository: )[^\n]+(\n"
+                  rf"    tag: )\"[^\"]+\""
+              )
+              updated, count = re.subn(
+                  pattern,
+                  rf"\1{repo}\2\"{tag}\"",
+                  content,
+                  count=1,
+                  flags=re.MULTILINE,
+              )
+              return updated, count == 1
+
+          text, app_ok = bump_block("app", app_repo, text)
+          text, scheduler_ok = bump_block("scheduler", scheduler_repo, text)
+
+          if not app_ok or not scheduler_ok:
+              print("::error::Could not find app.image or scheduler.image blocks in values.yaml")
+              sys.exit(1)
+
+          before = path.read_text()
+          if text == before:
+              print(f"::notice::Image tags already at {tag}")
           path.write_text(text)
           PY
 
@@ -154,7 +175,7 @@ jobs:
           IMAGE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
-          branch="chore/arvel-ecommerce-images-${IMAGE_TAG}"
+          branch="chore/ecommerce-images-${IMAGE_TAG}"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -189,8 +210,8 @@ jobs:
             --body "$(cat <<EOF
           Automated image tag bump from [\`${{ github.repository }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
 
-          - \`docker.io/rekiba/arvel-ecommerce-app:${IMAGE_TAG}\`
-          - \`docker.io/rekiba/arvel-ecommerce-scheduler:${IMAGE_TAG}\`
+          - \`docker.io/${{ env.DOCKERHUB_REPO_APP }}:${IMAGE_TAG}\`
+          - \`docker.io/${{ env.DOCKERHUB_REPO_SCHEDULER }}:${IMAGE_TAG}\`
 
           Merge to let Argo CD sync the ecommerce chart.
           EOF
