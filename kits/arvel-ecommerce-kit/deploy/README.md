@@ -22,7 +22,7 @@ Release flow:
 
 1. Tag `arvel-ecommerce-kit-v<semver>` on the arvel repo.
 2. GHA workflow `.github/workflows/ecommerce-images.yml` pushes both images to Docker Hub.
-3. The same workflow bumps image tags in `homelab-gitops` → Argo CD syncs.
+3. The same workflow opens a PR on `homelab-gitops` to bump image tags → merge → Argo CD sync.
 
 ### Observability (Kubernetes)
 
