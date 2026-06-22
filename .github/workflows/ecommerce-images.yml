@@ -40,7 +40,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Resolve image tag
         id: version
@@ -113,7 +113,7 @@ jobs:
             echo "tag=${GITHUB_REF_NAME#arvel-ecommerce-kit-v}" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ env.GITOPS_REPO }}
           token: ${{ secrets.HOMELAB_GITOPS_TOKEN || secrets.RELEASE_PLEASE_TOKEN }}

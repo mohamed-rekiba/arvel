@@ -26,7 +26,7 @@ jobs:
     name: SAST (bandit)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v8.2.0
         with:
           version: ${{ env.UV_VERSION }}
@@ -49,7 +49,7 @@ jobs:
     container:
       image: semgrep/semgrep:1.163.0
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: semgrep scan
         # Rules suppressed as false positives for this framework:
         # - python37-compatibility-importlib2: targets Python 3.7 compat; we require Python 3.14+
@@ -73,7 +73,7 @@ jobs:
     name: SCA (pip-audit)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v8.2.0
         with:
           version: ${{ env.UV_VERSION }}
@@ -92,7 +92,7 @@ jobs:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v3
@@ -106,7 +106,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [sca]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v8.2.0
         with:
           version: ${{ env.UV_VERSION }}

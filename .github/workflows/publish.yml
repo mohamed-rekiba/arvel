@@ -51,7 +51,7 @@ jobs:
     outputs:
       package: ${{ steps.pkg.outputs.package }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Resolve package name
         id: pkg
