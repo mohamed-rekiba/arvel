@@ -69,6 +69,7 @@ nav = [
     { "Events" = "events.md" },
     { "Mail" = "mail.md" },
     { "Notifications" = "notifications.md" },
+    { "Telemetry" = "telemetry.md" },
     { "Console (CLI)" = "console.md" },
     { "Dates & Time" = "dates.md" },
     { "File Storage" = "storage.md" },

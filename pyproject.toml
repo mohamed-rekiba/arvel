@@ -121,6 +121,7 @@ validation = "arvel.validation.provider:ValidationServiceProvider"
 dates = "arvel.dates.provider:DateServiceProvider"
 localization = "arvel.localization.provider:LocalizationServiceProvider"
 search = "arvel.search.provider:SearchServiceProvider"
+telemetry = "arvel.telemetry.provider:TelemetryServiceProvider"
 
 [tool.hatch.version]
 path = "src/arvel/__init__.py" # reads __version__ (V1: one source of truth)
