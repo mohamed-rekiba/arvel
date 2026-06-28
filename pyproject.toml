@@ -33,9 +33,9 @@ dependencies = [   # CORE — light, no heavy libs
 http = ["litestar"]
 server = ["granian[reload]", "uvicorn"]
 settings = []  # typed settings are msgspec-based (core) — no pydantic (DR-0005)
-postgres = ["sqlalchemy[asyncio]>=2", "alembic", "asyncpg"]
-mysql = ["sqlalchemy[asyncio]>=2", "alembic", "asyncmy"]
-sqlite = ["sqlalchemy[asyncio]>=2", "alembic", "aiosqlite"]
+postgres = ["sqlalchemy[asyncio]>=2.0.51", "alembic", "asyncpg"]
+mysql = ["sqlalchemy[asyncio]>=2.0.51", "alembic", "asyncmy"]
+sqlite = ["sqlalchemy[asyncio]>=2.0.51", "alembic", "aiosqlite"]
 redis = ["redis>=8"]
 queue = ["taskiq"]  # core queue engine (in-memory broker); add a broker extra for production
 queue-redis = ["arvel[queue]", "taskiq-redis"]  # Redis broker
