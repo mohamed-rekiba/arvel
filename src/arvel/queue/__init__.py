@@ -388,12 +388,24 @@ class QueueManager:
         from arvel.queue.jobs import QueuedJob
 
         moment = now if now is not None else int(time.time())
-        due = await QueuedJob.where("available_at", "<=", moment).get()
+        due = await QueuedJob.where("available_at", "<=", moment).where_null("reserved_at").get()
+        released = 0
         for row in due:
+            # Atomic claim: set reserved_at only while it's still null. rowcount == 1 means THIS worker
+            # won the row; 0 means another worker (or release pass) already took it — skip, no
+            # double-dispatch. The `reserved_at IS NULL` guard + per-row write atomicity is the lock.
+            claim = (
+                await QueuedJob.where("id", "=", row.id)
+                .where_null("reserved_at")
+                .update({"reserved_at": moment})
+            )
+            if claim.rowcount != 1:
+                continue
             job = await deserialize_instance(row.payload)
             await self.push_instance(job, queue=row.queue)
             await row.delete()
-        return len(due)
+            released += 1
+        return released
 
 
 def _queue_manager() -> Any:
