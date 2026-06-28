@@ -1,99 +1,44 @@
 name: Publish
 
-# Publishes a workspace package to PyPI when its release tag is pushed
-# (e.g. `arvel-v1.0.1`, `arvel-permission-v0.4.0`). Tags are created by
-# release-please when a release PR is merged. The package to publish is
-# derived from the tag: `<package>-v<version>`.
+# Publishes arvel to PyPI when a release tag is pushed (e.g. `v1.0.0`,
+# `v1.0.0-rc.1`). Tags are created by release-please when a release PR merges.
 #
-# Authentication uses PyPI Trusted Publishing (OIDC) — no API token is
-# stored. Each PyPI project must be configured as a Trusted Publisher with
-# this repo + this workflow + the `pypi` environment before its first
-# publish: https://docs.pypi.org/trusted-publishers/
-#
-# Fail-closed: until Trusted Publishing is configured on PyPI for a given
-# project, its upload step will be rejected by PyPI. No credentials live in
-# this workflow.
+# Auth is PyPI Trusted Publishing (OIDC) — no API token stored. The PyPI
+# project must be configured as a Trusted Publisher for this repo + this
+# workflow + the `pypi` environment before the first publish:
+# https://docs.pypi.org/trusted-publishers/  (fail-closed until then.)
 
 on:
   push:
     tags:
-      # <package>-v1.0.0 / <package>-v1.0.0-rc.1
-      - "*-v[0-9]+.[0-9]+.[0-9]+"
-      - "*-v[0-9]+.[0-9]+.[0-9]+-*"
-      # The kits aren't PyPI packages — the archive-kit job in
-      # release-please.yml ships them as a release tarball. Their tag matches
-      # the globs above, so exclude it here.
-      - "!*-kit-v*"
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
   workflow_dispatch:
-    inputs:
-      package:
-        description: "Package to build and publish"
-        required: true
-        type: choice
-        options:
-          - arvel
-          - arvel-permission
-          - arvel-image
-          - arvel-oauth
-          - arvel-search
-          - arvel-audit
 
 env:
   PYTHON_VERSION: "3.14"
-  UV_VERSION: "0.11.16"
 
 jobs:
   build:
     name: Build distribution
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     permissions:
-      contents: write # upload built artifacts to the GitHub Release
-    outputs:
-      package: ${{ steps.pkg.outputs.package }}
+      contents: write # attach built artifacts to the GitHub Release
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Resolve package name
-        id: pkg
-        env:
-          DISPATCH_PACKAGE: ${{ github.event.inputs.package }}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            PKG="${DISPATCH_PACKAGE}"
-          else
-            # Tag is "<package>-v<version>"; strip the "-v<version>" suffix.
-            PKG="${GITHUB_REF_NAME%-v*}"
-          fi
-          if [ -z "${PKG}" ]; then
-            echo "::error::Could not resolve package name from ref '${GITHUB_REF_NAME}'"
-            exit 1
-          fi
-          echo "package=${PKG}" >> "$GITHUB_OUTPUT"
-          echo "Resolved package: ${PKG}"
-
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v8.2.0
         with:
-          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
-          ignore-nothing-to-cache: true
-
-      - name: Sync workspace
-        run: uv sync --all-packages --all-extras --frozen
-
       - name: Build wheel + sdist
-        run: uv build --package "${{ steps.pkg.outputs.package }}" --out-dir dist
-
+        run: uv build --out-dir dist
       - name: Validate distribution metadata
         run: uvx twine check dist/*
-
-      - name: Upload distribution artifact
-        uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7
         with:
-          name: dist-${{ steps.pkg.outputs.package }}
+          name: dist
           path: dist/
           retention-days: 30
-
       - name: Attach distribution to GitHub Release
         if: github.event_name == 'push'
         env:
@@ -103,19 +48,18 @@ jobs:
   publish:
     name: Publish to PyPI
     needs: build
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/${{ needs.build.outputs.package }}
+      url: https://pypi.org/p/arvel
     permissions:
-      id-token: write
+      id-token: write # OIDC for Trusted Publishing
     steps:
       - name: Download built distribution
         uses: actions/download-artifact@v8
         with:
-          name: dist-${{ needs.build.outputs.package }}
+          name: dist
           path: dist/
-
       - name: Publish to PyPI (Trusted Publisher, OIDC)
         uses: pypa/gh-action-pypi-publish@v1.14.0
         with:

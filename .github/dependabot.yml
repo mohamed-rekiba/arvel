@@ -11,10 +11,8 @@ updates:
     commit-message:
       prefix: "chore(deps):"
     groups:
-      pydantic-stack:
-        patterns: ["pydantic*"]
       dev-tooling:
-        patterns: ["ruff", "mypy", "pyright", "pytest*", "coverage*"]
+        patterns: ["ruff", "mypy", "pyright", "pytest*", "coverage*", "bandit", "pip-audit"]
 
   - package-ecosystem: github-actions
     directory: "/"

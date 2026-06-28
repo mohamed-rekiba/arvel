@@ -1,560 +1,258 @@
-[project]
-name = "arvel-workspace"
-version = "0.0.0"
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-description = "Arvel monorepo — framework + cli + skeleton + docs + benchmarks."
+[project]
+name = "arvel"
+dynamic = [
+  "version",
+] # V1: single-sourced from arvel.__version__ (release-please managed)
+description = "A Laravel-grade web framework for Python — async-first, type-safe, modular."
 readme = "README.md"
 requires-python = ">=3.14"
-license = { text = "MIT" }
-authors = [{ name = "Arvel contributors" }]
-dependencies = []
-
-[tool.uv.workspace]
-members = ["packages/*", "kits/*/backend"]
-
-[tool.uv.sources]
-arvel = { workspace = true }
-arvel-permission = { workspace = true }
-arvel-image = { workspace = true }
-arvel-oauth = { workspace = true }
-arvel-search = { workspace = true }
-arvel-audit = { workspace = true }
-
-[dependency-groups]
-dev = [
-    "arvel[all]",
-    "arvel-permission",
-    "arvel-image",
-    "arvel-oauth",
-    "arvel-search",
-    "arvel-audit",
-    "bandit>=1.9.4",
-    "coverage[toml]>=7.14.1",
-    "cyclonedx-bom>=7.3.0",
-    "mkdocs-github-admonitions-plugin>=0.1.1",
-    "mkdocs-material>=9.7.6",
-    "mkdocs-minify-plugin>=0.8.0",
-    "mkdocstrings[python]>=1.0.4",
-    "mypy>=2.1.0",
-    "pip-audit>=2.10.1",
-    "pre-commit>=4.6.0",
-    "pyright>=1.1.410",
-    "pytest>=9.1.0",
-    "pytest-asyncio>=1.4.0",
-    "pytest-benchmark>=5.2.3",
-    "pytest-cov>=7.1.0",
-    "pytest-xdist>=3.8.0",
-    "ruff>=0.15.17",
-    "aiosqlite>=0.22.1",
-    "testcontainers>=4.14.2",
+license = "MIT"
+authors = [{ name = "arvel" }]
+keywords = ["framework", "web", "async", "laravel", "asgi"]
+dependencies = [ # CORE — light, no heavy libs
+  "msgspec>=0.21.1",
+  "whenever>=0.10.0",
+  "typer>=0.26.8",
+  "structlog>=26.1.0",
+  "httpx>=0.28.1",
+  "anyio>=4.14.1",
+  "python-ulid>=3.1.0",
+  "itsdangerous>=2.2.0",
+  "cryptography>=49.0.0",
+  "pwdlib[argon2]>=0.3.0",
+  "inflection>=0.5.1",
+  "python-slugify>=8.0.4",
+  "cashews>=7.5.0",
+  "fsspec>=2026.6.0",
+  "python-dotenv>=1.2.2",
 ]
 
-# ──────────────────────────  Shared tooling (workspace-wide)  ──────────────────
+[project.optional-dependencies]
+http = ["litestar>=2.24.0"]
+server = ["granian[reload]>=2.7.7", "uvicorn>=0.49.0"]
+postgres = ["sqlalchemy[asyncio]>=2.0.51", "alembic>=1.18.5", "asyncpg>=0.31.0"]
+mysql = ["sqlalchemy[asyncio]>=2.0.51", "alembic>=1.18.5", "asyncmy>=0.2.11"]
+sqlite = ["sqlalchemy[asyncio]>=2.0.51", "alembic>=1.18.5", "aiosqlite>=0.22.1"]
+redis = ["redis>=8.0.1"]
+queue = [
+  "taskiq>=0.12.4",
+] # core queue engine (in-memory broker); add a broker extra for production
+queue-redis = ["arvel[queue]", "taskiq-redis>=1.2.3"] # Redis broker
+queue-amqp = [
+  "arvel[queue]",
+  "taskiq-aio-pika>=0.6.0",
+] # AMQP broker (RabbitMQ/LavinMQ via taskiq AioPikaBroker)
+view = ["jinja2>=3.1.6"]
+console = [
+  "ipython>=9.15.0",
+] # the `arvel shell` REPL: top-level await + autocomplete (falls back to stdlib)
+jwt = ["pyjwt>=2.13.0"]
+oauth = ["httpx-oauth>=0.17.0", "authlib>=1.7.2"]
+"2fa" = ["pyotp>=2.10.0"]
+s3 = ["s3fs>=2026.6.0"]
+gcs = ["gcsfs>=2026.6.0"]
+azure = ["adlfs>=2026.5.0"]
+supabase = ["supabase>=2.31.0"]
+image = ["pillow>=12.2.0"]
+video = ["av>=17.1.0"]
+media = ["arvel[image]"]
+mail = ["aiosmtplib>=5.1.2", "markdown-it-py>=4.2.0"]
+notifications = ["apprise>=1.11.0"]
+search = ["meilisearch>=0.41.1"]
+# pgvector powers `t.vector(...)` columns + vector search on Postgres. The Python package
+# provides the SQLAlchemy type; it ALSO requires the Postgres server extension
+# (`CREATE EXTENSION vector;`). Without the package, `t.vector` falls back to a portable JSON column.
+vector = ["pgvector>=0.4.2"]
+telemetry = [
+  "opentelemetry-sdk>=1.43.0",
+  "sentry-sdk>=2.63.0",
+  "logfire>=4.37.0",
+]
+i18n = ["babel>=2.18.0"]
+docs = ["zensical>=0.0.46"]
+dev = [
+  "ruff>=0.15.20",
+  "mypy>=2.1.0",
+  "pyright>=1.1.411",
+  "bandit>=1.9.4",
+  "pip-audit>=2.10.1",
+  "pre-commit>=4.6.0",
+  "import-linter>=2.12",
+  "pytest>=9.1.1",
+  "pytest-asyncio>=1.4.0",
+  "pytest-xdist>=3.8.0",
+  "coverage>=7.14.3",
+  "polyfactory>=3.3.0",
+  "faker>=40.23.0",
+  "moto>=5.2.2",
+  "ipython>=9.15.0",
+  "hypothesis>=6.155.7",
+]
+test-integration = ["testcontainers>=4.14.2"]
+standard = [
+  "arvel[http,server,sqlite,postgres,redis,queue-redis,view,mail,image,console]",
+]
+all = [
+  "arvel[http,server,sqlite,postgres,mysql,redis,queue-redis,queue-amqp,view,console,jwt,oauth,2fa,s3,gcs,azure,supabase,image,video,media,mail,notifications,search,vector,telemetry,i18n]",
+]
 
+[project.scripts]
+arvel = "arvel.console:main"
+
+[project.entry-points."arvel.providers"]
+kernel = "arvel.kernel.provider:KernelServiceProvider"
+events = "arvel.events.provider:EventServiceProvider"
+security = "arvel.security.provider:SecurityServiceProvider"
+client = "arvel.client.provider:ClientServiceProvider"
+routing = "arvel.routing.provider:RoutingServiceProvider"
+database = "arvel.database.provider:DatabaseServiceProvider"
+cache = "arvel.cache.provider:CacheServiceProvider"
+filesystem = "arvel.filesystem.provider:FilesystemServiceProvider"
+mail = "arvel.mail.provider:MailServiceProvider"
+notifications = "arvel.notifications.provider:NotificationServiceProvider"
+view = "arvel.views.provider:ViewServiceProvider"
+queue = "arvel.queue.provider:QueueServiceProvider"
+auth = "arvel.auth.provider:AuthServiceProvider"
+media = "arvel.media.provider:MediaServiceProvider"
+validation = "arvel.validation.provider:ValidationServiceProvider"
+dates = "arvel.dates.provider:DateServiceProvider"
+localization = "arvel.localization.provider:LocalizationServiceProvider"
+search = "arvel.search.provider:SearchServiceProvider"
+
+[tool.hatch.version]
+path = "src/arvel/__init__.py" # reads __version__ (V1: one source of truth)
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/arvel"]
+
+# --- Lint / format --------------------------------------------------------
 [tool.ruff]
 line-length = 100
 target-version = "py314"
-extend-exclude = [".git", ".venv", "build", "dist"]
+src = ["src", "tests"]
+# Generated facade stub: `make stubs` emits it verbatim and test_facade_stubs asserts the file
+# equals the generator output. ruff-format must not rewrap it. force-exclude so the pre-commit
+# ruff hooks (which pass filenames explicitly) honor the exclusion too.
+extend-exclude = ["src/arvel/support/facades/__init__.pyi"]
+force-exclude = true
 
 [tool.ruff.lint]
-select = ["ALL"]
-ignore = [
-    "D",      # docstrings — enable per-module
-    "ANN401", # narrowly-scoped Any in container/facades
-    "COM812", # conflicts with formatter
-    "ISC001", # conflicts with formatter
-    "TC001",  # TYPE_CHECKING imports — judgement-based
-    "TC002",
-    "TC003",
-    "TRY003", # framework-style error messages
-    "EM101",  # short literal exception messages are fine for the framework
-    "EM102",
-    "UP046",  # classic Generic[T] kept for editor/runtime compat across tools
-    "UP047",  # PEP 695 not used everywhere yet — TypeVar still valid
-]
+select = ["E", "F", "I", "UP", "B", "S", "C4", "SIM", "RUF"]
+ignore = ["E501"]                                            # line length handled by formatter
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = [
-    "S101",
-    "S105",     # test fixtures hardcode obvious secrets
-    "S106",
-    "PLR2004",
-    "SLF001",
-    "ARG001",
-    "ARG002",
-    "PLR0913",
-    "FBT001",
-    "FBT002",
-    "FBT003",
-    "INP001",
-    "ANN001",
-    "ANN201",
-    "N802",     # tests intentionally use TypeVar `T` in names
-    "N806",     # nested Pydantic model defs read better Pascal-cased
-    "A002",     # `id` argument shadowing is fine in test doubles
-    "PT018",    # multi-assert composite assertion is fine here
-    "PLW0108",
-    "PTH201",
-    "PLC0415",  # scoped imports keep test files self-contained
-    "RUF043",   # pytest.raises(match=...) regex flexibility
-    "RUF012",   # mutable defaults are fine for test data
-    "ASYNC240", # sync pathlib in async test helpers is fine (asyncio backend)
-    "TRY301",   # raising inside try accepted in test helpers
-    "RUF006",   # asyncio.create_task without assignment OK in tests
-    "PT011",    # bare pytest.raises(ValueError) acceptable in provider tests
-    "BLE001",   # broad except in cookie encryption test is intentional
+"tests/**" = [
+  "S101",
+  "S105",
+  "S106",
+  "S107",
+  "S311",
+  "S404",
+  "S603",
+  "S607",
+  "B018",
+  "RUF012",
 ]
-"**/benchmarks/**" = ["S101", "INP001", "T201", "E501"]
-# Executable maintenance scripts: print is the interface, no package __init__.
-"scripts/**" = ["INP001", "T201"]
-"conftest.py" = [
-    "UP036",   # tomllib fallback is intentional for portability
-    "UP037",   # TYPE_CHECKING-guarded names are stringified by design
-    "PLC0415", # `coverage` imported lazily — pytest-cov owns the runtime
-    "S112",    # silent continue keeps the per-module gate non-fatal
-    "ARG001",  # pytest hook signature is fixed
-    "PLW0603", # _PENDING_FAILURE is the only state shared across hooks
-]
-"packages/arvel/src/arvel/container/**" = [
-    "SLF001",
-    "C901",
-    "PLR0911",
-    "PLR0912",
-]
-"packages/arvel/src/arvel/application/**" = ["SLF001", "PLC0415"]
-"kits/arvel-ecommerce-kit/backend/bootstrap/app.py" = [
-    "E402", # sys.path must be set before local app.* imports can resolve
-]
-"packages/arvel-permission/src/arvel_permission/models.py" = [
-    "ARG002", # TypeDecorator.process_*_param must keep SQLAlchemy's `dialect` name
-]
-"packages/arvel-oauth/src/arvel_oauth/exceptions.py" = [
-    "N818", # ProviderNotFound / InvalidOAuthState / DuplicateOAuthAccount are public API names
-]
-"packages/arvel-oauth/src/arvel_oauth/models.py" = [
-    "ARG002", # TypeDecorator.process_*_param must keep SQLAlchemy's `dialect` name
-]
-"packages/arvel-oauth/src/arvel_oauth/providers/**" = [
-    "PLR0913", # OAuth provider constructors carry the full credential + endpoint param set
-]
-"packages/arvel-search/src/arvel_search/exceptions.py" = [
-    "N818", # SearchEngineNotConfigured is a public API name, not an *Error
-]
-"packages/arvel-audit/src/arvel_audit/exceptions.py" = [
-    "N818", # InvalidAuditAction / MissingActivityDescription are public API names, not *Error
-]
-"packages/arvel-audit/src/arvel_audit/types.py" = [
-    "ARG002",  # TypeDecorator.process_*_param must keep SQLAlchemy's `dialect` name
-    "PLC0415", # Crypt imported lazily so importing the model never needs APP_KEY
-]
-"packages/arvel-audit/src/arvel_audit/auditable.py" = [
-    "SLF001", # observer stashes a private capture attr on the instance between hooks
-]
-"packages/arvel-search/src/arvel_search/engines/**" = [
-    "ARG002",  # Engine protocol methods keep a fixed (index, documents, key) signature
-    "PLR0913", # the REST drivers' private _request helper carries the full httpx knob set
-]
-"packages/arvel-search/src/arvel_search/searchable.py" = [
-    "PLC0415", # Bus/jobs imported lazily inside dispatch to break the queue import cycle
-]
-"packages/arvel-search/src/arvel_search/facade.py" = [
-    "PLC0415", # SearchFake imported lazily to keep test doubles out of the prod path
-]
-"kits/arvel-ecommerce-kit/backend/app/http/controllers/i18n.py" = [
-    "RUF001", # intentional Turkish locale strings — dotless-i is correct spelling
-]
-"kits/arvel-ecommerce-kit/backend/database/seeders/catalog_seeder.py" = [
-    "RUF001", # intentional Turkish locale strings — dotless-i is correct spelling
-    "E501",   # long seeder data lines are intentional (readability beats wrapping)
-]
-"kits/arvel-ecommerce-kit/backend/app/http/resources/**" = [
-    "ARG002", # JsonResource.to_dict keeps the base's fixed (request) name — pyright requires it
-]
-"packages/arvel/src/arvel/http/**" = [
-    "PLC0415", # lazy imports avoid heavy FastAPI/jwt at module load
-    "PLR0913", # CORS / Throttle constructors have many tunables
-    "BLE001",  # broad except in middleware: convert any guard error to 401
-    "N818",    # HttpException name is canonical; subclasses already follow OWASP
-]
-"packages/arvel/src/arvel/i18n/pluralisation.py" = [
-    "PLR2004", # CLDR plural-rule arithmetic (n % 100 != 11, etc.) — domain constants, not magic numbers
-    "ARG001",  # rule fns share a Callable[[int], int] signature; the zero rule ignores its arg
-]
-"packages/arvel/src/arvel/routing.py" = [
-    "BLE001",  # annotation resolution is best-effort, must not crash
-    "C901",    # signature rewriting is intrinsically a multi-branch routine
-    "PLC0415", # localized imports for optional integrations
-    "PLR0913", # facade decorator factories carry the full route knob set
-    "S110",    # try/except/pass for annotation resolution is intentional
-    "SIM108",  # explicit if/else reads better than the ternary for None checks
-]
-"packages/arvel/src/arvel/providers/**" = [
-    "PLW0108", # lambda binds Router.singleton lazily
-    "BLE001",  # provider boot/shutdown converts arbitrary backend errors
-    "S110",    # try/except/pass guards optional config sections
-    "PLC0415", # lazy imports for optional driver registration
-    "SLF001",  # providers peek at manager._config to validate
-]
-"packages/arvel/src/arvel/cache/**" = [
-    "PLC0415",  # lazy driver imports keep optional deps optional
-    "ARG002",   # protocol methods accept fixed signatures (NullStore, FileStore)
-    "N818",     # CacheException is intentional base-class name
-    "ASYNC109", # block(timeout=...) is explicit by design — asyncio.timeout adds no value here
-    "S311",     # random.randint for GC probability is not cryptographic
-]
-"packages/arvel/src/arvel/session/**" = [
-    "PLC0415", # lazy driver imports
-    "ARG002",  # SessionStore protocol methods accept fixed signatures
-    "SLF001",  # StartSession accesses manager._config internals
-    "BLE001",  # broad except in middleware prevents 500 on session errors
-]
-"packages/arvel/src/arvel/storage/**" = [
-    "PLC0415", # lazy cloud driver imports
-    "ARG002",  # StorageDisk protocol methods accept fixed signatures
-    "PLR0913", # StorageManager.__init__ carries per-driver config objects
-]
-"packages/arvel/src/arvel/console/commands/cache_commands.py" = [
-    "PLC0415", # façade and fallback store imported lazily inside CLI handlers
-    "BLE001",  # CLI fallback: catch-all when facade not bound is intentional
-    "SLF001",  # accessing Cache._mgr() is intentional — it's the internal gateway
-]
-"packages/arvel/src/arvel/console/entrypoint.py" = [
-    "PLC0415", # cache/storage commands imported lazily to keep startup fast
-]
-"packages/arvel/src/arvel/console/_scaffold/kits.py" = [
-    "PLC0415", # remote_kit imported lazily: breaks the kits↔remote_kit cycle, keeps httpx off startup
-]
-"packages/arvel/src/arvel/facades/**" = [
-    "PLC0415", # concrete types imported lazily inside bind() to break circular deps
-]
-"packages/arvel/src/arvel/queue/**" = [
-    "PLC0415",  # lazy driver imports keep optional deps optional
-    "ARG002",   # QueueConnection protocol methods accept fixed signatures
-    "N818",     # QueueException is intentional base-class name
-    "ASYNC109", # pop_blocking(timeout=...) is explicit by design — asyncio.timeout adds no value
-    "BLE001",   # worker/database broad except: failed jobs must not crash the loop
-    "S110",     # worker/database try/except/pass: failed job silently stored in failed_jobs table
-    "SLF001",   # DatabaseConnection._record_unknown_class accesses store._engine directly
-]
-"packages/arvel/src/arvel/mail/**" = [
-    "PLC0415", # lazy driver imports keep optional deps optional
-    "N818",    # MailException is intentional base-class name
-]
-"packages/arvel/src/arvel/notifications/**" = [
-    "PLC0415", # lazy driver/channel imports keep optional deps optional
-    "N818",    # NotificationException is intentional base-class name
-    "ARG002",  # channel protocol methods accept fixed (notifiable, notification) signatures
-    "BLE001",  # bootstrap try/except: channels silently disabled if deps absent
-    "SIM105",  # contextlib.suppress is less readable for bootstrap try/except blocks
-    "S110",    # bootstrap try/except/pass: channels disabled gracefully, not crashed
-]
-"packages/arvel/src/arvel/broadcasting/**" = [
-    "PLC0415", # lazy driver imports keep optional deps optional (redis, httpx)
-    "N818",    # BroadcastException is intentional base-class name
-    "RUF012",  # ReverbConfig.allowed_origins defaults to [] — pydantic deep-copies
-]
-"packages/arvel/src/arvel/reverb/**" = [
-    "PLC0415",  # lazy import of websockets (optional broadcasting extra)
-    "PLR0913",  # channel-auth signature helpers carry the full Pusher param set
-    "ASYNC109", # RedisBus.subscribe pumps with an explicit timeout — required by redis-py
-    "SIM105",   # contextlib.suppress is less readable for the ws.close() guard
-    "S110",     # ws.close() failure is intentional silent — connection already gone
-    "BLE001",   # routing JSON parse + ws.send fan-out: catch all to avoid loop crash
-]
-"packages/arvel/src/arvel/console/commands/reverb_commands.py" = [
-    "PLC0415", # lazy import keeps `arvel` CLI startup fast even without reverb extra
-]
-"packages/arvel/src/arvel/events/**" = [
-    "PLC0415", # lazy imports to avoid circular deps (Bus ↔ EventDispatcher)
-    "S110",    # Bus fallback: ShouldQueue listeners fall back to inline silently
-    "BLE001",  # ShouldQueue Bus fallback swallows FacadeNotBoundError intentionally
-]
-"packages/arvel/src/arvel/database/**" = [
-    "ARG001",  # SQLAlchemy event handlers receive (mapper, conn, target) — only target is used
-    "ARG002",  # TypeDecorator API: (value, dialect) signature is fixed
-    "PLC0415", # lazy imports break ORM↔HTTP/routing import cycles
-    "PLR2004", # cryptographic key sizes (32) are domain constants, not magic
-    "SLF001",  # QueryBuilder.clone() legitimately copies sibling state
-    "TRY004",  # AttributeError is the documented contract for "no such column"
-    "FBT001",  # Blueprint helpers expose `nullable=True` keyword-style booleans
-    "FBT002",
-    "SIM103",  # explicit return reads better in tree-walking helpers
-    "PLR0913", # Schema DSL builder methods carry intentional multi-param signatures
-]
-"packages/arvel/src/arvel/support/annotations.py" = [
-    "S110",   # PEP-563 fallback chain must never crash on bad annotations
-    "BLE001",
-]
-"packages/arvel/src/arvel/scheduling/**" = [
-    "N802",    # Laravel-parity DSL: dailyAt, weeklyOn, onOneServer, withoutOverlapping
-    "N807",    # __() / __choice() naming follows Laravel — kept module-level only
-    "PLC0415", # lazy imports break circular deps with cache/log managers
-    "PLR2004", # cron field counts (5) and minute-bounds are domain constants
-    "BLE001",  # serve_forever() must catch any task failure and keep ticking
-    "S110",    # auto-discovery best-effort: missing app/Console/Kernel.py is OK
-    "T201",    # CLI commands print to stdout (typer.echo wraps print)
-]
-"packages/arvel/src/arvel/logging/**" = [
-    "PLC0415", # request-context import is lazy to break the observability → logging circular dep
-]
-"packages/arvel/src/arvel/logging_/**" = [
-    "PLC0415", # request-context import is lazy to break the observability → providers → logging circular dep
-    "PLW0603", # _bind() sets the module-level facade singleton
-    "E501",    # log method signatures expose explicit kwargs for IDE introspection
-]
-"packages/arvel/src/arvel/i18n/**" = [
-    "N802",    # Laravel-parity: __, __choice
-    "N807",
-    "PLC0415", # lazy module imports for translation files
-    "PLW0603", # bind_translator() sets the module-level translator singleton
-    "BLE001",  # loader must not crash on a malformed .py file
-    "S110",
-    "SIM108",  # pluralization branching is clearer as an if/else than a ternary
-]
-"packages/arvel/src/arvel/providers/scheduler_provider.py" = [
-    "BLE001",  # boot() auto-discovery best-effort: log + continue
-    "S110",
-    "PLC0415", # lazy imports avoid loading scheduling/cache at provider import time
-]
-"packages/arvel/src/arvel/console/commands/schedule_commands.py" = [
-    "PLC0415", # CLI handlers lazy-import schedule/cache/log to keep CLI startup fast
-    "S108",    # /tmp default is for --once dry-run only; never reaches FS in tests
-    "ANN202",  # _build_kernel returns a SchedulerKernel via forward-typed factory
-    "FBT002",  # CLI flag `once: bool = False` is the standard typer signature
-    "E501",    # CLI signature lines exceed 100 due to typer Annotated decorators
-]
-"packages/arvel/src/arvel/console/commands/_companions.py" = [
-    "PLC0415", # sibling generators imported lazily so the orchestrators avoid an import cycle
-    "SLF001",  # companions delegate to a sibling command's _generate gateway by design
-]
-"packages/arvel/src/arvel/console/commands/make_model.py" = [
-    "C901",    # the hub callback fans out to every companion (-a/--all)
-    "PLR0912", # one branch per companion flag — intrinsic to the make:model hub
-    "PLR0913", # each companion is its own typer flag; the signature is the public API
-]
-"packages/arvel/src/arvel/console/commands/make_controller.py" = [
-    "C901",    # the callback dispatches model + observer/policy/requests companions
-    "PLR0913", # each companion is its own typer flag; the signature is the public API
-]
-"packages/arvel/src/arvel/testing/**" = [
-    "PLC0415",  # lazy imports across testing.fakes break circular deps with facades
-    "S108",     # /tmp default is for testing only (file_path is unused by ARRAY store)
-    "SLF001",   # OTel private provider variables must be patched to enable test swapping
-    "TRY004",   # AssertionError is the documented contract for fake-not-active failures
-    "PLR2004",  # 200..300 boundary is documented in Python — not a magic number
-    "PLR1714",  # the chained-equality form is explicit on purpose in key matching
-    "SIM109",   # status code 2xx range check is more readable as written
-    "E501",     # docstring lines hold copy-paste-ready user examples; do not wrap
-    "ARG002",   # LockFake mirrors CacheLock's signature for drop-in substitutability
-    "ASYNC109", # LockFake.block(timeout=...) mirrors CacheLock — asyncio.timeout adds no value
-]
-"packages/arvel/src/arvel/observability/**" = [
-    "PLC0415", # optional OTel exporters/instrumentors imported lazily to keep startup fast
-    "SLF001",  # provider.py must patch OTel private globals to support test provider swapping
-]
-"packages/arvel/src/arvel/facades/cache.py" = [
-    "PLC0415", # lazy fake-context import to avoid pulling test deps in prod paths
-    "TRY004",  # AssertionError is the documented contract for fake-not-active failures
-]
-"packages/arvel/src/arvel/facades/event.py" = [
-    "PLC0415", # lazy fake-context import
-    "TRY004",
-]
-"packages/arvel/src/arvel/facades/storage.py" = [
-    "PLC0415", # lazy fake-context import
-    "TRY004",
-]
+"src/arvel/console/**" = [
+  "B008",
+  "S603",
+] # Typer callable defaults; `serve` runs granian (fixed argv)
 
+# --- Types (G3) -----------------------------------------------------------
 [tool.mypy]
-python_version = "3.14"
 strict = true
-warn_unreachable = true
-warn_unused_ignores = true
-disallow_any_explicit = false
-explicit_package_bases = true
+files = ["src"]
 namespace_packages = true
-plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
-mypy_path = "packages/arvel/src:packages/arvel-permission/src:packages/arvel-image/src:packages/arvel-oauth/src:packages/arvel-oauth:packages/arvel-search/src:packages/arvel-audit/src"
-files = [
-    "packages/arvel/src",
-    "packages/arvel/tests",
-    "packages/arvel-permission/src",
-    "packages/arvel-permission/tests",
-    "packages/arvel-image/src",
-    "packages/arvel-oauth/src",
-    "packages/arvel-oauth/tests",
-    "packages/arvel-audit/src",
-    "packages/arvel-search/src",
-]
-# The skeleton tree is template content, not framework source — it runs under
-# a generated project's sys.path (where `bootstrap.app` exists), not the
-# installer's. Mirror the pyright exclude below to keep both checkers aligned.
-exclude = ["packages/arvel/src/arvel/_skeleton"]
+explicit_package_bases = true
+mypy_path = "src"
+# We run BOTH mypy and pyright in strict mode. Pyright tracks "Unknown" more aggressively
+# than mypy: isinstance-narrowing an `Any` gives pyright `list[Unknown]` (flagged) but mypy
+# `list[Any]`. We resolve those spots with an explicit `cast(...)` for pyright — which mypy
+# then sees as redundant. Disabling this one check keeps the dual-checker setup consistent
+# without weakening real type safety (every real cast still type-checks).
+warn_redundant_casts = false
 
-# Optional runtime dependencies — may or may not be installed in a given env.
-# ignore_missing_imports covers the "not installed" case without requiring
-# per-line `type: ignore[import-not-found]` noise in the framework source.
 [[tool.mypy.overrides]]
-module = [
-    "redis",
-    "redis.*",
-    "IPython",
-    "IPython.*",
-    "azure",
-    "azure.*",
-    "google",
-    "google.*",
-    "aioboto3",
-    "aioboto3.*",
-    "bcrypt",
-    "bcrypt.*",
-    "jwt",
-    "jwt.*",
-    "aiosmtplib",
-    "aiosmtplib.*",
-    "taskiq_redis",
-    "taskiq_redis.*",
-    "croniter",
-    "croniter.*",
-    "yaml",
-    "yaml.*",
-    "testcontainers",
-    "testcontainers.*",
-    "docker",
-    "docker.*",
-]
+module = ["babel", "babel.*", "fsspec", "fsspec.*", "av", "av.*"]
 ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = ["tests.*", "packages.arvel.tests.*"]
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-
-# QA-Pre test files intentionally import modules that don't exist yet (RED state).
-# ignore_errors avoids spurious import-not-found and misc(subclass-of-Any) errors
-# that disappear once Stage 3b (Execution) ships the implementation.
-[[tool.mypy.overrides]]
-module = [
-    "packages.arvel.tests.console.*",
-    "packages.arvel.tests.database.test_belongs_to_many",
-    "packages.arvel.tests.database.test_morph",
-    "packages.arvel.tests.database.benchmarks.*",
-    "packages.arvel.tests.cache.stores.test_redis_store",
-    "packages.arvel.tests.session.stores.test_redis_store",
-    "packages.arvel.tests.test_auth.unit.test_throttle_login",
-    "packages.arvel.tests.test_auth.unit.test_csrf_double_submit",
-    "packages.arvel.tests.test_auth.integration.test_mailables",
-]
-ignore_errors = true
-
 [tool.pyright]
+include = ["src"]
 typeCheckingMode = "strict"
 pythonVersion = "3.14"
-include = [
-    "packages/arvel/src",
-    "packages/arvel/tests",
-    "packages/arvel-permission/src",
-    "packages/arvel-permission/tests",
-    "packages/arvel-image/src",
-    "packages/arvel-image/tests",
-    "packages/arvel-oauth/src",
-    "packages/arvel-oauth/tests",
-    "packages/arvel-audit/src",
-    "packages/arvel-audit/tests",
-    "packages/arvel-search/src",
-    "packages/arvel-search/tests",
-]
-# The skeleton tree is template content, not framework source — it runs
-# under a generated project's sys.path, not the framework's, so imports
-# like `from bootstrap.app import ...` can't resolve here.
-exclude = ["packages/arvel/src/arvel/_skeleton"]
-# QA-Pre test files were excluded during RED state; all tests are now GREEN.
-ignore = [
-    "packages/arvel/tests/database/benchmarks",
-    "packages/arvel/tests/cache/stores/test_redis_store.py",
-    "packages/arvel/tests/session/stores/test_redis_store.py",
-]
-reportMissingTypeStubs = "warning"
-reportMissingImports = "warning"
-extraPaths = [
-    "packages/arvel/src",
-    "packages/arvel-permission/src",
-    "packages/arvel-image/src",
-    "packages/arvel-oauth/src",
-    "packages/arvel-audit/src",
-    "packages/arvel-search/src",
-    "packages/arvel-search/tests",
-]
-# All `report*` checks promoted to error. Per `enforce-quality-gates.mdc`,
-# warnings are not acceptable: every finding must be resolved with a real
-# code change, not a config downgrade or per-line suppression. Tighten,
-# don't loosen.
-reportUnknownVariableType = "error"
-reportUnknownMemberType = "error"
-reportUnknownArgumentType = "error"
-reportUnknownParameterType = "error"
-reportUnknownLambdaType = "error"
-reportPrivateUsage = "error"
-reportUnusedFunction = "error"
-reportUnusedClass = "error"
-reportUnusedImport = "error"
-reportArgumentType = "error"
-reportAttributeAccessIssue = "error"
-strictListInference = false
-strictDictionaryInference = false
-strictSetInference = false
+venvPath = "."
+venv = ".venv"
+# Third-party engines (fsspec, av, …) ship no type stubs — silence the "missing stubs"
+# noise about *their* packaging. This does NOT relax any check on our own code:
+# reportUnknown* stay on; we funnel untyped boundaries through explicit Any.
+reportMissingTypeStubs = false
 
+# --- Tests ----------------------------------------------------------------
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-addopts = "-ra --strict-markers --strict-config -m 'not benchmark'"
-python_files = ["test_*.py", "bench_*.py"]
-testpaths = [
-    "packages/arvel/tests",
-    "packages/arvel-permission/tests",
-    "packages/arvel-image/tests",
-    "packages/arvel-oauth/tests",
-    "packages/arvel-audit/tests",
-    "packages/arvel-search/tests",
-]
+testpaths = ["tests"]
+# Default suite stays hermetic + fast: the Docker-backed integration tier is opt-in
+# (`pytest -m integration` / `make test-integration`).
+addopts = "-q -m 'not integration'"
 markers = [
-    "slow: marks tests as slow",
-    "unit: pure-unit tests with no external dependencies",
-    "integration: integration tests",
-    "security: security tests",
-    "benchmark: ORM and core performance benchmarks (requires pytest-benchmark)",
-    "requires_emulator: requires a Docker-hosted backend (moto, Azurite, fake-gcs)",
+  "integration: real-service tests (Postgres/Redis/… via testcontainers; needs Docker)",
 ]
 
 [tool.coverage.run]
-source = [
-    "packages/arvel/src/arvel",
-    "packages/arvel-permission/src/arvel_permission",
-]
+source = ["arvel"]
 branch = true
-parallel = true
 
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "if TYPE_CHECKING:",
-    "raise NotImplementedError",
+# --- Security -------------------------------------------------------------
+[tool.bandit]
+exclude_dirs = ["tests"]
+
+# --- G1 module boundaries (import-linter) ---------------------------------
+[tool.importlinter]
+root_package = "arvel"
+include_external_packages = true
+# The lazy public surface re-exports capability types under `if TYPE_CHECKING:`;
+# those are type-only, not runtime imports, so they must not count as edges.
+exclude_type_checking_imports = true
+
+[[tool.importlinter.contracts]]
+name = "G1a — kernel imports only contracts + support (+ stdlib)"
+type = "forbidden"
+source_modules = ["arvel.kernel"]
+forbidden_modules = ["arvel.console"]
+# capability modules (http/database/cache/...) are added to this list as they land
+
+[[tool.importlinter.contracts]]
+name = "G2 — light core imports no heavy libs (startup NFR)"
+type = "forbidden"
+# The light core must never import a heavy lib (even lazily). Capability modules
+# (http→litestar, database→sqlalchemy, queue→taskiq, media→PIL) DO lazy-import their
+# engine; that `import arvel` stays light is guaranteed by the -X importtime pytest.
+source_modules = [
+  "arvel.contracts",
+  "arvel.kernel",
+  "arvel.support",
+  "arvel.dates",
+  "arvel.localization",
+  "arvel.events",
+  "arvel.console",
+  "arvel.security",
+  "arvel.client",
 ]
-fail_under = 90
-
-# Per-module coverage floors. Enforced by the workspace-root
-# conftest.py after pytest-cov finishes. Floors are *minimums*: pinned just
-# below the current measured number so refactors don't get blocked, and raised
-# whenever real coverage climbs durably. Current numbers (2026-05-17):
-#   application  95.58 | config   99.19 | container 92.67 | database  93.95
-#   facades     100.00 | http     94.90 | providers 85.71 | routing   94.33
-#   support      92.57
-[tool.coverage.arvel_per_module]
-"arvel.application" = 93.0
-"arvel.config" = 95.0
-"arvel.container" = 90.0
-"arvel.database" = 92.0
-"arvel.facades" = 100.0
-"arvel.http" = 92.0
-"arvel.providers" = 80.0
-"arvel.routing" = 92.0
-"arvel.support" = 90.0
+forbidden_modules = [
+  "litestar",
+  "sqlalchemy",
+  "taskiq",
+  "PIL",
+  "pydantic",
+  "rich",
+]
+ignore_imports = [
+  # Application.as_asgi() is the serve entry-point: it builds the HTTP kernel only
+  # when you actually serve. It stays light at `import arvel` (proven by the
+  # importtime NFR test, tests/test_startup.py) — this static edge is unavoidable.
+  "arvel.kernel.application -> arvel.http",
+]

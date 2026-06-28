@@ -1,0 +1,18 @@
+{
+  "unauthorized": "This action is unauthorized.",
+  "too_many_requests": "Too Many Requests",
+  "csrf": "CSRF token mismatch",
+  "not_found": "Not Found",
+  "status": {
+    "400": "Bad Request",
+    "401": "Unauthorized",
+    "403": "Forbidden",
+    "404": "Not Found",
+    "405": "Method Not Allowed",
+    "419": "Page Expired",
+    "422": "Unprocessable Entity",
+    "429": "Too Many Requests",
+    "500": "Server Error",
+    "503": "Service Unavailable"
+  }
+}

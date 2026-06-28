@@ -1,35 +1,18 @@
 title = "Arvel gitleaks configuration"
 
+# Extend the bundled rule set rather than redefining it.
 [extend]
 useDefault = true
 
 [allowlist]
 description = "False positives"
-# Documentation references to framework concepts that match the generic
-# API key heuristic.
-regexes = [
-  '''guest/verified/can''',
-  # SSRF guard fixtures use a harmless URL path named "secret"; no credential is present.
-  '''http://(192\.168\.1\.1|127\.0\.0\.1)/secret''',
-  '''secret", max_bytes''',
-  # Alpine-flavored semver tags from public Docker image pins
-  # (e.g. `9.1.0-alpine3.23`). The slash before the colon in `vendor/image:tag`
-  # is what trips generic-api-key here — node/postgres/python single-segment
-  # names don't fire. Anchored to the secret so a real high-entropy token
-  # shaped like a version still leaks.
-  '''^\d+\.\d+\.\d+-alpine\d+\.\d+$''',
-]
+# Markdown docs reference framework concepts (e.g. example keys/tokens) that
+# trip the generic high-entropy / API-key heuristics but carry no real secret.
 paths = [
   '''docs/.*\.md$''',
-  # Centralized Docker image pins — version strings like `9.0.4-alpine3.23`
-  # trip the generic-api-key entropy heuristic but are public image tags.
-  '''packages/arvel/tests/integration/emulators/_images\.py$''',
-  # SSRF tests intentionally use "/secret" as a fake blocked URL path.
-  # File was renamed from test_046_medialibrary_parity.py — keep this in sync
-  # with the actual filename or the allowlist silently goes dead. Both names
-  # are listed because gitleaks evaluates the file path against the commit
-  # snapshot, not the current tree; pre-rename commits still carry the old
-  # name when a full-history scan walks them.
-  '''packages/arvel-image/tests/test_046_media_library\.py$''',
-  '''packages/arvel-image/tests/test_046_medialibrary_parity\.py$''',
+]
+# Azurite's well-known PUBLIC dev-account key — a fixed constant documented by Microsoft, required
+# verbatim by the storage integration tests (tests/integration/conftest.py). Not a real secret.
+regexes = [
+  '''Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''',
 ]
