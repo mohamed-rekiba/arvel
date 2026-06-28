@@ -139,17 +139,23 @@ def test_metric_reader_and_log_exporter_select_from_config() -> None:
     assert isinstance(_build_log_exporter(console), ConsoleLogRecordExporter)
 
 
-def test_arvel_log_module_exports_to_otel_with_trace_context() -> None:
-    """The gap-closer: arvel's Log (structlog) flows into OTel logs, correlated to the active trace."""
+def test_arvel_log_facade_exports_to_otel_with_trace_context() -> None:
+    """The gap-closer: arvel's public ``Log`` facade flows into OTel logs, correlated to the trace."""
     import structlog
     from opentelemetry import trace
     from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
     import arvel.telemetry
-    from arvel.kernel.logging import LogManager, configure_logging
+    from arvel import Log
+    from arvel.kernel import Application, set_application
+    from arvel.kernel.logging import configure_logging
+    from arvel.kernel.provider import KernelServiceProvider
 
     log_exporter = InMemoryLogRecordExporter()
+    app = Application()
+    KernelServiceProvider(app).register()  # bind "log" exactly as the framework does at boot
+    set_application(app)
     try:
         configure_logging()  # arvel's structlog setup (as bootstrap does)
         result = configure(exporter=InMemorySpanExporter(), log_exporter=log_exporter)
@@ -157,7 +163,7 @@ def test_arvel_log_module_exports_to_otel_with_trace_context() -> None:
 
         span = result.tracer_provider.get_tracer("t").start_span("checkout")
         with trace.use_span(span, end_on_exit=True):
-            LogManager().warning("payment-declined", order_id=42)  # arvel Log inside the span
+            Log.info("payment-declined", order_id=42)  # the public facade an app actually calls
         result.logger_provider.force_flush()
 
         record = next(
@@ -170,6 +176,7 @@ def test_arvel_log_module_exports_to_otel_with_trace_context() -> None:
     finally:
         arvel.telemetry._otel_log_handler = None  # stop the bridge polluting later tests
         structlog.reset_defaults()
+        set_application(None)
 
 
 def test_tracer_helper_returns_a_usable_tracer() -> None:
