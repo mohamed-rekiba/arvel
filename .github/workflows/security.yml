@@ -19,40 +19,30 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.14"
-  UV_VERSION: "0.11.16"
 
 jobs:
   sast-bandit:
     name: SAST (bandit)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v8
         with:
-          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
-          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
-      - name: bandit (low+)
-        # The packaged skeleton under src/arvel/_skeleton is template code
-        # rendered into freshly-scaffolded user projects, not Arvel runtime
-        # code — its asserts and other patterns belong to user code, not us.
-        run: uv run bandit -r packages/arvel/src -l --exclude packages/arvel/src/arvel/_skeleton
-      - name: bandit (companion packages — arvel-permission, arvel-image)
-        run: |
-          uv run bandit -r packages/arvel-permission/src -l
-          uv run bandit -r packages/arvel-image/src -l
+      - name: bandit
+        run: uv run bandit -q -r src
+
   sast-semgrep:
     name: SAST (semgrep)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     container:
       image: semgrep/semgrep:1.163.0
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: semgrep scan
         # Rules suppressed as false positives for this framework:
-        # - python37-compatibility-importlib2: targets Python 3.7 compat; we require Python 3.14+
         # - non-literal-import: internal framework loaders from trusted config, not user input
         # - avoid-sqlalchemy-text: DDL/schema builders with developer-controlled identifiers
         # - dangerous-annotations-usage: ORM internals writing __annotations__ for SQLAlchemy
@@ -60,7 +50,6 @@ jobs:
         # - direct-use-of-jinja2: arvel view engine; autoescape is explicitly enabled
         run: >-
           semgrep scan --config=auto --error
-          --exclude-rule python.lang.compatibility.python37.python37-compatibility-importlib2
           --exclude-rule python.lang.security.audit.non-literal-import.non-literal-import
           --exclude-rule python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
           --exclude-rule python.lang.security.audit.dangerous-annotations-usage.dangerous-annotations-usage
@@ -71,59 +60,52 @@ jobs:
 
   sca:
     name: SCA (pip-audit)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v8
         with:
-          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
-          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
-      - name: pip-audit (skip editable workspace members)
-        # Unfixed CVEs: docs/security/dependency-exceptions.md
-        run: >-
-          uv run pip-audit --skip-editable
-          --ignore-vuln PYSEC-2026-89
-          --ignore-vuln PYSEC-2025-183
+      - name: pip-audit
+        # One documented carve-out — see SECURITY.md / DR-0008. Any OTHER new
+        # high/critical CVE blocks. Drop the ignore when asyncmy ships a fix.
+        run: uv run pip-audit --ignore-vuln GHSA-qhqw-rrw9-25rm
 
   secrets:
     name: Secret scan (gitleaks)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
           GITLEAKS_ENABLE_SUMMARY: "true"
 
   sbom:
     name: SBOM (CycloneDX)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     needs: [sca]
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v8
         with:
-          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
-          ignore-nothing-to-cache: true
-      - run: uv sync --all-extras --frozen
-      - name: Generate CycloneDX SBOM (arvel)
+      - name: Generate CycloneDX SBOM
         run: |
-          uv export --no-dev --no-hashes --package arvel --format requirements-txt > req-arvel.txt
-          uv run cyclonedx-py requirements \
-            --pyproject packages/arvel/pyproject.toml \
+          uv export --no-dev --no-hashes --format requirements-txt > req-arvel.txt
+          uvx cyclonedx-py requirements req-arvel.txt \
             --output-format JSON \
-            --output-file sbom-arvel.cdx.json \
-            req-arvel.txt
+            --output-file sbom-arvel.cdx.json
+          rm -f req-arvel.txt
       - uses: actions/upload-artifact@v7
         with:
-          name: sboms
-          path: sbom-*.cdx.json
+          name: sbom
+          path: sbom-arvel.cdx.json
           retention-days: 90

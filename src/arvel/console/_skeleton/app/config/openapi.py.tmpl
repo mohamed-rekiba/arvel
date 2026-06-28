@@ -1,0 +1,31 @@
+"""OpenAPI / API-docs configuration.
+
+The document is generated from your typed routes (handlers using ``arvel.Schema`` for request bodies /
+responses). The API-docs UI is served at ``path`` (``ui`` picks the renderer); the raw document at
+``<path>/openapi.json``. This whole dict is a typed view (``arvel.http.OpenApiSettings``) — keys are
+validated, not free-form.
+"""
+
+from arvel import env
+
+config = {
+    "title": env("APP_NAME", "{{name}}"),
+    "version": "0.1.0",
+    "description": "The {{name}} API.",
+    "path": "/schema",  # docs UI here; raw document at /schema/openapi.json
+    "ui": "swagger",  # swagger | redoc | scalar | rapidoc | stoplight
+    "use_handler_docstrings": True,  # handler docstrings become operation descriptions
+    # --- optional document metadata (uncomment to use) ---
+    # "summary": "A short tagline for the API.",
+    # "terms_of_service": "https://example.com/tos",
+    # "contact": {"name": "API Support", "email": "support@example.com", "url": "https://example.com"},
+    # "license": {"name": "MIT"},
+    # "servers": [{"url": "https://api.example.com", "description": "production"}],
+    # "tags": [{"name": "auth", "description": "Authentication endpoints"}],
+    # "external_docs": {"url": "https://docs.example.com", "description": "Full guides"},
+    # --- authentication ---
+    # Define a security scheme to get the 'Authorize' button in the docs UI, then mark protected
+    # routes with `Route.get(...).secure("bearer")`. (The --auth scaffold turns this on for you.)
+    # "security": {"bearer": True},  # HTTP bearer/JWT; or {"bearer": {"format": "JWT", "default": True}}
+    # "security": {"api_key": {"name": "X-API-Key", "in": "header"}},  # header/query API key
+}
