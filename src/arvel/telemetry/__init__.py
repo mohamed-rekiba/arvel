@@ -236,7 +236,9 @@ _LOG_LEVELS = {
 _SKIP_LOG_KEYS = frozenset({"event", "level", "timestamp"})
 
 
-def _otel_log_processor(_logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+def _otel_log_processor(
+    _logger: Any, method_name: str, event_dict: dict[str, Any]
+) -> dict[str, Any]:
     """structlog processor: mirror each log event into OpenTelemetry — the OTel handler stamps the
     active span's trace_id/span_id, so logs correlate to their trace — then return the event unchanged
     so the normal console/JSON renderer still runs (stdout is unaffected)."""
@@ -250,7 +252,9 @@ def _otel_log_processor(_logger: Any, method_name: str, event_dict: dict[str, An
         )
         for key, value in event_dict.items():
             if key not in _SKIP_LOG_KEYS:
-                setattr(record, key, value if isinstance(value, (str, int, float, bool)) else str(value))
+                setattr(
+                    record, key, value if isinstance(value, (str, int, float, bool)) else str(value)
+                )
         handler.handle(record)
     return event_dict
 

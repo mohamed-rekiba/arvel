@@ -83,7 +83,9 @@ def test_signal_endpoint_derives_per_signal_paths() -> None:
 
     assert _signal_endpoint("http://h:4318/v1/traces", "metrics") == "http://h:4318/v1/metrics"
     assert _signal_endpoint("http://h:4318/v1/traces", "logs") == "http://h:4318/v1/logs"
-    assert _signal_endpoint("", "metrics") == ""  # unset stays unset (exporter uses its own default)
+    assert (
+        _signal_endpoint("", "metrics") == ""
+    )  # unset stays unset (exporter uses its own default)
 
 
 def test_configure_exports_metrics() -> None:
@@ -96,10 +98,7 @@ def test_configure_exports_metrics() -> None:
     result.meter_provider.get_meter("test").create_counter("orders").add(3)
     data = reader.get_metrics_data()  # triggers collection
     metric_names = [
-        m.name
-        for rm in data.resource_metrics
-        for sm in rm.scope_metrics
-        for m in sm.metrics
+        m.name for rm in data.resource_metrics for sm in rm.scope_metrics for m in sm.metrics
     ]
     assert "orders" in metric_names
 
