@@ -1,0 +1,43 @@
+# {{name}}
+
+An arvel application.
+
+## Run
+
+```
+uv sync
+arvel migrate          # create the database tables (sqlite by default)
+arvel db:seed          # seed a demo user
+arvel serve            # dev server (granian) — http://127.0.0.1:8000
+arvel serve --reload   # auto-reload on code changes
+```
+
+## Structure
+
+```
+bootstrap/app.py        configure + build the app (routing, providers, middlewares, config)
+bootstrap/providers.py  your app's service providers
+bootstrap/middlewares.py customize the HTTP middlewares stack
+config/                 configuration files, loaded into config("...")
+routes/web.py           stateful browser routes (the "web" group)
+routes/api.py           stateless JSON routes (the "api" group, served under /api)
+routes/console.py       CLI command definitions
+config/openapi.py       API docs config (title, UI, auth) — see below
+app/models, app/controllers, app/providers
+database/migrations, database/seeders
+```
+
+## API docs (OpenAPI)
+
+With the server running, the interactive API docs are at **http://127.0.0.1:8000/schema** (the raw
+document at `/schema/openapi.json`). Type a route's request/response with `arvel.Schema` and its schema
+is generated automatically; configure the title, UI, and auth in `config/openapi.py`.
+
+## Commands
+
+```
+source .venv/bin/activate
+arvel route:list   # show registered routes
+arvel shell        # interactive REPL (models + app autoloaded)
+arvel make:model   # scaffold a model
+```

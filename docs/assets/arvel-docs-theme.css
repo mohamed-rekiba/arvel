@@ -1,0 +1,232 @@
+/* ===========================================================================
+   arvel documentation theme — monochromatic blue system (DESIGN.md).
+   One deep-to-pale blue ramp; no second accent. Light is the default scheme
+   (santifer.io-style restraint), dark uses navy as the canvas.
+   Ramp: navy #001D39 · blue #0A4174 · steel #49769F · teal #4E8EA2 ·
+         muted #6EA2B3 · sky #7BBDE8 · pale #BDD8E9
+   =========================================================================== */
+
+/* ---------- LIGHT (default) — default scheme ---------- */
+[data-md-color-scheme="default"] {
+  --md-default-bg-color:          #FFFFFF;
+  --md-default-bg-color--light:   #F4F8FC;   /* surfaces: cards, code, nav tint */
+  --md-default-bg-color--lighter: #E9F1F8;
+  --md-default-fg-color:          #001D39;   /* ink — navy */
+  --md-default-fg-color--light:   #49769F;   /* secondary — steel */
+  --md-default-fg-color--lighter: #6EA2B3;   /* muted — captions/borders */
+
+  --md-primary-fg-color:          #0A4174;   /* header / primary — blue */
+  --md-primary-fg-color--light:   #49769F;
+  --md-primary-fg-color--dark:    #001D39;
+  --md-primary-bg-color:          #FFFFFF;
+
+  --md-accent-fg-color:           #0A4174;   /* interaction / focus */
+  --md-accent-fg-color--transparent: rgba(10,65,116,.10);
+
+  --md-typeset-a-color:           #0A4174;   /* links — blue */
+  --md-code-bg-color:             #F1F6FB;
+  --md-code-fg-color:             #0A4174;
+  --md-footer-bg-color:           #001D39;
+}
+[data-md-color-scheme="default"] .md-typeset a:hover { color: #49769F; }
+[data-md-color-scheme="default"] .md-typeset code    { color: #0A4174; }
+[data-md-color-scheme="default"] ::selection         { background: rgba(123,189,232,.40); }
+
+/* ---------- DARK — slate scheme ---------- */
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color:          #001D39;   /* page — navy */
+  --md-default-bg-color--light:   #06294A;   /* surfaces */
+  --md-default-bg-color--lighter: #0E3358;   /* elevated */
+  --md-default-fg-color:          #E8F0F7;   /* body */
+  --md-default-fg-color--light:   #BDD8E9;   /* muted — pale */
+  --md-default-fg-color--lighter: #6EA2B3;   /* borders / disabled */
+
+  --md-primary-fg-color:          #0A4174;   /* header — blue */
+  --md-primary-fg-color--light:   #49769F;
+  --md-primary-fg-color--dark:    #001D39;
+  --md-primary-bg-color:          #FFFFFF;
+
+  --md-accent-fg-color:           #7BBDE8;   /* sky — on-dark accent / focus */
+  --md-accent-fg-color--transparent: rgba(123,189,232,.12);
+
+  --md-typeset-a-color:           #7BBDE8;   /* links — sky (readable on navy) */
+  --md-code-bg-color:             #06294A;
+  --md-code-fg-color:             #E8F0F7;
+  --md-footer-bg-color:           #00132A;
+}
+[data-md-color-scheme="slate"] .md-typeset a:hover { color: #BDD8E9; }
+[data-md-color-scheme="slate"] .md-typeset code    { color: #7BBDE8; }
+[data-md-color-scheme="slate"] ::selection         { background: rgba(123,189,232,.28); }
+
+/* ---------- Logo ---------- */
+.md-header__button.md-logo { margin: unset; padding: unset; }
+
+/* Logo swaps per scheme. The configured <img> is the deep mark (good on the
+   light header/drawer); in dark we replace the rendered image with the sky
+   mark so it stays legible on navy. Covers header + nav-drawer logos.
+   Path is relative to this CSS file (assets/). */
+[data-md-color-scheme="slate"] .md-logo img { content: url("arvel-mark-dark.svg"); }
+
+/* ---------- Admonitions (ramp-tinted; status colors are the only off-ramp hues) ---------- */
+.md-typeset .admonition.note,  .md-typeset .admonition.info     { border-color: #7BBDE8; }
+.md-typeset .admonition.tip,   .md-typeset .admonition.hint     { border-color: #0A4174; }
+.md-typeset .admonition.success                                 { border-color: #2E9E7B; }
+.md-typeset .admonition.warning                                 { border-color: #C98A1B; }
+.md-typeset .admonition.danger, .md-typeset .admonition.failure { border-color: #C0556B; }
+
+/* ===========================================================================
+   Home landing page (.arvel-home) — split hero, stack strip, feature cards,
+   code showcase, four-gates band, dark CTA. Scoped so it never touches docs
+   pages. Local tokens mirror DESIGN.md; full-bleed bands break the content box.
+   =========================================================================== */
+.arvel-home {
+  --navy:#001D39; --blue:#0A4174; --steel:#49769F; --teal:#4E8EA2;
+  --muted:#6EA2B3; --sky:#7BBDE8; --pale:#BDD8E9;
+  /* Light: a warm paper canvas with pure-white cards floating on it (depth),
+     warm-neutral panels, and blue reserved for ink + accents. */
+  --h-canvas:#FBFAF7; --h-surface:#F2F1EB; --h-line:#E7E3D9; --h-card:#FFFFFF;
+  --h-dot:#D4D0C4;
+  --h-ink:var(--navy); --h-2nd:#3C5F7E; --h-3rd:var(--steel);
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+[data-md-color-scheme="slate"] .arvel-home {
+  --h-canvas:#001D39; --h-surface:#06294A; --h-line:#0E3358; --h-card:#06294A;
+  --h-dot:#123A61;
+  --h-ink:#E8F0F7; --h-2nd:#BDD8E9; --h-3rd:#6EA2B3;
+}
+
+/* Let the home go full-width: strip Material's content box + max-widths. */
+.md-content__inner:has(.arvel-home) { margin: 0; padding: 0; }
+.md-content__inner:has(.arvel-home)::before { display: none; }
+.md-main__inner:has(.arvel-home),
+.md-content:has(.arvel-home) { max-width: none; margin: 0; }
+/* Dotted canvas (santifer.io-style): the whole home carries a faint dot grid.
+   Solid bands (showcase, CTA) paint over it; the hero, features and gates stay
+   transparent so the dots show through, with white cards floating above. */
+.md-typeset .arvel-home {
+  color: var(--h-ink);
+  background-color: var(--h-canvas);
+  background-image: radial-gradient(var(--h-dot) 1.3px, transparent 1.7px);
+  background-size: 22px 22px;
+  background-position: center top;
+}
+
+.arvel-home .ah-wrap { max-width: 1500px; margin-inline: auto; padding-inline: 40px; }
+.arvel-home .ah-block { padding-block: 2.5rem; }
+.arvel-home .ah-eyebrow { font-size:.78rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--h-2nd); margin-bottom:.7rem; }
+.md-typeset .arvel-home .ah-h2 { font-size:2.05rem; line-height:1.12; letter-spacing:-.025em; font-weight:720; margin:0 0 .8rem; color:var(--h-ink); text-wrap:balance; }
+.arvel-home .ah-sub { font-size:1.06rem; line-height:1.55; color:var(--h-2nd); max-width:62ch; margin:0 0 2.6rem; }
+.md-typeset .arvel-home a { text-decoration: none; }
+.md-typeset .arvel-home a:hover { color: var(--sky); }
+.md-typeset .arvel-home p { margin:0; }
+
+/* buttons */
+.arvel-home .ah-btn { display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:.95rem;
+  border-radius:10px; padding:13px 22px; transition:.15s; }
+.arvel-home .ah-btn--primary { background:var(--blue); color:#fff; }
+.arvel-home .ah-btn--primary:hover { background:#0c4e8c; }
+.arvel-home .ah-btn--ghost { background:var(--h-card); color:var(--h-ink); border:1px solid var(--h-line); }
+.arvel-home .ah-btn--ghost:hover { border-color:var(--sky); }
+.arvel-home .ah-btn--onnavy { background:transparent; color:#fff; border:1px solid rgba(189,216,233,.3); }
+.arvel-home .ah-btn--onnavy:hover { border-color:var(--sky); }
+
+/* hero */
+.arvel-home .ah-hero { position:relative; overflow:hidden; }
+.arvel-home .ah-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background:
+  radial-gradient(55% 65% at 82% 0%, rgba(123,189,232,.16), transparent 60%),
+  radial-gradient(45% 55% at 0% 6%, rgba(123,189,232,.10), transparent 55%); }
+.arvel-home .ah-snake { position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+.arvel-home .ah-hero__inner { position:relative; z-index:1; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:60px; align-items:center; padding-block:6rem; }
+.arvel-home .ah-hero__inner { background: rgba(255, 255, 255, 0.01); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(12px); border-radius: 0 0 10px 10px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15); margin-bottom: 40px; }
+.arvel-home .ah-badge { display:inline-flex; align-items:center; gap:8px; font-size:.8rem; font-weight:600; color:var(--blue);
+  background:rgba(123,189,232,.16); border:1px solid var(--pale); padding:5px 12px; border-radius:999px; margin-bottom:1.4rem; }
+[data-md-color-scheme="slate"] .arvel-home .ah-badge { color:var(--sky); border-color:#0E3358; background:rgba(123,189,232,.10); }
+.arvel-home .ah-badge__dot { width:6px; height:6px; border-radius:50%; background:#2E9E7B; box-shadow:0 0 0 3px rgba(46,158,123,.18); }
+.md-typeset .arvel-home .ah-h1 { font-size:clamp(2.6rem, 2.5vw, 3.5rem); line-height:1.05; letter-spacing:-.035em; font-weight:740;
+  margin:0 0 1.25rem; color:var(--h-ink); text-wrap:balance; hyphens:none; -webkit-hyphens:none; }
+.md-typeset .arvel-home .ah-h1 .hl { color:var(--blue); }
+[data-md-color-scheme="slate"] .md-typeset .arvel-home .ah-h1 .hl { color:var(--sky); }
+.arvel-home .ah-lead { font-size:1.15rem; line-height:1.55; color:var(--h-2nd); max-width:34ch; margin:0 0 1.9rem; }
+.arvel-home .ah-cta { display:flex; gap:12px; align-items:center; margin-block: 0.5rem 1.5rem; flex-wrap:wrap; }
+.arvel-home .ah-install { display:inline-flex; align-items:center; gap:14px; background:var(--h-surface); border:1px solid var(--h-line);
+  border-radius:10px; padding:11px 14px; font-family:var(--mono); font-size:.84rem; color:var(--h-ink); }
+.arvel-home .ah-install .p { color:var(--h-3rd); }
+.arvel-home .ah-install .cp { background:transparent; border:0; border-left:1px solid var(--h-line);
+  font-family:var(--mono); font-size:inherit; color:var(--h-2nd); padding:0 0 0 12px; margin:0; cursor:pointer; transition:color .15s; }
+.arvel-home .ah-install .cp:hover { color:var(--blue); }
+[data-md-color-scheme="slate"] .arvel-home .ah-install .cp:hover { color:var(--sky); }
+.arvel-home .ah-micro { margin-top:1.1rem; font-size:.78rem; color:var(--h-3rd); display:flex; gap:16px; flex-wrap:wrap; }
+
+/* code window */
+.arvel-home .ah-win { background:#001124; border-radius:18px; box-shadow:0 30px 60px -24px rgba(0,29,57,.45); overflow:hidden; border:1px solid rgba(123,189,232,.12); }
+.arvel-home .ah-win--wide { max-width:840px; margin-inline:auto; }
+.arvel-home .ah-win__bar { display:flex; align-items:center; gap:8px; padding:13px 16px; border-bottom:1px solid rgba(123,189,232,.12); }
+.arvel-home .ah-dots { display:flex; gap:7px; }
+.arvel-home .ah-dots i { width:11px; height:11px; border-radius:50%; display:block; }
+.arvel-home .ah-fname { margin-left:8px; font-family:var(--mono); font-size:.74rem; color:var(--sky); opacity:.85; }
+.md-typeset .arvel-home pre.ah-code { margin:0; padding:20px 22px; background:transparent; border:0; border-radius:0;
+  font-family:var(--mono); font-size:.8rem; line-height:1.75; color:#CFE3F2; overflow:auto; }
+.arvel-home .ah-code .tk{color:#7BBDE8;} .arvel-home .ah-code .ts{color:#8FD0C0;} .arvel-home .ah-code .tc{color:#5E7C97;font-style:italic;}
+.arvel-home .ah-code .tfn{color:#BDD8E9;} .arvel-home .ah-code .tn{color:#E6F1FA;} .arvel-home .ah-code .tde{color:#9DC3DF;}
+
+/* full-bleed band helper */
+.arvel-home .ah-strip, .arvel-home .ah-showcase, .arvel-home .ah-cta-band {
+  width:100vw; margin-inline:calc(50% - 50vw); }
+
+/* stack strip */
+.arvel-home .ah-strip { background:var(--h-surface); border-block:1px solid var(--h-line); }
+.arvel-home .ah-strip__inner { display:flex; align-items:center; gap:26px; padding-block:20px; flex-wrap:wrap; }
+.arvel-home .ah-strip__label { font-size:.72rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--h-3rd); white-space:nowrap; }
+.arvel-home .ah-chips { display:flex; gap:10px; flex-wrap:wrap; }
+.arvel-home .ah-chip { font-family:var(--mono); font-size:.76rem; color:var(--h-2nd); background:var(--h-card); border:1px solid var(--h-line); padding:5px 11px; border-radius:6px; }
+
+/* feature grid */
+.arvel-home .ah-feats { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+.arvel-home .ah-feat { background:var(--h-card); border:1px solid var(--h-line); border-radius:14px; padding:24px; transition:.16s; }
+[data-md-color-scheme="default"] .arvel-home .ah-feat,
+[data-md-color-scheme="default"] .arvel-home .ah-gate { box-shadow:0 1px 2px rgba(16,30,54,.05), 0 14px 30px -20px rgba(16,30,54,.22); }
+.arvel-home .ah-feat:hover { border-color:var(--sky); transform:translateY(-3px); box-shadow:0 18px 36px -18px rgba(10,65,116,.30); }
+.arvel-home .ah-feat__ic { width:42px; height:42px; border-radius:11px; background:rgba(123,189,232,.16); color:var(--blue); display:flex; align-items:center; justify-content:center; font-size:1.15rem; margin-bottom:16px; }
+[data-md-color-scheme="slate"] .arvel-home .ah-feat__ic { color:var(--sky); background:rgba(123,189,232,.12); }
+.md-typeset .arvel-home .ah-feat h3 { margin:0 0 .5rem; font-size:1.06rem; font-weight:680; color:var(--h-ink); }
+.arvel-home .ah-feat p { font-size:.88rem; line-height:1.6; color:var(--h-3rd); margin:0 0 .9rem; }
+.md-typeset .arvel-home .ah-feat code { background:var(--h-surface); color:var(--blue); }
+[data-md-color-scheme="slate"] .md-typeset .arvel-home .ah-feat code { color:var(--sky); }
+.arvel-home .ah-tag { font-family:var(--mono); font-size:.72rem; color:var(--teal); border:1px solid var(--h-line); border-radius:6px; padding:3px 8px; }
+
+/* showcase */
+.arvel-home .ah-showcase { background:var(--h-surface); border-block:1px solid var(--h-line); }
+
+/* four gates */
+.arvel-home .ah-gates { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+.arvel-home .ah-gate { background:var(--h-card); border:1px solid var(--h-line); border-radius:14px; padding:22px; }
+.arvel-home .ah-gate__g { font-family:var(--mono); font-size:.72rem; font-weight:700; color:#fff; background:var(--blue); border-radius:6px; padding:3px 9px; display:inline-block; margin-bottom:13px; }
+.md-typeset .arvel-home .ah-gate h4 { margin:0 0 .45rem; font-size:.96rem; font-weight:680; color:var(--h-ink); }
+.arvel-home .ah-gate p { font-size:.82rem; line-height:1.55; color:var(--h-3rd); }
+.md-typeset .arvel-home .ah-gate code { background:var(--h-surface); color:var(--blue); }
+[data-md-color-scheme="slate"] .md-typeset .arvel-home .ah-gate code { color:var(--sky); }
+
+/* CTA band */
+.arvel-home .ah-cta-band { background:var(--navy); position:relative; overflow:hidden; }
+[data-md-color-scheme="slate"] .arvel-home .ah-cta-band { border-top:1px solid #0E3358; background:#00132A; }
+.arvel-home .ah-cta-band::before { content:""; position:absolute; inset:0; background:radial-gradient(60% 120% at 80% 10%,rgba(123,189,232,.16),transparent 60%); }
+.arvel-home .ah-cta-band__inner { position:relative; text-align:center; padding-block:5rem; }
+.arvel-home .ah-cta-band__mark { width:46px; height:auto; margin:0 auto 1.1rem; display:block; }
+.md-typeset .arvel-home .ah-cta-band h2 { color:#fff; font-size:2.35rem; letter-spacing:-.025em; margin:0 0 .8rem; font-weight:720; }
+.arvel-home .ah-cta-band p { color:var(--pale); font-size:1.06rem; margin:0 0 1.9rem; }
+.arvel-home .ah-cta-band .ah-btn--primary { background:var(--sky); color:var(--navy); }
+.arvel-home .ah-cta-band .ah-btn--primary:hover { background:#9ccdee; }
+
+/* responsive */
+@media (max-width: 900px) {
+  .arvel-home .ah-hero__inner { grid-template-columns:1fr; gap:36px; }
+  .arvel-home .ah-feats { grid-template-columns:1fr 1fr; }
+  .arvel-home .ah-gates { grid-template-columns:1fr 1fr; }
+  .md-typeset .arvel-home .ah-h1 { font-size:2.5rem; }
+}
+@media (max-width: 600px) {
+  .arvel-home .ah-feats, .arvel-home .ah-gates { grid-template-columns:1fr; }
+}
+
+/* Footer metadata */
+.md-footer-meta { background-color: var(--md-default-bg-color--light); }
