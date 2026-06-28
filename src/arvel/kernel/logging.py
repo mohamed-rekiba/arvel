@@ -78,3 +78,8 @@ def configure_logging(*, json_logs: bool = False) -> None:
     else:
         processors.append(structlog.dev.ConsoleRenderer())
     structlog.configure(processors=processors)
+    # Re-assert the telemetry log bridge if it's active — we just rebuilt the processor list and would
+    # otherwise drop it. No-op (and no opentelemetry import) when telemetry is off.
+    from arvel.telemetry import instrument_logging
+
+    instrument_logging()

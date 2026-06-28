@@ -14,6 +14,7 @@ from arvel.http import HttpKernel
 from arvel.http.maintenance import PreventRequestsDuringMaintenance
 from arvel.http.middleware import RequestContextMiddleware
 from arvel.routing import Router
+from arvel.telemetry.middleware import TelemetryMiddleware
 
 
 async def _ok(request: Any) -> dict[str, str]:
@@ -22,8 +23,10 @@ async def _ok(request: Any) -> dict[str, str]:
 
 def test_use_default_global_wires_maintenance_early() -> None:
     kernel = HttpKernel().use_default_global()
-    # request-id is first (M3, so all logs carry it); maintenance runs right after, before validation
-    assert kernel.global_middleware[0] is RequestContextMiddleware
+    # telemetry is outermost (its span covers the whole request); request-id next (M3, so all logs
+    # carry it); maintenance runs right after, before validation.
+    assert kernel.global_middleware[0] is TelemetryMiddleware
+    assert kernel.global_middleware[1] is RequestContextMiddleware
     assert PreventRequestsDuringMaintenance in kernel.global_middleware
     kernel.use_default_global()  # idempotent — no duplicate
     assert kernel.global_middleware.count(PreventRequestsDuringMaintenance) == 1

@@ -41,9 +41,20 @@ provider with a `service.name` resource and a batched span exporter. Nothing els
 | `console` | Local dev. | Prints spans to stdout. |
 | `memory` | Tests. | Buffers spans in process for assertions. |
 
+## Automatic request tracing
+
+When telemetry is on, every HTTP request is automatically wrapped in a **SERVER span** — no setup. The
+span carries `http.request.method`, `url.path`, and `http.response.status_code`; a 5xx (or a raised
+handler) marks it as an error. Incoming **W3C `traceparent`** headers are honored, so a request shows up
+as one distributed trace across services, and any spans you create inside a handler nest under it.
+
+This is wired by a framework middleware that runs outermost; it's a zero-cost passthrough while
+telemetry is off.
+
 ## Creating spans
 
-Use the `tracer()` helper anywhere — it returns a standard OpenTelemetry tracer:
+For finer detail inside a request (or in jobs, commands, etc.), use the `tracer()` helper — it returns a
+standard OpenTelemetry tracer and its spans nest under the request span automatically:
 
 ```python
 from arvel.telemetry import tracer
@@ -72,15 +83,19 @@ Metrics are exported on an interval to your OTLP backend (Grafana Mimir/Promethe
 
 ## Logs
 
-When telemetry is on, arvel attaches an OpenTelemetry handler to Python's logging, so your log records
-are exported over OTLP (to Grafana Loki, …) **with trace context attached** — click from a span to its
-logs. Just log as usual:
+When telemetry is on, arvel's own `Log` is exported over OTLP (to Grafana Loki, …) **with trace context
+attached** — so a log line is linked to the trace (and span) it happened in; you can jump from a span in
+Tempo straight to its logs. Bound fields ride along as log attributes. Just log as usual:
 
 ```python
-import logging
+from arvel import Log
 
-logging.getLogger("app").info("checkout complete", extra={"order_id": order.id})
+Log.info("checkout complete", order_id=order.id)   # exported + correlated to the active trace
 ```
+
+This works by bridging arvel's structlog pipeline into OpenTelemetry; standard-library `logging` is
+exported too. Your normal console/JSON log output on stdout is unaffected — the OTLP export is
+additional.
 
 ## Choosing signals
 
@@ -121,5 +136,5 @@ Sentry at boot for error reporting, alongside OTLP tracing.
   `http://host:4318/v1/traces` — not just `http://host:4318`.
 - **Expecting spans while disabled.** `tracer()` always returns a tracer, but with telemetry off it's a
   no-op (spans go nowhere). Turn on `enabled` to export.
-- **Auto-instrumentation.** arvel sets up the exporter and gives you manual spans; it does not yet
-  auto-instrument every request/query. Wrap the spans you care about with `tracer()`.
+- **Auto-instrumentation scope.** HTTP requests are auto-traced; database queries and other internals
+  are not (yet). Wrap those with `tracer()` where you want the detail.

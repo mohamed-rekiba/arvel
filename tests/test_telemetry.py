@@ -139,6 +139,39 @@ def test_metric_reader_and_log_exporter_select_from_config() -> None:
     assert isinstance(_build_log_exporter(console), ConsoleLogRecordExporter)
 
 
+def test_arvel_log_module_exports_to_otel_with_trace_context() -> None:
+    """The gap-closer: arvel's Log (structlog) flows into OTel logs, correlated to the active trace."""
+    import structlog
+    from opentelemetry import trace
+    from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    import arvel.telemetry
+    from arvel.kernel.logging import LogManager, configure_logging
+
+    log_exporter = InMemoryLogRecordExporter()
+    try:
+        configure_logging()  # arvel's structlog setup (as bootstrap does)
+        result = configure(exporter=InMemorySpanExporter(), log_exporter=log_exporter)
+        assert result is not None
+
+        span = result.tracer_provider.get_tracer("t").start_span("checkout")
+        with trace.use_span(span, end_on_exit=True):
+            LogManager().warning("payment-declined", order_id=42)  # arvel Log inside the span
+        result.logger_provider.force_flush()
+
+        record = next(
+            r.log_record
+            for r in log_exporter.get_finished_logs()
+            if r.log_record.body == "payment-declined"
+        )
+        assert record.attributes is not None and record.attributes.get("order_id") == 42
+        assert record.trace_id == span.get_span_context().trace_id  # correlated to the trace
+    finally:
+        arvel.telemetry._otel_log_handler = None  # stop the bridge polluting later tests
+        structlog.reset_defaults()
+
+
 def test_tracer_helper_returns_a_usable_tracer() -> None:
     span_tracer = tracer("arvel.test")
     with span_tracer.start_as_current_span("unit"):

@@ -10,7 +10,8 @@ single vendor. opentelemetry is imported lazily (the ``[telemetry]`` extra), and
               "endpoint": env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/traces")}
 
 Then, anywhere:  ``with tracer().start_as_current_span("checkout"): ...``  ·
-``meter().create_counter("orders").add(1)``  ·  ``logging`` records export automatically.
+``meter().create_counter("orders").add(1)``  ·  ``Log`` records export automatically, correlated to
+the active trace.
 """
 
 from __future__ import annotations
@@ -45,6 +46,19 @@ class Telemetry:
     tracer_provider: Any = None
     meter_provider: Any = None
     logger_provider: Any = None
+
+
+# Set true once configure() wires tracing. Lets the HTTP middleware skip all OpenTelemetry work
+# (and imports) on a request when tracing is off — checking this costs nothing.
+_tracing_enabled = False
+
+# The OTel logging handler configure() builds — the structlog bridge feeds records to it directly.
+_otel_log_handler: Any = None
+
+
+def is_tracing_enabled() -> bool:
+    """Whether :func:`configure` has set up tracing — a cheap gate that imports no opentelemetry."""
+    return _tracing_enabled
 
 
 def _signal_endpoint(endpoint: str, signal: str) -> str:
@@ -145,9 +159,13 @@ def configure(
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         tracer_provider = TracerProvider(resource=resource)
-        tracer_provider.add_span_processor(BatchSpanProcessor(exporter or _build_exporter(settings)))
+        tracer_provider.add_span_processor(
+            BatchSpanProcessor(exporter or _build_exporter(settings))
+        )
         trace.set_tracer_provider(tracer_provider)  # honored once per process; later calls ignored
         result.tracer_provider = tracer_provider
+        global _tracing_enabled
+        _tracing_enabled = True
 
     if do_metrics:
         from opentelemetry import metrics
@@ -177,7 +195,10 @@ def configure(
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             handler = LoggingHandler(logger_provider=logger_provider)
-        logging.getLogger().addHandler(handler)
+        logging.getLogger().addHandler(handler)  # captures stdlib logging users
+        global _otel_log_handler
+        _otel_log_handler = handler
+        instrument_logging()  # route arvel's Log (structlog) into OTel too, with trace context
         result.logger_provider = logger_provider
 
     if settings.sentry_dsn:
@@ -201,4 +222,58 @@ def meter(name: str = "arvel") -> Any:
     return metrics.get_meter(name)
 
 
-__all__ = ["Telemetry", "TelemetrySettings", "configure", "meter", "tracer"]
+# stdlib level per structlog method name, so the OTel handler maps severity correctly.
+_LOG_LEVELS = {
+    "debug": 10,
+    "info": 20,
+    "warning": 30,
+    "warn": 30,
+    "error": 40,
+    "critical": 50,
+    "exception": 40,
+}
+# event-dict keys not worth duplicating as OTel attributes (the body, plus renderer-added fields).
+_SKIP_LOG_KEYS = frozenset({"event", "level", "timestamp"})
+
+
+def _otel_log_processor(_logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+    """structlog processor: mirror each log event into OpenTelemetry — the OTel handler stamps the
+    active span's trace_id/span_id, so logs correlate to their trace — then return the event unchanged
+    so the normal console/JSON renderer still runs (stdout is unaffected)."""
+    handler = _otel_log_handler
+    if handler is not None:
+        import logging
+
+        level = _LOG_LEVELS.get(method_name, logging.INFO)
+        record = logging.LogRecord(
+            "arvel", level, "(structlog)", 0, str(event_dict.get("event", "")), None, None
+        )
+        for key, value in event_dict.items():
+            if key not in _SKIP_LOG_KEYS:
+                setattr(record, key, value if isinstance(value, (str, int, float, bool)) else str(value))
+        handler.handle(record)
+    return event_dict
+
+
+_otel_log_processor._arvel_otel = True  # type: ignore[attr-defined]  # marker for idempotent insertion
+
+
+def instrument_logging() -> None:
+    """Insert the OTel-forwarding processor into structlog's chain, just before the renderer. A no-op
+    until the OTel log handler exists (telemetry off → zero overhead) and idempotent (no double-emit).
+
+    Called from both ``configure()`` and arvel's ``configure_logging()``, so the bridge survives
+    whichever runs last — ``configure_logging`` rebuilds structlog's processor list and would otherwise
+    drop it."""
+    if _otel_log_handler is None:
+        return
+    import structlog
+
+    processors = list(structlog.get_config().get("processors", []))
+    if any(getattr(processor, "_arvel_otel", False) for processor in processors):
+        return
+    processors.insert(max(len(processors) - 1, 0), _otel_log_processor)  # before the final renderer
+    structlog.configure(processors=processors)
+
+
+__all__ = ["Telemetry", "TelemetrySettings", "configure", "is_tracing_enabled", "meter", "tracer"]

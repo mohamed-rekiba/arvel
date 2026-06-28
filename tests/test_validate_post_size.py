@@ -12,6 +12,7 @@ from arvel.http import HttpKernel
 from arvel.http.maintenance import PreventRequestsDuringMaintenance
 from arvel.http.middleware import RequestContextMiddleware, ValidatePostSize
 from arvel.routing import Router
+from arvel.telemetry.middleware import TelemetryMiddleware
 
 
 class _Tiny(ValidatePostSize):
@@ -24,7 +25,8 @@ async def _ok(request: Any) -> dict[str, str]:
 
 def test_use_default_global_wires_post_size_after_maintenance() -> None:
     kernel = HttpKernel().use_default_global()
-    assert kernel.global_middleware[0] is RequestContextMiddleware  # request-id first (M3)
+    assert kernel.global_middleware[0] is TelemetryMiddleware  # telemetry outermost
+    assert kernel.global_middleware[1] is RequestContextMiddleware  # request-id next (M3)
     # maintenance still runs before post-size validation
     assert kernel.global_middleware.index(PreventRequestsDuringMaintenance) < (
         kernel.global_middleware.index(ValidatePostSize)

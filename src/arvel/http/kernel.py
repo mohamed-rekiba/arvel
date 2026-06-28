@@ -128,8 +128,12 @@ class HttpKernel:
             ValidateHost,
             ValidatePostSize,
         )
+        from arvel.telemetry.middleware import TelemetryMiddleware
 
         defaults = (
+            # TelemetryMiddleware is outermost so its request span covers everything below it; it's a
+            # no-op passthrough (no OpenTelemetry import) unless telemetry is enabled in config.
+            TelemetryMiddleware,
             RequestContextMiddleware,
             PreventRequestsDuringMaintenance,
             ValidatePostSize,
