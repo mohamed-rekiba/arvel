@@ -34,8 +34,9 @@ def test_configure_exports_spans_to_the_exporter() -> None:
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
     exporter = InMemorySpanExporter()
-    provider = configure(exporter=exporter)  # explicit exporter forces setup even if disabled
-    assert provider is not None
+    result = configure(exporter=exporter)  # explicit exporter forces setup even if disabled
+    assert result is not None and result.tracer_provider is not None
+    provider = result.tracer_provider
     assert provider.resource.attributes["service.name"] == "arvel"
 
     span_tracer = provider.get_tracer("test")
@@ -70,9 +71,72 @@ def test_sentry_is_initialized_when_dsn_set(monkeypatch: pytest.MonkeyPatch) -> 
 
     settings = TelemetrySettings()
     settings.enabled = True
+    settings.metrics = False  # traces-only: don't spin up real OTLP metric/log exporters
+    settings.logs = False
     settings.sentry_dsn = "https://k@example.test/1"
     configure(settings, exporter=InMemorySpanExporter())
     assert captured["dsn"] == "https://k@example.test/1"
+
+
+def test_signal_endpoint_derives_per_signal_paths() -> None:
+    from arvel.telemetry import _signal_endpoint
+
+    assert _signal_endpoint("http://h:4318/v1/traces", "metrics") == "http://h:4318/v1/metrics"
+    assert _signal_endpoint("http://h:4318/v1/traces", "logs") == "http://h:4318/v1/logs"
+    assert _signal_endpoint("", "metrics") == ""  # unset stays unset (exporter uses its own default)
+
+
+def test_configure_exports_metrics() -> None:
+    from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+
+    reader = InMemoryMetricReader()
+    result = configure(metric_reader=reader)  # metrics-only setup (override forces it)
+    assert result is not None and result.meter_provider is not None
+
+    result.meter_provider.get_meter("test").create_counter("orders").add(3)
+    data = reader.get_metrics_data()  # triggers collection
+    metric_names = [
+        m.name
+        for rm in data.resource_metrics
+        for sm in rm.scope_metrics
+        for m in sm.metrics
+    ]
+    assert "orders" in metric_names
+
+
+def test_configure_exports_logs() -> None:
+    import logging
+
+    from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
+
+    exporter = InMemoryLogRecordExporter()
+    result = configure(log_exporter=exporter)  # logs-only setup; auto-attaches a root handler
+    assert result is not None and result.logger_provider is not None
+
+    # Emit through stdlib logging — configure() attached the OTel handler to the root logger,
+    # so records propagate to it and export (the real production behavior).
+    log = logging.getLogger("arvel.telemetry.logtest")
+    log.setLevel(logging.INFO)
+    log.info("checkout-complete")
+    result.logger_provider.force_flush()
+
+    bodies = [r.log_record.body for r in exporter.get_finished_logs()]
+    assert "checkout-complete" in bodies
+
+
+def test_metric_reader_and_log_exporter_select_from_config() -> None:
+    from opentelemetry.sdk._logs.export import ConsoleLogRecordExporter
+    from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+
+    from arvel.telemetry import _build_log_exporter, _build_metric_reader
+
+    mem = TelemetrySettings()
+    mem.exporter = "memory"
+    assert isinstance(_build_metric_reader(mem), InMemoryMetricReader)
+
+    console = TelemetrySettings()
+    console.exporter = "console"
+    assert isinstance(_build_log_exporter(console), ConsoleLogRecordExporter)
 
 
 def test_tracer_helper_returns_a_usable_tracer() -> None:

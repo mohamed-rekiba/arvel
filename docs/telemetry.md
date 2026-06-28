@@ -1,9 +1,10 @@
 # Telemetry
 
-arvel ships first-class **OpenTelemetry** tracing. You point it at any **OTLP** backend — Grafana
-(Tempo/Alloy), the OpenTelemetry Collector, Jaeger, Honeycomb — and arvel exports spans there. There's
-no vendor lock-in and no proprietary agent: it's the open OTLP wire format, so you choose (and change)
-the backend in config.
+arvel ships first-class **OpenTelemetry** for all three signals — **traces, metrics, and logs**. You
+point it at any **OTLP** backend — Grafana (Tempo for traces · Mimir/Prometheus for metrics · Loki for
+logs), the OpenTelemetry Collector, Jaeger, Honeycomb — and arvel exports there. There's no vendor
+lock-in and no proprietary agent: it's the open OTLP wire format, so you choose (and change) the
+backend in config. Each signal can be toggled independently.
 
 Telemetry is **off by default** and costs nothing until you turn it on — `opentelemetry` is only
 imported when enabled, so a default app stays light.
@@ -55,12 +56,48 @@ with tracer().start_as_current_span("checkout") as span:
 Spans are exported through whichever exporter you configured — the same code runs in dev (console)
 and production (OTLP → Grafana).
 
+## Metrics
+
+Use the `meter()` helper to record metrics — counters, histograms, gauges:
+
+```python
+from arvel.telemetry import meter
+
+orders = meter().create_counter("orders.placed")
+orders.add(1, {"plan": "pro"})
+```
+
+Metrics are exported on an interval to your OTLP backend (Grafana Mimir/Prometheus, …) via the same
+`endpoint` — the `/v1/metrics` path is derived automatically.
+
+## Logs
+
+When telemetry is on, arvel attaches an OpenTelemetry handler to Python's logging, so your log records
+are exported over OTLP (to Grafana Loki, …) **with trace context attached** — click from a span to its
+logs. Just log as usual:
+
+```python
+import logging
+
+logging.getLogger("app").info("checkout complete", extra={"order_id": order.id})
+```
+
+## Choosing signals
+
+All three signals are on by default when telemetry is enabled. Turn any off in config:
+
+```python
+config = {"enabled": True, "endpoint": "...", "metrics": False, "logs": False}  # traces only
+```
+
 ## Sending to Grafana
 
 Run a collector that accepts OTLP and forwards to Grafana's stores, then set `endpoint` to it:
 
 ```
-your app ──OTLP/HTTP──▶ Grafana Alloy / OTel Collector ──▶ Tempo (traces) ──▶ Grafana
+                              ┌─▶ Tempo  (traces)  ┐
+your app ─OTLP/HTTP─▶ Alloy / ─┼─▶ Mimir  (metrics) ┼─▶ Grafana
+            Collector         └─▶ Loki   (logs)    ┘
 ```
 
 ```bash
@@ -68,6 +105,7 @@ OTEL_ENABLED=true
 OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318/v1/traces
 ```
 
+You set the **traces** endpoint; arvel derives the sibling `/v1/metrics` and `/v1/logs` paths from it.
 Any OTLP-compatible pipeline works the same way — swap the endpoint to change backends.
 
 ## Errors → Sentry
