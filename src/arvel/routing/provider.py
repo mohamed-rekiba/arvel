@@ -9,9 +9,10 @@ from arvel.routing import Router
 
 if TYPE_CHECKING:
     from arvel.contracts import Container
+    from arvel.kernel.application import Application
 
 
-def _build_served_asgi(app: Container) -> object:
+def _build_served_asgi(app: Application) -> object:
     """Compile the served ASGI app. Lives here (routing→http is a legal downward edge)
     so ``Application.as_asgi`` can resolve it from the container rather than importing
     ``arvel.http`` directly — ``kernel→http`` would violate the boundary (DR-0026)."""
