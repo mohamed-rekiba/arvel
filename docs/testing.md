@@ -108,6 +108,11 @@ Run it with `make test-integration` (or `pytest -m integration`). It covers Post
 executed end to end), and **OpenTelemetry** export to a live OTLP collector. These catch what fakes
 can't — e.g. cross-dialect DDL, broker serialization, and real wire protocols.
 
+It also includes a **reference app** (`test_reference_app.py`): a small project/task API — token auth,
+validated CRUD, pagination, a model relationship, and a queued job — assembled through the production
+fluent bootstrap and driven over HTTP against live PostgreSQL + Redis + RabbitMQ at once, proving the
+features *compose* on real infrastructure, not just in isolation.
+
 ## Common mistakes & gotchas
 
 - **Leaking a fake or a frozen clock.** Always `reset_fakes()` and `Date.set_test_now(None)` in
