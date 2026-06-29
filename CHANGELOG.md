@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.47.0](https://github.com/mohamed-rekiba/arvel/compare/v0.46.2...v0.47.0) (2026-06-29)
+
+
+### Features
+
+* **console:** make:event, make:listener, make:cast generators ([e26beac](https://github.com/mohamed-rekiba/arvel/commit/e26beacb8bd257b244891c48e70106b15033bf72))
+* **database:** model observers + fix queued binary attachments over a real broker ([6ec8e7d](https://github.com/mohamed-rekiba/arvel/commit/6ec8e7d0f99547296a76164c8cc21cc8fbbbc7e1))
+* **http:** HTML form method-spoofing (Laravel [@method](https://github.com/method)) ([81b1a1f](https://github.com/mohamed-rekiba/arvel/commit/81b1a1fce9021e09f5e0025715183792be1878f9))
+* multipart [@method](https://github.com/method), per-app manager config, richer reference app ([d7e29c4](https://github.com/mohamed-rekiba/arvel/commit/d7e29c4cbf7a8672e2b6d0f26fc27498990f428a))
+* **routing:** signed-URL key defaults to app key + ValidateSignature (signed) middleware ([d447141](https://github.com/mohamed-rekiba/arvel/commit/d447141fb810df601e5f72f5466888974c51b989))
+* **scaffold:** ship cache/filesystems/mail config files (Laravel parity + discoverability) ([e77f04e](https://github.com/mohamed-rekiba/arvel/commit/e77f04e7cbd8e611f04b8abdd5a3f76b850d464a))
+* **views:** auth()/guest() template globals (Laravel @auth/[@guest](https://github.com/guest)) ([0858d2b](https://github.com/mohamed-rekiba/arvel/commit/0858d2bddcda84c86f1d8ec267bcc6b6a697e2ed))
+
+
+### Bug Fixes
+
+* **mail,notifications:** queued mailables/notifications survive a real broker ([da9c9de](https://github.com/mohamed-rekiba/arvel/commit/da9c9de18b4d0448b5a8463e909d5ba2fa3f29af))
+
+
+### Refactors
+
+* **queue:** QueueManager is now a Manager subclass ([3a9bb14](https://github.com/mohamed-rekiba/arvel/commit/3a9bb142309447f2c7557092d85cb28722ca3a25))
+
 ## [0.46.2](https://github.com/mohamed-rekiba/arvel/compare/v0.46.1...v0.46.2) (2026-06-29)
 
 
