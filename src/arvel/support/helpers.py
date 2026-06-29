@@ -385,18 +385,21 @@ class Arr:
 
 def cache() -> Any:
     """The default cache driver, so you ``await cache().get("k")`` / ``await cache().put("k", v)``
-    instead of building ``CacheManager().driver()`` by hand. Mirrors :func:`config`: resolves the
-    app-bound ``CacheManager`` (or a default one when unbound).
+    instead of building ``CacheManager().driver()`` by hand. Resolves the app-bound ``CacheManager``
+    from the container.
 
     Imported as ``from arvel.support import cache`` — the bare top-level name ``arvel.cache`` is the
     cache *package*, so the helper lives here to avoid shadowing it.
+
+    Requires a booted application with the ``CacheServiceProvider`` registered. ``support`` is a leaf
+    that must not import the ``cache`` capability (DR-0026), so there is no app-less fallback — the
+    cache is reached only through the container.
     """
     from arvel.kernel.globals import app, has_application
 
-    if has_application() and app().bound("cache"):
-        manager: Any = app().make("cache")
-    else:
-        from arvel.cache import CacheManager
-
-        manager = CacheManager()
-    return manager.driver()
+    if not (has_application() and app().bound("cache")):
+        raise RuntimeError(
+            "cache() requires a booted application with the CacheServiceProvider registered. "
+            "Build the cache directly (arvel.cache.CacheManager) outside an application context."
+        )
+    return app().make("cache").driver()
