@@ -49,6 +49,14 @@ async def test_form_post_is_routed_as_the_spoofed_method() -> None:
             assert (await c.post("/items/5", json={"_method": "PUT"})).status_code == 405
             # a real PUT still routes normally
             assert (await c.put("/items/5")).status_code == 200
+
+            # multipart/form-data (file-upload form) is spoofed too — the _method part is read
+            multipart = await c.post(
+                "/items/7",
+                data={"_method": "PUT", "name": "x"},
+                files={"avatar": ("a.txt", b"file-bytes", "text/plain")},
+            )
+            assert multipart.status_code == 200 and multipart.json() == {"verb": "PUT", "id": 7}
     finally:
         set_application(None)
 

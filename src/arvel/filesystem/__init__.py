@@ -90,14 +90,16 @@ class FilesystemManager(Manager):
     """Resolves storage disks (fsspec filesystems) by config; ``disk()`` aliases ``driver()``."""
 
     def default_driver(self) -> str:
-        return FilesystemSettings().default  # auto-loads + validates config("filesystems")
+        return self._settings(
+            FilesystemSettings
+        ).default  # auto-loads + validates config("filesystems")
 
     def disk(self, name: str | None = None) -> Filesystem:
         disk: Filesystem = self.driver(name)
         return disk
 
     def _disk_config(self, name: str) -> dict[str, Any]:
-        return FilesystemSettings().disks.get(name, {})
+        return self._settings(FilesystemSettings).disks.get(name, {})
 
     def create_local_driver(self) -> Filesystem:
         root = self._disk_config("local").get("root", "")

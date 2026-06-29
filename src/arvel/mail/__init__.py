@@ -262,7 +262,7 @@ class MailManager(Manager):
     """Resolves mail transports by config; ``to()`` opens a pending send."""
 
     def default_driver(self) -> str:
-        return MailSettings().default  # auto-loads + validates config("mail")
+        return self._settings(MailSettings).default  # auto-loads + validates config("mail")
 
     def transport(self, name: str | None = None) -> Any:
         return self.driver(name)
@@ -274,7 +274,7 @@ class MailManager(Manager):
         return LogTransport()
 
     def create_smtp_driver(self) -> SmtpTransport:
-        return SmtpTransport(MailSettings().smtp)
+        return SmtpTransport(self._settings(MailSettings).smtp)
 
 
 __all__ = [

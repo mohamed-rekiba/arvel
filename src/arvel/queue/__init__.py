@@ -342,7 +342,13 @@ class QueueManager:
         # An explicit broker (passed to __init__) wins; otherwise build from the `queue` config
         # (memory by default, so no app/config still yields an InMemoryBroker — see _build_broker).
         if self._broker is None:
-            self._broker = _build_broker(QueueSettings())
+            # read THIS manager's app config when set (so QueueManager(app) honors app's queue
+            # config), else the global config — see Manager._settings for the same pattern.
+            if self.app is not None and hasattr(self.app, "config"):
+                settings = QueueSettings.from_source(self.app.config("queue"))
+            else:
+                settings = QueueSettings()
+            self._broker = _build_broker(settings)
         return self._broker
 
     async def _invoke(self, job: Job) -> Any:

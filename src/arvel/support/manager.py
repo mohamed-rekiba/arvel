@@ -9,7 +9,12 @@ Grounded in knowledge/port/16-managers.md.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from arvel.kernel.settings import Settings
+
+_S = TypeVar("_S", bound="Settings")
 
 
 class MissingExtraError(RuntimeError):
@@ -29,6 +34,17 @@ class Manager:
 
     def default_driver(self) -> str:
         raise NotImplementedError(f"{type(self).__name__} must define default_driver()")
+
+    def _settings(self, settings_cls: type[_S]) -> _S:
+        """Construct a typed ``Settings`` reading from THIS manager's ``app`` config — so
+        ``Manager(some_app)`` honors *that* app's config section, not just the global one. Falls back
+        to the global config when the manager has no app (the common container-resolved case, where the
+        manager's app already *is* the global app, behaves identically either way)."""
+        app = self.app
+        key = getattr(settings_cls, "__config_key__", None)
+        if app is not None and key is not None and hasattr(app, "config"):
+            return settings_cls.from_source(app.config(key))
+        return settings_cls()
 
     def driver(self, name: str | None = None) -> Any:
         name = name or self.default_driver()

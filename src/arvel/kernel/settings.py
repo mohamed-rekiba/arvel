@@ -27,9 +27,13 @@ kwargs. ``.env`` files feed ``os.environ`` via ``load_dotenv`` (read by config f
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 import msgspec
+
+# Sentinel: distinguishes "no _config_source given" (read the global config) from an explicit source
+# of ``None``/``{}`` (a specific app whose section is unset → use defaults, not the global config).
+_NO_CONFIG_SOURCE = object()
 
 
 class _SettingsMeta(msgspec.StructMeta):
@@ -54,13 +58,20 @@ class _SettingsMeta(msgspec.StructMeta):
             from arvel.kernel.globals import has_application
 
             data: dict[str, object] = {}
-            key = getattr(cls, "__config_key__", None)
-            if key is not None and has_application():
-                from arvel.kernel.config import config
+            # `_config_source` (when supplied) overrides the global config — a specific app's section,
+            # passed by Manager._settings so Manager(app) honors *that* app's config, not the global.
+            source = overrides.pop("_config_source", _NO_CONFIG_SOURCE)
+            if source is not _NO_CONFIG_SOURCE:
+                if isinstance(source, Mapping):
+                    data = dict(source)
+            else:
+                key = getattr(cls, "__config_key__", None)
+                if key is not None and has_application():
+                    from arvel.kernel.config import config
 
-                section = config(key)
-                if isinstance(section, Mapping):
-                    data = dict(section)
+                    section = config(key)
+                    if isinstance(section, Mapping):
+                        data = dict(section)
             data.update(overrides)  # explicit kwargs win over the config section
             return msgspec.convert(data, cls, strict=False)
 
@@ -72,6 +83,15 @@ class Settings(msgspec.Struct, metaclass=_SettingsMeta):
     it (see the module docstring)."""
 
     __config_key__: ClassVar[str | None] = None
+
+    @classmethod
+    def from_source(cls, source: Any) -> Self:
+        """Build the settings from an explicit config ``source`` (a section mapping) instead of the
+        global ``config()`` — used by ``Manager(app)`` so it reads *that* app's section. ``None`` ⇒
+        an empty section (defaults apply)."""
+        # the metaclass consumes ``_config_source``; pass it via **dict so it isn't type-checked
+        # against the (synthesized) struct __init__ signature.
+        return cls(**{"_config_source": source if source is not None else {}})
 
 
 def load_dotenv(path: str | os.PathLike[str]) -> None:

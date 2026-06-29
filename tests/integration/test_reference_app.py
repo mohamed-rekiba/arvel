@@ -22,6 +22,7 @@ import sqlalchemy as sa
 from arvel import Application, Cache, Model, Route, Schema, abort
 from arvel.auth import Authenticatable
 from arvel.auth.tokens import ApiToken, TokenGuard, create_token
+from arvel.database import SoftDeletes
 from arvel.kernel import set_application
 from arvel.kernel.bootstrap import bootstrap_app
 from arvel.queue import Job
@@ -50,11 +51,21 @@ class RefProject(Model):
         return self.has_many(RefTask, foreign_key="project_id")
 
 
-class RefTask(Model):
+class RefTask(
+    Model, SoftDeletes
+):  # SoftDeletes: delete() stamps deleted_at; default queries hide it
     __table_name__ = "ref_tasks"
     __fields__: ClassVar = {"title": str, "done": bool, "project_id": int}
     __fillable__: ClassVar = ["title", "done", "project_id"]
     __timestamps__ = True
+
+
+class RefTaskObserver:
+    """A model observer: bumps a Redis counter whenever a task is saved (proving observers compose on
+    real infra — the dispatcher fires, the handler hits the real cache)."""
+
+    async def saved(self, task: Any) -> None:
+        await Cache.increment("ref_tasks_observed")
 
 
 class RefTaskCreatedJob(Job):
@@ -166,6 +177,7 @@ async def test_reference_app_end_to_end(
         for model in (RefUser, RefProject, RefTask, ApiToken):
             model.set_connection(db)
             await db.execute(sa.schema.CreateTable(model.__table__))
+        RefTask.observe(RefTaskObserver())  # wire the observer to RefTask's lifecycle events
         await RefUser.create(name="Ada", email="ada@example.com", password="secret123")
 
         transport = httpx.ASGITransport(app=app.as_asgi())
@@ -202,6 +214,21 @@ async def test_reference_app_end_to_end(
             shown = (await c.get("/projects/1", headers=h)).json()
             assert shown["tasks"] == ["T1", "T2"]
             assert (await c.get("/projects/999", headers=h)).status_code == 404
+
+        # the observer fired on each task save (synchronously, in-request) → Redis counter == 2
+        assert int(await Cache.get("ref_tasks_observed", 0)) == 2
+
+        # eager-loading (with_) batches the relation — 2 tasks loaded, no N+1
+        loaded = await RefProject.with_("tasks").where("id", "=", 1).first()
+        assert loaded is not None
+        assert sorted(t.title for t in await loaded.tasks().get()) == ["T1", "T2"]
+
+        # soft deletes: delete() hides the row from default queries but with_trashed() still finds it
+        task = await RefTask.where("title", "=", "T1").first()
+        assert task is not None
+        await task.delete()
+        assert await RefTask.where("title", "=", "T1").first() is None  # hidden
+        assert await RefTask.with_trashed().where("title", "=", "T1").first() is not None  # soft
 
         # the two task-create jobs travelled through RabbitMQ; their handler bumped the Redis counter
         worker = asyncio.create_task(app.make("queue").work(release_interval=0.2))

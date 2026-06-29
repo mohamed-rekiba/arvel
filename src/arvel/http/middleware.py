@@ -471,17 +471,48 @@ class ValidateSignature(Middleware):
         return await call_next(request)
 
 
+def _multipart_field(ctype: str, body: bytes, field: str) -> str:
+    """Pull one text field's value out of a ``multipart/form-data`` body without fully parsing it
+    (used only to read ``_method``). Returns "" if the boundary/field isn't found."""
+    marker = "boundary="
+    at = ctype.find(marker)
+    if at == -1:
+        return ""
+    boundary = ctype[at + len(marker) :].split(";")[0].strip().strip('"')
+    delimiter = b"--" + boundary.encode("latin-1")
+    needle = f'name="{field}"'.encode("latin-1")  # the closing quote disambiguates "_method2" etc.
+    for part in body.split(delimiter):
+        if needle not in part:
+            continue
+        sep = part.find(b"\r\n\r\n")
+        if sep != -1:
+            return part[sep + 4 :].rstrip(b"\r\n").decode("latin-1", "ignore")
+    return ""
+
+
+def _form_method_override(ctype: str, body: bytes) -> str:
+    """The ``_method`` value from a form body (urlencoded or multipart), uppercased; "" if absent."""
+    from urllib.parse import parse_qs
+
+    if ctype.startswith("application/x-www-form-urlencoded"):
+        return (parse_qs(body.decode("latin-1")).get("_method") or [""])[0].upper()
+    if ctype.startswith("multipart/form-data"):
+        return _multipart_field(ctype, body, "_method").upper()
+    return ""
+
+
 class MethodOverride:
     """ASGI middleware for HTML form method-spoofing (Laravel ``@method``): a POST whose form body
     carries ``_method=PUT|PATCH|DELETE`` is **routed as that method**.
 
     It runs at the ASGI layer — *before* the router matches by HTTP method — so it rewrites
     ``scope["method"]`` and replays the buffered body downstream (HTML forms can only GET/POST, so
-    this is how a ``<form method=post>`` reaches a PUT/PATCH/DELETE route). Only
-    ``application/x-www-form-urlencoded`` bodies are inspected; everything else passes through
-    untouched. Pair with the ``method_field()`` view global."""
+    this is how a ``<form method=post>`` reaches a PUT/PATCH/DELETE route). Both
+    ``application/x-www-form-urlencoded`` and ``multipart/form-data`` (file-upload) bodies are
+    inspected; everything else passes through untouched. Pair with the ``method_field()`` view global."""
 
     _SPOOFABLE = frozenset({"PUT", "PATCH", "DELETE"})
+    _FORM_TYPES = ("application/x-www-form-urlencoded", "multipart/form-data")
 
     def __init__(self, app: Any) -> None:
         self.app = app
@@ -492,7 +523,7 @@ class MethodOverride:
             return
         headers = dict(scope.get("headers") or [])
         ctype = headers.get(b"content-type", b"").decode("latin-1").lower()
-        if not ctype.startswith("application/x-www-form-urlencoded"):
+        if not ctype.startswith(self._FORM_TYPES):
             await self.app(scope, receive, send)
             return
 
@@ -509,9 +540,7 @@ class MethodOverride:
             else:
                 more = False
 
-        from urllib.parse import parse_qs
-
-        override = (parse_qs(body.decode("latin-1")).get("_method") or [""])[0].upper()
+        override = _form_method_override(ctype, body)
         if override in self._SPOOFABLE:
             scope = {**scope, "method": override}
 

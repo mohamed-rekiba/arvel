@@ -91,7 +91,7 @@ class CacheManager(Manager):
     """Resolves cache drivers (cashews backends) by config."""
 
     def default_driver(self) -> str:
-        return CacheSettings().default  # auto-loads + validates config("cache")
+        return self._settings(CacheSettings).default  # auto-loads + validates config("cache")
 
     def _build(self, url: str) -> CacheRepository:
         from cashews import Cache
@@ -104,7 +104,7 @@ class CacheManager(Manager):
         return self._build("mem://")
 
     def create_redis_driver(self) -> CacheRepository:
-        return self._build(CacheSettings().url)
+        return self._build(self._settings(CacheSettings).url)
 
 
 _CACHE_MISS: Any = object()
