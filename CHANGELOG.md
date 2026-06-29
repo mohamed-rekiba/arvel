@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.44.0](https://github.com/mohamed-rekiba/arvel/compare/v0.43.1...v0.44.0) (2026-06-29)
+
+
+### Features
+
+* **telemetry:** auto-instrument cache + outbound HTTP, and propagate traces to queue jobs ([07a835f](https://github.com/mohamed-rekiba/arvel/commit/07a835f169551af7ba0bb1f3c2c5d549f0d816d4))
+
 ## [0.43.1](https://github.com/mohamed-rekiba/arvel/compare/v0.43.0...v0.43.1) (2026-06-29)
 
 
