@@ -222,11 +222,43 @@ include_external_packages = true
 exclude_type_checking_imports = true
 
 [[tool.importlinter.contracts]]
-name = "G1a — kernel imports only contracts + support (+ stdlib)"
-type = "forbidden"
-source_modules = ["arvel.kernel"]
-forbidden_modules = ["arvel.console"]
-# capability modules (http/database/cache/...) are added to this list as they land
+name = "G1 — module dependency DAG (layered, acyclic)"
+type = "layers"
+# The full module DAG as a topological order (highest first; a higher layer may import any
+# lower one, never the reverse). Each module is its own layer, so this forbids EVERY back-edge —
+# i.e. it mechanically enforces "no module cycles" + the dependency direction of DR-0003/DR-0026.
+# Consequences it locks in: `kernel` imports only `contracts`; `support` imports nothing above it
+# (no capability); cross-capability behaviour goes through a contract resolved from the container,
+# never a sibling import. `ignore_imports` is intentionally EMPTY — a new back-edge is a red build.
+layers = [
+  "arvel.routing",
+  "arvel.views",
+  "arvel.notifications",
+  "arvel.mail",
+  "arvel.queue",
+  "arvel.console",
+  "arvel.auth",
+  "arvel.http",
+  "arvel.validation",
+  "arvel.testing",
+  "arvel.media",
+  "arvel.activitylog",
+  "arvel.database",
+  "arvel.client",
+  "arvel.cache",
+  "arvel.telemetry",
+  "arvel.search",
+  "arvel.pagination",
+  "arvel.filesystem",
+  "arvel.broadcasting",
+  "arvel.support",
+  "arvel.security",
+  "arvel.dates",
+  "arvel.localization",
+  "arvel.events",
+  "arvel.kernel",
+  "arvel.contracts",
+]
 
 [[tool.importlinter.contracts]]
 name = "G2 — light core imports no heavy libs (startup NFR)"
@@ -252,10 +284,4 @@ forbidden_modules = [
   "PIL",
   "pydantic",
   "rich",
-]
-ignore_imports = [
-  # Application.as_asgi() is the serve entry-point: it builds the HTTP kernel only
-  # when you actually serve. It stays light at `import arvel` (proven by the
-  # importtime NFR test, tests/test_startup.py) — this static edge is unavoidable.
-  "arvel.kernel.application -> arvel.http",
 ]
