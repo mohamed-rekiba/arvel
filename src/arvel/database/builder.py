@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Sequence
 
     from arvel.database.connections import ConnectionResolver, WriteResult
+    from arvel.pagination import LengthAwarePaginator, Paginator
 
 _COMPARISONS = {
     "=": "__eq__",
@@ -656,14 +657,26 @@ class Builder:
     async def exists(self) -> bool:
         return await self.first() is not None
 
-    async def paginate(self, per_page: int = 15, page: int = 1) -> dict[str, Any]:
+    async def paginate(self, per_page: int = 15, page: int | None = None) -> LengthAwarePaginator:
+        """A length-aware paginator (Laravel ``paginate``): runs a ``count`` for the grand total
+        so it can render a full numbered page list. ``page`` defaults to the current request's
+        ``?page=`` (1 outside a request)."""
+        from arvel.pagination import LengthAwarePaginator, resolve_current_page
+
+        if page is None:
+            page = resolve_current_page()
         total = await self.count()
         self.limit(per_page).offset((page - 1) * per_page)
         data = await self.get()
-        return {
-            "data": data,
-            "total": total,
-            "per_page": per_page,
-            "page": page,
-            "last_page": max(1, -(-total // per_page)),
-        }
+        return LengthAwarePaginator(data, total, per_page, page)
+
+    async def simple_paginate(self, per_page: int = 15, page: int | None = None) -> Paginator:
+        """A lean prev/next paginator (Laravel ``simplePaginate``): no ``count`` query — it fetches
+        one extra row to know whether a *next* page exists. ``page`` defaults to ``?page=``."""
+        from arvel.pagination import Paginator, resolve_current_page
+
+        if page is None:
+            page = resolve_current_page()
+        self.limit(per_page + 1).offset((page - 1) * per_page)
+        data = await self.get()
+        return Paginator(data, per_page, page)

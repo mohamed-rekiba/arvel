@@ -1,0 +1,440 @@
+"""arvel.pagination — Laravel-parity paginators.
+
+``Builder.paginate()`` returns a :class:`LengthAwarePaginator` (knows the grand
+``total`` → can render a full page-number list) and ``simple_paginate()`` returns a
+:class:`Paginator` (a lean prev/next pager that only fetches one extra row to know
+whether a *next* page exists). Both are **iterable** over their page of items, carry
+the Laravel accessor surface (``total``/``current_page``/``last_page``/…), serialize
+to Laravel's JSON shape via :meth:`to_dict`, and render an HTML page-link bar via
+:meth:`links` (a shipped Jinja template under the ``pagination`` view namespace).
+
+URL + current-page awareness mirrors Laravel's resolver pattern: the current request
+path and ``?page=`` are resolved lazily from the bound request (``current_request``),
+so a handler can simply ``await Post.paginate()`` and get correctly-linked pages.
+Outside a request the paginator degrades safely (path ``"/"``, page ``1``).
+
+Grounded in knowledge/laravel (Illuminate\\Pagination).
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+from urllib.parse import urlencode
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from arvel.support import Collection
+
+# --- per-request resolution (Laravel: Paginator::resolveCurrentPage/Path) ----------
+
+
+def resolve_current_page(page_name: str = "page", default: int = 1) -> int:
+    """The current page from the bound request's ``?<page_name>=`` (>= 1), else ``default``.
+
+    Degrades to ``default`` outside a request or on a non-positive/non-numeric value —
+    Laravel clamps a bad ``page`` to 1 rather than erroring."""
+    raw = _request_query(page_name)
+    if raw is None:
+        return default
+    try:
+        page = int(raw)
+    except TypeError, ValueError:
+        return default
+    return page if page >= 1 else default
+
+
+def resolve_current_path(default: str = "/") -> str:
+    """The bound request's path (no query string), else ``default`` outside a request."""
+    request = _current_request()
+    if request is None:
+        return default
+    try:
+        return request.path() or default
+    except Exception:  # pragma: no cover - defensive: a degenerate request object
+        return default
+
+
+def _current_request() -> Any:
+    from arvel.http.request import current_request
+
+    return current_request.get(None)
+
+
+def _request_query(key: str) -> Any:
+    request = _current_request()
+    if request is None:
+        return None
+    try:
+        return request.query(key)
+    except Exception:  # pragma: no cover - defensive
+        return None
+
+
+def _request_query_string(exclude: str) -> dict[str, Any]:
+    """All current query params except ``exclude`` (the page key) — for ``with_query_string``."""
+    request = _current_request()
+    if request is None:
+        return {}
+    params = getattr(getattr(request, "raw", None), "query_params", None)
+    if params is None:
+        return {}
+    try:
+        return {k: v for k, v in params.items() if k != exclude}
+    except Exception:  # pragma: no cover - defensive
+        return {}
+
+
+def _serialize(item: Any) -> Any:
+    """Laravel ``toArray`` parity for a page item: models → ``to_dict()``, else pass through."""
+    to_dict = getattr(item, "to_dict", None)
+    return to_dict() if callable(to_dict) else item
+
+
+# --- base ---------------------------------------------------------------------------
+
+
+class AbstractPaginator:
+    """Shared paginator behavior: items, URL building, request-aware links + render."""
+
+    def __init__(
+        self,
+        items: list[Any],
+        per_page: int,
+        current_page: int | None,
+        *,
+        path: str | None = None,
+        query: dict[str, Any] | None = None,
+        fragment: str | None = None,
+        page_name: str = "page",
+    ) -> None:
+        self._items = list(items)
+        self._per_page = per_page
+        self._page_name = page_name
+        self._current_page = (
+            current_page if current_page is not None else resolve_current_page(page_name)
+        )
+        self._path = (path if path is not None else resolve_current_path()).rstrip("/") or "/"
+        self._query: dict[str, Any] = dict(query) if query else {}
+        self._fragment = fragment
+        self._on_each_side = 3
+
+    # -- items -----------------------------------------------------------------------
+    def items(self) -> Collection[Any]:
+        from arvel.support import Collection
+
+        return Collection(self._items)
+
+    def count(self) -> int:
+        """Items on the current page."""
+        return len(self._items)
+
+    def per_page(self) -> int:
+        return self._per_page
+
+    def current_page(self) -> int:
+        return self._current_page
+
+    def is_empty(self) -> bool:
+        return len(self._items) == 0
+
+    def is_not_empty(self) -> bool:
+        return not self.is_empty()
+
+    def first_item(self) -> int | None:
+        """1-based index of the first item on this page (Laravel ``from``), or None if empty."""
+        if not self._items:
+            return None
+        return (self._current_page - 1) * self._per_page + 1
+
+    def last_item(self) -> int | None:
+        """1-based index of the last item on this page (Laravel ``to``), or None if empty."""
+        if not self._items:
+            return None
+        return (self._current_page - 1) * self._per_page + len(self._items)
+
+    def on_first_page(self) -> bool:
+        return self._current_page <= 1
+
+    # -- iteration -------------------------------------------------------------------
+    def __iter__(self) -> Iterator[Any]:
+        return iter(self._items)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+    def __getitem__(self, index: Any) -> Any:
+        return self._items[index]
+
+    # -- query string / fragment -----------------------------------------------------
+    def path(self) -> str:
+        return self._path
+
+    def get_page_name(self) -> str:
+        return self._page_name
+
+    def set_page_name(self, name: str) -> AbstractPaginator:
+        self._page_name = name
+        return self
+
+    def append(self, key: str, value: Any) -> AbstractPaginator:
+        """Append a single key/value to every page URL (Laravel ``appends``)."""
+        self._query[key] = value
+        return self
+
+    def appends(self, values: dict[str, Any]) -> AbstractPaginator:
+        """Append several key/values to every page URL."""
+        self._query.update(values)
+        return self
+
+    def with_query_string(self) -> AbstractPaginator:
+        """Carry the current request's query string onto every page URL (minus the page key)."""
+        self._query.update(_request_query_string(self._page_name))
+        return self
+
+    def fragment(self, value: str | None = None) -> Any:
+        """Get (no arg) or set (returns self) the URL ``#fragment`` appended to page URLs."""
+        if value is None:
+            return self._fragment
+        self._fragment = value
+        return self
+
+    def on_each_side(self, count: int) -> AbstractPaginator:
+        """Pages to show on each side of the current page in the link window (Laravel default 3)."""
+        self._on_each_side = count
+        return self
+
+    # -- urls ------------------------------------------------------------------------
+    def url(self, page: int) -> str:
+        """The URL for ``page`` — ``path?<page_name>=N&<appended>``, plus any fragment."""
+        if page <= 0:
+            page = 1
+        params = {**self._query, self._page_name: page}
+        query = urlencode(params)
+        fragment = f"#{self._fragment}" if self._fragment else ""
+        return f"{self._path}?{query}{fragment}"
+
+    def previous_page_url(self) -> str | None:
+        if self._current_page <= 1:
+            return None
+        return self.url(self._current_page - 1)
+
+    # -- rendering -------------------------------------------------------------------
+    async def render(self, view: str | None = None, data: dict[str, Any] | None = None) -> Any:
+        """Render the page-link bar to HTML (returns ``Markup``). Override ``view`` to use a
+        custom template; extra ``data`` is passed to it. Default templates live under the
+        ``pagination`` view namespace."""
+        from arvel.views import View
+
+        template = view or self._default_view
+        rendered = await View(template, {"paginator": self, **(data or {})}).render()
+        try:
+            from markupsafe import Markup
+
+            # The string is HTML produced by our own autoescaping Jinja environment (page numbers
+            # + urlencoded URLs are escaped at render time), so it's trusted output — mark it safe
+            # so a template's ``{{ links }}`` doesn't double-escape the tags.
+            return Markup(rendered)  # noqa: S704  # nosec B704 - trusted autoescaped Jinja output
+        except ImportError:  # pragma: no cover - markupsafe ships with jinja2
+            return rendered
+
+    async def links(self, view: str | None = None, data: dict[str, Any] | None = None) -> Any:
+        """Alias of :meth:`render` (Laravel ``$paginator->links()``)."""
+        return await self.render(view, data)
+
+    _default_view = "pagination::default.html"
+
+    # -- subclass contract -----------------------------------------------------------
+    def has_more_pages(self) -> bool:  # pragma: no cover - overridden
+        raise NotImplementedError
+
+    def next_page_url(self) -> str | None:  # pragma: no cover - overridden
+        raise NotImplementedError
+
+    def to_dict(self) -> dict[str, Any]:  # pragma: no cover - overridden
+        raise NotImplementedError
+
+
+# --- length-aware (knows the grand total) -------------------------------------------
+
+
+class LengthAwarePaginator(AbstractPaginator):
+    """A full paginator: knows ``total`` → ``last_page`` and a numbered page window."""
+
+    _default_view = "pagination::default.html"
+
+    def __init__(
+        self,
+        items: list[Any],
+        total: int,
+        per_page: int,
+        current_page: int | None = None,
+        *,
+        path: str | None = None,
+        query: dict[str, Any] | None = None,
+        fragment: str | None = None,
+        page_name: str = "page",
+    ) -> None:
+        super().__init__(
+            items,
+            per_page,
+            current_page,
+            path=path,
+            query=query,
+            fragment=fragment,
+            page_name=page_name,
+        )
+        self._total = total
+
+    def total(self) -> int:
+        return self._total
+
+    def last_page(self) -> int:
+        return max(1, -(-self._total // self._per_page))  # ceil division
+
+    def has_pages(self) -> bool:
+        return self._current_page != 1 or self.has_more_pages()
+
+    def has_more_pages(self) -> bool:
+        return self._current_page < self.last_page()
+
+    def next_page_url(self) -> str | None:
+        if not self.has_more_pages():
+            return None
+        return self.url(self._current_page + 1)
+
+    def elements(self) -> list[Any]:
+        """The page-link window: a list of ``{page: url}`` bands separated by ``"..."`` strings.
+
+        Mirrors Laravel's UrlWindow — a single band when there are few pages, otherwise a
+        first band, a slider around the current page, and a last band with separators."""
+        last = self.last_page()
+        window = self._on_each_side * 2
+
+        if last < window + 8:
+            return [self._url_range(1, last)]
+
+        if self._current_page <= window:
+            return [self._url_range(1, window + 2), "...", self._url_range(last - 1, last)]
+
+        if self._current_page > last - window:
+            return [self._url_range(1, 2), "...", self._url_range(last - (window + 2), last)]
+
+        return [
+            self._url_range(1, 2),
+            "...",
+            self._url_range(
+                self._current_page - self._on_each_side, self._current_page + self._on_each_side
+            ),
+            "...",
+            self._url_range(last - 1, last),
+        ]
+
+    def _url_range(self, start: int, end: int) -> dict[int, str]:
+        return {page: self.url(page) for page in range(start, end + 1)}
+
+    def _link_collection(self) -> list[dict[str, Any]]:
+        """Laravel's flat ``links`` JSON array: Previous, each page (with ``...`` placeholders),
+        then Next — each ``{url, label, active}``."""
+        links: list[dict[str, Any]] = [
+            {"url": self.previous_page_url(), "label": "&laquo; Previous", "active": False}
+        ]
+        for element in self.elements():
+            if isinstance(element, str):
+                links.append({"url": None, "label": element, "active": False})
+            else:
+                for page, url in element.items():
+                    links.append(
+                        {"url": url, "label": str(page), "active": page == self._current_page}
+                    )
+        links.append({"url": self.next_page_url(), "label": "Next &raquo;", "active": False})
+        return links
+
+    def to_dict(self) -> dict[str, Any]:
+        last = self.last_page()
+        return {
+            "current_page": self._current_page,
+            "data": [_serialize(item) for item in self._items],
+            "first_page_url": self.url(1),
+            "from": self.first_item(),
+            "last_page": last,
+            "last_page_url": self.url(last),
+            "links": self._link_collection(),
+            "next_page_url": self.next_page_url(),
+            "path": self._path,
+            "per_page": self._per_page,
+            "prev_page_url": self.previous_page_url(),
+            "to": self.last_item(),
+            "total": self._total,
+        }
+
+
+# --- simple (prev/next only) --------------------------------------------------------
+
+
+class Paginator(AbstractPaginator):
+    """A lean prev/next pager (Laravel ``simplePaginate``): no grand total, so no page count.
+
+    ``has_more`` is normally inferred by fetching one extra row (``per_page + 1``): if an extra
+    came back there *is* a next page and the extra is trimmed off."""
+
+    _default_view = "pagination::simple.html"
+
+    def __init__(
+        self,
+        items: list[Any],
+        per_page: int,
+        current_page: int | None = None,
+        *,
+        has_more: bool | None = None,
+        path: str | None = None,
+        query: dict[str, Any] | None = None,
+        fragment: str | None = None,
+        page_name: str = "page",
+    ) -> None:
+        if has_more is None:
+            has_more = len(items) > per_page
+            items = items[:per_page]
+        super().__init__(
+            items,
+            per_page,
+            current_page,
+            path=path,
+            query=query,
+            fragment=fragment,
+            page_name=page_name,
+        )
+        self._has_more = has_more
+
+    def has_pages(self) -> bool:
+        return not self.on_first_page() or self.has_more_pages()
+
+    def has_more_pages(self) -> bool:
+        return self._has_more
+
+    def next_page_url(self) -> str | None:
+        if not self._has_more:
+            return None
+        return self.url(self._current_page + 1)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "current_page": self._current_page,
+            "data": [_serialize(item) for item in self._items],
+            "first_page_url": self.url(1),
+            "from": self.first_item(),
+            "next_page_url": self.next_page_url(),
+            "path": self._path,
+            "per_page": self._per_page,
+            "prev_page_url": self.previous_page_url(),
+            "to": self.last_item(),
+        }
+
+
+__all__ = [
+    "AbstractPaginator",
+    "LengthAwarePaginator",
+    "Paginator",
+    "resolve_current_page",
+    "resolve_current_path",
+]

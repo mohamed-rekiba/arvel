@@ -66,9 +66,9 @@ async def test_paginate() -> None:
     db = await _setup()
     try:
         page = await Builder(nums, db).order_by("val").paginate(per_page=2, page=2)
-        assert page["per_page"] == 2
-        assert page["page"] == 2
-        assert len(page["data"]) == 2
-        assert page["total"] == 5
+        assert page.per_page() == 2
+        assert page.current_page() == 2
+        assert page.count() == 2
+        assert page.total() == 5
     finally:
         await db.dispose()

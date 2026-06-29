@@ -46,3 +46,32 @@ def test_none_return_is_a_response() -> None:
     kernel.get("/empty", lambda request: None)
     with TestClient(kernel.build()) as client:
         assert client.get("/empty").status_code in (200, 204)  # a real response, no crash
+
+
+def test_date_value_serializes_to_iso_string() -> None:
+    # an arvel Date (what a model's date column hydrates to) must encode to an ISO string in a
+    # response, not raise SerializationException — the canonical `return User::paginate()` path.
+    from arvel.dates import Date
+
+    when = Date.now()
+    kernel = HttpKernel()
+    kernel.get("/d", lambda request: {"at": when})
+    with TestClient(kernel.build()) as client:
+        r = client.get("/d")
+        assert r.status_code == 200
+        assert r.json() == {"at": when.to_iso()}
+
+
+def test_paginator_return_serializes_to_laravel_shape() -> None:
+    from arvel.pagination import LengthAwarePaginator
+
+    def handler(request: Any) -> Any:
+        return LengthAwarePaginator([{"id": 1}, {"id": 2}], total=5, per_page=2, current_page=1)
+
+    kernel = HttpKernel()
+    kernel.get("/items", handler)
+    with TestClient(kernel.build()) as client:
+        d = client.get("/items").json()
+    assert d["total"] == 5 and d["last_page"] == 3 and d["per_page"] == 2
+    assert d["data"] == [{"id": 1}, {"id": 2}]
+    assert d["current_page"] == 1 and d["next_page_url"].endswith("page=2")

@@ -72,6 +72,8 @@ _LAZY: dict[str, tuple[str, str]] = {
     "today": ("arvel.dates", "today"),
     "trans": ("arvel.localization", "trans"),
     "trans_choice": ("arvel.localization", "trans_choice"),
+    "LengthAwarePaginator": ("arvel.pagination", "LengthAwarePaginator"),
+    "Paginator": ("arvel.pagination", "Paginator"),
 }
 
 # Kept static (pyright requires a literal) and in sync with _LAZY.
@@ -97,12 +99,14 @@ __all__ = [
     "Image",
     "Job",
     "Lang",
+    "LengthAwarePaginator",
     "Log",
     "Mail",
     "Mailable",
     "Model",
     "Notifiable",
     "Notification",
+    "Paginator",
     "Queue",
     "Route",
     "Schedule",
@@ -167,6 +171,7 @@ if TYPE_CHECKING:  # give type-checkers + IDEs the real symbols for the lazy sur
     from arvel.mail import Mailable
     from arvel.media import Image, Video
     from arvel.notifications import Notifiable, Notification
+    from arvel.pagination import LengthAwarePaginator, Paginator
     from arvel.queue import Job
     from arvel.support import Collection, Str
     from arvel.support.facades import (

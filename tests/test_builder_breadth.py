@@ -91,8 +91,8 @@ async def test_paginate() -> None:
     db = await _seed()
     try:
         result = await Builder(products, db).order_by("price").paginate(per_page=2, page=1)
-        assert result["total"] == 3
-        assert result["last_page"] == 2
-        assert len(result["data"]) == 2
+        assert result.total() == 3
+        assert result.last_page() == 2
+        assert result.count() == 2
     finally:
         await db.dispose()

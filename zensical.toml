@@ -38,6 +38,7 @@ nav = [
     ] },
     { "Middleware" = "middleware.md" },
     { "Validation" = "validation.md" },
+    { "Pagination" = "pagination.md" },
     { "Views" = "views.md" },
   ] },
   { "Architecture" = [

@@ -10,8 +10,12 @@ posts = await Post.where(published=True).order_by("-created_at").limit(10).get()
 one   = await Post.find(1)
 first = await Post.where("views", ">", 100).first()
 count = await Post.where(published=True).count()
-page  = await Post.paginate(per_page=20)
+page  = await Post.paginate(per_page=20)   # a LengthAwarePaginator — see Pagination
 ```
+
+`paginate()` returns a [paginator](../pagination.md) (iterable over the page of rows, with
+`total()`/`current_page()`/`last_page()` accessors, Laravel JSON shape, and `links()` HTML),
+not a plain dict.
 
 The builder carries the everyday Laravel query methods:
 

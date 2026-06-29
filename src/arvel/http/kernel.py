@@ -233,6 +233,7 @@ class HttpKernel:
         import litestar
         from litestar.handlers import HTTPRouteHandler
 
+        from arvel.dates import Date
         from arvel.http.exceptions import HttpException, render_exception
         from arvel.validation import ValidationException
 
@@ -247,6 +248,10 @@ class HttpKernel:
             route_handlers=handlers,
             cors_config=self._cors_config(),
             openapi_config=self._openapi_config(),
+            # Serialize the arvel Date value object to an ISO-8601 string in responses, so a handler
+            # can return a model (or a paginator of models) whose date columns hydrate to Date — the
+            # canonical Laravel ``return User::paginate()`` JSON path — without a SerializationException.
+            type_encoders={Date: lambda value: value.to_iso()},
             exception_handlers={
                 ValidationException: render_exception,
                 HttpException: render_exception,
@@ -642,6 +647,10 @@ class HttpKernel:
             return litestar.Response(
                 result.content, status_code=result.status, headers=result.headers
             )
+        from arvel.pagination import AbstractPaginator
+
+        if isinstance(result, AbstractPaginator):  # paginator → Laravel JSON shape (auto-serialize)
+            return cast("Any", litestar.Response(result.to_dict()))
         # plain dict/list/str/bytes/None → a Litestar Response; no explicit status_code so the
         # route's method-aware default still applies (e.g. POST → 201), and Litestar infers the
         # media type from the content.

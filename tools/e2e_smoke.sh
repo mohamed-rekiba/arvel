@@ -253,6 +253,73 @@ with TestClient(app=asgi_app) as client:
 print(f"   OpenAPI: title={doc['info']['title']!r}, schemas={sorted(schemas)}; POST /api/echo typed body OK")
 PY
 
+echo "== 8c. pagination: paginate() serves the Laravel JSON shape + links() renders HTML (real serve path) =="
+# add a JSON route returning a paginator (auto-serialized) and a web route rendering links()
+cat >> routes/api.py <<'PYEOF'
+
+
+async def users_page(request):
+    from app.models.user import User
+    return await User.paginate(per_page=2)
+
+
+Route.get("/users-page", users_page, name="api.users_page")
+PYEOF
+cat > resources/views/users_list.html <<'HTML'
+<!doctype html><html><body><ul>{% for u in users %}<li>{{ u.name }}</li>{% endfor %}</ul>{{ links }}</body></html>
+HTML
+cat >> routes/web.py <<'PYEOF'
+
+
+async def users_list(request):
+    from arvel import view
+    from app.models.user import User
+    page = await User.paginate(per_page=2)
+    links = await page.links()
+    return await view("users_list", {"users": page.items().all(), "links": links}).to_response()
+
+
+Route.get("/users", users_list, name="users.list")
+PYEOF
+python - <<'PY'
+import asyncio, sys
+sys.path.insert(0, ".")
+from bootstrap.app import create_app
+from arvel.kernel.bootstrap import bootstrap_app
+from app.models.user import User
+from litestar.testing import TestClient
+
+async def _seed():
+    app = create_app(); bootstrap_app(app); await app.boot()
+    for i in range(1, 6):  # 5 users → 3 pages at per_page 2
+        await User.create(name=f"PUser{i}", email=f"pu{i}@example.com", password="pw")
+asyncio.run(_seed())
+
+from asgi import asgi_app
+with TestClient(app=asgi_app) as client:
+    d = client.get("/api/users-page").json()
+    expected = {"current_page", "data", "first_page_url", "from", "last_page", "last_page_url",
+                "links", "next_page_url", "path", "per_page", "prev_page_url", "to", "total"}
+    assert set(d) == expected, f"paginator JSON shape drift: {sorted(d)}"
+    total = d["total"]
+    assert total >= 5 and d["per_page"] == 2, d  # >= the 5 we seeded (stage 7 may add a few)
+    assert d["last_page"] == -(-total // 2), d   # ceil(total / per_page)
+    assert d["current_page"] == 1 and d["from"] == 1 and d["to"] == 2, d
+    assert d["next_page_url"] == "/api/users-page?page=2" and d["prev_page_url"] is None, d
+    assert d["last_page_url"] == f"/api/users-page?page={d['last_page']}", d
+    # a date column (email_verified_at) hydrates to a Date → must serialize to an ISO string, not 500
+    assert all(not hasattr(u.get("email_verified_at"), "to_iso") for u in d["data"]), d
+    # ?page= is resolved from the request, and prev/next URLs reflect it
+    d2 = client.get("/api/users-page?page=2").json()
+    assert d2["current_page"] == 2 and d2["prev_page_url"] == "/api/users-page?page=1", d2
+    assert d2["next_page_url"] == "/api/users-page?page=3", d2
+    # links() renders an HTML page-link bar via the shipped pagination view namespace
+    html = client.get("/users").text
+    assert "<nav" in html and 'href="/users?page=2"' in html and "results" in html, html[:300]
+print(f"   pagination: GET /api/users-page -> Laravel JSON (total={total}, last_page={d['last_page']}); date col serialized; ?page=2 prev/next correct; /users renders links() HTML")
+PY
+echo "   pagination JSON + links() proven through the real serve path"
+
 echo "== 9. --auth scaffold: the bearer flow works (login -> token -> protected route) =="
 cd "$WORK"
 arvel new secured --auth >/dev/null
