@@ -31,7 +31,7 @@ async def _cannot(ability: str, *args: Any) -> bool:
 def _auth() -> Any:
     """Template ``auth()`` — the current authenticated user, or ``None`` (Laravel ``@auth``/``auth()``).
     ``{% if auth() %}Hi {{ auth().name }}{% endif %}``."""
-    from arvel.auth import current_user
+    from arvel.support import current_user
 
     return current_user.get()
 

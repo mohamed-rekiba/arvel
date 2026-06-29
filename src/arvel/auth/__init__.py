@@ -9,13 +9,14 @@ Grounded in knowledge/port/15-auth-authorization.md.
 
 from __future__ import annotations
 
-import contextvars
 from typing import TYPE_CHECKING, Any
 
 from arvel.auth.gate import AuthorizationError, Gate, GateResponse
 from arvel.auth.permissions import HasRoles, Permission, Role
 
-current_user: contextvars.ContextVar[Any] = contextvars.ContextVar("arvel_auth_user", default=None)
+# The current-principal ContextVar lives in the core ``support`` leaf so ``http`` can baseline/read
+# it without an illegal http→auth edge; auth re-exports it as its public ``current_user`` (DR-0026).
+from arvel.support import current_user
 
 
 def _gate() -> Gate:

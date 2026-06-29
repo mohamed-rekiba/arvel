@@ -510,7 +510,7 @@ class HttpKernel:
     ) -> Any:
         import contextlib
 
-        from arvel.auth import current_user
+        from arvel.support import current_user
 
         request = Request(litestar_request)
         token = current_request.set(request)

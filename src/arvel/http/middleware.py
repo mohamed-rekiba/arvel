@@ -305,7 +305,7 @@ class AuthenticateMiddleware(Middleware):
     async def handle(self, request: Any, call_next: Any) -> Any:
         import inspect
 
-        from arvel.auth import current_user
+        from arvel.support import current_user
         from arvel.kernel import app, has_application
 
         user = None
@@ -358,7 +358,7 @@ class LocaleMiddleware(Middleware):
 
     @staticmethod
     def _from_user() -> str | None:
-        from arvel.auth import current_user
+        from arvel.support import current_user
 
         user = current_user.get()
         if user is None:

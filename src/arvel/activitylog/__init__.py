@@ -95,7 +95,7 @@ class ActivityLogger:
     def _resolve_causer(self) -> Any:
         if self._causer is not None:
             return self._causer
-        from arvel.auth import current_user
+        from arvel.support import current_user
 
         return current_user.get()
 

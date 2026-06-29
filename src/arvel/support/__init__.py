@@ -6,11 +6,19 @@ python-slugify / python-ulid (all light). Laravel parity for Collection + Str.
 
 from __future__ import annotations
 
+import contextvars
 import functools
 import itertools
 import re
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import Any, cast
+
+#: The authenticated principal for the current request/async context. Lives in ``support``
+#: (a core leaf both ``auth`` and ``http`` import downward) so neither has to import the other:
+#: ``auth`` owns identity but stays import-light/core-installable, and ``http`` (the [http] extra)
+#: reads/baselines it without an illegal http→auth edge (DR-0026). Re-exported as
+#: ``arvel.auth.current_user`` and ``arvel.http.request.current_user`` for back-compat.
+current_user: contextvars.ContextVar[Any] = contextvars.ContextVar("arvel_user", default=None)
 
 import inflection
 from slugify import slugify as _slugify
@@ -626,6 +634,7 @@ __all__ = [
     "Arr",
     "Collection",
     "Currency",
+    "current_user",
     "LazyCollection",
     "Money",
     "Number",

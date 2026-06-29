@@ -11,7 +11,9 @@ import contextvars
 from typing import Any, cast
 
 current_request: contextvars.ContextVar[Request] = contextvars.ContextVar("arvel_request")
-current_user: contextvars.ContextVar[Any] = contextvars.ContextVar("arvel_user", default=None)
+# Re-exported from the core ``support`` leaf so http can read/baseline the principal without an
+# illegal http→auth edge; ``auth`` re-exports the same object as its public ``current_user`` (DR-0026).
+from arvel.support import current_user  # noqa: E402
 
 
 class Request:
