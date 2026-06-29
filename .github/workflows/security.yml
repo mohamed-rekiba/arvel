@@ -48,6 +48,8 @@ jobs:
         # - dangerous-annotations-usage: ORM internals writing __annotations__ for SQLAlchemy
         # - eval-detected: type annotation resolution mirroring typing.get_type_hints internals
         # - direct-use-of-jinja2: arvel view engine; autoescape is explicitly enabled
+        # - explicit-unescape-with-markup: Markup() wraps HTML already produced by arvel's own
+        #   autoescaping Jinja env (e.g. paginator links()) — trusted output, not external input
         run: >-
           semgrep scan --config=auto --error
           --exclude-rule python.lang.security.audit.non-literal-import.non-literal-import
@@ -55,6 +57,7 @@ jobs:
           --exclude-rule python.lang.security.audit.dangerous-annotations-usage.dangerous-annotations-usage
           --exclude-rule python.lang.security.audit.eval-detected.eval-detected
           --exclude-rule python.flask.security.xss.audit.direct-use-of-jinja2.direct-use-of-jinja2
+          --exclude-rule python.flask.security.xss.audit.explicit-unescape-with-markup.explicit-unescape-with-markup
         env:
           SEMGREP_RULES: "p/python p/security-audit p/owasp-top-ten"
 
