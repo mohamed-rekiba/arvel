@@ -98,6 +98,16 @@ The suite runs under `pytest` (async mode auto). The project's quality gate — 
 and `pyright` (strict), `import-linter`, `bandit`, the tests, and a line-coverage floor — is one
 command (`make check` / `./tools/validate.sh`), the same gate CI enforces.
 
+### Integration tests (real services)
+
+The unit suite uses fakes/SQLite; an opt-in **integration tier** exercises arvel against *real*
+infrastructure spun up on demand via [testcontainers](https://testcontainers.com) (needs Docker).
+Run it with `make test-integration` (or `pytest -m integration`). It covers PostgreSQL (+ pgvector),
+**MySQL** (the ORM + real `DATETIME` round-trips), Redis (cache/session/throttle), object storage
+(RustFS/S3 + Azurite), a real **AMQP broker** (RabbitMQ/LavinMQ — a job dispatched, consumed, and
+executed end to end), and **OpenTelemetry** export to a live OTLP collector. These catch what fakes
+can't — e.g. cross-dialect DDL, broker serialization, and real wire protocols.
+
 ## Common mistakes & gotchas
 
 - **Leaking a fake or a frozen clock.** Always `reset_fakes()` and `Date.set_test_now(None)` in

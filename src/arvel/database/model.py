@@ -39,6 +39,11 @@ def _sa_type(sa: Any, field_type: Any) -> Any:
         return sa.DateTime(timezone=True)
     if field_type is _datetime.date:
         return sa.Date()
+    if field_type is str:
+        # default to VARCHAR(255) — Laravel's default string length, matching Blueprint.string() — so
+        # the model table is portable to MySQL (which rejects length-less VARCHAR in DDL). Declare a
+        # sa.Text()/sa.String(n) in __fields__ for longer columns.
+        return sa.String(255)
     return getattr(sa, _PY_TO_SA.get(field_type, "String"))()
 
 
@@ -176,7 +181,8 @@ def _build_table(cls: type[Any]) -> Any:
     columns: list[Any] = []
     if pk not in cls.__fields__:
         if HasUuids in cls.__mro__ or HasUlids in cls.__mro__:
-            columns.append(sa.Column(pk, sa.String, primary_key=True))  # string id, no autoinc
+            # VARCHAR(255): a length-bearing string PK so the table is valid DDL on MySQL too
+            columns.append(sa.Column(pk, sa.String(255), primary_key=True))  # string id, no autoinc
         else:
             columns.append(sa.Column(pk, sa.Integer, primary_key=True, autoincrement=True))
     for field_name, field_type in cls.__fields__.items():

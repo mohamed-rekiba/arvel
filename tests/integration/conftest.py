@@ -135,3 +135,59 @@ def azurite_conn() -> Iterator[str]:
             "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;"
             f"AccountKey={key};BlobEndpoint=http://{host}:{port}/devstoreaccount1;"
         )
+
+
+@pytest.fixture(scope="session")
+def mysql_url() -> Iterator[str]:
+    """A throwaway MySQL-family server, yielded as an asyncmy URL; torn down after the session.
+
+    Defaults to MariaDB (MySQL wire-compatible — same ``asyncmy`` driver + ``mysql`` SQLAlchemy
+    dialect, so it exercises the identical MySQL code path). Override ``ARVEL_MYSQL_IMAGE`` to test
+    against ``mysql:8.4`` etc. where that image is available."""
+    import os
+
+    pytest.importorskip("testcontainers.mysql")
+    from testcontainers.mysql import MySqlContainer
+
+    image = os.environ.get("ARVEL_MYSQL_IMAGE", "mariadb:11.8.6")
+    with MySqlContainer(image, dialect="asyncmy") as mysql:
+        yield mysql.get_connection_url()
+
+
+@pytest.fixture(scope="session")
+def rabbitmq_url() -> Iterator[str]:
+    """A throwaway RabbitMQ (any AMQP broker — LavinMQ works the same); yields an ``amqp://`` URL.
+    Uses the generic container so no extra ``pika`` dependency is needed for readiness."""
+    from testcontainers.core.generic import DockerContainer
+    from testcontainers.core.wait_strategies import LogMessageWaitStrategy
+
+    container = (
+        DockerContainer("rabbitmq:4.3.0-management-alpine")
+        .with_exposed_ports(5672)
+        .waiting_for(LogMessageWaitStrategy("Server startup complete").with_startup_timeout(90))
+    )
+    with container:
+        host = container.get_container_host_ip()
+        port = container.get_exposed_port(5672)
+        yield f"amqp://guest:guest@{host}:{port}/"
+
+
+@pytest.fixture(scope="session")
+def otel_collector() -> Iterator[Any]:
+    """A throwaway OpenTelemetry Collector receiving OTLP/HTTP on 4318 and printing received signals
+    via the debug exporter; yields the container so a test can read its logs. Backend-agnostic — the
+    same OTLP push works against Grafana/Tempo/any OTLP endpoint."""
+    from pathlib import Path
+
+    from testcontainers.core.generic import DockerContainer
+    from testcontainers.core.wait_strategies import LogMessageWaitStrategy
+
+    config = str(Path(__file__).parent / "otelcol-config.yaml")
+    container = (
+        DockerContainer("otel/opentelemetry-collector-contrib:latest")
+        .with_exposed_ports(4318)
+        .with_volume_mapping(config, "/etc/otelcol-contrib/config.yaml")
+        .waiting_for(LogMessageWaitStrategy("Everything is ready").with_startup_timeout(60))
+    )
+    with container:
+        yield container
