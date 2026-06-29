@@ -305,8 +305,8 @@ class AuthenticateMiddleware(Middleware):
     async def handle(self, request: Any, call_next: Any) -> Any:
         import inspect
 
-        from arvel.support import current_user
         from arvel.kernel import app, has_application
+        from arvel.support import current_user
 
         user = None
         if has_application() and app().bound("user_resolver"):

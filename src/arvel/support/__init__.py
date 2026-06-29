@@ -13,13 +13,6 @@ import re
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import Any, cast
 
-#: The authenticated principal for the current request/async context. Lives in ``support``
-#: (a core leaf both ``auth`` and ``http`` import downward) so neither has to import the other:
-#: ``auth`` owns identity but stays import-light/core-installable, and ``http`` (the [http] extra)
-#: reads/baselines it without an illegal http→auth edge (DR-0026). Re-exported as
-#: ``arvel.auth.current_user`` and ``arvel.http.request.current_user`` for back-compat.
-current_user: contextvars.ContextVar[Any] = contextvars.ContextVar("arvel_user", default=None)
-
 import inflection
 from slugify import slugify as _slugify
 from ulid import ULID
@@ -43,6 +36,13 @@ from arvel.support.helpers import (
 from arvel.support.money import Currency, Money
 from arvel.support.number import Number
 from arvel.support.stringable import Stringable
+
+#: The authenticated principal for the current request/async context. Lives in ``support``
+#: (a core leaf both ``auth`` and ``http`` import downward) so neither has to import the other:
+#: ``auth`` owns identity but stays import-light/core-installable, and ``http`` (the [http] extra)
+#: reads/baselines it without an illegal http→auth edge (DR-0026). Re-exported as
+#: ``arvel.auth.current_user`` and ``arvel.http.request.current_user`` for back-compat.
+current_user: contextvars.ContextVar[Any] = contextvars.ContextVar("arvel_user", default=None)
 
 _UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -634,7 +634,6 @@ __all__ = [
     "Arr",
     "Collection",
     "Currency",
-    "current_user",
     "LazyCollection",
     "Money",
     "Number",
@@ -642,6 +641,7 @@ __all__ = [
     "Stringable",
     "blank",
     "cache",
+    "current_user",
     "data_get",
     "data_set",
     "filled",

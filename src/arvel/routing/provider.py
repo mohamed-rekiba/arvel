@@ -29,6 +29,7 @@ def _build_served_asgi(app: Container) -> object:
 class RoutingServiceProvider(ServiceProvider):
     def register(self) -> None:
         if not self.app.bound("router"):  # respect a router the app already provided
+
             def make_router(_app: Container) -> Router:
                 return Router()
 
