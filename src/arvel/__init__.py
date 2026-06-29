@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING
 
-__version__ = "0.44.1"  # x-release-please-version
+__version__ = "0.45.0"  # x-release-please-version
 
 # Public name -> (submodule, attribute). Resolved on first access by __getattr__,
 # so `from arvel import Date` imports arvel.dates only when Date is first used —
