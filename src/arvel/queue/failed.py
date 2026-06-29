@@ -10,6 +10,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, ClassVar
 
+import sqlalchemy as sa
+
 from arvel.database import HasUuids, Model
 
 
@@ -19,11 +21,12 @@ class FailedJob(HasUuids, Model):
 
     __table_name__ = "failed_jobs"
     # `failed_at` is a real DateTime column (DR-0023): the datetime cast stores/reads a real datetime
-    # (read back as a Date), matching the migration's DATETIME column.
-    __fields__: ClassVar[dict[str, type]] = {
+    # (read back as a Date), matching the migration's DATETIME column. `payload`/`exception` are TEXT
+    # (a serialized job / a full traceback both exceed VARCHAR(255)) — matching the migration.
+    __fields__: ClassVar[dict[str, Any]] = {
         "queue": str,
-        "payload": str,
-        "exception": str,
+        "payload": sa.Text(),
+        "exception": sa.Text(),
         "failed_at": datetime,
     }
     __fillable__: ClassVar[list[str]] = ["queue", "payload", "exception", "failed_at"]

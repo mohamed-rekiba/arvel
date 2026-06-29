@@ -20,6 +20,11 @@ t.timestamp("published_at").nullable()        # DateTime
 Cross-dialect types render natively where it matters (real `UNSIGNED` / `LONGTEXT` / `MEDIUMTEXT`
 on MySQL; portable equivalents elsewhere), so a ported Laravel migration runs unchanged.
 
+A model's own `__fields__` follow the same convention: a `str` field becomes `VARCHAR(255)`
+(Laravel's default string length) and a `datetime` field a real timezone-aware `DateTime` — so the
+table is valid DDL on **every** dialect, including MySQL (which rejects a length-less `VARCHAR`). For
+a longer column declare the type explicitly, e.g. `__fields__ = {"body": sa.Text()}`.
+
 
 ## Soft deletes, ids, pruning
 
