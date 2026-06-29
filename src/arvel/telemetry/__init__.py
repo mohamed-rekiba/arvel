@@ -36,6 +36,9 @@ class TelemetrySettings(Settings):
     traces: bool = True
     metrics: bool = True
     logs: bool = True
+    prometheus: bool = (
+        False  # metrics delivery: False = OTLP push; True = pull via a /metrics route
+    )
     sentry_dsn: str = ""
 
 
@@ -52,6 +55,9 @@ class Telemetry:
 # (and imports) on a request when tracing is off — checking this costs nothing.
 _tracing_enabled = False
 
+# Set true once configure() wires metrics — same idea, for the HTTP request-metrics path.
+_metrics_enabled = False
+
 # The OTel logging handler configure() builds — the structlog bridge feeds records to it directly.
 _otel_log_handler: Any = None
 
@@ -59,6 +65,11 @@ _otel_log_handler: Any = None
 def is_tracing_enabled() -> bool:
     """Whether :func:`configure` has set up tracing — a cheap gate that imports no opentelemetry."""
     return _tracing_enabled
+
+
+def is_metrics_enabled() -> bool:
+    """Whether :func:`configure` has set up metrics — a cheap gate that imports no opentelemetry."""
+    return _metrics_enabled
 
 
 def _signal_endpoint(endpoint: str, signal: str) -> str:
@@ -88,7 +99,12 @@ def _build_exporter(settings: TelemetrySettings) -> Any:
 
 
 def _build_metric_reader(settings: TelemetrySettings) -> Any:
-    """The OTel **metric** reader named by ``settings.exporter`` (lazy-imported)."""
+    """The OTel **metric** reader. ``prometheus`` → a pull reader (scraped at ``/metrics``); otherwise
+    the push reader named by ``settings.exporter`` (lazy-imported)."""
+    if settings.prometheus:
+        from opentelemetry.exporter.prometheus import PrometheusMetricReader
+
+        return PrometheusMetricReader()
     driver = settings.exporter
     if driver == "memory":
         from opentelemetry.sdk.metrics.export import InMemoryMetricReader
@@ -175,6 +191,8 @@ def configure(
         meter_provider = MeterProvider(resource=resource, metric_readers=[reader])
         metrics.set_meter_provider(meter_provider)
         result.meter_provider = meter_provider
+        global _metrics_enabled
+        _metrics_enabled = True
 
     if do_logs:
         import logging
@@ -220,6 +238,17 @@ def meter(name: str = "arvel") -> Any:
     from opentelemetry import metrics
 
     return metrics.get_meter(name)
+
+
+async def prometheus_metrics(request: Any = None) -> Any:
+    """Route handler for a Prometheus scrape endpoint — returns the current metrics in the exposition
+    format. ``TelemetryServiceProvider`` registers it at ``/metrics`` when ``telemetry.prometheus`` is
+    on (the ``PrometheusMetricReader`` exposes the OTel metrics through the prometheus_client registry)."""
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+    from arvel.http.response import Response
+
+    return Response(content=generate_latest(), headers={"content-type": CONTENT_TYPE_LATEST})
 
 
 # stdlib level per structlog method name, so the OTel handler maps severity correctly.
@@ -280,4 +309,13 @@ def instrument_logging() -> None:
     structlog.configure(processors=processors)
 
 
-__all__ = ["Telemetry", "TelemetrySettings", "configure", "is_tracing_enabled", "meter", "tracer"]
+__all__ = [
+    "Telemetry",
+    "TelemetrySettings",
+    "configure",
+    "is_metrics_enabled",
+    "is_tracing_enabled",
+    "meter",
+    "prometheus_metrics",
+    "tracer",
+]

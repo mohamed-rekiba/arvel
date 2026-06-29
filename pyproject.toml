@@ -69,6 +69,9 @@ search = ["meilisearch>=0.41.1"]
 vector = ["pgvector>=0.4.2"]
 telemetry = [
   "opentelemetry-sdk>=1.43.0",
+  "opentelemetry-exporter-otlp-proto-http>=1.42.1", # the default OTLP/HTTP push (traces/metrics/logs)
+  "opentelemetry-exporter-prometheus>=0.50b0",      # optional pull mode (the /metrics scrape route)
+  "prometheus-client>=0.20.0",                      # exposition format for the /metrics handler
   "sentry-sdk>=2.63.0",
 ]
 i18n = ["babel>=2.18.0"]

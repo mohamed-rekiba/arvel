@@ -45,10 +45,11 @@ def _capture_spans() -> Any:
     return exporter
 
 
-async def test_passthrough_when_tracing_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_passthrough_when_telemetry_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     import arvel.telemetry
 
     monkeypatch.setattr(arvel.telemetry, "is_tracing_enabled", lambda: False)
+    monkeypatch.setattr(arvel.telemetry, "is_metrics_enabled", lambda: False)
     seen = []
 
     async def destination(req: Any) -> str:
@@ -56,7 +57,35 @@ async def test_passthrough_when_tracing_disabled(monkeypatch: pytest.MonkeyPatch
         return "ok"
 
     result = await TelemetryMiddleware().handle(FakeRequest(), destination)
-    assert result == "ok" and len(seen) == 1  # called through, no span machinery
+    assert result == "ok" and len(seen) == 1  # called through, no span/metric machinery
+
+
+async def test_records_http_request_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
+    from opentelemetry.sdk.metrics import MeterProvider
+    from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+
+    import arvel.telemetry
+
+    reader = InMemoryMetricReader()
+    provider = MeterProvider(metric_readers=[reader])
+    monkeypatch.setattr(arvel.telemetry, "is_tracing_enabled", lambda: False)  # metrics-only path
+    monkeypatch.setattr(arvel.telemetry, "is_metrics_enabled", lambda: True)
+    monkeypatch.setattr(arvel.telemetry, "meter", lambda name="arvel": provider.get_meter(name))
+
+    await _run(TelemetryMiddleware(), FakeRequest("GET", "/orders"), FakeResponse(200))
+
+    metrics = {
+        m.name: m
+        for rm in reader.get_metrics_data().resource_metrics
+        for sm in rm.scope_metrics
+        for m in sm.metrics
+    }
+    assert "http.server.request.count" in metrics
+    assert "http.server.request.duration" in metrics
+    point = next(iter(metrics["http.server.request.count"].data.data_points))
+    assert point.value == 1
+    assert point.attributes["http.request.method"] == "GET"
+    assert point.attributes["http.response.status_code"] == 200
 
 
 async def _run(mw: TelemetryMiddleware, request: FakeRequest, response: FakeResponse) -> None:

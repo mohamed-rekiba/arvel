@@ -11,6 +11,7 @@ Grounded in knowledge/port/12-queues.md.
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 from typing import TYPE_CHECKING, Any, cast
 
@@ -207,6 +208,30 @@ class Job:
         return await manager.dispatch_after(delay, cls(*args, **kwargs))
 
 
+@contextlib.contextmanager
+def _job_span(job: Job) -> Any:
+    """A CONSUMER span around a job's execution when tracing is on; a no-op (and no opentelemetry
+    import) otherwise. Runs inline → nests under the dispatching request's span when there is one."""
+    from arvel.telemetry import is_tracing_enabled
+
+    if not is_tracing_enabled():
+        yield
+        return
+    from opentelemetry import trace
+    from opentelemetry.trace import SpanKind
+
+    name = type(job).__name__
+    with trace.get_tracer("arvel.queue").start_as_current_span(
+        f"job {name}", kind=SpanKind.CONSUMER
+    ) as span:
+        span.set_attribute("messaging.system", "arvel.queue")
+        span.set_attribute("messaging.operation", "process")
+        span.set_attribute("messaging.destination.name", str(getattr(job, "queue", "default")))
+        span.set_attribute("code.namespace", type(job).__module__)
+        span.set_attribute("code.function", name)
+        yield span
+
+
 async def run_job_with_retries(job: Job, *, runner: Any = None, sleep: Any = None) -> Any:
     """Run a job, retrying on failure up to ``job.tries`` with ``job.backoff`` between attempts;
     invoke ``job.failed(exc)`` once the attempts are exhausted. This is the worker's per-job
@@ -276,7 +301,8 @@ class QueueManager:
         runner = None
         if self.app is not None and hasattr(self.app, "call"):
             runner = lambda: self.app.call(job.handle)  # noqa: E731
-        return await run_job_with_retries(job, runner=runner)
+        with _job_span(job):
+            return await run_job_with_retries(job, runner=runner)
 
     def _runner(self) -> Any:
         if self._task is None:
