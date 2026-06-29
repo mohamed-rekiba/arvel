@@ -663,6 +663,7 @@ class Builder:
         ``?page=`` (1 outside a request)."""
         from arvel.pagination import LengthAwarePaginator, resolve_current_page
 
+        per_page = max(1, per_page)
         if page is None:
             page = resolve_current_page()
         total = await self.count()
@@ -675,6 +676,7 @@ class Builder:
         one extra row to know whether a *next* page exists. ``page`` defaults to ``?page=``."""
         from arvel.pagination import Paginator, resolve_current_page
 
+        per_page = max(1, per_page)
         if page is None:
             page = resolve_current_page()
         self.limit(per_page + 1).offset((page - 1) * per_page)

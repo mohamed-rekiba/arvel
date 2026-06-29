@@ -292,7 +292,9 @@ from litestar.testing import TestClient
 async def _seed():
     app = create_app(); bootstrap_app(app); await app.boot()
     for i in range(1, 6):  # 5 users → 3 pages at per_page 2
-        await User.create(name=f"PUser{i}", email=f"pu{i}@example.com", password="pw")
+        u = await User.create(name=f"PUser{i}", email=f"pu{i}@example.com", password="pw")
+        if i == 1:  # give one user a real date-column value so serialization is actually exercised
+            await u.mark_email_as_verified()
 asyncio.run(_seed())
 
 from asgi import asgi_app
@@ -307,8 +309,10 @@ with TestClient(app=asgi_app) as client:
     assert d["current_page"] == 1 and d["from"] == 1 and d["to"] == 2, d
     assert d["next_page_url"] == "/api/users-page?page=2" and d["prev_page_url"] is None, d
     assert d["last_page_url"] == f"/api/users-page?page={d['last_page']}", d
-    # a date column (email_verified_at) hydrates to a Date → must serialize to an ISO string, not 500
-    assert all(not hasattr(u.get("email_verified_at"), "to_iso") for u in d["data"]), d
+    # a populated date column (email_verified_at) hydrates to a Date → must serialize to an ISO
+    # string, not a Date object (and not 500). Assert positively: a verified user is on page 1.
+    verified = [u["email_verified_at"] for u in d["data"] if u["email_verified_at"] is not None]
+    assert verified and all(isinstance(v, str) for v in verified), d
     # ?page= is resolved from the request, and prev/next URLs reflect it
     d2 = client.get("/api/users-page?page=2").json()
     assert d2["current_page"] == 2 and d2["prev_page_url"] == "/api/users-page?page=1", d2

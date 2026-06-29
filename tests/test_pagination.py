@@ -79,6 +79,21 @@ def test_url_clamps_non_positive_page() -> None:
     assert p.url(-5) == "/users?page=1"
 
 
+def test_per_page_zero_is_guarded() -> None:
+    # per_page <= 0 would divide-by-zero in last_page — clamp to 1 (Laravel: per_page >= 1)
+    p = LengthAwarePaginator([1], total=5, per_page=0, current_page=1, path="/x")
+    assert p.per_page() == 1
+    assert p.last_page() == 5  # no ZeroDivisionError
+
+
+def test_url_preserves_list_valued_appends() -> None:
+    p = _page([1], total=10, per_page=2, current=1)
+    p.append("tag", ["a", "b"])
+    url = p.url(2)
+    assert "tag=a" in url and "tag=b" in url  # repeated params, not a stringified list
+    assert "%5B" not in url  # no "[" — the list was not stringified
+
+
 def test_appends_and_fragment() -> None:
     p = _page([1], total=10, per_page=1, current=2)
     p.appends({"sort": "name"}).append("filter", "active").fragment("results")

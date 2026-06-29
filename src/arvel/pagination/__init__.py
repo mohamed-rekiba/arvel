@@ -109,7 +109,7 @@ class AbstractPaginator:
         page_name: str = "page",
     ) -> None:
         self._items = list(items)
-        self._per_page = per_page
+        self._per_page = max(1, per_page)  # guard div-by-zero in last_page (Laravel: per_page >= 1)
         self._page_name = page_name
         self._current_page = (
             current_page if current_page is not None else resolve_current_page(page_name)
@@ -210,7 +210,9 @@ class AbstractPaginator:
         if page <= 0:
             page = 1
         params = {**self._query, self._page_name: page}
-        query = urlencode(params)
+        # doseq: a list-valued appended param (?tag=a&tag=b) emits repeated keys, not a stringified
+        # list — Laravel preserves array query params across page links.
+        query = urlencode(params, doseq=True)
         fragment = f"#{self._fragment}" if self._fragment else ""
         return f"{self._path}?{query}{fragment}"
 
