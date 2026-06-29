@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.0](https://github.com/mohamed-rekiba/arvel/compare/v0.45.0...v0.46.0) (2026-06-29)
+
+
+### Features
+
+* **database:** store datetimes as real DateTime values, not ISO strings (DR-0023) ([c15c846](https://github.com/mohamed-rekiba/arvel/commit/c15c84682e27bf041f4d744d8d80c5c6f66715e2))
+
 ## [0.45.0](https://github.com/mohamed-rekiba/arvel/compare/v0.44.1...v0.45.0) (2026-06-29)
 
 
