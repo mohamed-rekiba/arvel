@@ -70,5 +70,5 @@ async def test_no_span_when_tracing_disabled(monkeypatch: pytest.MonkeyPatch) ->
 
     client = PendingRequest(transport=httpx.MockTransport(handler))
     response = await client.request("GET", "http://service.test/data")
-    assert response.status_code == 200          # transparent
-    assert seen["traceparent"] is None          # no injection when off
+    assert response.status_code == 200  # transparent
+    assert seen["traceparent"] is None  # no injection when off

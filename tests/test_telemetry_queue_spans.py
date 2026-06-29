@@ -66,7 +66,9 @@ async def test_job_span_links_to_dispatching_trace_across_the_broker() -> None:
     exporter = _capture_spans()
     parent = trace.get_tracer_provider().get_tracer("t").start_span("request")
     with trace.use_span(parent, end_on_exit=True):
-        payload = serialize_instance(_Greet())  # dispatch — captures the traceparent into the payload
+        payload = serialize_instance(
+            _Greet()
+        )  # dispatch — captures the traceparent into the payload
 
     # "worker side": a fresh context with no ambient span — only the payload carries the link
     job = await deserialize_instance(payload)
@@ -74,7 +76,9 @@ async def test_job_span_links_to_dispatching_trace_across_the_broker() -> None:
 
     span = next(s for s in exporter.get_finished_spans() if s.name == "job _Greet")
     assert span.parent is not None
-    assert span.parent.trace_id == parent.get_span_context().trace_id  # same trace across the broker
+    assert (
+        span.parent.trace_id == parent.get_span_context().trace_id
+    )  # same trace across the broker
 
 
 async def test_no_span_and_result_unchanged_when_tracing_disabled(

@@ -57,7 +57,7 @@ async def test_cache_ops_emit_client_spans() -> None:
     assert spans["cache get"].kind == SpanKind.CLIENT
 
     gets = [s for s in exporter.get_finished_spans() if s.name == "cache get"]
-    assert any(s.attributes["cache.hit"] is True for s in gets)   # the hit
+    assert any(s.attributes["cache.hit"] is True for s in gets)  # the hit
     assert any(s.attributes["cache.hit"] is False for s in gets)  # the miss
 
 
@@ -67,5 +67,5 @@ async def test_no_span_and_value_unchanged_when_disabled(monkeypatch: pytest.Mon
     monkeypatch.setattr(arvel.telemetry, "is_tracing_enabled", lambda: False)
     cache = CacheRepository(_FakeClient())
     await cache.put("k", "v")
-    assert await cache.get("k") == "v"          # transparent
+    assert await cache.get("k") == "v"  # transparent
     assert await cache.get("x", "fallback") == "fallback"
