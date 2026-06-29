@@ -23,7 +23,10 @@ The builder carries the everyday Laravel query methods:
 await Post.where_in("status", ["draft", "review"]).get()
 await Post.where_not_in("status", ["archived"]).get()
 await Post.where_between("views", [100, 1000]).get()        # also where_not_between
-await Post.when(tag, lambda q: q.where(tag=tag)).get()      # apply a clause conditionally
+await Post.when(tag, lambda q, value: q.where(tag=value)).get()  # conditional clause; the truthy
+                                                                # value is passed (Laravel style)
+await Post.when(tag, lambda q: q.where(tag=tag)).get()      # 1-arg form (close over it) also works
+await Post.unless(archived, lambda q: q.where("status", "!=", "archived")).get()  # inverse of when
 await Post.order_by("views", "desc").skip(10).take(5).get() # skip/take alias offset/limit
 await Post.where(published=True).pluck("title")             # ["Hello", …] (or pluck("title","id") → dict)
 await Post.where(slug=s).value("title")                     # one column of the first row

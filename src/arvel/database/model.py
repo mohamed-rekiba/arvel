@@ -799,7 +799,21 @@ class Model(metaclass=ModelMeta):
         hidden = (set(self.__hidden__) | self._extra_hidden) - self._extra_visible
         for key in hidden:
             data.pop(key, None)
+        # Laravel toArray parity: eager-loaded relations serialize (nested) alongside attributes —
+        # a has-many/many-to-many → a list of dicts, a has-one/belongs-to → a single nested dict,
+        # a null relation → None. Only LOADED relations appear (unloaded ones are not serialized).
+        for name, related in self._relations.items():
+            data[name] = self._relation_to_dict(related)
         return data
+
+    @staticmethod
+    def _relation_to_dict(related: Any) -> Any:
+        if related is None:  # a loaded but empty has-one / belongs-to (Laravel → null)
+            return None
+        if isinstance(related, Model):  # has-one / belongs-to → a single nested dict
+            return related.to_dict()
+        # a has-many / belongs-to-many result: a list/Collection of models → a list of dicts
+        return [item.to_dict() for item in related]
 
     def to_json(self, **kwargs: Any) -> str:
         """Serialize ``to_dict()`` to a JSON string, honoring hidden/visible/appends (D3)."""

@@ -158,17 +158,48 @@ class Builder:
         self._add(sa.not_(self._table.c[column].between(low, high)))
         return self
 
-    def when(self, condition: Any, callback: Any, default: Any = None) -> Self:
-        """Laravel ``when`` — apply ``callback(self)`` only if ``condition`` is truthy,
-        else ``default(self)`` if given. Lets conditional clauses stay in the fluent chain.
+    def _apply_conditional(self, callback: Any, value: Any) -> None:
+        """Invoke a ``when``/``unless`` callback Laravel-style. Laravel passes ``($query, $value)``;
+        we pass the value as the 2nd argument when the callback accepts one, and fall back to
+        ``callback(self)`` for the common close-over-the-value 1-arg form."""
+        import inspect
 
-        The callback receives only the query (``self``), not Laravel's ``($query, $value)`` — close
-        over the value directly in Python: ``q.when(min_price, lambda q: q.where('price', '>=', min_price))``.
+        takes_value = False
+        try:
+            params = list(inspect.signature(callback).parameters.values())
+            positional = [
+                p for p in params if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+            ]
+            takes_value = len(positional) >= 2 or any(p.kind == p.VAR_POSITIONAL for p in params)
+        except ValueError, TypeError:  # pragma: no cover - builtins without a signature
+            takes_value = False
+        if takes_value:
+            callback(self, value)
+        else:
+            callback(self)
+
+    def when(self, condition: Any, callback: Any, default: Any = None) -> Self:
+        """Laravel ``when`` — apply ``callback(self, condition)`` only if ``condition`` is truthy,
+        else ``default(self, condition)`` if given. Lets conditional clauses stay in the fluent chain.
+
+        Matches Laravel's ``when($value, fn($query, $value))``: the truthy value is passed to the
+        callback's 2nd argument. A 1-arg callback (``lambda q: ...``, closing over the value
+        directly) also works — the value is only passed when the callback accepts it.
         """
         if condition:
-            callback(self)
+            self._apply_conditional(callback, condition)
         elif default is not None:
-            default(self)
+            self._apply_conditional(default, condition)
+        return self
+
+    def unless(self, condition: Any, callback: Any, default: Any = None) -> Self:
+        """Laravel ``unless`` — the inverse of ``when``: apply ``callback(self, condition)`` only
+        when ``condition`` is **falsy**, else ``default(self, condition)`` if given. Same
+        value-passing semantics as ``when`` (the value is passed to a 2-arg callback)."""
+        if not condition:
+            self._apply_conditional(callback, condition)
+        elif default is not None:
+            self._apply_conditional(default, condition)
         return self
 
     # --- JSON columns (Postgres jsonb / generic JSON) ----------------------
@@ -592,7 +623,13 @@ class Builder:
         if row is None:
             return None
         record = dict(row)
-        return self._hydrate(record) if self._hydrate else record
+        if self._hydrate is None:
+            return record
+        model = self._hydrate(record)
+        # Laravel parity: ``with('rel')->first()`` eager-loads the relation, just like ``get()``.
+        for spec in self._eager:
+            await self._eager_load_path([model], spec.split("."), self._eager_constraints.get(spec))
+        return model
 
     async def first_or_fail(self) -> Any:
         """``first()`` or raise ``ModelNotFound`` (Laravel ``firstOrFail``)."""

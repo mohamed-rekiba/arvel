@@ -68,6 +68,69 @@ async def test_when_conditional_clause() -> None:
         await db.dispose()
 
 
+async def test_when_passes_value_laravel_style() -> None:
+    """Laravel parity: ``when($value, fn($query, $value))`` passes the truthy value as the
+    callback's second argument. A 1-arg callback (close-over style) must keep working."""
+    db = await _seed()
+    try:
+        # 2-arg callback receives the value (here the tag to filter on)
+        got = await Item.query().when("x", lambda q, value: q.where("tag", "=", value)).get()
+        assert sorted(i.name for i in got) == ["a", "c"]
+        # the default branch also receives the (falsy) value as its 2nd arg
+        defaulted = (
+            await Item.query()
+            .when(
+                "",
+                lambda q, value: q.where("tag", "=", "x"),
+                lambda q, value: q.where("tag", "=", "z"),
+            )
+            .get()
+        )
+        assert [i.name for i in defaulted] == ["d"]
+        # 1-arg callback (existing style) still works
+        one_arg = await Item.query().when(True, lambda q: q.where("tag", "=", "y")).get()
+        assert [i.name for i in one_arg] == ["b"]
+    finally:
+        await db.dispose()
+
+
+async def test_when_unless_edge_callbacks() -> None:
+    """Edge forms: a ``*args`` callback receives the value; a falsy ``when`` / truthy ``unless``
+    with no default is a no-op that returns the builder unchanged (chainable)."""
+    db = await _seed()
+    try:
+        # *args callback → the value is passed through as the 2nd positional
+        got = await Item.query().when("z", lambda *a: a[0].where("tag", "=", a[1])).get()
+        assert [i.name for i in got] == ["d"]
+        # falsy when, no default → no clause added (all rows)
+        none_added = await Item.query().when(False, lambda q: q.where("tag", "=", "x")).get()
+        assert len(none_added) == 4
+        # truthy unless, no default → no clause added (all rows)
+        unless_noop = await Item.query().unless(True, lambda q: q.where("tag", "=", "x")).get()
+        assert len(unless_noop) == 4
+    finally:
+        await db.dispose()
+
+
+async def test_unless_conditional_clause() -> None:
+    """Laravel ``unless`` — the inverse of ``when`` (applies the callback when the condition is
+    falsy), with the same value-passing + default-branch semantics."""
+    db = await _seed()
+    try:
+        # condition falsy → callback applies; value passed through
+        applied = await Item.query().unless(False, lambda q, value: q.where("tag", "=", "x")).get()
+        assert sorted(i.name for i in applied) == ["a", "c"]
+        # condition truthy → callback skipped, default (if any) applies
+        defaulted = (
+            await Item.query()
+            .unless("on", lambda q: q.where("tag", "=", "x"), lambda q: q.where("tag", "=", "z"))
+            .get()
+        )
+        assert [i.name for i in defaulted] == ["d"]
+    finally:
+        await db.dispose()
+
+
 async def test_skip_take_aliases() -> None:
     db = await _seed()
     try:

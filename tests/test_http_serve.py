@@ -6,9 +6,35 @@ from typing import Any
 
 from litestar.testing import TestClient
 
-from arvel import Application
+from arvel import Application, Model
 from arvel.http import HttpKernel
 from arvel.routing import Router
+
+
+class _Widget(Model):
+    __fields__ = {"name": str}
+    __fillable__ = ["name"]
+
+
+def test_handler_can_return_a_model() -> None:
+    """Laravel parity: returning an Eloquent model from a controller serializes to JSON. The kernel
+    registers a type-encoder for the arvel Model (→ to_dict()) so this works without a 500."""
+    kernel = HttpKernel()
+    kernel.get("/widget", lambda request: _Widget(id=1, name="sprocket"))
+    with TestClient(kernel.build()) as client:
+        resp = client.get("/widget")
+    assert resp.status_code == 200
+    assert resp.json() == {"id": 1, "name": "sprocket"}
+
+
+def test_handler_can_return_a_list_of_models() -> None:
+    """A returned collection of models serializes element-by-element (Laravel returns a JSON array)."""
+    kernel = HttpKernel()
+    kernel.get("/widgets", lambda request: [_Widget(id=1, name="a"), _Widget(id=2, name="b")])
+    with TestClient(kernel.build()) as client:
+        resp = client.get("/widgets")
+    assert resp.status_code == 200
+    assert resp.json() == [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}]
 
 
 async def _upload(request: Any) -> dict[str, Any]:

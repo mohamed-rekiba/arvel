@@ -24,7 +24,7 @@ from arvel.http.response import Response
 from arvel.kernel.settings import Settings
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
 # Friendly ``.secure("bearer")`` / ``security.bearer`` names → the OpenAPI security-scheme component
 # key they reference. Keeps app-facing config readable while the document uses canonical scheme ids.
@@ -237,6 +237,17 @@ class HttpKernel:
         from arvel.http.exceptions import HttpException, render_exception
         from arvel.validation import ValidationException
 
+        # Serialize an arvel Model returned from a handler (or nested in a list/paginator) to its
+        # to_dict() form — the Laravel ``return $user`` / ``return User::all()`` JSON path. Imported
+        # lazily + via the contract base so the http layer takes no hard edge on the database module.
+        model_encoder: dict[Any, Callable[[Any], Any]] = {}
+        try:
+            from arvel.database.model import Model as _Model
+
+            model_encoder = {_Model: lambda value: value.to_dict()}
+        except Exception:  # pragma: no cover - database extra not installed
+            model_encoder = {}
+
         self._warn_undefined_security()
         handlers = [
             self._make_handler(
@@ -251,7 +262,8 @@ class HttpKernel:
             # Serialize the arvel Date value object to an ISO-8601 string in responses, so a handler
             # can return a model (or a paginator of models) whose date columns hydrate to Date — the
             # canonical Laravel ``return User::paginate()`` JSON path — without a SerializationException.
-            type_encoders={Date: lambda value: value.to_iso()},
+            # The Model encoder lets a handler return a model / collection of models directly.
+            type_encoders={Date: lambda value: value.to_iso(), **model_encoder},
             exception_handlers={
                 ValidationException: render_exception,
                 HttpException: render_exception,

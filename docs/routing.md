@@ -30,6 +30,18 @@ Route.any("/legacy", legacy)                       # all verbs
 A handler is any callable (sync or async); it receives the request and any path params, and
 returns a dict/list/str (Litestar serializes it) or an explicit `Response`.
 
+**Return a model or a collection directly** (Laravel parity) — the framework serializes an arvel
+`Model`, a list of models, or a paginator of models to JSON via each model's `to_dict()` (hidden
+fields and loaded relations honored):
+
+```python
+async def show(request):
+    return await Product.with_("variants").find(request.path_param("id"))   # → a JSON object
+
+async def index(request):
+    return await Product.query().paginate()      # → Laravel's paginator JSON shape
+```
+
 ### Redirect & view routes
 
 For the common controller-less cases there are shortcuts:

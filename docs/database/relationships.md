@@ -10,6 +10,17 @@ class Post(Model):
 
 await user.posts().get()                               # lazy
 users = await User.with_("posts").get()                # eager — one batched WHERE IN, no N+1
+post = await Post.with_("author").first()              # with_(...).first() eager-loads too (Laravel)
+```
+
+**Loaded relations serialize.** Like Laravel's `toArray()`, an eager-loaded relation is included
+(nested) in `to_dict()` / a JSON response — a has-many as a list, a has-one/belongs-to as a single
+nested object, an empty relation as `null`. Only *loaded* relations are serialized:
+
+```python
+post = await Post.with_("author", "comments").first()
+post.to_dict()
+# {"id": 1, "title": "Hi", "author": {"id": 7, ...}, "comments": [{...}, {...}]}
 ```
 
 **A relation *is* a query builder** (Laravel) — constrain it, count it, and create/save through it:
