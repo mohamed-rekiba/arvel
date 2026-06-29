@@ -13,7 +13,7 @@ from typing import Any, cast
 current_request: contextvars.ContextVar[Request] = contextvars.ContextVar("arvel_request")
 # Re-exported from the core ``support`` leaf so http can read/baseline the principal without an
 # illegal http→auth edge; ``auth`` re-exports the same object as its public ``current_user`` (DR-0026).
-from arvel.support import current_user  # noqa: E402
+from arvel.support import current_user as current_user  # noqa: E402  (explicit re-export)
 
 
 class Request:
