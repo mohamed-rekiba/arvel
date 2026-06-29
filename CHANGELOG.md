@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.43.1](https://github.com/mohamed-rekiba/arvel/compare/v0.43.0...v0.43.1) (2026-06-29)
+
+
+### Documentation
+
+* make the docs consistent with the merged observability features ([a20bdcc](https://github.com/mohamed-rekiba/arvel/commit/a20bdcc1f19543d7fc921b1e24895521af8ec6ba))
+* **telemetry:** add a hands-on "new to observability" tour with real output ([09c9ad7](https://github.com/mohamed-rekiba/arvel/commit/09c9ad7c97d54672f6315867f886fb3a67dd5861))
+
 ## [0.43.0](https://github.com/mohamed-rekiba/arvel/compare/v0.42.0...v0.43.0) (2026-06-29)
 
 
