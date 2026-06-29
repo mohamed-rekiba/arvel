@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.1](https://github.com/mohamed-rekiba/arvel/compare/v0.46.0...v0.46.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* **database:** store datetimes as UTC so SQLite round-trips keep the instant (review B1) ([3d52898](https://github.com/mohamed-rekiba/arvel/commit/3d52898bba6dc3f5faf8b05965c8447b20a01208))
+
 ## [0.46.0](https://github.com/mohamed-rekiba/arvel/compare/v0.45.0...v0.46.0) (2026-06-29)
 
 
