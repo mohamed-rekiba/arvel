@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.45.0](https://github.com/mohamed-rekiba/arvel/compare/v0.44.1...v0.45.0) (2026-06-29)
+
+
+### Features
+
+* **pagination:** Laravel-parity paginators (paginate/simple_paginate, links(), JSON) ([2ff86f2](https://github.com/mohamed-rekiba/arvel/commit/2ff86f24e6a30a3febd24df4db360f7affac4fbb))
+
+
+### Bug Fixes
+
+* **pagination:** address review nits (per_page&gt;=1 guard, list query params, real e2e date proof) ([ce7df61](https://github.com/mohamed-rekiba/arvel/commit/ce7df6123d3751bdba5407332836540343456924))
+
 ## [0.44.1](https://github.com/mohamed-rekiba/arvel/compare/v0.44.0...v0.44.1) (2026-06-29)
 
 
