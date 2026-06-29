@@ -202,3 +202,11 @@ class UploadedFile:
         path = f"{directory.rstrip('/')}/{name}" if directory else name
         await app("filesystem").disk(disk).put(path, await self._upload.read())
         return path
+
+
+# Wire pagination's current-request resolver (http→pagination is a legal downward edge;
+# pagination must not import http — DR-0026). Importing arvel.http.request is enough to make
+# ``await Post.paginate()`` resolve the bound request for URL/page building.
+import arvel.pagination as _pagination  # noqa: E402
+
+_pagination.set_request_resolver(lambda: current_request.get(None))

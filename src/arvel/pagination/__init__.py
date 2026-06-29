@@ -18,6 +18,7 @@ Grounded in knowledge/laravel (Illuminate\\Pagination).
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
@@ -25,6 +26,27 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from arvel.support import Collection
+
+# --- injected dependencies (DR-0026) -----------------------------------------------
+# pagination is a util module BELOW http/views in the layered DAG, so it must not import
+# them. The owning layers inject what the paginator needs through legal downward edges:
+# ``arvel.http.request`` (on import) sets the request resolver; ``arvel.views`` (on import)
+# sets the renderer. Unset → degrade exactly as before (no request → path "/", page 1).
+_request_resolver: Callable[[], Any] | None = None
+_view_renderer: Callable[[str, dict[str, Any]], Awaitable[Any]] | None = None
+
+
+def set_request_resolver(resolver: Callable[[], Any] | None) -> None:
+    """Register the source of the current request (the http layer wires this)."""
+    global _request_resolver
+    _request_resolver = resolver
+
+
+def set_view_renderer(renderer: Callable[[str, dict[str, Any]], Awaitable[Any]] | None) -> None:
+    """Register the page-link-bar renderer (the views layer wires this)."""
+    global _view_renderer
+    _view_renderer = renderer
+
 
 # --- per-request resolution (Laravel: Paginator::resolveCurrentPage/Path) ----------
 
@@ -56,9 +78,7 @@ def resolve_current_path(default: str = "/") -> str:
 
 
 def _current_request() -> Any:
-    from arvel.http.request import current_request
-
-    return current_request.get(None)
+    return _request_resolver() if _request_resolver is not None else None
 
 
 def _request_query(key: str) -> Any:
@@ -226,10 +246,13 @@ class AbstractPaginator:
         """Render the page-link bar to HTML (returns ``Markup``). Override ``view`` to use a
         custom template; extra ``data`` is passed to it. Default templates live under the
         ``pagination`` view namespace."""
-        from arvel.views import View
-
+        if _view_renderer is None:
+            raise RuntimeError(
+                "pagination rendering requires the view layer (import arvel.views, which wires "
+                "the renderer). Use to_dict()/the accessors if you don't need HTML."
+            )
         template = view or self._default_view
-        rendered = await View(template, {"paginator": self, **(data or {})}).render()
+        rendered = await _view_renderer(template, {"paginator": self, **(data or {})})
         try:
             from markupsafe import Markup
 
