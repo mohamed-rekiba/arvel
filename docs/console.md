@@ -51,6 +51,9 @@ appears. (No separate installer binary — one tool, like `git`.)
 | `make:provider <Name>` | scaffold a service provider |
 | `make:migration <name>` | scaffold a timestamped migration (`create_x_table` → create stub) |
 | `make:command <Name>` | scaffold a console command (register it in a provider's `commands()`) |
+| `make:event <Name>` | scaffold a domain event (`app/events/`) |
+| `make:listener <Name>` | scaffold an event listener (`app/listeners/`; register via `Event.listen`) |
+| `make:cast <Name>` | scaffold a custom attribute cast (`app/casts/`; use in a model's `__casts__`) |
 | `route:list` | tabulate the app's routes (methods, path, name) |
 | `migrate` / `migrate:rollback` | apply / revert migrations |
 | `db:seed` | run the app's database seeder |

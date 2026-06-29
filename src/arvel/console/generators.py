@@ -163,6 +163,31 @@ _STUBS: dict[str, tuple[str, str]] = {
         "        # register this command in a provider's commands() to wire it into the CLI\n"
         '        self.info("{name} ran")\n',
     ),
+    "event": (
+        "app/events",
+        "from typing import Any\n\n\n"
+        "class {name}:\n"
+        '    """A domain event — dispatch with ``await Event.dispatch({name}(...))``."""\n\n'
+        "    def __init__(self, *args: Any) -> None: ...\n",
+    ),
+    "listener": (
+        "app/listeners",
+        "from typing import Any\n\n\n"
+        "class {name}:\n"
+        '    """An event listener — register with ``Event.listen(SomeEvent, {name}().handle)``."""\n\n'
+        "    async def handle(self, event: Any) -> None: ...\n",
+    ),
+    "cast": (
+        "app/casts",
+        "from typing import Any\n\n\n"
+        "class {name}:\n"
+        '    """A custom attribute cast (Laravel CastsAttributes). Use via\n'
+        '    ``__casts__ = {{"column": {name}()}}``."""\n\n'
+        "    def get(self, model: Any, key: str, value: Any, attributes: dict[str, Any]) -> Any:\n"
+        "        return value\n\n"
+        "    def set(self, model: Any, key: str, value: Any, attributes: dict[str, Any]) -> Any:\n"
+        "        return value\n",
+    ),
 }
 
 
@@ -320,3 +345,30 @@ def make_migration(name: str) -> None:
         typer.echo(str(exc))
         raise typer.Exit(1) from exc
     typer.echo(f"created {target}")
+
+
+make_event_app = typer.Typer()
+
+
+@make_event_app.command()
+def make_event(name: str) -> None:
+    """Generate a domain event class (app/events/)."""
+    _run("event", name)
+
+
+make_listener_app = typer.Typer()
+
+
+@make_listener_app.command()
+def make_listener(name: str) -> None:
+    """Generate an event listener (app/listeners/) — register via Event.listen(...)."""
+    _run("listener", name)
+
+
+make_cast_app = typer.Typer()
+
+
+@make_cast_app.command()
+def make_cast(name: str) -> None:
+    """Generate a custom attribute cast (app/casts/) — use via a model's __casts__."""
+    _run("cast", name)
