@@ -15,6 +15,8 @@ import secrets
 from collections.abc import Iterable
 from typing import Any, ClassVar, cast
 
+import sqlalchemy as sa
+
 from arvel.database import Model
 
 
@@ -26,8 +28,8 @@ class ApiToken(Model):
         "name": str,
         "token": str,
         "tokenable_id": int,
-        "abilities": str,  # JSON-encoded list of scopes (cast below)
-        "expires_at": str,  # ISO datetime, nullable (cast below)
+        "abilities": sa.Text(),  # JSON-encoded list of scopes (cast below); TEXT, matches migration
+        "expires_at": str,  # datetime cast (below) → a real DateTime column (DR-0023)
     }
     __fillable__: ClassVar[list[str]] = [
         "name",

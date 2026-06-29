@@ -372,11 +372,18 @@ class QueueManager:
         from taskiq import InMemoryBroker
 
         self._runner()  # register the wrapper task on the broker
+        # If a same-process dispatch already started the broker in *client* mode, shut it down first:
+        # taskiq-aio-pika's startup() isn't idempotent (it reopens write_conn, orphaning the old one),
+        # and a client-mode start never declared the consumer. Restart cleanly in worker mode.
+        if self._started:
+            await self.broker.shutdown()
+            self._started = False
         # Mark the broker as a worker BEFORE startup: a consuming broker (e.g. taskiq-aio-pika) only
         # declares its read connection + consumer queue when ``is_worker_process`` is set, so without
         # this a real AMQP worker raises "Call startup before starting listening" on listen().
         self.broker.is_worker_process = True
         await self.broker.startup()
+        self._started = True
         # Release any delayed jobs whose time has come (dispatch_after) alongside consuming the broker.
         releaser = asyncio.create_task(self._release_loop(release_interval))
         try:

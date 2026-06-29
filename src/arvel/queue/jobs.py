@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
+import sqlalchemy as sa
+
 from arvel.database import Model
 
 
@@ -17,9 +19,9 @@ class QueuedJob(Model):
     """A stored, not-yet-due job. ``available_at``/``created_at`` are unix timestamps (ints)."""
 
     __table_name__ = "jobs"
-    __fields__: ClassVar[dict[str, type]] = {
+    __fields__: ClassVar[dict[str, Any]] = {
         "queue": str,
-        "payload": str,
+        "payload": sa.Text(),  # serialized job — exceeds VARCHAR(255); matches the migration's TEXT
         "attempts": int,
         "reserved_at": int,
         "available_at": int,

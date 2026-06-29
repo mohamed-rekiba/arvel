@@ -184,7 +184,7 @@ def otel_collector() -> Iterator[Any]:
 
     config = str(Path(__file__).parent / "otelcol-config.yaml")
     container = (
-        DockerContainer("otel/opentelemetry-collector-contrib:latest")
+        DockerContainer("otel/opentelemetry-collector-contrib:0.155.0")
         .with_exposed_ports(4318)
         .with_volume_mapping(config, "/etc/otelcol-contrib/config.yaml")
         .waiting_for(LogMessageWaitStrategy("Everything is ready").with_startup_timeout(60))
