@@ -35,17 +35,26 @@ class Notification:
 
 
 class SendQueuedNotification(Job):
-    """Worker job that delivers a notification enqueued via the ShouldQueue rail."""
+    """Worker job that delivers a notification enqueued via the ShouldQueue rail.
+
+    The notification is stored as a JSON-safe ``{class, state}`` view (``encode_instance``), not the
+    live object, so the job survives serialization across a **real broker** — a plain Notification is
+    not a Model, so without this it hits ``msgspec`` "unsupported type". The notifiable is a Model, so
+    the job's own ``serialize_instance`` already (class, pk)-refs it."""
 
     def __init__(self, notifiable: Any, notification: Notification) -> None:
+        from arvel.queue import encode_instance
+
         self.notifiable = notifiable
-        self.notification = notification
+        self.notification = encode_instance(notification)  # serializable repr (not the live object)
 
     async def handle(self) -> dict[str, Any]:
         from arvel.kernel import app
+        from arvel.queue import decode_instance
 
         manager: NotificationManager = app().make("notifications")
-        return await manager.send_now(self.notifiable, self.notification)
+        notification = cast("Notification", await decode_instance(self.notification))
+        return await manager.send_now(self.notifiable, notification)
 
 
 class NotificationManager:

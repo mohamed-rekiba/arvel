@@ -50,12 +50,26 @@ def _address(recipient: Any) -> str:
 class Mailable:
     """Base mail message: subclass and override ``build()`` (Laravel ``Mailable``)."""
 
+    # Class-level defaults so the base fields exist even when a subclass defines its own ``__init__``
+    # without calling ``super().__init__()`` (the normal Laravel shape) OR is rebuilt via
+    # ``__new__`` (a queued mailable decoded by the worker — see SendQueuedMailable). Immutable
+    # defaults are safe to share; the mutable attachment list is lazily created per-instance.
+    _subject: str = ""
+    _html: str = ""
+    _from: str = ""  # sender address; defaults to the transport/agent if unset
+    _reply_to: str = ""
+
     def __init__(self) -> None:
-        self._subject = ""
-        self._html = ""
-        self._from = ""  # sender address; defaults to the transport/agent if unset
-        self._reply_to = ""
         self._attachments: list[tuple[bytes, str, str]] = []  # (data, filename, content-type)
+
+    @property
+    def _attachment_list(self) -> list[tuple[bytes, str, str]]:
+        """The attachment list, lazily created — robust when ``__init__`` was bypassed/overridden."""
+        attachments: list[tuple[bytes, str, str]] | None = self.__dict__.get("_attachments")
+        if attachments is None:
+            attachments = []
+            self.__dict__["_attachments"] = attachments
+        return attachments
 
     def subject(self, subject: str) -> Mailable:
         self._subject = subject
@@ -94,14 +108,14 @@ class Mailable:
 
         filename = name or Path(path).name
         ctype = mime or mimetypes.guess_type(filename)[0] or "application/octet-stream"
-        self._attachments.append((Path(path).read_bytes(), filename, ctype))
+        self._attachment_list.append((Path(path).read_bytes(), filename, ctype))
         return self
 
     def attach_data(
         self, data: bytes, name: str, *, mime: str = "application/octet-stream"
     ) -> Mailable:
         """Attach raw in-memory bytes as ``name`` (Laravel ``->attachData``)."""
-        self._attachments.append((data, name, mime))
+        self._attachment_list.append((data, name, mime))
         return self
 
     def build(self) -> Mailable:  # overridden by subclasses
@@ -116,7 +130,7 @@ class Mailable:
         if self._reply_to:
             message["Reply-To"] = self._reply_to
         message.set_content(self._html, subtype="html")
-        for data, filename, ctype in self._attachments:
+        for data, filename, ctype in self._attachment_list:
             maintype, _, subtype = ctype.partition("/")
             message.add_attachment(
                 data, maintype=maintype, subtype=subtype or "octet-stream", filename=filename
