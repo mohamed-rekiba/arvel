@@ -99,3 +99,5 @@ the write connection; reads can route to a replica with sticky-after-write.
 
 - [Validation](../validation.md) — `unique`/`exists` rules query the DB.
 - [Console](../console.md) — `migrate` / `db:seed`. [Dates & Time](../dates.md) — the `datetime` cast.
+- [Telemetry](../telemetry.md) — with telemetry on, every query is auto-traced as a `db <OP>` span
+  (statement only — bind values are never captured) nested in the request trace.

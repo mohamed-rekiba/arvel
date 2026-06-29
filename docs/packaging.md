@@ -36,7 +36,7 @@ uv add 'arvel[standard]'           # a sensible full-stack bundle
 | Notifications (`arvel.notifications`) | `notifications` | apprise |
 | Media — images / video (`arvel.media`) | `image` / `video` | pillow / av |
 | Localization (`arvel.localization`) | `i18n` | babel |
-| Telemetry | `telemetry` | opentelemetry-sdk, sentry-sdk |
+| Telemetry (`arvel.telemetry`) | `telemetry` | opentelemetry-sdk, opentelemetry OTLP + Prometheus exporters, prometheus-client, sentry-sdk |
 
 **Core** (no extra) covers `kernel`, `support`, `dates`, `events`, **validation** (msgspec), and
 the helpers. `arvel[standard]` bundles the common set; `arvel[all]` pulls everything. The `vector`

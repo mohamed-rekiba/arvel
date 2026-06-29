@@ -165,3 +165,5 @@ imported lazily, so `import arvel` stays light until you actually queue somethin
 - [Events](events.md) — fire-and-forget *in-process* hooks (versus out-of-process jobs).
 - [Mail](mail.md) · [Notifications](notifications.md) — common work to push onto a queue.
 - [Console (CLI)](console.md) — `queue:work` and the scheduler.
+- [Telemetry](telemetry.md) — when telemetry is on, each job run is auto-traced as a `job <Name>` span
+  (and nests under the dispatching request when it runs inline).
