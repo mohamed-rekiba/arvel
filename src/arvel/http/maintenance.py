@@ -20,9 +20,17 @@ KEY = "arvel:maintenance"
 
 
 def _cache() -> Any:
-    from arvel.support import cache
+    # Use the app-bound cache when booted, else a default CacheManager — so `arvel down`/`up` work
+    # from the CLI without a fully-booted app. http→cache is a legal downward edge (DR-0026); the
+    # support ``cache()`` helper can't be used here because support is a leaf that no longer
+    # constructs a cache app-less.
+    from arvel.kernel import app, has_application
 
-    return cache()
+    if has_application() and app().bound("cache"):
+        return app().make("cache").driver()
+    from arvel.cache import CacheManager
+
+    return CacheManager().driver()
 
 
 async def down(message: str = "Down for maintenance.", retry: int = 60) -> None:
