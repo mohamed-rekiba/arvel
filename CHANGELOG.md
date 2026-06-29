@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.43.0](https://github.com/mohamed-rekiba/arvel/compare/v0.42.0...v0.43.0) (2026-06-29)
+
+
+### Features
+
+* **telemetry:** auto-instrument database queries with OpenTelemetry CLIENT spans ([41e65d4](https://github.com/mohamed-rekiba/arvel/commit/41e65d496ac5c1a549550fb697e87480c4de9ca3))
+* **telemetry:** record HTTP request metrics (count + duration) in the middleware ([c73bdbb](https://github.com/mohamed-rekiba/arvel/commit/c73bdbb26d5e61e7f2396c1de73650bd572d2488))
+
+
+### Bug Fixes
+
+* format code for better readability in telemetry processing functions ([b8ea2dc](https://github.com/mohamed-rekiba/arvel/commit/b8ea2dc2daea5d731729e2e561da7abc899a31ca))
+
 ## [0.42.0](https://github.com/mohamed-rekiba/arvel/compare/v0.41.0...v0.42.0) (2026-06-28)
 
 
