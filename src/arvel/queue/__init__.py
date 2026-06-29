@@ -16,6 +16,7 @@ import importlib
 from typing import TYPE_CHECKING, Any, cast
 
 from arvel.kernel import Settings
+from arvel.support.manager import Manager
 
 if TYPE_CHECKING:
     from arvel.queue.failed import FailedJob as FailedJob
@@ -33,33 +34,6 @@ class QueueSettings(Settings):
     __config_key__ = "queue"
     default: str = "memory"
     url: str = "redis://localhost:6379/0"
-
-
-def _build_broker(settings: QueueSettings) -> Any:
-    """Construct the taskiq broker named by ``settings.default`` from its ``url`` (constructs only;
-    connect is on ``startup``). Raises a clear error for an unknown driver or a missing extra."""
-    driver = settings.default
-    if driver == "memory":
-        from taskiq import InMemoryBroker
-
-        return InMemoryBroker()
-    if driver == "redis":
-        try:
-            from taskiq_redis import ListQueueBroker
-        except ImportError as exc:  # pragma: no cover - exercised only without the extra
-            raise ImportError(
-                "the 'redis' queue driver needs the [queue-redis] extra (taskiq-redis)"
-            ) from exc
-        return ListQueueBroker(settings.url)
-    if driver == "amqp":
-        try:
-            from taskiq_aio_pika import AioPikaBroker
-        except ImportError as exc:  # pragma: no cover - exercised only without the extra
-            raise ImportError(
-                "the 'amqp' queue driver needs the [queue-amqp] extra (taskiq-aio-pika)"
-            ) from exc
-        return AioPikaBroker(settings.url)
-    raise ValueError(f"Unknown queue driver {driver!r} (expected: memory, redis, amqp)")
 
 
 def _qualified_name(cls: type) -> str:
@@ -328,28 +302,52 @@ async def _record_failed_job(job: Job, exc: BaseException) -> None:
     )
 
 
-class QueueManager:
-    """Pushes jobs onto a taskiq broker and runs them via a single wrapper task."""
+class QueueManager(Manager):
+    """Pushes jobs onto a config-selected taskiq broker (the Manager 'driver': ``memory``/``redis``/
+    ``amqp``) and runs them via a single wrapper task."""
 
     def __init__(self, app: Any = None, broker: Any = None) -> None:
-        self.app = app
-        self._broker = broker
+        super().__init__(
+            app
+        )  # Manager: sets up driver resolution/cache + the _settings(app) helper
+        self._broker = broker  # an explicit broker passed in wins over the config-selected one
         self._task: Any = None
         self._started = False
 
+    def default_driver(self) -> str:
+        driver: str = self._settings(QueueSettings).default
+        if driver not in ("memory", "redis", "amqp"):
+            raise ValueError(f"Unknown queue driver {driver!r} (expected: memory, redis, amqp)")
+        return driver
+
+    def create_memory_driver(self) -> Any:
+        from taskiq import InMemoryBroker
+
+        return InMemoryBroker()
+
+    def create_redis_driver(self) -> Any:
+        try:
+            from taskiq_redis import ListQueueBroker
+        except ImportError as exc:  # pragma: no cover - exercised only without the extra
+            raise ImportError(
+                "the 'redis' queue driver needs the [queue-redis] extra (taskiq-redis)"
+            ) from exc
+        return ListQueueBroker(self._settings(QueueSettings).url)
+
+    def create_amqp_driver(self) -> Any:
+        try:
+            from taskiq_aio_pika import AioPikaBroker
+        except ImportError as exc:  # pragma: no cover - exercised only without the extra
+            raise ImportError(
+                "the 'amqp' queue driver needs the [queue-amqp] extra (taskiq-aio-pika)"
+            ) from exc
+        return AioPikaBroker(self._settings(QueueSettings).url)
+
     @property
     def broker(self) -> Any:
-        # An explicit broker (passed to __init__) wins; otherwise build from the `queue` config
-        # (memory by default, so no app/config still yields an InMemoryBroker — see _build_broker).
-        if self._broker is None:
-            # read THIS manager's app config when set (so QueueManager(app) honors app's queue
-            # config), else the global config — see Manager._settings for the same pattern.
-            if self.app is not None and hasattr(self.app, "config"):
-                settings = QueueSettings.from_source(self.app.config("queue"))
-            else:
-                settings = QueueSettings()
-            self._broker = _build_broker(settings)
-        return self._broker
+        # An explicit broker (passed to __init__) wins; otherwise the config-selected driver, built +
+        # cached by Manager.driver() (memory by default → no app/config still yields an InMemoryBroker).
+        return self._broker if self._broker is not None else self.driver()
 
     async def _invoke(self, job: Job) -> Any:
         # Worker execution: container-DI into handle() when an app is present, with the
