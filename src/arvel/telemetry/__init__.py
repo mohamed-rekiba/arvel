@@ -277,15 +277,14 @@ def span(name: str, *, kind: str = "internal", attributes: dict[str, Any] | None
             raise
 
 
-async def prometheus_metrics(request: Any = None) -> Any:
-    """Route handler for a Prometheus scrape endpoint — returns the current metrics in the exposition
-    format. ``TelemetryServiceProvider`` registers it at ``/metrics`` when ``telemetry.prometheus`` is
-    on (the ``PrometheusMetricReader`` exposes the OTel metrics through the prometheus_client registry)."""
+def prometheus_payload() -> tuple[bytes, str]:
+    """The current metrics in Prometheus exposition format, with its content-type. The HTTP
+    Response-wrapping + ``/metrics`` route registration live in the http/routing layer — telemetry
+    is a util module that must not import ``arvel.http`` (DR-0026). The ``PrometheusMetricReader``
+    exposes the OTel metrics through the prometheus_client registry."""
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-    from arvel.http.response import Response
-
-    return Response(content=generate_latest(), headers={"content-type": CONTENT_TYPE_LATEST})
+    return generate_latest(), CONTENT_TYPE_LATEST
 
 
 # stdlib level per structlog method name, so the OTel handler maps severity correctly.
@@ -353,7 +352,7 @@ __all__ = [
     "is_metrics_enabled",
     "is_tracing_enabled",
     "meter",
-    "prometheus_metrics",
+    "prometheus_payload",
     "span",
     "tracer",
 ]

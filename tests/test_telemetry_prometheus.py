@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from arvel.telemetry import TelemetrySettings, _build_metric_reader, prometheus_metrics
+from arvel.http.response import prometheus_metrics  # handler lives in http (DR-0026)
+from arvel.telemetry import TelemetrySettings, _build_metric_reader
 
 
 def test_prometheus_reader_selected_when_enabled() -> None:
@@ -24,16 +25,18 @@ async def test_metrics_handler_returns_prometheus_exposition() -> None:
 
 
 def test_provider_registers_metrics_route_when_prometheus_on() -> None:
+    # Route registration moved from the telemetry provider to the routing provider (DR-0026):
+    # telemetry must not import arvel.http, so the layer that legally imports both wires /metrics.
     from arvel.kernel import Application, set_application
     from arvel.routing import Router
-    from arvel.telemetry.provider import TelemetryServiceProvider
+    from arvel.routing.provider import RoutingServiceProvider
 
     app = Application()
     app.instance("router", Router())
     app.make("config").set("telemetry", {"enabled": True, "prometheus": True})
     set_application(app)
     try:
-        TelemetryServiceProvider(app).register()
+        RoutingServiceProvider(app).register()
         router: Any = app.make("router")
         paths = [definition.path for definition in router._routes]
         assert "/metrics" in paths
@@ -44,14 +47,14 @@ def test_provider_registers_metrics_route_when_prometheus_on() -> None:
 def test_provider_skips_metrics_route_when_prometheus_off() -> None:
     from arvel.kernel import Application, set_application
     from arvel.routing import Router
-    from arvel.telemetry.provider import TelemetryServiceProvider
+    from arvel.routing.provider import RoutingServiceProvider
 
     app = Application()
     app.instance("router", Router())
     app.make("config").set("telemetry", {"enabled": True, "prometheus": False})
     set_application(app)
     try:
-        TelemetryServiceProvider(app).register()
+        RoutingServiceProvider(app).register()
         router: Any = app.make("router")
         assert "/metrics" not in [definition.path for definition in router._routes]
     finally:

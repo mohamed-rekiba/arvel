@@ -35,6 +35,15 @@ class RoutingServiceProvider(ServiceProvider):
             self.app.singleton("router", make_router)
         # The kernel resolves this builder in Application.as_asgi() (DR-0026).
         self.app.instance("http.asgi_builder", _build_served_asgi)
+        # Prometheus scrape route — registered here (not in the telemetry provider) so telemetry needn't
+        # import arvel.http; routing legally imports both http (the handler) and telemetry (DR-0026).
+        # Registered at `register` so it lands before the router compiles into the served app.
+        from arvel.telemetry import TelemetrySettings
+
+        if TelemetrySettings().prometheus and self.app.bound("router"):
+            from arvel.http.response import prometheus_metrics
+
+            self.app.make("router").get("/metrics", prometheus_metrics, name="telemetry.metrics")
 
     def boot(self) -> None:
         """No-op."""
