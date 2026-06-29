@@ -22,8 +22,31 @@ def _no_bootstrapped_app() -> object:
 
 def test_url_globals_registered() -> None:
     env = ViewFactory("resources/views").env
-    for name in ("route", "url", "config", "asset", "can", "cannot", "trans", "trans_choice"):
+    for name in (
+        "route",
+        "url",
+        "config",
+        "asset",
+        "can",
+        "cannot",
+        "trans",
+        "trans_choice",
+        "auth",
+        "guest",
+    ):
         assert name in env.globals
+
+
+def test_auth_and_guest_globals_reflect_current_user() -> None:
+    from arvel.auth import current_user
+    from arvel.views import _auth, _guest
+
+    assert _auth() is None and _guest() is True  # no authenticated user
+    token = current_user.set(object())
+    try:
+        assert _auth() is not None and _guest() is False
+    finally:
+        current_user.reset(token)
 
 
 def test_config_degrades_to_default_without_app() -> None:

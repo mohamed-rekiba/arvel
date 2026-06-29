@@ -31,6 +31,7 @@ app and degrade safely when there's no app/session:
 | `config('app.name', 'arvel')` | read a config value |
 | `trans('messages.saved')` · `trans_choice('items', n)` | translations (see [Localization](localization.md)) |
 | `can('update', post)` · `cannot('delete', post)` | authorization gate checks |
+| `auth()` · `guest()` | the current authenticated user (or `None`) / whether nobody is logged in (Laravel `@auth`/`@guest`) |
 | `csrf_token()` · `csrf_field()` | the session CSRF token / a hidden `_token` input |
 
 ```html

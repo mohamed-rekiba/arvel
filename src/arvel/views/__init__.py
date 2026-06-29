@@ -28,6 +28,19 @@ async def _cannot(ability: str, *args: Any) -> bool:
     return not await _can(ability, *args)
 
 
+def _auth() -> Any:
+    """Template ``auth()`` — the current authenticated user, or ``None`` (Laravel ``@auth``/``auth()``).
+    ``{% if auth() %}Hi {{ auth().name }}{% endif %}``."""
+    from arvel.auth import current_user
+
+    return current_user.get()
+
+
+def _guest() -> bool:
+    """Template ``guest()`` — ``True`` when no user is authenticated (Laravel ``@guest``)."""
+    return _auth() is None
+
+
 def _config(key: str, default: Any = None) -> Any:
     """Template ``config('app.name')`` helper — reads the bound config, or ``default``."""
     from arvel.kernel import app, has_application
@@ -133,6 +146,8 @@ class ViewFactory:
             asset=_asset,
             csrf_token=_csrf_token,
             csrf_field=_csrf_field,
+            auth=_auth,
+            guest=_guest,
         )
 
     def _build_loader(self) -> Any:
