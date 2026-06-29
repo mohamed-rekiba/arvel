@@ -13,6 +13,7 @@ correlated to the trace it happened in.
 ## Contents
 
 - [Quick start](#quick-start)
+- [New to observability? A hands-on tour](#new-to-observability-a-hands-on-tour)
 - [Configuration](#configuration)
 - [Traces](#traces) — automatic + manual
 - [Metrics](#metrics) — automatic + manual
@@ -49,6 +50,96 @@ it, plus request metrics and your logs — all exported to `endpoint`.
 
 For local development, set `exporter` to `console` to print spans/metrics/logs to stdout — no collector
 needed.
+
+## New to observability? A hands-on tour
+
+Never instrumented an app before? Start here — you'll see real output in two minutes, no servers to
+install.
+
+### The three pillars, in plain words
+
+Observability answers "what is my app doing, and why is it slow or broken?" with three kinds of data:
+
+- **Logs** — *what happened*, as text events: "order received", "payment failed". You already know these.
+- **Metrics** — *how much / how often*, as numbers you graph over time: requests per second, error rate,
+  p95 latency, orders placed.
+- **Traces** — *where the time went* for one request, as a tree of timed steps: "this `POST /orders`
+  took 40ms; 6ms of it was one SQL query." A trace is built from **spans** (one timed operation each);
+  spans nest to form the tree.
+
+You don't pick one — they work together, and arvel wires all three from a single switch.
+
+### See it locally (no Grafana needed)
+
+Turn telemetry on with the **console** exporter, which just prints to your terminal:
+
+```python
+# config/telemetry.py
+config = {"enabled": True, "exporter": "console"}
+```
+
+Now write a route that does what a real one would — log something, touch the database, and count a
+business event:
+
+```python
+# routes/web.py
+from arvel import Log, Route
+from arvel.telemetry import meter
+
+async def place_order(request):
+    Log.info("order received", customer="ada", total=4200)            # a log
+    await Order.create(customer="ada", total=4200)                    # a DB write (auto-traced)
+    meter().create_counter("orders.placed").add(1, {"plan": "pro"})   # a metric
+    return {"status": "placed"}
+
+Route.post("/orders", place_order)
+```
+
+Run `arvel serve` and `curl -X POST localhost:8000/orders`. Three kinds of output print — trimmed here
+to the parts that matter:
+
+**A trace** — the request, with the DB write nested inside it. Note both share one `trace_id`, and the
+query's `parent_id` points at the request span:
+
+```jsonc
+{ "name": "POST /orders", "kind": "SERVER",
+  "trace_id": "0x5508…b227", "span_id": "0xa907…c81b", "parent_id": null,
+  "attributes": { "http.request.method": "POST", "http.response.status_code": 200 } }
+
+{ "name": "db INSERT", "kind": "CLIENT",
+  "trace_id": "0x5508…b227", "span_id": "0x1f93…",  "parent_id": "0xa907…c81b",  // ← child of the request
+  "attributes": { "db.system": "sqlite",
+                  "db.statement": "INSERT INTO orders (customer, total) VALUES (?, ?)" } }  // ← placeholders, never the values
+```
+
+That tree — request on top, query underneath — *is* a trace. In a UI like Grafana you'd see them as
+nested bars on a timeline, so a slow query is obvious at a glance.
+
+**A log** — your `Log.info` line, carrying the **same `trace_id`** as the request, so the log is linked
+to the trace it happened in (click a span → see its logs):
+
+```jsonc
+{ "body": "order received", "severity_text": "INFO",
+  "attributes": { "customer": "ada", "total": 4200 },
+  "trace_id": "0x5508…b227", "span_id": "0xa907…c81b" }   // ← same trace as above
+```
+
+**A metric** — the counter you incremented, a number you can chart and alert on later:
+
+```jsonc
+{ "name": "orders.placed", "data_points": [ { "attributes": { "plan": "pro" }, "value": 1 } ] }
+```
+
+That's the whole idea: one request produced a **trace** (where time went), a **log** (what happened,
+linked to that trace), and a **metric** (a number to chart) — and you wrote almost no telemetry code.
+The request span and the DB span appeared on their own; the log and the metric were one line each.
+
+### Next: real dashboards
+
+`console` is just for seeing it work. In production you switch `exporter` to `otlp` and point `endpoint`
+at a collector, and the same data flows into **Grafana** — traces in Tempo, metrics in Mimir, logs in
+Loki — where you get searchable traces, dashboards, and alerts (see [Sending to Grafana](#sending-to-grafana)).
+The code above doesn't change; only the config does.
 
 ## Configuration
 
