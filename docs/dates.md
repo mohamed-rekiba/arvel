@@ -42,10 +42,23 @@ reason `Date` exists instead of raw `datetime`.
 
 ```python
 Date.now().start_of_day()
-Date.now().is_weekend()
+Date.now().is_weekend()                # per config('app.weekend_days'); defaults to Sat/Sun
+Date.now().is_weekday()                # the inverse
 Date.now().to_iso()                    # "2026-06-22T09:30:00+00:00"
 Date.now().diff_for_humans()           # "in 3 hours" / "2 days ago"
 Date.parse(a) == Date.parse(b)         # value equality
+Date.from_py(a_stdlib_datetime)        # wrap a stdlib datetime (e.g. a DB value) as a Date
+```
+
+### Weekend days
+
+The weekend is **not** Saturday/Sunday everywhere — Egypt and much of the Gulf rest Friday/Saturday.
+`is_weekend()` / `is_weekday()` read `config('app.weekend_days')`, a list of day names, and fall back
+to Saturday/Sunday when unset:
+
+```python
+# config/app.py
+weekend_days = ["friday", "saturday"]   # now Friday & Saturday count as the weekend
 ```
 
 ## Model casts

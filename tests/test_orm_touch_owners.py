@@ -40,13 +40,13 @@ async def test_saving_child_touches_parent() -> None:
         t1 = Date.parse("2026-01-01T00:00:00+00:00[UTC]")
         with freeze_time(t1):
             post = await Post.create(title="Hello")
-        assert (await Post.find(post.id)).updated_at == t1.to_iso()
+        assert (await Post.find(post.id)).updated_at == t1  # timestamps read back as Date
 
         t2 = Date.parse("2026-02-02T00:00:00+00:00[UTC]")
         with freeze_time(t2):
             await Comment(post_id=post.id, body="hi").save()
 
-        assert (await Post.find(post.id)).updated_at == t2.to_iso()  # parent touched to t2
+        assert (await Post.find(post.id)).updated_at == t2  # parent touched to t2
     finally:
         await db.dispose()
 

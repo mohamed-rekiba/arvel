@@ -59,8 +59,28 @@ def test_iso_roundtrip_and_add() -> None:
 
 
 def test_is_weekend() -> None:
-    assert Date(ZonedDateTime(2024, 3, 30, 12, tz="Europe/London")).is_weekend() is True  # Sat
-    assert Date(ZonedDateTime(2024, 4, 1, 12, tz="Europe/London")).is_weekend() is False  # Mon
+    sat = Date(ZonedDateTime(2024, 3, 30, 12, tz="Europe/London"))
+    mon = Date(ZonedDateTime(2024, 4, 1, 12, tz="Europe/London"))
+    assert sat.is_weekend() is True and sat.is_weekday() is False  # Sat (default weekend)
+    assert mon.is_weekend() is False and mon.is_weekday() is True  # Mon
+
+
+def test_weekend_days_are_configurable() -> None:
+    """Many countries rest Fri/Sat, not Sat/Sun — config('app.weekend_days') overrides the default."""
+    from arvel.kernel import Application, set_application
+
+    fri = Date(ZonedDateTime(2024, 3, 29, 12, tz="UTC"))  # Friday
+    sun = Date(ZonedDateTime(2024, 3, 31, 12, tz="UTC"))  # Sunday
+    # default: Fri is a weekday, Sun is weekend
+    assert fri.is_weekend() is False and sun.is_weekend() is True
+    app = Application()
+    app.make("config").set("app.weekend_days", ["friday", "saturday"])
+    set_application(app)
+    try:
+        assert fri.is_weekend() is True  # now a weekend day
+        assert sun.is_weekend() is False  # Sunday is now a working day
+    finally:
+        set_application(None)
 
 
 def test_set_test_now_freezes() -> None:

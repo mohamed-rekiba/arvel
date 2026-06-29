@@ -11,7 +11,45 @@ from __future__ import annotations
 import contextvars
 from typing import Any
 
-from whenever import SATURDAY, SUNDAY, ZonedDateTime
+from whenever import (
+    FRIDAY,
+    MONDAY,
+    SATURDAY,
+    SUNDAY,
+    THURSDAY,
+    TUESDAY,
+    WEDNESDAY,
+    Instant,
+    ZonedDateTime,
+)
+
+# Weekend days are NOT universally Saturday/Sunday — many countries (e.g. Egypt and much of the
+# Gulf) rest Friday/Saturday. So ``is_weekend`` reads ``config('app.weekend_days')`` (a list of day
+# names) and only falls back to Sat/Sun. Carbon parity (``Carbon::setWeekendDays``).
+_WEEKDAYS = {
+    "monday": MONDAY,
+    "tuesday": TUESDAY,
+    "wednesday": WEDNESDAY,
+    "thursday": THURSDAY,
+    "friday": FRIDAY,
+    "saturday": SATURDAY,
+    "sunday": SUNDAY,
+}
+_DEFAULT_WEEKEND = (SATURDAY, SUNDAY)
+
+
+def _weekend_days() -> tuple[Any, ...]:
+    """The configured weekend weekdays (``config('app.weekend_days')`` as day names), or Sat/Sun."""
+    from arvel.kernel.globals import app, has_application
+
+    names = app().config("app.weekend_days", None) if has_application() else None
+    if not names:
+        return _DEFAULT_WEEKEND
+    resolved = tuple(
+        _WEEKDAYS[key] for name in names if (key := str(name).strip().lower()) in _WEEKDAYS
+    )
+    return resolved or _DEFAULT_WEEKEND
+
 
 _test_now: contextvars.ContextVar[ZonedDateTime | None] = contextvars.ContextVar(
     "arvel_test_now", default=None
@@ -50,6 +88,25 @@ class Date:
         dt = ZonedDateTime.parse_iso(str(value))
         return cls(dt if tz is None else dt.to_tz(tz))
 
+    @classmethod
+    def from_py(cls, value: Any, tz: str | None = None) -> Date:
+        """Wrap a stdlib ``datetime`` (e.g. a value a DateTime DB column hydrates to) in a Date.
+        A naive datetime is assumed to be in ``tz`` (the app timezone by default); an aware one is
+        converted to it. Falls back to ISO-string parsing, so a SQLite-stored ISO string still
+        reads back as a Date."""
+        import datetime as _datetime
+
+        if isinstance(value, Date):
+            return value
+        zone = tz or _app_timezone()
+        if isinstance(value, _datetime.datetime):
+            if value.tzinfo is None:
+                from zoneinfo import ZoneInfo
+
+                value = value.replace(tzinfo=ZoneInfo(zone))
+            return cls(Instant.from_timestamp(value.timestamp()).to_tz(zone))
+        return cls.parse(value, tz)
+
     def add(self, **units: int) -> Date:
         # whenever's add() overloads are keyword-only-by-name; **dict is fine at runtime.
         dt: Any = self._dt
@@ -67,7 +124,13 @@ class Date:
         return Date(self._dt.start_of("day"))
 
     def is_weekend(self) -> bool:
-        return self._dt.date().day_of_week() in (SATURDAY, SUNDAY)
+        """Whether this date falls on a weekend — per ``config('app.weekend_days')`` (day names),
+        defaulting to Saturday/Sunday. Carbon parity (weekend days are region-specific)."""
+        return self._dt.date().day_of_week() in _weekend_days()
+
+    def is_weekday(self) -> bool:
+        """The inverse of :meth:`is_weekend` — a working day under the configured weekend."""
+        return not self.is_weekend()
 
     def to_iso(self) -> str:
         return self._dt.format_iso()

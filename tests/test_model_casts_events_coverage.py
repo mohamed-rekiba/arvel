@@ -33,8 +33,10 @@ async def test_casts_events_and_app_db_resolution() -> None:
             num=5,
             meta={"a": 1},
         )
+        from datetime import datetime as _dt
+
         assert "saved" in fired  # model event dispatched via the container's events
-        assert isinstance(created._attributes["when"], str)  # datetime cast on set → ISO
+        assert isinstance(created._attributes["when"], _dt)  # datetime cast on set → real datetime
         assert isinstance(created._attributes["meta"], str)  # json cast on set → string
 
         reloaded = await Evented.find(created.id)  # read path resolved via app('db')

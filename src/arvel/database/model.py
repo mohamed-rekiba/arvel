@@ -21,11 +21,26 @@ if TYPE_CHECKING:
 
     from arvel.database.connections import ConnectionResolver
 
-# Python type -> SQLAlchemy type name for ``__fields__`` columns. NB: temporal fields (``datetime``)
-# fall through to String here on purpose — arvel stores datetimes as ISO strings (the ``datetime`` cast
-# + ``_now_iso`` timestamps), matching how created_at/updated_at are modelled. A real end-to-end
-# DateTime-column port is tracked separately.
+# Python type -> SQLAlchemy type name for ``__fields__`` columns. Temporal types are handled in
+# ``_sa_type`` (real ``DateTime``/``Date``), so datetimes round-trip as real values on every dialect
+# (incl. Postgres timestamptz), matching what migrations create. Unknown types fall back to String.
 _PY_TO_SA = {int: "Integer", str: "String", bool: "Boolean", float: "Float", dict: "JSON"}
+
+
+def _sa_type(sa: Any, field_type: Any) -> Any:
+    """Resolve a ``__fields__`` field type to a SQLAlchemy column type. A pre-built ``TypeEngine``
+    passes through; ``datetime``/``date`` map to real (timezone-aware) temporal columns; everything
+    else uses ``_PY_TO_SA`` (defaulting to String)."""
+    import datetime as _datetime
+
+    if isinstance(field_type, sa.types.TypeEngine):
+        return field_type
+    if field_type is _datetime.datetime:
+        return sa.DateTime(timezone=True)
+    if field_type is _datetime.date:
+        return sa.Date()
+    return getattr(sa, _PY_TO_SA.get(field_type, "String"))()
+
 
 _MODEL_REGISTRY: dict[str, type] = {}
 
@@ -114,10 +129,12 @@ class Prunable:
     ``prune()`` removes (e.g. expired tokens). Pair with a scheduled command (doc 12)."""
 
 
-def _now_iso() -> str:
+def _now() -> Any:
+    """The current instant as a stdlib timezone-aware ``datetime`` — bound into real
+    ``DateTime`` timestamp/soft-delete columns (the DB driver needs a datetime, not an ISO string)."""
     from arvel.dates import Date
 
-    return Date.now().to_iso()
+    return Date.now().to_py()
 
 
 def _build_table(cls: type[Any]) -> Any:
@@ -133,18 +150,21 @@ def _build_table(cls: type[Any]) -> Any:
         else:
             columns.append(sa.Column(pk, sa.Integer, primary_key=True, autoincrement=True))
     for field_name, field_type in cls.__fields__.items():
-        sa_type: Any = (
-            cast("Any", field_type)
-            if isinstance(field_type, sa.types.TypeEngine)
-            else getattr(sa, _PY_TO_SA.get(field_type, "String"))()
-        )
-        columns.append(sa.Column(field_name, sa_type, primary_key=(field_name == pk)))
+        # a "datetime"-cast field is a real DateTime column even if declared `str` (the cast now
+        # stores/returns real datetimes), so the column type and the cast can't disagree on Postgres.
+        if cls.__casts__.get(field_name) == "datetime" and not isinstance(
+            field_type, sa.types.TypeEngine
+        ):
+            col_type: Any = sa.DateTime(timezone=True)
+        else:
+            col_type = _sa_type(sa, field_type)
+        columns.append(sa.Column(field_name, col_type, primary_key=(field_name == pk)))
     if cls.__timestamps__:
         for ts in ("created_at", "updated_at"):
             if ts not in cls.__fields__:
-                columns.append(sa.Column(ts, sa.String, nullable=True))
+                columns.append(sa.Column(ts, sa.DateTime(timezone=True), nullable=True))
     if SoftDeletes in cls.__mro__ and "deleted_at" not in cls.__fields__:
-        columns.append(sa.Column("deleted_at", sa.String, nullable=True))
+        columns.append(sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
     # A __view__-backed model reads from the view relation (D5).
     name = (
         getattr(cls, "__view__", None) or cls.__table_name__ or Str.plural(Str.snake(cls.__name__))
@@ -629,7 +649,7 @@ class Model(metaclass=ModelMeta):
     def _touch_timestamps(self) -> None:
         if not self.__timestamps__:
             return
-        now = _now_iso()
+        now = _now()
         if not self._exists:
             self._attributes.setdefault("created_at", now)
         self._attributes["updated_at"] = now
@@ -681,7 +701,7 @@ class Model(metaclass=ModelMeta):
     async def delete(self) -> bool:
         self._guard_writable()
         if self._uses_soft_deletes():  # soft: stamp deleted_at, keep the row
-            self._attributes["deleted_at"] = _now_iso()
+            self._attributes["deleted_at"] = _now()
             await self._key_query().update({"deleted_at": self._attributes["deleted_at"]})
             await self._fire("deleted")
             return True
@@ -715,7 +735,7 @@ class Model(metaclass=ModelMeta):
     async def touch(self) -> Self:
         """Update the ``updated_at`` timestamp to now and persist it."""
         self._guard_writable()  # a view-backed model has no writable updated_at (D5)
-        now = _now_iso()
+        now = _now()
         self._attributes["updated_at"] = now
         if self._exists:
             await self._key_query().update({"updated_at": now})
@@ -755,6 +775,24 @@ class Model(metaclass=ModelMeta):
         method = type(self).__attributes_meta__.get(key)
         return method(self) if method is not None else None
 
+    def _effective_cast(self, key: str) -> Any:
+        """The cast for ``key`` — an explicit ``__casts__`` entry, an implicit ``datetime`` for the
+        timestamp/soft-delete columns (Laravel casts created_at/updated_at/deleted_at to Carbon by
+        default), or for a field *declared* with a ``datetime`` type — so a real ``DateTime`` column
+        always normalizes on write (→ datetime) and reads back as ``Date``, without a redundant cast."""
+        import datetime as _datetime
+
+        cast = self.__casts__.get(key)
+        if cast is not None:
+            return cast
+        if key in ("created_at", "updated_at") and self.__timestamps__:
+            return "datetime"
+        if key == "deleted_at" and self._uses_soft_deletes():
+            return "datetime"
+        if self.__fields__.get(key) is _datetime.datetime:
+            return "datetime"
+        return None
+
     def _cast_get(self, key: str, value: Any) -> Any:
         attr = self._accessor(key)
         if attr is not None and attr.get is not None:
@@ -764,7 +802,7 @@ class Model(metaclass=ModelMeta):
             if attr.cached:
                 self._accessor_cache[key] = result
             return result
-        cast = self.__casts__.get(key)
+        cast = self._effective_cast(key)
         if value is None or cast is None:
             return value
         if not isinstance(cast, (str, type)) and hasattr(cast, "get"):  # custom Cast protocol
@@ -774,7 +812,7 @@ class Model(metaclass=ModelMeta):
         if cast == "datetime":
             from arvel.dates import Date
 
-            return value if isinstance(value, Date) else Date.parse(value)
+            return value if isinstance(value, Date) else Date.from_py(value)
         if cast == "bool":
             return bool(value)
         if cast == "int":
@@ -789,7 +827,7 @@ class Model(metaclass=ModelMeta):
         attr = self._accessor(key)
         if attr is not None and attr.set is not None:
             return attr.set(value, self._attributes)
-        cast = self.__casts__.get(key)
+        cast = self._effective_cast(key)
         if cast is None:
             return value
         if not isinstance(cast, (str, type)) and hasattr(cast, "set"):  # custom Cast protocol
@@ -798,11 +836,16 @@ class Model(metaclass=ModelMeta):
             return value.value
         if cast == "json" and not isinstance(value, str):
             return json.dumps(value)
-        if cast == "datetime":
+        if cast == "datetime" and value is not None:
             from arvel.dates import Date
 
-            if isinstance(value, Date):
-                return value.to_iso()
+            # store a stdlib datetime so SQLAlchemy binds it to the real DateTime column; accept a
+            # Date, an ISO string, or a datetime
+            return (
+                Date.parse(value).to_py()
+                if isinstance(value, str)
+                else (value.to_py() if isinstance(value, Date) else value)
+            )
         if cast == "hashed" and value is not None:
             return self._hash().make(value)
         if cast == "encrypted" and value is not None:
