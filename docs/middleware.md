@@ -90,6 +90,10 @@ Global (every request, on by default):
   10 MiB) with `413`, before the handler runs.
 - **`ValidateHost`** — `400` when the `Host` isn't in `config('app.trusted_hosts')` (a no-op until
   you configure it).
+- **`MethodOverride`** — HTML form method-spoofing (Laravel `@method`): a `POST` whose
+  `application/x-www-form-urlencoded` body carries `_method=PUT|PATCH|DELETE` is routed as that verb,
+  so a `<form method="post">` can reach a PUT/PATCH/DELETE route. Runs at the ASGI layer before
+  routing; emit the field with `{{ method_field('PUT') }}`.
 
 Group / opt-in:
 

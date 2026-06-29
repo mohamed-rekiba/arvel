@@ -33,6 +33,7 @@ app and degrade safely when there's no app/session:
 | `can('update', post)` · `cannot('delete', post)` | authorization gate checks |
 | `auth()` · `guest()` | the current authenticated user (or `None`) / whether nobody is logged in (Laravel `@auth`/`@guest`) |
 | `csrf_token()` · `csrf_field()` | the session CSRF token / a hidden `_token` input |
+| `method_field('PUT')` | a hidden `_method` input so a form can target a PUT/PATCH/DELETE route (Laravel `@method`) |
 
 ```html
 <a href="{{ route('users.show', id=user.id) }}">{{ user.name }}</a>

@@ -244,7 +244,7 @@ class HttpKernel:
             )
             for methods, path, handler, group, middleware, name, security in self._routes
         ]
-        return litestar.Litestar(
+        litestar_app = litestar.Litestar(
             route_handlers=handlers,
             cors_config=self._cors_config(),
             openapi_config=self._openapi_config(),
@@ -261,6 +261,7 @@ class HttpKernel:
             },
             lifespan=[lifespan] if lifespan is not None else [],
         )
+        return litestar_app
 
     def _openapi_config(self) -> Any:
         """The OpenAPI document config — a typed view over the ``openapi`` config section
@@ -411,9 +412,13 @@ class HttpKernel:
         }
         return CORSConfig(**kwargs)
 
-    def as_asgi(self) -> Any:
-        """The ASGI application (a ``litestar.Litestar`` instance)."""
-        return self.build()
+    def as_asgi(self, lifespan: Any = None) -> Any:
+        """The served ASGI application: the Litestar app (from :meth:`build`) wrapped in
+        ``MethodOverride`` so a ``_method`` form field re-routes the request *before* Litestar matches
+        by HTTP method (Laravel @method). Non-HTTP scopes pass straight through to Litestar."""
+        from arvel.http.middleware import MethodOverride
+
+        return MethodOverride(self.build(lifespan))
 
     def openapi(self) -> dict[str, Any]:
         """The OpenAPI document Litestar generates from the registered routes (G4)."""

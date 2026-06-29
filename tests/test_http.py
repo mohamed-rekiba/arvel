@@ -58,11 +58,18 @@ def test_openapi_generated_by_litestar() -> None:
         assert "/ping" in schema.json()["paths"]
 
 
-def test_as_asgi_is_litestar_instance() -> None:
+def test_as_asgi_wraps_litestar_for_method_override() -> None:
+    from arvel.http.middleware import MethodOverride
+
     kernel = HttpKernel()
 
     async def index(request: object) -> dict[str, bool]:
         return {"ok": True}
 
     kernel.get("/", index)
-    assert isinstance(kernel.as_asgi(), litestar.Litestar)
+    # build() is the raw Litestar app (used for OpenAPI/introspection)…
+    assert isinstance(kernel.build(), litestar.Litestar)
+    # …and as_asgi() wraps it in MethodOverride so `_method` form-spoofing runs before routing.
+    served = kernel.as_asgi()
+    assert isinstance(served, MethodOverride)
+    assert isinstance(served.app, litestar.Litestar)

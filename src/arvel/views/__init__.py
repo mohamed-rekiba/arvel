@@ -90,6 +90,14 @@ def _csrf_field() -> Any:
     return Markup('<input type="hidden" name="_token" value="{}">').format(_csrf_token())
 
 
+def _method_field(method: str) -> Any:
+    """Template ``method_field('PUT')`` — a hidden ``_method`` input so an HTML form can target a
+    PUT/PATCH/DELETE route (Laravel ``@method``; honored by the ``MethodOverride`` middleware)."""
+    from markupsafe import Markup
+
+    return Markup('<input type="hidden" name="_method" value="{}">').format(method.upper())
+
+
 def _asset(path: str) -> str:
     """Template ``asset('css/app.css')`` helper — ``config('app.asset_url')`` (falling back to
     ``app.url``) joined with ``path``."""
@@ -146,6 +154,7 @@ class ViewFactory:
             asset=_asset,
             csrf_token=_csrf_token,
             csrf_field=_csrf_field,
+            method_field=_method_field,
             auth=_auth,
             guest=_guest,
         )

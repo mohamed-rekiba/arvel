@@ -469,3 +469,53 @@ class ValidateSignature(Middleware):
 
             return Response({"message": "Invalid signature."}, status=403)
         return await call_next(request)
+
+
+class MethodOverride:
+    """ASGI middleware for HTML form method-spoofing (Laravel ``@method``): a POST whose form body
+    carries ``_method=PUT|PATCH|DELETE`` is **routed as that method**.
+
+    It runs at the ASGI layer — *before* the router matches by HTTP method — so it rewrites
+    ``scope["method"]`` and replays the buffered body downstream (HTML forms can only GET/POST, so
+    this is how a ``<form method=post>`` reaches a PUT/PATCH/DELETE route). Only
+    ``application/x-www-form-urlencoded`` bodies are inspected; everything else passes through
+    untouched. Pair with the ``method_field()`` view global."""
+
+    _SPOOFABLE = frozenset({"PUT", "PATCH", "DELETE"})
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope.get("type") != "http" or scope.get("method") != "POST":
+            await self.app(scope, receive, send)
+            return
+        headers = dict(scope.get("headers") or [])
+        ctype = headers.get(b"content-type", b"").decode("latin-1").lower()
+        if not ctype.startswith("application/x-www-form-urlencoded"):
+            await self.app(scope, receive, send)
+            return
+
+        # buffer the request body so we can read _method, then replay it untouched downstream
+        buffered: list[Any] = []
+        body = b""
+        more = True
+        while more:
+            message = await receive()
+            buffered.append(message)
+            if message["type"] == "http.request":
+                body += message.get("body", b"")
+                more = message.get("more_body", False)
+            else:
+                more = False
+
+        from urllib.parse import parse_qs
+
+        override = (parse_qs(body.decode("latin-1")).get("_method") or [""])[0].upper()
+        if override in self._SPOOFABLE:
+            scope = {**scope, "method": override}
+
+        async def replay() -> Any:
+            return buffered.pop(0) if buffered else await receive()
+
+        await self.app(scope, replay, send)

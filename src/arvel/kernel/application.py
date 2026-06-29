@@ -251,7 +251,9 @@ class Application(Container):
         kernel.use_default_groups()  # web=session+CSRF, api=throttle — reachable by group-assigned routes
         if self.bound("router"):
             self.make("router").apply_to(kernel)
-        return kernel.build(lifespan=serve_lifespan(self))
+        # as_asgi (not build) wraps the Litestar app in MethodOverride so a `_method` form field
+        # re-routes before Litestar matches by HTTP method (Laravel @method).
+        return kernel.as_asgi(lifespan=serve_lifespan(self))
 
     # --- config convenience ------------------------------------------------
     @overload
