@@ -11,10 +11,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from arvel.http.middleware import Middleware
+# Structurally an arvel middleware (``handle``/``terminate``) but NOT a subclass of
+# ``arvel.http.middleware.Middleware`` — telemetry is a util module below http in the
+# layered DAG and must not import it (DR-0026). The kernel duck-types middleware (no
+# isinstance checks), and both methods are defined here, so no base class is needed.
 
 
-class TelemetryMiddleware(Middleware):
+class TelemetryMiddleware:
     _span: Any = None
     _token: Any = None
     _trace_on: bool = False
