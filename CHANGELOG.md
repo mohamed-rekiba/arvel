@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.46.2](https://github.com/mohamed-rekiba/arvel/compare/v0.46.1...v0.46.2) (2026-06-29)
+
+
+### Bug Fixes
+
+* **queue,db:** address review nits — TEXT columns, AMQP startup leak, pin collector ([8070167](https://github.com/mohamed-rekiba/arvel/commit/80701670aa56fb1a04791aba92fe01ae6dc7c116))
+
+
+### Documentation
+
+* testing.md integration tier, migrations.md default string length. ([f898c42](https://github.com/mohamed-rekiba/arvel/commit/f898c42340e6601c0d19c58e4559f11d4189075f))
+
 ## [0.46.1](https://github.com/mohamed-rekiba/arvel/compare/v0.46.0...v0.46.1) (2026-06-29)
 
 
