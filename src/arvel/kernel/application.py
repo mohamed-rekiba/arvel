@@ -238,22 +238,15 @@ class Application(Container):
         """Compile the registered routes into the served ASGI app (a litestar.Litestar).
 
         Runs the **synchronous** bootstrap first (``bootstrap_app``: env, config, provider
-        registration → the router and other bindings exist), then builds the Litestar app with a
-        lifespan that runs the **async** ``boot()``/``terminate()`` on ASGI startup/shutdown (B1).
-        ``arvel.http`` is imported lazily here (serve path only) so ``import arvel`` and the T0 CLI
-        stay light (G2)."""
-        from arvel.http import HttpKernel
-        from arvel.kernel.bootstrap import bootstrap_app, serve_lifespan
+        registration → the router and other bindings exist), then resolves the served-ASGI
+        builder the routing provider bound under ``http.asgi_builder``. The kernel must not
+        import ``arvel.http`` (kernel→capability is forbidden, DR-0026); the build logic lives
+        in ``arvel.routing`` (a legal downward edge) and is reached through the container — so
+        ``import arvel`` and the T0 CLI stay light (G2) without a kernel→http edge."""
+        from arvel.kernel.bootstrap import bootstrap_app
 
-        bootstrap_app(self)  # sync prep: env → config → providers register (binds router, etc.)
-        kernel = HttpKernel(app=self)
-        kernel.use_default_global()  # maintenance-mode 503 gate runs on every request
-        kernel.use_default_groups()  # web=session+CSRF, api=throttle — reachable by group-assigned routes
-        if self.bound("router"):
-            self.make("router").apply_to(kernel)
-        # as_asgi (not build) wraps the Litestar app in MethodOverride so a `_method` form field
-        # re-routes before Litestar matches by HTTP method (Laravel @method).
-        return kernel.as_asgi(lifespan=serve_lifespan(self))
+        bootstrap_app(self)  # sync prep: env → config → providers register (binds router + builder)
+        return self.make("http.asgi_builder")(self)
 
     # --- config convenience ------------------------------------------------
     @overload

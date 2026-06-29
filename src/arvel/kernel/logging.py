@@ -8,9 +8,25 @@ logger. Grounded in knowledge/port/04 (logging channels).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import structlog
+
+# Post-(re)configure hooks. ``configure_logging`` rebuilds structlog's processor
+# list and would drop any externally-inserted processor (e.g. telemetry's OTel log
+# bridge); rather than the kernel importing ``arvel.telemetry`` (an illegal
+# kernel→capability edge, DR-0026), capabilities register a callback here and the
+# kernel fires them after every (re)configuration. Inversion of control: the kernel
+# owns the seam; the capability fills it.
+_post_configure_hooks: list[Callable[[], None]] = []
+
+
+def on_logging_configured(hook: Callable[[], None]) -> None:
+    """Register a callback fired after each ``configure_logging`` run. Idempotent
+    on identity — registering the same callable twice is a no-op."""
+    if hook not in _post_configure_hooks:
+        _post_configure_hooks.append(hook)
 
 
 class LogManager:
@@ -78,8 +94,8 @@ def configure_logging(*, json_logs: bool = False) -> None:
     else:
         processors.append(structlog.dev.ConsoleRenderer())
     structlog.configure(processors=processors)
-    # Re-assert the telemetry log bridge if it's active — we just rebuilt the processor list and would
-    # otherwise drop it. No-op (and no opentelemetry import) when telemetry is off.
-    from arvel.telemetry import instrument_logging
-
-    instrument_logging()
+    # Fire post-configure hooks (e.g. telemetry re-asserts its OTel log bridge, which this
+    # rebuild would otherwise drop). The kernel does not know about telemetry — capabilities
+    # register their hook via ``on_logging_configured`` (DR-0026). No-op when none registered.
+    for hook in _post_configure_hooks:
+        hook()

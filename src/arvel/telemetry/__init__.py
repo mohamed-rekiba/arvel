@@ -218,6 +218,12 @@ def configure(
         global _otel_log_handler
         _otel_log_handler = handler
         instrument_logging()  # route arvel's Log (structlog) into OTel too, with trace context
+        # Re-assert the bridge whenever the kernel rebuilds structlog's processors. We register
+        # the hook here (telemetry→kernel is a legal capability→kernel edge) instead of the kernel
+        # importing telemetry (DR-0026). Idempotent: on_logging_configured dedups by identity.
+        from arvel.kernel.logging import on_logging_configured
+
+        on_logging_configured(instrument_logging)
         result.logger_provider = logger_provider
 
     if settings.sentry_dsn:
