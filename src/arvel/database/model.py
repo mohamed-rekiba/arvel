@@ -897,6 +897,27 @@ class Model(metaclass=ModelMeta):
         return resolve_hasher()
 
     # --- model events via the EventDispatcher CONTRACT (no arvel.events import)
+    #: lifecycle hooks an observer may handle (arvel fires these; `saving` may return False to cancel)
+    OBSERVABLE_EVENTS: ClassVar[tuple[str, ...]] = ("saving", "saved", "deleted", "restored")
+
+    @classmethod
+    def observe(cls, observer: Any) -> None:
+        """Register a model observer (Laravel ``Model::observe``). For each lifecycle hook the observer
+        defines a method for (``saving``/``saved``/``deleted``/``restored``), wire that method to this
+        model's event so it runs when the model fires it. ``saving`` returning ``False`` cancels the
+        save. Call from a provider's ``boot()`` (the events dispatcher must be bound). No-op without an
+        app/dispatcher."""
+        from arvel.kernel import app, has_application
+
+        if not (has_application() and app().bound("events")):
+            return
+        instance = observer() if isinstance(observer, type) else observer
+        dispatcher = app().make("events")
+        for hook in cls.OBSERVABLE_EVENTS:
+            method = getattr(instance, hook, None)
+            if callable(method):
+                dispatcher.listen(f"{cls.__name__}.{hook}", method)
+
     async def _fire(self, hook: str) -> Any:
         from arvel.kernel import app, has_application
 

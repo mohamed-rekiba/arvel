@@ -72,16 +72,27 @@ def _load(qualified: str) -> Any:
 
 
 def model_ref(value: Any) -> Any:
-    """Replace a Model instance with a ``(class, pk)`` ref; pass other values through.
+    """Make a value JSON-safe for the broker, **recursively**: a Model → a ``(class, pk)`` ref,
+    ``bytes`` → a tagged base64 string (msgspec encodes bytes to base64 but can't decode them back to
+    ``bytes`` without type info — e.g. a queued mailable's binary attachment), and lists/dicts are
+    walked so nested models/bytes are handled too. Tuples become lists (JSON has no tuples).
 
-    Jobs carry no live objects across the broker (01 §5: no closures/handles). A model is
-    reduced to its class + primary key on dispatch, then re-fetched fresh in the worker.
+    Jobs carry no live objects across the broker (01 §5: no closures/handles). A model is reduced to
+    its class + primary key on dispatch, then re-fetched fresh in the worker.
     """
     from arvel.database import Model
 
     if isinstance(value, Model):
         pk = type(value).__primary_key__
         return {"__model__": _qualified_name(type(value)), "__id__": getattr(value, pk)}
+    if isinstance(value, bytes):
+        import base64
+
+        return {"__bytes__": base64.b64encode(value).decode("ascii")}
+    if isinstance(value, (list, tuple)):
+        return [model_ref(item) for item in cast("list[Any]", value)]
+    if isinstance(value, dict):
+        return {key: model_ref(item) for key, item in cast("dict[Any, Any]", value).items()}
     return value
 
 
@@ -94,6 +105,14 @@ async def _rehydrate(value: Any) -> Any:
         ref = cast("dict[str, Any]", value)
         model_cls = _load(str(ref["__model__"]))
         return await model_cls.find(ref["__id__"])
+    if isinstance(value, dict) and "__bytes__" in value:
+        import base64
+
+        return base64.b64decode(str(cast("dict[str, Any]", value)["__bytes__"]))
+    if isinstance(value, list):
+        return [await _rehydrate(item) for item in cast("list[Any]", value)]
+    if isinstance(value, dict):
+        return {key: await _rehydrate(item) for key, item in cast("dict[Any, Any]", value).items()}
     return value
 
 

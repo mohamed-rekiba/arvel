@@ -54,6 +54,7 @@ appears. (No separate installer binary — one tool, like `git`.)
 | `make:event <Name>` | scaffold a domain event (`app/events/`) |
 | `make:listener <Name>` | scaffold an event listener (`app/listeners/`; register via `Event.listen`) |
 | `make:cast <Name>` | scaffold a custom attribute cast (`app/casts/`; use in a model's `__casts__`) |
+| `make:observer <Name>` | scaffold a model observer (`app/observers/`; register via `Model.observe()`) |
 | `route:list` | tabulate the app's routes (methods, path, name) |
 | `migrate` / `migrate:rollback` | apply / revert migrations |
 | `db:seed` | run the app's database seeder |

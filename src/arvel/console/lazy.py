@@ -41,6 +41,7 @@ class LazyGroup(TyperGroup):
         "make:event": "arvel.console.generators:make_event_app",
         "make:listener": "arvel.console.generators:make_listener_app",
         "make:cast": "arvel.console.generators:make_cast_app",
+        "make:observer": "arvel.console.generators:make_observer_app",
         "make:migration": "arvel.console.generators:make_migration_app",
         "db:seed": "arvel.console.seed:seed_app",
         "migrate": "arvel.console.migrate:migrate_app",

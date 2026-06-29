@@ -37,6 +37,7 @@ _CASES = {
     "event": ("app/events/order_placed.py", "class OrderPlaced"),
     "listener": ("app/listeners/notify_team.py", "class NotifyTeam"),
     "cast": ("app/casts/money.py", "class Money"),
+    "observer": ("app/observers/post_observer.py", "class PostObserver"),
 }
 
 _CLASS_NAMES = {
@@ -51,6 +52,7 @@ _CLASS_NAMES = {
     "event": "OrderPlaced",
     "listener": "NotifyTeam",
     "cast": "Money",
+    "observer": "PostObserver",
 }
 
 

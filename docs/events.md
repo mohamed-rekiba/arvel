@@ -138,6 +138,24 @@ async with events.transaction():
     await events.dispatch(UserRegistered(user)) # … the event fires; if it rolls back, it doesn't
 ```
 
+## Model observers
+
+A model fires lifecycle events — `saving`, `saved`, `deleted`, `restored` — and an **observer** groups
+their handlers for one model in a class (Laravel `Model::observe`). Register it from a provider's
+`boot()`:
+
+```python
+class PostObserver:
+    async def saving(self, post):    # return False to cancel the save
+        post.slug = slugify(post.title)
+    async def saved(self, post): ...
+    async def deleted(self, post): ...
+
+Post.observe(PostObserver())         # scaffold one with `make:observer`
+```
+
+Each method runs when `Post` fires the matching event; only the hooks you define are wired.
+
 ## Common mistakes & gotchas
 
 - **Listening with a string but dispatching a class (or vice-versa).** The channel must match:

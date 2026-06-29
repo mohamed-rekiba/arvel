@@ -188,6 +188,16 @@ _STUBS: dict[str, tuple[str, str]] = {
         "    def set(self, model: Any, key: str, value: Any, attributes: dict[str, Any]) -> Any:\n"
         "        return value\n",
     ),
+    "observer": (
+        "app/observers",
+        "from typing import Any\n\n\n"
+        "class {name}:\n"
+        '    """A model observer (Laravel). Register in a provider\'s boot: ``Post.observe({name}())``;\n'
+        '    `saving` may return False to cancel the save."""\n\n'
+        "    async def saving(self, model: Any) -> Any: ...\n\n"
+        "    async def saved(self, model: Any) -> None: ...\n\n"
+        "    async def deleted(self, model: Any) -> None: ...\n",
+    ),
 }
 
 
@@ -372,3 +382,12 @@ make_cast_app = typer.Typer()
 def make_cast(name: str) -> None:
     """Generate a custom attribute cast (app/casts/) — use via a model's __casts__."""
     _run("cast", name)
+
+
+make_observer_app = typer.Typer()
+
+
+@make_observer_app.command()
+def make_observer(name: str) -> None:
+    """Generate a model observer (app/observers/) — register via Model.observe() in a provider boot."""
+    _run("observer", name)

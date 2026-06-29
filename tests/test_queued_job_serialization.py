@@ -44,6 +44,28 @@ async def test_queued_mailable_serializes_and_rebuilds_renderable() -> None:
     assert mailable._attachment_list == []  # lazily created
 
 
+class MailWithAttachment(Mailable, ShouldQueue):
+    def __init__(self) -> None:
+        self.attach_data(b"\x89PNG\r\n\x1a\n binary", "logo.png", mime="image/png")
+
+    def build(self) -> Mailable:
+        return self.subject("Report").html("<p>see attached</p>")
+
+
+async def test_queued_mailable_attachment_bytes_survive_serialization() -> None:
+    # binary attachments must round-trip as bytes (msgspec base64-encodes bytes but decodes to str
+    # without type info — the recursive bytes-tagging in model_ref/_rehydrate preserves them).
+    job = SendQueuedMailable(["ada@example.com"], MailWithAttachment())
+    payload = serialize_instance(job)
+
+    rebuilt = await deserialize_any(payload)
+    mailable = await rebuilt._rebuild_mailable()
+    data, name, mime = mailable._attachment_list[0]
+    assert isinstance(data, bytes) and data == b"\x89PNG\r\n\x1a\n binary"
+    assert (name, mime) == ("logo.png", "image/png")
+    mailable.render()  # must not raise (a str attachment would crash add_attachment)
+
+
 async def test_queued_notification_serializes_and_rebuilds() -> None:
     job = SendQueuedNotification(notifiable=None, notification=WelcomeNotification("Ada"))
     payload = serialize_instance(
