@@ -99,21 +99,30 @@ class Builder:
     def _add(self, clause: Any, connector: str = "and") -> None:
         self._wheres.append((connector, clause))
 
+    @staticmethod
+    def _bind(value: Any) -> Any:
+        """Adapt an arvel value object to what the DB driver binds: an arvel ``Date`` becomes its
+        UTC-aware stdlib datetime, so ``where("col", "<", Date.now())`` works without the caller
+        dropping to ``.to_py()`` (Laravel accepts a Carbon directly). Other values pass through."""
+        from arvel.dates import Date
+
+        return value.raw.to_tz("UTC").to_stdlib() if isinstance(value, Date) else value
+
     def _comparison(self, column: str, operator: str, value: Any) -> Any:
         col = self._table.c[column]
         if operator == "like":
             return col.like(value)
         if operator == "in":
-            return col.in_(value)
-        return getattr(col, _COMPARISONS[operator])(value)
+            return col.in_([self._bind(v) for v in value])
+        return getattr(col, _COMPARISONS[operator])(self._bind(value))
 
     def _apply_conditions(
         self, args: tuple[Any, ...], kwargs: dict[str, Any], connector: str
     ) -> None:
         for column, val in kwargs.items():
-            self._add(self._table.c[column] == val, connector)
+            self._add(self._table.c[column] == self._bind(val), connector)
         if len(args) == 2:
-            self._add(self._table.c[args[0]] == args[1], connector)
+            self._add(self._table.c[args[0]] == self._bind(args[1]), connector)
         elif len(args) == 3:
             self._add(self._comparison(args[0], args[1], args[2]), connector)
 

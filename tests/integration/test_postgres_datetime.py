@@ -45,9 +45,10 @@ async def test_datetime_columns_round_trip_on_postgres(postgres_url: str) -> Non
         assert isinstance(found.starts_at, Date)
         assert found.starts_at.to_iso().startswith("2026-06-29T09:30:00")
 
-        # a datetime range query works against the real timestamptz column
+        # a datetime range query works against the real timestamptz column — pass a Date directly
+        # (no .to_py()): the builder adapts it at the bind boundary
         later = await Meeting.where(
-            "starts_at", "<", Date.parse("2026-07-01T00:00:00+00:00[UTC]").to_py()
+            "starts_at", "<", Date.parse("2026-07-01T00:00:00+00:00[UTC]")
         ).get()
         assert [x.title for x in later] == ["standup"]
     finally:

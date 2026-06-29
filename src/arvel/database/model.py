@@ -129,12 +129,42 @@ class Prunable:
     ``prune()`` removes (e.g. expired tokens). Pair with a scheduled command (doc 12)."""
 
 
-def _now() -> Any:
-    """The current instant as a stdlib timezone-aware ``datetime`` — bound into real
-    ``DateTime`` timestamp/soft-delete columns (the DB driver needs a datetime, not an ISO string)."""
+def _to_db_datetime(value: Any) -> Any:
+    """Normalize a Date / stdlib datetime / ISO string to a **UTC-aware** stdlib ``datetime`` for
+    storage. UTC is the on-disk timezone so the round-trip is instant-faithful on every dialect:
+    Postgres ``timestamptz`` keeps the instant regardless, and SQLite (which drops the offset and
+    reads back a naive value) then stores a UTC wall-clock that :func:`_from_db_datetime` reads as
+    UTC — so a value stored in a non-UTC zone is not silently shifted on SQLite."""
     from arvel.dates import Date
 
-    return Date.now().to_py()
+    if isinstance(value, str):
+        date = Date.parse(value)
+    elif isinstance(value, Date):
+        date = value
+    else:
+        date = Date.from_py(value)  # stdlib datetime (naive ⇒ app tz, aware ⇒ instant)
+    return date.raw.to_tz("UTC").to_stdlib()
+
+
+def _from_db_datetime(value: Any) -> Any:
+    """Interpret a value read back from a DateTime column. A **naive** datetime means SQLite (which
+    dropped the offset) — it was stored as a UTC wall-clock (see :func:`_to_db_datetime`), so attach
+    UTC; an aware datetime (Postgres) or a string passes through for :meth:`Date.from_py`."""
+    import datetime as _datetime
+
+    if isinstance(value, _datetime.datetime) and value.tzinfo is None:
+        from zoneinfo import ZoneInfo
+
+        return value.replace(tzinfo=ZoneInfo("UTC"))
+    return value
+
+
+def _now() -> Any:
+    """The current instant as a UTC-aware stdlib ``datetime`` — bound into real ``DateTime``
+    timestamp/soft-delete columns (the DB driver needs a datetime, not an ISO string)."""
+    from arvel.dates import Date
+
+    return _to_db_datetime(Date.now())
 
 
 def _build_table(cls: type[Any]) -> Any:
@@ -812,7 +842,7 @@ class Model(metaclass=ModelMeta):
         if cast == "datetime":
             from arvel.dates import Date
 
-            return value if isinstance(value, Date) else Date.from_py(value)
+            return value if isinstance(value, Date) else Date.from_py(_from_db_datetime(value))
         if cast == "bool":
             return bool(value)
         if cast == "int":
@@ -837,15 +867,9 @@ class Model(metaclass=ModelMeta):
         if cast == "json" and not isinstance(value, str):
             return json.dumps(value)
         if cast == "datetime" and value is not None:
-            from arvel.dates import Date
-
-            # store a stdlib datetime so SQLAlchemy binds it to the real DateTime column; accept a
-            # Date, an ISO string, or a datetime
-            return (
-                Date.parse(value).to_py()
-                if isinstance(value, str)
-                else (value.to_py() if isinstance(value, Date) else value)
-            )
+            # store a UTC-aware stdlib datetime so SQLAlchemy binds it to the real DateTime column
+            # (accepts a Date, an ISO string, or a datetime) and the round-trip stays instant-faithful
+            return _to_db_datetime(value)
         if cast == "hashed" and value is not None:
             return self._hash().make(value)
         if cast == "encrypted" and value is not None:

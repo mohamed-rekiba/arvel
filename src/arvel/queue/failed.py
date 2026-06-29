@@ -18,7 +18,8 @@ class FailedJob(HasUuids, Model):
     no created/updated timestamps — Laravel's ``failed_jobs`` only stamps ``failed_at``)."""
 
     __table_name__ = "failed_jobs"
-    # `failed_at` casts to an ISO string itself, so the migration's DATETIME column is cast-compatible.
+    # `failed_at` is a real DateTime column (DR-0023): the datetime cast stores/reads a real datetime
+    # (read back as a Date), matching the migration's DATETIME column.
     __fields__: ClassVar[dict[str, type]] = {
         "queue": str,
         "payload": str,

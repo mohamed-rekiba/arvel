@@ -93,6 +93,45 @@ async def test_timestamps_round_trip_as_date() -> None:
         await db.dispose()
 
 
+async def test_round_trip_preserves_instant_under_non_utc_app_tz() -> None:
+    """Regression (review B1): SQLite drops the tz offset and reads back a naive value. Datetimes are
+    stored as UTC and read back as UTC, so a value stored under a non-UTC app timezone keeps its
+    instant rather than being silently shifted."""
+    from arvel.kernel import Application, set_application
+
+    app = Application()
+    app.make("config").set("app.timezone", "America/New_York")
+    set_application(app)
+    db = ConnectionResolver()
+    Appt.set_connection(db)
+    try:
+        await db.execute(sa.schema.CreateTable(Appt.__table__))
+        stored = Date.parse("2026-06-29T09:00:00+00:00[UTC]")
+        a = await Appt.create(name="x", starts_at=stored)
+        found = await Appt.find(a.id)
+        assert found is not None
+        assert found.starts_at == stored  # same instant (Date.__eq__ is instant-based), not shifted
+    finally:
+        await db.dispose()
+        set_application(None)
+
+
+async def test_where_accepts_a_date_directly() -> None:
+    """N1: a Date can be passed to where() without dropping to .to_py() (Laravel accepts a Carbon)."""
+    db = ConnectionResolver()
+    Appt.set_connection(db)
+    try:
+        await db.execute(sa.schema.CreateTable(Appt.__table__))
+        await Appt.create(name="early", starts_at=Date.parse("2026-06-01T00:00:00+00:00[UTC]"))
+        await Appt.create(name="late", starts_at=Date.parse("2026-07-01T00:00:00+00:00[UTC]"))
+        rows = await Appt.where(
+            "starts_at", "<", Date.parse("2026-06-15T00:00:00+00:00[UTC]")
+        ).get()
+        assert [r.name for r in rows] == ["early"]
+    finally:
+        await db.dispose()
+
+
 async def test_datetime_cast_accepts_iso_string_input() -> None:
     db = ConnectionResolver()
     Token.set_connection(db)

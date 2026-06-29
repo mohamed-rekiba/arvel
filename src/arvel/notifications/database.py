@@ -18,9 +18,9 @@ class DatabaseNotification(HasUuids, Model):
     """A stored notification row. UUID primary key; ``data`` is JSON; ``read_at`` is null until read."""
 
     __table_name__ = "notifications"
-    # NB: the `data`/`read_at` casts serialize to strings themselves (JSON text / ISO datetime — arvel's
-    # standard storage, like created_at/updated_at), so the scaffold migration's TEXT/DATETIME columns
-    # and these field types are intentionally cast-compatible, not drift. Don't "fix" the mismatch.
+    # NB: `data` is JSON text; `read_at` is a real DateTime column (DR-0023) — the datetime cast
+    # stores/reads a real datetime (read back as a Date). Both match the scaffold migration's
+    # TEXT/DATETIME columns.
     __fields__: ClassVar[dict[str, type]] = {
         "type": str,
         "notifiable_type": str,
