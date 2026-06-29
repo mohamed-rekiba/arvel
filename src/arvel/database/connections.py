@@ -113,15 +113,48 @@ class ConnectionResolver:
         if has_application() and app().bound("events"):
             await app().make("events").dispatch(QueryExecuted(sql, rounded, name or self._default))
 
+    # --- telemetry ----------------------------------------------------------
+    def _dialect(self, name: str | None) -> str:
+        """Dialect name for ``db.system`` (best-effort: sqlite/postgresql/mysql)."""
+        try:
+            return str(self.engine(name).dialect.name)
+        except Exception:
+            return "sql"
+
+    @contextlib.contextmanager
+    def _trace_query(self, statement: Any, name: str | None) -> Any:
+        """Wrap a query in an OpenTelemetry CLIENT span when tracing is on; a no-op (and no
+        opentelemetry import) otherwise. ``db.statement`` is the unbound SQL — placeholders only,
+        never bind values (DR-0020)."""
+        from arvel.telemetry import is_tracing_enabled
+
+        if not is_tracing_enabled():
+            yield
+            return
+        from opentelemetry import trace
+        from opentelemetry.trace import SpanKind
+
+        sql = str(statement)
+        operation = sql.split(None, 1)[0].upper() if sql.strip() else "QUERY"
+        # start_as_current_span records the exception + sets ERROR status on a raise by default,
+        # then re-raises — so a failed query is marked and propagates unchanged.
+        with trace.get_tracer("arvel.database").start_as_current_span(
+            f"db {operation}", kind=SpanKind.CLIENT
+        ) as span:
+            span.set_attribute("db.system", self._dialect(name))
+            span.set_attribute("db.statement", sql)
+            yield
+
     # --- reads / writes -----------------------------------------------------
     async def fetch_all(self, statement: Any, name: str | None = None) -> list[Any]:
         start = time.perf_counter()
-        active = _active_conn.get()
-        if active is not None:  # inside a transaction → run on its connection
-            rows = list((await active.execute(statement)).mappings().all())
-        else:
-            async with self.engine(name, "read").connect() as conn:
-                rows = list((await conn.execute(statement)).mappings().all())
+        with self._trace_query(statement, name):
+            active = _active_conn.get()
+            if active is not None:  # inside a transaction → run on its connection
+                rows = list((await active.execute(statement)).mappings().all())
+            else:
+                async with self.engine(name, "read").connect() as conn:
+                    rows = list((await conn.execute(statement)).mappings().all())
         await self._record(statement, (time.perf_counter() - start) * 1000, name)
         return rows
 
@@ -131,12 +164,13 @@ class ConnectionResolver:
 
     async def scalar(self, statement: Any, name: str | None = None) -> Any:
         start = time.perf_counter()
-        active = _active_conn.get()
-        if active is not None:
-            value = (await active.execute(statement)).scalar()
-        else:
-            async with self.engine(name, "read").connect() as conn:
-                value = (await conn.execute(statement)).scalar()
+        with self._trace_query(statement, name):
+            active = _active_conn.get()
+            if active is not None:
+                value = (await active.execute(statement)).scalar()
+            else:
+                async with self.engine(name, "read").connect() as conn:
+                    value = (await conn.execute(statement)).scalar()
         await self._record(statement, (time.perf_counter() - start) * 1000, name)
         return value
 
@@ -165,12 +199,13 @@ class ConnectionResolver:
 
     async def execute(self, statement: Any, name: str | None = None) -> WriteResult:
         start = time.perf_counter()
-        active = _active_conn.get()
-        if active is not None:  # inside a transaction → write on its connection (no commit)
-            primary_key, rowcount = self._write_meta(await active.execute(statement))
-        else:
-            async with self.engine(name, "write").begin() as conn:
-                primary_key, rowcount = self._write_meta(await conn.execute(statement))
+        with self._trace_query(statement, name):
+            active = _active_conn.get()
+            if active is not None:  # inside a transaction → write on its connection (no commit)
+                primary_key, rowcount = self._write_meta(await active.execute(statement))
+            else:
+                async with self.engine(name, "write").begin() as conn:
+                    primary_key, rowcount = self._write_meta(await conn.execute(statement))
         self._mark_sticky(name)
         await self._record(statement, (time.perf_counter() - start) * 1000, name)
         return WriteResult(rowcount=rowcount, primary_key=primary_key)
