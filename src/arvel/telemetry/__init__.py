@@ -16,6 +16,7 @@ the active trace.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from typing import Any
 
@@ -240,6 +241,36 @@ def meter(name: str = "arvel") -> Any:
     return metrics.get_meter(name)
 
 
+@contextlib.contextmanager
+def span(name: str, *, kind: str = "internal", attributes: dict[str, Any] | None = None) -> Any:
+    """Open a gated OpenTelemetry span around a block — a no-op (yields ``None``, imports no
+    opentelemetry) when tracing is off. ``kind`` is internal|client|server|consumer|producer. Sets
+    ERROR status + records the exception if the block raises. Used to instrument library calls
+    (cache, the HTTP client, …) consistently."""
+    if not is_tracing_enabled():
+        yield None
+        return
+    from opentelemetry import trace
+    from opentelemetry.trace import SpanKind, Status, StatusCode
+
+    span_kind = {
+        "client": SpanKind.CLIENT,
+        "server": SpanKind.SERVER,
+        "consumer": SpanKind.CONSUMER,
+        "producer": SpanKind.PRODUCER,
+        "internal": SpanKind.INTERNAL,
+    }.get(kind, SpanKind.INTERNAL)
+    with trace.get_tracer("arvel").start_as_current_span(name, kind=span_kind) as current:
+        for key, value in (attributes or {}).items():
+            current.set_attribute(key, value)
+        try:
+            yield current
+        except Exception as exc:
+            current.set_status(Status(StatusCode.ERROR))
+            current.record_exception(exc)
+            raise
+
+
 async def prometheus_metrics(request: Any = None) -> Any:
     """Route handler for a Prometheus scrape endpoint — returns the current metrics in the exposition
     format. ``TelemetryServiceProvider`` registers it at ``/metrics`` when ``telemetry.prometheus`` is
@@ -317,5 +348,6 @@ __all__ = [
     "is_tracing_enabled",
     "meter",
     "prometheus_metrics",
+    "span",
     "tracer",
 ]

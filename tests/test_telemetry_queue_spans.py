@@ -56,6 +56,27 @@ async def test_job_span_nests_under_dispatching_trace() -> None:
     assert job.parent.span_id == parent.get_span_context().span_id
 
 
+async def test_job_span_links_to_dispatching_trace_across_the_broker() -> None:
+    """Cross-process: the traceparent captured at dispatch rides in the payload, so a job run in a
+    separate context (no ambient span) still links to the dispatching request's trace."""
+    from opentelemetry import trace
+
+    from arvel.queue import deserialize_instance, serialize_instance
+
+    exporter = _capture_spans()
+    parent = trace.get_tracer_provider().get_tracer("t").start_span("request")
+    with trace.use_span(parent, end_on_exit=True):
+        payload = serialize_instance(_Greet())  # dispatch — captures the traceparent into the payload
+
+    # "worker side": a fresh context with no ambient span — only the payload carries the link
+    job = await deserialize_instance(payload)
+    await _manager()._invoke(job)
+
+    span = next(s for s in exporter.get_finished_spans() if s.name == "job _Greet")
+    assert span.parent is not None
+    assert span.parent.trace_id == parent.get_span_context().trace_id  # same trace across the broker
+
+
 async def test_no_span_and_result_unchanged_when_tracing_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

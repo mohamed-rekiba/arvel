@@ -14,6 +14,7 @@ from typing import Any
 
 from arvel.kernel import Settings
 from arvel.support.manager import Manager
+from arvel.telemetry import span
 
 
 class CacheSettings(Settings):
@@ -39,23 +40,29 @@ class CacheRepository:
         return self._client
 
     async def get(self, key: str, default: Any = None) -> Any:
-        value = await self._client.get(key)
-        return default if value is None else value
+        with span("cache get", kind="client", attributes={"cache.operation": "get"}) as sp:
+            value = await self._client.get(key)
+            if sp is not None:
+                sp.set_attribute("cache.hit", value is not None)
+            return default if value is None else value
 
     async def put(self, key: str, value: Any, ttl: int | None = None) -> bool:
-        await self._client.set(key, value, expire=ttl)
-        return True
+        with span("cache put", kind="client", attributes={"cache.operation": "put"}):
+            await self._client.set(key, value, expire=ttl)
+            return True
 
     async def has(self, key: str) -> bool:
         return await self._client.get(key) is not None
 
     async def forget(self, key: str) -> bool:
-        await self._client.delete(key)
-        return True
+        with span("cache forget", kind="client", attributes={"cache.operation": "forget"}):
+            await self._client.delete(key)
+            return True
 
     async def increment(self, key: str, by: int = 1) -> int:
         """Atomically add ``by`` to a counter (created at 0 if absent); returns the new value."""
-        return int(await self._client.incr(key, by))
+        with span("cache increment", kind="client", attributes={"cache.operation": "increment"}):
+            return int(await self._client.incr(key, by))
 
     async def expire(self, key: str, ttl: int) -> bool:
         """Set/refresh a key's time-to-live in seconds."""

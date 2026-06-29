@@ -173,7 +173,12 @@ When telemetry is on, arvel traces the request lifecycle with **no code**:
   honors incoming W3C `traceparent` headers, so a request is one distributed trace across services.
 - **Database queries** → a `CLIENT` span `db SELECT` per query (with `db.system` and the SQL text),
   nested under the request.
-- **Queue jobs** → a `CONSUMER` span `job SendWelcome` around each job's execution.
+- **Cache operations** → a `CLIENT` span `cache get`/`cache put`/… (`get` records `cache.hit`).
+- **Outbound HTTP** (the `Http` client) → a `CLIENT` span `HTTP GET` that **injects the W3C
+  `traceparent`** into the outgoing request, so the called service continues the same trace.
+- **Queue jobs** → a `CONSUMER` span `job SendWelcome` around each job's execution. The dispatching
+  trace context rides in the job payload, so even a job run by a **separate worker process** links back
+  to the request that queued it.
 
 A single request trace therefore looks like:
 
@@ -325,8 +330,9 @@ config = {"enabled": True, "endpoint": "...", "sentry_dsn": env("SENTRY_DSN", ""
   just `http://host:4318`.
 - **Expecting spans while disabled.** `tracer()`/`meter()` always return objects, but with telemetry off
   they're no-ops (nothing is exported). Turn on `enabled`.
-- **Auto-instrumentation scope.** HTTP requests, DB queries, and queue jobs are auto-traced; other
-  internals (cache, outbound HTTP) are not yet — wrap those with `tracer()` where you want detail.
+- **Auto-instrumentation scope.** HTTP requests, DB queries, cache operations, outbound HTTP, and queue
+  jobs are auto-traced. For anything else, wrap it with `tracer()` (or the `span()` helper) where you
+  want detail.
 - **Prometheus vs push.** `prometheus: true` changes only *metrics* delivery; traces and logs still push
   over OTLP via `endpoint`.
 

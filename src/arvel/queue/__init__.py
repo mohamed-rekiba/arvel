@@ -97,6 +97,21 @@ async def _rehydrate(value: Any) -> Any:
     return value
 
 
+def _trace_carrier() -> dict[str, str]:
+    """The current W3C trace context as a carrier, to ride along in a job payload so the worker can
+    continue the dispatching trace (cross-process linking). Empty + no opentelemetry import when
+    tracing is off."""
+    from arvel.telemetry import is_tracing_enabled
+
+    if not is_tracing_enabled():
+        return {}
+    from opentelemetry.propagate import inject
+
+    carrier: dict[str, str] = {}
+    inject(carrier)
+    return carrier
+
+
 def serialize(job_cls: type, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
     import msgspec
 
@@ -105,6 +120,7 @@ def serialize(job_cls: type, args: tuple[Any, ...], kwargs: dict[str, Any]) -> s
             "job": _qualified_name(job_cls),
             "args": [model_ref(a) for a in args],
             "kwargs": {k: model_ref(v) for k, v in kwargs.items()},
+            "_trace": _trace_carrier(),
         }
     ).decode()
 
@@ -117,6 +133,7 @@ async def deserialize(payload: str) -> Job:
     args = [await _rehydrate(a) for a in data["args"]]
     kwargs = {k: await _rehydrate(v) for k, v in data["kwargs"].items()}
     job: Job = job_cls(*args, **kwargs)
+    job.__arvel_trace__ = data.get("_trace")  # type: ignore[attr-defined]  # parent trace for the job span
     return job
 
 
@@ -127,8 +144,10 @@ def serialize_instance(job: Job) -> str:
     """
     import msgspec
 
-    state = {key: model_ref(val) for key, val in vars(job).items()}
-    return msgspec.json.encode({"job": _qualified_name(type(job)), "state": state}).decode()
+    state = {key: model_ref(val) for key, val in vars(job).items() if key != "__arvel_trace__"}
+    return msgspec.json.encode(
+        {"job": _qualified_name(type(job)), "state": state, "_trace": _trace_carrier()}
+    ).decode()
 
 
 async def deserialize_instance(payload: str) -> Job:
@@ -139,6 +158,7 @@ async def deserialize_instance(payload: str) -> Job:
     job: Job = job_cls.__new__(job_cls)  # bypass __init__; restore attribute state directly
     for key, val in cast("dict[str, Any]", data["state"]).items():
         setattr(job, key, await _rehydrate(val))
+    job.__arvel_trace__ = data.get("_trace")  # type: ignore[attr-defined]  # parent trace for the job span
     return job
 
 
@@ -221,9 +241,20 @@ def _job_span(job: Job) -> Any:
     from opentelemetry.trace import SpanKind
 
     name = type(job).__name__
-    with trace.get_tracer("arvel.queue").start_as_current_span(
-        f"job {name}", kind=SpanKind.CONSUMER
-    ) as span:
+    tracer = trace.get_tracer("arvel.queue")
+    # A traceparent captured at dispatch (rides in the payload) makes this job a child of the
+    # dispatching request even across a separate worker process. No carrier → ambient nesting
+    # (the inline case) or a fresh root (a standalone worker).
+    carrier = getattr(job, "__arvel_trace__", None)
+    if carrier:
+        from opentelemetry.propagate import extract
+
+        cm = tracer.start_as_current_span(
+            f"job {name}", context=extract(carrier), kind=SpanKind.CONSUMER
+        )
+    else:
+        cm = tracer.start_as_current_span(f"job {name}", kind=SpanKind.CONSUMER)
+    with cm as span:
         span.set_attribute("messaging.system", "arvel.queue")
         span.set_attribute("messaging.operation", "process")
         span.set_attribute("messaging.destination.name", str(getattr(job, "queue", "default")))

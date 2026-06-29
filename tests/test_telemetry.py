@@ -182,3 +182,51 @@ def test_tracer_helper_returns_a_usable_tracer() -> None:
     span_tracer = tracer("arvel.test")
     with span_tracer.start_as_current_span("unit"):
         pass  # no exception → a real tracer (no-op or configured)
+
+
+def test_push_metric_reader_built_for_console_and_otlp() -> None:
+    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+
+    from arvel.telemetry import _build_metric_reader
+
+    console = TelemetrySettings()
+    console.exporter = "console"
+    assert isinstance(_build_metric_reader(console), PeriodicExportingMetricReader)
+
+    otlp = TelemetrySettings()
+    otlp.exporter = "otlp"
+    otlp.endpoint = "http://h:4318/v1/traces"
+    assert isinstance(_build_metric_reader(otlp), PeriodicExportingMetricReader)
+
+
+def test_otlp_log_exporter_built() -> None:
+    from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+
+    from arvel.telemetry import _build_log_exporter
+
+    otlp = TelemetrySettings()
+    otlp.exporter = "otlp"
+    otlp.endpoint = "http://h:4318/v1/traces"
+    assert isinstance(_build_log_exporter(otlp), OTLPLogExporter)
+
+
+def test_span_helper_is_a_noop_when_tracing_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    import arvel.telemetry
+    from arvel.telemetry import span
+
+    monkeypatch.setattr(arvel.telemetry, "is_tracing_enabled", lambda: False)
+    with span("work", kind="client", attributes={"x": 1}) as current:
+        assert current is None  # off → yields None, no span, no opentelemetry work
+
+
+def test_disabled_telemetry_does_no_opentelemetry_work(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The 'off = free' guarantee: with telemetry off, the instrumentation helpers short-circuit to
+    a no-op (a bool check + a no-op context manager) — they create no spans and touch no OTel state."""
+    import arvel.telemetry
+    from arvel.telemetry import span
+
+    monkeypatch.setattr(arvel.telemetry, "is_tracing_enabled", lambda: False)
+    ran = []
+    with span("cache get", kind="client") as current:
+        ran.append(current)  # the block still runs (transparent), just without a span
+    assert ran == [None]

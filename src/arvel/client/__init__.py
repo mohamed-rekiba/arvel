@@ -11,6 +11,8 @@ from typing import Any
 
 import httpx
 
+from arvel.telemetry import span
+
 
 class PendingRequest:
     """A configurable, sendable HTTP request."""
@@ -38,13 +40,31 @@ class PendingRequest:
         return self
 
     async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
-        async with httpx.AsyncClient(
-            base_url=self._base_url,
-            headers=self._headers,
-            timeout=self._timeout,
-            transport=self._transport,
-        ) as client:
-            return await client.request(method, url, **kwargs)
+        with span(
+            f"HTTP {method.upper()}",
+            kind="client",
+            attributes={"http.request.method": method.upper(), "url.full": str(url)},
+        ) as sp:
+            if sp is not None:
+                from opentelemetry.propagate import inject
+
+                headers = dict(kwargs.get("headers") or {})
+                inject(headers)  # W3C traceparent → the callee continues this trace (distributed)
+                kwargs["headers"] = headers
+            async with httpx.AsyncClient(
+                base_url=self._base_url,
+                headers=self._headers,
+                timeout=self._timeout,
+                transport=self._transport,
+            ) as client:
+                response = await client.request(method, url, **kwargs)
+            if sp is not None:
+                sp.set_attribute("http.response.status_code", response.status_code)
+                if response.status_code >= 400:
+                    from opentelemetry.trace import Status, StatusCode
+
+                    sp.set_status(Status(StatusCode.ERROR))
+            return response
 
     async def get(self, url: str, **kwargs: Any) -> httpx.Response:
         return await self.request("GET", url, **kwargs)
