@@ -442,3 +442,30 @@ class ShareErrorsFromSession(Middleware):
             bag = FlashBag(cast("dict[str, Any]", session))
             app("view").share(errors=bag.errors(), old=bag.old)
         return await call_next(request)
+
+
+class ValidateSignature(Middleware):
+    """Laravel's ``signed`` middleware: reject (**403**) a request whose URL lacks a valid signature.
+
+    Pair it with :meth:`arvel.routing.Router.signed_url` (``Route.signed_url(name, ...)``): the
+    signature is an itsdangerous MAC over the route's path+query (plus an optional ``expires`` unix
+    timestamp), and the signing key defaults to the app key. Apply per route, e.g.
+    ``Route.get("/unsubscribe/{id}", handler).middleware(ValidateSignature)``. A tampered or expired
+    URL gets a 403 before the handler runs."""
+
+    async def handle(self, request: Any, call_next: Any) -> Any:
+        from arvel.kernel import app, has_application
+
+        raw_url = getattr(getattr(request, "raw", None), "url", None)
+        url = str(getattr(raw_url, "path", "") or request.path())
+        query = str(getattr(raw_url, "query", "") or "")
+        if query:
+            url += "?" + query
+        valid = (
+            has_application() and app().bound("router") and app("router").has_valid_signature(url)
+        )
+        if not valid:
+            from arvel.http.response import Response
+
+            return Response({"message": "Invalid signature."}, status=403)
+        return await call_next(request)

@@ -67,15 +67,28 @@ Tamper-evident links (password resets, unsubscribe, email confirmation) carry a 
 the URL; an optional `expires` makes them temporary:
 
 ```python
-link = router.signed_url("unsubscribe", key=APP_KEY, user=7)
-temp = router.signed_url("confirm", key=APP_KEY, expires=ts, token=t)
+link = router.signed_url("unsubscribe", user=7)            # key defaults to the app key
+temp = router.signed_url("confirm", expires=ts, token=t)   # temporary (expires is a unix ts)
 
-if router.has_valid_signature(request.full_url(), key=APP_KEY):
+if router.has_valid_signature(request.full_url()):
     ...                                            # signature intact AND not expired
 ```
 
 The signature is an itsdangerous MAC appended as a `signature` query param; verification checks
-both integrity and (if present) that `expires` is still in the future.
+both integrity and (if present) that `expires` is still in the future. The signing key defaults to
+the app key (`config('app.key')`); pass `key=` to override (a rotated key invalidates old links).
+
+Protect a route declaratively with the **signed** middleware (Laravel's `signed`) instead of
+checking by hand:
+
+```python
+from arvel.http.middleware import ValidateSignature
+
+Route.get("/unsubscribe", unsubscribe, name="unsubscribe").middleware(ValidateSignature)
+```
+
+A request to that route without a valid (or with an expired) signature gets a **403** before the
+handler runs.
 
 ## Resource controllers
 

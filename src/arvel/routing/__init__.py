@@ -325,28 +325,47 @@ class Router:
                 return path
         raise KeyError(f"No route named {name!r}")
 
-    def signed_url(self, name: str, *, key: str, expires: int | None = None, **params: Any) -> str:
+    @staticmethod
+    def _signing_key(key: str | None) -> str:
+        """The signing key — an explicit ``key`` or, by default, the app key (``config('app.key')``,
+        Laravel parity). Raises a clear error if neither is available."""
+        if key is not None:
+            return key
+        from arvel.kernel import app, has_application
+
+        app_key = app("config").get("app.key") if has_application() else None
+        if not app_key:
+            raise RuntimeError(
+                "signed URLs need a key: pass key=, or set config('app.key') (APP_KEY)."
+            )
+        return str(app_key)
+
+    def signed_url(
+        self, name: str, *, key: str | None = None, expires: int | None = None, **params: Any
+    ) -> str:
         """A tamper-evident URL for a named route (Laravel ``URL::signedRoute``).
 
-        ``expires`` (a unix timestamp) makes it temporary. The signature is an
-        itsdangerous MAC over the URL, appended as a ``signature`` query param.
+        ``expires`` (a unix timestamp) makes it temporary. The signature is an itsdangerous MAC over
+        the URL, appended as a ``signature`` query param. ``key`` defaults to the app key.
         """
         from arvel.security import Signer
 
         url = self.url(name, **params)
         if expires is not None:
             url += ("&" if "?" in url else "?") + f"expires={expires}"
-        token = Signer(key).sign(url)
+        token = Signer(self._signing_key(key)).sign(url)
         return url + ("&" if "?" in url else "?") + f"signature={token}"
 
-    def has_valid_signature(self, url: str, *, key: str) -> bool:
-        """Verify a ``signed_url`` (integrity + ``expires`` not in the past)."""
+    def has_valid_signature(self, url: str, *, key: str | None = None) -> bool:
+        """Verify a ``signed_url`` (integrity + ``expires`` not in the past). ``key`` defaults to the
+        app key."""
         import time
 
         from arvel.security import Signer
 
         if "signature=" not in url:
             return False
+        key = self._signing_key(key)
         base, _, token = url.rpartition("signature=")
         base = base.rstrip("?&")
         try:
