@@ -533,7 +533,10 @@ class Builder:
     def to_update(self, values: dict[str, Any]) -> Any:
         import sqlalchemy as sa
 
-        stmt = sa.update(self._table).values(**values)
+        # Adapt value-object bind values (e.g. an arvel Date → its UTC stdlib datetime) the same way
+        # where() does, so `update({"published_at": Date.now()})` works without dropping to .to_py().
+        bound = {column: self._bind(value) for column, value in values.items()}
+        stmt = sa.update(self._table).values(**bound)
         expr = self._where_expression()
         if expr is not None:
             stmt = stmt.where(expr)

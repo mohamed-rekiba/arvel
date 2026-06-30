@@ -39,7 +39,7 @@ async def show(request):
     return await Product.with_("variants").find(request.path_param("id"))   # → a JSON object
 
 async def index(request):
-    return await Product.query().paginate()      # → Laravel's paginator JSON shape
+    return await Product.paginate()      # → Laravel's paginator JSON shape
 ```
 
 ### Redirect & view routes

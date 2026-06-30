@@ -80,7 +80,7 @@ async def test_to_dict_includes_loaded_relations() -> None:
         assert cdata["post"]["title"] == "hello"
 
         # an unloaded relation is absent (not eagerly serialized)
-        bare = await User.query().first()
+        bare = await User.first()
         assert "posts" not in bare.to_dict()
 
         # a loaded-but-empty belongs-to serializes to None (Laravel → null)

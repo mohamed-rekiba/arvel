@@ -71,6 +71,35 @@ def test_timestamp_and_field_columns_are_real_datetime() -> None:
     assert _is_datetime_col(Doc, "deleted_at")  # soft-delete column
 
 
+class Plain(Model):
+    # NO explicit __timestamps__ — Laravel's $timestamps is true by default
+    __fields__: ClassVar = {"name": str}
+    __fillable__: ClassVar = ["name"]
+
+
+async def test_timestamps_are_managed_by_default() -> None:
+    """Laravel parity (DR): a model manages created_at/updated_at by DEFAULT (no opt-in). Without
+    this, the scaffold's ``t.timestamps()`` columns sit NULL on every row — silently green-but-broken
+    until a feature (an abandoned-cart sweep, an audit trail) needs them."""
+    assert Plain.__timestamps__ is True
+    assert _is_datetime_col(Plain, "created_at") and _is_datetime_col(Plain, "updated_at")
+    db = ConnectionResolver()
+    Plain.set_connection(db)
+    try:
+        await db.execute(sa.schema.CreateTable(Plain.__table__))
+        row = await Plain.create(name="x")
+        assert isinstance(row.created_at, Date)  # auto-stamped, read back as Date
+        assert isinstance(row.updated_at, Date)
+
+        # builder.update() adapts a Date bind value (parity with where()) — no .to_py() needed
+        past = Date.now().subtract(hours=100)
+        await Plain.where("id", row.id).update({"updated_at": past})
+        refreshed = await Plain.find(row.id)
+        assert refreshed.updated_at.to_iso().startswith(past.to_iso()[:13])
+    finally:
+        await db.dispose()
+
+
 # --- round-trip on SQLite (real DateTime affinity) ----------------------------------
 
 

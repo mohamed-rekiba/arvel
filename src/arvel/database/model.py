@@ -240,7 +240,7 @@ class ModelMeta(type):
         return cls
 
     def __getattr__(cls, item: str) -> Any:
-        # User.where(...) → User.query().where(...)  (proxy class-level calls to a fresh query)
+        # User.where(...) → User.where(...)  (proxy class-level calls to a fresh query)
         return getattr(cls.query(), item)
 
 
@@ -257,7 +257,7 @@ class Model(metaclass=ModelMeta):
     __appends__: ClassVar[list[str]] = []
     __touches__: ClassVar[list[str]] = []  # relation names whose parent updated_at to bump on save
     __global_scopes__: ClassVar[dict[str, Any]] = {}
-    __timestamps__: ClassVar[bool] = False
+    __timestamps__: ClassVar[bool] = True
     __attributes_meta__: ClassVar[dict[str, Any]] = {}
     __local_scopes__: ClassVar[dict[str, Any]] = {}  # @scope-decorated methods (name → fn)
     _resolver: ClassVar[ConnectionResolver | None] = None
@@ -885,7 +885,9 @@ class Model(metaclass=ModelMeta):
         if isinstance(value, enum.Enum):
             return value.value
         if cast == "json" and not isinstance(value, str):
-            return json.dumps(value)
+            # _json_default handles Date/datetime/Decimal/Enum nested in the value (e.g. an activity
+            # log snapshot of a model whose attributes include timestamps) — plain json.dumps can't.
+            return json.dumps(value, default=_json_default)
         if cast == "datetime" and value is not None:
             # store a UTC-aware stdlib datetime so SQLAlchemy binds it to the real DateTime column
             # (accepts a Date, an ISO string, or a datetime) and the round-trip stays instant-faithful

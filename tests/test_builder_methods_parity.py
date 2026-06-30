@@ -32,20 +32,19 @@ async def _seed() -> ConnectionResolver:
 async def test_where_variants() -> None:
     db = await _seed()
     try:
-        assert sorted(i.name for i in await Item.query().where_not_in("tag", ["x"]).get()) == [
+        assert sorted(i.name for i in await Item.where_not_in("tag", ["x"]).get()) == [
             "b",
             "d",
         ]
-        assert sorted(
-            i.name for i in await Item.query().where_between("price", [15, 35]).get()
-        ) == [
+        assert sorted(i.name for i in await Item.where_between("price", [15, 35]).get()) == [
             "b",
             "c",
         ]
-        assert sorted(
-            i.name for i in await Item.query().where_not_between("price", [15, 35]).get()
-        ) == ["a", "d"]
-        got = await Item.query().where("tag", "=", "y").or_where_in("tag", ["z"]).get()
+        assert sorted(i.name for i in await Item.where_not_between("price", [15, 35]).get()) == [
+            "a",
+            "d",
+        ]
+        got = await Item.where("tag", "=", "y").or_where_in("tag", ["z"]).get()
         assert sorted(i.name for i in got) == ["b", "d"]
     finally:
         await db.dispose()
@@ -54,9 +53,9 @@ async def test_where_variants() -> None:
 async def test_when_conditional_clause() -> None:
     db = await _seed()
     try:
-        applied = await Item.query().when(True, lambda q: q.where("tag", "=", "x")).get()
+        applied = await Item.when(True, lambda q: q.where("tag", "=", "x")).get()
         assert sorted(i.name for i in applied) == ["a", "c"]
-        skipped = await Item.query().when(False, lambda q: q.where("tag", "=", "x")).get()
+        skipped = await Item.when(False, lambda q: q.where("tag", "=", "x")).get()
         assert len(skipped) == 4
         defaulted = (
             await Item.query()
@@ -74,7 +73,7 @@ async def test_when_passes_value_laravel_style() -> None:
     db = await _seed()
     try:
         # 2-arg callback receives the value (here the tag to filter on)
-        got = await Item.query().when("x", lambda q, value: q.where("tag", "=", value)).get()
+        got = await Item.when("x", lambda q, value: q.where("tag", "=", value)).get()
         assert sorted(i.name for i in got) == ["a", "c"]
         # the default branch also receives the (falsy) value as its 2nd arg
         defaulted = (
@@ -88,7 +87,7 @@ async def test_when_passes_value_laravel_style() -> None:
         )
         assert [i.name for i in defaulted] == ["d"]
         # 1-arg callback (existing style) still works
-        one_arg = await Item.query().when(True, lambda q: q.where("tag", "=", "y")).get()
+        one_arg = await Item.when(True, lambda q: q.where("tag", "=", "y")).get()
         assert [i.name for i in one_arg] == ["b"]
     finally:
         await db.dispose()
@@ -100,13 +99,13 @@ async def test_when_unless_edge_callbacks() -> None:
     db = await _seed()
     try:
         # *args callback → the value is passed through as the 2nd positional
-        got = await Item.query().when("z", lambda *a: a[0].where("tag", "=", a[1])).get()
+        got = await Item.when("z", lambda *a: a[0].where("tag", "=", a[1])).get()
         assert [i.name for i in got] == ["d"]
         # falsy when, no default → no clause added (all rows)
-        none_added = await Item.query().when(False, lambda q: q.where("tag", "=", "x")).get()
+        none_added = await Item.when(False, lambda q: q.where("tag", "=", "x")).get()
         assert len(none_added) == 4
         # truthy unless, no default → no clause added (all rows)
-        unless_noop = await Item.query().unless(True, lambda q: q.where("tag", "=", "x")).get()
+        unless_noop = await Item.unless(True, lambda q: q.where("tag", "=", "x")).get()
         assert len(unless_noop) == 4
     finally:
         await db.dispose()
@@ -118,7 +117,7 @@ async def test_unless_conditional_clause() -> None:
     db = await _seed()
     try:
         # condition falsy → callback applies; value passed through
-        applied = await Item.query().unless(False, lambda q, value: q.where("tag", "=", "x")).get()
+        applied = await Item.unless(False, lambda q, value: q.where("tag", "=", "x")).get()
         assert sorted(i.name for i in applied) == ["a", "c"]
         # condition truthy → callback skipped, default (if any) applies
         defaulted = (
@@ -134,7 +133,7 @@ async def test_unless_conditional_clause() -> None:
 async def test_skip_take_aliases() -> None:
     db = await _seed()
     try:
-        rows = await Item.query().order_by("price", "asc").skip(1).take(2).get()
+        rows = await Item.order_by("price", "asc").skip(1).take(2).get()
         assert [i.name for i in rows] == ["b", "c"]
     finally:
         await db.dispose()
@@ -143,10 +142,10 @@ async def test_skip_take_aliases() -> None:
 async def test_pluck_and_value() -> None:
     db = await _seed()
     try:
-        assert await Item.query().order_by("price", "asc").pluck("name") == ["a", "b", "c", "d"]
-        assert await Item.query().pluck("price", key="name") == {"a": 10, "b": 20, "c": 30, "d": 40}
-        assert await Item.query().order_by("price", "asc").value("name") == "a"
-        assert await Item.query().where("tag", "=", "nope").value("name") is None
+        assert await Item.order_by("price", "asc").pluck("name") == ["a", "b", "c", "d"]
+        assert await Item.pluck("price", key="name") == {"a": 10, "b": 20, "c": 30, "d": 40}
+        assert await Item.order_by("price", "asc").value("name") == "a"
+        assert await Item.where("tag", "=", "nope").value("name") is None
     finally:
         await db.dispose()
 
@@ -154,8 +153,8 @@ async def test_pluck_and_value() -> None:
 async def test_first_or_fail() -> None:
     db = await _seed()
     try:
-        assert (await Item.query().where("tag", "=", "z").first_or_fail()).name == "d"
+        assert (await Item.where("tag", "=", "z").first_or_fail()).name == "d"
         with pytest.raises(ModelNotFound):
-            await Item.query().where("tag", "=", "nope").first_or_fail()
+            await Item.where("tag", "=", "nope").first_or_fail()
     finally:
         await db.dispose()
