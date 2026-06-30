@@ -78,9 +78,9 @@ class HttpKernel:
 
     def __init__(self, app: Any = None) -> None:
         self.app = app
-        # (methods, path, handler, group, route_middleware)
+        # (methods, path, handler, group, route_middleware, name, security, status_code)
         self._routes: list[
-            tuple[list[str], str, Any, str | None, list[Any], str | None, list[str]]
+            tuple[list[str], str, Any, str | None, list[Any], str | None, list[str], int | None]
         ] = []
         self.global_middleware: list[Any] = []
         self.groups: dict[str, list[Any]] = {"web": [], "api": []}
@@ -172,6 +172,7 @@ class HttpKernel:
         middleware: Sequence[Any] | None = None,
         name: str | None = None,
         security: Sequence[str] | None = None,
+        status_code: int | None = None,
     ) -> None:
         self._routes.append(
             (
@@ -182,6 +183,7 @@ class HttpKernel:
                 list(middleware or []),
                 name,
                 list(security or []),
+                status_code,
             )
         )
 
@@ -202,7 +204,7 @@ class HttpKernel:
 
     def routes(
         self,
-    ) -> list[tuple[list[str], str, Any, str | None, list[Any], str | None, list[str]]]:
+    ) -> list[tuple[list[str], str, Any, str | None, list[Any], str | None, list[str], int | None]]:
         return list(self._routes)
 
     @staticmethod
@@ -251,9 +253,17 @@ class HttpKernel:
         self._warn_undefined_security()
         handlers = [
             self._make_handler(
-                methods, path, handler, group, middleware, name, security, HTTPRouteHandler
+                methods,
+                path,
+                handler,
+                group,
+                middleware,
+                name,
+                security,
+                status_code,
+                HTTPRouteHandler,
             )
-            for methods, path, handler, group, middleware, name, security in self._routes
+            for methods, path, handler, group, middleware, name, security, status_code in self._routes
         ]
         litestar_app = litestar.Litestar(
             route_handlers=handlers,
@@ -376,14 +386,14 @@ class HttpKernel:
         """Warn (at build) when a route's ``.secure(...)`` names a scheme that isn't defined in
         ``config('openapi').security`` — that would emit a dangling ``securitySchemes`` reference (a
         technically-invalid OpenAPI document). Non-fatal: the doc still serves."""
-        secured = {scheme for *_, security in self._routes for scheme in security}
+        secured = {scheme for *_, security, _status in self._routes for scheme in security}
         if not secured:  # the common case — no per-route security, nothing to validate
             return
         defined, _ = self._security_schemes(OpenApiSettings().security)
         from arvel.kernel.logging import LogManager
 
         log = LogManager().channel("http")
-        for _methods, path, _handler, _group, _middleware, name, security in self._routes:
+        for _methods, path, _handler, _group, _middleware, name, security, _status in self._routes:
             for scheme in security:
                 if _SECURITY_SCHEME_KEYS.get(scheme, scheme) not in defined:
                     log.warning(
@@ -446,6 +456,7 @@ class HttpKernel:
         middleware: list[Any],
         name: str | None,
         security: list[str],
+        status_code: int | None,
         route_handler: Any,
     ) -> Any:
         kernel = self
@@ -485,7 +496,13 @@ class HttpKernel:
         adapter.__doc__ = handler.__doc__
         # DELETE defaults to 204 (no body) in Litestar; arvel handlers may return a
         # body, so pin DELETE routes to 200. GET/POST keep Litestar's 200/201 defaults.
-        extra: dict[str, Any] = {"status_code": 200} if "DELETE" in methods else {}
+        # explicit per-route status wins; else DELETE → 200 (arvel handlers may return a body);
+        # else Litestar's per-method default (GET 200 / POST 201).
+        extra: dict[str, Any] = {}
+        if status_code is not None:
+            extra["status_code"] = status_code
+        elif "DELETE" in methods:
+            extra["status_code"] = 200
         if name:  # explicit operationId = the route name (else Litestar doubles the path prefix)
             extra["operation_id"] = name
         if security:  # this route requires auth → mark it (the Swagger lock + 'Authorize' use)

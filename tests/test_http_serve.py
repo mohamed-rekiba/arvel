@@ -60,6 +60,19 @@ def test_openapi_is_generated_from_routes() -> None:
     assert "/ping" in schema["paths"]
 
 
+def test_route_status_override_lets_a_typed_post_return_200() -> None:
+    """Route.post(...).status(200): a typed handler can return 200 instead of Litestar's POST-201
+    default (e.g. a login/logout action that isn't creating a resource)."""
+    router = Router()
+    router.post("/login", lambda request: {"ok": True}, name="login").status(200)
+    app = Application()
+    app.singleton("router", lambda _app: router)
+    with TestClient(app.as_asgi()) as client:
+        resp = client.post("/login")
+    assert resp.status_code == 200  # not the default 201
+    assert resp.json() == {"ok": True}
+
+
 def test_application_as_asgi_serves_router_routes() -> None:
     app = Application()
     router = Router()

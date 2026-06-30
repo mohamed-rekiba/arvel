@@ -92,6 +92,14 @@ class RouteDefinition:
     security: list[str] = field(
         default_factory=list[str]
     )  # OpenAPI security schemes this route requires (e.g. "bearer")
+    status_code: int | None = None  # explicit response status (else Litestar's per-method default)
+
+    def status(self, code: int) -> RouteDefinition:
+        """Pin this route's success response status (Laravel ``response()->json($x, 200)``). Lets a
+        typed-Schema POST return 200 instead of Litestar's default 201 (e.g. a login/logout action
+        that isn't *creating* a resource)."""
+        self.status_code = code
+        return self
 
     def middleware(self, *mw: Any) -> RouteDefinition:
         """Attach per-route middleware (Laravel ``Route::get(...)->middleware('auth')``).
@@ -392,6 +400,7 @@ class Router:
                 middleware=route.middlewares,
                 name=route.name,
                 security=route.security,
+                status_code=route.status_code,
             )
         kernel.bindings.update(self._bindings)
 
