@@ -29,6 +29,25 @@ async def _seed() -> ConnectionResolver:
     return db
 
 
+def test_query_entry_classmethods_return_a_typed_builder() -> None:
+    """The common query starters are explicit typed classmethods (return Builder), not just the
+    metaclass Any-proxy — so `Model.where(...).first()` is strict-type-safe without `.query()`."""
+    from arvel.database.builder import Builder
+
+    for builder in (
+        Item.where("tag", "x"),
+        Item.or_where("tag", "x"),
+        Item.where_in("tag", ["x"]),
+        Item.where_not_in("tag", ["x"]),
+        Item.with_(),
+        Item.order_by("price"),
+    ):
+        assert isinstance(builder, Builder)
+    # `when` is intentionally NOT a Model classmethod (it would shadow a column named `when`); it
+    # stays a Builder method, chained: Model.query()/Model.where(...).when(...).
+    assert isinstance(Item.query().when(True, lambda q: q), Builder)
+
+
 async def test_where_variants() -> None:
     db = await _seed()
     try:

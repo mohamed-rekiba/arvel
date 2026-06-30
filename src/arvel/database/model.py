@@ -308,6 +308,34 @@ class Model(metaclass=ModelMeta):
     def query(cls) -> Builder:
         return cls._base_query()
 
+    # Typed classmethod query entry-points (Laravel `Model::where(...)`). The metaclass
+    # `__getattr__` already forwards ANY builder method to `query()`, but as `Any` — untyped,
+    # so it trips strict type-checking. These explicit proxies give the everyday starters a real
+    # `Builder` return type, so `Product.where(...).first()` is fully type-safe without `.query()`.
+    @classmethod
+    def where(cls, *args: Any, **kwargs: Any) -> Builder:
+        return cls.query().where(*args, **kwargs)
+
+    @classmethod
+    def or_where(cls, *args: Any, **kwargs: Any) -> Builder:
+        return cls.query().or_where(*args, **kwargs)
+
+    @classmethod
+    def where_in(cls, column: str, values: Any) -> Builder:
+        return cls.query().where_in(column, values)
+
+    @classmethod
+    def where_not_in(cls, column: str, values: Any) -> Builder:
+        return cls.query().where_not_in(column, values)
+
+    @classmethod
+    def with_(cls, *names: str, **constrained: Any) -> Builder:
+        return cls.query().with_(*names, **constrained)
+
+    @classmethod
+    def order_by(cls, column: str, direction: str = "asc") -> Builder:
+        return cls.query().order_by(column, direction)
+
     def recursive(
         self,
         related: Any,
