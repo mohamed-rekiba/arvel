@@ -14,7 +14,7 @@ from arvel.database.attribute import Attribute
 from arvel.database.builder import Builder
 from arvel.database.connections import ConnectionResolver, QueryExecuted, WriteResult
 from arvel.database.factory import Factory, FactoryBatch
-from arvel.database.migrations import Migration, Migrator, discover_migrations
+from arvel.database.migrations import Migration, Migrator, Schema, discover_migrations
 from arvel.database.model import (
     HasUlids,
     HasUuids,
@@ -52,6 +52,7 @@ __all__ = [
     "Prunable",
     "QueryExecuted",
     "ReadOnlyModelError",
+    "Schema",
     "Seeder",
     "SoftDeletes",
     "WriteResult",

@@ -60,6 +60,21 @@ def test_openapi_is_generated_from_routes() -> None:
     assert "/ping" in schema["paths"]
 
 
+def test_model_not_found_renders_as_404() -> None:
+    """find_or_fail/first_or_fail raise ModelNotFound; the kernel renders it as 404 (Laravel
+    findOrFail parity) — so a handler needn't guard `if x is None: abort(404)` by hand."""
+    from arvel.database.model import ModelNotFound
+
+    async def show(request: Any, id: int) -> Any:
+        raise ModelNotFound("No query results for model [Post].")
+
+    kernel = HttpKernel()
+    kernel.get("/posts/{id:int}", show)
+    with TestClient(kernel.build()) as client:
+        resp = client.get("/posts/999", headers={"accept": "application/json"})
+    assert resp.status_code == 404
+
+
 def test_route_status_override_lets_a_typed_post_return_200() -> None:
     """Route.post(...).status(200): a typed handler can return 200 instead of Litestar's POST-201
     default (e.g. a login/logout action that isn't creating a resource)."""

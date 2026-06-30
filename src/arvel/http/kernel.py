@@ -243,10 +243,15 @@ class HttpKernel:
         # to_dict() form — the Laravel ``return $user`` / ``return User::all()`` JSON path. Imported
         # lazily + via the contract base so the http layer takes no hard edge on the database module.
         model_encoder: dict[Any, Callable[[Any], Any]] = {}
+        extra_exception_handlers: dict[Any, Any] = {}
         try:
             from arvel.database.model import Model as _Model
+            from arvel.database.model import ModelNotFound
 
             model_encoder = {_Model: lambda value: value.to_dict()}
+            # find_or_fail/first_or_fail raise ModelNotFound — render it as 404 (Laravel findOrFail
+            # parity) rather than letting it fall to the generic 500 path. http→database is legal.
+            extra_exception_handlers = {ModelNotFound: render_exception}
         except Exception:  # pragma: no cover - database extra not installed
             model_encoder = {}
 
@@ -277,6 +282,7 @@ class HttpKernel:
             exception_handlers={
                 ValidationException: render_exception,
                 HttpException: render_exception,
+                **extra_exception_handlers,  # ModelNotFound → 404 (when the database module is present)
                 # E1: every OTHER uncaught exception is reported through the bound ExceptionHandler
                 # and rendered (content-negotiated) — not silently turned into Litestar's generic 500.
                 Exception: self._handle_uncaught,

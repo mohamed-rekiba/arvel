@@ -65,7 +65,17 @@ def scope[F: "Any"](method: F) -> F:
 
 
 class ModelNotFound(Exception):
-    """Raised by ``find_or_fail`` / ``first_or_fail`` when no row matches."""
+    """Raised by ``find_or_fail`` / ``first_or_fail`` when no row matches.
+
+    Carries ``status = 404`` so the HTTP kernel renders it as a 404 (Laravel ``findOrFail`` →
+    ``ModelNotFoundException`` → 404), letting a handler use ``await Post.find_or_fail(id)`` without
+    a manual ``if post is None: abort(404)`` guard. The exception renderer reads ``.status``/``.detail``."""
+
+    status = 404
+
+    def __init__(self, message: str = "Resource not found.") -> None:
+        self.detail = message
+        super().__init__(message)
 
 
 class ReadOnlyModelError(Exception):
