@@ -64,6 +64,9 @@ def test_migrator_emits_create_index_for_gin() -> None:
         def create_index(self, *args: Any, **kwargs: Any) -> None:
             self.calls.append(("create_index", args, kwargs))
 
+        def get_bind(self) -> Any:  # Schema.dialect reads this (postgres → no degrade warning)
+            return type("B", (), {"dialect": type("D", (), {"name": "postgresql"})()})()
+
     op = _Op()
     Schema(op).create("docs", lambda t: (t.id(), t.jsonb("data"), t.gin_index("data")))
     created = [c for c in op.calls if c[0] == "create_index"]

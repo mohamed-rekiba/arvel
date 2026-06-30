@@ -1,5 +1,12 @@
 # SQL Views & Functions
 
+!!! note "Postgres-only DDL degrades loudly, not silently"
+    Materialized views, `CREATE EXTENSION`, and GIN/GiST indexes are **Postgres-only**. On another
+    dialect (sqlite/mysql) `Schema` emits a `postgres_only_feature` warning and degrades sensibly — a
+    materialized view becomes a **plain view** (live, not materialized — so skip `REFRESH MATERIALIZED
+    VIEW` off Postgres), an extension is **skipped**, and GIN/GiST become a plain index — so the same
+    migration runs everywhere and your logs say what happened. Check `schema.dialect` to branch.
+
 ## Views & materialized views
 
 Declare **views** and **materialized views** as classes, then create them in a migration; a

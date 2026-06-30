@@ -34,17 +34,39 @@ def _index_columns(columns: Sequence[str]) -> list[Any]:
     return [c if PLAIN_IDENTIFIER.match(c) else sa.text(f"({c})") for c in columns]
 
 
+def _warn_pg_only(feature: str, dialect: str, *, action: str) -> None:
+    """Surface (not silently swallow) a Postgres-only DDL feature used on another dialect."""
+    from arvel.kernel.logging import LogManager
+
+    LogManager().channel("database").warning(
+        "postgres_only_feature", feature=feature, dialect=dialect, action=action
+    )
+
+
 class Schema:
-    """Operations facade bound to an Alembic ``Operations`` instance."""
+    """Operations facade bound to an Alembic ``Operations`` instance.
+
+    Several DDL features are **Postgres-only** (materialized views, ``CREATE EXTENSION``, GIN/GiST
+    access methods). Rather than silently degrade or crash on another dialect, these emit a
+    ``postgres_only_feature`` warning and degrade sensibly (MV → plain view, extension → skip,
+    GIN/GiST → plain index) so a sqlite/mysql test run is honest about what it did.
+    """
 
     def __init__(self, op: Any) -> None:
         self._op = op
+
+    @property
+    def dialect(self) -> str:
+        """The active connection's dialect name (``postgresql`` / ``sqlite`` / ``mysql``)."""
+        return str(self._op.get_bind().dialect.name)
 
     def create(self, name: str, define: Callable[[Blueprint], Any]) -> None:
         blueprint = Blueprint(name)
         define(blueprint)
         self._op.create_table(name, *blueprint.core_columns())
         for spec in blueprint.index_specs():  # btree/GIN/GiST → a separate create_index op
+            if spec["using"] in ("gin", "gist") and self.dialect != "postgresql":
+                _warn_pg_only(f"{spec['using'].upper()} index", self.dialect, action="plain index")
             self._op.create_index(
                 spec["name"], name, _index_columns(spec["columns"]), postgresql_using=spec["using"]
             )
@@ -59,9 +81,20 @@ class Schema:
         self._op.execute(create_view(name, selectable))
 
     def create_materialized_view(self, name: str, selectable: Any) -> None:
+        """A Postgres materialized view. On a dialect without them (sqlite/mysql) this warns and
+        creates a **plain view** instead, so the same migration runs everywhere (the view is live, not
+        materialized — call ``REFRESH MATERIALIZED VIEW`` only on Postgres)."""
+        if self.dialect != "postgresql":
+            _warn_pg_only("materialized view", self.dialect, action="plain view")
+            self._op.execute(create_view(name, selectable))
+            return
         self._op.execute(create_materialized_view(name, selectable))
 
     def create_extension(self, name: str) -> None:
+        """``CREATE EXTENSION`` (Postgres). A no-op (with a warning) on other dialects."""
+        if self.dialect != "postgresql":
+            _warn_pg_only(f"extension {name!r}", self.dialect, action="skipped")
+            return
         self._op.execute(create_extension(name))
 
 
