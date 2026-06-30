@@ -355,11 +355,12 @@ class HttpKernel:
 
     @staticmethod
     def _security_schemes(security: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-        """Build OpenAPI security schemes from ``config('openapi').security`` — currently ``bearer``
-        (HTTP bearer/JWT → the 'Authorize' button) and ``api_key`` (header/query key). A truthy value
-        defines the scheme; a ``dict`` customizes it (``format``/``description`` for bearer; ``name``/
-        ``in`` for api_key). ``default: true`` makes it required on every route (else routes opt in via
-        ``.secure(...)``). Returns ``(schemes, default_requirements)``."""
+        """Build OpenAPI security schemes from ``config('openapi').security`` — ``bearer`` (HTTP
+        bearer/JWT → the 'Authorize' button), ``api_key`` (header/query key), and ``oidc``
+        (OpenID Connect discovery → the IdP login, e.g. Keycloak). A truthy value defines the scheme;
+        a ``dict`` customizes it (``format``/``description`` for bearer; ``name``/``in`` for api_key;
+        ``openIdConnectUrl`` for oidc). ``default: true`` makes it required on every route (else routes
+        opt in via ``.secure(...)``). Returns ``(schemes, default_requirements)``."""
         from litestar.openapi.spec import SecurityScheme
 
         schemes: dict[str, Any] = {}
@@ -386,6 +387,16 @@ class HttpKernel:
             )
             if opts.get("default"):
                 default_security.append({"apiKeyAuth": []})
+        oidc = security.get("oidc")
+        if oidc:
+            opts = cast("dict[str, Any]", oidc) if isinstance(oidc, dict) else {}
+            schemes["oidc"] = SecurityScheme(
+                type="openIdConnect",
+                open_id_connect_url=opts.get("openIdConnectUrl") or opts.get("url", ""),
+                description=opts.get("description"),
+            )
+            if opts.get("default"):
+                default_security.append({"oidc": []})
         return schemes, default_security
 
     def _warn_undefined_security(self) -> None:

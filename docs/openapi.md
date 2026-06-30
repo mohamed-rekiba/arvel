@@ -103,11 +103,13 @@ By default the scheme is only *advertised* — routes opt in with `.secure(...)`
 "security": {"bearer": {"format": "JWT", "default": True}},
 ```
 
-You can also customize the scheme or use an API-key scheme:
+You can also customize the scheme, use an API-key scheme, or an **OpenID Connect** scheme (for an
+IdP login like Keycloak — `.secure("oidc")` on the route):
 
 ```python
 "security": {"bearer": {"format": "JWT", "description": "Paste your access token"}},
 "security": {"api_key": {"name": "X-API-Key", "in": "header"}},
+"security": {"oidc": {"openIdConnectUrl": "https://idp/realms/app/.well-known/openid-configuration"}},
 ```
 
 !!! tip "Scaffold it"

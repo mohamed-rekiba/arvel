@@ -160,6 +160,18 @@ def test_bearer_security_scheme_and_per_route_secure() -> None:
     assert s["paths"]["/private"]["get"]["security"] == [{"bearerAuth": []}]
 
 
+def test_oidc_security_scheme_openid_connect() -> None:
+    router = Router()
+    router.get("/admin", health, name="admin").secure("oidc")
+    url = "http://localhost:8080/realms/arvel/.well-known/openid-configuration"
+    with _serve({"security": {"oidc": {"openIdConnectUrl": url}}}, router) as c:
+        s = c.get("/schema/openapi.json").json()
+    scheme = s["components"]["securitySchemes"]["oidc"]
+    assert scheme["type"] == "openIdConnect"
+    assert scheme["openIdConnectUrl"] == url
+    assert s["paths"]["/admin"]["get"]["security"] == [{"oidc": []}]
+
+
 def test_security_default_true_applies_globally() -> None:
     router = Router()
     router.get("/health", health, name="health")
