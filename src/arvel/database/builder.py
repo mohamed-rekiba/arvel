@@ -219,6 +219,15 @@ class Builder:
         self._add(self._json_path(column, path).as_string() == value, connector)
         return self
 
+    def where_json_like(
+        self, column: str, path: str, value: str, *, connector: str = "and"
+    ) -> Self:
+        """``LIKE`` against a value inside a JSON column — Laravel ``where('data->name', 'like', '%x%')``.
+        Handy for searching a per-locale translatable attribute, e.g.
+        ``where_json_like('name', 'en', '%phone%')``. Cross-dialect (json_extract / ``->>``)."""
+        self._add(self._json_path(column, path).as_string().like(value), connector)
+        return self
+
     def where_json_contains(self, column: str, value: Any, *, connector: str = "and") -> Self:
         """Postgres/MySQL JSON containment — Laravel ``whereJsonContains('data->tags', 'x')``:
         rows where ``column`` contains ``value`` (the ``@>`` operator). Postgres-targeted; build

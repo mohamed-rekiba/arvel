@@ -61,3 +61,15 @@ def test_where_json_contains_compiles_to_postgres_containment() -> None:
     stmt = Builder(docs).where_json_contains("data", ["x"]).to_select()
     sql = str(stmt.compile(dialect=postgresql.dialect()))
     assert "@>" in sql
+
+
+async def test_where_json_like_searches_a_locale_value() -> None:
+    db = await _seed()
+    try:
+        await Builder(docs, db).insert(
+            {"name": "c", "data": {"lang": "en", "name_i18n": "Aurora Phone"}}
+        )
+        rows = await Builder(docs, db).where_json_like("data", "name_i18n", "%Phone%").get()
+        assert {r["name"] for r in rows} == {"c"}
+    finally:
+        await db.dispose()
