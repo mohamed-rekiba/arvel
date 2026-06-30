@@ -103,7 +103,7 @@ async def _auth(request: Any) -> int:
 async def _login(request: Any, data: Credentials) -> Any:
     from arvel.http import Response
 
-    user = await RefUser.query().where("email", data.email).first()
+    user = await RefUser.where("email", data.email).first()
     if user is None or not Hasher().check(data.password, user.password):
         abort(401, "Invalid credentials")
     token, _ = await create_token(user, name="api")

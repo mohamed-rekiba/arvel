@@ -34,7 +34,7 @@ async def health(request) -> HealthStatus:
 
 
 async def login(request, data: Credentials):  # `data: Credentials` → parsed + validated request body
-    user = await User.query().where("email", data.email).first()
+    user = await User.where("email", data.email).first()
     if user is None or not Hasher().check(data.password, user.password):
         abort(401, "Invalid credentials")
     token, _ = await create_token(user, name="api")

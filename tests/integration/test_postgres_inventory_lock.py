@@ -36,7 +36,7 @@ async def test_lock_for_update_serializes_concurrent_decrements(postgres_url: st
             # each call runs in its own asyncio Task (own _active_conn context) → a real second
             # transaction that must block on the row lock the first holds.
             async with db.transaction():
-                locked = await Stock.query().where("id", row.id).lock_for_update().first()
+                locked = await Stock.where("id", row.id).lock_for_update().first()
                 if locked.units < 1:
                     return False
                 await asyncio.sleep(0.1)  # widen the window the lock must protect

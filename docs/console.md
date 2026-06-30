@@ -77,7 +77,7 @@ it, it falls back to the stdlib REPL (no `await`). Inside a project it preloads:
 ```python
 arvel tinker
 >>> await User.find(1)          # top-level await — no asyncio.run needed
->>> Post.query().where(...)     # models reachable by name, no import
+>>> Post.where(...)     # models reachable by name, no import
 ```
 
 ## Generators
