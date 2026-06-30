@@ -42,6 +42,14 @@ async def index(request):
     return await Product.paginate()      # → Laravel's paginator JSON shape
 ```
 
+**Pin the response status** with `.status(code)` — handy for a 200 action (login/logout) that
+returns a typed body but isn't *creating* a resource (POST otherwise defaults to 201):
+
+```python
+Route.post("/login", login).status(200)        # 200, not the POST-default 201
+Route.post("/orders/{id}/status", transition).status(200)
+```
+
 ### Redirect & view routes
 
 For the common controller-less cases there are shortcuts:

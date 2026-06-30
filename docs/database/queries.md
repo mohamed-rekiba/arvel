@@ -30,8 +30,8 @@ await Post.unless(archived, lambda q: q.where("status", "!=", "archived")).get()
 await Post.order_by("views", "desc").skip(10).take(5).get() # skip/take alias offset/limit
 await Post.where(published=True).pluck("title")             # ["Hello", …] (or pluck("title","id") → dict)
 await Post.where(slug=s).value("title")                     # one column of the first row
-await Post.find_or_fail(1)                                  # raises ModelNotFound on miss
-await Post.where(slug=s).first_or_fail()
+await Post.find_or_fail(1)                                  # ModelNotFound on miss → HTTP 404
+await Post.where(slug=s).first_or_fail()                    # same — no manual `if None: abort(404)`
 ```
 
 

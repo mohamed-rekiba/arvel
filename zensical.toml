@@ -63,6 +63,7 @@ nav = [
     { "Configuration" = "auth/configuration.md" },
   ] },
   { "Digging Deeper" = [
+    { "HTTP Client" = "http-client.md" },
     { "Cache" = "cache.md" },
     { "Search" = "search.md" },
     { "Activity Log" = "activitylog.md" },
