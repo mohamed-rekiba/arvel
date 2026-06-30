@@ -82,7 +82,14 @@ class LazyGroup(TyperGroup):
         if target is not None:
             module_name, attr = target.split(":")
             sub_app = getattr(importlib.import_module(module_name), attr)
-            return typer.main.get_command(sub_app)
+            command = typer.main.get_command(sub_app)
+            # Display the manifest key (the Laravel-style `make:model` / `db:seed`), not the name Typer
+            # derives from the handler function (`make-model`). Without this the `--help` listing shows
+            # hyphenated names that don't match the colon names you actually invoke — and `shell` +
+            # `tinker` (both → shell_app) both render as "shell". The name is display-only; invocation
+            # routes through the manifest key.
+            command.name = cmd_name
+            return command
         # app/provider command classes (CLI-3) + routes/console.py closures (Console.command)
         from arvel.console.closure import ClosureCommand
         from arvel.console.kernel import discover_app_commands, run_command_class
