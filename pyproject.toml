@@ -51,6 +51,9 @@ console = [
   "ipython>=9.15.0",
 ] # the `arvel shell` REPL: top-level await + autocomplete (falls back to stdlib)
 jwt = ["pyjwt>=2.13.0"]
+# OIDC / IdP SSO (Keycloak etc.): validate bearer JWTs against the IdP JWKS — auth.oidc.jwks_verifier
+# uses pyjwt's PyJWKClient (JWKS fetched via urllib; no extra HTTP dep).
+oidc = ["pyjwt[crypto]>=2.13.0"]
 oauth = ["httpx-oauth>=0.17.0", "authlib>=1.7.2"]
 "2fa" = ["pyotp>=2.10.0"]
 s3 = ["s3fs>=2026.6.0"]
@@ -96,10 +99,10 @@ dev = [
 ]
 test-integration = ["testcontainers>=4.14.2"]
 standard = [
-  "arvel[http,server,sqlite,postgres,redis,queue-redis,view,mail,image,console]",
+  "arvel[http,server,postgres,redis,queue-redis,view,mail,image,jwt,console]",
 ]
 all = [
-  "arvel[http,server,sqlite,postgres,mysql,redis,queue-redis,queue-amqp,view,console,jwt,oauth,2fa,s3,gcs,azure,supabase,image,video,media,mail,notifications,search,vector,telemetry,i18n]",
+  "arvel[http,server,sqlite,postgres,mysql,redis,queue-redis,queue-amqp,view,console,jwt,oidc,oauth,2fa,s3,gcs,azure,supabase,image,video,media,mail,notifications,search,vector,telemetry,i18n]",
 ]
 
 [project.scripts]
