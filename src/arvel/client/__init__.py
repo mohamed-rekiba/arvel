@@ -100,6 +100,9 @@ class Client:
     def base_url(self, url: str) -> PendingRequest:
         return self._pending().base_url(url)
 
+    def timeout(self, seconds: float) -> PendingRequest:
+        return self._pending().timeout(seconds)
+
     async def get(self, url: str, **kwargs: Any) -> httpx.Response:
         return await self._pending().get(url, **kwargs)
 

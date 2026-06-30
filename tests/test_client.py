@@ -54,3 +54,14 @@ async def test_base_url_and_headers() -> None:
         await client.base_url("https://api.test/v1").with_headers({"X-App": "arvel"}).get("/ping")
     )
     assert response.status_code == 200
+
+
+async def test_timeout_is_chainable_from_the_client() -> None:
+    # Client.timeout proxies to a PendingRequest (parity with base_url/with_headers/with_token),
+    # so `Http.timeout(5).get(...)` works without first calling another builder method.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200)
+
+    client = Client(transport=_transport(handler))
+    response = await client.timeout(5).get("https://api.test/ping")
+    assert response.status_code == 200
