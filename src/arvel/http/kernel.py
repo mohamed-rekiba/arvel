@@ -479,6 +479,10 @@ class HttpKernel:
         # method+path fallback ("ArvelGetApiHealth"). Fall back to a unique method+path id.
         safe = re.sub(r"\W+", "_", f"{'_'.join(methods).lower()}{path}")
         adapter.__name__ = re.sub(r"\W+", "_", name) if name else f"arvel_{safe}"
+        # Carry the original handler's docstring onto the synthetic adapter so Litestar's
+        # use_handler_docstrings turns it into the OpenAPI operation description (otherwise the
+        # adapter is blank and the operation has only a name-derived summary).
+        adapter.__doc__ = handler.__doc__
         # DELETE defaults to 204 (no body) in Litestar; arvel handlers may return a
         # body, so pin DELETE routes to 200. GET/POST keep Litestar's 200/201 defaults.
         extra: dict[str, Any] = {"status_code": 200} if "DELETE" in methods else {}

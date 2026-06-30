@@ -28,6 +28,7 @@ class ThingOut(Schema):
 
 
 async def store(request: Any, data: CreateThing) -> ThingOut:
+    """Create a thing from the posted name."""
     return ThingOut(id=1, name=data.name)
 
 
@@ -84,6 +85,9 @@ def test_request_and_response_schemas_are_generated(client: TestClient[Any]) -> 
     resp = post["responses"]["201"]["content"]["application/json"]["schema"]
     assert resp["$ref"].endswith("ThingOut")
     assert s["paths"]["/health"]["get"]["operationId"] == "health"
+    # the handler's docstring becomes the operation description (use_handler_docstrings) — the
+    # synthetic route adapter must carry the original handler's __doc__, not be blank.
+    assert post["description"] == "Create a thing from the posted name."
 
 
 def test_typed_body_is_parsed_and_passed_to_the_handler(client: TestClient[Any]) -> None:
