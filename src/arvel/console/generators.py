@@ -198,7 +198,44 @@ _STUBS: dict[str, tuple[str, str]] = {
         "    async def saved(self, model: Any) -> None: ...\n\n"
         "    async def deleted(self, model: Any) -> None: ...\n",
     ),
+    "enum": (
+        "app/enums",
+        "from enum import StrEnum\n\n\n"
+        "class {name}(StrEnum):\n"
+        '    """A string-backed enum — a typed closed value set (use as a model `__casts__` enum)."""\n\n'
+        '    EXAMPLE = "example"\n',
+    ),
+    "exception": (
+        "app/exceptions",
+        "class {name}(Exception):\n"
+        '    """An application exception. Set `status` (+ optionally a `detail`) and the HTTP kernel\n'
+        '    renders it with that status code."""\n\n'
+        "    status = 500\n",
+    ),
 }
+
+# pytest discovers ``test_*.py``, so make:test writes ``tests/test_<name>.py`` (not the generic
+# ``<name>.py`` path the other generators use).
+_TEST_STUB = (
+    "from __future__ import annotations\n\n\n"
+    "def test_{name}() -> None:\n"
+    "    assert True  # TODO: write the test\n"
+)
+
+
+def generate_test(name: str, base: Path | None = None) -> Path:
+    """Write ``tests/test_<name>.py`` (Laravel ``make:test``)."""
+    from arvel.support import Str
+
+    directory = (base or Path()) / "tests"
+    directory.mkdir(parents=True, exist_ok=True)
+    slug = Str.snake(name).removeprefix("test_")
+    target = directory / f"test_{slug}.py"
+    if target.exists():
+        message = f"test {name!r} already exists at {target}"
+        raise FileExistsError(message)
+    target.write_text(_TEST_STUB.format(name=slug))
+    return target
 
 
 def generate(kind: str, name: str, base: Path | None = None) -> Path:
@@ -391,3 +428,35 @@ make_observer_app = typer.Typer()
 def make_observer(name: str) -> None:
     """Generate a model observer (app/observers/) — register via Model.observe() in a provider boot."""
     _run("observer", name)
+
+
+make_enum_app = typer.Typer()
+
+
+@make_enum_app.command()
+def make_enum(name: str) -> None:
+    """Generate a string-backed enum (app/enums/)."""
+    _run("enum", name)
+
+
+make_exception_app = typer.Typer()
+
+
+@make_exception_app.command()
+def make_exception(name: str) -> None:
+    """Generate an exception class (app/exceptions/)."""
+    _run("exception", name)
+
+
+make_test_app = typer.Typer()
+
+
+@make_test_app.command()
+def make_test(name: str) -> None:
+    """Generate a test (tests/test_<name>.py)."""
+    try:
+        target = generate_test(name)
+    except FileExistsError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(1) from exc
+    typer.echo(f"created {target}")

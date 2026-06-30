@@ -81,6 +81,17 @@ class Migrator:
         async with self._resolver.engine(self._name).begin() as conn:
             await conn.run_sync(self._apply, list(reversed(list(migrations))), "down")
 
+    async def drop_all(self) -> int:
+        """Reflect and drop every table on the connection (DB-agnostic — Postgres/sqlite). Backs
+        ``db:wipe`` and ``migrate:fresh``. Returns the number of tables dropped."""
+        from sqlalchemy import MetaData
+
+        meta = MetaData()
+        async with self._resolver.engine(self._name).begin() as conn:
+            await conn.run_sync(meta.reflect)
+            await conn.run_sync(meta.drop_all)
+        return len(meta.tables)
+
     @staticmethod
     def _apply(sync_conn: Any, migrations: list[Migration], direction: str) -> None:
         from alembic.migration import MigrationContext

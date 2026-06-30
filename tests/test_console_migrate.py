@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from typer.testing import CliRunner
 
 from arvel.console import build_cli
@@ -71,3 +73,46 @@ def test_migrate_rollback_reverts() -> None:
         assert "rolled back 1 migration" in result.output
     finally:
         set_application(None)
+
+
+def _app_with(migration: Migration) -> tuple[Any, Any]:
+    from arvel.kernel import Application, set_application
+
+    app = Application()
+    app.instance("migrator", Migrator(ConnectionResolver()))
+    app.instance("migrations", [migration])
+    set_application(app)
+    return app, set_application
+
+
+def test_migrate_fresh_drops_then_remigrates() -> None:
+    _, reset = _app_with(CreateWidgets())
+    try:
+        assert runner.invoke(build_cli(), ["migrate"]).exit_code == 0
+        result = runner.invoke(build_cli(), ["migrate:fresh"])
+        assert result.exit_code == 0, result.output
+        assert "dropped" in result.output and "migrated 1 migration" in result.output
+    finally:
+        reset(None)
+
+
+def test_migrate_refresh_rolls_back_then_remigrates() -> None:
+    _, reset = _app_with(CreateWidgets())
+    try:
+        assert runner.invoke(build_cli(), ["migrate"]).exit_code == 0
+        result = runner.invoke(build_cli(), ["migrate:refresh"])
+        assert result.exit_code == 0, result.output
+        assert "refreshed 1 migration" in result.output
+    finally:
+        reset(None)
+
+
+def test_db_wipe_drops_all_tables() -> None:
+    _, reset = _app_with(CreateWidgets())
+    try:
+        assert runner.invoke(build_cli(), ["migrate"]).exit_code == 0
+        result = runner.invoke(build_cli(), ["db:wipe"])
+        assert result.exit_code == 0, result.output
+        assert "dropped" in result.output
+    finally:
+        reset(None)

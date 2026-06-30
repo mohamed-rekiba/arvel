@@ -52,3 +52,56 @@ async def _rollback(app: Any) -> None:
     migrator, migrations = _resolve(app)
     await migrator.rollback(migrations)
     typer.echo(f"rolled back {len(migrations)} migration(s)")
+
+
+fresh_app = typer.Typer()
+
+
+@fresh_app.command()
+def migrate_fresh() -> None:
+    """Drop all tables, then re-run every migration (Laravel `migrate:fresh`)."""
+    from arvel.console.kernel import run_app_command
+
+    run_app_command(_fresh)
+
+
+async def _fresh(app: Any) -> None:
+    migrator, migrations = _resolve(app)
+    dropped = await migrator.drop_all()
+    await migrator.run(migrations)
+    typer.echo(f"dropped {dropped} table(s); migrated {len(migrations)} migration(s)")
+
+
+refresh_app = typer.Typer()
+
+
+@refresh_app.command()
+def migrate_refresh() -> None:
+    """Roll back all migrations, then re-run them (Laravel `migrate:refresh`)."""
+    from arvel.console.kernel import run_app_command
+
+    run_app_command(_refresh)
+
+
+async def _refresh(app: Any) -> None:
+    migrator, migrations = _resolve(app)
+    await migrator.rollback(migrations)
+    await migrator.run(migrations)
+    typer.echo(f"refreshed {len(migrations)} migration(s)")
+
+
+wipe_app = typer.Typer()
+
+
+@wipe_app.command()
+def db_wipe() -> None:
+    """Drop all tables without re-migrating (Laravel `db:wipe`)."""
+    from arvel.console.kernel import run_app_command
+
+    run_app_command(_wipe)
+
+
+async def _wipe(app: Any) -> None:
+    migrator, _ = _resolve(app)
+    dropped = await migrator.drop_all()
+    typer.echo(f"dropped {dropped} table(s)")

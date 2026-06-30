@@ -59,6 +59,12 @@ class CacheRepository:
             await self._client.delete(key)
             return True
 
+    async def flush(self) -> bool:
+        """Remove every entry from the store (Laravel ``Cache::flush`` / ``cache:clear``)."""
+        with span("cache flush", kind="client", attributes={"cache.operation": "flush"}):
+            await self._client.clear()
+            return True
+
     async def increment(self, key: str, by: int = 1) -> int:
         """Atomically add ``by`` to a counter (created at 0 if absent); returns the new value."""
         with span("cache increment", kind="client", attributes={"cache.operation": "increment"}):

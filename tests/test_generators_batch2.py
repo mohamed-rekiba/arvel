@@ -73,3 +73,39 @@ def test_generator_refuses_to_overwrite(tmp_path: Path) -> None:
     generate("job", "ProcessPayment", base=tmp_path)
     with pytest.raises(FileExistsError):
         generate("job", "ProcessPayment", base=tmp_path)
+
+
+# --- third batch: enum / exception / test + the ops commands (key:generate, storage:link) -------
+def test_generate_enum_and_exception(tmp_path: Path) -> None:
+    enum = generate("enum", "OrderStatus", base=tmp_path)
+    assert enum == tmp_path / "app/enums/order_status.py"
+    assert "class OrderStatus(StrEnum):" in enum.read_text()
+    assert hasattr(_exec_module(enum, "gen_enum"), "OrderStatus")
+
+    exc = generate("exception", "PaymentFailed", base=tmp_path)
+    assert exc == tmp_path / "app/exceptions/payment_failed.py"
+    assert "class PaymentFailed(Exception):" in exc.read_text()
+
+
+def test_generate_test_writes_pytest_discoverable_file(tmp_path: Path) -> None:
+    from arvel.console.generators import generate_test
+
+    target = generate_test("Checkout", base=tmp_path)
+    assert target == tmp_path / "tests/test_checkout.py"  # test_*.py for pytest discovery
+    ast.parse(target.read_text())
+    assert "def test_checkout()" in target.read_text()
+
+
+def test_key_generate_sets_app_key_in_dotenv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from arvel.console.ops import _set_env_var
+
+    env = tmp_path / ".env"
+    env.write_text("APP_NAME=demo\nAPP_KEY=old\n")
+    _set_env_var(env, "APP_KEY", "fresh-key")
+    assert "APP_KEY=fresh-key" in env.read_text()
+    assert "APP_NAME=demo" in env.read_text()  # other vars preserved
+    # appends when absent
+    _set_env_var(env, "EXTRA", "1")
+    assert "EXTRA=1" in env.read_text()
