@@ -17,7 +17,7 @@ Set the whole map (``product.name = {"en": "Phone", "fr": "Téléphone"}``) or o
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 
 def _load(value: Any) -> dict[str, Any]:
@@ -48,14 +48,17 @@ class Translatable:
         return next(iter(data.values()))
 
     def set(self, model: Any, key: str, value: Any, attributes: dict[str, Any]) -> Any:
+        """Store the ``{locale: value}`` map as a dict — back the attribute with a ``jsonb``/JSON
+        column and SQLAlchemy serializes it once (a pre-stringified value would double-encode and
+        break ``->>`` / ``json_extract`` lookups)."""
         from arvel.localization import current_locale
 
         if isinstance(value, dict):
-            return json.dumps(value)
+            return cast("dict[str, Any]", value)
         # a bare string sets the current locale, preserving the other translations
-        data = _load(attributes.get(key))
+        data: dict[str, Any] = _load(attributes.get(key))
         data[current_locale.get()] = value
-        return json.dumps(data)
+        return data
 
 
 class HasTranslations:
