@@ -59,6 +59,25 @@ def test_registration_sends_welcome():
 
 Call `reset_fakes()` in teardown so a swapped fake doesn't leak into the next test.
 
+## Isolating process-global state
+
+The default api-group **rate limiter** and the in-process **session store** are process-global —
+correct for one running app, but they persist across the many app instances a suite builds in one
+process, so the throttle eventually returns a spurious `429` mid-suite. Reset them between tests:
+
+```python
+import pytest
+from arvel.http import reset_rate_limiter, reset_sessions
+
+@pytest.fixture(autouse=True)
+def _isolate():
+    reset_rate_limiter()   # clear the in-process rate-limit windows
+    reset_sessions()       # clear the in-process session store
+    yield
+```
+
+(No effect on a cache-backed limiter/session store — clear that backend instead.)
+
 ## Database assertions
 
 Assert rows exist, don't exist, or are soft-deleted — straight against the connection:

@@ -37,6 +37,23 @@ _THROTTLE_HITS: dict[str, tuple[int, float]] = {}
 _SESSIONS: dict[str, dict[str, Any]] = {}
 
 
+def reset_rate_limiter() -> None:
+    """Clear the in-process rate-limiter window state (Laravel ``RateLimiter::clear`` for all keys).
+
+    The default ``ThrottleRequests`` state is **process-global** — correct for one running app, but
+    it leaks across the multiple app instances a test suite builds in a single process, so the api
+    throttle eventually 429s spuriously mid-suite. Call this between tests (an autouse fixture) to
+    isolate each test. No effect on a cache-backed (distributed) limiter — clear that store instead.
+    """
+    _THROTTLE_HITS.clear()
+
+
+def reset_sessions() -> None:
+    """Clear the default in-process session store — the session counterpart to
+    :func:`reset_rate_limiter` for test isolation (no effect on a cache-backed session store)."""
+    _SESSIONS.clear()
+
+
 class Middleware:
     """Base middleware. Override ``handle`` to inspect/short-circuit/decorate, and (optionally)
     ``terminate`` to run *after* the response is built (session flush, logging, …)."""
