@@ -68,6 +68,14 @@ class Schema:
 class Migration:
     """Base migration: subclass and implement ``up`` and ``down``."""
 
+    _name: str = ""  # set to the file stem by discover_migrations; else the class name is used
+
+    @property
+    def name(self) -> str:
+        """The stable identifier recorded in the migrations table — the file stem when discovered
+        from ``database/migrations`` (set by :func:`discover_migrations`), else the class name."""
+        return self._name or type(self).__name__
+
     def up(self, schema: Schema) -> None:
         raise NotImplementedError
 
@@ -75,20 +83,27 @@ class Migration:
         raise NotImplementedError
 
 
+_MIGRATIONS_TABLE = "arvel_migrations"
+
+
 class Migrator:
-    """Runs migrations through Alembic on the write connection."""
+    """Runs migrations through Alembic on the write connection, recording applied migrations in the
+    ``arvel_migrations`` table so ``migrate`` is **idempotent** (only pending migrations run) and
+    ``migrate:rollback`` reverts the last batch (Laravel parity)."""
 
     def __init__(self, resolver: ConnectionResolver, name: str | None = None) -> None:
         self._resolver = resolver
         self._name = name
 
-    async def run(self, migrations: Sequence[Migration]) -> None:
+    async def run(self, migrations: Sequence[Migration]) -> int:
+        """Apply every not-yet-applied migration (in order) as one new batch. Returns how many ran."""
         async with self._resolver.engine(self._name).begin() as conn:
-            await conn.run_sync(self._apply, list(migrations), "up")
+            return int(await conn.run_sync(self._apply, list(migrations), "up"))
 
-    async def rollback(self, migrations: Sequence[Migration]) -> None:
+    async def rollback(self, migrations: Sequence[Migration]) -> int:
+        """Roll back the migrations in the most recent batch (reverse order). Returns how many ran."""
         async with self._resolver.engine(self._name).begin() as conn:
-            await conn.run_sync(self._apply, list(reversed(list(migrations))), "down")
+            return int(await conn.run_sync(self._apply, list(migrations), "down"))
 
     async def drop_all(self) -> int:
         """Reflect and drop every table on the connection (DB-agnostic — Postgres/sqlite). Backs
@@ -102,17 +117,63 @@ class Migrator:
         return len(meta.tables)
 
     @staticmethod
-    def _apply(sync_conn: Any, migrations: list[Migration], direction: str) -> None:
+    def _apply(sync_conn: Any, migrations: list[Migration], direction: str) -> int:
+        import sqlalchemy as sa
         from alembic.migration import MigrationContext
         from alembic.operations import Operations
 
+        sync_conn.execute(
+            sa.text(
+                f"CREATE TABLE IF NOT EXISTS {_MIGRATIONS_TABLE} "
+                "(name VARCHAR(255) PRIMARY KEY, batch INTEGER NOT NULL)"
+            )
+        )
+        applied: set[str] = set(
+            sync_conn.execute(sa.text(f"SELECT name FROM {_MIGRATIONS_TABLE}")).scalars()  # noqa: S608 # nosec B608 - trusted constant table name; values bound
+        )
         context = MigrationContext.configure(sync_conn)
         schema = Schema(Operations(context))
-        for migration in migrations:
-            if direction == "up":
+
+        if direction == "up":
+            pending = [m for m in migrations if m.name not in applied]
+            if not pending:
+                return 0
+            next_batch = (
+                sync_conn.execute(
+                    sa.text(f"SELECT COALESCE(MAX(batch), 0) FROM {_MIGRATIONS_TABLE}")  # noqa: S608 # nosec B608 - trusted constant table name; values bound
+                ).scalar()
+                or 0
+            ) + 1
+            for migration in pending:
                 migration.up(schema)
-            else:
+                sync_conn.execute(
+                    sa.text(f"INSERT INTO {_MIGRATIONS_TABLE} (name, batch) VALUES (:n, :b)"),  # noqa: S608 # nosec B608 - trusted constant table name; values bound
+                    {"n": migration.name, "b": next_batch},
+                )
+            return len(pending)
+
+        # down: revert only the most recent batch, in reverse order
+        last_batch = sync_conn.execute(
+            sa.text(f"SELECT MAX(batch) FROM {_MIGRATIONS_TABLE}")  # noqa: S608 # nosec B608 - trusted constant table name; values bound
+        ).scalar()
+        if last_batch is None:
+            return 0
+        in_batch: set[str] = set(
+            sync_conn.execute(
+                sa.text(f"SELECT name FROM {_MIGRATIONS_TABLE} WHERE batch = :b"),  # noqa: S608 # nosec B608 - trusted constant table name; values bound
+                {"b": last_batch},
+            ).scalars()
+        )
+        reverted = 0
+        for migration in reversed(migrations):
+            if migration.name in in_batch:
                 migration.down(schema)
+                sync_conn.execute(
+                    sa.text(f"DELETE FROM {_MIGRATIONS_TABLE} WHERE name = :n"),  # noqa: S608 # nosec B608 - trusted constant table name; values bound
+                    {"n": migration.name},
+                )
+                reverted += 1
+        return reverted
 
 
 def discover_migrations(paths: Sequence[str], base_path: str = ".") -> list[Migration]:
@@ -149,7 +210,10 @@ def discover_migrations(paths: Sequence[str], base_path: str = ".") -> list[Migr
                     and issubclass(value, Migration)
                     and value is not Migration
                 ):
-                    instances.append(value())
+                    migration = value()
+                    # the recorded identifier (one migration per file convention)
+                    migration._name = file.stem  # pyright: ignore[reportPrivateUsage]
+                    instances.append(migration)
     return instances
 
 

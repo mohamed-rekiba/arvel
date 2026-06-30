@@ -69,7 +69,20 @@ def run_app_command(handler: CommandHandler) -> None:
     if project is None:
         typer.echo("not inside an arvel project (no bootstrap/app.py with a create_app() factory)")
         raise typer.Exit(1)
-    asyncio.run(_lifecycle(project, handler))
+    try:
+        asyncio.run(_lifecycle(project, handler))
+    except typer.Exit:
+        raise
+    except Exception as exc:  # a command failure → one concise line, not a wall of traceback
+        import os
+
+        if os.environ.get("ARVEL_DEBUG"):
+            raise  # opt back into the full traceback for debugging
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
+        typer.secho(
+            "  (set ARVEL_DEBUG=1 for the full traceback)", fg=typer.colors.BRIGHT_BLACK, err=True
+        )
+        raise typer.Exit(1) from exc
 
 
 def load_console_routes(app: Any) -> None:

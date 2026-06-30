@@ -123,25 +123,48 @@ def _write_project(root: Path, *, bad_boot: bool) -> None:
 def test_terminate_runs_when_handler_raises(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """A command failure exits cleanly (typer.Exit, one-line message — not a raw traceback) and
+    terminate still runs. ARVEL_DEBUG re-raises the original error for debugging."""
+    import typer
+
     _write_project(tmp_path, bad_boot=False)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("ARVEL_DEBUG", raising=False)
     from arvel.console.kernel import run_app_command
 
     try:
-        with pytest.raises(RuntimeError, match="handler boom"):
+        with pytest.raises(typer.Exit):  # concise exit, not the RuntimeError traceback
             run_app_command(_boom_handler)
         assert (tmp_path / "terminated.flag").exists()  # finally → terminate ran
     finally:
         set_application(None)
 
 
-def test_terminate_runs_on_boot_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _write_project(tmp_path, bad_boot=True)
+def test_arvel_debug_reraises_the_original_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_project(tmp_path, bad_boot=False)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARVEL_DEBUG", "1")
     from arvel.console.kernel import run_app_command
 
     try:
-        with pytest.raises(RuntimeError, match="boot boom"):
+        with pytest.raises(RuntimeError, match="handler boom"):  # full traceback path
+            run_app_command(_boom_handler)
+    finally:
+        set_application(None)
+
+
+def test_terminate_runs_on_boot_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import typer
+
+    _write_project(tmp_path, bad_boot=True)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("ARVEL_DEBUG", raising=False)
+    from arvel.console.kernel import run_app_command
+
+    try:
+        with pytest.raises(typer.Exit):
             run_app_command(_noop_handler)
         assert (tmp_path / "terminated.flag").exists()  # M7: failed boot still terminated
     finally:

@@ -116,3 +116,17 @@ def test_db_wipe_drops_all_tables() -> None:
         assert "dropped" in result.output
     finally:
         reset(None)
+
+
+def test_migrate_is_idempotent() -> None:
+    """Running migrate twice doesn't re-run applied migrations (no 'already exists') — the second run
+    is a no-op. This is the bug that crashed `make setup` on an already-migrated database."""
+    _, reset = _app_with(CreateWidgets())
+    try:
+        first = runner.invoke(build_cli(), ["migrate"])
+        assert first.exit_code == 0 and "migrated 1 migration" in first.output
+        second = runner.invoke(build_cli(), ["migrate"])
+        assert second.exit_code == 0, second.output
+        assert "Nothing to migrate" in second.output
+    finally:
+        reset(None)

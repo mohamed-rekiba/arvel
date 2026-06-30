@@ -33,8 +33,8 @@ def migrate() -> None:
 
 async def _migrate(app: Any) -> None:
     migrator, migrations = _resolve(app)
-    await migrator.run(migrations)
-    typer.echo(f"migrated {len(migrations)} migration(s)")
+    applied = await migrator.run(migrations)
+    typer.echo(f"migrated {applied} migration(s)" if applied else "Nothing to migrate.")
 
 
 rollback_app = typer.Typer()
@@ -50,8 +50,8 @@ def migrate_rollback() -> None:
 
 async def _rollback(app: Any) -> None:
     migrator, migrations = _resolve(app)
-    await migrator.rollback(migrations)
-    typer.echo(f"rolled back {len(migrations)} migration(s)")
+    reverted = await migrator.rollback(migrations)
+    typer.echo(f"rolled back {reverted} migration(s)" if reverted else "Nothing to roll back.")
 
 
 fresh_app = typer.Typer()
