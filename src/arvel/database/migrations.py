@@ -140,11 +140,24 @@ class Migrator:
 
     async def drop_all(self) -> int:
         """Reflect and drop every table on the connection (DB-agnostic — Postgres/sqlite). Backs
-        ``db:wipe`` and ``migrate:fresh``. Returns the number of tables dropped."""
+        ``db:wipe`` and ``migrate:fresh``. On Postgres, materialized/plain views are dropped first
+        (with CASCADE) so a view depending on a table doesn't block the drop. Returns table count."""
+        import sqlalchemy as sa
         from sqlalchemy import MetaData
 
+        engine = self._resolver.engine(self._name)
         meta = MetaData()
-        async with self._resolver.engine(self._name).begin() as conn:
+        async with engine.begin() as conn:
+            if conn.dialect.name == "postgresql":
+                await conn.execute(
+                    sa.text(
+                        "DO $$ DECLARE r RECORD; BEGIN "
+                        "FOR r IN SELECT matviewname AS n FROM pg_matviews WHERE schemaname='public' LOOP "
+                        "EXECUTE 'DROP MATERIALIZED VIEW IF EXISTS \"'||r.n||'\" CASCADE'; END LOOP; "
+                        "FOR r IN SELECT viewname AS n FROM pg_views WHERE schemaname='public' LOOP "
+                        "EXECUTE 'DROP VIEW IF EXISTS \"'||r.n||'\" CASCADE'; END LOOP; END $$;"
+                    )
+                )
             await conn.run_sync(meta.reflect)
             await conn.run_sync(meta.drop_all)
         return len(meta.tables)
