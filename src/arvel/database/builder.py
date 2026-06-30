@@ -163,6 +163,27 @@ class Builder:
         self._add(sa.not_(self._table.c[column].between(low, high)))
         return self
 
+    def where_raw(self, sql: str, *, connector: str = "and") -> Self:
+        """A raw SQL boolean predicate (Laravel ``whereRaw``) — e.g. a correlated ``EXISTS(...)``.
+        The SQL is **trusted**: never interpolate user input here; use bound ``where(...)`` for values."""
+        import sqlalchemy as sa
+
+        self._add(sa.text(sql), connector)
+        return self
+
+    def where_exists(self, subquery: Select[Any], *, connector: str = "and") -> Self:
+        """``WHERE EXISTS (subquery)`` (Laravel ``whereExists``). ``subquery`` is a ``Select`` — correlate
+        it to the outer query (``where(other.c.id == self.table.c['id'])``) for a per-row check."""
+        import sqlalchemy as sa
+
+        self._add(sa.exists(subquery), connector)
+        return self
+
+    @property
+    def table(self) -> Any:
+        """The underlying SQLAlchemy ``Table`` — for building a correlated ``where_exists`` subquery."""
+        return self._table
+
     def _apply_conditional(self, callback: Any, value: Any) -> None:
         """Invoke a ``when``/``unless`` callback Laravel-style. Laravel passes ``($query, $value)``;
         we pass the value as the 2nd argument when the callback accepts one, and fall back to

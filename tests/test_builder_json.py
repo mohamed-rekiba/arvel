@@ -85,3 +85,24 @@ async def test_where_in_accepts_a_subquery() -> None:
         assert {r["name"] for r in rows} == {"a", "b"}  # c excluded by the subquery
     finally:
         await db.dispose()
+
+
+async def test_where_raw_predicate() -> None:
+    db = await _seed()
+    try:
+        rows = await Builder(docs, db).where_raw("name = 'a'").get()
+        assert {r["name"] for r in rows} == {"a"}
+    finally:
+        await db.dispose()
+
+
+async def test_where_exists_correlated() -> None:
+    db = await _seed()
+    try:
+        await Builder(docs, db).insert({"name": "c", "data": {"lang": "en"}})
+        inner = docs.alias("inner")  # correlate the inner alias to the outer docs row
+        sub = sa.select(inner.c.id).where((inner.c.id == docs.c.id) & inner.c.name.in_(["a", "b"]))
+        rows = await Builder(docs, db).where_exists(sub).get()
+        assert {r["name"] for r in rows} == {"a", "b"}  # only rows whose name is in {a,b}
+    finally:
+        await db.dispose()
