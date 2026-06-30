@@ -55,9 +55,18 @@ appears. (No separate installer binary — one tool, like `git`.)
 | `make:listener <Name>` | scaffold an event listener (`app/listeners/`; register via `Event.listen`) |
 | `make:cast <Name>` | scaffold a custom attribute cast (`app/casts/`; use in a model's `__casts__`) |
 | `make:observer <Name>` | scaffold a model observer (`app/observers/`; register via `Model.observe()`) |
+| `make:enum <Name>` | scaffold a string-backed enum (`app/enums/`) |
+| `make:exception <Name>` | scaffold an exception class (`app/exceptions/`) |
+| `make:test <Name>` | scaffold a pytest test (`tests/test_<name>.py`) |
 | `route:list` | tabulate the app's routes (methods, path, name) |
 | `migrate` / `migrate:rollback` | apply / revert migrations |
+| `migrate:fresh` | drop all tables, then re-run every migration |
+| `migrate:refresh` | roll back all migrations, then re-run them |
+| `db:wipe` | drop all tables without re-migrating |
 | `db:seed` | run the app's database seeder |
+| `cache:clear` | flush the default cache store |
+| `key:generate` | generate an app key and write it to `.env` as `APP_KEY` |
+| `storage:link` | symlink `public/storage` → `storage/app/public` |
 | `schedule:run` | run scheduled tasks that are due now |
 | `lang:list` | list available locales |
 | `queue:work` | run a worker that processes queued jobs |
