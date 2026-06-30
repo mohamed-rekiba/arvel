@@ -60,6 +60,27 @@ def test_openapi_is_generated_from_routes() -> None:
     assert "/ping" in schema["paths"]
 
 
+def test_typed_query_params_are_injected_and_documented() -> None:
+    """A handler's non-path/non-body typed args are query parameters: Litestar injects them (with
+    defaults) AND documents them under the operation's `parameters`."""
+
+    async def search(request: Any, q: str | None = None, page: int = 1) -> dict[str, Any]:
+        return {"q": q, "page": page}
+
+    kernel = HttpKernel()
+    kernel.get("/search", search)
+    # injected with coercion + defaults
+    with TestClient(kernel.build()) as client:
+        assert client.get("/search?q=hat&page=3").json() == {"q": "hat", "page": 3}
+        assert client.get("/search").json() == {"q": None, "page": 1}
+    # documented as query parameters
+    schema = kernel.openapi()
+    params = schema["paths"]["/search"]["get"].get("parameters", [])
+    by_name = {p["name"]: p for p in params}
+    assert {"q", "page"} <= set(by_name)
+    assert all(p["in"] == "query" for p in params)
+
+
 def test_model_not_found_renders_as_404() -> None:
     """find_or_fail/first_or_fail raise ModelNotFound; the kernel renders it as 404 (Laravel
     findOrFail parity) — so a handler needn't guard `if x is None: abort(404)` by hand."""

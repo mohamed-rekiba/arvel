@@ -468,28 +468,35 @@ class HttpKernel:
         kernel = self
         litestar_path, key_fields = self._compile_path(path)
         return_hint, body = self._handler_io(handler)
+        body_name = body[0] if body is not None else None
+        query_params = self._query_params(handler, litestar_path, body_name)
 
-        adapter: Any
+        # One synthetic adapter. Litestar reads its `__signature__` to know what to inject + document:
+        # the request, the typed body (as `data` → request schema), and each typed query parameter
+        # (non-path, non-body handler args → documented query params). Injected args arrive by name in
+        # ``injected``; we split out the body and forward the rest as query kwargs to the handler.
+        async def adapter(request: Any, **injected: Any) -> Any:
+            body_arg = (body_name, injected.pop(body_name)) if body_name is not None else None
+            return await kernel._dispatch(
+                handler, request, group, middleware, key_fields, body=body_arg, query=injected
+            )
+
+        sig_params = [inspect.Parameter("request", inspect.Parameter.POSITIONAL_OR_KEYWORD)]
+        annotations: dict[str, Any] = {"request": Any, "return": return_hint}
         if body is not None:
-            body_name, body_type = body
-
-            # the handler declares a typed request body (a msgspec.Struct param) — expose it to
-            # Litestar as `data` so the body is parsed/validated AND a request schema is generated,
-            # then forward it to the handler under its own param name.
-            async def adapter_with_body(request: Any, data: Any) -> Any:
-                return await kernel._dispatch(
-                    handler, request, group, middleware, key_fields, body=(body_name, data)
+            sig_params.append(
+                inspect.Parameter(body[0], inspect.Parameter.KEYWORD_ONLY, annotation=body[1])
+            )
+            annotations[body[0]] = body[1]
+        for qname, qann, qdefault in query_params:
+            sig_params.append(
+                inspect.Parameter(
+                    qname, inspect.Parameter.KEYWORD_ONLY, annotation=qann, default=qdefault
                 )
-
-            adapter = adapter_with_body
-            adapter.__annotations__ = {"request": Any, "data": body_type, "return": return_hint}
-        else:
-
-            async def adapter_plain(request: Any) -> Any:
-                return await kernel._dispatch(handler, request, group, middleware, key_fields)
-
-            adapter = adapter_plain
-            adapter.__annotations__ = {"request": Any, "return": return_hint}
+            )
+            annotations[qname] = qann
+        adapter.__signature__ = inspect.Signature(sig_params, return_annotation=return_hint)  # type: ignore[attr-defined]
+        adapter.__annotations__ = annotations
 
         # Name the adapter from the route's name when given (e.g. "home"/"api.health" →
         # home / api_health) so the OpenAPI operationId + summary are clean — not the mangled
@@ -538,6 +545,32 @@ class HttpKernel:
                 return return_hint, (pname, ann)
         return return_hint, None
 
+    @staticmethod
+    def _query_params(
+        handler: Any, litestar_path: str, body_name: str | None
+    ) -> list[tuple[str, Any, Any]]:
+        """A handler's query parameters: every typed arg that isn't the request (first param), the
+        body, or a path param. Returns ``(name, annotation, default)`` — exposed on the adapter so
+        Litestar documents + injects them (``def index(request, q: str | None = None, page: int = 1)``).
+        Best-effort; degrades to no query params on an unintrospectable handler."""
+        path_names = set(re.findall(r"\{(\w+)", litestar_path))
+        try:
+            signature = inspect.signature(handler)
+            hints = typing.get_type_hints(handler)
+        except Exception:
+            return []
+        result: list[tuple[str, Any, Any]] = []
+        for index, param in enumerate(signature.parameters.values()):
+            if index == 0:  # the request
+                continue
+            if param.name == body_name or param.name in path_names:
+                continue
+            if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
+                continue
+            default = None if param.default is inspect.Parameter.empty else param.default
+            result.append((param.name, hints.get(param.name, Any), default))
+        return result
+
     async def _dispatch(
         self,
         handler: Any,
@@ -546,6 +579,7 @@ class HttpKernel:
         route_middleware: Sequence[Any] | None = None,
         key_fields: dict[str, str] | None = None,
         body: tuple[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
     ) -> Any:
         import contextlib
 
@@ -567,6 +601,8 @@ class HttpKernel:
                 await self._resolve_implicit_bindings(handler, params, key_fields or {})
                 if body is not None:  # typed request body → pass under the handler's param name
                     params[body[0]] = body[1]
+                if query:  # typed query parameters → forwarded to the handler by name
+                    params.update(query)
 
                 return await self._handle(handler, request, params, group, route_middleware)
         finally:
