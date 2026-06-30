@@ -47,6 +47,23 @@ def _address(recipient: Any) -> str:
     return str(getattr(recipient, "email", recipient))
 
 
+def _global_from() -> str:
+    """The app-wide default sender (Laravel ``mail.from``): ``config('mail.from.address')`` formatted
+    as ``Name <address>``. Applied when a mailable doesn't set ``from_`` — SMTP requires a From header,
+    so without this a confirmation email built without an explicit sender fails to send."""
+    from arvel.kernel import has_application
+
+    if not has_application():
+        return ""
+    from arvel import config
+
+    address = config("mail.from.address") or ""
+    if not address:
+        return ""
+    name = config("mail.from.name") or ""
+    return f"{name} <{address}>" if name else str(address)
+
+
 class Mailable:
     """Base mail message: subclass and override ``build()`` (Laravel ``Mailable``)."""
 
@@ -125,8 +142,9 @@ class Mailable:
         self.build()
         message = EmailMessage()
         message["Subject"] = self._subject
-        if self._from:
-            message["From"] = self._from
+        sender = self._from or _global_from()
+        if sender:
+            message["From"] = sender
         if self._reply_to:
             message["Reply-To"] = self._reply_to
         message.set_content(self._html, subtype="html")

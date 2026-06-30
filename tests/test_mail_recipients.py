@@ -100,3 +100,31 @@ async def test_queued_mailable_survives_broker_serialization_and_rebuilds() -> N
     mailable = await restored._rebuild_mailable()
     msg = mailable.render()
     assert msg["Subject"] == "Welcome Ada"  # subclass state survived; build() ran on rebuild
+
+
+def test_render_uses_global_from_when_unset() -> None:
+    """A mailable without an explicit from_ falls back to config('mail.from') — SMTP needs a From
+    header, so an app-wide default sender makes confirmation mails sendable (Laravel mail.from)."""
+    from arvel.kernel import Application, set_application
+
+    app = Application()
+    app.instance("config", {"mail.from.address": "shop@arvel.test", "mail.from.name": "Arvel"})
+    set_application(app)
+    try:
+        message = Doc().subject("Hi").html("<p>x</p>").render()
+        assert message["From"] == "Arvel <shop@arvel.test>"
+    finally:
+        set_application(None)
+
+
+def test_explicit_from_wins_over_global() -> None:
+    from arvel.kernel import Application, set_application
+
+    app = Application()
+    app.instance("config", {"mail.from.address": "shop@arvel.test"})
+    set_application(app)
+    try:
+        message = Doc().from_("me@arvel.test").subject("Hi").html("<p>x</p>").render()
+        assert message["From"] == "me@arvel.test"
+    finally:
+        set_application(None)
