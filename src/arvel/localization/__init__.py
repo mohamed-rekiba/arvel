@@ -14,6 +14,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
+# translatable.py imports current_locale lazily (inside methods), so this top-level import is safe
+from arvel.localization.translatable import HasTranslations, Translatable
+
 current_locale: contextvars.ContextVar[str] = contextvars.ContextVar("arvel_locale", default="en")
 
 
@@ -171,6 +174,8 @@ def trans_choice(key: str, n: int, **replace: Any) -> str:
 
 
 __all__ = [
+    "HasTranslations",
+    "Translatable",
     "Translator",
     "__",
     "current_locale",

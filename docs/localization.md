@@ -118,6 +118,27 @@ trans("messages.saved")        # "Enregistré !"
 `LocaleMiddleware` sets it from the request's `Accept-Language` header for the duration of each
 request and resets it afterward, so you rarely set it by hand.
 
+## Translatable model attributes
+
+Beyond UI strings, **content** is often multilingual (a product name in en/fr/de). Mix in
+`HasTranslations` and cast an attribute as `Translatable` — it's stored as a JSON object
+`{locale: value}` (back it with a `jsonb` column) and **read as the current locale's value**:
+
+```python
+from arvel.localization import HasTranslations, Translatable
+
+class Product(HasTranslations, Model):
+    __casts__ = {"name": Translatable(), "description": Translatable()}
+
+product.name = {"en": "Phone", "fr": "Téléphone"}   # set the whole map…
+product.set_translation("name", "de", "Telefon")     # …or one locale at a time
+current_locale.set("fr"); product.name                # "Téléphone"  (falls back to the default locale)
+```
+
+Index a specific locale you filter/sort by with a B-tree expression index —
+`t.btree_index("name->>'en'")` (GIN is for containment search; see
+[JSON, Full-text & Vectors](database/json-search.md)).
+
 ## Common mistakes & gotchas
 
 - **Setting the locale globally.** Don't reach for a module global — the context variable is
