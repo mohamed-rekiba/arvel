@@ -338,7 +338,7 @@ all = [
     { name = "pgvector" },
     { name = "pillow" },
     { name = "prometheus-client" },
-    { name = "pyjwt" },
+    { name = "pyjwt", extra = ["crypto"] },
     { name = "pyotp" },
     { name = "redis" },
     { name = "s3fs" },
@@ -410,6 +410,9 @@ notifications = [
 oauth = [
     { name = "authlib" },
     { name = "httpx-oauth" },
+]
+oidc = [
+    { name = "pyjwt", extra = ["crypto"] },
 ]
 postgres = [
     { name = "alembic" },
@@ -570,6 +573,8 @@ requires-dist = [
     { name = "pyjwt", marker = "extra == 'all'", specifier = ">=2.13.0" },
     { name = "pyjwt", marker = "extra == 'jwt'", specifier = ">=2.13.0" },
     { name = "pyjwt", marker = "extra == 'standard'", specifier = ">=2.13.0" },
+    { name = "pyjwt", extras = ["crypto"], marker = "extra == 'all'", specifier = ">=2.13.0" },
+    { name = "pyjwt", extras = ["crypto"], marker = "extra == 'oidc'", specifier = ">=2.13.0" },
     { name = "pyotp", marker = "extra == '2fa'", specifier = ">=2.10.0" },
     { name = "pyotp", marker = "extra == 'all'", specifier = ">=2.10.0" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.411" },
@@ -613,7 +618,7 @@ requires-dist = [
     { name = "whenever", specifier = ">=0.10.0" },
     { name = "zensical", marker = "extra == 'docs'", specifier = ">=0.0.46" },
 ]
-provides-extras = ["2fa", "all", "azure", "console", "dev", "docs", "gcs", "http", "i18n", "image", "jwt", "mail", "media", "mysql", "notifications", "oauth", "postgres", "queue", "queue-amqp", "queue-redis", "redis", "s3", "search", "server", "sqlite", "standard", "supabase", "telemetry", "test-integration", "vector", "video", "view"]
+provides-extras = ["2fa", "all", "azure", "console", "dev", "docs", "gcs", "http", "i18n", "image", "jwt", "mail", "media", "mysql", "notifications", "oauth", "oidc", "postgres", "queue", "queue-amqp", "queue-redis", "redis", "s3", "search", "server", "sqlite", "standard", "supabase", "telemetry", "test-integration", "vector", "video", "view"]
 
 [[package]]
 name = "ast-serialize"
