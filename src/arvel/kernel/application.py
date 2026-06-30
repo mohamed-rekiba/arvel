@@ -180,15 +180,17 @@ class Application(Container):
 
     def _apply_builder_overrides(self) -> None:
         """Apply builder-supplied config against the now-bound targets (C2): ``with_exceptions``
-        customizes the exception handler; ``with_middlewares`` appends to the HTTP kernel's global
-        middleware stack. No-op when the target isn't bound (e.g. a non-HTTP app)."""
+        customizes the bound exception handler. ``with_middlewares`` is NOT applied here — the served
+        ``HttpKernel`` is built on demand in ``_build_served_asgi`` (it is not a container singleton;
+        ``"http"`` is the HTTP *client*), which consumes ``builder_middlewares`` there."""
         if self._builder_exceptions is not None and self.bound("exceptions"):
             self._builder_exceptions(self.make("exceptions"))
-        if self._builder_middlewares and self.bound("http"):
-            kernel = self.make("http")
-            kernel.global_middleware.extend(
-                kernel.resolve_middleware(mw) for mw in self._builder_middlewares
-            )
+
+    @property
+    def builder_middlewares(self) -> Sequence[Any]:
+        """Global middleware registered via the fluent ``with_middlewares([...])`` — consumed by the
+        served kernel builder (``_build_served_asgi``) so they run on every request."""
+        return self._builder_middlewares
 
     def _register_translation_namespaces(self) -> None:
         """Apply provider-registered translation namespaces (``load_translations_from``) to the

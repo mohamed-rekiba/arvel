@@ -44,6 +44,16 @@ Before any group runs, a handful of **global** middleware run on *every* request
 gate (`503` while the app is down), `ValidatePostSize` (`413` on an over-large body), and
 `ValidateHost` (`400` on an untrusted `Host`). You don't wire these up — they're on by default.
 
+**Add your own global middleware** in `bootstrap/middlewares.py` (the list the fluent
+`with_middlewares(...)` loads) — they run on every request, after the built-in global gate:
+
+```python
+# bootstrap/middlewares.py
+from arvel.http.middleware import AuthenticateMiddleware
+
+middlewares = [AuthenticateMiddleware]   # resolves the request user into `current_user`
+```
+
 Populate the group defaults at boot and tweak them:
 
 ```python

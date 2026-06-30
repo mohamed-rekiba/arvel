@@ -27,25 +27,17 @@ async def test_with_exceptions_configures_the_bound_handler_at_boot() -> None:
     assert received == [sentinel]  # configure callback ran against the bound handler
 
 
-async def test_with_middlewares_appends_to_the_kernel_global_stack_at_boot() -> None:
-    builder = Application.configure()
-
+async def test_with_middlewares_are_exposed_for_the_served_kernel() -> None:
+    # The served HttpKernel is built on demand in _build_served_asgi (it is NOT a container
+    # singleton — "http" is the HTTP *client*), so builder middlewares are exposed via
+    # `app.builder_middlewares` and consumed there, not applied to a boot-time kernel binding.
+    # (The end-to-end run of a builder middleware on the served path is covered in
+    # test_fluent_bootstrap.test_with_middlewares_loads_a_middleware_file.)
     class Mw: ...
 
-    builder.with_middlewares([Mw])
-    app = builder.create()
-
-    class Kernel:
-        def __init__(self) -> None:
-            self.global_middleware: list[object] = []
-
-        def resolve_middleware(self, ref: object) -> object:
-            return ref
-
-    kernel = Kernel()
-    app.instance("http", kernel)
+    app = Application.configure().with_middlewares([Mw]).create()
     await app.boot()
-    assert kernel.global_middleware == [Mw]  # the builder's middleware landed on the global stack
+    assert list(app.builder_middlewares) == [Mw]
 
 
 async def test_unconfigured_builder_boots_cleanly() -> None:

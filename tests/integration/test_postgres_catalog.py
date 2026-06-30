@@ -21,7 +21,7 @@ from arvel.database import ConnectionResolver, Model
 pytestmark = pytest.mark.integration
 
 
-class ProductStatus(str, enum.Enum):
+class ProductStatus(enum.StrEnum):
     DRAFT = "draft"
     ACTIVE = "active"
 

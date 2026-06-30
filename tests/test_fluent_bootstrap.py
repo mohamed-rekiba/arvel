@@ -35,29 +35,42 @@ def test_with_providers_loads_a_providers_file(tmp_path: Path) -> None:
     assert app.make("marker") == 42  # the file's provider was registered
 
 
-async def test_with_middlewares_loads_a_middleware_file(tmp_path: Path) -> None:
+def test_with_middlewares_loads_a_middleware_file(tmp_path: Path) -> None:
+    """A `with_middlewares([...])` global middleware actually RUNS on the served app — exercised
+    through the real served ASGI path (not a fake "http" kernel binding). Regression: "http" is the
+    HTTP *client*, so the served kernel (built on demand in _build_served_asgi) must consume the
+    builder middlewares itself; the old test bound a fake kernel and masked that the real path
+    dropped them (and crashed on a non-empty list)."""
+    from litestar.testing import TestClient
+
     (tmp_path / "middlewares.py").write_text(
-        "class AuthMiddleware: ...\n\nmiddlewares = [AuthMiddleware]\n"
+        "from arvel.http.middleware import Middleware\n"
+        "from arvel.http.exceptions import abort\n\n"
+        "class ShortCircuit(Middleware):\n"
+        "    async def handle(self, request, call_next):\n"
+        "        if request.header('x-trip-mw') == 'yes':\n"
+        "            abort(418, 'mw ran')\n"
+        "        return await call_next(request)\n\n"
+        "middlewares = [ShortCircuit]\n"
+    )
+    (tmp_path / "web.py").write_text(
+        "from arvel.support.facades import Route\n\n"
+        "async def home() -> str: return 'home'\n\n"
+        "Route.get('/', home, name='home')\n"
     )
     app = (
-        Application.configure(str(tmp_path)).with_middlewares(tmp_path / "middlewares.py").create()
+        Application.configure(str(tmp_path))
+        .with_middlewares(tmp_path / "middlewares.py")
+        .with_routing(web=tmp_path / "web.py")
+        .create()
     )
-
-    class Kernel:
-        def __init__(self) -> None:
-            self.global_middleware: list[object] = []
-
-        def resolve_middleware(self, ref: object) -> object:
-            return ref
-
-    kernel = Kernel()
-    app.instance("http", kernel)
-    await app.boot()
-    # the file's `middlewares = [...]` list appended to the kernel's global stack
-    assert [
-        type(m).__name__ if not isinstance(m, type) else m.__name__
-        for m in kernel.global_middleware
-    ] == ["AuthMiddleware"]
+    with TestClient(app=app.as_asgi()) as client:
+        assert client.get("/").status_code == 200  # passes through normally
+        tripped = client.get(  # the builder middleware short-circuits this one
+            "/", headers={"x-trip-mw": "yes", "accept": "application/json"}
+        )
+    assert tripped.status_code == 418  # the builder middleware ran on the real served path
+    assert tripped.json()["message"] == "mw ran"
 
 
 def test_with_routing_imports_web_and_api_inside_their_groups(tmp_path: Path) -> None:

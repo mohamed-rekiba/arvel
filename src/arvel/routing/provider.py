@@ -22,6 +22,11 @@ def _build_served_asgi(app: Application) -> object:
     kernel = HttpKernel(app=app)
     kernel.use_default_global()  # maintenance-mode 503 gate runs on every request
     kernel.use_default_groups()  # web=session+CSRF, api=throttle
+    # Global middleware registered via the fluent builder (`with_middlewares([...])`) — applied to
+    # the real served kernel here (it is built on demand, not bound under "http", which is the
+    # HTTP client). Runs on every request, after the default global gate.
+    for middleware in app.builder_middlewares:
+        kernel.global_middleware.append(kernel.resolve_middleware(middleware))
     if app.bound("router"):
         app.make("router").apply_to(kernel)
     return kernel.as_asgi(lifespan=serve_lifespan(app))
