@@ -9,7 +9,11 @@ lazy-imported. Grounded in knowledge/port/08-advanced-database.md.
 
 from __future__ import annotations
 
+import re
 from typing import Any, ClassVar
+
+# A plain column name (vs an index expression like ``name->>'en'`` that must be wrapped as SQL text).
+PLAIN_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _big_integer_factory() -> Any:
@@ -106,17 +110,28 @@ class Blueprint:
         self._columns.append(column)
         return column
 
-    # --- access-method indexes (Postgres GIN / GiST) -----------------------
+    # --- access-method indexes (btree / Postgres GIN / GiST) ---------------
     def _index_using(self, using: str, columns: tuple[str, ...], name: str | None) -> None:
         if not columns:
             raise ValueError(f"{using}_index requires at least one column")
+        # auto-name from the columns; an expression column (e.g. "name->>'en'") isn't a valid
+        # identifier, so sanitize non-word chars to keep the generated index name legal.
+        slug = re.sub(r"\W+", "_", "_".join(columns)).strip("_")
         self._indexes.append(
             {
                 "using": using,
                 "columns": tuple(columns),
-                "name": name or f"{self.name}_{'_'.join(columns)}_{using}",
+                "name": name or f"{self.name}_{slug}_{using}",
             }
         )
+
+    def btree_index(self, *columns: str, name: str | None = None) -> None:
+        """A **B-tree** index — the default access method, for composite and **expression** indexes
+        (a single plain column is usually better done with ``.index()`` on the column). Expression
+        columns are emitted verbatim, so a per-locale i18n lookup index is
+        ``t.btree_index("name->>'en'")`` → ``CREATE INDEX ... ((name->>'en'))``. The best fit for
+        exact key lookups in a ``jsonb`` column (GIN is for containment/key-existence search)."""
+        self._index_using("btree", columns, name)
 
     def gin_index(self, *columns: str, name: str | None = None) -> None:
         """A **GIN** index on ``columns`` — the right index for ``jsonb`` containment/key lookups,
@@ -363,15 +378,18 @@ class Blueprint:
         import sqlalchemy as sa
 
         meta = metadata if metadata is not None else sa.MetaData()
-        table = sa.Table(self.name, meta, *self.core_columns())
-        for spec in self._indexes:  # GIN/GiST indexes attach to the table (incl. in CreateTable)
-            columns: tuple[str, ...] = spec["columns"]
+        # btree/GIN/GiST indexes are built then passed as Table args so SQLAlchemy binds them (incl.
+        # expression indexes): a plain column is referenced by name; anything else (e.g. "name->>'en'")
+        # becomes a text() expression index.
+        indexes = [
             sa.Index(
                 spec["name"],
-                *[table.c[c] for c in columns],
+                *[c if PLAIN_IDENTIFIER.match(c) else sa.text(f"({c})") for c in spec["columns"]],
                 postgresql_using=spec["using"],
             )
-        return table
+            for spec in self._indexes
+        ]
+        return sa.Table(self.name, meta, *self.core_columns(), *indexes)
 
 
 def _to_sql(selectable: Any) -> str:

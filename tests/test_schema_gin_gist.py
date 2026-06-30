@@ -4,6 +4,7 @@ other dialects, and is emitted as a `create_index` op by the migrator."""
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pytest
@@ -75,3 +76,42 @@ def test_migrator_emits_create_index_for_gin() -> None:
 def test_index_requires_a_column() -> None:
     with pytest.raises(ValueError, match="requires at least one column"):
         Blueprint("docs").gin_index()
+
+
+def test_btree_index_composite_renders_plain_on_postgres() -> None:
+    bp = Blueprint("products")
+    bp.id()
+    bp.string("name")
+    bp.integer("category_id")
+    bp.btree_index("category_id", "name", name="products_cat_name")
+    index = next(i for i in bp.to_table().indexes if i.name == "products_cat_name")
+    ddl = str(sa.schema.CreateIndex(index).compile(dialect=postgresql.dialect()))
+    assert "category_id" in ddl and "name" in ddl
+    assert "USING gin" not in ddl  # btree is the default access method
+
+
+def test_btree_expression_index_for_per_locale_lookup() -> None:
+    """A jsonb per-locale lookup index: t.btree_index("name->>'en'") → an expression index, with a
+    sanitized (identifier-legal) auto name."""
+    bp = Blueprint("products")
+    bp.id()
+    bp.jsonb("name")
+    bp.btree_index("name->>'en'")
+    index = next(iter(bp.to_table().indexes))
+    assert re.match(r"[A-Za-z0-9_]+$", index.name or "")  # legal identifier, no `->` etc.
+    ddl = str(sa.schema.CreateIndex(index).compile(dialect=postgresql.dialect()))
+    assert "->>" in ddl  # emitted as an expression, not a quoted column
+
+
+async def test_btree_expression_index_creates_on_sqlite() -> None:
+    bp = Blueprint("docs")
+    bp.id()
+    bp.jsonb("data")
+    bp.btree_index("json_extract(data, '$.en')")  # sqlite expression syntax
+    db = ConnectionResolver()
+    try:
+        await db.execute(sa.schema.CreateTable(bp.to_table()))
+        for index in bp.to_table().indexes:
+            await db.execute(sa.schema.CreateIndex(index))
+    finally:
+        await db.dispose()

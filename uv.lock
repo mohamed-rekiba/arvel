@@ -447,7 +447,6 @@ sqlite = [
 ]
 standard = [
     { name = "aiosmtplib" },
-    { name = "aiosqlite" },
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "granian", extra = ["reload"] },
@@ -456,6 +455,7 @@ standard = [
     { name = "litestar" },
     { name = "markdown-it-py" },
     { name = "pillow" },
+    { name = "pyjwt" },
     { name = "redis" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "taskiq" },
@@ -494,7 +494,6 @@ requires-dist = [
     { name = "aiosmtplib", marker = "extra == 'standard'", specifier = ">=5.1.2" },
     { name = "aiosqlite", marker = "extra == 'all'", specifier = ">=0.22.1" },
     { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.22.1" },
-    { name = "aiosqlite", marker = "extra == 'standard'", specifier = ">=0.22.1" },
     { name = "alembic", marker = "extra == 'all'", specifier = ">=1.18.5" },
     { name = "alembic", marker = "extra == 'mysql'", specifier = ">=1.18.5" },
     { name = "alembic", marker = "extra == 'postgres'", specifier = ">=1.18.5" },
@@ -570,6 +569,7 @@ requires-dist = [
     { name = "pwdlib", extras = ["argon2"], specifier = ">=0.3.0" },
     { name = "pyjwt", marker = "extra == 'all'", specifier = ">=2.13.0" },
     { name = "pyjwt", marker = "extra == 'jwt'", specifier = ">=2.13.0" },
+    { name = "pyjwt", marker = "extra == 'standard'", specifier = ">=2.13.0" },
     { name = "pyotp", marker = "extra == '2fa'", specifier = ">=2.10.0" },
     { name = "pyotp", marker = "extra == 'all'", specifier = ">=2.10.0" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.411" },

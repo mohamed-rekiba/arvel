@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from arvel.database.schema import (
+    PLAIN_IDENTIFIER,
     Blueprint,
     create_extension,
     create_materialized_view,
@@ -25,6 +26,14 @@ if TYPE_CHECKING:
     from arvel.database.connections import ConnectionResolver
 
 
+def _index_columns(columns: Sequence[str]) -> list[Any]:
+    """A plain column name stays a string; anything else (an expression like ``name->>'en'``) is
+    wrapped in ``sa.text`` so it's emitted as an expression index, not a quoted column name."""
+    import sqlalchemy as sa
+
+    return [c if PLAIN_IDENTIFIER.match(c) else sa.text(f"({c})") for c in columns]
+
+
 class Schema:
     """Operations facade bound to an Alembic ``Operations`` instance."""
 
@@ -35,9 +44,9 @@ class Schema:
         blueprint = Blueprint(name)
         define(blueprint)
         self._op.create_table(name, *blueprint.core_columns())
-        for spec in blueprint.index_specs():  # GIN/GiST → a separate create_index op
+        for spec in blueprint.index_specs():  # btree/GIN/GiST → a separate create_index op
             self._op.create_index(
-                spec["name"], name, list(spec["columns"]), postgresql_using=spec["using"]
+                spec["name"], name, _index_columns(spec["columns"]), postgresql_using=spec["using"]
             )
 
     def drop(self, name: str) -> None:

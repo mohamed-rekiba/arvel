@@ -38,6 +38,18 @@ await Document.where_json_contains("data", ["release"]).get()
     `t.gist_index(...)` is the GiST counterpart (geometric/range types and `tsvector`). Both emit
     the Postgres access method on Postgres and degrade to a plain index on other dialects.
 
+    For an **exact key lookup** in a `jsonb` column (e.g. a per-locale i18n field you filter or sort
+    by), a B-tree **expression index** is the better fit than GIN — `t.btree_index` takes a raw
+    expression:
+
+    ```python
+    t.btree_index("name->>'en'")   # CREATE INDEX ... ((name->>'en'))  — fast WHERE/ORDER BY name->>'en'
+    ```
+
+    Rule of thumb: **GIN** for "does this jsonb *contain* X / have key K" (`@>`, `?`); **btree
+    expression** for "this jsonb's value at a known key equals/sorts". `t.btree_index` also takes
+    multiple columns for a composite index.
+
 !!! warning "Compare as text"
     `where_json` compares the extracted value **as text**, so pass the value as a string
     (`"2"`, not `2`). This keeps the operator portable across SQLite and Postgres.
