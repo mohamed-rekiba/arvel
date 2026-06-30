@@ -73,3 +73,15 @@ async def test_where_json_like_searches_a_locale_value() -> None:
         assert {r["name"] for r in rows} == {"c"}
     finally:
         await db.dispose()
+
+
+async def test_where_in_accepts_a_subquery() -> None:
+    """where_in with a Select filters DB-side (WHERE id IN (SELECT ...)) — no app-side id list."""
+    db = await _seed()
+    try:
+        await Builder(docs, db).insert({"name": "c", "data": {"lang": "en"}})
+        sub = sa.select(docs.c.id).where(docs.c.name.in_(["a", "b"]))  # the "allowed" set
+        rows = await Builder(docs, db).where_in("id", sub).get()
+        assert {r["name"] for r in rows} == {"a", "b"}  # c excluded by the subquery
+    finally:
+        await db.dispose()

@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any, Self, cast
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Sequence
 
+    from sqlalchemy import Select
+
     from arvel.database.connections import ConnectionResolver, WriteResult
     from arvel.pagination import LengthAwarePaginator, Paginator
 
@@ -134,11 +136,14 @@ class Builder:
         self._apply_conditions(args, kwargs, "or")
         return self
 
-    def where_in(self, column: str, values: Sequence[Any]) -> Self:
+    def where_in(self, column: str, values: Sequence[Any] | Select[Any]) -> Self:
+        """``WHERE col IN (...)``. ``values`` is a list **or a subquery** ``Select`` (Laravel
+        ``whereIn('id', $subquery)``) — pass ``sa.select(other.c.id)`` to filter DB-side without
+        materializing the id list in the app (e.g. ``where_in('id', select(retrievable.c.id))``)."""
         self._add(self._table.c[column].in_(values))
         return self
 
-    def where_not_in(self, column: str, values: Sequence[Any]) -> Self:
+    def where_not_in(self, column: str, values: Sequence[Any] | Select[Any]) -> Self:
         self._add(self._table.c[column].not_in(values))
         return self
 
