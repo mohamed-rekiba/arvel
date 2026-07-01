@@ -216,3 +216,19 @@ async def test_custom_media_model_with_user_accessors() -> None:
         assert loaded.thumb is not None
     finally:
         await db.dispose()
+
+
+def test_jpeg_conversion_flattens_rgba_source() -> None:
+    """A JPEG conversion of an RGBA source must not raise — JPEG has no alpha channel, so the
+    pipeline flattens to RGB before encoding (a plain resize+encode would crash in Pillow)."""
+    from io import BytesIO
+
+    from PIL import Image as PILImage
+
+    buf = BytesIO()
+    PILImage.new("RGBA", (20, 20), (120, 90, 100, 128)).save(buf, format="PNG")
+    source = Image.open(buf.getvalue())
+
+    out = MediaConversion("web", width=10, height=10, fmt="JPEG").apply(source)
+
+    assert PILImage.open(BytesIO(out)).format == "JPEG"
