@@ -39,6 +39,10 @@ class MediaConversion:
         result = image
         if self.width is not None and self.height is not None:
             result = image.resize(self.width, self.height)
+        if self.fmt.upper() in ("JPEG", "JPG"):
+            # JPEG can't hold an alpha channel — flatten RGBA/P/LA to RGB first, else Pillow raises
+            # (the documented gotcha). Harmless for images already in RGB.
+            result = result.convert("RGB")
         return result.encode(self.fmt)
 
 
