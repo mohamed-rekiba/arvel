@@ -41,6 +41,16 @@ class Role(Model):
                 )
         return self
 
+    async def permissions(self) -> list[Any]:
+        """The permissions granted to this role (Spatie ``$role->permissions``)."""
+        from arvel.database.builder import Builder
+
+        pivot = _pivot("role_has_permissions", "role_id", "permission_id")
+        rows = await Builder(pivot, type(self)._resolve()).where("role_id", "=", self.id).get()
+        ids = [row["permission_id"] for row in rows]
+        result: list[Any] = await Permission.where_in("id", ids).get() if ids else []
+        return result
+
 
 class Permission(Model):
     __fields__: ClassVar[dict[str, Any]] = {"name": str, "guard_name": str}

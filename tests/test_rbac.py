@@ -78,6 +78,9 @@ async def test_permission_via_role() -> None:
         await member.assign_role("editor")
         assert await member.has_permission_to("edit-articles")  # inherited via role
         assert not await member.has_permission_to("delete-articles")
+        assert {p.name for p in await editor.permissions()} == {
+            "edit-articles"
+        }  # role's own grants
     finally:
         await db.dispose()
 
