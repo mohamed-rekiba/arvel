@@ -53,6 +53,21 @@ async def test_assign_role_and_has_role() -> None:
         await db.dispose()
 
 
+async def test_remove_role_revokes() -> None:
+    db = await _setup()
+    try:
+        await Role.create(name="editor", guard_name="web")
+        member = await Member.create(name="ada")
+        await member.assign_role("editor")
+        assert await member.has_role("editor")
+        await member.remove_role("editor")
+        assert not await member.has_role("editor")
+        assert {r.name for r in await member.roles()} == set()
+        await member.remove_role("editor")  # idempotent no-op
+    finally:
+        await db.dispose()
+
+
 async def test_permission_via_role() -> None:
     db = await _setup()
     try:

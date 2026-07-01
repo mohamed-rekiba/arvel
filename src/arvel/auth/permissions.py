@@ -100,6 +100,25 @@ class HasRoles:
         self.flush_permission_cache()
         return self
 
+    async def remove_role(self, name: str, team: Any = None) -> HasRoles:
+        """Revoke a role from this model (Spatie ``removeRole``). No-op if the role isn't assigned."""
+        from arvel.database.builder import Builder
+
+        morph_type, morph_id = self._morph()
+        role = await Role.where(name=name).first()
+        if role is not None:
+            query = (
+                Builder(self._roles_pivot(teams=team is not None), self._connection())
+                .where("role_id", "=", role.id)
+                .where("model_type", "=", morph_type)
+                .where("model_id", "=", morph_id)
+            )
+            if team is not None:
+                query = query.where("team_id", "=", team)
+            await query.delete()
+        self.flush_permission_cache()
+        return self
+
     async def roles(self, team: Any = None) -> list[Any]:
         from arvel.database.builder import Builder
 
