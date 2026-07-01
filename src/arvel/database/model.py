@@ -190,18 +190,31 @@ def _build_table(cls: type[Any]) -> Any:
     pk = cls.__primary_key__
     columns: list[Any] = []
     if pk not in cls.__fields__:
-        if HasUuids in cls.__mro__ or HasUlids in cls.__mro__:
-            # VARCHAR(255): a length-bearing string PK so the table is valid DDL on MySQL too
-            columns.append(sa.Column(pk, sa.String(255), primary_key=True))  # string id, no autoinc
+        if HasUuids in cls.__mro__:
+            # sa.Uuid(as_uuid=False): native UUID on Postgres, CHAR(32) elsewhere, with a *string*
+            # Python side — so the string uuid HasUuids generates binds correctly against a native
+            # `uuid` column (t.uuid("id")) on PG instead of being sent as a mismatched VARCHAR.
+            columns.append(sa.Column(pk, sa.Uuid(as_uuid=False), primary_key=True))
+        elif HasUlids in cls.__mro__:
+            # a ULID is a 26-char string, NOT a uuid — keep a length-bearing VARCHAR PK
+            columns.append(sa.Column(pk, sa.String(255), primary_key=True))
         else:
             columns.append(sa.Column(pk, sa.Integer, primary_key=True, autoincrement=True))
     for field_name, field_type in cls.__fields__.items():
+        cast = cls.__casts__.get(field_name)
         # a "datetime"-cast field is a real DateTime column even if declared `str` (the cast now
         # stores/returns real datetimes), so the column type and the cast can't disagree on Postgres.
-        if cls.__casts__.get(field_name) == "datetime" and not isinstance(
-            field_type, sa.types.TypeEngine
-        ):
+        if cast == "datetime" and not isinstance(field_type, sa.types.TypeEngine):
             col_type: Any = sa.DateTime(timezone=True)
+        elif cast == "json":
+            # A "json"-cast field lands in a plain TEXT column, NOT a native sa.JSON column — even
+            # when declared `dict`. arvel's "json" cast already owns serialization (json.dumps on
+            # set / json.loads on get, Laravel parity). A native sa.JSON column adds a SECOND layer,
+            # and the two are asymmetric: the Builder read path returns raw column text (it bypasses
+            # SQLAlchemy's JSON *result* processor), while writes go through Core statements that DO
+            # apply the JSON *bind* processor. So every write re-encodes the value and it corrupts
+            # monotonically (double-, then triple-encoded…). One serialization layer, in the cast.
+            col_type = sa.Text()
         else:
             col_type = _sa_type(sa, field_type)
         columns.append(sa.Column(field_name, col_type, primary_key=(field_name == pk)))

@@ -325,8 +325,10 @@ class Blueprint:
     def uuid(self, name: str) -> ColumnDefinition:
         import sqlalchemy as sa
 
-        # sa.Uuid renders native UUID on Postgres, CHAR(32) on SQLite — Core maps the dialect.
-        return self._add(ColumnDefinition(name, sa.Uuid))
+        # Native UUID on Postgres, CHAR(32) on SQLite — Core maps the dialect. as_uuid=False so the
+        # Python side is a *string* (SQLAlchemy converts to/from the native uuid): models generate
+        # string uuids (HasUuids → str(uuid7())), which otherwise mismatch a native uuid column on PG.
+        return self._add(ColumnDefinition(name, lambda: sa.Uuid(as_uuid=False)))
 
     def enum(self, name: str, *values: str) -> ColumnDefinition:
         """Native ENUM on Postgres; SQLite degrades to VARCHAR + CHECK — both compile."""
