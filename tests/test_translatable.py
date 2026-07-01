@@ -45,6 +45,17 @@ def test_set_translation_merges_and_helpers_read() -> None:
     assert post.translations("title") == {"en": "Hello", "fr": "Bonjour"}
 
 
+def test_set_translation_stores_a_dict_not_a_double_encoded_string() -> None:
+    # Regression: set_translation must store a DICT so a jsonb column serializes it exactly once.
+    # A pre-stringified value double-encodes on jsonb and breaks ->>' / json_extract lookups — and the
+    # helper reads tolerate a string, so only checking the stored type catches it.
+    post = _Post(title={"en": "Hello"})
+    post.set_translation("title", "fr", "Bonjour")
+    stored = post._attributes["title"]
+    assert isinstance(stored, dict), f"expected a jsonb-safe dict, got {type(stored).__name__}"
+    assert stored == {"en": "Hello", "fr": "Bonjour"}
+
+
 def test_assigning_a_bare_string_sets_the_current_locale() -> None:
     post = _Post(title={"en": "Hello", "fr": "Bonjour"})
     current_locale.set("fr")
