@@ -60,6 +60,21 @@ async def test_save_indexes_and_search_hydrates_models() -> None:
         await db.dispose()
 
 
+async def test_make_all_searchable_bulk_indexes_and_remove_all_flushes() -> None:
+    _app, db = await _app_with_search()
+    try:
+        # rows inserted with indexing suppressed (raw) still get indexed by make_all_searchable
+        await Article.create(title="async python", body="fast web")
+        await Article.create(title="ruby on rails", body="slow")
+        indexed = await Article.make_all_searchable()
+        assert indexed == 2
+        assert {h.title for h in await Article.search("async")} == {"async python"}
+        await Article.remove_all_from_search()
+        assert await Article.search("async") == []
+    finally:
+        await db.dispose()
+
+
 async def test_delete_removes_from_index() -> None:
     _app, db = await _app_with_search()
     try:

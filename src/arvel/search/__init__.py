@@ -143,6 +143,22 @@ class Searchable:
             await engine.delete(self.searchable_as(), self.get_search_key())
 
     @classmethod
+    async def make_all_searchable(cls) -> int:
+        """Index every row of this model (Scout's ``makeAllSearchable`` / ``scout:import``). Returns
+        the number of records indexed. Use it to (re)build the index after a bulk load / seed."""
+        records = cast("list[Any]", await cls.all())  # type: ignore[attr-defined]
+        for record in records:
+            await record.searchable()
+        return len(records)
+
+    @classmethod
+    async def remove_all_from_search(cls) -> None:
+        """Remove every row of this model from the index (Scout's ``scout:flush``)."""
+        engine = cls._search_engine()
+        if engine is not None:
+            await engine.flush(cls.searchable_as())
+
+    @classmethod
     async def search(cls, query: str) -> list[Any]:
         """Search the index and return hydrated models."""
         from arvel.kernel import app
