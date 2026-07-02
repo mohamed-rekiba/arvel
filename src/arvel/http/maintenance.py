@@ -53,9 +53,21 @@ async def payload() -> dict[str, Any]:
 
 
 class PreventRequestsDuringMaintenance:
-    """Middleware: return 503 (with Retry-After) while the app is in maintenance mode."""
+    """Middleware: return 503 (with Retry-After) while the app is in maintenance mode.
+
+    Paths in ``config('app.maintenance_except')`` (e.g. a health probe) stay reachable —
+    Laravel's ``$except`` on the maintenance middleware."""
 
     async def handle(self, request: Any, call_next: Any) -> Any:
+        from arvel.kernel import app, has_application
+
+        excepted: list[str] = []
+        if has_application():
+            excepted = list(app().config("app.maintenance_except", []) or [])
+        raw_path = getattr(request, "path", "")
+        path = str(raw_path() if callable(raw_path) else raw_path or "")
+        if path in excepted:
+            return await call_next(request)
         if not await is_down():
             return await call_next(request)
         from arvel.http.response import Response

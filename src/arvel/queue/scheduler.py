@@ -118,5 +118,16 @@ class Schedule:
         return [event for event in self.events if event.is_due(moment)]
 
     async def run_due(self, moment: datetime) -> None:
+        """Run every due event. A failing event is LOGGED and skipped — one bad task must never
+        starve the rest of the schedule (or kill the cron tick)."""
         for event in self.due_events(moment):
-            await event.run()
+            try:
+                await event.run()
+            except Exception:
+                from arvel.kernel.logging import LogManager
+
+                LogManager().channel("schedule").error(
+                    "scheduled_task_failed",
+                    task=getattr(event.callback, "__name__", repr(event.callback)),
+                    exc_info=True,
+                )

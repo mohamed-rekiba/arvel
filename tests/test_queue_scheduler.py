@@ -42,3 +42,25 @@ async def test_run_due_executes_only_due_events() -> None:
 
     await schedule.run_due(datetime(2026, 1, 1, 4, 30))  # not on the hour
     assert ran == ["minutely"]
+
+
+async def test_a_throwing_event_does_not_kill_the_tick() -> None:
+    """run_due keeps going past a failing task (logged, not raised) — one bad job must never
+    starve every other schedule."""
+    from datetime import datetime
+
+    from arvel.queue.scheduler import Schedule
+
+    schedule = Schedule()
+    ran: list[str] = []
+
+    async def boom() -> None:
+        raise RuntimeError("scheduled boom")
+
+    async def fine() -> None:
+        ran.append("fine")
+
+    schedule.call(boom).every_minute()
+    schedule.call(fine).every_minute()
+    await schedule.run_due(datetime(2026, 7, 2, 12, 0))
+    assert ran == ["fine"]  # the second task still ran
