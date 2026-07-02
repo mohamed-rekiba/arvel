@@ -198,6 +198,23 @@ class Date:
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Date) and self._dt == other._dt
 
+    def __hash__(self) -> int:
+        return hash(self._dt)
+
+    # Carbon parity: dates order naturally (`$date < now()`); whenever's ZonedDateTime
+    # compares by instant, so these do too.
+    def __lt__(self, other: "Date") -> bool:
+        return self._dt < other._dt
+
+    def __le__(self, other: "Date") -> bool:
+        return self._dt <= other._dt
+
+    def __gt__(self, other: "Date") -> bool:
+        return self._dt > other._dt
+
+    def __ge__(self, other: "Date") -> bool:
+        return self._dt >= other._dt
+
     def __repr__(self) -> str:
         return f"Date({self._dt.format_iso()})"
 

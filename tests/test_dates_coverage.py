@@ -51,3 +51,16 @@ def test_dst_fall_back_calendar_vs_exact() -> None:
     start = Date.parse("2025-11-02T01:30:00-04:00[America/New_York]")
     assert start.add(days=1).to_iso() == "2025-11-03T01:30:00-05:00[America/New_York]"
     assert start.add(hours=24).to_iso() == "2025-11-03T00:30:00-05:00[America/New_York]"
+
+
+def test_dates_order_naturally() -> None:
+    """Carbon parity: Date instances compare by instant (`<`, `<=`, `>`, `>=`)."""
+    from arvel.dates import Date
+
+    earlier = Date.now().subtract(hours=1)
+    later = Date.now()
+    assert earlier < later and earlier <= later
+    assert later > earlier and later >= earlier
+    assert not (later < earlier)
+    same = later
+    assert same <= later and same >= later
