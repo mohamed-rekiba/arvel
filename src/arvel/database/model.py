@@ -164,9 +164,17 @@ def _to_db_datetime(value: Any) -> Any:
 def _from_db_datetime(value: Any) -> Any:
     """Interpret a value read back from a DateTime column. A **naive** datetime means SQLite (which
     dropped the offset) — it was stored as a UTC wall-clock (see :func:`_to_db_datetime`), so attach
-    UTC; an aware datetime (Postgres) or a string passes through for :meth:`Date.from_py`."""
+    UTC. The Builder's RAW read path (``select_raw``) skips result processors entirely, so on
+    SQLite the very same column arrives as its stored **string** (``'2026-07-02 21:41:10.506842'``)
+    — parse it (stdlib ``fromisoformat`` accepts the space separator) and apply the same naive-
+    means-UTC rule. Anything unparseable passes through for :meth:`Date.from_py` to reject."""
     import datetime as _datetime
 
+    if isinstance(value, str):
+        try:
+            value = _datetime.datetime.fromisoformat(value)
+        except ValueError:
+            return value
     if isinstance(value, _datetime.datetime) and value.tzinfo is None:
         from zoneinfo import ZoneInfo
 
