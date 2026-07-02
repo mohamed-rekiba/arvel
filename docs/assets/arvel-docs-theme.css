@@ -219,7 +219,7 @@
 
 /* responsive */
 @media (max-width: 900px) {
-  .arvel-home .ah-hero__inner { grid-template-columns:1fr; gap:36px; }
+  .arvel-home .ah-hero__inner { grid-template-columns:minmax(0,1fr); gap:36px; }
   .arvel-home .ah-feats { grid-template-columns:1fr 1fr; }
   .arvel-home .ah-gates { grid-template-columns:1fr 1fr; }
   .md-typeset .arvel-home .ah-h1 { font-size:2.5rem; }
