@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from arvel.kernel.service_provider import ServiceProvider
 from arvel.routing import Router
@@ -12,12 +12,11 @@ if TYPE_CHECKING:
     from arvel.kernel.application import Application
 
 
-def _build_served_asgi(app: Application) -> object:
-    """Compile the served ASGI app. Lives here (routing→http is a legal downward edge)
-    so ``Application.as_asgi`` can resolve it from the container rather than importing
-    ``arvel.http`` directly — ``kernel→http`` would violate the boundary (DR-0026)."""
+def _build_served_kernel(app: Application) -> Any:
+    """The fully-configured served HttpKernel (global gate, default groups, builder middleware,
+    routes applied). Shared by the ASGI builder and non-serving consumers of the compiled app —
+    e.g. ``openapi:export``, which renders the OpenAPI document without binding a socket."""
     from arvel.http import HttpKernel
-    from arvel.kernel.bootstrap import serve_lifespan
 
     kernel = HttpKernel(app=app)
     kernel.use_default_global()  # maintenance-mode 503 gate runs on every request
@@ -29,7 +28,16 @@ def _build_served_asgi(app: Application) -> object:
         kernel.global_middleware.append(kernel.resolve_middleware(middleware))
     if app.bound("router"):
         app.make("router").apply_to(kernel)
-    return kernel.as_asgi(lifespan=serve_lifespan(app))
+    return kernel
+
+
+def _build_served_asgi(app: Application) -> object:
+    """Compile the served ASGI app. Lives here (routing→http is a legal downward edge)
+    so ``Application.as_asgi`` can resolve it from the container rather than importing
+    ``arvel.http`` directly — ``kernel→http`` would violate the boundary (DR-0026)."""
+    from arvel.kernel.bootstrap import serve_lifespan
+
+    return _build_served_kernel(app).as_asgi(lifespan=serve_lifespan(app))
 
 
 class RoutingServiceProvider(ServiceProvider):
@@ -42,6 +50,7 @@ class RoutingServiceProvider(ServiceProvider):
             self.app.singleton("router", make_router)
         # The kernel resolves this builder in Application.as_asgi() (DR-0026).
         self.app.instance("http.asgi_builder", _build_served_asgi)
+        self.app.instance("http.kernel_builder", _build_served_kernel)
         # Prometheus scrape route — registered here (not in the telemetry provider) so telemetry needn't
         # import arvel.http; routing legally imports both http (the handler) and telemetry (DR-0026).
         # Registered at `register` so it lands before the router compiles into the served app.

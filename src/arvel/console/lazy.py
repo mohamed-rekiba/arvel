@@ -61,6 +61,7 @@ class LazyGroup(TyperGroup):
         "package:discover": "arvel.console.discover:discover_app",
         "vendor:publish": "arvel.console.publish:vendor_publish_app",
         "route:list": "arvel.console.routes:route_list_app",
+        "openapi:export": "arvel.console.openapi:openapi_export_app",
         "schedule:run": "arvel.console.schedule:schedule_app",
         "shell": "arvel.console.shell:shell_app",
         "tinker": "arvel.console.shell:shell_app",  # alias for shell, Laravel Tinker style
