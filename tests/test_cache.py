@@ -47,7 +47,8 @@ async def test_redis_driver_fails_loudly_when_backend_is_down() -> None:
 
     app = Application()
     app.make("config").set(
-        "cache", {"default": "redis", "url": "redis://127.0.0.1:9/0"}  # discard port — dead
+        "cache",
+        {"default": "redis", "url": "redis://127.0.0.1:9/0"},  # discard port — dead
     )
     set_application(app)
     try:

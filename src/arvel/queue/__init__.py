@@ -384,6 +384,26 @@ class QueueManager(Manager):
         label = queue or getattr(job_cls, "queue", "default")
         return await task.kicker().with_labels(queue=label).kiq(serialize(job_cls, args, kwargs))
 
+    async def failed_jobs(self) -> list[Any]:
+        """The failed-job records, newest first (Laravel ``queue:failed``)."""
+        from arvel.queue.failed import FailedJob
+
+        return list(await FailedJob.order_by("failed_at", "desc").get())
+
+    async def retry_failed(self, failed_id: str | None = None) -> list[Any]:
+        """Re-dispatch failed jobs — one by id, or every one (Laravel ``queue:retry``). Returns
+        the records that were retried (each is re-pushed and its record deleted)."""
+        from arvel.queue.failed import FailedJob
+
+        if failed_id is None:
+            jobs = list(await FailedJob.get())
+        else:
+            found = await FailedJob.find(failed_id)
+            jobs = [found] if found is not None else []
+        for job in jobs:
+            await job.retry()
+        return jobs
+
     async def work(self, queues: list[str] | None = None, *, release_interval: float = 1.0) -> None:
         """Run an in-process worker: consume + execute jobs from the broker until cancelled.
 

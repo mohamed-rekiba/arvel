@@ -28,7 +28,8 @@ class AddSubtitleToPosts(Migration):
 
     def up(self, schema: object) -> None:
         schema.table(  # type: ignore[attr-defined]
-            "posts", lambda t: [t.string("subtitle").nullable(), t.integer("views").default(value=0)]
+            "posts",
+            lambda t: [t.string("subtitle").nullable(), t.integer("views").default(value=0)],
         )
 
     def down(self, schema: object) -> None:

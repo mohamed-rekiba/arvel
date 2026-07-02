@@ -35,9 +35,8 @@ def queue_failed() -> None:
     from arvel.console.kernel import run_app_command
 
     async def _handler(app: Any) -> None:
-        from arvel.queue.failed import FailedJob
-
-        jobs = await FailedJob.order_by("failed_at", "desc").get()
+        # reached through the container-bound queue manager — console imports no queue internals (G2)
+        jobs = await app.make("queue").failed_jobs()
         if not jobs:
             typer.echo("no failed jobs")
             return
@@ -58,18 +57,11 @@ def queue_retry(
     from arvel.console.kernel import run_app_command
 
     async def _handler(app: Any) -> None:
-        from arvel.queue.failed import FailedJob
-
-        jobs = (
-            await FailedJob.get()
-            if id == "all"
-            else [j for j in [await FailedJob.find(id)] if j is not None]
-        )
-        if not jobs:
+        retried = await app.make("queue").retry_failed(None if id == "all" else id)
+        if not retried:
             typer.echo(f"no failed job matches '{id}'")
             raise typer.Exit(1)
-        for job in jobs:
-            await job.retry()
+        for job in retried:
             typer.echo(f"retried {job.id}")
 
     run_app_command(_handler)

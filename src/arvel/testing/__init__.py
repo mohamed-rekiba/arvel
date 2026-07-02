@@ -41,10 +41,10 @@ class _PendingFake:
         self._mailer = mailer
         self._recipients = recipients or []
 
-    def cc(self, *recipients: Any) -> "_PendingFake":
+    def cc(self, *recipients: Any) -> _PendingFake:
         return self
 
-    def bcc(self, *recipients: Any) -> "_PendingFake":
+    def bcc(self, *recipients: Any) -> _PendingFake:
         return self
 
     async def send(self, mailable: Any) -> bool:
