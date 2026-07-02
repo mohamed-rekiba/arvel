@@ -129,6 +129,30 @@ async def test_clear_media_collection_removes_rows_and_files() -> None:
         await db.dispose()
 
 
+async def test_delete_media_removes_one_item_and_guards_ownership() -> None:
+    """delete_media removes THAT item's row + files (Spatie deleteMedia parity) — and never
+    another model's media through a foreign id."""
+    fs, db = await _setup()
+    try:
+        album = await Album.create(title="t")
+        keep = await album.add_media(_png(), file_name="keep.png").to_media_collection("images")
+        gone = await album.add_media(_png(), file_name="gone.png").to_media_collection("images")
+        gone_paths = list(gone.stored_paths())
+
+        assert await album.delete_media(gone.id) is True
+        remaining = await album.get_media("images")
+        assert [m.id for m in remaining] == [keep.id]
+        for path in gone_paths:
+            assert not await fs.exists(path)
+
+        # a DIFFERENT owner cannot delete the album's media
+        other = await Album.create(title="other")
+        assert await other.delete_media(keep.id) is False
+        assert [m.id for m in await album.get_media("images")] == [keep.id]
+    finally:
+        await db.dispose()
+
+
 async def test_non_image_media_stores_without_conversions() -> None:
     # Album registers an image "thumb" conversion; a video must still attach (no PIL decode).
     fs, db = await _setup()
