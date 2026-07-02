@@ -86,7 +86,7 @@ async def test_concurrent_sends_use_independent_connections() -> None:
             used_clients.append(self)
             self.sent: list[Any] = []
 
-        async def __aenter__(self) -> "_FakeSmtp":
+        async def __aenter__(self) -> _FakeSmtp:
             await asyncio.sleep(0.01)  # force overlap between the two sends
             return self
 

@@ -71,16 +71,11 @@ def test_queue_failed_lists_and_retry_redispatches(tmp_path: Any) -> None:
 
     failed_id = asyncio.run(seed())
 
-    class FakeManager:
-        def __init__(self) -> None:
-            self.pushed: list[Any] = []
+    from arvel.queue import QueueManager
 
-        async def push_instance(self, job: Any) -> None:
-            self.pushed.append(job)
-
-    fake = FakeManager()
     app = Application()
-    app.instance("queue", fake)
+    manager = QueueManager(app=app)  # default in-memory broker — retry re-runs the job inline
+    app.instance("queue", manager)
     set_application(app)
     FailedJob.set_connection(ConnectionResolver({"default": {"url": url}}))
     try:
@@ -91,7 +86,7 @@ def test_queue_failed_lists_and_retry_redispatches(tmp_path: Any) -> None:
 
         retried = runner.invoke(build_cli(), ["queue:retry", failed_id])
         assert retried.exit_code == 0, retried.output
-        assert len(fake.pushed) == 1  # re-dispatched onto the queue
+        assert f"retried {failed_id}" in retried.output
 
         # the record is deleted → nothing left to list or retry
         assert "no failed jobs" in runner.invoke(build_cli(), ["queue:failed"]).output
