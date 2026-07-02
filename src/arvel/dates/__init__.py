@@ -203,16 +203,16 @@ class Date:
 
     # Carbon parity: dates order naturally (`$date < now()`); whenever's ZonedDateTime
     # compares by instant, so these do too.
-    def __lt__(self, other: "Date") -> bool:
+    def __lt__(self, other: Date) -> bool:
         return self._dt < other._dt
 
-    def __le__(self, other: "Date") -> bool:
+    def __le__(self, other: Date) -> bool:
         return self._dt <= other._dt
 
-    def __gt__(self, other: "Date") -> bool:
+    def __gt__(self, other: Date) -> bool:
         return self._dt > other._dt
 
-    def __ge__(self, other: "Date") -> bool:
+    def __ge__(self, other: Date) -> bool:
         return self._dt >= other._dt
 
     def __repr__(self) -> str:

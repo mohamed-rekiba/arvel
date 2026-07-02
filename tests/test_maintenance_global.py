@@ -62,3 +62,29 @@ def test_up_app_passes_through(monkeypatch: pytest.MonkeyPatch) -> None:
     router.apply_to(kernel)
     with TestClient(kernel.build()) as client:
         assert client.get("/").json() == {"ok": "1"}
+
+
+def test_excepted_paths_stay_reachable_during_maintenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """config('app.maintenance_except') paths (health probes) answer even while down."""
+    from arvel.kernel import Application, set_application
+
+    async def _down() -> bool:
+        return True
+
+    monkeypatch.setattr(maint, "is_down", _down)
+    app = Application()
+    app.make("config").set("app", {"maintenance_except": ["/health"]})
+    set_application(app)
+    try:
+        kernel = HttpKernel().use_default_global()
+        router = Router()
+        router.get("/health", _ok)
+        router.get("/shop", _ok)
+        router.apply_to(kernel)
+        with TestClient(app=kernel.as_asgi()) as client:
+            assert client.get("/health").status_code == 200  # the probe stays up
+            assert client.get("/shop").status_code == 503  # everything else is down
+    finally:
+        set_application(None)
