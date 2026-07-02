@@ -76,3 +76,44 @@ async def test_migration_upgrade_then_downgrade() -> None:
             await db.select("SELECT * FROM posts")
     finally:
         await db.dispose()
+
+
+class AddIndexedTagToPosts(Migration):
+    """schema.table with an index spec — incl. the GIN→plain-index degrade off Postgres."""
+
+    def up(self, schema: object) -> None:
+        def define(t):  # type: ignore[no-untyped-def]
+            t.string("tag").nullable()
+            t.gin_index("tag")
+
+        schema.table("posts", define)  # type: ignore[attr-defined]
+
+    def down(self, schema: object) -> None:
+        schema.drop_column("posts", "tag")  # type: ignore[attr-defined]
+
+
+async def test_schema_table_creates_indexes_and_degrades_gin_off_postgres() -> None:
+    db = ConnectionResolver()
+    migrator = Migrator(db)
+    try:
+        await migrator.run([CreatePosts(), AddIndexedTagToPosts()])  # GIN → plain index on sqlite
+        await db.statement("INSERT INTO posts (title, published, tag) VALUES ('t', 1, 'x')")
+        rows = await db.select("SELECT tag FROM posts")
+        assert rows[0]["tag"] == "x"
+    finally:
+        await db.dispose()
+
+
+def test_server_default_clause_covers_the_scalar_literals() -> None:
+    """->default() emits DDL defaults for bools/numbers/strings (quotes escaped); other values
+    stay client-side only."""
+    import sqlalchemy as sa
+
+    from arvel.database.schema import ColumnDefinition
+
+    clause = ColumnDefinition._server_default_clause
+    assert str(clause(sa, True)) == "TRUE"
+    assert str(clause(sa, False)) == "FALSE"
+    assert str(clause(sa, 7)) == "7"
+    assert str(clause(sa, "it's")) == "'it''s'"
+    assert clause(sa, object()) is None
