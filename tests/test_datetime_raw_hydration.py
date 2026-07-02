@@ -29,7 +29,7 @@ def test_aware_strings_and_datetimes_pass_through_correctly() -> None:
     naive = _from_db_datetime(_datetime.datetime(2026, 7, 2, 21, 41, 10))
     assert naive.tzinfo is not None and naive.utcoffset() == _datetime.timedelta(0)
 
-    already = _datetime.datetime(2026, 7, 2, tzinfo=_datetime.timezone.utc)
+    already = _datetime.datetime(2026, 7, 2, tzinfo=_datetime.UTC)
     assert _from_db_datetime(already) is already
 
 
