@@ -172,6 +172,9 @@ class Searchable:
             await self.searchable()
         elif hook == "deleted":
             await self.unsearchable()
+        elif hook == "restored":
+            # Scout parity: restoring a soft-deleted model makes it searchable again
+            await self.searchable()
         return result
 
 

@@ -86,6 +86,31 @@ async def test_delete_removes_from_index() -> None:
         await db.dispose()
 
 
+async def test_restore_reindexes_a_soft_deleted_model() -> None:
+    """Scout parity: soft-deleting a searchable model unsearches it; RESTORING it makes it
+    searchable again (the `restored` hook re-indexes — a restored product must come back to
+    search without a manual reimport)."""
+    from arvel.database import SoftDeletes
+
+    class Post(Searchable, Model, SoftDeletes):
+        __fields__ = {"title": str}
+        __fillable__ = ["title"]
+
+    _app, db = await _app_with_search()
+    try:
+        Post.set_connection(db)
+        await db.execute(sa.schema.CreateTable(Post.__table__))
+        post = await Post.create(title="hidden gem")
+        assert len(await Post.search("gem")) == 1
+        await post.delete()  # soft — fires deleted → unsearchable
+        assert await Post.search("gem") == []
+        await post.restore()  # fires restored → searchable again
+        assert {h.title for h in await Post.search("gem")} == {"hidden gem"}
+    finally:
+        Post.set_connection(None)
+        await db.dispose()
+
+
 async def test_searchable_metadata_defaults() -> None:
     assert Article.searchable_as() == "articles"
     article = Article(title="x", body="y")
