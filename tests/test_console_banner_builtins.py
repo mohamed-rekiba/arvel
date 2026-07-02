@@ -51,8 +51,8 @@ def test_print_banner_suppressed_by_env(
     [
         (["about"], "arvel"),
         (["extras"], "extras"),
-        (["down"], "maintenance"),
-        (["up"], "live"),
+        # down/up now require the project app (the flag must land in the APP's cache store) —
+        # covered with a bound app in test_maintenance_mode.test_down_up_cli_uses_the_app_bound_cache
     ],
 )
 def test_builtin_commands(args: list[str], expect: str) -> None:

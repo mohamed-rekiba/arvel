@@ -190,13 +190,18 @@ down_app = typer.Typer()
 
 @down_app.command()
 def down() -> None:
-    """Put the application into maintenance mode (stored in the default cache)."""
-    import asyncio
+    """Put the application into maintenance mode (flag stored in the APP's default cache —
+    booted through the project app so a redis/valkey store reaches every server process; an
+    app-less write would land in a CLI-process-local array cache and die with the process)."""
+    from arvel.console.kernel import run_app_command
 
-    from arvel.http.maintenance import down as enter_maintenance
+    async def _handler(app: object) -> None:
+        from arvel.http.maintenance import down as enter_maintenance
 
-    asyncio.run(enter_maintenance())
-    typer.echo("application is now in maintenance mode (503)")
+        await enter_maintenance()
+        typer.echo("application is now in maintenance mode (503)")
+
+    run_app_command(_handler)
 
 
 up_app = typer.Typer()
@@ -204,13 +209,16 @@ up_app = typer.Typer()
 
 @up_app.command()
 def up() -> None:
-    """Bring the application out of maintenance mode (clears the cache flag)."""
-    import asyncio
+    """Bring the application out of maintenance mode (clears the flag in the APP's cache)."""
+    from arvel.console.kernel import run_app_command
 
-    from arvel.http.maintenance import up as leave_maintenance
+    async def _handler(app: object) -> None:
+        from arvel.http.maintenance import up as leave_maintenance
 
-    asyncio.run(leave_maintenance())
-    typer.echo("application is live")
+        await leave_maintenance()
+        typer.echo("application is live")
+
+    run_app_command(_handler)
 
 
 serve_app = typer.Typer()

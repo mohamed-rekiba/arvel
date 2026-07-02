@@ -58,3 +58,51 @@ async def test_middleware_returns_503_when_down() -> None:
         assert resp.content == {"message": "Soon"}
     finally:
         set_application(None)
+
+
+def test_down_up_cli_uses_the_app_bound_cache() -> None:
+    """`arvel down` must flag the APP's cache driver (redis in prod → every server process sees
+    it). Without booting the app, the flag lands in a CLI-process-local array cache and dies with
+    the process — maintenance mode that never reaches the server."""
+    from typer.testing import CliRunner
+
+    from arvel.console import build_cli
+    from arvel.kernel import Application, set_application
+
+    class SpyCache:
+        def __init__(self) -> None:
+            self.store: dict[str, object] = {}
+
+        async def put(self, key: str, value: object, ttl: object = None) -> bool:
+            self.store[key] = value
+            return True
+
+        async def forget(self, key: str) -> bool:
+            self.store.pop(key, None)
+            return True
+
+        async def has(self, key: str) -> bool:
+            return key in self.store
+
+        async def get(self, key: str, default: object = None) -> object:
+            return self.store.get(key, default)
+
+    class SpyManager:
+        def __init__(self) -> None:
+            self.repo = SpyCache()
+
+        def driver(self, name: object = None) -> SpyCache:
+            return self.repo
+
+    spy = SpyManager()
+    app = Application()
+    app.instance("cache", spy)
+    set_application(app)
+    runner = CliRunner()
+    try:
+        assert runner.invoke(build_cli(), ["down"]).exit_code == 0
+        assert "arvel:maintenance" in spy.repo.store  # flagged in the APP cache, not a local one
+        assert runner.invoke(build_cli(), ["up"]).exit_code == 0
+        assert "arvel:maintenance" not in spy.repo.store
+    finally:
+        set_application(None)
