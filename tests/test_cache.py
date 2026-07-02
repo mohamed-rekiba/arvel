@@ -36,6 +36,28 @@ async def test_remember_computes_once() -> None:
     assert calls["n"] == 1
 
 
+async def test_redis_driver_fails_loudly_when_backend_is_down() -> None:
+    """A dead Redis must RAISE, not silently no-op (Laravel parity). cashews' Redis backend
+    defaults ``suppress=True`` — get→None / put→no-op / a Cache.lock that isn't a lock — which
+    turns an infra outage into silent data-correctness bugs (surfaced by the kit's S1 tier)."""
+    pytest.importorskip("cashews.backends.redis")
+    from cashews.exceptions import CacheBackendInteractionError
+
+    from arvel.kernel import Application, set_application
+
+    app = Application()
+    app.make("config").set(
+        "cache", {"default": "redis", "url": "redis://127.0.0.1:9/0"}  # discard port — dead
+    )
+    set_application(app)
+    try:
+        cache = CacheManager(app=app).driver()
+        with pytest.raises(CacheBackendInteractionError):
+            await cache.put("k", "v")
+    finally:
+        set_application(None)
+
+
 def test_manager_forwards_to_default_driver() -> None:
     manager = CacheManager()
     # __getattr__ proxy: manager.lock resolves on the default driver

@@ -99,18 +99,21 @@ class CacheManager(Manager):
     def default_driver(self) -> str:
         return self._settings(CacheSettings).default  # auto-loads + validates config("cache")
 
-    def _build(self, url: str) -> CacheRepository:
+    def _build(self, url: str, **backend_options: Any) -> CacheRepository:
         from cashews import Cache
 
         client = Cache()
-        client.setup(url)
+        client.setup(url, **backend_options)
         return CacheRepository(client)
 
     def create_array_driver(self) -> CacheRepository:
         return self._build("mem://")
 
     def create_redis_driver(self) -> CacheRepository:
-        return self._build(self._settings(CacheSettings).url)
+        # cashews' Redis backend defaults suppress=True: a dead Redis silently no-ops — get
+        # returns None, put is dropped, and a Cache.lock isn't a lock. Laravel raises on a dead
+        # store; so must we, or cache-dependent correctness (locks, throttles) degrades silently.
+        return self._build(self._settings(CacheSettings).url, suppress=False)
 
 
 _CACHE_MISS: Any = object()
