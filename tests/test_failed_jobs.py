@@ -38,6 +38,19 @@ class _Ok(Job):
         RAN.append(self.tag)
 
 
+def test_schema_matches_the_canonical_migration() -> None:
+    """failed_jobs (Laravel parity) has only failed_at — no created_at/updated_at. The model must
+    opt out of the timestamps default or its SELECTs name columns the migration never created."""
+    assert FailedJob.__timestamps__ is False
+    assert {c.name for c in FailedJob.__table__.columns} == {
+        "id",
+        "queue",
+        "payload",
+        "exception",
+        "failed_at",
+    }
+
+
 async def _setup() -> tuple[Application, ConnectionResolver]:
     app = Application()
     db = ConnectionResolver()

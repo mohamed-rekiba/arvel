@@ -20,6 +20,10 @@ class FailedJob(HasUuids, Model):
     no created/updated timestamps — Laravel's ``failed_jobs`` only stamps ``failed_at``)."""
 
     __table_name__ = "failed_jobs"
+    # Laravel's failed_jobs has NO created_at/updated_at (only failed_at) — opt out of the
+    # __timestamps__=True default (DR-0029) or every SELECT names columns the canonical migration
+    # never created (caught by the kit's queue-rail integration test on real PG).
+    __timestamps__: ClassVar[bool] = False
     # `failed_at` is a real DateTime column (DR-0023): the datetime cast stores/reads a real datetime
     # (read back as a Date), matching the migration's DATETIME column. `payload`/`exception` are TEXT
     # (a serialized job / a full traceback both exceed VARCHAR(255)) — matching the migration.

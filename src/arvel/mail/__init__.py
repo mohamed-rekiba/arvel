@@ -168,13 +168,21 @@ class LogTransport:
 
 
 class SmtpTransport:
-    """Sends via a real ``aiosmtplib.SMTP`` connection."""
+    """Sends via a real ``aiosmtplib.SMTP`` connection — a FRESH one per send.
+
+    aiosmtplib clients are not concurrency-safe: when a queue worker executes two mail jobs at
+    once, concurrent ``async with`` on a shared client collides on the session state and hangs
+    until the SMTP timeout (caught live by the kit's queue-rail integration test). Each send
+    opens its own connection (Laravel/Symfony mailer semantics)."""
 
     def __init__(self, config: SmtpSettings) -> None:
+        self._config = config
+
+    def _make_client(self) -> Any:
         import aiosmtplib
 
-        self._config = config
-        self.client = aiosmtplib.SMTP(
+        config = self._config
+        return aiosmtplib.SMTP(
             hostname=config.host,
             port=config.port,
             username=config.username or None,
@@ -184,9 +192,15 @@ class SmtpTransport:
             timeout=config.timeout,
         )
 
+    @property
+    def client(self) -> Any:
+        """A configured (unconnected) client — one per access, mirroring the per-send semantics."""
+        return self._make_client()
+
     async def send(self, message: EmailMessage) -> bool:
-        async with self.client:
-            await self.client.send_message(message)
+        client = self._make_client()
+        async with client:
+            await client.send_message(message)
         return True
 
 

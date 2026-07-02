@@ -53,6 +53,8 @@ class LazyGroup(TyperGroup):
         "migrate:fresh": "arvel.console.migrate:fresh_app",
         "migrate:refresh": "arvel.console.migrate:refresh_app",
         "queue:work": "arvel.console.work:work_app",
+        "queue:failed": "arvel.console.work:failed_app",
+        "queue:retry": "arvel.console.work:retry_app",
         "cache:clear": "arvel.console.ops:cache_clear_app",
         "key:generate": "arvel.console.ops:key_generate_app",
         "storage:link": "arvel.console.ops:storage_link_app",
