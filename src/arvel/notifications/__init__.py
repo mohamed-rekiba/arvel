@@ -42,11 +42,17 @@ class SendQueuedNotification(Job):
     not a Model, so without this it hits ``msgspec`` "unsupported type". The notifiable is a Model, so
     the job's own ``serialize_instance`` already (class, pk)-refs it."""
 
-    def __init__(self, notifiable: Any, notification: Notification) -> None:
+    def __init__(
+        self, notifiable: Any, notification: Notification, channels: list[str] | None = None
+    ) -> None:
         from arvel.queue import encode_instance
 
         self.notifiable = notifiable
         self.notification = encode_instance(notification)  # serializable repr (not the live object)
+        # the channel slice this job delivers (None = all of via()); the ShouldQueue rail enqueues
+        # one job PER channel (Laravel parity) so a mail failure retries only mail and can never
+        # re-run — i.e. double-store — an already-delivered database channel
+        self.channels = channels
 
     async def handle(self) -> dict[str, Any]:
         from arvel.kernel import app
@@ -54,7 +60,7 @@ class SendQueuedNotification(Job):
 
         manager: NotificationManager = app().make("notifications")
         notification = cast("Notification", await decode_instance(self.notification))
-        return await manager.send_now(self.notifiable, notification)
+        return await manager.send_now(self.notifiable, notification, channels=self.channels)
 
 
 class NotificationManager:
@@ -87,14 +93,26 @@ class NotificationManager:
             and hasattr(app, "bound")
             and app.bound("queue")
         ):
-            await app.make("queue").push_instance(SendQueuedNotification(notifiable, notification))
+            # one queued job PER channel (Laravel parity): channel failures are isolated, so a
+            # retrying mail job can never re-run (double-store) the database channel
+            queue = app.make("queue")
+            for channel in notification.via(notifiable):
+                await queue.push_instance(
+                    SendQueuedNotification(notifiable, notification, channels=[channel])
+                )
             return {"queued": True}
         return await self.send_now(notifiable, notification)
 
-    async def send_now(self, notifiable: Any, notification: Notification) -> dict[str, Any]:
-        """Fan out across all channels immediately, bypassing the queue rail."""
+    async def send_now(
+        self,
+        notifiable: Any,
+        notification: Notification,
+        channels: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Fan out immediately, bypassing the queue rail — across all of ``via()``, or only the
+        given ``channels`` slice (the per-channel worker path)."""
         results: dict[str, Any] = {}
-        for channel in notification.via(notifiable):
+        for channel in channels if channels is not None else notification.via(notifiable):
             results[channel] = await self._dispatch(channel, notifiable, notification)
         return results
 

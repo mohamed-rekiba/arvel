@@ -71,6 +71,41 @@ def test_smtp_transport_applies_auth_and_encryption() -> None:
     assert t.client.use_tls is True  # encryption="ssl" → implicit TLS wired into the client
 
 
+async def test_concurrent_sends_use_independent_connections() -> None:
+    """One SmtpTransport, N concurrent sends → N independent SMTP connections. aiosmtplib clients
+    are not concurrency-safe: a shared client deadlocks when a worker executes two queued mail
+    jobs at once (caught live by the kit's queue-rail integration test — the mail jobs hung until
+    the SMTP timeout while the shared client's session state collided)."""
+    import asyncio
+    from email.message import EmailMessage
+
+    used_clients: list[Any] = []
+
+    class _FakeSmtp:
+        def __init__(self) -> None:
+            used_clients.append(self)
+            self.sent: list[Any] = []
+
+        async def __aenter__(self) -> "_FakeSmtp":
+            await asyncio.sleep(0.01)  # force overlap between the two sends
+            return self
+
+        async def __aexit__(self, *exc: Any) -> None:
+            return None
+
+        async def send_message(self, message: Any) -> None:
+            await asyncio.sleep(0.01)
+            self.sent.append(message)
+
+    transport = SmtpTransport(SmtpSettings(host="h", port=25))
+    transport._make_client = lambda: _FakeSmtp()  # type: ignore[method-assign]
+
+    msg1, msg2 = EmailMessage(), EmailMessage()
+    assert await asyncio.gather(transport.send(msg1), transport.send(msg2)) == [True, True]
+    assert len(used_clients) == 2  # a fresh connection per send — never a shared session
+    assert [len(c.sent) for c in used_clients] == [1, 1]
+
+
 def test_invalid_port_fails_fast() -> None:
     _app(smtp={"port": "not-a-number"})
     try:
