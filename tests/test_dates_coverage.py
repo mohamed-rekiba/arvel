@@ -64,3 +64,20 @@ def test_dates_order_naturally() -> None:
     assert not (later < earlier)
     same = later
     assert same <= later and same >= later
+
+
+def test_ordering_a_date_against_a_non_date_is_a_typeerror() -> None:
+    """The ordering dunders return NotImplemented for foreign types, so Python raises its
+    standard TypeError (not an AttributeError from poking other._dt)."""
+    import pytest
+
+    from arvel.dates import Date
+
+    for expr in (
+        lambda: Date.now() < 5,
+        lambda: Date.now() <= "2026-01-01",
+        lambda: Date.now() > object(),
+        lambda: Date.now() >= None,
+    ):
+        with pytest.raises(TypeError):
+            expr()

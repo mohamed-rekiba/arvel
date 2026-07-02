@@ -194,7 +194,8 @@ class SmtpTransport:
 
     @property
     def client(self) -> Any:
-        """A configured (unconnected) client — one per access, mirroring the per-send semantics."""
+        """A configured (unconnected) client — a FRESH instance per access (non-identity-stable),
+        mirroring the per-send connection semantics."""
         return self._make_client()
 
     async def send(self, message: EmailMessage) -> bool:

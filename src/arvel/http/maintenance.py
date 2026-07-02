@@ -66,6 +66,7 @@ class PreventRequestsDuringMaintenance:
             excepted = list(app().config("app.maintenance_except", []) or [])
         raw_path = getattr(request, "path", "")
         path = str(raw_path() if callable(raw_path) else raw_path or "")
+        # exact-match only (no wildcards, unlike Laravel's $except globs) — list full paths
         if path in excepted:
             return await call_next(request)
         if not await is_down():

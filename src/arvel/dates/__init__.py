@@ -202,17 +202,26 @@ class Date:
         return hash(self._dt)
 
     # Carbon parity: dates order naturally (`$date < now()`); whenever's ZonedDateTime
-    # compares by instant, so these do too.
-    def __lt__(self, other: Date) -> bool:
+    # compares by instant, so these do too. Non-Date operands return NotImplemented so
+    # Python raises TypeError (or defers to the reflected operand) instead of AttributeError.
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, Date):
+            return NotImplemented
         return self._dt < other._dt
 
-    def __le__(self, other: Date) -> bool:
+    def __le__(self, other: object) -> bool:
+        if not isinstance(other, Date):
+            return NotImplemented
         return self._dt <= other._dt
 
-    def __gt__(self, other: Date) -> bool:
+    def __gt__(self, other: object) -> bool:
+        if not isinstance(other, Date):
+            return NotImplemented
         return self._dt > other._dt
 
-    def __ge__(self, other: Date) -> bool:
+    def __ge__(self, other: object) -> bool:
+        if not isinstance(other, Date):
+            return NotImplemented
         return self._dt >= other._dt
 
     def __repr__(self) -> str:
