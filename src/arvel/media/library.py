@@ -226,6 +226,27 @@ class HasMedia:
         media = await self.get_first_media(collection)
         return media.get_url(conversion) if media is not None else None
 
+    async def delete_media(self, media_id: int) -> bool:
+        """Delete ONE media item this model owns — the row plus every stored file (original +
+        conversions; Spatie ``deleteMedia`` parity). Returns ``False`` when the id isn't attached
+        to THIS model, so a caller can never remove another model's media through it."""
+        from arvel.kernel import app
+
+        media_model = getattr(type(self), "__media_model__", Media)
+        media = await media_model.find(media_id)
+        if (
+            media is None
+            or media.model_type != type(self).__name__
+            or media.model_id != getattr(self, "id", None)
+        ):
+            return False
+        disk = app("filesystem").disk(media.disk)
+        for path in media.stored_paths():
+            if await disk.exists(path):
+                await disk.delete(path)
+        await media.delete()
+        return True
+
     async def clear_media_collection(self, collection: str = "default") -> None:
         """Delete every media item in ``collection`` (rows + stored files)."""
         from arvel.kernel import app
