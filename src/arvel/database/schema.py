@@ -94,8 +94,26 @@ class ColumnDefinition:
             # must opt out or SQLAlchemy rejects it (CHAR is not autoincrementable).
             kwargs["autoincrement"] = isinstance(col_type, sa.Integer)
         if self._has_default:
+            # Laravel ->default() is a SERVER-side DDL default (so raw inserts and ALTER TABLE
+            # ADD COLUMN on populated tables honor it), not just an ORM-side value. Keep the
+            # client default too so Core/ORM inserts behave as before.
             kwargs["default"] = self._default
+            server_default = self._server_default_clause(sa, self._default)
+            if server_default is not None:
+                kwargs["server_default"] = server_default
         return sa.Column(*args, **{k: v for k, v in kwargs.items() if v is not None})
+
+    @staticmethod
+    def _server_default_clause(sa: Any, value: Any) -> Any:
+        """A DDL DEFAULT clause for a scalar default; None for values with no portable literal."""
+        if isinstance(value, bool):
+            return sa.text("TRUE") if value else sa.text("FALSE")
+        if isinstance(value, (int, float)):
+            return sa.text(str(value))
+        if isinstance(value, str):
+            escaped = value.replace("'", "''")
+            return sa.text(f"'{escaped}'")
+        return None
 
 
 class Blueprint:

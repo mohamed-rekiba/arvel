@@ -71,6 +71,26 @@ class Schema:
                 spec["name"], name, _index_columns(spec["columns"]), postgresql_using=spec["using"]
             )
 
+    def table(self, name: str, define: Callable[[Blueprint], Any]) -> None:
+        """ALTER an existing table (Laravel ``Schema::table``): every column defined on the
+        blueprint is ADDED, and its index specs are created. Column modify/rename aren't covered —
+        use ``execute`` for those (Laravel needs doctrine/dbal there for the same reason)."""
+        blueprint = Blueprint(name)
+        define(blueprint)
+        for column in blueprint.core_columns():
+            self._op.add_column(name, column)
+        for spec in blueprint.index_specs():
+            if spec["using"] in ("gin", "gist") and self.dialect != "postgresql":
+                _warn_pg_only(f"{spec['using'].upper()} index", self.dialect, action="plain index")
+            self._op.create_index(
+                spec["name"], name, _index_columns(spec["columns"]), postgresql_using=spec["using"]
+            )
+
+    def drop_column(self, table: str, *columns: str) -> None:
+        """Drop columns from an existing table (Laravel ``$table->dropColumn``)."""
+        for column in columns:
+            self._op.drop_column(table, column)
+
     def drop(self, name: str) -> None:
         self._op.drop_table(name)
 

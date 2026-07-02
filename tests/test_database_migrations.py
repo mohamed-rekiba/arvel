@@ -23,6 +23,42 @@ class CreatePosts(Migration):
         schema.drop("posts")  # type: ignore[attr-defined]
 
 
+class AddSubtitleToPosts(Migration):
+    """Laravel ``Schema::table`` parity — alter an existing table by adding columns."""
+
+    def up(self, schema: object) -> None:
+        schema.table(  # type: ignore[attr-defined]
+            "posts", lambda t: [t.string("subtitle").nullable(), t.integer("views").default(value=0)]
+        )
+
+    def down(self, schema: object) -> None:
+        schema.drop_column("posts", "subtitle", "views")  # type: ignore[attr-defined]
+
+
+async def test_schema_table_adds_and_drops_columns() -> None:
+    """schema.table() ADDs the blueprint's columns to an existing table (ALTER TABLE), and
+    schema.drop_column() removes them — the Schema::table / dropColumn Laravel surface."""
+    db = ConnectionResolver()
+    migrator = Migrator(db)
+    try:
+        await migrator.run([CreatePosts(), AddSubtitleToPosts()])
+        await db.statement(
+            "INSERT INTO posts (title, published, subtitle, views) VALUES ('t', 1, 's', 3)"
+        )
+        rows = await db.select("SELECT title, subtitle, views FROM posts")
+        assert (rows[0]["subtitle"], rows[0]["views"]) == ("s", 3)
+        # the default applies when the column isn't named
+        await db.statement("INSERT INTO posts (title, published) VALUES ('u', 0)")
+        rows = await db.select("SELECT views FROM posts WHERE title = 'u'")
+        assert rows[0]["views"] == 0
+
+        await migrator.rollback([AddSubtitleToPosts()])  # last batch only → drops the columns
+        rows = await db.select("SELECT * FROM posts")
+        assert "subtitle" not in rows[0]
+    finally:
+        await db.dispose()
+
+
 async def test_migration_upgrade_then_downgrade() -> None:
     db = ConnectionResolver()
     migrator = Migrator(db)

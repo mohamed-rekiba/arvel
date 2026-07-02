@@ -14,13 +14,16 @@ from typing import Any, cast
 
 
 class FakeMailer:
-    """Records sent mailables instead of delivering them."""
+    """Records sent mailables instead of delivering them. ``sent[i]`` is the mailable and
+    ``recipients[i]`` the recipient list of the same send (Laravel assertSent-with-callback
+    parity: tests can assert WHO a mail went to, not just that it went)."""
 
     def __init__(self) -> None:
         self.sent: list[Any] = []
+        self.recipients: list[list[str]] = []
 
     def to(self, *recipients: Any) -> _PendingFake:
-        return _PendingFake(self)
+        return _PendingFake(self, [str(r) for r in recipients])
 
     def assert_sent(self, mailable_cls: type) -> None:
         if not any(isinstance(m, mailable_cls) for m in self.sent):
@@ -34,11 +37,19 @@ class FakeMailer:
 
 
 class _PendingFake:
-    def __init__(self, mailer: FakeMailer) -> None:
+    def __init__(self, mailer: FakeMailer, recipients: list[str] | None = None) -> None:
         self._mailer = mailer
+        self._recipients = recipients or []
+
+    def cc(self, *recipients: Any) -> "_PendingFake":
+        return self
+
+    def bcc(self, *recipients: Any) -> "_PendingFake":
+        return self
 
     async def send(self, mailable: Any) -> bool:
         self._mailer.sent.append(mailable)
+        self._mailer.recipients.append(self._recipients)
         return True
 
 
