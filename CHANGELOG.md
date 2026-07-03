@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.50.0](https://github.com/mohamed-rekiba/arvel/compare/v0.49.0...v0.50.0) (2026-07-03)
+
+
+### Features
+
+* **database:** where() gains the 'ilike' operator ([125b557](https://github.com/mohamed-rekiba/arvel/commit/125b557566c20b2c816bf096f68cc27f0afc25bd))
+
+
+### Bug Fixes
+
+* **database:** raw-select datetime hydration parses SQLite string values ([7d54cca](https://github.com/mohamed-rekiba/arvel/commit/7d54cca3e0ed5493d0be314828b1c34497a905a6))
+* **search:** restoring a soft-deleted searchable model re-indexes it ([a408cfb](https://github.com/mohamed-rekiba/arvel/commit/a408cfb0fc72b47f4fcbcba1607b34c7e5b7419a))
+
 ## [0.49.0](https://github.com/mohamed-rekiba/arvel/compare/v0.48.0...v0.49.0) (2026-07-02)
 
 
