@@ -114,6 +114,9 @@ class Builder:
         col = self._table.c[column]
         if operator == "like":
             return col.like(value)
+        if operator == "ilike":
+            # native ILIKE on PostgreSQL; SQLAlchemy lowers both sides elsewhere
+            return col.ilike(value)
         if operator == "in":
             return col.in_([self._bind(v) for v in value])
         return getattr(col, _COMPARISONS[operator])(self._bind(value))

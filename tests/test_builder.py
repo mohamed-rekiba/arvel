@@ -29,6 +29,16 @@ def test_where_operators() -> None:
     assert "LIKE" in compiled.upper()
 
 
+def test_where_ilike_is_case_insensitive_on_every_dialect() -> None:
+    """`where("col", "ilike", pat)` — ILIKE on PostgreSQL; SQLAlchemy lowers both sides on
+    dialects without native ILIKE (SQLite/MySQL), so the semantics hold everywhere."""
+    builder = Builder(users).where("name", "ilike", "%CARA%")
+    pg = str(builder.to_select().compile(dialect=postgresql.dialect()))
+    lite = str(builder.to_select().compile(dialect=sqlite.dialect()))
+    assert "ILIKE" in pg.upper()
+    assert "lower(" in lite.lower()
+
+
 def test_same_builder_compiles_multi_dialect() -> None:
     builder = Builder(users).where(active=True)
     pg = str(builder.to_select().compile(dialect=postgresql.dialect()))
