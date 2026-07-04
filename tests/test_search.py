@@ -393,3 +393,33 @@ async def test_handle_index_request_is_a_no_op_without_a_bound_engine() -> None:
         await handle_index_request(ModelIndexRequested(Article, 1, {"title": "x"}))  # no raise
     finally:
         set_application(None)
+
+
+def test_meilisearch_filter_field_must_be_a_bare_identifier() -> None:
+    from arvel.search import _safe_field
+
+    assert _safe_field("views") == "views"
+    assert _safe_field("meta.rank") == "meta.rank"
+    import pytest
+
+    for bad in ("views = 1 OR title = 'x'", "views;drop", "a b", "1abc"):
+        with pytest.raises(ValueError):
+            _safe_field(bad)
+
+
+async def test_queued_mode_without_a_dispatcher_raises_instead_of_dropping_the_write() -> None:
+    # search.queue on but no events binding: a silent skip would lose the index write, so fail loud
+    spy = _SpyEngine()
+    config = {"search": {"driver": "array", "queue": True}}
+    app = Application.configure().with_config(config).create()
+    app.instance("search", spy)
+    db = ConnectionResolver()
+    Article.set_connection(db)
+    await db.execute(sa.schema.CreateTable(Article.__table__))
+    try:
+        import pytest
+
+        with pytest.raises(RuntimeError, match="no event dispatcher"):
+            await Article.create(title="python", body="x", views=1)
+    finally:
+        await db.dispose()

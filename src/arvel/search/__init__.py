@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import enum
 import json
+import re
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
@@ -163,6 +164,17 @@ class ArrayEngine:
         """No-op: the in-memory engine filters/sorts on any field, declared or not."""
 
 
+_FIELD_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
+
+
+def _safe_field(field: str) -> str:
+    """A filter field must be a bare identifier — never request-derived free text — so it can't
+    inject Meilisearch filter-expression syntax."""
+    if not _FIELD_RE.match(field):
+        raise ValueError(f"unsafe search filter field: {field!r}")
+    return field
+
+
 class MeilisearchEngine:
     """Meilisearch-backed engine (optional ``[search]`` extra). Construction fails with
     ``MissingExtraError`` when the ``meilisearch`` client isn't installed.
@@ -217,9 +229,12 @@ class MeilisearchEngine:
 
         options: dict[str, Any] = {}
         if filters:
-            # equality filters only (Scope of this story); values are repr()'d into Meilisearch's
-            # filter-expression syntax (`field = 'value'` / `field = 1`).
-            options["filter"] = [f"{field} = {value!r}" for field, value in filters.items()]
+            # equality filters only (scope of this story); values are repr()'d into Meilisearch's
+            # filter-expression syntax. Field names are interpolated raw, so guard them: only a
+            # bare identifier is allowed — never request-derived free text (filter-injection).
+            options["filter"] = [
+                f"{_safe_field(field)} = {value!r}" for field, value in filters.items()
+            ]
         if sort:
             options["sort"] = list(sort)
         if limit is not None:
@@ -350,9 +365,15 @@ class Searchable:
         :class:`ModelIndexRequested` event when ``search.queue`` is enabled."""
         if SearchSettings().queue:
             dispatcher = self._events_dispatcher()
-            if dispatcher is not None:
-                event = ModelIndexRequested(type(self), self.get_search_key(), record)
-                await dispatcher.dispatch(event)
+            if dispatcher is None:
+                # queued indexing configured but nothing can carry the event — that's a
+                # dropped index write; fail loudly rather than silently lose the update
+                raise RuntimeError(
+                    "search.queue is enabled but no event dispatcher is bound; "
+                    "register one (or disable search.queue) so index writes aren't lost"
+                )
+            event = ModelIndexRequested(type(self), self.get_search_key(), record)
+            await dispatcher.dispatch(event)
             return
         engine = self._search_engine()
         if engine is None:
