@@ -215,7 +215,12 @@ class PendingRequest:
         """Attempt the request up to ``times`` times total, sleeping ``sleep_ms`` between
         attempts. Retries connect errors and 5xx responses by default; ``when(exc_or_response)``
         overrides that policy. Raises when every attempt is retry-worthy (the last exception, or
-        ``RequestFailed`` for a persistent bad-status response)."""
+        ``RequestFailed`` for a persistent bad-status response).
+
+        Note: a custom ``when`` that stays truthy on a *successful* response (e.g. content-based
+        polling) still raises ``RequestFailed`` once ``times`` is exhausted, even though the final
+        response is 2xx — exhaustion-with-``when`` always raises. Inspect the returned response
+        instead if you want to poll without an exception."""
         clone = self._clone()
         clone._retry_times = times
         clone._retry_sleep_ms = sleep_ms
@@ -610,7 +615,11 @@ class Client:
 
     def prevent_stray_requests(self, enabled: bool = True) -> None:
         """Requires an active ``fake()``: raise ``StrayRequest`` for any request that matches no
-        faked pattern (instead of passing it through to the network)."""
+        faked pattern (instead of passing it through to the network).
+
+        Note: a blanket ``fake()`` (called with no mapping) stubs *every* URL with a default
+        response, so no request is ever "stray" and this check never fires — pass an explicit
+        mapping if you want unmatched URLs to raise."""
         if self._fake_state is None:
             raise RuntimeError("prevent_stray_requests() requires an active Http.fake()")
         self._fake_state.prevent_stray = enabled
