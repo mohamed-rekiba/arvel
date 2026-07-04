@@ -174,3 +174,83 @@ def test_http_unregistered_exception_falls_through_to_default_render() -> None:
     assert resp.status_code == 500
     assert resp.json()["message"] == "Server Error"
     assert logger.errors  # still reported
+
+
+# --- review follow-ups: edge coverage ---------------------------------------
+
+
+class _RaisingStore(dict):  # type: ignore[type-arg]
+    def __setitem__(self, key: Any, value: Any) -> None:
+        raise TypeError("cannot weakref")
+
+
+def test_non_weakrefable_instances_skip_dedupe_and_always_report() -> None:
+    logger = _SpyLogger()
+    handler = ExceptionHandler(logger)  # type: ignore[arg-type]
+    handler._reported = _RaisingStore()  # type: ignore[assignment]  # simulate non-weakref-able
+    exc = TeapotError("t")
+    handler.report(exc)
+    handler.report(exc)
+    assert len(logger.errors) == 2  # double-report beats false suppression
+
+
+def test_equal_but_distinct_instances_both_report() -> None:
+    logger = _SpyLogger()
+    handler = ExceptionHandler(logger)  # type: ignore[arg-type]
+
+    class EqError(Exception):
+        def __eq__(self, other: object) -> bool:
+            return isinstance(other, EqError)
+
+        def __hash__(self) -> int:
+            return 7
+
+    handler.report(EqError())
+    handler.report(EqError())  # __eq__-equal, distinct identity → still reports
+    assert len(logger.errors) == 2
+
+
+def test_raising_renderable_falls_through_to_default_render() -> None:
+    logger = _SpyLogger()
+    handler = ExceptionHandler(logger)  # type: ignore[arg-type]
+
+    def bad(exc: TeapotError, request: Any) -> Any:
+        raise RuntimeError("hook bug")
+
+    handler.renderable(TeapotError, bad)
+    assert handler.try_render(None, TeapotError("t")) is None
+    assert any("exception_handler_hook_failed" in args for args, _ in logger.errors)
+
+
+def test_raising_reportable_does_not_mask_the_default_log() -> None:
+    logger = _SpyLogger()
+    handler = ExceptionHandler(logger)  # type: ignore[arg-type]
+
+    def bad(exc: TeapotError) -> None:
+        raise RuntimeError("hook bug")
+
+    handler.reportable(TeapotError, bad)
+    handler.report(TeapotError("t"))
+    events = [args[0] for args, _ in logger.errors]
+    assert "unhandled_exception" in events  # real report survives the buggy hook
+    assert "exception_handler_hook_failed" in events
+
+
+def test_renderable_response_headers_pass_through_http() -> None:
+    logger = _SpyLogger()
+    app = Application()
+    app.instance("config", Repository({"app": {"debug": False}}))
+    handler = ExceptionHandler(logger)  # type: ignore[arg-type]
+    handler.renderable(
+        TeapotError,
+        lambda e, r: Response({"error": "teapot"}, status=418, headers={"x-brew": "chamomile"}),
+    )
+    app.instance("exceptions", handler)
+    router = Router()
+    router.get("/teapot", _spill)
+    kernel = HttpKernel(app)
+    router.apply_to(kernel)
+    with TestClient(kernel.build()) as client:
+        resp = client.get("/teapot", headers={"accept": "application/json"})
+    assert resp.status_code == 418
+    assert resp.headers["x-brew"] == "chamomile"
