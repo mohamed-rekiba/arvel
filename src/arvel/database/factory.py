@@ -54,7 +54,16 @@ class Factory[M: Model]:
         # abstract base in an app's factory hierarchy has no `model` of its own to collide on
         target = getattr(cls, "model", None)
         if target is not None:
-            _FACTORY_REGISTRY.setdefault(target, cls)
+            existing = _FACTORY_REGISTRY.setdefault(target, cls)
+            if existing is not cls:  # two factories for one model — first import wins, warn
+                import warnings
+
+                warnings.warn(
+                    f"{cls.__name__} and {existing.__name__} both target {target.__name__}; "
+                    f"Model.factory() will use {existing.__name__} (first imported). "
+                    f"Set __factory__ on the model to pick explicitly.",
+                    stacklevel=2,
+                )
 
     def __init__(self) -> None:
         self._states: list[dict[str, Any] | Callable[[dict[str, Any]], dict[str, Any]]] = []

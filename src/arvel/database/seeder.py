@@ -9,9 +9,16 @@ from __future__ import annotations
 
 from arvel.database.model_events import EVENTS_SUPPRESSED
 
-# Process-wide: which seeder classes `call_once` has already run, so a seeder reachable from
-# multiple `call()` chains within the same process only actually runs once (Laravel `callOnce`).
+# Which seeder classes `call_once` has already run in the current seeding run, so a seeder
+# reachable from multiple `call()` chains runs once (Laravel `callOnce`). Reset per run (see
+# `reset_called_once`, invoked by the seed entrypoint) — NOT process-lifetime, or a long-lived
+# worker / repeated `db:seed` would silently skip every once-seeder after the first run.
 _called_once: set[type[Seeder]] = set()
+
+
+def reset_called_once() -> None:
+    """Clear the `call_once` dedup set — the seed entrypoint calls this so each run starts fresh."""
+    _called_once.clear()
 
 
 class Seeder:

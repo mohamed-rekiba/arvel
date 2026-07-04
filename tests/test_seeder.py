@@ -76,3 +76,20 @@ def test_without_model_events_resets_even_on_exception() -> None:
     except RuntimeError:
         pass
     assert EVENTS_SUPPRESSED.get() is False
+
+
+async def test_call_once_dedup_is_per_run_not_process_lifetime() -> None:
+    # regression: without a per-run reset, a repeated db:seed / long-lived worker would
+    # silently skip every once-seeder after the first run.
+    from arvel.database.seeder import _called_once, reset_called_once
+
+    reset_called_once()  # isolate from any prior test's call_once state
+    RUN_COUNT.clear()
+    await UsersSeeder().run()
+    assert RUN_COUNT == ["roles"]
+    await UsersSeeder().run()  # same process, no reset -> skipped
+    assert RUN_COUNT == ["roles"]
+    reset_called_once()
+    assert _called_once == set()
+    await UsersSeeder().run()  # fresh run -> runs again
+    assert RUN_COUNT == ["roles", "roles"]

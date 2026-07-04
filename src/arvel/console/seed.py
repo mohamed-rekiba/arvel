@@ -14,12 +14,15 @@ def db_seed() -> None:
     """Run the application's root database seeder."""
     from arvel.console.kernel import run_app_command
 
-    run_app_command(_db_seed)
+    run_app_command(run_seed)
 
 
-async def _db_seed(app: Any) -> None:
+async def run_seed(app: Any) -> None:
+    from arvel.database.seeder import reset_called_once
+
     if not app.bound("seeder"):
         typer.echo("no seeder bound; register one as 'seeder' in your app")
         raise typer.Exit(1)
+    reset_called_once()  # scope call_once dedup to this run (Laravel semantics)
     await app.make("seeder").run()
     typer.echo("seeding complete")

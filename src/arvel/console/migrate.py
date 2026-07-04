@@ -94,11 +94,9 @@ async def _refresh(app: Any, *, seed: bool) -> None:
     await migrator.run(migrations)
     typer.echo(f"refreshed {len(migrations)} migration(s)")
     if seed:
-        if not app.bound("seeder"):
-            typer.echo("no seeder bound; register one as 'seeder' in your app")
-            raise typer.Exit(1)
-        await app.make("seeder").run()
-        typer.echo("seeding complete")
+        from arvel.console.seed import run_seed
+
+        await run_seed(app)  # single seed path — resets call_once + same bound-check/echoes
 
 
 wipe_app = typer.Typer()
