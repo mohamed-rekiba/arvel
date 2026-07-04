@@ -134,3 +134,15 @@ def test_host_prefixed_cookie_forces_path_and_no_domain() -> None:
     set_cookie = resp.headers["set-cookie"]
     assert "Path=/" in set_cookie
     assert "Domain=" not in set_cookie
+
+
+def test_host_prefixed_cookie_forces_secure_even_if_caller_says_false() -> None:
+    # a __Host- cookie without Secure is silently rejected by the browser — force it on
+    def handler(request: Any) -> Response:
+        return response.json({"ok": True}).with_cookie("__Host-s", "v", secure=False)
+
+    kernel = HttpKernel()
+    kernel.get("/c", handler)
+    with TestClient(kernel.build()) as client:
+        resp = client.get("/c")
+    assert "Secure" in resp.headers["set-cookie"]

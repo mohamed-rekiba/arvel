@@ -833,10 +833,11 @@ class HttpKernel:
     @staticmethod
     def _apply_cookies(litestar_response: Any, response: Response) -> Any:
         """Apply a ``Response``'s queued cookies/expirations to the built Litestar response. A
-        ``__Host-``-prefixed name gets ``path="/"``/no ``domain`` forced (the browser rule that
-        prefix requires — ``StartSession`` enforces the same thing for the session cookie); an
-        unset ``secure`` defers to ``SessionSettings().secure`` (the app's own cookie-security
-        default), not a hardcoded guess."""
+        ``__Host-``-prefixed name gets ``path="/"``/no ``domain``/``secure=True`` forced — the full
+        browser rule that prefix requires (``StartSession`` enforces the same for the session
+        cookie). Without the forced ``Secure`` a ``__Host-`` cookie is silently rejected, so it
+        overrides even an app whose ``session.secure`` is False; a non-prefixed cookie's unset
+        ``secure`` defers to ``SessionSettings().secure``."""
         if not response.cookies and not response.forgotten_cookies:
             return litestar_response
         from arvel.http.middleware import SessionSettings
@@ -850,7 +851,9 @@ class HttpKernel:
                 max_age=cookie.max_age,
                 path="/" if host_prefixed else cookie.path,
                 domain=None if host_prefixed else cookie.domain,
-                secure=default_secure if cookie.secure is None else cookie.secure,
+                secure=True
+                if host_prefixed
+                else (default_secure if cookie.secure is None else cookie.secure),
                 httponly=cookie.http_only,
                 samesite=cookie.same_site,
             )
