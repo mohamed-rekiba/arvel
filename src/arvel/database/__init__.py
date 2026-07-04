@@ -29,7 +29,7 @@ from arvel.database.model import (
 from arvel.database.relations import SyncResult
 from arvel.database.resources import JsonResource, ResourceCollection
 from arvel.database.schema import Blueprint
-from arvel.database.seeder import Seeder
+from arvel.database.seeder import Seeder, WithoutModelEvents
 
 
 def raw(sql: str) -> Any:
@@ -63,6 +63,7 @@ __all__ = [
     "SoftDeletes",
     "SyncResult",
     "UnsupportedDriverOperation",
+    "WithoutModelEvents",
     "WriteResult",
     "discover_migrations",
     "raw",

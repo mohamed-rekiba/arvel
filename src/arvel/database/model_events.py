@@ -7,12 +7,20 @@ boundary).
 from __future__ import annotations
 
 import asyncio
+import contextvars
 from typing import Any, ClassVar
 
 # Tasks scheduled by `_fire_sync` (a sync lifecycle point firing an async event) must be kept
 # referenced until done — asyncio only holds a weak reference via the loop's callback chain, and
 # an unreferenced task can be garbage-collected mid-flight.
 _pending_tasks: set[asyncio.Task[Any]] = set()
+
+# The seam `arvel.database.seeder.WithoutModelEvents` flips while seeding so bulk inserts don't fan
+# out observer work (Laravel's `WithoutModelEvents` trait). A ContextVar (not a plain module global)
+# so it's scoped to the current task tree and never leaks across concurrently-running requests/tests.
+EVENTS_SUPPRESSED: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "arvel_events_suppressed", default=False
+)
 
 
 class HasEvents:
@@ -62,6 +70,8 @@ class HasEvents:
     async def _fire(self, hook: str) -> Any:
         from arvel.kernel import app, has_application
 
+        if EVENTS_SUPPRESSED.get():
+            return None
         if not has_application():
             return None
         container = app()
@@ -84,4 +94,4 @@ class HasEvents:
         task.add_done_callback(_pending_tasks.discard)
 
 
-__all__ = ["HasEvents"]
+__all__ = ["EVENTS_SUPPRESSED", "HasEvents"]

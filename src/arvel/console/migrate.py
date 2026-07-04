@@ -76,18 +76,29 @@ refresh_app = typer.Typer()
 
 
 @refresh_app.command()
-def migrate_refresh() -> None:
+def migrate_refresh(
+    seed: bool = typer.Option(False, "--seed", help="Run the app's seeder after refreshing."),
+) -> None:
     """Roll back all migrations, then re-run them (Laravel `migrate:refresh`)."""
     from arvel.console.kernel import run_app_command
 
-    run_app_command(_refresh)
+    async def _handler(app: Any) -> None:
+        await _refresh(app, seed=seed)
+
+    run_app_command(_handler)
 
 
-async def _refresh(app: Any) -> None:
+async def _refresh(app: Any, *, seed: bool) -> None:
     migrator, migrations = _resolve(app)
     await migrator.rollback(migrations)
     await migrator.run(migrations)
     typer.echo(f"refreshed {len(migrations)} migration(s)")
+    if seed:
+        if not app.bound("seeder"):
+            typer.echo("no seeder bound; register one as 'seeder' in your app")
+            raise typer.Exit(1)
+        await app.make("seeder").run()
+        typer.echo("seeding complete")
 
 
 wipe_app = typer.Typer()

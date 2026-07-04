@@ -16,6 +16,21 @@ from typing import Any, ClassVar
 PLAIN_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$")
 
 
+def server_default_literal(value: Any) -> Any:
+    """A DDL ``DEFAULT`` clause for a scalar value (``ColumnDefinition``'s own default handling, and
+    ``Schema.change_column``'s ``default=``); ``None`` for values with no portable SQL literal."""
+    import sqlalchemy as sa
+
+    if isinstance(value, bool):
+        return sa.text("TRUE") if value else sa.text("FALSE")
+    if isinstance(value, (int, float)):
+        return sa.text(str(value))
+    if isinstance(value, str):
+        escaped = value.replace("'", "''")
+        return sa.text(f"'{escaped}'")
+    return None
+
+
 def _big_integer_factory() -> Any:
     import sqlalchemy as sa
 
@@ -103,14 +118,7 @@ class ColumnDefinition:
     @staticmethod
     def _server_default_clause(sa: Any, value: Any) -> Any:
         """A DDL DEFAULT clause for a scalar default; None for values with no portable literal."""
-        if isinstance(value, bool):
-            return sa.text("TRUE") if value else sa.text("FALSE")
-        if isinstance(value, (int, float)):
-            return sa.text(str(value))
-        if isinstance(value, str):
-            escaped = value.replace("'", "''")
-            return sa.text(f"'{escaped}'")
-        return None
+        return server_default_literal(value)
 
 
 class Blueprint:
@@ -533,4 +541,5 @@ __all__ = [
     "drop_materialized_view",
     "drop_view",
     "refresh_materialized_view",
+    "server_default_literal",
 ]

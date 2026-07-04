@@ -18,6 +18,7 @@ from arvel.database.schema import (
     create_extension,
     create_materialized_view,
     create_view,
+    server_default_literal,
 )
 
 if TYPE_CHECKING:
@@ -93,6 +94,82 @@ class Schema:
 
     def drop(self, name: str) -> None:
         self._op.drop_table(name)
+
+    def rename(self, old_table: str, new_table: str) -> None:
+        """Rename a table (Laravel ``Schema::rename``)."""
+        self._op.rename_table(old_table, new_table)
+
+    def _existing_column(self, table: str, column: str) -> Any:
+        """The reflected column dict (SQLAlchemy ``Inspector.get_columns`` shape) for ``column``, or
+        ``None`` — MySQL's ``ALTER COLUMN`` needs the *existing* type even for a plain rename/nullable
+        change, so ``rename_column``/``change_column`` derive it here rather than asking the caller."""
+        import sqlalchemy as sa
+
+        inspector = sa.inspect(self._op.get_bind())
+        for col in inspector.get_columns(table):
+            if col["name"] == column:
+                return col
+        return None
+
+    def _alter_column(self, table: str, name: str, **kwargs: Any) -> None:
+        existing = self._existing_column(table, name)
+        if existing is not None:
+            kwargs.setdefault("existing_type", existing["type"])
+        # SQLite has no in-place ALTER COLUMN (rename/type/drop-constraint) — batch mode recreates
+        # the table under the hood so the same call still works there.
+        if self.dialect == "sqlite":
+            with self._op.batch_alter_table(table) as batch_op:
+                batch_op.alter_column(name, **kwargs)
+        else:
+            self._op.alter_column(table, name, **kwargs)
+
+    def rename_column(self, table: str, old: str, new: str) -> None:
+        """Rename a column, preserving its data (Laravel ``renameColumn``)."""
+        self._alter_column(table, old, new_column_name=new)
+
+    def change_column(
+        self,
+        table: str,
+        name: str,
+        *,
+        type: Any = None,
+        nullable: bool | None = None,
+        default: Any = None,
+        comment: str | None = None,
+    ) -> None:
+        """Modify an existing column's type/nullable/default/comment (Laravel ``$table->change()``).
+        Only the kwargs given are altered; everything else on the column is left as-is."""
+        kwargs: dict[str, Any] = {}
+        if type is not None:
+            kwargs["type_"] = type
+        if nullable is not None:
+            kwargs["nullable"] = nullable
+        if default is not None:
+            kwargs["server_default"] = server_default_literal(default)
+        if comment is not None:
+            kwargs["comment"] = comment
+        self._alter_column(table, name, **kwargs)
+
+    def drop_foreign(self, table: str, name: str) -> None:
+        """Drop a foreign-key constraint by name (Laravel ``dropForeign``)."""
+        if self.dialect == "sqlite":
+            with self._op.batch_alter_table(table) as batch_op:
+                batch_op.drop_constraint(name, type_="foreignkey")
+        else:
+            self._op.drop_constraint(name, table, type_="foreignkey")
+
+    def drop_unique(self, table: str, name: str) -> None:
+        """Drop a unique constraint by name (Laravel ``dropUnique``)."""
+        if self.dialect == "sqlite":
+            with self._op.batch_alter_table(table) as batch_op:
+                batch_op.drop_constraint(name, type_="unique")
+        else:
+            self._op.drop_constraint(name, table, type_="unique")
+
+    def drop_index(self, table: str, name: str) -> None:
+        """Drop an index by name (Laravel ``dropIndex``). Native ``DROP INDEX`` on every dialect
+        here (including SQLite), so no batch mode is needed."""
+        self._op.drop_index(name, table_name=table)
 
     def execute(self, statement: Any) -> None:
         self._op.execute(statement)

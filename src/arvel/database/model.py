@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
     from arvel.database.collection import EloquentCollection
     from arvel.database.connections import ConnectionResolver
+    from arvel.database.factory import Factory
 
 # Python type -> SQLAlchemy type name; temporal types get their own real DateTime/Date in _sa_type.
 _PY_TO_SA = {int: "Integer", str: "String", bool: "Boolean", float: "Float", dict: "JSON"}
@@ -228,6 +229,7 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
     __timestamps__: ClassVar[bool] = True
     __attributes_meta__: ClassVar[dict[str, Any]] = {}
     __local_scopes__: ClassVar[dict[str, Any]] = {}  # @scope-decorated methods (name → fn)
+    __factory__: ClassVar[type[Factory[Any]] | None] = None  # override for Model.factory()
     _resolver: ClassVar[ConnectionResolver | None] = None
     __table__: ClassVar[Any] = None
 
@@ -404,6 +406,17 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         instance.fill(attributes)
         await instance.save()
         return instance
+
+    @classmethod
+    def factory(cls) -> Factory[Self]:
+        """This model's factory (Laravel ``Model::factory()``): ``__factory__`` if set, else the
+        ``<Model>Factory`` registered for this class (registered automatically when that ``Factory``
+        subclass is defined — make sure it's imported, e.g. from a seeder or test)."""
+        if cls.__factory__ is not None:
+            return cast("Factory[Self]", cls.__factory__())
+        from arvel.database.factory import factory_for
+
+        return cast("Factory[Self]", factory_for(cls))
 
     @classmethod
     async def first_or_create(

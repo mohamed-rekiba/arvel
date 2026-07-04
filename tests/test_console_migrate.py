@@ -7,7 +7,7 @@ from typing import Any
 from typer.testing import CliRunner
 
 from arvel.console import build_cli
-from arvel.database import ConnectionResolver, Migrator
+from arvel.database import ConnectionResolver, Migrator, Seeder
 from arvel.database.migrations import Migration, Schema
 
 runner = CliRunner()
@@ -105,6 +105,54 @@ def test_migrate_refresh_rolls_back_then_remigrates() -> None:
         assert "refreshed 1 migration" in result.output
     finally:
         reset(None)
+
+
+def test_migrate_refresh_seed_reseeds() -> None:
+    from arvel.kernel import Application, set_application
+
+    ran: list[str] = []
+
+    class RootSeeder(Seeder):
+        async def run(self) -> None:
+            ran.append("seeded")
+
+    app = Application()
+    app.instance("migrator", Migrator(ConnectionResolver()))
+    app.instance("migrations", [CreateWidgets()])
+    app.instance("seeder", RootSeeder())
+    set_application(app)
+    try:
+        assert runner.invoke(build_cli(), ["migrate"]).exit_code == 0
+        result = runner.invoke(build_cli(), ["migrate:refresh", "--seed"])
+        assert result.exit_code == 0, result.output
+        assert "refreshed 1 migration" in result.output
+        assert "seeding complete" in result.output
+        assert ran == ["seeded"]
+    finally:
+        set_application(None)
+
+
+def test_migrate_refresh_without_seed_flag_does_not_seed() -> None:
+    from arvel.kernel import Application, set_application
+
+    ran: list[str] = []
+
+    class RootSeeder(Seeder):
+        async def run(self) -> None:
+            ran.append("seeded")
+
+    app = Application()
+    app.instance("migrator", Migrator(ConnectionResolver()))
+    app.instance("migrations", [CreateWidgets()])
+    app.instance("seeder", RootSeeder())
+    set_application(app)
+    try:
+        assert runner.invoke(build_cli(), ["migrate"]).exit_code == 0
+        result = runner.invoke(build_cli(), ["migrate:refresh"])
+        assert result.exit_code == 0, result.output
+        assert ran == []
+    finally:
+        set_application(None)
 
 
 def test_db_wipe_drops_all_tables() -> None:
