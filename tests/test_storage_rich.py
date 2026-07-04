@@ -11,7 +11,12 @@ import fsspec
 import pytest
 
 from arvel.dates import Date
-from arvel.filesystem import Filesystem, UnsupportedDriverOperation, Visibility
+from arvel.filesystem import (
+    Filesystem,
+    PathTraversalError,
+    UnsupportedDriverOperation,
+    Visibility,
+)
 
 
 def _disk(tmp_path: Path, **kwargs: object) -> Filesystem:
@@ -220,3 +225,22 @@ async def test_temporary_url_unsupported_on_local(tmp_path: Path) -> None:
     disk = _disk(tmp_path)
     with pytest.raises(UnsupportedDriverOperation):
         await disk.temporary_url("a.png", timedelta(minutes=5))
+
+
+# --- review follow-up: path traversal containment (HIGH blocker) ---
+
+
+async def test_dotdot_path_cannot_escape_disk_root(tmp_path: Path) -> None:
+    disk = _disk(tmp_path)
+    with pytest.raises(PathTraversalError):
+        await disk.get("../escape.txt")
+    with pytest.raises(PathTraversalError):
+        await disk.put("a/../../escape.txt", "x")
+    with pytest.raises(PathTraversalError):
+        await disk.delete("../../etc/passwd")
+
+
+async def test_interior_dotdot_normalizes_without_escaping(tmp_path: Path) -> None:
+    disk = _disk(tmp_path)
+    await disk.put("docs/sub/../a.txt", "kept")  # normalizes to docs/a.txt, stays in root
+    assert (await disk.get("docs/a.txt")).decode() == "kept"

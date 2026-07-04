@@ -62,6 +62,13 @@ class UnsupportedDriverOperation(RuntimeError):
     ``temporaryUrl`` throws a ``RuntimeException`` on a driver without presigned-URL support)."""
 
 
+class PathTraversalError(ValueError):
+    """Raised when a path uses ``..`` to climb above the disk root (Flysystem parity)."""
+
+    def __init__(self, path: str) -> None:
+        super().__init__(f"path escapes the disk root: {path!r}")
+
+
 class Filesystem:
     """Laravel-style disk API over an fsspec filesystem (async via worker threads)."""
 
@@ -85,8 +92,20 @@ class Filesystem:
         return self._fs
 
     def _full(self, path: str) -> str:
-        path = path.lstrip("/")
-        return f"{self._root}/{path}" if self._root else path
+        # Keys often derive from user input; a `..` segment must never escape the disk root
+        # (Flysystem's PathTraversalDetected guard). Normalize, then reject any climb-out.
+        segments: list[str] = []
+        for segment in path.replace("\\", "/").split("/"):
+            if segment in ("", "."):
+                continue
+            if segment == "..":
+                if not segments:
+                    raise PathTraversalError(path)
+                segments.pop()
+                continue
+            segments.append(segment)
+        relative = "/".join(segments)
+        return f"{self._root}/{relative}" if self._root else relative
 
     def _protocol(self) -> tuple[str, ...]:
         proto = self._fs.protocol
@@ -507,6 +526,7 @@ __all__ = [
     "Filesystem",
     "FilesystemManager",
     "FilesystemSettings",
+    "PathTraversalError",
     "UnsupportedDriverOperation",
     "Visibility",
 ]
