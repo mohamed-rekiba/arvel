@@ -159,3 +159,9 @@ async def test_cursor_paginate_defaults_to_primary_key_order_when_unordered() ->
         assert [r["id"] for r in page] == [1, 2]
     finally:
         await db.dispose()
+
+
+def test_malformed_cursor_degrades_to_first_page_not_500() -> None:
+    # untrusted query input (rule 20): garbage must not raise, it resolves to first-page
+    for bad in ("not-base64!!", "YWJj", "", "eyJiYWQiOjF9"):
+        assert decode_cursor(bad) == ({}, False)

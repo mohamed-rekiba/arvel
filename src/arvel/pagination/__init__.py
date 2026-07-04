@@ -465,9 +465,15 @@ def encode_cursor(position: dict[str, Any], *, backward: bool = False) -> str:
 
 
 def decode_cursor(cursor: str) -> tuple[dict[str, Any], bool]:
-    """Decode a cursor produced by :func:`encode_cursor` back to ``(position, backward)``."""
-    payload = _json.loads(base64.urlsafe_b64decode(cursor.encode()))
-    return payload["p"], bool(payload["b"])
+    """Decode a cursor produced by :func:`encode_cursor` back to ``(position, backward)``.
+    The cursor is untrusted query-string input, so a malformed one degrades to an empty
+    position (the first page, forward) rather than 500ing — matching Laravel, which resolves
+    an invalid cursor to null."""
+    try:
+        payload = _json.loads(base64.urlsafe_b64decode(cursor.encode()))
+        return payload["p"], bool(payload["b"])
+    except ValueError, KeyError, TypeError:  # binascii.Error/JSONDecodeError are ValueErrors
+        return {}, False
 
 
 class CursorPaginator:
