@@ -44,7 +44,18 @@ def test_defaults_registered_publishable_under_lang_tag(tmp_path: Path) -> None:
     app = _provider_for(tmp_path)
     assert "lang" in app.published  # vendor:publish --tag=lang has something to copy
     dests = set(app.published["lang"].values())
-    assert dests == {"lang"}
+    # the real {base_path}/lang, not a bare "lang" relative to whatever the CLI's CWD happens to
+    # be — vendor:publish must land in the app's actual configured lang dir.
+    assert dests == {str(tmp_path / "lang")}
+
+
+def test_defaults_publish_into_with_lang_dir_override(tmp_path: Path) -> None:
+    app = Application(base_path=str(tmp_path))
+    app.lang_dir = str(tmp_path / "resources" / "lang")  # simulates with_lang_dir(...)
+    provider = LocalizationServiceProvider(app)
+    provider.register()
+    dests = set(app.published["lang"].values())
+    assert dests == {str(tmp_path / "resources" / "lang")}
 
 
 def test_app_lang_overrides_framework_default(tmp_path: Path) -> None:
