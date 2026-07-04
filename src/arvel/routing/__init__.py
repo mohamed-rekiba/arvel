@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Sequence
+    from pathlib import Path
 
     from arvel.http.kernel import HttpKernel
 
@@ -218,6 +219,100 @@ class Router:
         route = self.add(["GET"], "/{fallback_path:path}", handler, name or "fallback")
         route.is_fallback = True
         return route
+
+    def public(
+        self,
+        directory: str | Path,
+        *,
+        path: str = "/",
+        assets_dirname: str = "assets",
+        spa_fallback: bool = True,
+    ) -> Router:
+        """Serve ``directory`` as the app's public web root — Laravel's ``public/``: the ONE
+        directory a webserver exposes (``index.php`` there is the front controller; everything
+        else — ``app/``, ``routes/``, ``.env``, ``storage/`` — sits outside it and is never
+        directly reachable). arvel has no separate webserver in front to split "a real file →
+        serve it directly" from "everything else → the app," so this registers that split as ASGI
+        routes instead: a request whose path matches a real file under ``directory`` (favicon.ico,
+        robots.txt, a published ``storage`` symlink target, a bundler's build output, ...) gets
+        that file back as-is. Anything under ``assets_dirname`` is assumed content-hashed by a
+        frontend bundler (Vite/webpack/... all use this convention) and is cached forever;
+        everything else stays revalidate-able so a new deploy is picked up without a hard
+        cache-bust.
+
+        ``spa_fallback`` (default ``True``) decides what happens when a path ISN'T a real file.
+        Most arvel apps embed a client-side-routed frontend, so by default it falls back to
+        ``directory/index.html`` and lets that router (history-mode) decide what to render — the
+        same trick as Laravel's own OPTIONAL catch-all ``Route::get('/{any}', ...)->where('any',
+        '.*')`` or Nginx's ``try_files $uri $uri/ /index.html``. It's optional in Laravel too — a
+        server-rendered (Blade/Inertia-SSR) or API-only app has no such route. Pass
+        ``spa_fallback=False`` for those: only real files under ``directory`` are ever served
+        (favicon/robots/storage/...), and an unmatched path 404s normally rather than claiming
+        ``/`` or any other path your app already owns.
+
+        With ``spa_fallback=True``, both registered routes are marked ``is_fallback``
+        (:meth:`apply_to` sorts those last), so this is safe to call before OR after your other
+        routes — a more specific route (``/api/*``, an admin group, ...) always wins on its own
+        path regardless of registration order.
+        """
+        from pathlib import Path as _Path
+
+        root = _Path(directory).resolve()
+
+        def _real_file(rel: str) -> _Path | None:
+            requested = (root / rel.lstrip("/")).resolve()
+            return requested if requested.is_relative_to(root) and requested.is_file() else None
+
+        async def _to_response(target: _Path) -> Any:
+            from mimetypes import guess_type
+
+            from arvel.http.exceptions import abort
+            from arvel.http.response import Response
+
+            if not target.is_file():
+                # The one case this can't be a real file: spa_fallback's own index.html doesn't
+                # exist yet (public/ not built, or misconfigured) — a clear, diagnosable error
+                # instead of a raw FileNotFoundError surfacing as an opaque 500.
+                abort(500, f"public directory has no index.html — did you build it? ({target})")
+            immutable = target.parent.name == assets_dirname
+            content_type = guess_type(target.name)[0] or "application/octet-stream"
+            cache = "public, max-age=31536000, immutable" if immutable else "no-cache"
+            return Response(
+                content=target.read_bytes(),
+                status=200,
+                headers={"content-type": content_type, "cache-control": cache},
+            )
+
+        if spa_fallback:
+            # Two thin handlers rather than one shared function taking an optional `path` — the
+            # root route's template has no `{path}` placeholder, so a shared handler's `path`
+            # param would be (wrongly) inferred as a documented query parameter on that route.
+            async def _serve_root(request: Any) -> Any:
+                return await _to_response(_real_file("") or root / "index.html")
+
+            async def _serve_catchall(request: Any, path: str) -> Any:
+                return await _to_response(_real_file(path) or root / "index.html")
+
+            root_route = self.add(["GET"], path, _serve_root, "public.root")
+            root_route.is_fallback = True
+            catchall_route = self.add(
+                ["GET"], path.rstrip("/") + "/{path:path}", _serve_catchall, "public"
+            )
+            catchall_route.is_fallback = True
+        else:
+            from arvel.http.exceptions import abort
+
+            async def _serve_static(request: Any, path: str) -> Any:
+                found = _real_file(path)
+                if found is None:
+                    abort(404, "Not found")
+                return await _to_response(found)
+
+            static_route = self.add(
+                ["GET"], path.rstrip("/") + "/{path:path}", _serve_static, "public"
+            )
+            static_route.is_fallback = True
+        return self
 
     def redirect(
         self, uri: str, destination: str, status: int = 302, name: str | None = None
