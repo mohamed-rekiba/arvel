@@ -96,8 +96,13 @@ class Encrypter:
         return self._seal(json.dumps({"j": value}).encode())
 
     def decrypt(self, token: str) -> Any:
-        envelope = json.loads(self._open(token))
-        return envelope["j"]
+        # a verified-but-non-envelope payload (e.g. an encrypt_string token) is a caller
+        # contract break, surfaced uniformly as DecryptionFailed — never a leaked json error
+        try:
+            envelope = json.loads(self._open(token))
+            return envelope["j"]
+        except json.JSONDecodeError, TypeError, KeyError:
+            raise DecryptionFailed("token does not hold a serialized envelope") from None
 
     def rotate(self, token: str) -> str:
         """Re-encrypt a token (from any held key) under the current primary key, without

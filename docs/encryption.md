@@ -112,3 +112,8 @@ failed — so `previous_keys` and `rotate` cost nothing on the common (primary-k
 
 - [Hashing](hashing.md) — for passwords; never `encrypt` a password, `Hash.make` it.
 - [Configuration](configuration.md) — where `APP_KEY` is read from.
+
+!!! note "High-volume nonce budget"
+    Each encryption draws a random 96-bit GCM nonce. Per NIST SP 800-38D, keep a single
+    key under ~2^32 encryptions to make nonce collision negligible — rotate `APP_KEY`
+    (the `previous_keys` mechanism keeps old ciphertext readable) well before that.

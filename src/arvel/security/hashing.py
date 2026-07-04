@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Literal, Protocol
 
 import argon2
 import bcrypt
-from argon2.exceptions import InvalidHashError, VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerificationError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -65,9 +65,11 @@ class Argon2Driver:
         return self._hasher.hash(plain)
 
     def check(self, plain: str, hashed: str) -> bool:
+        # VerificationError is VerifyMismatchError's base: wrong password, corrupt hash, and
+        # any other verification failure all mean "not authenticated", never an exception.
         try:
             return self._hasher.verify(hashed, plain)
-        except VerifyMismatchError, InvalidHashError:
+        except VerificationError, InvalidHashError:
             return False
 
     def needs_rehash(self, hashed: str) -> bool:
@@ -106,11 +108,13 @@ class BcryptDriver:
         self._rounds = rounds
 
     def make(self, plain: str) -> str:
-        return bcrypt.hashpw(plain.encode(), bcrypt.gensalt(rounds=self._rounds)).decode()
+        # bcrypt only reads the first 72 bytes; bcrypt>=4 rejects longer input instead of
+        # silently truncating — truncate explicitly (Laravel behavior) so registration never 500s
+        return bcrypt.hashpw(plain.encode()[:72], bcrypt.gensalt(rounds=self._rounds)).decode()
 
     def check(self, plain: str, hashed: str) -> bool:
         try:
-            return bcrypt.checkpw(plain.encode(), hashed.encode())
+            return bcrypt.checkpw(plain.encode()[:72], hashed.encode())
         except ValueError:
             return False
 
@@ -164,6 +168,8 @@ class HashManager:
         }
 
     def _detect_name(self, hashed: str) -> DriverName | None:
+        if not hashed:  # a NULL/empty DB value must fail auth, not raise
+            return None
         for name, recognizes in _RECOGNIZERS.items():
             if recognizes(hashed):
                 return name

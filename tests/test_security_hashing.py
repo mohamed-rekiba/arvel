@@ -92,3 +92,26 @@ def test_argon2_hash_verifies_under_bcrypt_configured_manager() -> None:
     manager = HashManager("bcrypt")
     assert manager.check("secret", argon2_hash) is True
     assert manager.needs_rehash(argon2_hash) is True
+
+
+# --- review follow-ups (Tier-3 reject → fix): robustness on the auth hot path ---
+
+
+def test_corrupt_argon2_hash_fails_check_instead_of_raising() -> None:
+    manager = HashManager()
+    assert manager.check("pw", "$argon2id$garbage") is False
+    assert manager.check("pw", "$argon2id$v=19$m=65536,t=3,p=4$truncated") is False
+
+
+def test_none_and_non_string_hashes_fail_check_instead_of_raising() -> None:
+    manager = HashManager()
+    assert manager.check("pw", None) is False  # type: ignore[arg-type]  # corrupt NULL column
+    assert manager.is_hashed(None) is False  # type: ignore[arg-type]
+
+
+def test_bcrypt_long_password_is_truncated_like_laravel_not_rejected() -> None:
+    driver = BcryptDriver(rounds=4)
+    long_password = "x" * 100
+    hashed = driver.make(long_password)
+    assert driver.check(long_password, hashed) is True
+    assert driver.check("x" * 72, hashed) is True  # only the first 72 bytes count

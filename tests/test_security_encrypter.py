@@ -113,3 +113,17 @@ def test_raw_base64_key_without_prefix_is_accepted() -> None:
 def test_wrong_key_length_is_rejected() -> None:
     with pytest.raises(ValueError, match="32 bytes"):
         Encrypter("base64:dG9vc2hvcnQ=")  # decodes to far fewer than 32 bytes
+
+
+def test_decrypt_of_a_string_token_raises_decryption_failed_not_json_error() -> None:
+    enc = Encrypter(Encrypter.generate_key())
+    token = enc.encrypt_string("not an envelope")
+    with pytest.raises(DecryptionFailed):
+        enc.decrypt(token)
+
+
+def test_decrypt_of_non_envelope_json_raises_decryption_failed() -> None:
+    enc = Encrypter(Encrypter.generate_key())
+    token = enc.encrypt_string('{"other": 1}')
+    with pytest.raises(DecryptionFailed):
+        enc.decrypt(token)
