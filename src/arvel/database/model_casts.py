@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import enum
 import json
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 #: cast keys whose column is a plain TEXT (the cast owns (de)serialization; a native JSON/DECIMAL
 #: column's asymmetric read/write processors would double-encode on every write — see model.py).
@@ -37,6 +37,24 @@ def json_default(value: Any) -> Any:
     if hasattr(value, "isoformat"):
         return value.isoformat()
     return str(value)
+
+
+def to_serializable(value: Any) -> Any:
+    """Unwrap a cast-get result to a JSON-native value for ``to_dict`` (Laravel ``toArray``):
+    ``collection`` -> list, ``object`` -> dict, ``stringable`` -> str, ``Decimal`` -> str.
+    Read-path only; ``_cast_set`` already unwraps for the write path."""
+    from decimal import Decimal
+    from types import SimpleNamespace
+
+    from arvel.support import Collection, Stringable
+
+    if isinstance(value, Collection):
+        return cast("list[Any]", value.to_list())
+    if isinstance(value, SimpleNamespace):
+        return vars(value)
+    if isinstance(value, (Stringable, Decimal)):
+        return str(value)
+    return value
 
 
 def _to_db_datetime(value: Any) -> Any:

@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from typing import Any, ClassVar, Self
 
-from arvel.database.model_casts import json_default
+from arvel.database.model_casts import json_default, to_serializable
 
 
 class SerializesModels:
@@ -41,9 +41,12 @@ class SerializesModels:
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        data = {key: self._cast_get(key, value) for key, value in self._attributes.items()}
+        data = {
+            key: to_serializable(self._cast_get(key, value))
+            for key, value in self._attributes.items()
+        }
         for key in self.__appends__:  # computed accessors not stored as attributes
-            data[key] = self._cast_get(key, None)
+            data[key] = to_serializable(self._cast_get(key, None))
         if self.__visible__:
             data = {k: v for k, v in data.items() if k in self.__visible__}
         hidden = (set(self.__hidden__) | self._extra_hidden) - self._extra_visible
