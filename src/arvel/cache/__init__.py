@@ -180,6 +180,10 @@ class TaggedCache:
     that same combination — a plain ``repository.get(key)`` or a different tag set never sees
     them. ``flush()`` deletes every entry ever written under **any** of these tags, even via a
     different combination, mirroring Laravel's cross-combination tag invalidation.
+
+    Note: TTL-expired entries are not proactively pruned from their tag sets (Laravel has the
+    same limitation); a tag set reclaims its members only on ``flush()``. Long-lived tags with
+    high churn of short-TTL keys should be flushed periodically.
     """
 
     def __init__(self, repository: CacheRepository, names: tuple[str, ...]) -> None:
@@ -413,6 +417,14 @@ class CacheRepository:
                 if inspect.isawaitable(computed):
                     computed = await computed
                 await self._client.set(key, (computed, clock()), expire=stale)
+            except Exception:
+                # a fire-and-forget task's exception would otherwise vanish into asyncio's
+                # "never retrieved" warning; surface it so ops can see a failing revalidate
+                from arvel.kernel.logging import LogManager
+
+                LogManager().channel("cache").warning(
+                    "flexible_revalidation_failed", key=key, exc_info=True
+                )
             finally:
                 await self._client.delete(guard_key)
 
@@ -457,6 +469,10 @@ class CacheRepository:
     async def _lock_acquire(self, name: str, owner: str, seconds: int | None) -> bool:
         if self._driver == "redis":
             client = await self._redis_raw_client(name)
+            # redis rejects px=0 ("invalid expire time"); seconds=0 means expire-immediately,
+            # so the lock is never actually held — match the array path's behaviour, don't 500
+            if seconds == 0:
+                return False
             px = int(seconds * 1000) if seconds is not None else None
             return bool(await client.set(name, owner, nx=True, px=px))
         return self._array_locks().try_acquire(name, owner, seconds)
