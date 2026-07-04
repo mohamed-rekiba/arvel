@@ -150,6 +150,7 @@ class HttpKernel:
         but only when a group hasn't already been customized, so an app's ``append_to_group`` /
         ``middleware_group`` done before serve is preserved (merge, not overwrite)."""
         from arvel.http.middleware import (
+            SessionSettings,
             ShareErrorsFromSession,
             StartSession,
             ThrottleRequests,
@@ -157,8 +158,22 @@ class HttpKernel:
         )
 
         if not self.groups.get("web"):
+            session_mw: Any = StartSession
+            # session.driver == "redis" → the app's own bound "cache" service backs sessions (so
+            # they survive restarts and are shared across every worker/host), instead of
+            # StartSession's in-process dict default. Built here (not left to container DI) since
+            # `cache: Any` isn't a type DI can resolve, and "no cache bound" is a legitimate
+            # config, not an error to raise on.
+            if self.app is not None and self.app.bound("cache"):
+                # from_source (not a bare SessionSettings()) reads THIS app's config section
+                # directly — the bare form reads the *global* config() (see Manager(app)'s own
+                # docstring on Settings.from_source), which use_default_groups() shouldn't depend
+                # on some earlier set_application(app) call having happened.
+                section = self.app.make("config").get("session", {})
+                if SessionSettings.from_source(section).driver == "redis":
+                    session_mw = StartSession(cache=self.app.make("cache"))
             # StartSession first (sets request.session); ShareErrorsFromSession reads it.
-            self.groups["web"] = [StartSession, ShareErrorsFromSession, ValidateCsrfToken]
+            self.groups["web"] = [session_mw, ShareErrorsFromSession, ValidateCsrfToken]
         if not self.groups.get("api"):
             self.groups["api"] = [ThrottleRequests]
         return self
@@ -725,6 +740,10 @@ class HttpKernel:
         raise ValidationException(trans("http.not_found"), status=404)
 
     def _make(self, middleware_cls: Any) -> Any:
+        # An already-built instance (e.g. use_default_groups' cache-backed StartSession) is used
+        # as-is — Container.make() expects a class/string abstract, not an arbitrary instance.
+        if not isinstance(middleware_cls, type):
+            return middleware_cls
         return self.app.make(middleware_cls) if self.app is not None else middleware_cls()
 
     def _to_response(self, result: Any) -> Any:

@@ -23,9 +23,16 @@ class SessionSettings(Settings):
 
     ``host_prefix`` is ``None`` by default so it derives from ``secure`` (the ``__Host-`` prefix
     requires a Secure cookie); set it explicitly in config to force on/off.
+
+    ``driver`` selects the server-side store: any value other than ``"redis"`` keeps the existing
+    in-process dict (``StartSession``'s own default — lost on restart, not shared across workers);
+    ``"redis"`` wires ``StartSession`` to the app's own bound ``"cache"`` service (``HttpKernel.
+    use_default_groups``), so sessions survive restarts and are shared across every worker/host —
+    the same Redis/Valkey the app already runs for caching, not a second connection.
     """
 
     __config_key__ = "session"
+    driver: str = "cookie"  # anything but "redis" → in-process (kept for config back-compat)
     lifetime: int = 120  # minutes (Laravel parity); x60 for cookie max-age / cache TTL
     secure: bool = True
     host_prefix: bool | None = None
