@@ -17,6 +17,9 @@ from typing import Any, cast
 
 #: Cache key holding the maintenance payload (absent ⇒ the app is up).
 KEY = "arvel:maintenance"
+#: The bypass cookie set on a request whose ``?secret=`` matched (so subsequent requests bypass
+#: without repeating the query param — Laravel ``down --secret``).
+SECRET_COOKIE = "arvel_maintenance_secret"  # noqa: S105 - a cookie name, not a credential
 
 
 def _cache() -> Any:
@@ -30,9 +33,35 @@ def _cache() -> Any:
     return CacheManager().driver()
 
 
-async def down(message: str = "Down for maintenance.", retry: int = 60) -> None:
-    """Enter maintenance mode — store the flag (no TTL ⇒ until ``up``) with a Retry-After hint."""
-    await _cache().put(KEY, {"message": message, "retry": retry})
+async def down(
+    message: str = "Down for maintenance.",
+    retry: int = 60,
+    secret: str | None = None,
+    allow: list[str] | None = None,
+    render: str | None = None,
+) -> None:
+    """Enter maintenance mode — store the flag (no TTL ⇒ until ``up``) with a Retry-After hint, plus
+    an optional bypass ``secret``, IP ``allow``-list, and a pre-``render``-ed page (Laravel ``down
+    --secret``/``--allow``/``--render``)."""
+    info: dict[str, Any] = {"message": message, "retry": retry}
+    if secret:
+        info["secret"] = secret
+    if allow:
+        info["allow"] = list(allow)
+    if render:
+        info["render"] = _render_page(render)
+    await _cache().put(KEY, info)
+
+
+def _render_page(view_name: str) -> str:
+    """Read ``resources/views/<view_name>.html`` verbatim, once, at ``down`` time (Laravel
+    ``--render``). A raw file read, not the Jinja view engine: maintenance mode must not depend on
+    services that might themselves be why the app is down — and ``arvel.http`` stays below
+    ``arvel.views`` in the module DAG (G1), so it can't import the view engine anyway."""
+    from pathlib import Path
+
+    path = Path("resources") / "views" / f"{view_name}.html"
+    return path.read_text() if path.is_file() else f"<h1>{view_name}</h1>"
 
 
 async def up() -> None:
@@ -49,11 +78,29 @@ async def payload() -> dict[str, Any]:
     return cast("dict[str, Any]", info) if isinstance(info, dict) else {}
 
 
+def _client_ip(request: Any) -> str | None:
+    """Best-effort, duck-typed client IP — ``request`` may be the real ``arvel.http.Request``
+    (unwraps ``.raw.client.host``) or a bare test double (degrades to ``None``, never crashes)."""
+    raw = getattr(request, "raw", request)
+    client = getattr(raw, "client", None)
+    host = getattr(client, "host", None) if client is not None else None
+    return str(host) if host else None
+
+
+def _duck_call(request: Any, method: str, *args: Any) -> Any:
+    """Best-effort duck-typed call (``request.query(...)``/``request.cookie(...)``) — missing on a
+    bare test double degrades to ``None`` rather than crashing the maintenance check."""
+    fn = getattr(request, method, None)
+    return fn(*args) if callable(fn) else None
+
+
 class PreventRequestsDuringMaintenance:
     """Middleware: return 503 (with Retry-After) while the app is in maintenance mode.
 
     Paths in ``config('app.maintenance_except')`` (e.g. a health probe) stay reachable —
-    Laravel's ``$except`` on the maintenance middleware."""
+    Laravel's ``$except`` on the maintenance middleware. An IP in the ``down --allow`` list, or a
+    request whose ``?secret=``/bypass cookie matches ``down --secret``, passes straight through
+    (the first ``?secret=`` hit also sets the bypass cookie for later requests)."""
 
     async def handle(self, request: Any, call_next: Any) -> Any:
         from arvel.kernel import app, has_application
@@ -68,11 +115,32 @@ class PreventRequestsDuringMaintenance:
             return await call_next(request)
         if not await is_down():
             return await call_next(request)
-        from arvel.http.response import Response
 
         info = await payload()
+        allow = cast("list[str]", info.get("allow") or [])
+        if allow and _client_ip(request) in allow:
+            return await call_next(request)
+
+        secret = info.get("secret")
+        if secret:
+            query_secret = _duck_call(request, "query", "secret")
+            cookie_secret = _duck_call(request, "cookie", SECRET_COOKIE)
+            if query_secret == secret or cookie_secret == secret:
+                response = await call_next(request)
+                if query_secret == secret and hasattr(response, "with_cookie"):
+                    response.with_cookie(SECRET_COOKIE, secret, minutes=60 * 24)
+                return response
+
+        from arvel.http.response import Response
+
+        rendered = info.get("render")
+        body = (
+            rendered
+            if rendered is not None
+            else {"message": info.get("message", "Down for maintenance.")}
+        )
         return Response(
-            {"message": info.get("message", "Down for maintenance.")},
+            body,
             status=503,
             headers={"Retry-After": str(info.get("retry", 60))},
         )

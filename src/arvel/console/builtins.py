@@ -8,6 +8,7 @@ vendors click as ``typer._click``, so commands must be Typer-built to mount.)
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import typer
@@ -75,6 +76,17 @@ def extras() -> None:
 
 
 new_app = typer.Typer()
+
+
+def _derive_package_name(raw: str) -> str:
+    """The package/app name for a scaffold target (A8) — the **basename** of ``raw`` (so an
+    absolute or relative path both work: ``arvel new /abs/path/my-app`` names the package
+    ``my-app``, not the whole path), sanitized to a valid PEP 503 name. Empty/invalid input (e.g.
+    a bare ``/`` or a name that's only punctuation) sanitizes to ``""`` — the caller must guard it."""
+    from pathlib import Path
+
+    basename = Path(raw).name
+    return re.sub(r"[^a-z0-9]+", "-", basename.lower()).strip("-")
 
 
 def _pkg_provider(name: str) -> str:
@@ -154,32 +166,36 @@ def new(
     from pathlib import Path
 
     target = Path(name)
+    pkg_name = _derive_package_name(name)
+    if not pkg_name:
+        typer.echo(f"{name!r} has no valid package name (its basename sanitizes to empty)")
+        raise typer.Exit(1)
     if target.exists():
         typer.echo(f"{name!r} already exists")
         raise typer.Exit(1)
 
     if package:
         files = {
-            "pyproject.toml": _pkg_pyproject(name),
-            f"src/arvel_{name.replace('-', '_')}/__init__.py": "",
-            f"src/arvel_{name.replace('-', '_')}/provider.py": _pkg_provider(name),
-            "README.md": f"# arvel-{name}\n\nAn arvel ecosystem package.\n",
+            "pyproject.toml": _pkg_pyproject(pkg_name),
+            f"src/arvel_{pkg_name.replace('-', '_')}/__init__.py": "",
+            f"src/arvel_{pkg_name.replace('-', '_')}/provider.py": _pkg_provider(pkg_name),
+            "README.md": f"# arvel-{pkg_name}\n\nAn arvel ecosystem package.\n",
         }
         count = _write_tree(target, files)
-        typer.echo(f"[arvel new] created package arvel-{name} ({count} files)")
+        typer.echo(f"[arvel new] created package arvel-{pkg_name} ({count} files)")
         return
 
-    count = _copy_skeleton("app", target, {"name": name})
+    count = _copy_skeleton("app", target, {"name": pkg_name})
     if profile in ("web", "inertia-vue"):
         views = target / "resources" / "views"
         views.mkdir(parents=True, exist_ok=True)
-        (views / "welcome.html").write_text(f"<h1>Welcome to {name}</h1>\n")
+        (views / "welcome.html").write_text(f"<h1>Welcome to {pkg_name}</h1>\n")
         count += 1
     if auth:
         # overlay the bearer-token auth flow (overwrites routes/api.py, adds the auth test)
-        count += _copy_skeleton("auth", target, {"name": name})
+        count += _copy_skeleton("auth", target, {"name": pkg_name})
     label = f"{profile}+auth" if auth else profile
-    typer.echo(f"[arvel new] created app {name!r} (profile: {label}, {count} files)")
+    typer.echo(f"[arvel new] created app {pkg_name!r} (profile: {label}, {count} files)")
     typer.echo(f"  cd {name} && uv sync")
     typer.echo("  source .venv/bin/activate")
     typer.echo("  arvel serve --reload")
@@ -189,7 +205,25 @@ down_app = typer.Typer()
 
 
 @down_app.command()
-def down() -> None:
+def down(
+    message: str = typer.Option(
+        "Down for maintenance.", "--message", help="The message shown to visitors."
+    ),
+    retry: int = typer.Option(60, "--retry", help="Retry-After seconds hint."),
+    secret: str | None = typer.Option(
+        None,
+        "--secret",
+        help="A bypass token: a request with ?secret=<token> (and its follow-up cookie) gets through.",
+    ),
+    allow: list[str] = typer.Option(
+        [], "--allow", help="An IP allowed through unrestricted (repeatable)."
+    ),
+    render: str | None = typer.Option(
+        None,
+        "--render",
+        help="Pre-render resources/views/<name>.html into the maintenance payload.",
+    ),
+) -> None:
     """Put the application into maintenance mode (flag stored in the APP's default cache —
     booted through the project app so a redis/valkey store reaches every server process; an
     app-less write would land in a CLI-process-local array cache and die with the process)."""
@@ -198,7 +232,7 @@ def down() -> None:
     async def _handler(app: object) -> None:
         from arvel.http.maintenance import down as enter_maintenance
 
-        await enter_maintenance()
+        await enter_maintenance(message, retry, secret, allow, render)
         typer.echo("application is now in maintenance mode (503)")
 
     run_app_command(_handler)

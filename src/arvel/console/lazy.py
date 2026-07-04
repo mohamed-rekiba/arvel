@@ -46,6 +46,7 @@ class LazyGroup(TyperGroup):
         "make:enum": "arvel.console.generators:make_enum_app",
         "make:exception": "arvel.console.generators:make_exception_app",
         "make:test": "arvel.console.generators:make_test_app",
+        "stub:publish": "arvel.console.generators:stub_publish_app",
         "db:seed": "arvel.console.seed:seed_app",
         "scout:import": "arvel.console.scout:scout_import_app",
         "scout:flush": "arvel.console.scout:scout_flush_app",
@@ -118,10 +119,43 @@ class LazyGroup(TyperGroup):
                     "closure_command_invalid", command=cmd_name, exc_info=True
                 )
                 return None
+        try:
+            return self._command_class_command(cmd_name, descriptor, run_command_class)
+        except Exception:
+            from arvel.kernel.logging import LogManager
+
+            LogManager().channel("console").warning(
+                "command_class_signature_invalid", command=cmd_name, exc_info=True
+            )
+            return None
+
+    @staticmethod
+    def _command_class_command(cmd_name: str, descriptor: Any, run_command_class: Any) -> Any:
+        """Build a command from an app/provider ``Command`` class's ``signature`` (same grammar as a
+        closure — see ``console.closure``); the parsed CLI tokens are passed through to
+        ``run_command_class`` so the kernel can stash them on the instance (``argument()``/``option()``)."""
+        import inspect
+
+        import typer
+
+        from arvel.console.closure import parse_signature
+
+        tokens = parse_signature(getattr(descriptor, "signature", "") or "")
         sub = typer.Typer()
-        sub.command(name=cmd_name, help=(getattr(descriptor, "description", "") or None))(
-            lambda: run_command_class(descriptor)
-        )
+        help_text = getattr(descriptor, "description", "") or None
+        if tokens:
+
+            def run(**kwargs: Any) -> None:
+                run_command_class(
+                    descriptor, **{key: value for key, value in kwargs.items() if value is not None}
+                )
+
+            parameters, annotations = _signature_typer_params(cmd_name, tokens)
+            run.__signature__ = inspect.Signature(parameters)  # type: ignore[attr-defined]
+            run.__annotations__ = annotations
+            sub.command(name=cmd_name, help=help_text)(run)
+        else:
+            sub.command(name=cmd_name, help=help_text)(lambda: run_command_class(descriptor))
         command = typer.main.get_command(sub)
         command.name = cmd_name  # display the registered name (not the wrapper fn's "<lambda>")
         return command
@@ -145,36 +179,7 @@ class LazyGroup(TyperGroup):
                 cmd_name, {key: value for key, value in kwargs.items() if value is not None}
             )
 
-        parameters: list[inspect.Parameter] = []
-        annotations: dict[str, Any] = {}
-        seen_optional_positional = False
-        for arg_name, is_option, optional in closure.arguments():
-            if is_option:  # {--flag} → boolean option, default False
-                parameters.append(
-                    inspect.Parameter(arg_name, inspect.Parameter.KEYWORD_ONLY, default=False)
-                )
-                annotations[arg_name] = bool
-            elif optional:  # {arg?} → optional POSITIONAL (None when omitted)
-                seen_optional_positional = True
-                # a plain None default makes Typer render this as an --option instead of a positional arg
-                parameters.append(
-                    inspect.Parameter(
-                        arg_name,
-                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                        default=typer.Argument(None),
-                    )
-                )
-                annotations[arg_name] = str
-            else:  # {arg} → required positional (Typer enforces; missing → usage error, exit 2)
-                if seen_optional_positional:
-                    raise ValueError(
-                        f"closure command {cmd_name!r}: required argument {{{arg_name}}} cannot "
-                        f"follow an optional one (an optional positional must come last)"
-                    )
-                parameters.append(
-                    inspect.Parameter(arg_name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-                )
-                annotations[arg_name] = str
+        parameters, annotations = _signature_typer_params(cmd_name, closure.tokens())
         run.__signature__ = inspect.Signature(parameters)  # type: ignore[attr-defined]
         run.__annotations__ = annotations
 
@@ -183,3 +188,82 @@ class LazyGroup(TyperGroup):
         command = typer.main.get_command(sub)
         command.name = cmd_name
         return command
+
+
+def _signature_typer_params(cmd_name: str, tokens: list[Any]) -> tuple[list[Any], dict[str, Any]]:
+    """Build the ``inspect.Parameter`` list + annotations for a synthetic Typer callback from parsed
+    signature tokens (shared by closure commands and app/provider ``Command`` classes — see
+    ``console.closure`` for the grammar). A required positional after an optional one is rejected
+    (an optional positional must come last, same rule Laravel enforces)."""
+    import inspect
+
+    import typer
+
+    parameters: list[inspect.Parameter] = []
+    annotations: dict[str, Any] = {}
+    seen_optional_positional = False
+    for token in tokens:
+        if token.is_option:
+            decls = [f"--{token.name}", *([f"-{token.shortcut}"] if token.shortcut else [])]
+            if token.variadic:  # {--opt=*}
+                parameters.append(
+                    inspect.Parameter(
+                        token.name, inspect.Parameter.KEYWORD_ONLY, default=typer.Option([], *decls)
+                    )
+                )
+                annotations[token.name] = list[str]
+            elif token.takes_value:  # {--opt=}
+                parameters.append(
+                    inspect.Parameter(
+                        token.name,
+                        inspect.Parameter.KEYWORD_ONLY,
+                        default=typer.Option(None, *decls),
+                    )
+                )
+                annotations[token.name] = str | None
+            elif token.shortcut:  # {--S|flag} boolean with a shortcut
+                parameters.append(
+                    inspect.Parameter(
+                        token.name,
+                        inspect.Parameter.KEYWORD_ONLY,
+                        default=typer.Option(False, *decls),
+                    )
+                )
+                annotations[token.name] = bool
+            else:  # {--flag} → plain boolean option, default False (Typer's own --flag/--no-flag)
+                parameters.append(
+                    inspect.Parameter(token.name, inspect.Parameter.KEYWORD_ONLY, default=False)
+                )
+                annotations[token.name] = bool
+        elif token.variadic:  # {arg*} → variadic POSITIONAL (a list; None when omitted)
+            seen_optional_positional = True
+            parameters.append(
+                inspect.Parameter(
+                    token.name,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    default=typer.Argument(None),
+                )
+            )
+            annotations[token.name] = list[str]
+        elif token.optional:  # {arg?} / {arg=default} → optional POSITIONAL
+            seen_optional_positional = True
+            # a plain None default makes Typer render this as an --option instead of a positional arg
+            parameters.append(
+                inspect.Parameter(
+                    token.name,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    default=typer.Argument(token.default),
+                )
+            )
+            annotations[token.name] = str
+        else:  # {arg} → required positional (Typer enforces; missing → usage error, exit 2)
+            if seen_optional_positional:
+                raise ValueError(
+                    f"command {cmd_name!r}: required argument {{{token.name}}} cannot "
+                    f"follow an optional one (an optional positional must come last)"
+                )
+            parameters.append(
+                inspect.Parameter(token.name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            )
+            annotations[token.name] = str
+    return parameters, annotations

@@ -6,11 +6,12 @@ Drives the real path through `run_app_command`: load a temp project's bootstrap/
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
-from arvel.kernel import set_application
+from arvel.kernel import Application, set_application
 
 # terminating hook writes a sentinel file so tests can prove terminate() ran; `{boot}` optionally
 # splices in a provider whose async boot() raises, to test the boot-failure path.
@@ -167,3 +168,83 @@ def test_terminate_runs_on_boot_failure(tmp_path: Path, monkeypatch: pytest.Monk
         assert (tmp_path / "terminated.flag").exists()  # failed boot still terminated
     finally:
         set_application(None)
+
+
+# -- Artisan.call / call_silently (CLI-5) -------------------------------------------------------
+
+
+def test_artisan_call_runs_a_builtin_and_returns_its_exit_code() -> None:
+    from arvel.console.kernel import Artisan
+
+    assert Artisan.call("extras") == 0
+
+
+def test_artisan_call_returns_the_command_s_typer_exit_code(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from arvel.console.kernel import Artisan
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "taken").mkdir()
+    assert Artisan.call("new", ["taken"]) == 1  # `new` exits 1 when the target already exists
+
+
+def test_artisan_call_silently_suppresses_output(capsys: pytest.CaptureFixture[str]) -> None:
+    from arvel.console.kernel import Artisan
+
+    assert Artisan.call_silently("extras") == 0
+    assert capsys.readouterr().out == ""
+
+
+@pytest.fixture
+def app() -> Iterator[Application]:
+    application = Application()
+    set_application(application)
+    yield application
+    set_application(None)
+
+
+def test_artisan_call_dispatches_an_app_registered_closure(app: Application) -> None:
+    from arvel import Console
+    from arvel.console.kernel import Artisan
+
+    ran: list[str] = []
+
+    async def greet(name: str) -> None:
+        ran.append(name)
+
+    Console.command("greet {name}", greet)
+    assert Artisan.call("greet", {"name": "Ada"}) == 0
+    assert ran == ["Ada"]
+
+
+def test_artisan_call_dispatches_an_app_registered_command_class(app: Application) -> None:
+    from arvel.console import Command
+    from arvel.console.kernel import Artisan
+
+    seen: dict[str, object] = {}
+
+    class Notify(Command):
+        signature = "notify {user} {--force}"
+
+        async def handle(self) -> None:
+            seen["user"] = self.argument("user")
+            seen["force"] = self.option("force")
+
+    app.command_classes.append(Notify)
+    assert Artisan.call("notify", {"user": "Ada", "--force": True}) == 0
+    assert seen == {"user": "Ada", "force": True}
+
+
+def test_artisan_call_without_an_active_app_errors_clearly() -> None:
+    from arvel.console.kernel import Artisan
+
+    with pytest.raises(RuntimeError, match="no active application"):
+        Artisan.call("some:app-registered-command")
+
+
+def test_artisan_call_unknown_command_raises(app: Application) -> None:
+    from arvel.console.kernel import Artisan
+
+    with pytest.raises(ValueError, match="is not defined"):
+        Artisan.call("totally-unknown-command")

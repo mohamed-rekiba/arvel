@@ -35,6 +35,13 @@ _GENERIC_MIGRATION = (
 )
 
 
+def _load_stub(base: Path | None, filename: str, fallback: str) -> str:
+    """An app-published stub (``stubs/<filename>`` — see ``stub:publish``) overrides the built-in
+    template; editing it changes what the generators write, without a code change here."""
+    path = (base or Path()) / "stubs" / filename
+    return path.read_text() if path.is_file() else fallback
+
+
 def generate_migration(name: str, base: Path | None = None) -> Path:
     """Write a timestamped migration ``database/migrations/<ts>_<name>.py`` (Laravel
     ``make:migration``). A ``create_<table>_table`` name gets a create/drop stub; any other name
@@ -51,9 +58,11 @@ def generate_migration(name: str, base: Path | None = None) -> Path:
     cls = Str.studly(name)
     created = re.fullmatch(r"create_(\w+?)_table", name)
     if created:
-        body = _CREATE_MIGRATION.format(cls=cls, table=created.group(1))
+        template = _load_stub(base, "migration.create.stub", _CREATE_MIGRATION)
+        body = template.format(cls=cls, table=created.group(1))
     else:
-        body = _GENERIC_MIGRATION.format(cls=cls)
+        template = _load_stub(base, "migration.generic.stub", _GENERIC_MIGRATION)
+        body = template.format(cls=cls)
     target.write_text(body)
     return target
 
@@ -233,7 +242,8 @@ def generate_test(name: str, base: Path | None = None) -> Path:
     if target.exists():
         message = f"test {name!r} already exists at {target}"
         raise FileExistsError(message)
-    target.write_text(_TEST_STUB.format(name=slug))
+    template = _load_stub(base, "test.stub", _TEST_STUB)
+    target.write_text(template.format(name=slug))
     return target
 
 
@@ -241,7 +251,8 @@ def generate(kind: str, name: str, base: Path | None = None) -> Path:
     """Write the ``kind`` stub for class ``name`` under ``base`` (defaults to cwd)."""
     from arvel.support import Str
 
-    folder, template = _STUBS[kind]
+    folder, fallback_template = _STUBS[kind]
+    template = _load_stub(base, f"{kind}.stub", fallback_template)
     directory = (base or Path()) / folder
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "__init__.py").touch()
@@ -459,3 +470,35 @@ def make_test(name: str) -> None:
         typer.echo(str(exc))
         raise typer.Exit(1) from exc
     typer.echo(f"created {target}")
+
+
+#: every ``kind.stub`` a generator consults (see ``_load_stub``) — the ``make:*`` template
+#: filenames plus the two migration variants and the test stub.
+_ALL_STUBS: dict[str, str] = {
+    **{f"{kind}.stub": template for kind, (_, template) in _STUBS.items()},
+    "migration.create.stub": _CREATE_MIGRATION,
+    "migration.generic.stub": _GENERIC_MIGRATION,
+    "test.stub": _TEST_STUB,
+}
+
+stub_publish_app = typer.Typer()
+
+
+@stub_publish_app.command()
+def stub_publish(
+    force: bool = typer.Option(False, "--force", help="Overwrite already-published stubs."),
+) -> None:
+    """Publish the generator stubs to ./stubs so you can customize them (Laravel ``stub:publish``) —
+    a generator prefers ``stubs/<kind>.stub`` over its built-in template once one is published."""
+    directory = Path() / "stubs"
+    directory.mkdir(parents=True, exist_ok=True)
+    published = skipped = 0
+    for filename, template in _ALL_STUBS.items():
+        target = directory / filename
+        if target.exists() and not force:
+            skipped += 1
+            continue
+        target.write_text(template)
+        published += 1
+    note = f", {skipped} already existed (skipped; pass --force to overwrite)" if skipped else ""
+    typer.echo(f"[stub:publish] published {published} stub(s) to {directory}{note}")

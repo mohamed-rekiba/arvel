@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 #: A command handler: ``async def handler(app) -> None``. The kernel runs it inside the booted app.
 CommandHandler = Callable[[Any], Coroutine[Any, Any, None]]
@@ -170,15 +170,139 @@ def discover_app_commands() -> dict[str, Any]:
     return table
 
 
-def run_command_class(cls: Any) -> None:
-    """Dispatch an app/provider command class through the full booted lifecycle: instantiate it and
-    run ``handle`` with container dependency injection."""
+def run_command_class(cls: Any, **cli_kwargs: Any) -> None:
+    """Dispatch an app/provider command class through the full booted lifecycle: instantiate it,
+    stash the parsed CLI tokens on it (so ``argument()``/``option()`` resolve — CLI-4), and run
+    ``handle`` with container dependency injection."""
     import inspect
 
     async def handler(app: Any) -> None:
         instance = cls()
+        instance.bind_parsed(cli_kwargs)
         result = app.call((instance, "handle"))
         if inspect.isawaitable(result):
             await result
 
     run_app_command(handler)
+
+
+class Artisan:
+    """Programmatic command invocation (Laravel ``Artisan::call``/``callSilently``) — dispatches in
+    process and returns the exit code.
+
+    Built-in framework commands (``about``, ``migrate``, ``make:*``, …) dispatch through the same
+    click command the CLI uses, so ``args`` is CLI-shaped (a ``dict`` of ``{"--flag": True, "name":
+    "value"}`` — see :func:`_artisan_argv` — or a raw ``list[str]`` of argv tokens). App-registered
+    command classes/closures (``routes/console.py`` ``Console.command(...)``, or a provider's
+    ``commands()``) dispatch **directly against the already-active application** — call ``Artisan``
+    from inside a booted app (a request, another command, a scheduled task, or a test that set one
+    up via ``set_application``), not as a bare script; there's no project to (re)boot here."""
+
+    @staticmethod
+    def call(name: str, args: dict[str, Any] | list[str] | None = None) -> int:
+        return _artisan_dispatch(name, args)
+
+    @staticmethod
+    def call_silently(name: str, args: dict[str, Any] | list[str] | None = None) -> int:
+        """Like :meth:`call`, with stdout/stderr swallowed for the duration."""
+        import contextlib
+        import io
+
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return _artisan_dispatch(name, args)
+
+
+def _artisan_argv(args: dict[str, Any] | list[str] | None) -> list[str]:
+    """CLI-shaped ``args`` → argv tokens for a built-in (click) command. A ``--opt`` key with a
+    ``True``/``False`` value is a flag (present/absent); a ``list`` value repeats the option (``{--opt=*}``
+    or a variadic positional); anything else is a single value."""
+    if args is None:
+        return []
+    if isinstance(args, list):
+        return [str(a) for a in args]
+    argv: list[str] = []
+    for key, value in args.items():
+        if key.startswith("--"):
+            if value is False or value is None:
+                continue
+            if value is True:
+                argv.append(key)
+            elif isinstance(value, list):
+                for item in cast("list[Any]", value):
+                    argv.extend([key, str(item)])
+            else:
+                argv.extend([key, str(value)])
+        elif isinstance(value, list):
+            argv.extend(str(item) for item in cast("list[Any]", value))
+        else:
+            argv.append(str(value))
+    return argv
+
+
+def _dispatch_builtin(name: str, args: dict[str, Any] | list[str] | None) -> int:
+    import importlib
+
+    import typer
+
+    from arvel.console.lazy import LazyGroup
+
+    module_name, attr = LazyGroup.commands_manifest[name].split(":")
+    sub_app = getattr(importlib.import_module(module_name), attr)
+    command = typer.main.get_command(sub_app)
+    try:
+        result = command.main(args=_artisan_argv(args), prog_name=name, standalone_mode=False)
+    except SystemExit as exc:
+        return exc.code if isinstance(exc.code, int) else 1
+    except Exception as exc:  # click UsageError/ClickException etc. carry `.exit_code`
+        code = getattr(exc, "exit_code", 1)
+        return code if isinstance(code, int) else 1
+    return result if isinstance(result, int) else 0
+
+
+def _run_and_capture_exit(fn: Any) -> int:
+    import typer
+
+    try:
+        fn()
+    except typer.Exit as exc:
+        return exc.exit_code
+    except SystemExit as exc:
+        return exc.code if isinstance(exc.code, int) else 1
+    return 0
+
+
+def _artisan_dispatch(name: str, args: dict[str, Any] | list[str] | None) -> int:
+    from arvel.console.lazy import LazyGroup
+
+    if name in LazyGroup.commands_manifest:
+        return _dispatch_builtin(name, args)
+
+    from arvel.kernel import app as active_app
+    from arvel.kernel import has_application
+
+    if not has_application():
+        message = (
+            f"Artisan.call({name!r}): no active application — app-registered commands dispatch "
+            "against the currently booted app (call from inside a request, another command, or a "
+            "test that set one up), not as a bare script"
+        )
+        raise RuntimeError(message)
+    if args is not None and not isinstance(args, dict):
+        message = (
+            f"Artisan.call({name!r}): an app-registered command takes a dict of args, not a list"
+        )
+        raise TypeError(message)
+    # bare param/token names (``run_closure_command``/``bind_parsed`` key on those) — a leading
+    # ``--`` (Laravel's own ``Artisan::call`` convention for options) is accepted and stripped.
+    values: dict[str, Any] = {k.removeprefix("--"): v for k, v in (args or {}).items()}
+
+    application = active_app()
+    closure = application.console_commands.get(name)
+    if closure is not None:
+        from arvel.console.closure import run_closure_command
+
+        return _run_and_capture_exit(lambda: run_closure_command(name, values))
+    cls = next((c for c in application.command_classes if command_name(c) == name), None)
+    if cls is not None:
+        return _run_and_capture_exit(lambda: run_command_class(cls, **values))
+    raise ValueError(f"command {name!r} is not defined")

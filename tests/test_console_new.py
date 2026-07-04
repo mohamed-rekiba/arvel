@@ -48,3 +48,56 @@ def test_new_existing_path_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     monkeypatch.chdir(tmp_path)
     (tmp_path / "taken").mkdir()
     assert runner.invoke(build_cli(), ["new", "taken"]).exit_code == 1
+
+
+# -- A8: package name derives from the path's basename, not the whole path -------------------
+
+
+def test_derive_package_name_basename_matrix() -> None:
+    from arvel.console.builtins import _derive_package_name
+
+    assert _derive_package_name("myapp") == "myapp"
+    assert _derive_package_name("/abs/path/my-app") == "my-app"
+    assert _derive_package_name("/abs/path/my-app/") == "my-app"  # trailing slash
+    assert _derive_package_name("./relative/My_App") == "my-app"
+    assert _derive_package_name("Weird--Name!!") == "weird-name"
+    assert _derive_package_name("/") == ""  # invalid: no basename to derive from
+    assert _derive_package_name("---") == ""  # invalid: sanitizes to empty
+
+
+def test_new_absolute_path_names_the_package_from_the_basename(tmp_path: Path) -> None:
+    """The live-repro'd A8 bug: scaffolding to an absolute path must NOT leak the whole path into
+    the package name / pyproject / welcome title."""
+    target = tmp_path / "my-app"
+    result = runner.invoke(build_cli(), ["new", str(target)])
+    assert result.exit_code == 0, result.output
+    pyproject = (target / "pyproject.toml").read_text()
+    assert 'name = "my-app"' in pyproject
+    web = (target / "routes" / "web.py").read_text()
+    assert '"title": "my-app"' in web
+    assert str(target) not in pyproject  # the whole path must never leak into the package name
+
+
+def test_new_absolute_path_with_trailing_slash(tmp_path: Path) -> None:
+    target = tmp_path / "trailing-app"
+    result = runner.invoke(build_cli(), ["new", str(target) + "/"])
+    assert result.exit_code == 0, result.output
+    assert 'name = "trailing-app"' in (target / "pyproject.toml").read_text()
+
+
+def test_new_invalid_basename_errors_clearly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(build_cli(), ["new", "___"])  # sanitizes to "" — no valid basename
+    assert result.exit_code == 1
+    assert "valid package name" in result.output
+
+
+def test_new_package_absolute_path_names_from_basename(tmp_path: Path) -> None:
+    target = tmp_path / "my-pkg"
+    result = runner.invoke(build_cli(), ["new", str(target), "--package"])
+    assert result.exit_code == 0, result.output
+    pyproject = (target / "pyproject.toml").read_text()
+    assert 'name = "arvel-my-pkg"' in pyproject
+    assert (target / "src" / "arvel_my_pkg" / "provider.py").exists()
