@@ -42,7 +42,7 @@ async def test_stale_hash_is_upgraded_on_successful_login() -> None:
         user.password = _stale_hash("secret")
         await user.save()
         old = user.password
-        assert Hasher().needs_rehash("secret", old)  # precondition: the stored hash is stale
+        assert Hasher().needs_rehash(old)  # precondition: the stored hash is stale
 
         ok = await AuthManager().attempt(
             {"email": "ada@example.com", "password": "secret"}, _provider
@@ -52,7 +52,7 @@ async def test_stale_hash_is_upgraded_on_successful_login() -> None:
         fresh = await User.where(email="ada@example.com").first()
         assert fresh.password != old  # upgraded
         assert Hasher().check("secret", fresh.password)  # still the same password
-        assert not Hasher().needs_rehash("secret", fresh.password)  # now current
+        assert not Hasher().needs_rehash(fresh.password)  # now current
     finally:
         AuthManager().logout()
         await db.dispose()

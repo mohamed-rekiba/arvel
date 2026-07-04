@@ -53,14 +53,14 @@ def _console_uses_typer() -> None:
 
 # (capability name, check) — check() raises AssertionError if the mandated engine is not in use.
 def _security_uses_mandated_libs() -> None:
-    """Hashing on pwdlib (argon2), encryption on cryptography (Fernet)."""
+    """Hashing on argon2-cffi, encryption on cryptography (AES-256-GCM)."""
     from arvel.security import Encrypter, Hasher
 
     hashed = Hasher().make("secret")
-    assert hashed.startswith("$argon2"), f"hash not argon2/pwdlib: {hashed[:12]}"
+    assert hashed.startswith("$argon2"), f"hash not argon2: {hashed[:12]}"
     enc = Encrypter(Encrypter.generate_key())
     assert enc.decrypt(enc.encrypt("payload")) == "payload"
-    assert "pwdlib" in sys.modules and "cryptography" in sys.modules
+    assert "argon2" in sys.modules and "cryptography" in sys.modules
 
 
 def _http_uses_litestar() -> None:

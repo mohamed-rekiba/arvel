@@ -912,7 +912,7 @@ class Model(metaclass=ModelMeta):
         if cast == "json":
             return json.loads(value) if isinstance(value, str) else value
         if cast == "encrypted":
-            return self._crypt().decrypt(value)
+            return self._crypt().decrypt_string(value)
         return value
 
     def _cast_set(self, key: str, value: Any) -> Any:
@@ -937,7 +937,7 @@ class Model(metaclass=ModelMeta):
         if cast == "hashed" and value is not None:
             return self._hash().make(value)
         if cast == "encrypted" and value is not None:
-            return self._crypt().encrypt(value)
+            return self._crypt().encrypt_string(value)
         return value
 
     @staticmethod

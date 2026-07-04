@@ -167,7 +167,7 @@ class AuthManager:
         from arvel.security import resolve_hasher
 
         hasher = resolve_hasher()
-        if hasher.needs_rehash(password, stored):
+        if hasher.needs_rehash(stored):
             user.set_auth_password(hasher.make(password))
             await user.save()
 

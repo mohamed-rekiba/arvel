@@ -1,4 +1,5 @@
-"""Managers/Security (doc 16) — Encrypter key rotation via MultiFernet. Test-first."""
+"""Managers/Security (doc 16) — Encrypter key rotation (previous_keys decrypt fallback +
+rotate re-encrypts under the primary key). Test-first."""
 
 from __future__ import annotations
 

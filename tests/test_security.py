@@ -1,10 +1,12 @@
-"""T4.1 — security: Hasher (pwdlib), Encrypter (Fernet), Signer (itsdangerous)."""
+"""T4.1 — security: Hasher (argon2-cffi/bcrypt driver manager), Encrypter (AES-256-GCM),
+Signer (itsdangerous). Deeper hashing/encryption coverage lives in test_security_hashing.py
+and test_security_encrypter.py; this file keeps the original cross-cutting smoke tests."""
 
 from __future__ import annotations
 
 import pytest
 
-from arvel.security import Encrypter, Hasher, Signer
+from arvel.security import DecryptionFailed, Encrypter, Hasher, Signer
 
 
 def test_hasher_make_and_check() -> None:
@@ -23,10 +25,8 @@ def test_encrypter_roundtrip() -> None:
 
 
 def test_encrypter_rejects_tampered_token() -> None:
-    from cryptography.fernet import InvalidToken
-
     enc = Encrypter(Encrypter.generate_key())
-    with pytest.raises(InvalidToken):
+    with pytest.raises(DecryptionFailed):
         enc.decrypt("not-a-valid-token")
 
 

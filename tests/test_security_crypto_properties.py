@@ -7,14 +7,14 @@ hold across generated inputs, not just hand-picked values. Happy-path examples l
 
 from __future__ import annotations
 
-from cryptography.fernet import InvalidToken
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from itsdangerous import BadData
 
-from arvel.security import Encrypter, Hasher, Signer
+from arvel.security import DecryptionFailed, Encrypter, Hasher, Signer
 
-# urlsafe-base64 alphabet Fernet/itsdangerous tokens are drawn from.
+# A replacement-char pool for single-char mutation (doesn't need to match a token's own
+# alphabet exactly — any char differing from the original exercises the tamper-rejection path).
 _B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_="
 
 
@@ -49,7 +49,7 @@ def test_encrypter_mutation_never_yields_different_plaintext(plaintext: str, ind
     tampered = _flip_char(token, index)
     try:
         result = enc.decrypt(tampered)
-    except InvalidToken:
+    except DecryptionFailed:
         return
     assert result == plaintext, f"mutation forged a different plaintext: {result!r}"
 
@@ -62,7 +62,7 @@ def test_encrypter_rejects_truncated_token(plaintext: str, cut: int) -> None:
     truncated = token[:-cut] if cut < len(token) else ""
     try:
         enc.decrypt(truncated)
-    except InvalidToken:
+    except DecryptionFailed:
         return
     raise AssertionError("truncated token was accepted")
 
@@ -75,7 +75,7 @@ def test_encrypter_rejects_arbitrary_bytes(blob: bytes) -> None:
     candidate = blob.decode("latin-1")
     try:
         enc.decrypt(candidate)
-    except InvalidToken:
+    except DecryptionFailed:
         return
     raise AssertionError("arbitrary bytes accepted as a valid token")
 
@@ -90,7 +90,7 @@ def test_encrypter_wrong_key_is_rejected(plaintext: str) -> None:
     other = Encrypter(Encrypter.generate_key())
     try:
         other.decrypt(token)
-    except InvalidToken:
+    except DecryptionFailed:
         return
     raise AssertionError("ciphertext decrypted under an unrelated key")
 

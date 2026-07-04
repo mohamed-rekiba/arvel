@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from arvel.kernel import config
 from arvel.kernel.service_provider import ServiceProvider
@@ -10,6 +10,7 @@ from arvel.security import Encrypter, Hasher, Signer
 
 if TYPE_CHECKING:
     from arvel.contracts import Container
+    from arvel.security.hashing import DriverName
 
 
 def _require_key() -> str:
@@ -24,7 +25,9 @@ def _require_key() -> str:
 class SecurityServiceProvider(ServiceProvider):
     def register(self) -> None:
         def make_hasher(_app: Container) -> Hasher:
-            return Hasher()
+            driver = cast("DriverName", config("hashing.driver", "argon2id"))
+            options = cast("dict[str, int]", config("hashing.options", {}) or {})
+            return Hasher(driver, **options)
 
         def make_encrypter(_app: Container) -> Encrypter:
             return Encrypter(_require_key())
