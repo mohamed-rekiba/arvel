@@ -308,3 +308,28 @@ async def test_auth_manager_attempt_wrong_password() -> None:
     ok = await mgr.attempt({"email": "ada", "password": "nope"}, provider)
     assert ok is False
     assert mgr.guest()
+
+
+@pytest.mark.asyncio
+async def test_login_clears_stale_impersonator_flag() -> None:
+    from arvel.http.middleware import StartSession
+
+    # a session already flagged as impersonating; a fresh credential login must drop the flag
+    store: dict[str, dict[str, Any]] = {"imp": {"_impersonator_id": 99}}
+    mw = StartSession(store=store, secure=False)
+    req = _FakeSessionRequest({"session": "imp"})
+    after: dict[str, Any] = {}
+
+    async def dest(r: Any) -> str:
+        await SessionGuard().login(_User(7), r)
+        after.update(r.session)
+        return "ok"
+
+    token = current_user.set(None)
+    try:
+        await mw.handle(req, dest)
+    finally:
+        current_user.reset(token)
+
+    assert "_impersonator_id" not in after
+    assert after["_user_id"] == 7

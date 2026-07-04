@@ -106,7 +106,11 @@ class SessionGuard:
                 if isinstance(user, Authenticatable)
                 else getattr(user, "id", None)
             )
-            cast("dict[str, Any]", session)[self.SESSION_KEY] = subject
+            typed_session = cast("dict[str, Any]", session)
+            typed_session[self.SESSION_KEY] = subject
+            # a fresh credential login is not an impersonation — drop any stale flag so a session
+            # that was impersonating doesn't stay flagged after a real re-auth (defence in depth)
+            typed_session.pop("_impersonator_id", None)
 
         from arvel.auth import current_user
 
