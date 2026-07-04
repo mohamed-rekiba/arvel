@@ -351,6 +351,9 @@ class Queue(Facade):
     @classmethod
     def work(cls, queues: Any = ..., *, release_interval: Any = ...) -> Any: ...
 
+class RateLimiter(Facade):
+    ...
+
 class Redis(Facade):
     @classmethod
     def close_all(cls) -> Any: ...

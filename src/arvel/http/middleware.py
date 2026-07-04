@@ -8,9 +8,13 @@ chain of responsibility. Grounded in knowledge/port/04-http-kernel-middleware.md
 
 from __future__ import annotations
 
-from typing import Any, cast
+import inspect
+from typing import TYPE_CHECKING, Any, cast
 
 from arvel.kernel import Settings
+
+if TYPE_CHECKING:
+    from arvel.http.rate_limiter import Limit
 
 
 class SessionSettings(Settings):
@@ -72,6 +76,21 @@ class Middleware:
         """Optional after-response hook; the kernel calls it once the response is built."""
 
 
+def _default_segment(request: Any) -> str:
+    """The default throttle segment key (Laravel): the authenticated user's id, else the client
+    IP. Prefixed so a numeric user id can never collide with an IP string."""
+    from arvel.support import current_user
+
+    user = current_user.get()
+    if user is not None:
+        uid = getattr(user, "id", None)
+        if uid is not None:
+            return f"user:{uid}"
+    getter = getattr(request, "ip", None)
+    client: Any = getter() if callable(getter) else None
+    return f"ip:{client}" if client else "ip:global"
+
+
 class ThrottleRequests(Middleware):
     """Rate-limit by client: at most ``max_attempts`` per ``decay_seconds`` window (api group).
 
@@ -79,6 +98,17 @@ class ThrottleRequests(Middleware):
     (a ``CacheRepository``) to count over a shared backend instead — that makes limiting
     **distributed** across processes/hosts (e.g. Redis). A 429 ``ValidationException`` is raised
     when the limit is exceeded.
+
+    Pass ``limiter_name`` instead (what the ``throttle:<name>`` route-middleware string builds,
+    e.g. ``Route.get(...).middleware("throttle:api")``) to rate-limit via a **named limiter**
+    registered on the app's ``limiter`` (:class:`~arvel.http.rate_limiter.RateLimiter`) with
+    ``RateLimiter.for_(name, resolver)``: ``resolver(request)`` returns a
+    :class:`~arvel.http.rate_limiter.Limit`, a ``list[Limit]``, or ``None`` (unlimited). A limit
+    with no explicit ``.by(key)`` segments by :func:`_default_segment` (user id, else IP). Over any
+    limit renders a 429 with ``Retry-After``/``X-RateLimit-Limit``/``X-RateLimit-Remaining``
+    headers (or the limit's own ``.response(cb)`` builder); a successful response carries the
+    ``X-RateLimit-*`` headers too. This named-limiter mode never raises — it returns the response
+    directly, so it (unlike the plain mode above) needs no exception-header plumbing.
     """
 
     def __init__(
@@ -88,11 +118,15 @@ class ThrottleRequests(Middleware):
         *,
         name: str = "default",
         cache: Any = None,
+        limiter_name: str | None = None,
     ) -> None:
         self.max_attempts = max_attempts
         self.decay_seconds = decay_seconds
         self.name = name
         self._cache = cache  # CacheRepository for distributed limiting; None → in-process
+        self._limiter_name = limiter_name
+        # set in handle() for the named-limiter mode; applied to the response in terminate()
+        self._success_headers: dict[str, str] | None = None
 
     def _client(self, request: Any) -> str:
         getter = getattr(request, "ip", None)
@@ -117,6 +151,8 @@ class ThrottleRequests(Middleware):
         return count
 
     async def handle(self, request: Any, call_next: Any) -> Any:
+        if self._limiter_name is not None:
+            return await self._handle_named(request, call_next)
         key = f"{self.name}:{self._client(request)}"
         if await self._hit(key) > self.max_attempts:
             from arvel.localization import trans
@@ -124,6 +160,70 @@ class ThrottleRequests(Middleware):
 
             raise ValidationException(trans("http.too_many_requests"), status=429)
         return await call_next(request)
+
+    async def _handle_named(self, request: Any, call_next: Any) -> Any:
+        from arvel.kernel import app, has_application
+
+        if not has_application() or not app().bound("limiter"):
+            raise RuntimeError(
+                f"throttle:{self._limiter_name} — no `limiter` bound (needs a cache-backed app)."
+            )
+        limiter = app().make("limiter")
+        resolver = limiter.limiter(self._limiter_name)
+        if resolver is None:
+            raise RuntimeError(
+                f"Unknown rate limiter {self._limiter_name!r} — register it with "
+                f"RateLimiter.for_({self._limiter_name!r}, resolver)."
+            )
+        resolved: Limit | list[Limit] | None = resolver(request)
+        if inspect.isawaitable(resolved):
+            resolved = await resolved
+        if resolved is None:  # the resolver opted this request out — unlimited
+            return await call_next(request)
+        limits: list[Limit] = resolved if isinstance(resolved, list) else [resolved]
+
+        remaining = 0
+        for limit in limits:
+            key = f"{self._limiter_name}:{limit.decay_seconds}:{limit.key or _default_segment(request)}"
+            attempts_before = await limiter.attempts(key)
+            if attempts_before >= limit.max_attempts:
+                retry_after = await limiter.available_in(key)
+                return await self._too_many_attempts_response(request, limit, retry_after)
+            await limiter.hit(key, limit.decay_seconds)
+            remaining = max(limit.max_attempts - attempts_before - 1, 0)
+
+        self._success_headers = {
+            "X-RateLimit-Limit": str(limits[-1].max_attempts),
+            "X-RateLimit-Remaining": str(max(remaining, 0)),
+        }
+        return await call_next(request)
+
+    @staticmethod
+    async def _too_many_attempts_response(request: Any, limit: Limit, retry_after: int) -> Any:
+        if limit.response_callback is not None:
+            result = limit.response_callback(request)
+            if inspect.isawaitable(result):
+                result = await result
+            return result
+        from arvel.http.response import Response
+        from arvel.localization import trans
+
+        return Response(
+            {"message": trans("http.too_many_requests")},
+            status=429,
+            headers={
+                "Retry-After": str(retry_after),
+                "X-RateLimit-Limit": str(limit.max_attempts),
+                "X-RateLimit-Remaining": "0",
+            },
+        )
+
+    async def terminate(self, request: Any, response: Any) -> None:
+        if self._success_headers is None:
+            return
+        headers: dict[str, str] | None = getattr(response, "headers", None)
+        if isinstance(headers, dict):
+            headers.update(self._success_headers)
 
 
 class StartSession(Middleware):

@@ -200,6 +200,16 @@ class Validator(Facade):
         return "validator"
 
 
+class RateLimiter(Facade):
+    """Named, cache-backed rate limiters (``arvel.http.rate_limiter.RateLimiter``) — register a
+    limiter's rule with ``RateLimiter.for_("api", resolver)``, consumed by the ``throttle:api``
+    route middleware. Bound as ``limiter`` by the served ``HttpKernel`` (over the app's cache)."""
+
+    @classmethod
+    def accessor(cls) -> str:
+        return "limiter"
+
+
 __all__ = [
     "DB",
     "Auth",
@@ -217,6 +227,7 @@ __all__ = [
     "Log",
     "Mail",
     "Queue",
+    "RateLimiter",
     "Redis",
     "Route",
     "Storage",

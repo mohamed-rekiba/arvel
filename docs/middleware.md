@@ -91,6 +91,72 @@ Give a middleware a short name and reference it by that name in groups or routes
 kernel.alias({"auth": Authenticate, "throttle": ThrottleRequests})
 ```
 
+## Rate limiting
+
+`ThrottleRequests` has two modes. The plain one (used by the `api` group's default) takes
+`max_attempts`/`decay_seconds` directly and raises a `429` over the limit — see the built-in
+middleware list below.
+
+The other is **named limiters**: define the rule once, reuse it from any route via
+`throttle:<name>`. Register a limiter on the app's `limiter` (the `RateLimiter` facade) — typically
+in a service provider's `boot()`:
+
+```python
+from arvel.support.facades import RateLimiter
+from arvel.http.rate_limiter import Limit
+
+class AppServiceProvider(ServiceProvider):
+    def boot(self) -> None:
+        # 60 requests/minute, segmented by authenticated user id (else client IP)
+        RateLimiter.for_("api", lambda request: Limit.per_minute(60))
+
+        # multiple limits (both enforced), explicitly segmented
+        RateLimiter.for_(
+            "uploads",
+            lambda request: [Limit.per_minute(10).by(request.ip()), Limit.per_day(200)],
+        )
+
+        # unlimited for this request — return None from the resolver
+        RateLimiter.for_("webhooks", lambda request: None)
+```
+
+Then attach it to a route or group with the `throttle:<name>` string:
+
+```python
+Route.get("/reports", show).middleware("throttle:api")
+
+with router.group(group="api", middleware=["throttle:uploads"]):
+    router.post("/uploads", store)
+```
+
+A request over any of the limiter's `Limit`s gets a `429` with `Retry-After`,
+`X-RateLimit-Limit`, and `X-RateLimit-Remaining` headers; a request under the limit gets
+`X-RateLimit-Limit`/`X-RateLimit-Remaining` too. Build your own `429` instead of the default JSON
+one with `.response(...)`:
+
+```python
+Limit.per_minute(5).response(lambda request: {"message": "Slow down."})
+```
+
+**Segmenting.** A `Limit` with no explicit `.by(key)` is keyed by the authenticated user's id, else
+the client IP (Laravel's default) — call `.by(...)` yourself to segment differently (per tenant,
+per API key, …).
+
+**Window.** Counting is fixed-window (a cache TTL arms on the first hit in a window) — the same
+technique the plain `ThrottleRequests` mode and Laravel's own limiter use. A burst can straddle two
+windows (e.g. a client could squeeze in ~2x the limit right at a window boundary); it's not a
+sliding-window limiter. Good enough for the vast majority of rate-limiting needs; reach for a
+dedicated rate-limiting proxy/service if you need a hard sliding-window guarantee.
+
+**Direct use.** The low-level verbs (`hit`, `too_many_attempts`, `remaining`, `available_in`,
+`clear`, and the combined `attempt`) work with any caller-chosen key — no registered limiter
+required — e.g. for a login-lockout check inside a handler:
+
+```python
+if await RateLimiter.too_many_attempts(f"login:{email}", 5):
+    abort(429, f"Try again in {await RateLimiter.available_in(f'login:{email}')}s")
+```
+
 ## The built-in middleware
 
 Global (every request, on by default):
@@ -109,7 +175,8 @@ Group / opt-in:
 
 - **`ThrottleRequests(max_attempts, decay_seconds)`** — rate-limit per client; over the limit
   raises a `429`. Keyed by `request.ip()` (the first trusted `X-Forwarded-For` hop, else the socket
-  peer).
+  peer). The `throttle:<name>` string form runs a different, header-carrying mode instead — see
+  [Rate limiting](#rate-limiting) above.
 - **`StartSession`** — attaches a `request.session` dict loaded from (and saved back to) the
   session store, keyed by the `session` cookie. The store is an in-process dict by default (lost
   on restart, not shared across workers); set `session.driver = "redis"` in config (the app's own
