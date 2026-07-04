@@ -193,6 +193,35 @@ Group / opt-in:
 - **`RequestContext`**, **`Locale`**, **`Authenticate`** — bind a request id, set the locale
   from `Accept-Language`, and resolve the current user.
 
+### Excepting routes from CSRF
+
+A route a third party posts to with no session (a webhook) can't carry a CSRF token — exempt it
+by URI glob pattern (Laravel `$except`), either in config or on a subclass:
+
+```python
+# config/session.py
+"csrf_except": ["webhooks/*"],
+```
+
+```python
+from arvel.http.middleware import ValidateCsrfToken
+
+class AppCsrf(ValidateCsrfToken):
+    except_ = ["webhooks/*", "health"]   # merged with config('session.csrf_except'), not replaced
+```
+
+Swap it into the web group in place of the default:
+
+```python
+kernel.use_default_groups()
+kernel.groups["web"] = [
+    AppCsrf if mw is ValidateCsrfToken else mw for mw in kernel.groups["web"]
+]
+```
+
+Every other state-changing route on the exempted middleware still gets a `419` without a valid
+token — only the listed patterns skip the check.
+
 ## CSRF from a SPA or mobile app
 
 Which path you take depends on **how the client authenticates**:

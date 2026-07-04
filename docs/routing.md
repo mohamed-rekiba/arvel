@@ -77,9 +77,47 @@ a query string:
 router.url("users.show", user=7, tab="profile")    # "/users/7?tab=profile"
 ```
 
-`url()` fails loudly rather than rendering a wrong path: it raises `KeyError` for an unknown
+`router.url()` fails loudly rather than rendering a wrong path: it raises `KeyError` for an unknown
 route name, and `ValueError` if a required path parameter is missing (so a half-built link never
 slips through with a literal `{user}` in it).
+
+### Global URL helpers
+
+Outside a `Router` instance, the same generation is available as plain functions — Laravel's
+`url()`/`route()`/`to_route()`:
+
+```python
+from arvel.routing import route, to_route, url
+
+route("users.show", user=7)                  # "https://example.com/users/7" — absolute by default
+route("users.show", user=7, absolute=False)  # "/users/7" — the bare path
+
+to_route("users.show", user=7)               # a Redirect — sugar for redirect().route(...)
+
+url("/pricing")                              # "https://example.com/pricing" (config('app.url') + path)
+```
+
+`url()` called with **no** argument returns the generator itself, so you can chain the
+request-scoped accessors off it:
+
+```python
+url().current()          # this request's absolute path, no query string
+url().full()              # ...with the query string
+url().previous("/")      # the Referer, or the fallback — never raises
+url().query("/search", {"q": "books"})   # "/search?q=books"
+```
+
+`.current()`/`.full()` need an active request — call them from inside a handler (or anything it
+calls); outside one they raise a `RuntimeError` rather than returning a nonsense path. `.previous()`
+always degrades to its `fallback` instead (no active request, or no Referer header).
+
+A signed URL that expires relative to *now* (Laravel `URL::temporarySignedRoute`):
+
+```python
+from arvel.routing import temporary_signed_route
+
+temporary_signed_route("unsubscribe", 3600, user=7)   # valid for the next hour
+```
 
 ### Signed URLs
 
@@ -132,6 +170,46 @@ Route.resource("posts", PostController, except_=["destroy"])
 | DELETE | `/posts/{post}` | destroy | `posts.destroy` |
 
 `only` / `except_` trim the set; `api_resource` drops the form-rendering `create`/`edit`.
+
+### Controller middleware
+
+Attach middleware to specific controller actions in one place (Laravel's `HasMiddleware`), instead
+of repeating `.middleware(...)` on every route the controller ends up bound to:
+
+```python
+from arvel.routing import Controller, ControllerMiddleware
+
+class PostController(Controller):
+    @classmethod
+    def middleware(cls) -> list[ControllerMiddleware]:
+        return [
+            ControllerMiddleware(EnsureSubscribed, only=("store", "update", "destroy")),
+            ControllerMiddleware("throttle:uploads", except_=("index", "show")),
+        ]
+```
+
+`Router.resource`/`api_resource` apply each entry to the actions it binds (`only`/`except_` narrow
+it, same semantics as the resource's own `only`/`except_`); a plain `middleware=` string works too
+(an alias, or a `throttle:<name>` reference). No entries (the default) means no extra middleware.
+
+### Invokable controllers
+
+A class with `__call__` is route-bindable directly — no `Controller` base, no per-action dispatch:
+
+```python
+class ShowDashboard:
+    def __init__(self, reports: ReportRepository) -> None:   # constructor deps, container-resolved
+        self.reports = reports
+
+    async def __call__(self, request, team_id: str) -> dict:
+        return {"reports": await self.reports.for_team(team_id)}
+
+Route.get("/teams/{team_id}/dashboard", ShowDashboard)
+```
+
+Pass the **class**, not an instance — the kernel instantiates it via the container per request
+(the same `app.make(...)` path middleware classes go through), so constructor dependencies resolve
+normally.
 
 ### Authorizing every action at once
 

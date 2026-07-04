@@ -54,6 +54,11 @@ _LAZY: dict[str, tuple[str, str]] = {
     "view": ("arvel.views", "view"),
     "cached": ("arvel.cache", "cached"),
     "abort": ("arvel.http", "abort"),
+    "response": ("arvel.http", "response"),
+    "redirect": ("arvel.http", "redirect"),
+    "url": ("arvel.routing", "url"),
+    "route": ("arvel.routing", "route"),
+    "to_route": ("arvel.routing", "to_route"),
     "Schema": ("arvel.validation", "Schema"),
     "validate": ("arvel.validation", "validate"),
     "FormRequest": ("arvel.validation", "FormRequest"),
@@ -124,10 +129,15 @@ __all__ = [
     "env",
     "now",
     "raw",
+    "redirect",
+    "response",
+    "route",
     "scope",
+    "to_route",
     "today",
     "trans",
     "trans_choice",
+    "url",
     "validate",
     "view",
 ]
@@ -155,6 +165,8 @@ if TYPE_CHECKING:  # give type-checkers + IDEs the real symbols for the lazy sur
     from arvel.database import Attribute, Model, raw, scope
     from arvel.dates import Date, now, today
     from arvel.http import abort
+    from arvel.http.redirect import redirect
+    from arvel.http.response import response
     from arvel.kernel import (
         Application,
         ApplicationBuilder,
@@ -171,6 +183,7 @@ if TYPE_CHECKING:  # give type-checkers + IDEs the real symbols for the lazy sur
     from arvel.notifications import Notifiable, Notification
     from arvel.pagination import LengthAwarePaginator, Paginator
     from arvel.queue import Job
+    from arvel.routing import route, to_route, url
     from arvel.support import Collection, Str
     from arvel.support.facades import (
         DB,

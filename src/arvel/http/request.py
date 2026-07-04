@@ -16,6 +16,16 @@ from arvel.support import current_user as current_user  # noqa: E402  (explicit 
 
 
 class Request:
+    #: web-group session state, attached by ``StartSession`` — absent until then (no default here;
+    #: ``getattr(request, "session", None)`` is still how everything off the web group checks for it).
+    session: dict[str, Any]
+    #: the live session id — set by ``StartSession``; rotated by ``regenerate_session``.
+    _session_id: str
+    #: old session ids to forget on request teardown (``arvel.http.session`` contract).
+    _session_drop: set[str]
+    #: whether ``StartSession.terminate`` should issue a ``Set-Cookie``.
+    _session_set_cookie: bool
+
     def __init__(self, litestar_request: Any) -> None:
         self._r = litestar_request
 
@@ -126,15 +136,21 @@ class Request:
     #: input fields never flashed back (Laravel ``dontFlash``) — keep secrets out of the session.
     _DONT_FLASH = ("password", "password_confirmation")
 
-    def _flash_old_input(self, data: Any) -> None:
-        """Flash the submitted input (minus passwords) so ``old()`` can repopulate the form after a
-        validation redirect-back. No-op off the web group (no ``session`` attribute) — see kernel S1."""
+    def _flash_old_input(self, data: Any, *, except_: tuple[str, ...] = ()) -> None:
+        """Flash the submitted input (minus passwords, plus any caller-given ``except_`` fields) so
+        ``old()`` can repopulate the form after a validation redirect-back or a
+        ``redirect().with_input(except_=...)``. No-op off the web group (no ``session`` attribute)
+        — see kernel S1."""
         session = getattr(self, "session", None)
-        if isinstance(session, dict) and isinstance(data, dict):
+        # `data` is a plain dict from `.json()`, but Litestar's `.form()` returns a `FormMultiDict`
+        # (Mapping-like, not a `dict` instance) — duck-type on `.items()` so a form submission
+        # flashes too, not just JSON.
+        if isinstance(session, dict) and hasattr(data, "items"):
             from arvel.http.flash import FlashBag
 
-            payload = cast("dict[str, Any]", data)
-            safe = {k: v for k, v in payload.items() if k not in self._DONT_FLASH}
+            payload = dict(cast("dict[str, Any]", data).items())
+            excluded = set(self._DONT_FLASH) | set(except_)
+            safe = {k: v for k, v in payload.items() if k not in excluded}
             FlashBag(cast("dict[str, Any]", session)).flash_input(safe)
 
     async def form(self) -> Any:

@@ -9,12 +9,34 @@ chain of responsibility. Grounded in knowledge/port/04-http-kernel-middleware.md
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol, cast
+
+import msgspec
 
 from arvel.kernel import Settings
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from arvel.http.rate_limiter import Limit
+    from arvel.http.request import Request
+
+
+def _empty_str_list() -> list[str]:
+    return []
+
+
+class MiddlewareProtocol(Protocol):
+    """Structural type for arvel's own middleware ``handle`` seam (the two-tier pipeline
+    ``HttpKernel._run_pipeline`` drives): ``request`` is the typed ``Request``, ``call_next``
+    forwards it to the next middleware/handler. Documents + type-checks arvel's built-ins below;
+    an **app's own** middleware classes stay duck-typed (``HttpKernel`` calls ``.handle(...)`` on
+    whatever it resolves, no isinstance check), so nothing outside this module need implement it
+    formally."""
+
+    async def handle(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Any]]
+    ) -> Any: ...
 
 
 class SessionSettings(Settings):
@@ -28,18 +50,24 @@ class SessionSettings(Settings):
     ``host_prefix`` is ``None`` by default so it derives from ``secure`` (the ``__Host-`` prefix
     requires a Secure cookie); set it explicitly in config to force on/off.
 
-    ``driver`` selects the server-side store: any value other than ``"redis"`` keeps the existing
-    in-process dict (``StartSession``'s own default — lost on restart, not shared across workers);
-    ``"redis"`` wires ``StartSession`` to the app's own bound ``"cache"`` service (``HttpKernel.
-    use_default_groups``), so sessions survive restarts and are shared across every worker/host —
-    the same Redis/Valkey the app already runs for caching, not a second connection.
+    ``driver`` selects the server-side store: ``"cookie"`` (default) is arvel's own in-process dict
+    (``StartSession``'s own default — lost on restart, not shared across workers); ``"redis"`` wires
+    ``StartSession`` to the app's own bound ``"cache"`` service (``HttpKernel.use_default_groups``),
+    so sessions survive restarts and are shared across every worker/host — the same Redis/Valkey
+    the app already runs for caching, not a second connection. A closed set (the only two drivers
+    ``StartSession`` actually branches on) — an unknown value fails config validation immediately
+    instead of silently falling back to in-process.
+
+    ``csrf_except`` — URI glob patterns (``request.is_()``-style, e.g. ``"webhooks/*"``) exempt from
+    ``ValidateCsrfToken`` (Laravel ``$except``), merged with any subclass-level override.
     """
 
     __config_key__ = "session"
-    driver: str = "cookie"  # anything but "redis" → in-process (kept for config back-compat)
+    driver: Literal["cookie", "redis"] = "cookie"
     lifetime: int = 120  # minutes (Laravel parity); x60 for cookie max-age / cache TTL
     secure: bool = True
     host_prefix: bool | None = None
+    csrf_except: list[str] = msgspec.field(default_factory=_empty_str_list)
 
 
 # Shared across the per-request middleware instances the kernel builds: name:client -> (count, window_start).
@@ -69,7 +97,7 @@ class Middleware:
     """Base middleware. Override ``handle`` to inspect/short-circuit/decorate, and (optionally)
     ``terminate`` to run *after* the response is built (session flush, logging, …)."""
 
-    async def handle(self, request: Any, call_next: Any) -> Any:
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         return await call_next(request)
 
     async def terminate(self, request: Any, response: Any) -> None:
@@ -150,7 +178,7 @@ class ThrottleRequests(Middleware):
         _THROTTLE_HITS[key] = (count, start)
         return count
 
-    async def handle(self, request: Any, call_next: Any) -> Any:
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         if self._limiter_name is not None:
             return await self._handle_named(request, call_next)
         key = f"{self.name}:{self._client(request)}"
@@ -292,7 +320,7 @@ class StartSession(Middleware):
         else:
             self._store.pop(sid, None)
 
-    async def handle(self, request: Any, call_next: Any) -> Any:
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         import secrets
 
         cookie_sid = self._cookie_sid(request)
@@ -302,16 +330,22 @@ class StartSession(Middleware):
         from arvel.http.flash import FlashBag
 
         FlashBag(session).age()  # expire last-request flashes/errors (one-request lifecycle)
-        request._session_id = sid  # the live id (regenerate_session may rotate it mid-request)
+        # the underscore-prefixed attrs below are a documented cross-module contract with
+        # arvel.http.session (regenerate_session/invalidate_session mutate the same names), not an
+        # encapsulation leak — pyright's privacy check doesn't know that, hence the ignores.
+        request._session_id = sid  # pyright: ignore[reportPrivateUsage]
         drop: set[str] = set()  # old ids to forget (regenerate/invalidate add to this same set)
-        request._session_drop = drop
-        request._session_set_cookie = cookie_sid is None  # issue a cookie when the client had none
+        request._session_drop = drop  # pyright: ignore[reportPrivateUsage]
+        request._session_set_cookie = cookie_sid is None  # pyright: ignore[reportPrivateUsage]
         try:
             return await call_next(request)
         finally:
             for old in drop:
                 await self._forget(old)
-            await self._save(request._session_id, request.session)
+            await self._save(
+                request._session_id,  # pyright: ignore[reportPrivateUsage]
+                request.session,
+            )
 
     async def terminate(self, request: Any, response: Any) -> None:
         if not getattr(request, "_session_set_cookie", False):
@@ -342,16 +376,29 @@ class ValidateCsrfToken(Middleware):
     so a decoupled SPA can read it and echo it back as ``X-XSRF-TOKEN`` — no server-rendered meta tag
     needed. That cookie is intentionally **not** ``HttpOnly`` (it's the double-submit token, not a
     secret — the session id cookie stays ``HttpOnly``); it inherits the session's Secure flag.
+
+    ``except_`` (Laravel ``$except``) exempts URI glob patterns from CSRF entirely — e.g. a webhook
+    endpoint a third party posts to with no session/token. Override the ``except_`` class attribute
+    in a subclass, and/or configure ``session.csrf_except`` (both apply — merged, not replaced).
+    Patterns are matched via ``request.is_()`` (``fnmatch`` against the path with no leading slash).
     """
 
     SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
     HEADER = "x-csrf-token"
     COOKIE = "XSRF-TOKEN"
+    #: URI glob patterns exempt from CSRF (Laravel ``$except``) — override in a subclass; merged
+    #: with ``config('session.csrf_except')`` at construction.
+    except_: ClassVar[list[str]] = []
 
     def __init__(self) -> None:
         settings = SessionSettings()  # share the session cookie's Secure flag + lifetime
         self._secure = settings.secure
         self._max_age = settings.lifetime * 60  # minutes -> seconds for max-age
+        self._except = [*self.except_, *settings.csrf_except]
+
+    def _is_excepted(self, request: Any) -> bool:
+        checker = getattr(request, "is_", None)
+        return callable(checker) and any(checker(pattern) for pattern in self._except)
 
     async def _submitted(self, request: Any) -> Any:
         header = request.header(self.HEADER) or request.header("x-xsrf-token")
@@ -375,13 +422,13 @@ class ValidateCsrfToken(Middleware):
             return None
         return cast("dict[str, Any]", session).get("_token")
 
-    async def handle(self, request: Any, call_next: Any) -> Any:
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         import secrets
 
         session = getattr(request, "session", None)
         if isinstance(session, dict):  # ensure a token exists so forms can render + submit it
             cast("dict[str, Any]", session).setdefault("_token", secrets.token_hex(32))
-        if request.method().upper() in self.SAFE_METHODS:
+        if request.method().upper() in self.SAFE_METHODS or self._is_excepted(request):
             return await call_next(request)
         expected = self._expected(request)
         submitted = await self._submitted(request)
@@ -422,7 +469,7 @@ class AuthenticateMiddleware(Middleware):
     """Resolve the request's user via the app's ``user_resolver`` binding and bind it to
     ``arvel.auth.current_user`` for the request's duration (cleared afterward)."""
 
-    async def handle(self, request: Any, call_next: Any) -> Any:
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         import inspect
 
         from arvel.kernel import app, has_application
@@ -446,7 +493,7 @@ class RequestContextMiddleware(Middleware):
     event emitted while handling the request then carries ``request_id`` automatically.
     """
 
-    async def handle(self, request: Any, call_next: Any) -> Any:
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         import uuid
 
         from arvel.kernel.logging import LogManager
@@ -464,7 +511,7 @@ class LocaleMiddleware(Middleware):
     """Set the request locale for the call's duration. Precedence: the authenticated user's
     preferred locale, then the ``Accept-Language`` header (doc 21)."""
 
-    async def handle(self, request: Any, call_next: Any) -> Any:
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         from arvel.localization import current_locale
 
         locale = self._from_user() or self._from_header(request)
@@ -514,7 +561,7 @@ class ValidatePostSize(Middleware):
             return int(app("config").get("app.max_request_size", self.DEFAULT_MAX))
         return self.DEFAULT_MAX
 
-    async def handle(self, request: Any, call_next: Any) -> Any:
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         length = request.header("content-length")
         if length is not None:
             try:
@@ -533,7 +580,7 @@ class ValidateHost(Middleware):
     (Laravel ``ValidateHost`` / Symfony trusted-hosts). When the list is unset/empty all hosts
     are allowed (Laravel's default), so this is a no-op until an app opts in."""
 
-    async def handle(self, request: Any, call_next: Any) -> Any:
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         from arvel.kernel import app, has_application
 
         allowed: Any = None
@@ -552,7 +599,7 @@ class ShareErrorsFromSession(Middleware):
     (Laravel ``old()``). Web group, runs after ``StartSession`` (which sets ``request.session`` and
     ages the flash). No-op when no session or view is bound, so non-view apps are unaffected."""
 
-    async def handle(self, request: Any, call_next: Any) -> Any:
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         from arvel.kernel import app, has_application
 
         session = getattr(request, "session", None)
@@ -573,7 +620,7 @@ class ValidateSignature(Middleware):
     ``Route.get("/unsubscribe/{id}", handler).middleware(ValidateSignature)``. A tampered or expired
     URL gets a 403 before the handler runs."""
 
-    async def handle(self, request: Any, call_next: Any) -> Any:
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         from arvel.kernel import app, has_application
 
         raw_url = getattr(getattr(request, "raw", None), "url", None)

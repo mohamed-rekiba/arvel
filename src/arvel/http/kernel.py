@@ -15,7 +15,7 @@ from __future__ import annotations
 import inspect
 import re
 import typing
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import msgspec
 
@@ -38,10 +38,15 @@ def _empty_str_dict() -> dict[str, Any]:
     return {}
 
 
+#: the 5 render plugins Litestar ships (``_render_plugin`` maps each to its ``OpenAPIRenderPlugin``).
+OpenApiUi = Literal["swagger", "redoc", "scalar", "rapidoc", "stoplight"]
+
+
 class OpenApiSettings(Settings, forbid_unknown_fields=True):
     """Typed view over the ``openapi`` config section (DR-0016) — the full OpenAPI document config:
     identity (title/version/description/summary/terms), the ``path`` the schema + UI are served at, the
-    ``ui`` renderer (swagger/redoc/scalar/rapidoc/stoplight), contact/license/servers/tags/external
+    ``ui`` renderer (swagger/redoc/scalar/rapidoc/stoplight — a closed set; an unknown name fails
+    config validation instead of silently falling back), contact/license/servers/tags/external
     docs, whether handler docstrings feed operation descriptions, and ``security`` schemes (e.g. a
     bearer/JWT scheme → the Swagger 'Authorize' button). Auto-loads + validates ``config('openapi')``;
     defaults when unset."""
@@ -53,7 +58,7 @@ class OpenApiSettings(Settings, forbid_unknown_fields=True):
     summary: str | None = None
     terms_of_service: str | None = None
     path: str = "/schema"
-    ui: str = "swagger"
+    ui: OpenApiUi = "swagger"
     contact: dict[str, Any] | None = None
     license: dict[str, Any] | None = None
     servers: list[dict[str, Any]] = msgspec.field(default_factory=_empty_dict_list)
@@ -661,10 +666,14 @@ class HttpKernel:
         route_middleware: Sequence[Any] | None,
     ) -> Any:
         async def destination(req: Any) -> Any:
+            target = handler
+            if isinstance(target, type):  # an invokable controller class — instantiate via the
+                # container (DI for its constructor), same as `_make` does for middleware.
+                target = self.app.make(target) if self.app is not None else target()
             if self.app is not None:
-                result = self.app.call(handler, request=req, **params)
+                result = self.app.call(target, request=req, **params)
             else:
-                result = handler(req, **params)
+                result = target(req, **params)
             if inspect.isawaitable(result):
                 result = await result
             return result
@@ -679,7 +688,7 @@ class HttpKernel:
             )
         ]
         result = await self._run_pipeline(instances, request, destination)
-        response = self._to_response(result, request)
+        response = await self._to_response(result, request)
         await self._terminate(instances, request, response)
         return response
 
@@ -761,17 +770,53 @@ class HttpKernel:
             return middleware_cls
         return self.app.make(middleware_cls) if self.app is not None else middleware_cls()
 
-    def _to_response(self, result: Any, request: Any | None = None) -> Any:
+    async def _to_response(self, result: Any, request: Any | None = None) -> Any:
         """Normalize any handler return into a Litestar ``Response`` (doc 04 §response
-        normalization), so middleware/terminate see a uniform response object."""
+        normalization + HTTP-PARITY §2), so middleware/terminate see a uniform response object.
+        The one conversion funnel for every value type a handler may return — extend here, don't
+        add a second path."""
         import litestar
 
         if isinstance(result, litestar.Response):
             return cast("Any", result)
         if isinstance(result, Response):
-            return litestar.Response(
-                result.content, status_code=result.status, headers=result.headers
+            return self._apply_cookies(
+                litestar.Response(
+                    result.content, status_code=result.status, headers=result.headers
+                ),
+                result,
             )
+        from arvel.http.redirect import Redirect
+
+        if isinstance(result, Redirect):
+            return await self._redirect_response(result, request)
+        from arvel.http.response import FileDownload, StreamValue
+
+        if isinstance(result, FileDownload):
+            import mimetypes
+
+            from litestar.response import File
+
+            # Litestar's `File`/`Stream` resolve content-type from the *route handler's* declared
+            # return annotation, not their own constructor arg — and every arvel adapter is typed
+            # `Any` (dynamic handler I/O), so that resolution always lands on the JSON default.
+            # Forcing it into `headers` sidesteps that resolution entirely.
+            guessed = mimetypes.guess_type(str(result.name or result.path))[0]
+            headers = {"content-type": guessed or "application/octet-stream", **result.headers}
+            return cast(
+                "Any",
+                File(
+                    path=result.path,
+                    filename=result.name,
+                    content_disposition_type="inline" if result.inline else "attachment",
+                    headers=headers,
+                ),
+            )
+        if isinstance(result, StreamValue):
+            from litestar.response import Stream
+
+            headers = {"content-type": result.media_type, **result.headers}
+            return cast("Any", Stream(result.content, headers=headers))
         from arvel.pagination import AbstractPaginator
 
         if isinstance(result, AbstractPaginator):
@@ -784,3 +829,62 @@ class HttpKernel:
             return cast("Any", litestar.Response(result.to_payload(request)))
         # no explicit status_code, so the route's method-aware default still applies (e.g. POST -> 201)
         return cast("Any", litestar.Response(result))
+
+    @staticmethod
+    def _apply_cookies(litestar_response: Any, response: Response) -> Any:
+        """Apply a ``Response``'s queued cookies/expirations to the built Litestar response. A
+        ``__Host-``-prefixed name gets ``path="/"``/no ``domain`` forced (the browser rule that
+        prefix requires — ``StartSession`` enforces the same thing for the session cookie); an
+        unset ``secure`` defers to ``SessionSettings().secure`` (the app's own cookie-security
+        default), not a hardcoded guess."""
+        if not response.cookies and not response.forgotten_cookies:
+            return litestar_response
+        from arvel.http.middleware import SessionSettings
+
+        default_secure = SessionSettings().secure
+        for cookie in response.cookies:
+            host_prefixed = cookie.name.startswith("__Host-")
+            litestar_response.set_cookie(
+                cookie.name,
+                cookie.value,
+                max_age=cookie.max_age,
+                path="/" if host_prefixed else cookie.path,
+                domain=None if host_prefixed else cookie.domain,
+                secure=default_secure if cookie.secure is None else cookie.secure,
+                httponly=cookie.http_only,
+                samesite=cookie.same_site,
+            )
+        for name in response.forgotten_cookies:
+            litestar_response.delete_cookie(name)
+        return litestar_response
+
+    @staticmethod
+    async def _redirect_response(value: Any, request: Any) -> Any:
+        """Convert a ``Redirect`` into a 302 (or its own ``status``), writing its flash/old-input/
+        errors through the same session machinery ``ShareErrorsFromSession``/``render_exception``'s
+        redirect-back path use — ``FlashBag`` and ``Request._flash_old_input`` — not a second
+        implementation."""
+        import litestar
+
+        session = getattr(request, "session", None)
+        if isinstance(session, dict):
+            from arvel.http.flash import FlashBag
+
+            bag = FlashBag(cast("dict[str, Any]", session))
+            for key, flashed in value.flash_data.items():
+                bag.flash(key, flashed)
+            if value.errors is not None:
+                bag.flash_errors(value.errors)
+            if value.wants_input:
+                content_type = request.header("content-type") or ""
+                try:
+                    data = (
+                        await request.form()
+                        if ("form" in content_type or "urlencoded" in content_type)
+                        else await request.json()
+                    )
+                except Exception:  # unparseable/absent body → nothing to flash, not a 500
+                    data = {}
+                request._flash_old_input(data, except_=value.input_except)
+        headers = {"Location": value.location or "/", **value.headers}
+        return litestar.Response(None, status_code=value.status, headers=headers)

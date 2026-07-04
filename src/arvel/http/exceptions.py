@@ -111,11 +111,11 @@ def render_exception(request: Any, exc: Any, *, debug: bool = False) -> Any:
 
         FlashBag(cast("dict[str, Any]", session)).flash_errors(errors)
     referer = headers.get("referer") or headers.get("referrer") or "/"
-    location = _same_origin_or_root(str(referer), str(headers.get("host") or ""))
+    location = same_origin_or_root(str(referer), str(headers.get("host") or ""))
     return litestar.Response(None, status_code=302, headers={"Location": location})
 
 
-def _same_origin_or_root(target: str, host: str) -> str:
+def same_origin_or_root(target: str, host: str) -> str:
     """Return ``target`` only if it's safe to redirect to — a same-origin/relative URL — else ``/``.
 
     Prevents an open redirect: an attacker-controlled ``Referer`` (now reachable on every auth

@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import contextlib
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Sequence
     from pathlib import Path
 
     from arvel.http.kernel import HttpKernel
+    from arvel.http.redirect import Redirect
 
 
 _RESOURCE_ACTIONS: list[tuple[str, list[str], str]] = [
@@ -44,12 +45,35 @@ _ACTION_ABILITIES: dict[str, tuple[str, bool]] = {
 }
 
 
+@dataclass
+class ControllerMiddleware:
+    """One entry of ``Controller.middleware()`` (Laravel ``HasMiddleware``): ``middleware`` is
+    anything a route accepts (an alias string, a ``throttle:name`` string, or a middleware
+    class/instance); ``only``/``except_`` narrow it to specific resource actions."""
+
+    middleware: Any
+    only: tuple[str, ...] = ()
+    except_: tuple[str, ...] = ()
+
+    def applies_to(self, action: str) -> bool:
+        if self.only and action not in self.only:
+            return False
+        return action not in self.except_
+
+
 class Controller:
     """Base controller. Subclass with async action methods — ``index``/``show``/
     ``store``/``update``/``destroy`` (+ ``create``/``edit`` for web resources) — and
     register them in one call via ``Router.resource(name, Controller)``."""
 
     __resource_policy__: ClassVar[type | None] = None
+
+    @classmethod
+    def middleware(cls) -> list[ControllerMiddleware]:
+        """Controller-level middleware (Laravel ``HasMiddleware``): override to return
+        ``ControllerMiddleware(name, only=(...), except_=(...))`` entries — honored by
+        ``Router.resource``/``api_resource``, applied per bound action."""
+        return []
 
     @classmethod
     def authorize_resource(cls, model: type) -> None:
@@ -183,6 +207,9 @@ class Router:
         from arvel.support import Str
 
         instance = controller() if isinstance(controller, type) else controller
+        controller_middleware = (
+            list(instance.middleware()) if hasattr(instance, "middleware") else []
+        )
         param = Str.snake(Str.singular(name.strip("/").split("/")[-1]))
         base = "/" + name.strip("/")
         excluded = {"create", "edit"} if api else set[str]()
@@ -200,7 +227,10 @@ class Router:
             if policy is not None and action in _ACTION_ABILITIES:
                 handler = _guard_action(handler, action, policy, param)
             path = base + suffix.replace("{id}", "{" + param + "}")
-            self.add(methods, path, handler, name=f"{name}.{action}")
+            route = self.add(methods, path, handler, name=f"{name}.{action}")
+            for entry in controller_middleware:
+                if entry.applies_to(action):
+                    route.middleware(entry.middleware)
         return self
 
     def api_resource(
@@ -499,4 +529,111 @@ class Router:
         kernel.bindings.update(self._bindings)
 
 
-__all__ = ["Controller", "RouteDefinition", "Router"]
+def _absolute(path: str) -> str:
+    """Join ``path`` onto ``config('app.url')`` (Laravel ``url()``/``asset()``'s own join rule;
+    duplicated in miniature from ``arvel.views``'s template ``url()`` global rather than importing
+    it — pulling view-templating into the routing/URL-generation layer for four lines would be a
+    backwards dependency even though the DAG technically allows it)."""
+    from arvel.kernel import app, has_application
+
+    base = ""
+    if has_application() and app().bound("config"):
+        base = str(app("config").get("app.url", "") or "")
+    base = base.rstrip("/")
+    suffix = ("/" + path.lstrip("/")) if path else ""
+    return (base + suffix) if base else (suffix or "/")
+
+
+class _UrlGenerator:
+    """The ``url()`` global (Laravel ``URL::current/full/previous`` + the ``url()`` helper):
+    ``url("/x")`` returns an absolute URL string; ``url()`` (no path) returns this generator so
+    ``.current()``/``.full()``/``.previous()``/``.query()`` can chain off it — reads the active
+    request via the same ``current_request`` contextvar the kernel already binds per-request."""
+
+    def __call__(self, path: str | None = None) -> str | _UrlGenerator:
+        return self if path is None else _absolute(path)
+
+    def current(self) -> str:
+        """The current request's absolute path (no query string). Raises ``RuntimeError`` outside
+        an active request — there is no "current" URL to report."""
+        return _absolute(self._request().path())
+
+    def full(self) -> str:
+        """The current request's absolute URL, query string included."""
+        request = self._request()
+        query = str(getattr(request.raw.url, "query", "") or "")
+        return _absolute(request.path() + (f"?{query}" if query else ""))
+
+    def previous(self, fallback: str = "/") -> str:
+        """The ``Referer`` of the current request, or ``fallback`` when there's no active request
+        or no Referer header (never raises — Laravel ``URL::previous`` always degrades)."""
+        from arvel.http.request import current_request
+
+        request = current_request.get(None)
+        if request is None:
+            return _absolute(fallback)
+        referer = request.header("referer") or request.header("referrer")
+        return referer or _absolute(fallback)
+
+    def query(self, path: str, params: dict[str, Any]) -> str:
+        """``path`` with ``params`` appended as a URL-encoded query string."""
+        from urllib.parse import urlencode
+
+        qs = urlencode(params)
+        return _absolute(f"{path}?{qs}" if qs else path)
+
+    @staticmethod
+    def _request() -> Any:
+        from arvel.http.request import current_request
+
+        request = current_request.get(None)
+        if request is None:
+            raise RuntimeError(
+                "url().current()/.full() need an active request — called outside one."
+            )
+        return request
+
+
+#: ``url("/x")`` → absolute string; ``url()`` → this generator, for ``.current()``/``.full()``/
+#: ``.previous()``/``.query()``.
+url = _UrlGenerator()
+
+
+def route(name: str, *, absolute: bool = True, **params: Any) -> str:
+    """The URL for a named route (Laravel ``route()``) — absolute by default; pass
+    ``absolute=False`` for the bare path (what ``Router.url`` itself returns)."""
+    from arvel.kernel import app
+
+    path: str = app("router").url(name, **params)
+    return _absolute(path) if absolute else path
+
+
+def to_route(name: str, **params: Any) -> Redirect:
+    """``redirect().route(name, **params)`` sugar (Laravel ``to_route()``)."""
+    from arvel.http.redirect import redirect
+
+    return redirect().route(name, **params)
+
+
+def temporary_signed_route(name: str, expires_in: int, **params: Any) -> str:
+    """A signed URL that expires ``expires_in`` seconds from now (Laravel
+    ``URL::temporarySignedRoute``) — sugar over ``Router.signed_url(expires=...)``."""
+    import time
+
+    from arvel.kernel import app
+
+    return cast(
+        "str", app("router").signed_url(name, expires=int(time.time()) + expires_in, **params)
+    )
+
+
+__all__ = [
+    "Controller",
+    "ControllerMiddleware",
+    "RouteDefinition",
+    "Router",
+    "route",
+    "temporary_signed_route",
+    "to_route",
+    "url",
+]

@@ -238,13 +238,13 @@ def test_kernel_resets_current_user_per_request() -> None:
 
 
 def test_same_origin_redirect_guard() -> None:
-    """render_exception's redirect-back must not become an open redirect."""
-    from arvel.http.exceptions import _same_origin_or_root
+    """render_exception's redirect-back (and Redirect.back()) must not become an open redirect."""
+    from arvel.http.exceptions import same_origin_or_root
 
-    assert _same_origin_or_root("/dashboard", "app.test") == "/dashboard"  # relative
+    assert same_origin_or_root("/dashboard", "app.test") == "/dashboard"  # relative
     assert (
-        _same_origin_or_root("https://app.test/x", "app.test") == "https://app.test/x"
+        same_origin_or_root("https://app.test/x", "app.test") == "https://app.test/x"
     )  # same host
-    assert _same_origin_or_root("https://evil.test/x", "app.test") == "/"  # cross-origin
-    assert _same_origin_or_root("//evil.test/x", "app.test") == "/"  # protocol-relative
-    assert _same_origin_or_root("", "app.test") == "/"
+    assert same_origin_or_root("https://evil.test/x", "app.test") == "/"  # cross-origin
+    assert same_origin_or_root("//evil.test/x", "app.test") == "/"  # protocol-relative
+    assert same_origin_or_root("", "app.test") == "/"
