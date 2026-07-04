@@ -248,3 +248,22 @@ def test_artisan_call_unknown_command_raises(app: Application) -> None:
 
     with pytest.raises(ValueError, match="is not defined"):
         Artisan.call("totally-unknown-command")
+
+
+async def test_artisan_call_works_from_inside_a_running_event_loop(app: Application) -> None:
+    # the production path: Artisan.call from a request/scheduled task (async) — the sync-body tests
+    # masked that the app-command path did asyncio.run() and crashed inside a running loop.
+    from arvel import Console
+    from arvel.console.kernel import Artisan
+
+    ran: list[str] = []
+
+    async def greet(name: str) -> None:
+        ran.append(name)
+
+    Console.command("greet2 {name}", greet)
+    exit_code = Artisan.call(
+        "greet2", {"name": "Grace"}
+    )  # called from an async test = running loop
+    assert exit_code == 0
+    assert ran == ["Grace"]

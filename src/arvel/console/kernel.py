@@ -44,6 +44,24 @@ def load_project_app() -> Any | None:
     return factory() if callable(factory) else None
 
 
+def _run_to_completion(coro: Any) -> None:
+    """Drive ``coro`` to completion whether or not a loop is already running. ``Artisan.call`` is a
+    sync API documented as callable from a request/scheduled task (i.e. from inside a running loop),
+    where ``asyncio.run`` raises; there we run it on a fresh loop in a worker thread (a fresh loop
+    gets its own per-loop DB connections via the resolver, so there's no cross-loop affinity bug)."""
+    import asyncio
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(coro)  # no loop here — the normal CLI/sync path
+        return
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        pool.submit(asyncio.run, coro).result()
+
+
 def run_app_command(handler: CommandHandler) -> None:
     """Run an app-dependent console command inside the project app.
 
@@ -62,7 +80,7 @@ def run_app_command(handler: CommandHandler) -> None:
     from arvel.kernel import has_application
 
     if has_application():  # tests / embedding own the app's lifecycle — just run the command
-        asyncio.run(handler(active_app()))
+        _run_to_completion(handler(active_app()))
         return
     project = load_project_app()
     if project is None:

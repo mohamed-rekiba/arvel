@@ -13,6 +13,7 @@ multi-process / multi-instance maintenance).
 
 from __future__ import annotations
 
+import hmac
 from typing import Any, cast
 
 #: Cache key holding the maintenance payload (absent ⇒ the app is up).
@@ -125,9 +126,13 @@ class PreventRequestsDuringMaintenance:
         if secret:
             query_secret = _duck_call(request, "query", "secret")
             cookie_secret = _duck_call(request, "cookie", SECRET_COOKIE)
-            if query_secret == secret or cookie_secret == secret:
+            # constant-time compare — the bypass secret is a credential; a plain == leaks it
+            # byte-by-byte through response timing.
+            query_ok = hmac.compare_digest(str(query_secret or ""), str(secret))
+            cookie_ok = hmac.compare_digest(str(cookie_secret or ""), str(secret))
+            if query_ok or cookie_ok:
                 response = await call_next(request)
-                if query_secret == secret and hasattr(response, "with_cookie"):
+                if query_ok and hasattr(response, "with_cookie"):
                     response.with_cookie(SECRET_COOKIE, secret, minutes=60 * 24)
                 return response
 
