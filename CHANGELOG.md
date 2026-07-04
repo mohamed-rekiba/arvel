@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.51.0](https://github.com/mohamed-rekiba/arvel/compare/v0.50.0...v0.51.0) (2026-07-04)
+
+
+### Features
+
+* **http:** Redis-backed session store via session.driver config ([0fef79e](https://github.com/mohamed-rekiba/arvel/commit/0fef79e0a3ae3598df9e427c80f5d3a80e3d4892))
+* **kernel:** with_public_dir/with_lang_dir app-bootstrap overrides ([95d0c82](https://github.com/mohamed-rekiba/arvel/commit/95d0c82a4e8a8b89a5c1d82b9e6f16df6a6b8933))
+* **routing:** Router.public() — Laravel-parity public/ web root + SPA fallback ([70a9629](https://github.com/mohamed-rekiba/arvel/commit/70a96295ce64f6980664e128ba688afbf2290360))
+
+
+### Bug Fixes
+
+* **security:** allowlist gitleaks false positives from the scheduled full-history scan ([23f04ed](https://github.com/mohamed-rekiba/arvel/commit/23f04ed107253e766505e0ef2cb7ad980809b46f))
+
 ## [0.50.0](https://github.com/mohamed-rekiba/arvel/compare/v0.49.0...v0.50.0) (2026-07-03)
 
 
