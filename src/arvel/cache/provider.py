@@ -1,8 +1,8 @@
-"""CacheServiceProvider — binds the Cache manager (auto-discovered)."""
+"""CacheServiceProvider — binds the Cache manager + the Redis facade manager (auto-discovered)."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from arvel.cache import CacheManager
 from arvel.kernel.service_provider import ServiceProvider
@@ -18,5 +18,19 @@ class CacheServiceProvider(ServiceProvider):
 
         self.app.singleton("cache", make_cache)
 
+        def make_redis(app: Container) -> Any:
+            from arvel.cache.redis import RedisManager
+
+            return RedisManager(app)
+
+        self.app.singleton("redis", make_redis)
+
     def boot(self) -> None:
-        """No-op."""
+        # Graceful shutdown: close pooled redis connections when the app terminates.
+        app = self.app
+
+        async def close_redis() -> None:
+            if app.bound("redis"):
+                await app.make("redis").close_all()
+
+        app.terminating(close_redis)

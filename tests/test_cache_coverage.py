@@ -17,7 +17,7 @@ async def test_remember_and_lock() -> None:
     assert await cache.remember("k", 60, compute) == 7  # cached → compute once
     assert calls["n"] == 1
     assert await cache.remember_forever("kf", lambda: 9) == 9
-    async with cache.lock("L", ttl=5):
+    async with cache.lock("L", seconds=5):
         pass  # atomic lock context manager
 
 

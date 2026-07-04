@@ -126,6 +126,15 @@ class Cache(Facade):
         return "cache"
 
 
+class Redis(Facade):
+    """Direct Redis access (Laravel ``Redis::command``/pipeline/pub-sub) — distinct from
+    ``Cache``, which goes through the cashews cache abstraction."""
+
+    @classmethod
+    def accessor(cls) -> str:
+        return "redis"
+
+
 class Storage(Facade):
     @classmethod
     def accessor(cls) -> str:
@@ -201,6 +210,7 @@ __all__ = [
     "Log",
     "Mail",
     "Queue",
+    "Redis",
     "Route",
     "Storage",
     "Validator",
