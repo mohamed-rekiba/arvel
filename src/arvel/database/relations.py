@@ -543,7 +543,7 @@ class RecursiveRelation:
     async def get(self) -> Any:
         resolver = self.related._resolve()
         rows = [dict(r) for r in await resolver.fetch_all(self._statement())]
-        models = [self.related._hydrate(r) for r in rows]
+        models = [await self.related._hydrate_and_fire(r) for r in rows]
         return self._nest(models) if self._as_tree else models
 
     async def eager_load(self, parents: list[Any], name: str, constrain: Any = None) -> None:
@@ -568,7 +568,7 @@ class RecursiveRelation:
         grouped: dict[Any, list[Any]] = {}
         for row in rows:
             root = row.pop("__root")  # discriminator, not a model column
-            grouped.setdefault(root, []).append(self.related._hydrate(row))
+            grouped.setdefault(root, []).append(await self.related._hydrate_and_fire(row))
         for parent in parents:
             parent._relations[name] = grouped.get(parent._attributes.get(lk), [])
 

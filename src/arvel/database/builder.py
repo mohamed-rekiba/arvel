@@ -19,6 +19,16 @@ if TYPE_CHECKING:
     from arvel.database.connections import ConnectionResolver, WriteResult
     from arvel.pagination import LengthAwarePaginator, Paginator
 
+
+async def _maybe_await(value: Any) -> Any:
+    """Await ``value`` if it's awaitable, else pass it through — ``hydrate`` accepts either a
+    sync callable (``Model._hydrate``, a stable direct-call surface) or an async one
+    (``Model._hydrate_and_fire``, used by the model's own query path to fire ``retrieved``)."""
+    import inspect
+
+    return await value if inspect.isawaitable(value) else value
+
+
 _COMPARISONS = {
     "=": "__eq__",
     "==": "__eq__",
@@ -598,7 +608,7 @@ class Builder:
         records = [dict(row) for row in rows]
         if self._hydrate is None:
             return records
-        models = [self._hydrate(r) for r in records]
+        models = [await _maybe_await(self._hydrate(r)) for r in records]
         for spec in self._eager:
             await self._eager_load_path(models, spec.split("."), self._eager_constraints.get(spec))
         return models
@@ -626,7 +636,7 @@ class Builder:
         """Stream results one model at a time (low memory; server-side cursor)."""
         rows: Any = self._require_resolver().stream(self.to_select())
         async for row in rows:
-            yield self._hydrate(row) if self._hydrate is not None else row
+            yield (await _maybe_await(self._hydrate(row))) if self._hydrate is not None else row
 
     async def lazy(self) -> AsyncIterator[Any]:
         """Lazily stream results (alias of ``cursor`` — yields models one by one)."""
@@ -663,7 +673,7 @@ class Builder:
         record = dict(row)
         if self._hydrate is None:
             return record
-        model = self._hydrate(record)
+        model = await _maybe_await(self._hydrate(record))
         # Laravel parity: ``with('rel')->first()`` eager-loads the relation, just like ``get()``.
         for spec in self._eager:
             await self._eager_load_path([model], spec.split("."), self._eager_constraints.get(spec))

@@ -30,6 +30,7 @@ nav = [
       { "Relationships" = "database/relationships.md" },
       { "Migrations & Schema" = "database/migrations.md" },
       { "Casts & Serialization" = "database/casts.md" },
+      { "API Resources" = "database/resources.md" },
       { "Factories" = "database/factories.md" },
       { "Transactions & Streaming" = "database/transactions.md" },
       { "CTEs & Recursive Queries" = "database/ctes.md" },

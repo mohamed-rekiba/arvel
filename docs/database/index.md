@@ -56,12 +56,53 @@ extra fields is safe. `MassAssignmentException` is a programmer error (a missing
 user input — it is not a `ValidationException` and renders as a 500, not a 422.
 
 
+## Model events (the full lifecycle)
+
+Every write/read path fires a lifecycle event, resolved through the container's `EventDispatcher`
+(no-op if nothing is bound — a model works standalone in tests without an app):
+
+```
+retrieved
+creating -> created         (insert)
+updating -> updated         (an existing, dirty save)
+saving -> saved             (wraps either of the above; saved always fires)
+deleting -> deleted, trashed        (a SoftDeletes model's delete())
+deleting -> force_deleting -> force_deleted, deleted   (force_delete(), or delete() on a
+                                                         non-SoftDeletes model)
+restoring -> restored
+replicating
+```
+
+`creating`/`updating`/`saving`/`deleting`/`restoring` are **cancelable**: an observer returning
+`False` aborts the operation and the calling method (`save`/`delete`/`restore`) returns `False` —
+the row is left exactly as it was on disk. `created`/`updated` only fire when there was actually a
+row to write (an insert, or an update on a genuinely dirty model); `saved` always fires, matching
+Laravel (and this cast's prior, narrower behavior) even on a clean no-op `save()`.
+
+```python
+class PostObserver:
+    async def creating(self, post):   # return False to cancel the create
+        post.slug = slugify(post.title)
+    async def deleting(self, post):   # return False to cancel the delete
+        return post.is_protected is False
+
+Post.observe(PostObserver())
+```
+
+Only the hooks an observer defines are wired — see [Events](../events.md#model-observers) for the
+registration mechanics (`Model.observe`, the halting/cancel semantics shared with `Event::until`).
+
+!!! note "`replicate()` stays synchronous"
+    `post.replicate()` keeps its plain, non-`async` signature (Laravel parity) — the `replicating`
+    event it fires is dispatched best-effort on the running loop rather than awaited inline.
+
 ## In this section
 
 - **[Queries](queries.md)** — reading, writing, and reusable scopes.
 - **[Relationships](relationships.md)** — has-many / belongs-to / many-to-many, eager loading, aggregates.
 - **[Migrations & Schema](migrations.md)** — the schema builder, column types, soft deletes, ids, pruning.
 - **[Casts & Serialization](casts.md)** — attribute casts, change tracking, `to_dict`/`to_json`.
+- **[API Resources](resources.md)** — shape a model (or a page of them) into JSON with `JsonResource`.
 - **[Factories](factories.md)** — generate model instances for tests and seeders.
 - **[Transactions & Streaming](transactions.md)** — atomic units of work, locks, raw SQL, large-result iteration.
 - **[CTEs & Recursive Queries](ctes.md)** — `WITH` / `WITH RECURSIVE` and referential (self-referencing) trees.

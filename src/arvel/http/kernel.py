@@ -655,7 +655,7 @@ class HttpKernel:
             )
         ]
         result = await self._run_pipeline(instances, request, destination)
-        response = self._to_response(result)
+        response = self._to_response(result, request)
         await self._terminate(instances, request, response)
         return response
 
@@ -737,7 +737,7 @@ class HttpKernel:
             return middleware_cls
         return self.app.make(middleware_cls) if self.app is not None else middleware_cls()
 
-    def _to_response(self, result: Any) -> Any:
+    def _to_response(self, result: Any, request: Any | None = None) -> Any:
         """Normalize any handler return into a Litestar ``Response`` (doc 04 §response
         normalization), so middleware/terminate see a uniform response object."""
         import litestar
@@ -752,5 +752,11 @@ class HttpKernel:
 
         if isinstance(result, AbstractPaginator):
             return cast("Any", litestar.Response(result.to_dict()))
+        # a route handler returning a JsonResource/ResourceCollection (DB-MODEL §4) "just works" —
+        # database sits below http in the layered DAG, so this downward import is legal.
+        from arvel.database.resources import JsonResource, ResourceCollection
+
+        if isinstance(result, (JsonResource, ResourceCollection)):
+            return cast("Any", litestar.Response(result.to_payload(request)))
         # no explicit status_code, so the route's method-aware default still applies (e.g. POST -> 201)
         return cast("Any", litestar.Response(result))

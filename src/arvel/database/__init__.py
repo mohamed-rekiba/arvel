@@ -25,6 +25,7 @@ from arvel.database.model import (
     SoftDeletes,
     scope,
 )
+from arvel.database.resources import JsonResource, ResourceCollection
 from arvel.database.schema import Blueprint
 from arvel.database.seeder import Seeder
 
@@ -45,6 +46,7 @@ __all__ = [
     "FactoryBatch",
     "HasUlids",
     "HasUuids",
+    "JsonResource",
     "MassAssignmentException",
     "Migration",
     "Migrator",
@@ -52,6 +54,7 @@ __all__ = [
     "Prunable",
     "QueryExecuted",
     "ReadOnlyModelError",
+    "ResourceCollection",
     "Schema",
     "Seeder",
     "SoftDeletes",

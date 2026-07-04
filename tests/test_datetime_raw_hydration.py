@@ -7,7 +7,7 @@ import datetime as _datetime
 
 import pytest
 
-from arvel.database.model import _from_db_datetime
+from arvel.database.model_casts import _from_db_datetime
 from arvel.dates import Date
 
 

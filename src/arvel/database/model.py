@@ -2,19 +2,24 @@
 
 The model *is* its DAO (``await User.where(active=True).get()``, ``await user.save()``).
 The metaclass builds a Core ``Table`` cheaply at class-creation (no DB connection or
-reflection at import). Model lifecycle events are dispatched through the
-``EventDispatcher`` **contract resolved from the container** — this module never
-imports ``arvel.events`` (G1 boundary). Grounded in knowledge/port/07.
+reflection at import). ``Model`` is a thin composition of focused mixins — persistence/CRUD
++ attribute access stay here; events (``model_events.HasEvents``), casts
+(``model_casts.HasCasts``), relations (``model_relations.HasRelationships``), and serialization
+(``model_serialization.SerializesModels``) each live in their own module. Model lifecycle events
+are dispatched through the ``EventDispatcher`` **contract resolved from the container** — this
+module never imports ``arvel.events`` (G1 boundary). Grounded in knowledge/port/07.
 """
 # Active-Record attribute access is dynamic by nature; mypy-strict still checks it.
 
 from __future__ import annotations
 
-import enum
-import json
 from typing import TYPE_CHECKING, Any, ClassVar, Self, cast
 
 from arvel.database.builder import Builder
+from arvel.database.model_casts import HasCasts, now_utc, uses_text_column
+from arvel.database.model_events import HasEvents
+from arvel.database.model_relations import HasRelationships
+from arvel.database.model_serialization import SerializesModels
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -93,17 +98,6 @@ class MassAssignmentException(Exception):
         )
 
 
-def _json_default(value: Any) -> Any:
-    """JSON fallback for ``to_json`` — Date/Decimal/Enum and anything with isoformat."""
-    if isinstance(value, enum.Enum):
-        return value.value
-    if hasattr(value, "to_iso"):  # arvel Date
-        return value.to_iso()
-    if hasattr(value, "isoformat"):
-        return value.isoformat()
-    return str(value)
-
-
 class SoftDeletes:
     """Marker mixin: ``class Post(Model, SoftDeletes)`` adds a ``deleted_at`` column,
     makes ``delete()`` soft, and hides trashed rows from default queries (doc 07)."""
@@ -141,52 +135,6 @@ class Prunable:
     ``prune()`` removes (e.g. expired tokens). Pair with a scheduled command (doc 12)."""
 
 
-def _to_db_datetime(value: Any) -> Any:
-    """Normalize a Date / stdlib datetime / ISO string to a **UTC-aware** stdlib ``datetime`` for
-    storage. UTC is the on-disk timezone so the round-trip is instant-faithful on every dialect:
-    Postgres ``timestamptz`` keeps the instant regardless, and SQLite (which drops the offset and
-    reads back a naive value) then stores a UTC wall-clock that :func:`_from_db_datetime` reads as
-    UTC — so a value stored in a non-UTC zone is not silently shifted on SQLite."""
-    from arvel.dates import Date
-
-    if isinstance(value, str):
-        date = Date.parse(value)
-    elif isinstance(value, Date):
-        date = value
-    else:
-        date = Date.from_py(value)  # stdlib datetime (naive ⇒ app tz, aware ⇒ instant)
-    return date.raw.to_tz("UTC").to_stdlib()
-
-
-def _from_db_datetime(value: Any) -> Any:
-    """Interpret a value read back from a DateTime column. A **naive** datetime means SQLite (which
-    dropped the offset) — it was stored as a UTC wall-clock (see :func:`_to_db_datetime`), so attach
-    UTC. The Builder's RAW read path (``select_raw``) skips result processors entirely, so on
-    SQLite the very same column arrives as its stored **string** (``'2026-07-02 21:41:10.506842'``)
-    — parse it (stdlib ``fromisoformat`` accepts the space separator) and apply the same naive-
-    means-UTC rule. Anything unparseable passes through for :meth:`Date.from_py` to reject."""
-    import datetime as _datetime
-
-    if isinstance(value, str):
-        try:
-            value = _datetime.datetime.fromisoformat(value)
-        except ValueError:
-            return value
-    if isinstance(value, _datetime.datetime) and value.tzinfo is None:
-        from zoneinfo import ZoneInfo
-
-        return value.replace(tzinfo=ZoneInfo("UTC"))
-    return value
-
-
-def _now() -> Any:
-    """The current instant as a UTC-aware stdlib ``datetime`` — bound into real ``DateTime``
-    timestamp/soft-delete columns (the DB driver needs a datetime, not an ISO string)."""
-    from arvel.dates import Date
-
-    return _to_db_datetime(Date.now())
-
-
 def _build_table(cls: type[Any]) -> Any:
     import sqlalchemy as sa
 
@@ -209,9 +157,9 @@ def _build_table(cls: type[Any]) -> Any:
         # type and the cast never disagree on Postgres
         if cast == "datetime" and not isinstance(field_type, sa.types.TypeEngine):
             col_type: Any = sa.DateTime(timezone=True)
-        elif cast == "json":
-            # plain TEXT, not sa.JSON: the cast already owns (de)serialization, and a native JSON
-            # column's asymmetric read/write processors would double-encode the value on every write
+        elif uses_text_column(cast):
+            # plain TEXT, not a native JSON/DECIMAL column: the cast already owns (de)serialization,
+            # and a native column's asymmetric read/write processors would double-encode on every write
             col_type = sa.Text()
         else:
             col_type = _sa_type(sa, field_type)
@@ -263,7 +211,7 @@ class ModelMeta(type):
         return getattr(cls.query(), item)
 
 
-class Model(metaclass=ModelMeta):
+class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=ModelMeta):
     __table_name__: ClassVar[str | None] = None
     __view__: ClassVar[str | None] = None  # set → read-only model over a DB view (D5)
     __primary_key__: ClassVar[str] = "id"
@@ -315,7 +263,7 @@ class Model(metaclass=ModelMeta):
 
     @classmethod
     def _base_query(cls, *, skip_scopes: tuple[str, ...] = ()) -> Builder:
-        builder = Builder(cls.__table__, cls._resolve(), hydrate=cls._hydrate, model=cls)
+        builder = Builder(cls.__table__, cls._resolve(), hydrate=cls._hydrate_and_fire, model=cls)
         if cls._uses_soft_deletes():  # default scope: exclude trashed rows
             builder = builder.where_null("deleted_at")
         for name, scope in cls._global_scopes().items():
@@ -352,36 +300,6 @@ class Model(metaclass=ModelMeta):
     @classmethod
     def order_by(cls, column: str, direction: str = "asc") -> Builder:
         return cls.query().order_by(column, direction)
-
-    def recursive(
-        self,
-        related: Any,
-        foreign_key: str,
-        *,
-        local_key: str | None = None,
-        direction: str = "down",
-        depth_key: str = "depth",
-    ) -> Any:
-        """A self-referential **recursive relation** over an adjacency-list tree. Define it like
-        any relation::
-
-            def descendants(self): return self.recursive(Category, "parent_id")
-            def ancestors(self):   return self.recursive(Category, "parent_id", direction="up")
-
-        ``.get()`` returns a flat list of models, each carrying a ``depth`` (1 = direct
-        child/parent); ``.tree().get()`` returns a nested structure. ``direction="down"`` walks
-        children, ``"up"`` walks parents. (For low-level custom recursion use
-        ``Builder.recursive_cte`` / ``from_cte``.)"""
-        from arvel.database.relations import RecursiveRelation
-
-        return RecursiveRelation(
-            self,
-            related,
-            foreign_key,
-            local_key=local_key or self.__primary_key__,
-            direction=direction,
-            depth_key=depth_key,
-        )
 
     @classmethod
     def _uses_unique_ids(cls) -> bool:
@@ -424,12 +342,12 @@ class Model(metaclass=ModelMeta):
     @classmethod
     def with_trashed(cls) -> Builder:
         """Query including soft-deleted rows (no default scope)."""
-        return Builder(cls.__table__, cls._resolve(), hydrate=cls._hydrate)
+        return Builder(cls.__table__, cls._resolve(), hydrate=cls._hydrate_and_fire)
 
     @classmethod
     def only_trashed(cls) -> Builder:
         """Query only the soft-deleted rows."""
-        return Builder(cls.__table__, cls._resolve(), hydrate=cls._hydrate).where_not_null(
+        return Builder(cls.__table__, cls._resolve(), hydrate=cls._hydrate_and_fire).where_not_null(
             "deleted_at"
         )
 
@@ -514,6 +432,15 @@ class Model(metaclass=ModelMeta):
         object.__setattr__(instance, "_exists", True)
         return instance
 
+    @classmethod
+    async def _hydrate_and_fire(cls, row: dict[str, Any]) -> Self:
+        """``_hydrate`` + the ``retrieved`` event — the path every DB read goes through
+        (``Builder.get``/``first``/``cursor``, relation eager-loading). ``_hydrate`` itself stays
+        synchronous (a stable, direct-call surface — e.g. hydrating a legacy row in a test)."""
+        instance = cls._hydrate(row)
+        await instance._fire("retrieved")
+        return instance
+
     # --- mass assignment -----------------------------------------------------
     def _is_fillable(self, key: str) -> bool:
         if key in self.__fillable__:
@@ -539,126 +466,6 @@ class Model(metaclass=ModelMeta):
         if discarded and self._totally_guarded():
             raise MassAssignmentException(type(self).__name__, discarded)
         return self
-
-    # --- relations -----------------------------------------------------------
-    def has_many(
-        self, related: Any, foreign_key: str | None = None, local_key: str | None = None
-    ) -> Any:
-        from arvel.database.relations import HasMany
-        from arvel.support import Str
-
-        fk = foreign_key or f"{Str.snake(type(self).__name__)}_id"
-        return HasMany(self, related, fk, local_key or self.__primary_key__)
-
-    def has_one(
-        self, related: Any, foreign_key: str | None = None, local_key: str | None = None
-    ) -> Any:
-        from arvel.database.relations import HasOne
-        from arvel.support import Str
-
-        fk = foreign_key or f"{Str.snake(type(self).__name__)}_id"
-        return HasOne(self, related, fk, local_key or self.__primary_key__)
-
-    def belongs_to(
-        self, related: Any, foreign_key: str | None = None, owner_key: str | None = None
-    ) -> Any:
-        from arvel.database.relations import BelongsTo
-        from arvel.support import Str
-
-        fk = foreign_key or f"{Str.snake(related.__name__)}_id"
-        return BelongsTo(self, related, fk, owner_key or related.__primary_key__)
-
-    def belongs_to_many(
-        self,
-        related: Any,
-        pivot: str | None = None,
-        foreign_pivot_key: str | None = None,
-        related_pivot_key: str | None = None,
-    ) -> Any:
-        from arvel.database.relations import BelongsToMany
-        from arvel.support import Str
-
-        me = Str.snake(type(self).__name__)
-        them = Str.snake(related.__name__)
-        pivot = pivot or "_".join(sorted([me, them]))
-        return BelongsToMany(
-            self,
-            related,
-            pivot,
-            foreign_pivot_key or f"{me}_id",
-            related_pivot_key or f"{them}_id",
-            self.__primary_key__,
-            related.__primary_key__,
-        )
-
-    def has_many_through(
-        self,
-        related: Any,
-        through: Any,
-        first_key: str | None = None,
-        second_key: str | None = None,
-    ) -> Any:
-        from arvel.database.relations import HasManyThrough
-        from arvel.support import Str
-
-        return HasManyThrough(
-            self,
-            related,
-            through,
-            first_key or f"{Str.snake(type(self).__name__)}_id",
-            second_key or f"{Str.snake(through.__name__)}_id",
-            self.__primary_key__,
-            through.__primary_key__,
-        )
-
-    def has_one_through(
-        self,
-        related: Any,
-        through: Any,
-        first_key: str | None = None,
-        second_key: str | None = None,
-    ) -> Any:
-        from arvel.database.relations import HasOneThrough
-        from arvel.support import Str
-
-        return HasOneThrough(
-            self,
-            related,
-            through,
-            first_key or f"{Str.snake(type(self).__name__)}_id",
-            second_key or f"{Str.snake(through.__name__)}_id",
-            self.__primary_key__,
-            through.__primary_key__,
-        )
-
-    def morph_many(self, related: Any, name: str) -> Any:
-        from arvel.database.relations import MorphMany
-
-        return MorphMany(self, related, name, self.__primary_key__)
-
-    def morph_one(self, related: Any, name: str) -> Any:
-        from arvel.database.relations import MorphOne
-
-        return MorphOne(self, related, name, self.__primary_key__)
-
-    def morph_to(self, name: str) -> Any:
-        from arvel.database.relations import MorphTo
-
-        return MorphTo(self, name)
-
-    def morph_to_many(self, related: Any, name: str, pivot: str | None = None) -> Any:
-        from arvel.database.relations import MorphToMany
-
-        return MorphToMany(self, related, name, pivot)
-
-    def morphed_by_many(self, related: Any, name: str, pivot: str | None = None) -> Any:
-        from arvel.database.relations import MorphedByMany
-
-        return MorphedByMany(self, related, name, pivot)
-
-    def relation(self, name: str) -> Any:
-        """Read an eager-loaded relation (loaded via ``Model.with_(name)``)."""
-        return self._relations.get(name)
 
     # --- attribute access ----------------------------------------------------
     def __getattr__(self, item: str) -> Any:
@@ -704,13 +511,18 @@ class Model(metaclass=ModelMeta):
         }
 
     def replicate(self, *, exclude: tuple[str, ...] = ()) -> Self:
-        """A new *unsaved* copy: attributes minus the primary key, timestamps, and ``exclude``."""
+        """A new *unsaved* copy: attributes minus the primary key, timestamps, and ``exclude``.
+
+        Fires ``replicating`` on ``self`` before returning (Laravel parity). ``replicate()``
+        keeps its public **sync** signature, so the (async) event dispatch is best-effort —
+        see :meth:`HasEvents._fire_sync`."""
         skip = {self.__primary_key__, "created_at", "updated_at", *exclude}
         data = {k: v for k, v in self._attributes.items() if k not in skip}
         clone = type(self)()
         object.__setattr__(clone, "_attributes", data)
         object.__setattr__(clone, "_original", {})
         object.__setattr__(clone, "_exists", False)
+        self._fire_sync("replicating")
         return clone
 
     async def fresh(self) -> Self | None:
@@ -727,7 +539,7 @@ class Model(metaclass=ModelMeta):
     def _touch_timestamps(self) -> None:
         if not self.__timestamps__:
             return
-        now = _now()
+        now = now_utc()
         if not self._exists:
             self._attributes.setdefault("created_at", now)
         self._attributes["updated_at"] = now
@@ -739,26 +551,41 @@ class Model(metaclass=ModelMeta):
             )
 
     async def save(self) -> bool:
+        """Insert (new) or update (existing + dirty) this model. Lifecycle: ``saving`` →
+        (``creating`` | ``updating``, only when there's actually a row to write) → the SQL → the
+        matching (``created`` | ``updated``) → ``saved``. ``saving``/``creating``/``updating``
+        are cancelable — an observer returning ``False`` aborts and ``save()`` returns ``False``
+        (the row is left exactly as it was on disk). ``saved`` always fires, matching the prior
+        (pre-lifecycle-expansion) behavior, even on a no-op save of a clean existing model."""
         self._guard_writable()
         if await self._fire("saving") is False:
             return False
+        is_new = not self._exists
         self._touch_timestamps()
         resolver = self._resolve()
-        if self._exists:
-            if self.is_dirty():
-                await (
-                    Builder(self.__table__, resolver)
-                    .where(self.__primary_key__, "=", self._attributes[self.__primary_key__])
-                    .update(dict(self._attributes))
-                )
-        else:
+        performed = False
+        if is_new:
+            if await self._fire("creating") is False:
+                return False
             if self._uses_unique_ids() and self.__primary_key__ not in self._attributes:
                 self._attributes[self.__primary_key__] = self._new_unique_id()
             result = await Builder(self.__table__, resolver).insert(dict(self._attributes))
             if result.primary_key is not None and self.__primary_key__ not in self._attributes:
                 self._attributes[self.__primary_key__] = result.primary_key
             object.__setattr__(self, "_exists", True)
+            performed = True
+        elif self.is_dirty():
+            if await self._fire("updating") is False:
+                return False
+            await (
+                Builder(self.__table__, resolver)
+                .where(self.__primary_key__, "=", self._attributes[self.__primary_key__])
+                .update(dict(self._attributes))
+            )
+            performed = True
         object.__setattr__(self, "_original", dict(self._attributes))
+        if performed:
+            await self._fire("created" if is_new else "updated")
         await self._fire("saved")
         await self._touch_owners()
         return True
@@ -777,23 +604,37 @@ class Model(metaclass=ModelMeta):
         )
 
     async def delete(self) -> bool:
+        """Soft-delete (stamps ``deleted_at``, keeps the row — a ``SoftDeletes`` model) or
+        delegates entirely to :meth:`force_delete`. ``deleting`` is cancelable — an observer
+        returning ``False`` aborts and the row is left untouched."""
         self._guard_writable()
+        if await self._fire("deleting") is False:
+            return False
         if self._uses_soft_deletes():  # soft: stamp deleted_at, keep the row
-            self._attributes["deleted_at"] = _now()
+            self._attributes["deleted_at"] = now_utc()
             await self._key_query().update({"deleted_at": self._attributes["deleted_at"]})
             await self._fire("deleted")
+            await self._fire("trashed")
             return True
         return await self.force_delete()
 
     async def force_delete(self) -> bool:
+        """Hard-delete the row, bypassing soft deletes. ``force_deleting`` is cancelable."""
         self._guard_writable()
+        if await self._fire("force_deleting") is False:
+            return False
         await self._key_query().delete()
         object.__setattr__(self, "_exists", False)
+        await self._fire("force_deleted")
         await self._fire("deleted")
         return True
 
     async def restore(self) -> bool:
+        """Un-soft-delete: clears ``deleted_at``. ``restoring`` is cancelable — an observer
+        returning ``False`` aborts and the row stays trashed."""
         self._guard_writable()
+        if await self._fire("restoring") is False:
+            return False
         self._attributes["deleted_at"] = None
         await self._key_query().update({"deleted_at": None})
         await self._fire("restored")
@@ -813,176 +654,8 @@ class Model(metaclass=ModelMeta):
     async def touch(self) -> Self:
         """Update the ``updated_at`` timestamp to now and persist it."""
         self._guard_writable()  # a view-backed model has no writable updated_at (D5)
-        now = _now()
+        now = now_utc()
         self._attributes["updated_at"] = now
         if self._exists:
             await self._key_query().update({"updated_at": now})
         return self
-
-    # --- serialization -------------------------------------------------------
-    def make_hidden(self, *keys: str) -> Self:
-        self._extra_hidden.update(keys)
-        self._extra_visible.difference_update(keys)
-        return self
-
-    def make_visible(self, *keys: str) -> Self:
-        """Reveal attributes for this instance — including ones in the class ``__hidden__``
-        list (Laravel ``makeVisible``), not only those previously hidden via ``make_hidden``."""
-        self._extra_visible.update(keys)
-        self._extra_hidden.difference_update(keys)
-        return self
-
-    def to_dict(self) -> dict[str, Any]:
-        data = {key: self._cast_get(key, value) for key, value in self._attributes.items()}
-        for key in self.__appends__:  # computed accessors not stored as attributes
-            data[key] = self._cast_get(key, None)
-        if self.__visible__:
-            data = {k: v for k, v in data.items() if k in self.__visible__}
-        hidden = (set(self.__hidden__) | self._extra_hidden) - self._extra_visible
-        for key in hidden:
-            data.pop(key, None)
-        # Laravel toArray parity: eager-loaded relations serialize (nested) alongside attributes —
-        # a has-many/many-to-many → a list of dicts, a has-one/belongs-to → a single nested dict,
-        # a null relation → None. Only LOADED relations appear (unloaded ones are not serialized).
-        for name, related in self._relations.items():
-            data[name] = self._relation_to_dict(related)
-        return data
-
-    @staticmethod
-    def _relation_to_dict(related: Any) -> Any:
-        if related is None:  # a loaded but empty has-one / belongs-to (Laravel → null)
-            return None
-        if isinstance(related, Model):  # has-one / belongs-to → a single nested dict
-            return related.to_dict()
-        # a has-many / belongs-to-many result: a list/Collection of models → a list of dicts
-        return [item.to_dict() for item in related]
-
-    def to_json(self, **kwargs: Any) -> str:
-        """Serialize ``to_dict()`` to a JSON string, honoring hidden/visible/appends (D3)."""
-        return json.dumps(self.to_dict(), default=_json_default, **kwargs)
-
-    # --- casts ---------------------------------------------------------------
-    def _accessor(self, key: str) -> Any:
-        """The Attribute for ``key`` if a model accessor/mutator method defines one."""
-        method = type(self).__attributes_meta__.get(key)
-        return method(self) if method is not None else None
-
-    def _effective_cast(self, key: str) -> Any:
-        """The cast for ``key`` — an explicit ``__casts__`` entry, an implicit ``datetime`` for the
-        timestamp/soft-delete columns (Laravel casts created_at/updated_at/deleted_at to Carbon by
-        default), or for a field *declared* with a ``datetime`` type — so a real ``DateTime`` column
-        always normalizes on write (→ datetime) and reads back as ``Date``, without a redundant cast."""
-        import datetime as _datetime
-
-        cast = self.__casts__.get(key)
-        if cast is not None:
-            return cast
-        if key in ("created_at", "updated_at") and self.__timestamps__:
-            return "datetime"
-        if key == "deleted_at" and self._uses_soft_deletes():
-            return "datetime"
-        if self.__fields__.get(key) is _datetime.datetime:
-            return "datetime"
-        return None
-
-    def _cast_get(self, key: str, value: Any) -> Any:
-        attr = self._accessor(key)
-        if attr is not None and attr.get is not None:
-            if attr.cached and key in self._accessor_cache:
-                return self._accessor_cache[key]
-            result = attr.get(value, self._attributes)
-            if attr.cached:
-                self._accessor_cache[key] = result
-            return result
-        cast = self._effective_cast(key)
-        if value is None or cast is None:
-            return value
-        if not isinstance(cast, (str, type)) and hasattr(cast, "get"):  # custom Cast protocol
-            return cast.get(self, key, value, self._attributes)
-        if isinstance(cast, type) and issubclass(cast, enum.Enum):
-            return cast(value)
-        if cast == "datetime":
-            from arvel.dates import Date
-
-            return value if isinstance(value, Date) else Date.from_py(_from_db_datetime(value))
-        if cast == "bool":
-            return bool(value)
-        if cast == "int":
-            return int(value)
-        if cast == "json":
-            return json.loads(value) if isinstance(value, str) else value
-        if cast == "encrypted":
-            return self._crypt().decrypt_string(value)
-        return value
-
-    def _cast_set(self, key: str, value: Any) -> Any:
-        attr = self._accessor(key)
-        if attr is not None and attr.set is not None:
-            return attr.set(value, self._attributes)
-        cast = self._effective_cast(key)
-        if cast is None:
-            return value
-        if not isinstance(cast, (str, type)) and hasattr(cast, "set"):  # custom Cast protocol
-            return cast.set(self, key, value, self._attributes)
-        if isinstance(value, enum.Enum):
-            return value.value
-        if cast == "json" and not isinstance(value, str):
-            # _json_default handles Date/datetime/Decimal/Enum nested in the value (e.g. an activity
-            # log snapshot of a model whose attributes include timestamps) — plain json.dumps can't.
-            return json.dumps(value, default=_json_default)
-        if cast == "datetime" and value is not None:
-            # store a UTC-aware stdlib datetime so SQLAlchemy binds it to the real DateTime column
-            # (accepts a Date, an ISO string, or a datetime) and the round-trip stays instant-faithful
-            return _to_db_datetime(value)
-        if cast == "hashed" and value is not None:
-            return self._hash().make(value)
-        if cast == "encrypted" and value is not None:
-            return self._crypt().encrypt_string(value)
-        return value
-
-    @staticmethod
-    def _crypt() -> Any:
-        from arvel.kernel import app
-
-        return app("encrypter")
-
-    @staticmethod
-    def _hash() -> Any:
-        # resolve_hasher() returns the app-bound hasher when running, else a default Hasher — so a
-        # `hashed` cast (e.g. User.password) works in tests/seeders without a booted app.
-        from arvel.security import resolve_hasher
-
-        return resolve_hasher()
-
-    # --- model events via the EventDispatcher CONTRACT (no arvel.events import)
-    #: lifecycle hooks an observer may handle (arvel fires these; `saving` may return False to cancel)
-    OBSERVABLE_EVENTS: ClassVar[tuple[str, ...]] = ("saving", "saved", "deleted", "restored")
-
-    @classmethod
-    def observe(cls, observer: Any) -> None:
-        """Register a model observer (Laravel ``Model::observe``). For each lifecycle hook the observer
-        defines a method for (``saving``/``saved``/``deleted``/``restored``), wire that method to this
-        model's event so it runs when the model fires it. ``saving`` returning ``False`` cancels the
-        save. Call from a provider's ``boot()`` (the events dispatcher must be bound). No-op without an
-        app/dispatcher."""
-        from arvel.kernel import app, has_application
-
-        if not (has_application() and app().bound("events")):
-            return
-        instance = observer() if isinstance(observer, type) else observer
-        dispatcher = app().make("events")
-        for hook in cls.OBSERVABLE_EVENTS:
-            method = getattr(instance, hook, None)
-            if callable(method):
-                dispatcher.listen(f"{cls.__name__}.{hook}", method)
-
-    async def _fire(self, hook: str) -> Any:
-        from arvel.kernel import app, has_application
-
-        if not has_application():
-            return None
-        container = app()
-        if not container.bound("events"):
-            return None
-        dispatcher = container.make("events")
-        return await dispatcher.until(f"{type(self).__name__}.{hook}", self)
