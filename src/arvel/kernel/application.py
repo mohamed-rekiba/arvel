@@ -74,6 +74,12 @@ class Application(Container):
         # builder-supplied config (ApplicationBuilder.with_routing/middleware/exceptions)
         self.routing: dict[str, Any] = {}
         self.config_dir: str | None = None  # with_config_dir override (else {base_path}/config)
+        self.public_dir: str | None = (
+            None  # with_public_dir — auto-registers Route.public() at boot
+        )
+        self.public_path: str = "/"  # with_public_dir(..., path=...) — mount point, e.g. a sub-path
+        self.public_spa_fallback: bool = True  # with_public_dir(..., spa_fallback=...)
+        self.lang_dir: str | None = None  # with_lang_dir override (else {base_path}/lang)
         self._builder_middlewares: list[Any] = []
         self._builder_exceptions: Callable[[Any], Any] | None = None
 
@@ -283,6 +289,10 @@ class ApplicationBuilder:
         self._providers: list[ProviderInput] = []
         self._config: dict[str, Any] = {}
         self._config_dir: str | None = None
+        self._public_dir: str | None = None
+        self._public_path: str = "/"
+        self._public_spa_fallback: bool = True
+        self._lang_dir: str | None = None
         self._routing: dict[str, Any] = {}
         self._middlewares: list[Any] = []
         self._exceptions: Callable[[Any], Any] | None = None
@@ -294,6 +304,29 @@ class ApplicationBuilder:
     def with_config_dir(self, directory: str | Path) -> ApplicationBuilder:
         """Load config from ``directory`` instead of the default ``{base_path}/config``."""
         self._config_dir = str(directory)
+        return self
+
+    def with_public_dir(
+        self, directory: str | Path, *, path: str = "/", spa_fallback: bool = True
+    ) -> ApplicationBuilder:
+        """Serve ``directory`` as the app's public web root — Laravel's ``public/`` (see
+        ``Router.public()`` for the full rationale). Registers automatically at boot
+        (``RoutingServiceProvider``); no route-file code needed at all, matching how Laravel's
+        own webserver-served ``public/`` needs zero lines in ``routes/web.php``. ``path`` mounts
+        it under a sub-path (e.g. ``/app``) instead of the root; ``spa_fallback=False`` serves
+        only real files (favicon/robots/storage/...) and 404s on an unmatched path instead of
+        falling back to ``index.html`` — for an app with no client-side router. Both are the same
+        params ``Router.public()`` itself takes."""
+        self._public_dir = str(directory)
+        self._public_path = path
+        self._public_spa_fallback = spa_fallback
+        return self
+
+    def with_lang_dir(self, directory: str | Path) -> ApplicationBuilder:
+        """Load translations from ``directory`` instead of the default ``{base_path}/lang``
+        (e.g. ``resources/lang``, the pre-Laravel-9 convention) — ``LocalizationServiceProvider``
+        loads the app's own translations from here, after the framework's bundled defaults."""
+        self._lang_dir = str(directory)
         return self
 
     def with_providers(self, providers: str | Path | Sequence[ProviderInput]) -> ApplicationBuilder:
@@ -341,6 +374,12 @@ class ApplicationBuilder:
             app.instance("config", Repository(self._config))
         if self._config_dir is not None:
             app.config_dir = self._config_dir
+        if self._public_dir is not None:
+            app.public_dir = self._public_dir
+            app.public_path = self._public_path
+            app.public_spa_fallback = self._public_spa_fallback
+        if self._lang_dir is not None:
+            app.lang_dir = self._lang_dir
         set_application(app)
         for provider in self._providers:
             instance = provider(app) if isinstance(provider, type) else provider
