@@ -1,5 +1,5 @@
-"""F1 — facade type stubs (spec 06 §42-50). The committed `.pyi` must stay in sync with the
-live backing classes ("generated in CI ... never drift"): regenerate in-memory and compare."""
+"""Facade type stubs. The committed `.pyi` must stay in sync with the live backing classes
+("generated in CI ... never drift"): regenerate in-memory and compare."""
 
 from __future__ import annotations
 

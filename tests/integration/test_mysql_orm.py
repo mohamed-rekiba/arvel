@@ -1,7 +1,5 @@
-"""Integration (doc 20) — the ORM compiles + round-trips against a real MySQL (not just SQLite/PG).
-
-Exercises the same surface as the Postgres test plus real DateTime columns (DR-0023), so the
-cross-dialect SQLAlchemy Core construction is verified on MySQL's `DATETIME`/`TIMESTAMP` types too.
+"""The ORM compiles + round-trips against a real MySQL, including DateTime columns on MySQL's
+`DATETIME`/`TIMESTAMP` types.
 """
 
 from __future__ import annotations
@@ -40,7 +38,7 @@ async def test_orm_and_datetime_round_trip_on_mysql(mysql_url: str) -> None:
 
         found = await Gizmo.find(a.id)
         assert found is not None and found.name == "widget"
-        # real datetimes round-trip and read back as Date (Laravel parity), not strings
+        # datetimes round-trip and read back as Date, not strings
         assert isinstance(found.created_at, Date)
         assert isinstance(found.starts_at, Date)
         assert found.starts_at.to_iso().startswith("2026-06-29T09:00:00")
@@ -49,7 +47,7 @@ async def test_orm_and_datetime_round_trip_on_mysql(mysql_url: str) -> None:
         assert [g.name for g in many] == ["sprocket"]
         assert await Gizmo.count() == 2
 
-        # a Date passed straight to where() binds against the real DATETIME column (no .to_py())
+        # a Date passed straight to where() binds against the real DATETIME column
         early = await Gizmo.where(
             "starts_at", "<", Date.parse("2026-06-30T00:00:00+00:00[UTC]")
         ).get()

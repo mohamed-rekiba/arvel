@@ -1,4 +1,4 @@
-"""Auth (G8 hardening) — sign out of all devices (persistent-credential revocation)."""
+"""Sign out of all devices (persistent-credential revocation)."""
 
 from __future__ import annotations
 
@@ -44,9 +44,9 @@ async def test_logout_everywhere_revokes_all_persistent_credentials() -> None:
         await logout_everywhere(FakeUser(42))
 
         # user 42: every persistent credential is dead
-        assert await rotate_refresh_token(refresh42) is None  # refresh revoked
-        assert await recall_remember_token(remember42) is None  # remember deleted
-        assert await resolve_token(api42) is None  # API token deleted
+        assert await rotate_refresh_token(refresh42) is None
+        assert await recall_remember_token(remember42) is None
+        assert await resolve_token(api42) is None
 
         # user 99: untouched
         assert await recall_remember_token(remember99) is not None

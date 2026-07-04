@@ -31,9 +31,8 @@ def load_project_app() -> Any | None:
     path = cwd / "bootstrap" / "app.py"
     if not path.is_file():
         return None
-    # Put the project root on sys.path so bootstrap/app.py can import the app's packages (app/,
-    # config/, …). `python -m arvel.console` adds cwd automatically, but the `arvel` entry-point
-    # script does not — without this, `from app.providers... import ...` would fail under `arvel`.
+    # `python -m arvel.console` adds cwd to sys.path automatically; the `arvel` entry-point script
+    # doesn't, so `from app.providers... import ...` would fail without this
     if (cwd_str := str(cwd)) not in sys.path:
         sys.path.insert(0, cwd_str)
     spec = importlib.util.spec_from_file_location("_arvel_bootstrap_app", path)
@@ -116,7 +115,7 @@ async def _lifecycle(app: Any, handler: CommandHandler) -> None:
             await app.boot()  # async provider boot
             load_console_routes(app)  # register routes/console.py defs (scheduled tasks, commands)
     except BaseException:
-        await safe_terminate(app)  # M7: a failed boot still releases half-opened resources
+        await safe_terminate(app)  # a failed boot still releases half-opened resources
         raise
     try:
         await handler(app)
@@ -156,17 +155,13 @@ def discover_app_commands() -> dict[str, Any]:
 
     table: dict[str, Any] = {}
     try:
-        # The ENTIRE discovery is best-effort: load_project_app() runs create_app() (which registers
-        # the app's providers → command_classes) and bootstrap_app() discovers package providers too.
-        # A broken project (e.g. a typo'd import in a command module) must NOT crash `--help`, so the
-        # suppress wraps load + bootstrap (command_classes is populated by create_app, before bootstrap).
+        # best-effort: a broken project (e.g. a typo'd import in a command module) must not crash --help
         with contextlib.suppress(Exception):
             app = load_project_app()
             if app is not None:
                 bootstrap_app(app)
                 table = {command_name(cls): cls for cls in app.command_classes}
-                # routes/console.py's `Console.command(...)` closures populate app.console_commands;
-                # load it here too so closures appear in `--help` (dispatch reloads it on its own app).
+                # so routes/console.py's Console.command(...) closures also appear in --help
                 load_console_routes(app)
                 table.update(app.console_commands)  # name -> ClosureCommand
     finally:

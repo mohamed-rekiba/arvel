@@ -13,12 +13,9 @@ from typing import Any
 
 import structlog
 
-# Post-(re)configure hooks. ``configure_logging`` rebuilds structlog's processor
-# list and would drop any externally-inserted processor (e.g. telemetry's OTel log
-# bridge); rather than the kernel importing ``arvel.telemetry`` (an illegal
-# kernel→capability edge, DR-0026), capabilities register a callback here and the
-# kernel fires them after every (re)configuration. Inversion of control: the kernel
-# owns the seam; the capability fills it.
+# configure_logging() rebuilds the processor list and would drop externally-inserted processors
+# (e.g. telemetry's OTel bridge); the kernel can't import arvel.telemetry directly, so capabilities
+# register a callback here instead and the kernel fires it after every (re)configuration.
 _post_configure_hooks: list[Callable[[], None]] = []
 
 
@@ -36,8 +33,7 @@ class LogManager:
         self._logger: Any = logger if logger is not None else structlog.get_logger()
 
     def channel(self, name: str) -> LogManager:
-        # M6: bind on THIS logger so channel() keeps context already bound (e.g. via .bind());
-        # the previous structlog.get_logger() started fresh and discarded it.
+        # bind on THIS logger (not a fresh structlog.get_logger()) so already-bound context survives
         return LogManager(self._logger.bind(channel=name))
 
     def bind(self, **kw: Any) -> LogManager:
@@ -94,8 +90,6 @@ def configure_logging(*, json_logs: bool = False) -> None:
     else:
         processors.append(structlog.dev.ConsoleRenderer())
     structlog.configure(processors=processors)
-    # Fire post-configure hooks (e.g. telemetry re-asserts its OTel log bridge, which this
-    # rebuild would otherwise drop). The kernel does not know about telemetry — capabilities
-    # register their hook via ``on_logging_configured`` (DR-0026). No-op when none registered.
+    # e.g. telemetry re-asserts its OTel log bridge, which this rebuild would otherwise drop
     for hook in _post_configure_hooks:
         hook()

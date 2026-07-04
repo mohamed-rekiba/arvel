@@ -58,8 +58,7 @@ async def test_grouped_middleware_runs_in_pipeline_order() -> None:
         order.append("handler")
         return "ok"
 
-    # _run_pipeline runs already-instantiated middleware (the kernel instantiates the group
-    # once in _dispatch so a terminable middleware shares state across handle/terminate).
+    # instantiated once, like _dispatch, so a terminable middleware shares state across handle/terminate
     instances = [kernel._make(m) for m in kernel.groups["web"]]
     result = await kernel._run_pipeline(instances, object(), destination)
     assert result == "ok"

@@ -87,9 +87,7 @@ async def test_delete_removes_from_index() -> None:
 
 
 async def test_restore_reindexes_a_soft_deleted_model() -> None:
-    """Scout parity: soft-deleting a searchable model unsearches it; RESTORING it makes it
-    searchable again (the `restored` hook re-indexes — a restored product must come back to
-    search without a manual reimport)."""
+    """Scout parity: soft-delete unsearches a model; restore re-indexes it via the `restored` hook."""
     from arvel.database import SoftDeletes
 
     class Post(Searchable, Model, SoftDeletes):

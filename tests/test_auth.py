@@ -1,4 +1,4 @@
-"""Phase 9 — AuthManager (session state) + Gate/Policy authorization."""
+"""AuthManager (session state) + Gate/Policy authorization."""
 
 from __future__ import annotations
 

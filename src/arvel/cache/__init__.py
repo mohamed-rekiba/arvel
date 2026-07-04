@@ -110,9 +110,8 @@ class CacheManager(Manager):
         return self._build("mem://")
 
     def create_redis_driver(self) -> CacheRepository:
-        # cashews' Redis backend defaults suppress=True: a dead Redis silently no-ops — get
-        # returns None, put is dropped, and a Cache.lock isn't a lock. Laravel raises on a dead
-        # store; so must we, or cache-dependent correctness (locks, throttles) degrades silently.
+        # cashews defaults suppress=True (a dead Redis silently no-ops); we need it to raise,
+        # or cache-dependent correctness (locks, throttles) degrades silently.
         return self._build(self._settings(CacheSettings).url, suppress=False)
 
 
@@ -138,8 +137,7 @@ def cached(fn: Any = None, *, ttl: int | None = None, key: str | None = None) ->
 
         cache_key = key or f"{fn.__module__}.{fn.__qualname__}:{args!r}:{sorted(kwargs.items())!r}"
         repo = cache()
-        # Wrap in a 1-tuple so a cached None is never confused with a miss (the cache layer maps a
-        # stored None to "absent"); the wrapper is always truthy/non-None.
+        # Wrap in a 1-tuple so a cached None is never confused with a miss.
         hit = await repo.get(cache_key, _CACHE_MISS)
         if hit is not _CACHE_MISS:
             return hit[0]

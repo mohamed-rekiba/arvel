@@ -1,4 +1,4 @@
-"""Phase 3 — claim->Role translation (DR-0013) + ephemeral IdP-role union in HasRoles (DR-0011).
+"""Claim->Role translation + ephemeral IdP-role union in HasRoles.
 
 The translator is a pure function; the has_role union is tested without a DB by overriding roles().
 """
@@ -12,7 +12,7 @@ import pytest
 from arvel.auth.claim_map import roles_for_claims
 from arvel.auth.permissions import HasRoles
 
-# --- claim_map.roles_for_claims (DR-0013) -------------------------------------
+# --- claim_map.roles_for_claims -----------------------------------------------
 
 
 def test_maps_group_values_to_roles() -> None:
@@ -49,7 +49,7 @@ def test_missing_claim_yields_empty() -> None:
     assert roles_for_claims({}, {"x": "y"}) == set()
 
 
-# --- HasRoles ephemeral IdP-role union (DR-0011) ------------------------------
+# --- HasRoles ephemeral IdP-role union -----------------------------------------
 
 
 class _U(HasRoles):

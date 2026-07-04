@@ -209,8 +209,7 @@ class RememberMe(Middleware):
         session = getattr(request, "session", None)
         if isinstance(session, dict):
             session[self._session_key] = tokenable_id  # persist so we don't recall every request
-            # Stamp the session generation so a recalled (remembered) session participates in
-            # "log out other devices" eviction rather than being untracked.
+            # so this recalled session participates in "log out other devices" eviction too
             from arvel.auth.sessions import stamp_session
 
             await stamp_session(session, tokenable_id)

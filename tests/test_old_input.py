@@ -1,6 +1,5 @@
-"""old-input — after a validation failure, the submitted input is flashed so a redirected-back form
-can repopulate via the ``old()`` view global (Laravel ``withInput()`` / ``old()``). It rides on the
-flash-aging lifecycle (survives exactly one request) and excludes password fields (Laravel dontFlash)."""
+"""old-input — a validation failure flashes submitted input for one request via ``old()``, excluding
+password fields (Laravel dontFlash)."""
 
 from __future__ import annotations
 

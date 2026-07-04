@@ -1,14 +1,6 @@
-"""G4 — stack fidelity harness.
-
-Each capability module, as it lands, registers a check here asserting that its
-**mandated DR-0002 engine actually backs it** — e.g. a real ``litestar.Litestar``
-app + Litestar-generated OpenAPI; SQLAlchemy Core constructs compiled by the
-builder; a ``whenever`` type under ``Date``; Typer under the CLI. A stdlib
-reimplementation of a mandated library must make its check FAIL.
-
-*Lazy-import ≠ reimplement* (knowledge/port/00-porting-strategy.md §5b). Empty at
-T0.1 (no capability modules yet); the registry grows with every engine story.
-"""
+"""Stack fidelity harness: each capability module registers a check here asserting its
+mandated engine (DR-0002) actually backs it — e.g. real litestar/SQLAlchemy/whenever/Typer,
+not a stdlib reimplementation. See knowledge/port/00-porting-strategy.md §5b."""
 
 from __future__ import annotations
 
@@ -26,8 +18,7 @@ def _dates_use_whenever() -> None:
     assert isinstance(value, whenever.ZonedDateTime), (
         f"Date backed by {type(value)!r}, not whenever"
     )
-    # DST-correct: adding a calendar day across a spring-forward keeps wall-clock time
-    # (something stdlib naive arithmetic gets wrong) — whenever handles it.
+    # DST-correct: adding a calendar day across a spring-forward keeps wall-clock time.
     before = Date.parse("2024-03-30T12:00:00+00:00[Europe/London]")
     after = before.add(days=1)
     assert after.to_iso().startswith("2024-03-31T12:00:00"), after.to_iso()
@@ -60,8 +51,7 @@ def _console_uses_typer() -> None:
     assert "arvel.console.builtins" not in sys.modules, "LazyGroup imported a command eagerly"
 
 
-# (capability name, check) — check() raises AssertionError if the mandated engine
-# is not the one actually in use. Capability stories append to this list.
+# (capability name, check) — check() raises AssertionError if the mandated engine is not in use.
 def _security_uses_mandated_libs() -> None:
     """Hashing on pwdlib (argon2), encryption on cryptography (Fernet)."""
     from arvel.security import Encrypter, Hasher

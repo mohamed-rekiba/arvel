@@ -235,9 +235,8 @@ def _job_span(job: Job) -> Any:
 
     name = type(job).__name__
     tracer = trace.get_tracer("arvel.queue")
-    # A traceparent captured at dispatch (rides in the payload) makes this job a child of the
-    # dispatching request even across a separate worker process. No carrier → ambient nesting
-    # (the inline case) or a fresh root (a standalone worker).
+    # Traceparent captured at dispatch makes this job a child of the dispatching request even in
+    # a separate worker process; no carrier -> ambient nesting or a fresh root.
     carrier = getattr(job, "__arvel_trace__", None)
     if carrier:
         from opentelemetry.propagate import extract
@@ -307,9 +306,7 @@ class QueueManager(Manager):
     ``amqp``) and runs them via a single wrapper task."""
 
     def __init__(self, app: Any = None, broker: Any = None) -> None:
-        super().__init__(
-            app
-        )  # Manager: sets up driver resolution/cache + the _settings(app) helper
+        super().__init__(app)
         self._broker = broker  # an explicit broker passed in wins over the config-selected one
         self._task: Any = None
         self._started = False
@@ -345,13 +342,9 @@ class QueueManager(Manager):
 
     @property
     def broker(self) -> Any:
-        # An explicit broker (passed to __init__) wins; otherwise the config-selected driver, built +
-        # cached by Manager.driver() (memory by default → no app/config still yields an InMemoryBroker).
         return self._broker if self._broker is not None else self.driver()
 
     async def _invoke(self, job: Job) -> Any:
-        # Worker execution: container-DI into handle() when an app is present, with the
-        # job's retry/backoff/failed() policy enforced around it.
         runner = None
         if self.app is not None and hasattr(self.app, "call"):
             runner = lambda: self.app.call(job.handle)  # noqa: E731
@@ -415,24 +408,20 @@ class QueueManager(Manager):
         from taskiq import InMemoryBroker
 
         self._runner()  # register the wrapper task on the broker
-        # If a same-process dispatch already started the broker in *client* mode, shut it down first:
-        # taskiq-aio-pika's startup() isn't idempotent (it reopens write_conn, orphaning the old one),
-        # and a client-mode start never declared the consumer. Restart cleanly in worker mode.
+        # A same-process dispatch may have started the broker in client mode; taskiq-aio-pika's
+        # startup() isn't idempotent, so shut it down first and restart cleanly in worker mode.
         if self._started:
             await self.broker.shutdown()
             self._started = False
-        # Mark the broker as a worker BEFORE startup: a consuming broker (e.g. taskiq-aio-pika) only
-        # declares its read connection + consumer queue when ``is_worker_process`` is set, so without
-        # this a real AMQP worker raises "Call startup before starting listening" on listen().
+        # Must be set before startup: a consuming broker (e.g. taskiq-aio-pika) only declares its
+        # read connection/consumer when is_worker_process is set, else listen() raises.
         self.broker.is_worker_process = True
         await self.broker.startup()
         self._started = True
-        # Release any delayed jobs whose time has come (dispatch_after) alongside consuming the broker.
         releaser = asyncio.create_task(self._release_loop(release_interval))
         try:
             if isinstance(self.broker, InMemoryBroker):
-                # the in-memory broker runs jobs inline on dispatch and cannot be listened to;
-                # the worker's only ongoing job is releasing due delayed jobs.
+                # runs jobs inline on dispatch and can't be listened to; just release due delayed jobs.
                 await releaser
             else:
                 from taskiq.receiver import Receiver
@@ -455,7 +444,7 @@ class QueueManager(Manager):
         while True:
             await asyncio.sleep(interval)
             if has_application() and app().bound("db"):
-                # a transient DB hiccup must not kill the worker — try again next tick
+                # a transient DB hiccup must not kill the worker; try again next tick
                 with contextlib.suppress(Exception):
                     await self.release_due_jobs()
 
@@ -502,9 +491,8 @@ class QueueManager(Manager):
         due = await QueuedJob.where("available_at", "<=", moment).where_null("reserved_at").get()
         released = 0
         for row in due:
-            # Atomic claim: set reserved_at only while it's still null. rowcount == 1 means THIS worker
-            # won the row; 0 means another worker (or release pass) already took it — skip, no
-            # double-dispatch. The `reserved_at IS NULL` guard + per-row write atomicity is the lock.
+            # Atomic claim: rowcount == 1 means this worker won the row; 0 means another worker
+            # already took it — skip it to avoid a double-dispatch.
             claim = (
                 await QueuedJob.where("id", "=", row.id)
                 .where_null("reserved_at")
@@ -563,8 +551,7 @@ class Bus:
 
 
 def __getattr__(name: str) -> Any:
-    # Lazy re-export: FailedJob pulls in arvel.database (SQLAlchemy); resolve it only on access so
-    # `import arvel.queue` stays light (import-linter G2).
+    # FailedJob pulls in arvel.database (SQLAlchemy); resolve lazily so `import arvel.queue` stays light.
     if name == "FailedJob":
         from arvel.queue.failed import FailedJob
 

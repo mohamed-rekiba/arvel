@@ -1,4 +1,4 @@
-"""Auth (L1b) — centralized auth.* configuration: components read config-sourced defaults.
+"""Centralized auth.* configuration: components read config-sourced defaults.
 
 Precedence everywhere: explicit constructor arg > auth.* config > built-in default; with no app
 bound, the built-in default applies (so test-constructed components keep working)."""
@@ -37,7 +37,7 @@ def test_session_reads_config_and_arg_wins() -> None:
     set_application(_FakeApp({"session": {"secure": False, "lifetime": 111}}))
     try:
         mw = StartSession()
-        # lifetime is MINUTES (DR-0019); _max_age is the seconds value (x60) for cookie/TTL.
+        # lifetime is MINUTES; _max_age is the seconds value (x60) for cookie/TTL
         assert mw._secure is False and mw._max_age == 111 * 60  # from config
         assert StartSession(secure=True, lifetime=222)._secure is True  # explicit arg wins
     finally:

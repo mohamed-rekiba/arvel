@@ -17,8 +17,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from arvel.kernel.application import Application
 
-#: Framework providers not exposed as entry points. (The kernel provider ships as
-#: an ``arvel.providers`` entry point, so it is discovered there, not listed here.)
+#: Framework providers not exposed as entry points (the kernel provider is one, so it's not listed here).
 FRAMEWORK_PROVIDERS: list[type] = []
 
 _cache: list[type] | None = None

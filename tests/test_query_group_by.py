@@ -1,5 +1,4 @@
-"""Query builder — ``select_raw`` + ``group_by`` for grouped aggregates (spec 08 §42,
-the MaterializedView surface ``Order.select_raw(...).group_by(...)``). Test-first."""
+"""Query builder — ``select_raw`` + ``group_by`` for grouped aggregates (spec 08 §42)."""
 
 from __future__ import annotations
 

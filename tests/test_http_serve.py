@@ -17,8 +17,7 @@ class _Widget(Model):
 
 
 def test_handler_can_return_a_model() -> None:
-    """Laravel parity: returning an Eloquent model from a controller serializes to JSON. The kernel
-    registers a type-encoder for the arvel Model (→ to_dict()) so this works without a 500."""
+    """The kernel registers a type-encoder for Model (→ to_dict()), so returning one just works."""
     kernel = HttpKernel()
     kernel.get("/widget", lambda request: _Widget(id=1, name="sprocket"))
     with TestClient(kernel.build()) as client:
@@ -28,7 +27,7 @@ def test_handler_can_return_a_model() -> None:
 
 
 def test_handler_can_return_a_list_of_models() -> None:
-    """A returned collection of models serializes element-by-element (Laravel returns a JSON array)."""
+    """A returned list of models serializes element-by-element into a JSON array."""
     kernel = HttpKernel()
     kernel.get("/widgets", lambda request: [_Widget(id=1, name="a"), _Widget(id=2, name="b")])
     with TestClient(kernel.build()) as client:
@@ -61,8 +60,7 @@ def test_openapi_is_generated_from_routes() -> None:
 
 
 def test_typed_query_params_are_injected_and_documented() -> None:
-    """A handler's non-path/non-body typed args are query parameters: Litestar injects them (with
-    defaults) AND documents them under the operation's `parameters`."""
+    """A handler's non-path/non-body typed args are query parameters, injected and documented."""
 
     async def search(request: Any, q: str | None = None, page: int = 1) -> dict[str, Any]:
         return {"q": q, "page": page}
@@ -82,8 +80,7 @@ def test_typed_query_params_are_injected_and_documented() -> None:
 
 
 def test_model_not_found_renders_as_404() -> None:
-    """find_or_fail/first_or_fail raise ModelNotFound; the kernel renders it as 404 (Laravel
-    findOrFail parity) — so a handler needn't guard `if x is None: abort(404)` by hand."""
+    """find_or_fail/first_or_fail raise ModelNotFound; the kernel renders it as 404."""
     from arvel.database.model import ModelNotFound
 
     async def show(request: Any, id: int) -> Any:
@@ -97,8 +94,7 @@ def test_model_not_found_renders_as_404() -> None:
 
 
 def test_route_status_override_lets_a_typed_post_return_200() -> None:
-    """Route.post(...).status(200): a typed handler can return 200 instead of Litestar's POST-201
-    default (e.g. a login/logout action that isn't creating a resource)."""
+    """Route.post(...).status(200) overrides Litestar's default POST-201."""
     router = Router()
     router.post("/login", lambda request: {"ok": True}, name="login").status(200)
     app = Application()

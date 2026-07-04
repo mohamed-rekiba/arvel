@@ -28,10 +28,8 @@ if TYPE_CHECKING:
     from arvel.support import Collection
 
 # --- injected dependencies (DR-0026) -----------------------------------------------
-# pagination is a util module BELOW http/views in the layered DAG, so it must not import
-# them. The owning layers inject what the paginator needs through legal downward edges:
-# ``arvel.http.request`` (on import) sets the request resolver; ``arvel.views`` (on import)
-# sets the renderer. Unset → degrade exactly as before (no request → path "/", page 1).
+# pagination sits below http/views in the layered DAG and can't import them; those layers
+# inject their resolver/renderer on import instead. Unset -> degrade (no request, page 1).
 _request_resolver: Callable[[], Any] | None = None
 _view_renderer: Callable[[str, dict[str, Any]], Awaitable[Any]] | None = None
 
@@ -230,8 +228,7 @@ class AbstractPaginator:
         if page <= 0:
             page = 1
         params = {**self._query, self._page_name: page}
-        # doseq: a list-valued appended param (?tag=a&tag=b) emits repeated keys, not a stringified
-        # list — Laravel preserves array query params across page links.
+        # doseq: list-valued params emit repeated keys (?tag=a&tag=b), matching Laravel's array query params.
         query = urlencode(params, doseq=True)
         fragment = f"#{self._fragment}" if self._fragment else ""
         return f"{self._path}?{query}{fragment}"
@@ -256,9 +253,7 @@ class AbstractPaginator:
         try:
             from markupsafe import Markup
 
-            # The string is HTML produced by our own autoescaping Jinja environment (page numbers
-            # + urlencoded URLs are escaped at render time), so it's trusted output — mark it safe
-            # so a template's ``{{ links }}`` doesn't double-escape the tags.
+            # Already escaped by our autoescaping Jinja env; mark safe so templates don't double-escape.
             return Markup(rendered)  # noqa: S704  # nosec B704 - trusted autoescaped Jinja output
         except ImportError:  # pragma: no cover - markupsafe ships with jinja2
             return rendered

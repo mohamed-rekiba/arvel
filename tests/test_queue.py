@@ -44,9 +44,7 @@ async def test_dispatch_serializes_and_runs() -> None:
 
 
 async def test_push_instance_runs_job_on_broker() -> None:
-    # Regression: push_instance serializes as {job, state}; the broker runner must deserialize THAT
-    # shape, not the args/kwargs shape — else every instance-pushed job (queued mailables/
-    # notifications, chains/batches, FailedJob.retry) KeyErrors when the worker executes it.
+    # push_instance serializes as {job, state}; the runner must deserialize that shape, not args/kwargs
     RAN.clear()
     manager = QueueManager()
     try:

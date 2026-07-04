@@ -1,4 +1,4 @@
-"""Advanced DB (doc 08) — db.call_function statement fidelity (D7, unit half).
+"""db.call_function statement fidelity — the unit half.
 
 The integration half (a real plpgsql function on Postgres) lives in
 tests/integration/test_postgres_call_function.py.

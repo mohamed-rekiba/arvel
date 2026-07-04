@@ -1,4 +1,4 @@
-"""T2.1 — facades: static-looking proxies to container-resolved services."""
+"""Facades: static-looking proxies to container-resolved services."""
 
 from __future__ import annotations
 

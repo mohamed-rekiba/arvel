@@ -1,5 +1,4 @@
-"""A Manager(app) reads THAT app's config section, not just the global one (the previously-misleading
-`app` arg now actually governs built-in drivers' config — via Manager._settings)."""
+"""A Manager(app) reads THAT app's config section, not just the global one."""
 
 from __future__ import annotations
 

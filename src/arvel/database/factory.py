@@ -65,9 +65,8 @@ class Factory[M: Model]:
         return clone
 
     def _attributes(self, overrides: dict[str, Any], index: int = 0) -> dict[str, Any]:
-        # Resolution order (later wins): definition() → states (in call order) → sequence[index] →
-        # explicit overrides. A *callable* state therefore sees definition + earlier states, NOT the
-        # sequence value for its index (sequence is applied after states).
+        # order (later wins): definition() → states → sequence[index] → overrides — so a callable
+        # state never sees its own sequence value (sequence applies after states)
         attrs = self.definition()
         for state in self._states:
             extra = state(attrs) if callable(state) else state

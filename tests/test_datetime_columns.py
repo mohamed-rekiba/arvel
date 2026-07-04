@@ -1,4 +1,4 @@
-"""Datetimes are stored as real (timezone-aware) DateTime values, not ISO strings (DR-0023).
+"""Datetimes are stored as real (timezone-aware) DateTime values, not ISO strings.
 
 Model timestamp/soft-delete/datetime-cast columns map to real ``sa.DateTime(timezone=True)`` (so they
 round-trip on Postgres timestamptz, not just SQLite), are stamped/stored as stdlib datetimes, and read
@@ -78,9 +78,8 @@ class Plain(Model):
 
 
 async def test_timestamps_are_managed_by_default() -> None:
-    """Laravel parity (DR): a model manages created_at/updated_at by DEFAULT (no opt-in). Without
-    this, the scaffold's ``t.timestamps()`` columns sit NULL on every row — silently green-but-broken
-    until a feature (an abandoned-cart sweep, an audit trail) needs them."""
+    """A model manages created_at/updated_at by DEFAULT (no opt-in) — without this, the scaffold's
+    ``t.timestamps()`` columns sit NULL until a feature needs them."""
     assert Plain.__timestamps__ is True
     assert _is_datetime_col(Plain, "created_at") and _is_datetime_col(Plain, "updated_at")
     db = ConnectionResolver()
@@ -123,9 +122,8 @@ async def test_timestamps_round_trip_as_date() -> None:
 
 
 async def test_round_trip_preserves_instant_under_non_utc_app_tz() -> None:
-    """Regression (review B1): SQLite drops the tz offset and reads back a naive value. Datetimes are
-    stored as UTC and read back as UTC, so a value stored under a non-UTC app timezone keeps its
-    instant rather than being silently shifted."""
+    """SQLite drops the tz offset on read, so a value stored under a non-UTC app timezone must
+    keep its instant (stored/read back as UTC) rather than being silently shifted."""
     from arvel.kernel import Application, set_application
 
     app = Application()
@@ -146,7 +144,7 @@ async def test_round_trip_preserves_instant_under_non_utc_app_tz() -> None:
 
 
 async def test_where_accepts_a_date_directly() -> None:
-    """N1: a Date can be passed to where() without dropping to .to_py() (Laravel accepts a Carbon)."""
+    """A Date can be passed to where() without dropping to .to_py()."""
     db = ConnectionResolver()
     Appt.set_connection(db)
     try:

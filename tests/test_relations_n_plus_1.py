@@ -1,6 +1,5 @@
-"""Relations — eager-loading must batch (no N+1). Audit: `with_("articles")` should issue ONE
-WHERE IN for the children across all parents (2 queries total), not one query per parent. Counted via
-the connection's query log; a contrast test pins that lazy access really is N+1 (so with_ earns its keep)."""
+"""Relations — eager-loading must batch (no N+1): `with_("articles")` issues ONE WHERE IN for the
+children across all parents, not one query per parent."""
 
 from __future__ import annotations
 

@@ -109,29 +109,24 @@ class UserProvider:
         self._user_factory = user_factory
 
     async def resolve(self, principal: Principal) -> Any | None:
-        # 1. Known identity → that user.
         identity = await self._store.find(principal.provider, principal.subject)
         if identity is not None:
             return await self._store.user_for(identity)
 
-        # 2. Link to an existing user ONLY on verified email from a trusted provider (DR-0010).
         if principal.email_verified and principal.provider in self._trusted and principal.email:
             user = await self._store.user_by_email(principal.email)
             if user is not None:
                 await self._store.link(principal, user)
                 return user
 
-        # 3. Just-in-time provisioning — opt-in only.
         if self._jit and self._user_factory is not None:
             user = await self._user_factory(principal)
             await self._store.link(principal, user)
             return user
 
-        # 4. No safe resolution.
         return None
 
     async def unlink(self, user: Any, provider: str, subject: str) -> None:
-        # DR-0012: never remove a user's last remaining credential.
         if await self._store.count_for_user(user) <= 1:
             raise LastCredentialError(
                 "Cannot unlink the last remaining authentication method for this user."

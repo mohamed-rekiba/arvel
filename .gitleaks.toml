@@ -11,22 +11,13 @@ description = "False positives"
 paths = [
   '''docs/.*\.md$''',
 ]
-# Azurite's well-known PUBLIC dev-account key — a fixed constant documented by Microsoft, required
-# verbatim by the storage integration tests (tests/integration/conftest.py). Not a real secret.
-#
-# A deliberately-fake base64 string (decodes to "testkeyforsasgeneration") — a storage test's own
-# comment says as much; generate_blob_sas just needs something that decodes as valid b64.
-#
-# Docker image version tags (e.g. valkey/valkey:9.1.0-alpine3.23) — gitleaks' generic-api-key
-# heuristic flags just the version-number substring itself (confirmed via a local unredacted scan,
-# not the "valkey/valkey:" prefix), so the match targets that shape generically — covers future
-# version bumps too, not just today's pins.
-#
-# `max_bytes=<N>` in the SSRF-guard tests (fetch_url's byte-limit kwarg) — flagged for the
-# digit/letter mix next to a URL, not because it's a credential.
 regexes = [
+  # Azurite's well-known public dev-account key, required verbatim by the storage integration tests.
   '''Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''',
+  # A deliberately-fake base64 blob a storage test uses to exercise generate_blob_sas.
   '''dGVzdGtleWZvcnNhc2dlbmVyYXRpb24=''',
+  # Docker image version tags (e.g. valkey:9.1.0-alpine3.23) trip the generic-api-key heuristic.
   '''\d+\.\d+\.\d+-alpine\d+(\.\d+)?''',
+  # `max_bytes=<N>` in the SSRF-guard tests — flagged for the digit/letter mix, not a credential.
   '''max_bytes=\d+''',
 ]

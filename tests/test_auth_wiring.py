@@ -1,4 +1,4 @@
-"""Phase 4 — app wiring: DB-backed IdentityStore round-trip + AuthServiceProvider registration."""
+"""App wiring: DB-backed IdentityStore round-trip + AuthServiceProvider registration."""
 
 from __future__ import annotations
 

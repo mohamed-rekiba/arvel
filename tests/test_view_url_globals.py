@@ -1,6 +1,5 @@
-"""View-global parity (Laravel Blade helpers): templates can now call route()/url()/config()/asset()
-(alongside the existing can/cannot/trans). They resolve through the bound app and degrade safely when no
-app is present, so templates never crash. The app-resolved path is exercised end-to-end via the serve path."""
+"""View-global parity (Laravel Blade helpers): templates can call route()/url()/config()/asset()
+(alongside can/cannot/trans); they degrade safely when no app is bound, so templates never crash."""
 
 from __future__ import annotations
 
@@ -12,9 +11,8 @@ from arvel.views import ViewFactory, _asset, _config, _route, _url
 
 @pytest.fixture(autouse=True)
 def _no_bootstrapped_app() -> object:
-    """These tests assert the **no-app** degraded path, so guarantee a clean global app regardless of
-    test order — a sibling tool/test (e.g. the facade-stub generator's _boot) can leak a bootstrapped
-    app into the process. Reset before and after so the contract holds independent of ordering."""
+    """Guarantees a clean global app regardless of test order — a sibling test (e.g. the facade-stub
+    generator's _boot) can leak a bootstrapped app into the process."""
     set_application(None)
     yield
     set_application(None)

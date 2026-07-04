@@ -104,10 +104,8 @@ def test_missing_required_field_raises() -> None:
 
 
 def test_no_pydantic_imported() -> None:
-    # Checked in a FRESH interpreter: `import arvel` must not pull in pydantic.
-    # (taskiq, a [queue]-extra transitive dep, uses pydantic internally — but it is
-    # lazy-imported, so it must not load on `import arvel`. An in-session sys.modules
-    # check is order-fragile once any test imports the queue, hence the subprocess.)
+    # fresh interpreter: taskiq (a [queue]-extra dep) uses pydantic internally but lazily; an
+    # in-session sys.modules check is order-fragile once another test imports queue, hence subprocess.
     import subprocess
     import sys
 
@@ -134,7 +132,7 @@ def test_load_dotenv(tmp_path: object, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_load_dotenv_handles_export_quotes_and_inline_comments(
     tmp_path: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # L2: the mature parser handles syntax the old hand-rolled one dropped or mangled.
+    # the mature parser handles syntax the old hand-rolled one dropped or mangled.
     from pathlib import Path
 
     env_file = Path(str(tmp_path)) / ".env"

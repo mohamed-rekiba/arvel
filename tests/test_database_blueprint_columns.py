@@ -1,7 +1,5 @@
-"""Advanced DB (doc 08) — Blueprint column-type breadth (gap-audit D8). Test-first.
-
-Every new column type must compile under BOTH the PostgreSQL and SQLite dialects
-from the same Blueprint call (G4 stack fidelity) — no raw SQL, generic SA types only.
+"""Blueprint column-type breadth: every new column type must compile under BOTH the PostgreSQL
+and SQLite dialects from the same Blueprint call — no raw SQL, generic SA types only.
 """
 
 from __future__ import annotations

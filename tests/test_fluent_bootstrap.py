@@ -36,11 +36,8 @@ def test_with_providers_loads_a_providers_file(tmp_path: Path) -> None:
 
 
 def test_with_middlewares_loads_a_middleware_file(tmp_path: Path) -> None:
-    """A `with_middlewares([...])` global middleware actually RUNS on the served app — exercised
-    through the real served ASGI path (not a fake "http" kernel binding). Regression: "http" is the
-    HTTP *client*, so the served kernel (built on demand in _build_served_asgi) must consume the
-    builder middlewares itself; the old test bound a fake kernel and masked that the real path
-    dropped them (and crashed on a non-empty list)."""
+    """with_middlewares([...]) must actually run on the served app — verified through the real
+    ASGI serve path, not a fake kernel binding (which previously masked that middlewares were dropped)."""
     from litestar.testing import TestClient
 
     (tmp_path / "middlewares.py").write_text(

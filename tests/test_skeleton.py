@@ -16,9 +16,9 @@ def test_subpackages_import() -> None:
     from arvel.kernel import Application, ServiceProvider
     from arvel.kernel.provider import KernelServiceProvider
 
-    assert "Container" in arvel.contracts.__all__  # populated in T0.2
-    assert "Container" in arvel.kernel.__all__  # populated in T1.1
-    assert "Collection" in arvel.support.__all__  # populated in T1.6
+    assert "Container" in arvel.contracts.__all__
+    assert "Container" in arvel.kernel.__all__
+    assert "Collection" in arvel.support.__all__
     assert issubclass(KernelServiceProvider, ServiceProvider)
     provider = KernelServiceProvider(Application())
     provider.register()
@@ -35,8 +35,7 @@ def test_lazy_getattr_rejects_unknown() -> None:
 def test_cli_version() -> None:
     import arvel
 
-    # Invoke our module via the venv interpreter (not PATH, which may hold a
-    # stray `arvel`) so we exercise *this* CLI.
+    # invoke via the venv interpreter, not PATH, which may hold a stray `arvel`.
     proc = subprocess.run(
         [sys.executable, "-m", "arvel.console", "--version"],
         capture_output=True,

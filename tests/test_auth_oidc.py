@@ -1,4 +1,4 @@
-"""Phase 2 — OIDC/Keycloak guard driver. Test-first with an injected verifier (no network)."""
+"""OIDC/Keycloak guard driver, with an injected verifier (no network)."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ async def test_jwks_verifier_rejects_garbage_without_raising() -> None:
 
 @pytest.mark.asyncio
 async def test_string_email_verified_is_normalized() -> None:
-    # Defense-in-depth (security review): an IdP string "false" must not coerce to True.
+    # defense-in-depth: an IdP string "false" must not coerce to True
     async def verifier(_t: str) -> dict[str, Any]:
         return {"sub": "kc-1", "email": "ada@corp.com", "email_verified": "false"}
 
@@ -85,7 +85,7 @@ async def test_string_email_verified_is_normalized() -> None:
 
 
 def test_create_oidc_driver_fails_loud_on_missing_config() -> None:
-    # Misconfigured auth.oidc must raise, not silently reject every token.
+    # misconfigured auth.oidc must raise, not silently reject every token
     from arvel.auth.guards import GuardManager
 
     class _App:

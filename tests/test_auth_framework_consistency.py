@@ -1,4 +1,4 @@
-"""Auth (L1c) — framework-capability consistency: Hash + Http resolved from the container.
+"""Framework-capability consistency: Hash + Http resolved from the container.
 
 (The Log-facade path is covered in test_auth_impersonation.py via Log.swap.)
 """
@@ -23,7 +23,7 @@ class _FakeApp:
         return key in self._b
 
 
-# --- V2: hasher resolves from the container ----------------------------------
+# --- hasher resolves from the container ---------------------------------------
 
 
 def test_resolve_hasher_falls_back_without_app() -> None:
@@ -40,7 +40,7 @@ def test_resolve_hasher_uses_container_when_bound() -> None:
         set_application(None)
 
 
-# --- V3: userinfo uses the framework http client -----------------------------
+# --- userinfo uses the framework http client -----------------------------------
 
 
 class _FakeResp:

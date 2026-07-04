@@ -1,5 +1,4 @@
-"""Number-helper parity (Laravel Number): abbreviate / for_humans / ordinal / file_size / clamp / trim
-were absent (the helper had only format/currency/percentage/human). Completes the support-helper family."""
+"""Number-helper parity (Laravel Number): abbreviate / for_humans / ordinal / file_size / clamp / trim."""
 
 from __future__ import annotations
 

@@ -46,7 +46,7 @@ async def confirm_password(
     if user is None or not isinstance(session, dict):
         return False
     subject = identifier if identifier is not None else _subject(user)
-    # Only throttle when we have a real key — never bucket distinct identifier-less users together.
+    # never bucket distinct identifier-less users into one throttle key
     throttle = limiter if subject is not None else None
     key = str(subject)
     if throttle is not None and await throttle.too_many_attempts(key):

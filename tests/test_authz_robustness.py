@@ -1,4 +1,4 @@
-"""Auth (L3) — sudo-confirm throttling + Authorize ability boot-assertion."""
+"""Sudo-confirm throttling + Authorize ability boot-assertion."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ class _CapLog:
         self.records.append(("warning", event, f))
 
 
-# --- (A) sudo-confirm throttling ----------------------------------------------
+# --- sudo-confirm throttling -----------------------------------------------------
 
 
 async def test_confirm_wrong_password_records_failure_and_audits() -> None:
@@ -117,7 +117,7 @@ async def test_confirm_without_limiter_unchanged() -> None:
         current_user.reset(token)
 
 
-# --- (B) Authorize ability boot-assertion -------------------------------------
+# --- Authorize ability boot-assertion --------------------------------------------
 
 
 def test_authorize_exposes_required_ability() -> None:

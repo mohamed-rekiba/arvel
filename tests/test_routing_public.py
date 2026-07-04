@@ -1,8 +1,5 @@
-"""Router.public() — serve a directory as the app's public web root (Laravel's public/: the one
-directory a webserver exposes; everything else sits outside it). Real files are served as-is;
-with spa_fallback=True (default) anything else falls back to index.html for a client-side router
-to take over, matching Laravel's own OPTIONAL SPA catch-all — with spa_fallback=False, only real
-files are served and an unmatched path 404s normally, for apps with no client-side router at all."""
+"""Router.public() serves a directory as the app's public web root (Laravel's public/).
+spa_fallback=True (default) falls back unmatched paths to index.html (SPA); False 404s instead."""
 
 from __future__ import annotations
 
@@ -103,7 +100,7 @@ def test_path_traversal_cannot_escape_the_public_directory(tmp_path: Path) -> No
         assert resp.text == "<html>shell</html>"  # fell back to the shell, not the escape
 
 
-# --- spa_fallback=False: static files only, no SPA shell, no root claimed --------------------
+# --- spa_fallback=False: static files only, no SPA shell ---
 
 
 def test_no_fallback_serves_real_files(tmp_path: Path) -> None:
@@ -130,8 +127,7 @@ def test_no_fallback_404s_on_unmatched_path(tmp_path: Path) -> None:
 
 
 def test_no_fallback_does_not_claim_root(tmp_path: Path) -> None:
-    """An app with its own `/` (a Blade-equivalent view, no client-side router) must keep it —
-    `public(spa_fallback=False)` must not register a competing root route."""
+    """public(spa_fallback=False) must not register a competing root route."""
     _build_public_dir(tmp_path)
     r = Router()
     r.public(tmp_path, spa_fallback=False)
@@ -144,8 +140,7 @@ def test_no_fallback_does_not_claim_root(tmp_path: Path) -> None:
 
 
 def test_missing_index_html_is_a_clear_error_not_a_bare_crash(tmp_path: Path) -> None:
-    """with_public_dir pointed at a directory with no index.html yet (public/ not built, or a
-    misconfigured path) — a diagnosable message, not a raw FileNotFoundError-as-500."""
+    """Missing index.html should give a diagnosable message, not a raw FileNotFoundError-as-500."""
     r = Router()
     r.public(tmp_path)  # empty dir — no index.html at all
     kernel = HttpKernel()

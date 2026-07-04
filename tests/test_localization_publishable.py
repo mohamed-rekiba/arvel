@@ -1,7 +1,5 @@
-"""i18n publishable/overridable defaults (Laravel lang:publish): the framework now ships default lang
-files (validation/auth/http), the localization provider loads them + the app's lang/ (which overrides),
-and registers the defaults as publishable (vendor:publish --tag=lang). Previously the translator was bound
-empty — no defaults, app lang/ never loaded, nothing to publish."""
+"""The localization provider ships default lang files, loads the app's lang/ override, and registers
+the defaults as publishable (vendor:publish --tag=lang)."""
 
 from __future__ import annotations
 
@@ -21,8 +19,7 @@ def _provider_for(base_path: Path) -> Application:
 
 
 def test_shipped_validation_json_matches_default_messages() -> None:
-    """Guard against drift: the shipped lang file must equal validation's _DEFAULT_MESSAGES, so a rule
-    added to the dict can't silently desync from its published/overridable translation."""
+    """Guard against drift between validation's _DEFAULT_MESSAGES and the shipped lang file."""
     import arvel.localization
     from arvel.validation import _DEFAULT_MESSAGES
 
@@ -44,8 +41,7 @@ def test_defaults_registered_publishable_under_lang_tag(tmp_path: Path) -> None:
     app = _provider_for(tmp_path)
     assert "lang" in app.published  # vendor:publish --tag=lang has something to copy
     dests = set(app.published["lang"].values())
-    # the real {base_path}/lang, not a bare "lang" relative to whatever the CLI's CWD happens to
-    # be — vendor:publish must land in the app's actual configured lang dir.
+    # must be the app's actual configured lang dir, not "lang" relative to the CLI's CWD
     assert dests == {str(tmp_path / "lang")}
 
 

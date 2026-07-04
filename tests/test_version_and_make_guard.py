@@ -1,5 +1,5 @@
-"""Phase H / It.10-11 hygiene: the version is single-sourced (V1), and autowiring a bare builtin
-collection is rejected with a clear error instead of silently returning an empty one."""
+"""The version is single-sourced, and autowiring a bare builtin collection is rejected with a
+clear error instead of silently returning an empty one."""
 
 from __future__ import annotations
 
@@ -11,8 +11,7 @@ from arvel.kernel.container import BindingResolutionError, Container
 
 
 def test_version_is_single_sourced_from_package_metadata() -> None:
-    # V1: Application.version() derives from the installed dist version, which the dynamic build
-    # sources from arvel.__version__ — one source of truth (no more stale "0.0.1").
+    # Application.version() derives from the installed dist version (arvel.__version__) — one source of truth.
     assert Application.version() == arvel.__version__
 
 

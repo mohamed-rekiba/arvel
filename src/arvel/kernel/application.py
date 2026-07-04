@@ -60,7 +60,7 @@ class Application(Container):
         self.instance(Application, self)
         if "config" not in self._instances:
             self.instance("config", Repository())
-        # registries populated by ServiceProvider integration verbs (T1.4)
+        # registries populated by ServiceProvider integration verbs
         self.route_files: list[str] = []
         self.migration_paths: list[str] = []
         self.view_namespaces: dict[str, str] = {}
@@ -99,7 +99,7 @@ class Application(Container):
         provider.register()
         self._providers.append(provider)
         self.registered_provider_types.add(type(provider))
-        if self._booted:  # registered after the boot loop → boot it now + re-finalize (B8/B3)
+        if self._booted:  # registered after the boot loop → boot it now + re-finalize
             self._boot_deferred(provider)
             self._register_translation_namespaces()
         return provider
@@ -135,7 +135,7 @@ class Application(Container):
         provider = self._deferred.get(key)
         if provider is not None and key not in self._bindings and key not in self._instances:
             self._deferred = {k: v for k, v in self._deferred.items() if v is not provider}
-            self.register(provider)  # register() boots it too when the app is already booted (B8)
+            self.register(provider)  # register() boots it too when the app is already booted
         return super()._resolve(abstract, params)
 
     def _boot_deferred(self, provider: ServiceProvider) -> None:
@@ -148,8 +148,7 @@ class Application(Container):
             cast("Any", result).close()  # close the unawaited coroutine
             from arvel.kernel.logging import LogManager
 
-            # B2: a post-boot async deferred boot() is dropped — warn loudly instead of swallowing it
-            # silently, so the no-op is diagnosable (keep deferred boot() synchronous).
+            # a post-boot async deferred boot() is dropped — warn loudly rather than swallow it
             LogManager().channel("kernel").warning(
                 "async_deferred_boot_skipped",
                 provider=type(provider).__name__,
@@ -178,8 +177,7 @@ class Application(Container):
         reads; the global middleware list + exception configurator are applied at boot against
         their bound targets."""
         self.routing.update(routing)
-        # `console` is a CLI-command file (loaded by the console kernel), not an HTTP route file —
-        # keep it out of the HTTP route registry. web/api/other named groups feed the router.
+        # `console` is a CLI-command file, not an HTTP route file — keep it out of the route registry
         self.route_files.extend(path for name, path in routing.items() if name != "console")
         self._builder_middlewares = middlewares
         self._builder_exceptions = exceptions
@@ -234,8 +232,7 @@ class Application(Container):
 
     async def terminate(self) -> None:
         await self._fire("terminating")
-        # LIFO (T1): dispose in reverse order of registration, like nested context managers, so a
-        # dependency isn't torn down before the resource that depends on it.
+        # LIFO, like nested context managers, so a dependency outlives what depends on it
         for callback in reversed(self._terminating):
             result = callback()
             if inspect.isawaitable(result):

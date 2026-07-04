@@ -34,9 +34,7 @@ def _deep_merge(base: dict[str, Any], override: Mapping[str, Any]) -> dict[str, 
 
 
 def _load_config_file(path: str) -> Mapping[str, Any]:
-    # A config file is EXECUTED as Python — load only from a trusted project tree, never an
-    # untrusted/user-supplied path. Restrict to .py so a non-module path fails clearly (not as a
-    # confusing exec error), as light defense-in-depth.
+    # executed as Python — load only from a trusted project tree, never an untrusted path
     if not str(path).endswith(".py"):
         raise ValueError(f"config file must be a .py module, got: {path!r}")
     spec = importlib.util.spec_from_file_location("_arvel_published_config", path)

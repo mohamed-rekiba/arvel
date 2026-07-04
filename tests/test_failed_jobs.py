@@ -1,4 +1,4 @@
-"""Failed-job persistence (doc 12) — Laravel parity. When a job exhausts its retries the worker
+"""Failed-job persistence — Laravel parity. When a job exhausts its retries the worker
 records a row in the ``failed_jobs`` table (serialized payload + exception); ``FailedJob.retry()``
 re-dispatches it and removes the record. Without a bound DB the worker degrades gracefully — the
 job's ``failed()`` hook still runs, nothing is persisted, nothing crashes."""

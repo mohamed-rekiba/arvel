@@ -1,4 +1,4 @@
-"""T2.2 — fast console: Typer + LazyGroup, T0 fast-path, banner, built-ins."""
+"""Fast console: Typer + LazyGroup, fast-path startup, banner, built-ins."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def test_version_fast_path() -> None:
 
 
 def test_version_imports_no_typer_or_rich() -> None:
-    # T0 fast path: answering --version must import neither Typer nor rich/click.
+    # answering --version must import neither Typer nor rich/click
     proc = subprocess.run(
         [sys.executable, "-X", "importtime", "-m", "arvel.console", "--version"],
         capture_output=True,

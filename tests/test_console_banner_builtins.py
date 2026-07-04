@@ -21,7 +21,7 @@ def test_print_banner_plain_on_non_tty(
     print_banner("9.9.9")
     out = capsys.readouterr().out
     assert "arvel 9.9.9" in out
-    assert "\x1b[" not in out  # never any ANSI color
+    assert "\x1b[" not in out
 
 
 def test_print_banner_art_on_tty(
@@ -32,9 +32,9 @@ def test_print_banner_art_on_tty(
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
     print_banner("1.2.3")
     out = capsys.readouterr().out
-    assert "(_|" in out  # a distinctive fragment of the ASCII art
+    assert "(_|" in out
     assert "arvel · async-first" in out and "v1.2.3" in out
-    assert "\x1b[" not in out  # plain — no ANSI
+    assert "\x1b[" not in out
 
 
 def test_print_banner_suppressed_by_env(
@@ -51,8 +51,7 @@ def test_print_banner_suppressed_by_env(
     [
         (["about"], "arvel"),
         (["extras"], "extras"),
-        # down/up now require the project app (the flag must land in the APP's cache store) —
-        # covered with a bound app in test_maintenance_mode.test_down_up_cli_uses_the_app_bound_cache
+        # down/up need a bound app (cache store) — see test_maintenance_mode's bound-app test
     ],
 )
 def test_builtin_commands(args: list[str], expect: str) -> None:

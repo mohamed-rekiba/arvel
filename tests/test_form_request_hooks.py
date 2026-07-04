@@ -1,6 +1,6 @@
 """Validation — FormRequest lifecycle hooks that map cleanly onto the msgspec path:
 ``prepare_for_validation`` (normalize input before convert) and ``passed_validation``
-(post-success transform). Spec 10 §81. Test-first.
+(post-success transform).
 
 ``with_validator`` is intentionally NOT on the msgspec FormRequest — it belongs to the rule
 ``Validator`` (see note in validation/__init__.py)."""

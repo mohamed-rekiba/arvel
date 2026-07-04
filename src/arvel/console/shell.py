@@ -66,8 +66,7 @@ def _import_app_models(app: Any) -> None:
             spec = importlib.util.spec_from_file_location(modname, file)
             if spec is not None and spec.loader is not None:
                 module = importlib.util.module_from_spec(spec)
-                # Register in sys.modules so the imported model classes stay referenced — Model
-                # subclasses are tracked via weakrefs (__subclasses__), so a GC'd module drops them.
+                # __subclasses__ is a weakref list; a GC'd module would drop its model classes from it
                 sys.modules[modname] = module
                 spec.loader.exec_module(module)
 
@@ -88,8 +87,7 @@ def _launch_repl(namespace: dict[str, Any]) -> None:
         )
         return
 
-    # IPython/traitlets ship no type stubs — reached via importlib so the dynamic attrs are Any
-    # (no suppressions, no static heavy-import edge).
+    # IPython/traitlets ship no type stubs; reached via importlib so the dynamic attrs are Any
     config: Any = traitlets_config.Config()
     config.TerminalInteractiveShell.autoawait = True  # top-level await (default on in IPython 9.x)
     config.TerminalInteractiveShell.banner1 = "arvel shell — IPython · top-level await enabled\n"

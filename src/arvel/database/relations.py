@@ -62,9 +62,7 @@ class HasOneOrMany(Relation):
     ``create``/``save`` set the foreign key to the parent automatically."""
 
     def __getattr__(self, name: str) -> Any:
-        # Only proxy genuine query-builder calls — never internals/dunders (avoids recursion and
-        # keeps `hasattr` honest). `query`, `get`, `first`, `create`, `save` are real attributes,
-        # so they're resolved before this ever fires.
+        # never proxy internals/dunders (avoids recursion); real attrs resolve before this fires
         if name.startswith("_"):
             raise AttributeError(name)
         return getattr(self.query(), name)
@@ -312,8 +310,7 @@ class MorphMany(Relation):
         )
 
     def _eager_query(self, keys: list[Any]) -> Any:
-        # Polymorphic: also filter by the parent type, so children of a different model that
-        # happen to share an id are never mis-attached during eager loading.
+        # also filter by parent type, so children of a different model sharing an id aren't mis-attached
         return self.related.where(
             f"{self.morph_name}_type", "=", type(self.parent).__name__
         ).where_in(self.foreign_key, keys)
@@ -445,8 +442,7 @@ class BelongsTo(Relation):
         self.owner_key = owner_key
 
     def __getattr__(self, name: str) -> Any:
-        # Proxy query-builder calls to the owner query; never internals/dunders (avoids recursion,
-        # keeps hasattr honest). Real attrs/methods (owner_key/query/get/associate/...) resolve first.
+        # proxies to the owner query; never internals/dunders (avoids recursion)
         if name.startswith("_"):
             raise AttributeError(name)
         return getattr(self.query(), name)
@@ -588,8 +584,7 @@ class RecursiveRelation:
             nodes[m._attributes[lk]] = data
         roots: list[dict[str, Any]] = []
         if self.direction == "up":
-            # child → parent: each node nests the row that is its parent in the chain; the root
-            # is the nearest ancestor (no other row points to it as a parent).
+            # root = the nearest ancestor: the one row no other row points to as a parent
             referenced = {m._attributes.get(fk) for m in models}
             for m in models:
                 node = nodes[m._attributes[lk]]

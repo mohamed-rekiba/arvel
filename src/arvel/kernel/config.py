@@ -74,8 +74,7 @@ class Repository:
         return copy.deepcopy(self._data)
 
     def __repr__(self) -> str:
-        # Redact values: config holds secrets (DB passwords, API keys, tokens). Never let them leak
-        # into a repr, traceback, or log line — show only the top-level shape.
+        # config holds secrets (DB passwords, API keys) — never let a value leak into a repr/traceback
         return f"Repository(keys={sorted(self._data)})"
 
 
@@ -97,9 +96,7 @@ def config_default(key: str, fallback: Any) -> Any:
     from arvel.kernel.globals import has_application
 
     if has_application():
-        # Swallow only "config isn't resolvable" (no binding / no app), not every error — a genuine
-        # bug (e.g. a config value that raises when computed) should surface, not silently become the
-        # fallback.
+        # swallow only "config isn't resolvable" — a genuine bug computing the value should surface
         with contextlib.suppress(LookupError, RuntimeError, BindingResolutionError):
             return config(key, fallback)
     return fallback

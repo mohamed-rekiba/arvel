@@ -1,4 +1,4 @@
-"""Auth (G10 hardening) — rehash-on-login: a stale password hash is upgraded on a correct login."""
+"""Rehash-on-login: a stale password hash is upgraded on a correct login."""
 
 from __future__ import annotations
 

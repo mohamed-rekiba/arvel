@@ -69,8 +69,7 @@ def test_merge_config_from_scalar_existing_wins() -> None:
 
 
 def test_merge_config_from_does_not_mutate_source_defaults() -> None:
-    # H2: a provider's defaults are often a module-level constant — merging must not alias or mutate
-    # the nested source objects into the live repo.
+    # H2: merging must not alias or mutate the source's nested objects into the live repo
     defaults = {"widget": {"size": "L", "opts": {"a": 1}}}
     source_widget = defaults["widget"]
     app = Application()

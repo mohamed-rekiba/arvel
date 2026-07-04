@@ -1,10 +1,4 @@
-"""Pagination — Laravel-parity LengthAwarePaginator + simple Paginator.
-
-Covers the accessor surface, URL building (incl. per-request resolvers + query string +
-fragment), the numbered link window, the Laravel JSON shape, simple prev/next semantics,
-iteration, model-item serialization, and HTML rendering through the real view factory +
-shipped ``pagination`` namespace. Builder integration is exercised against real sqlite.
-"""
+"""Pagination — Laravel-parity LengthAwarePaginator + simple Paginator."""
 
 from __future__ import annotations
 
@@ -18,7 +12,7 @@ from arvel.pagination import (
     resolve_current_path,
 )
 
-# --- LengthAwarePaginator: accessors ------------------------------------------------
+# --- LengthAwarePaginator: accessors ---
 
 
 def _page(items: list[int], total: int, per_page: int, current: int) -> LengthAwarePaginator:
@@ -63,7 +57,7 @@ def test_empty_page_items_are_none() -> None:
     assert p.is_empty() is True
 
 
-# --- URL building -------------------------------------------------------------------
+# --- URL building ---
 
 
 def test_url_building_and_neighbours() -> None:
@@ -106,7 +100,7 @@ def test_appends_and_fragment() -> None:
     assert p.fragment() == "results"
 
 
-# --- numbered link window -----------------------------------------------------------
+# --- numbered link window ---
 
 
 def test_window_small_is_single_band() -> None:
@@ -159,7 +153,7 @@ def test_page_name_accessors() -> None:
     assert p.is_not_empty() is True
 
 
-# --- Laravel JSON shape -------------------------------------------------------------
+# --- Laravel JSON shape ---
 
 
 def test_to_dict_laravel_shape() -> None:
@@ -197,7 +191,7 @@ def test_to_dict_serializes_model_items() -> None:
     assert p.to_dict()["data"] == [{"v": 1}, {"v": 2}]
 
 
-# --- iteration ----------------------------------------------------------------------
+# --- iteration ---
 
 
 def test_iteration_and_indexing() -> None:
@@ -207,7 +201,7 @@ def test_iteration_and_indexing() -> None:
     assert p[1] == 20
 
 
-# --- simple Paginator ---------------------------------------------------------------
+# --- simple Paginator ---
 
 
 def test_simple_infers_more_from_extra_row() -> None:
@@ -248,7 +242,7 @@ def test_simple_to_dict_has_no_total() -> None:
     assert d["data"] == [1, 2]
 
 
-# --- per-request resolvers ----------------------------------------------------------
+# --- per-request resolvers ---
 
 
 class _FakeURL:
@@ -307,7 +301,7 @@ def test_with_query_string_pulls_request_params() -> None:
         current_request.reset(token)
 
 
-# --- Builder integration against real sqlite ----------------------------------------
+# --- Builder integration against real sqlite ---
 
 _md = sa.MetaData()
 _items = sa.Table(
@@ -362,7 +356,7 @@ async def test_builder_simple_paginate_detects_next_without_count() -> None:
         await db.dispose()
 
 
-# --- HTML rendering through the real view factory + shipped namespace ----------------
+# --- HTML rendering through the real view factory + shipped namespace ---
 
 
 def _app_with_pagination_views() -> None:

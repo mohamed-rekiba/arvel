@@ -1,6 +1,5 @@
-"""ch04 / finding A1 — ValidatePostSize global middleware: an over-large request body is
-rejected with 413 before the handler runs (Laravel ValidatePostSize), and it's wired into the
-default global pipeline."""
+"""ValidatePostSize global middleware: an over-large request body is rejected with 413 before
+the handler runs (Laravel ValidatePostSize), and it's wired into the default global pipeline."""
 
 from __future__ import annotations
 
@@ -26,7 +25,7 @@ async def _ok(request: Any) -> dict[str, str]:
 def test_use_default_global_wires_post_size_after_maintenance() -> None:
     kernel = HttpKernel().use_default_global()
     assert kernel.global_middleware[0] is TelemetryMiddleware  # telemetry outermost
-    assert kernel.global_middleware[1] is RequestContextMiddleware  # request-id next (M3)
+    assert kernel.global_middleware[1] is RequestContextMiddleware  # request-id next
     # maintenance still runs before post-size validation
     assert kernel.global_middleware.index(PreventRequestsDuringMaintenance) < (
         kernel.global_middleware.index(ValidatePostSize)

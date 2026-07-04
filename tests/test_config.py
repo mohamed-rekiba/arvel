@@ -45,21 +45,21 @@ def test_has() -> None:
 def test_set_over_scalar_intermediate_clobbers_and_logs() -> None:
     from structlog.testing import capture_logs
 
-    # turning a scalar into a section auto-vivifies (Laravel parity) but emits a debug log event.
+    # turning a scalar into a section auto-vivifies (Laravel parity) but logs it
     repo = Repository({"app": "a-string"})
     with capture_logs() as logs:
         repo.set("app.name", "x")
-    assert repo.get("app.name") == "x"  # clobbered into a section
+    assert repo.get("app.name") == "x"
     assert any(log.get("event") == "config_set_replacing_scalar_with_section" for log in logs)
 
 
 def test_all_returns_a_snapshot_not_live_state() -> None:
-    # H2: mutating the result of all() must NOT leak back into the repository.
+    # mutating the result of all() must NOT leak back into the repository
     repo = Repository({"app": {"name": "arvel", "nested": {"k": 1}}})
     snapshot = repo.all()
     snapshot["app"]["name"] = "hacked"  # type: ignore[index]
     snapshot["app"]["nested"]["k"] = 999  # type: ignore[index]
-    assert repo.get("app.name") == "arvel"  # unchanged
+    assert repo.get("app.name") == "arvel"
     assert repo.get("app.nested.k") == 1  # nested also protected (deep copy)
 
 
@@ -84,7 +84,7 @@ def test_env_literal_variants_and_case_insensitivity(monkeypatch: pytest.MonkeyP
         monkeypatch.setenv("ARVEL_LIT", raw)
         result = env("ARVEL_LIT")
         assert result == expected and type(result) is type(expected)
-    monkeypatch.setenv("ARVEL_LIT", "")  # an explicitly empty value is returned as ""
+    monkeypatch.setenv("ARVEL_LIT", "")
     assert env("ARVEL_LIT") == ""
     monkeypatch.delenv("ARVEL_LIT", raising=False)
 
@@ -92,15 +92,15 @@ def test_env_literal_variants_and_case_insensitivity(monkeypatch: pytest.MonkeyP
 def test_get_through_non_dict_intermediate_returns_default() -> None:
     repo = Repository({"app": {"name": "arvel"}})
     assert repo.get("app.name.sub", "d") == "d"  # name is a str, not a dict
-    assert repo.get("", "d") == "d"  # empty key
-    assert repo.get("app.", "d") == "d"  # trailing dot
+    assert repo.get("", "d") == "d"
+    assert repo.get("app.", "d") == "d"
 
 
 def test_repr_redacts_values() -> None:
     repo = Repository({"db": {"password": "s3cret"}, "app": {"key": "tok"}})
     text = repr(repo)
     assert "s3cret" not in text and "tok" not in text
-    assert "db" in text and "app" in text  # shape only
+    assert "db" in text and "app" in text
 
 
 def test_config_default_without_app_returns_fallback() -> None:
@@ -113,8 +113,8 @@ def test_config_default_with_app_reads_then_falls_back() -> None:
     c.instance("config", Repository({"auth": {"timeout": 900}}))
     set_application(c)
     try:
-        assert config_default("auth.timeout", 60) == 900  # present → read
-        assert config_default("auth.missing", 60) == 60  # absent → fallback
+        assert config_default("auth.timeout", 60) == 900
+        assert config_default("auth.missing", 60) == 60
     finally:
         set_application(None)
 
@@ -133,7 +133,7 @@ def test_config_facade_proxies_and_swaps() -> None:
 def test_config_helper_reads_from_container() -> None:
     c = Container()
     c.instance("config", Repository({"app": {"name": "myapp"}}))
-    set_application(c)  # a Container satisfies the app accessor (.make)
+    set_application(c)
     try:
         assert has_application() is True
         assert config("app.name") == "myapp"

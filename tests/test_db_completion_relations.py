@@ -1,4 +1,4 @@
-"""ORM gap-audit completion — D1 (has_one_through), D2 (with_where_has). Test-first."""
+"""ORM completion: has_one_through, with_where_has."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from arvel.database import ConnectionResolver, Model
 
 
-# --- D1: has_one_through (Country → User → Post, single row) ---------------------
+# --- has_one_through (Country → User → Post, single row) ---------------------
 class Country(Model):
     __fields__ = {"name": str}
     __fillable__ = ["name"]
@@ -61,7 +61,7 @@ async def test_has_one_through_returns_none_when_absent() -> None:
         await db.dispose()
 
 
-# --- D2: with_where_has (one constraint → both filters parents AND eager load) ---
+# --- with_where_has (one constraint → both filters parents AND eager load) ---
 async def test_with_where_has_filters_parents_and_constrains_eager_load() -> None:
     db = await _setup()
     try:

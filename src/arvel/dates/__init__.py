@@ -23,9 +23,8 @@ from whenever import (
     ZonedDateTime,
 )
 
-# Weekend days are NOT universally Saturday/Sunday — many countries (e.g. Egypt and much of the
-# Gulf) rest Friday/Saturday. So ``is_weekend`` reads ``config('app.weekend_days')`` (a list of day
-# names) and only falls back to Sat/Sun. Carbon parity (``Carbon::setWeekendDays``).
+# Weekend days aren't universally Sat/Sun (e.g. Egypt/Gulf rest Fri/Sat), so is_weekend
+# reads config('app.weekend_days') and only falls back to Sat/Sun.
 _WEEKDAYS = {
     "monday": MONDAY,
     "tuesday": TUESDAY,
@@ -201,9 +200,7 @@ class Date:
     def __hash__(self) -> int:
         return hash(self._dt)
 
-    # Carbon parity: dates order naturally (`$date < now()`); whenever's ZonedDateTime
-    # compares by instant, so these do too. Non-Date operands return NotImplemented so
-    # Python raises TypeError (or defers to the reflected operand) instead of AttributeError.
+    # Non-Date operands return NotImplemented so Python raises TypeError instead of AttributeError.
     def __lt__(self, other: object) -> bool:
         if not isinstance(other, Date):
             return NotImplemented

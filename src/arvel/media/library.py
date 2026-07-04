@@ -40,8 +40,7 @@ class MediaConversion:
         if self.width is not None and self.height is not None:
             result = image.resize(self.width, self.height)
         if self.fmt.upper() in ("JPEG", "JPG"):
-            # JPEG can't hold an alpha channel — flatten RGBA/P/LA to RGB first, else Pillow raises
-            # (the documented gotcha). Harmless for images already in RGB.
+            # JPEG has no alpha channel; flatten RGBA/P/LA to RGB first or Pillow raises.
             result = result.convert("RGB")
         return result.encode(self.fmt)
 
@@ -157,8 +156,7 @@ class MediaAdder:
         base_dir = f"{collection}/{media.id}"
         await filesystem.put(f"{base_dir}/{self._file_name}", self._contents)
 
-        # Conversions are image transforms (PIL), so they run only on image media — a video,
-        # PDF, or any non-image file is stored as-is without conversions (no decode attempt).
+        # Conversions are image transforms (PIL); non-image files are stored as-is, untouched.
         conversions = model.register_media_conversions()
         if conversions and self._is_image():
             from arvel.media import Image

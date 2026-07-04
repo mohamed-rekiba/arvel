@@ -1,8 +1,6 @@
-"""Mass-assignment guarding (doc 07) — Laravel parity. A *totally-guarded* model (the default
-``__guarded__ == ['*']`` with no ``__fillable__``) raises ``MassAssignmentException`` when you
-mass-assign attributes, instead of silently discarding them into an empty row. Models that declare
-``__fillable__`` keep silently discarding non-fillable keys (Laravel's behavior for partially-guarded
-models); a fully-unguarded model (``__guarded__ == []``) fills everything."""
+"""Mass-assignment guarding (doc 07) — a totally-guarded model raises on mass-assign instead of
+silently discarding; partially-guarded (``__fillable__``) still discards silently; fully-unguarded
+fills everything."""
 
 from __future__ import annotations
 
@@ -37,7 +35,7 @@ def test_totally_guarded_fill_raises_listing_the_attributes() -> None:
 
 
 def test_fillable_model_silently_discards_non_fillable() -> None:
-    # partially-guarded (fillable declared) keeps Laravel's silent-discard — only the extra is dropped
+    # partially-guarded (fillable declared) silently discards only the extra keys
     m = _Fillable()
     m.fill({"name": "ok", "sneaky": True})
     assert m._attributes == {"name": "ok"}  # no raise; sneaky dropped
@@ -50,7 +48,7 @@ def test_unguarded_model_fills_everything() -> None:
 
 
 def test_totally_guarded_with_no_attributes_does_not_raise() -> None:
-    # nothing to discard -> no exception (mirrors Laravel: only raises when attrs are actually dropped)
+    # nothing to discard -> no exception (only raises when attrs are actually dropped)
     assert _Guarded().fill({})._attributes == {}
 
 

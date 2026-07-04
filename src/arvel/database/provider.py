@@ -56,10 +56,7 @@ class DatabaseServiceProvider(ServiceProvider):
 
         app.terminating(dispose_pools)
 
-        # Discover file-based migrations into the `migrations` binding that `arvel migrate` runs.
-        # The conventional `database/migrations` directory is scanned by default (Laravel-style — no
-        # registration needed), plus any paths added via load_migrations_from() (e.g. by packages).
-        # Runs in boot so every provider's load_migrations_from() has already appended.
+        # runs in boot so every provider's load_migrations_from() has already appended its paths
         if not app.bound("migrations"):
             from arvel.database.migrations import discover_migrations
 

@@ -1,6 +1,5 @@
-"""HTML form method-spoofing (Laravel @method): a POST carrying ``_method=PUT|PATCH|DELETE`` is
-routed as that verb by the MethodOverride ASGI middleware, so a ``<form method=post>`` can reach a
-PUT/PATCH/DELETE route. The ``method_field()`` view global renders the hidden input."""
+"""A POST carrying ``_method=PUT|PATCH|DELETE`` is routed as that verb by MethodOverride, so a plain
+HTML form can reach a PUT/PATCH/DELETE route."""
 
 from __future__ import annotations
 

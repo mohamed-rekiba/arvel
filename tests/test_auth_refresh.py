@@ -1,4 +1,4 @@
-"""Auth (doc 15) — rotating refresh tokens."""
+"""Rotating refresh tokens."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ async def test_unknown_token_rejected() -> None:
         await db.dispose()
 
 
-# --- reuse detection / family revocation (DR-0014) ----------------------------
+# --- reuse detection / family revocation ---------------------------------------
 
 
 async def test_reuse_of_rotated_token_revokes_the_whole_family() -> None:

@@ -31,8 +31,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 import msgspec
 
-# Sentinel: distinguishes "no _config_source given" (read the global config) from an explicit source
-# of ``None``/``{}`` (a specific app whose section is unset → use defaults, not the global config).
+# distinguishes "no _config_source given" (read the global config) from an explicit None/{} source
 _NO_CONFIG_SOURCE = object()
 
 
@@ -58,8 +57,7 @@ class _SettingsMeta(msgspec.StructMeta):
             from arvel.kernel.globals import has_application
 
             data: dict[str, object] = {}
-            # `_config_source` (when supplied) overrides the global config — a specific app's section,
-            # passed by Manager._settings so Manager(app) honors *that* app's config, not the global.
+            # `_config_source`, when supplied, overrides the global config with a specific app's section
             source = overrides.pop("_config_source", _NO_CONFIG_SOURCE)
             if source is not _NO_CONFIG_SOURCE:
                 if isinstance(source, Mapping):
@@ -89,8 +87,7 @@ class Settings(msgspec.Struct, metaclass=_SettingsMeta):
         """Build the settings from an explicit config ``source`` (a section mapping) instead of the
         global ``config()`` — used by ``Manager(app)`` so it reads *that* app's section. ``None`` ⇒
         an empty section (defaults apply)."""
-        # the metaclass consumes ``_config_source``; pass it via **dict so it isn't type-checked
-        # against the (synthesized) struct __init__ signature.
+        # via **dict so `_config_source` isn't type-checked against the synthesized __init__
         return cls(**{"_config_source": source if source is not None else {}})
 
 

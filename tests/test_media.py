@@ -34,7 +34,6 @@ def test_image_manager_open_make() -> None:
 
 
 def test_video_manager_exists() -> None:
-    # Opening a real container is exercised by the G4 fidelity check; here we just
-    # assert the manager surface is present (av is heavy to synthesize twice).
+    # real container open is covered by the G4 fidelity check; av is heavy to synthesize twice
     assert hasattr(VideoManager(), "open")
     assert hasattr(Video, "open")

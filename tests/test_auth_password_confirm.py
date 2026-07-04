@@ -1,4 +1,4 @@
-"""Auth (G6 hardening) — password confirmation / sudo mode."""
+"""Password confirmation / sudo mode."""
 
 from __future__ import annotations
 
@@ -124,12 +124,12 @@ async def test_middleware_passes_when_freshly_confirmed() -> None:
         current_user.reset(token)
 
 
-# --- security regressions (from the G6 review) --------------------------------
+# --- security regressions ------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_confirmation_is_bound_to_the_user_no_cross_user_inheritance() -> None:
-    """A confirmation must not carry over to a DIFFERENT user on the same session (CRITICAL fix)."""
+    """A confirmation must not carry over to a DIFFERENT user on the same session."""
     req = _Req()
     alice = current_user.set(_User(Hasher().make("secret"), uid=1))
     try:
@@ -150,7 +150,7 @@ async def test_confirmation_is_bound_to_the_user_no_cross_user_inheritance() -> 
 
 @pytest.mark.asyncio
 async def test_malformed_stored_hash_fails_closed() -> None:
-    """A non-verifiable stored hash must return False, not raise (MEDIUM fix)."""
+    """A non-verifiable stored hash must return False, not raise."""
     token = current_user.set(_User("not-a-valid-argon2-hash"))
     try:
         assert await confirm_password(_Req(), "secret") is False

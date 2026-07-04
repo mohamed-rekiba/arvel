@@ -70,8 +70,8 @@ async def test_policy_before_grants_super_admin_and_falls_through() -> None:
 
 
 def test_authorization_error_renders_correct_status_and_message() -> None:
-    """The HTTP renderer maps AuthorizationError.status/.detail → the response (the 500->403/404 fix).
-    Previously AuthorizationError had no .status, so the catch-all rendered it as a generic 500."""
+    """The HTTP renderer maps AuthorizationError.status/.detail → the response; previously it had
+    no .status and rendered as a generic 500."""
     from arvel.http.exceptions import render_exception
 
     class _Req:
@@ -86,8 +86,8 @@ def test_authorization_error_renders_correct_status_and_message() -> None:
 
 
 def test_denial_renders_403_and_404_through_the_real_serve_path() -> None:
-    """The consumer path: a route whose handler calls gate.authorize() and is denied must return the
-    policy's status (403 / 404) — NOT a generic 500. This is the gap the unit-only tests missed."""
+    """A route whose handler calls gate.authorize() and is denied must return the policy's status
+    (403/404), not a generic 500 — the gap unit-only tests missed."""
     from litestar.testing import TestClient
 
     from arvel.http import HttpKernel

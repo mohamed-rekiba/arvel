@@ -1,8 +1,7 @@
-"""Console boot kernel (foundation It.5a — CLI-1): an app-dependent command boots the project app.
+"""Console boot kernel: an app-dependent command boots the project app.
 
-Drives the real path — a temp project with bootstrap/app.py (create_app factory) + a route file — and
-runs `route:list` through ``run_app_command``, which loads the app, boots it (sync bootstrap + async
-boot, one event loop), runs the command, and terminates.
+Drives the real path through `run_app_command`: load a temp project's bootstrap/app.py, boot it
+(sync bootstrap + async boot, one event loop), run the command, terminate.
 """
 
 from __future__ import annotations
@@ -13,8 +12,8 @@ import pytest
 
 from arvel.kernel import set_application
 
-# bootstrap/app.py whose terminating hook writes a sentinel file, so a test can prove terminate() ran.
-# `{boot}` is spliced in to optionally add a provider whose async boot() raises (the M7 boot-failure).
+# terminating hook writes a sentinel file so tests can prove terminate() ran; `{boot}` optionally
+# splices in a provider whose async boot() raises, to test the boot-failure path.
 _BOOTSTRAP_WITH_TERMINATE_SENTINEL = """
 from pathlib import Path
 from arvel.kernel import Application
@@ -69,12 +68,12 @@ def test_route_list_boots_app_and_lists_routes(
     from arvel.console.routes import route_list
 
     try:
-        route_list()  # → run_app_command: load create_app → boot → list routes → terminate
+        route_list()
     finally:
         set_application(None)
 
     out = capsys.readouterr().out
-    assert "/ping" in out  # the route file was imported into the booted app and listed
+    assert "/ping" in out
 
 
 def test_app_command_outside_a_project_exits_clearly(
@@ -123,8 +122,7 @@ def _write_project(root: Path, *, bad_boot: bool) -> None:
 def test_terminate_runs_when_handler_raises(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A command failure exits cleanly (typer.Exit, one-line message — not a raw traceback) and
-    terminate still runs. ARVEL_DEBUG re-raises the original error for debugging."""
+    """Handler failure exits cleanly (typer.Exit) but terminate still runs; ARVEL_DEBUG re-raises."""
     import typer
 
     _write_project(tmp_path, bad_boot=False)
@@ -166,6 +164,6 @@ def test_terminate_runs_on_boot_failure(tmp_path: Path, monkeypatch: pytest.Monk
     try:
         with pytest.raises(typer.Exit):
             run_app_command(_noop_handler)
-        assert (tmp_path / "terminated.flag").exists()  # M7: failed boot still terminated
+        assert (tmp_path / "terminated.flag").exists()  # failed boot still terminated
     finally:
         set_application(None)

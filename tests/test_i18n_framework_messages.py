@@ -1,5 +1,4 @@
-"""Framework user-facing messages are i18n-aware: the auth + http hardcoded strings now route through
-trans(), backed by shipped, publishable lang groups (auth/http) that the app's lang/ can override."""
+"""Framework user-facing messages route through trans(), backed by shipped, overridable lang groups."""
 
 from __future__ import annotations
 

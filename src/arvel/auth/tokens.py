@@ -29,7 +29,7 @@ class ApiToken(Model):
         "token": str,
         "tokenable_id": int,
         "abilities": sa.Text(),  # JSON-encoded list of scopes (cast below); TEXT, matches migration
-        "expires_at": str,  # datetime cast (below) → a real DateTime column (DR-0023)
+        "expires_at": str,  # datetime cast (below) → a real DateTime column
     }
     __fillable__: ClassVar[list[str]] = [
         "name",
@@ -45,8 +45,7 @@ class ApiToken(Model):
 
         An unset/empty abilities list grants nothing (fail closed).
         """
-        # getattr(..., None) so a legacy/partial row missing the column degrades to deny (the model's
-        # __getattr__ raises on an absent column) — fail closed, not crash.
+        # getattr(..., None): a legacy/partial row missing the column degrades to deny, not a crash
         abilities = cast("list[Any]", getattr(self, "abilities", None) or [])
         return "*" in abilities or ability in abilities
 

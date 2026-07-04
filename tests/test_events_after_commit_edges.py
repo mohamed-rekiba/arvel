@@ -1,4 +1,4 @@
-"""Events depth (doc 11) — after-commit buffering edge cases: nesting, ordering, async isolation,
+"""Events — after-commit buffering edge cases: nesting, ordering, async isolation,
 and immediate dispatch of non-after-commit events inside a transaction."""
 
 from __future__ import annotations

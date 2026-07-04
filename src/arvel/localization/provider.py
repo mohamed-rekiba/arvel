@@ -31,22 +31,18 @@ class LocalizationServiceProvider(ServiceProvider):
             return Translator(fallback=fallback)
 
         self.app.singleton("translator", make_translator)
-        # let `vendor:publish --tag=lang` copy the framework defaults into the app for editing —
-        # into with_lang_dir(...)'s override (e.g. resources/lang) when set, else {base_path}/lang.
-        # ApplicationBuilder.create() sets app.lang_dir before providers ever register, so this
-        # always sees the real destination, not a bare "lang" relative to the CWD the CLI happens
-        # to be invoked from.
+        # app.lang_dir is set by ApplicationBuilder.create() before providers register, so this
+        # is the real destination, not a bare "lang" relative to the CLI's CWD
         dest = self.app.lang_dir or str(Path(self.app.base_path) / "lang")
         self.publishes({str(_FRAMEWORK_LANG): dest}, tag="lang")
 
     def boot(self) -> None:
         translator = self.app.make("translator")
-        if _FRAMEWORK_LANG.is_dir():  # framework defaults first…
+        if _FRAMEWORK_LANG.is_dir():
             translator.load(_FRAMEWORK_LANG)
-        # with_lang_dir(...) overrides the default {base_path}/lang (e.g. resources/lang, the
-        # pre-Laravel-9 convention).
+        # with_lang_dir(...) overrides the default {base_path}/lang
         app_lang = (
             Path(self.app.lang_dir) if self.app.lang_dir else Path(self.app.base_path) / "lang"
         )
-        if app_lang.is_dir():  # …then the app's own lang dir, which overrides them
+        if app_lang.is_dir():  # loaded after the framework defaults, so it overrides them
             translator.load(app_lang)

@@ -1,5 +1,5 @@
-"""arvel.media.library — Spatie-medialibrary-style HasMedia: attach files to a model in named
-collections, with generated conversions (thumbnails)."""
+"""arvel.media.library — HasMedia attaches files to a model in named collections with generated
+conversions (thumbnails)."""
 
 from __future__ import annotations
 
@@ -130,8 +130,7 @@ async def test_clear_media_collection_removes_rows_and_files() -> None:
 
 
 async def test_delete_media_removes_one_item_and_guards_ownership() -> None:
-    """delete_media removes THAT item's row + files (Spatie deleteMedia parity) — and never
-    another model's media through a foreign id."""
+    """delete_media removes only that item's row + files, never another model's media."""
     fs, db = await _setup()
     try:
         album = await Album.create(title="t")
@@ -243,8 +242,7 @@ async def test_custom_media_model_with_user_accessors() -> None:
 
 
 def test_jpeg_conversion_flattens_rgba_source() -> None:
-    """A JPEG conversion of an RGBA source must not raise — JPEG has no alpha channel, so the
-    pipeline flattens to RGB before encoding (a plain resize+encode would crash in Pillow)."""
+    """JPEG has no alpha channel, so the pipeline must flatten an RGBA source before encoding."""
     from io import BytesIO
 
     from PIL import Image as PILImage

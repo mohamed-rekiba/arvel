@@ -54,8 +54,7 @@ async def logout_everywhere(user: Any) -> None:
             await revoke(tokenable_id)
         except Exception as exc:  # collect + re-raise; never swallow a revocation failure
             errors.append(exc)
-    # Also bump the session generation so LIVE web sessions are evicted (where EnsureSessionCurrent is
-    # wired) — best-effort, never raises (a cache miss just means live sessions lapse at TTL instead).
+    # also bumps the session generation so live web sessions are evicted, not just tokens
     await invalidate_all_sessions(tokenable_id)
     audit("auth.logout_everywhere", tokenable_id=tokenable_id, failures=len(errors))
     if errors:

@@ -1,4 +1,4 @@
-"""ORM gap-audit completion — D3 (to_json), D5 (__view__ read-only), D6 (recursive/from_cte)."""
+"""ORM completion: to_json, __view__ read-only models, recursive/from_cte."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from arvel.database import Attribute, Builder, ConnectionResolver
 from arvel.database.model import Model, ReadOnlyModelError
 
 
-# --- D3: to_json ----------------------------------------------------------------
+# --- to_json ----------------------------------------------------------------
 class Article(Model):
     __fields__ = {"title": str, "secret": str}
     __hidden__ = ["secret"]
@@ -35,7 +35,7 @@ def test_to_json_honors_hidden_and_appends() -> None:
     assert parsed["slug"] == "hi-there"  # __appends__ accessor
 
 
-# --- D5: __view__ read-only model -----------------------------------------------
+# --- __view__ read-only model -----------------------------------------------
 class ActiveUser(Model):
     __view__ = "active_users"
     __fields__ = {"name": str}
@@ -47,7 +47,7 @@ def test_view_model_reads_from_the_view() -> None:
 
 async def test_view_model_blocks_writes() -> None:
     user = ActiveUser(name="ada")
-    # every write path must raise — a missed one is a silent UPDATE against a view (B1)
+    # every write path must raise — a missed one is a silent UPDATE against a view
     with pytest.raises(ReadOnlyModelError):
         await user.save()
     with pytest.raises(ReadOnlyModelError):
@@ -60,7 +60,7 @@ async def test_view_model_blocks_writes() -> None:
         await user.touch()
 
 
-# --- D6: low-level Builder.recursive_cte + from_cte -----------------------------
+# --- low-level Builder.recursive_cte + from_cte -----------------------------
 # (the ergonomic tree API lives in test_orm_recursive_relation.py via Model.recursive())
 class Category(Model):
     __fields__ = {"parent_id": int, "name": str}

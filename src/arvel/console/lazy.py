@@ -68,8 +68,7 @@ class LazyGroup(TyperGroup):
         "lang:list": "arvel.console.lang:lang_app",
     }
 
-    # Commands that work *before* a project exists (installer mode). Everything else needs a
-    # project (a bootstrap/app.py) and is hidden until then — doc 13 §One binary, two modes.
+    # commands that work before a project exists; everything else is hidden until one does
     installer_commands: ClassVar[set[str]] = {"new", "about", "extras"}
 
     def list_commands(self, ctx: Any) -> list[str]:
@@ -78,7 +77,7 @@ class LazyGroup(TyperGroup):
         names = set(super().list_commands(ctx)) | set(self.commands_manifest)
         if not in_project():  # installer mode → only the project-less commands are advertised
             return sorted(names & self.installer_commands)
-        # in a project: also advertise app/provider command classes (CLI-3)
+        # in a project: also advertise app/provider command classes
         from arvel.console.kernel import discover_app_commands
 
         names |= set(discover_app_commands())
@@ -95,14 +94,11 @@ class LazyGroup(TyperGroup):
             module_name, attr = target.split(":")
             sub_app = getattr(importlib.import_module(module_name), attr)
             command = typer.main.get_command(sub_app)
-            # Display the manifest key (the Laravel-style `make:model` / `db:seed`), not the name Typer
-            # derives from the handler function (`make-model`). Without this the `--help` listing shows
-            # hyphenated names that don't match the colon names you actually invoke — and `shell` +
-            # `tinker` (both → shell_app) both render as "shell". The name is display-only; invocation
-            # routes through the manifest key.
+            # display the manifest key (`make:model`), not Typer's derived name (`make-model`);
+            # display-only — invocation still routes through the manifest key
             command.name = cmd_name
             return command
-        # app/provider command classes (CLI-3) + routes/console.py closures (Console.command)
+        # app/provider command classes + routes/console.py closures (Console.command)
         from arvel.console.closure import ClosureCommand
         from arvel.console.kernel import discover_app_commands, run_command_class
 
@@ -113,8 +109,7 @@ class LazyGroup(TyperGroup):
             try:
                 return self._closure_command(cmd_name, descriptor)
             except Exception:
-                # a malformed closure signature (e.g. a required arg after an optional one) must not
-                # crash `--help` — degrade gracefully like a broken command class (kernel.py contract).
+                # a malformed closure signature must not crash --help; degrade like a broken command class
                 from arvel.kernel.logging import LogManager
 
                 LogManager().channel("console").warning(
@@ -143,8 +138,7 @@ class LazyGroup(TyperGroup):
         from arvel.console.closure import run_closure_command
 
         def run(**kwargs: Any) -> None:
-            # drop omitted optional args (Typer yields None) so the handler's own default / container
-            # DI applies instead of being overridden with None.
+            # drop omitted optional args so the handler's own default / container DI applies
             run_closure_command(
                 cmd_name, {key: value for key, value in kwargs.items() if value is not None}
             )
@@ -160,8 +154,7 @@ class LazyGroup(TyperGroup):
                 annotations[arg_name] = bool
             elif optional:  # {arg?} → optional POSITIONAL (None when omitted)
                 seen_optional_positional = True
-                # the default must be `typer.Argument(None)`, not a plain None: a plain default makes
-                # Typer render the param as an `--option`, breaking `cmd value` for an optional arg.
+                # a plain None default makes Typer render this as an --option instead of a positional arg
                 parameters.append(
                     inspect.Parameter(
                         arg_name,

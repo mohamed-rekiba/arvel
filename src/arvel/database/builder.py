@@ -58,8 +58,7 @@ class Builder:
         self._aggregates: list[Any] = []  # labeled scalar subqueries (with_count/with_sum)
 
     def __getattr__(self, name: str) -> Any:
-        # Resolve local scopes: a model method `scope_<name>` is callable as `.<name>(...)`.
-        # Only kicks in for genuinely-missing attributes; everything else is a real error.
+        # local scopes: a model method `scope_<name>` becomes callable as `.<name>(...)`
         if name.startswith("_"):
             raise AttributeError(name)
         model = self.__dict__.get("_model")
@@ -571,8 +570,7 @@ class Builder:
     def to_update(self, values: dict[str, Any]) -> Any:
         import sqlalchemy as sa
 
-        # Adapt value-object bind values (e.g. an arvel Date → its UTC stdlib datetime) the same way
-        # where() does, so `update({"published_at": Date.now()})` works without dropping to .to_py().
+        # same value-object adaptation as where() (e.g. Date -> UTC stdlib datetime)
         bound = {column: self._bind(value) for column, value in values.items()}
         stmt = sa.update(self._table).values(**bound)
         expr = self._where_expression()
@@ -613,8 +611,7 @@ class Builder:
         import importlib
 
         resolver = self._require_resolver()
-        # ON CONFLICT lives on the dialect-specific insert(); load it by name so the two
-        # branches don't collide in the type-checker (pg + sqlite share the same API).
+        # ON CONFLICT lives on the dialect-specific insert(); load it by name (pg vs sqlite)
         name = "postgresql" if resolver.engine().dialect.name == "postgresql" else "sqlite"
         dialect_dml: Any = importlib.import_module(f"sqlalchemy.dialects.{name}")
         statement = dialect_dml.insert(self._table).values(rows)

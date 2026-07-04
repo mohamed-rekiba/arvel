@@ -1,6 +1,5 @@
-"""Phase G / It.9 — logging channel() keeps bound context (M6); request-id + locale middleware are
-wired into the default global stack (M3). (Kernel diagnostics also now use the framework LogManager,
-not stdlib logging — verified by the suite + a no-stdlib-logging check.)"""
+"""logging channel() keeps bound context (M6); request-id + locale middleware wired into the default
+global stack (M3)."""
 
 from __future__ import annotations
 

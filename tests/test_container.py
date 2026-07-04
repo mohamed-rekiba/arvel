@@ -1,7 +1,7 @@
 """Container — autowiring, singletons, scopes, contextual bindings, tags, hooks.
 
-Covers the doc-02 acceptance checks. Fixture classes are module-level so
-``typing.get_type_hints`` resolves their annotations under ``from __future__``.
+Fixture classes are module-level so ``typing.get_type_hints`` resolves their annotations
+under ``from __future__``.
 """
 
 from __future__ import annotations

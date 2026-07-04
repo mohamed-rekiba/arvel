@@ -1,4 +1,4 @@
-"""Auth (G3 hardening) — login throttling / lockout: LoginRateLimiter + AuthManager integration."""
+"""Login throttling / lockout: LoginRateLimiter + AuthManager integration."""
 
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ async def test_available_in_counts_down_from_decay() -> None:
 
 @pytest.mark.asyncio
 async def test_identifier_is_normalized_no_casing_evasion() -> None:
-    """Casing/whitespace variants of the same login must share one bucket (DR-0015)."""
+    """Casing/whitespace variants of the same login must share one bucket."""
     limiter = LoginRateLimiter(_cache(), max_attempts=2, decay_seconds=60)
     await limiter.record_failure("Ada@Example.com")
     await limiter.record_failure("  ada@example.com ")  # same account, different casing/spaces
@@ -67,7 +67,7 @@ async def test_identifier_is_normalized_no_casing_evasion() -> None:
 
 @pytest.mark.asyncio
 async def test_fail_open_vs_fail_closed_on_cache_error() -> None:
-    """On a cache backend error, fail_open allows (default), fail_open=False denies (DR-0015)."""
+    """On a cache backend error, fail_open allows (default), fail_open=False denies."""
 
     class _BrokenCache:
         async def get(self, *a: Any, **k: Any) -> Any:

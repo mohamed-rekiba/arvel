@@ -23,9 +23,7 @@ class QueueServiceProvider(ServiceProvider):
 
         self.app.singleton("queue", make_queue)
 
-        # The task scheduler (Laravel `Schedule`): one registry of cron-cadenced events that
-        # `arvel schedule:run` ticks once a minute. Bound lazily — the Schedule class is
-        # dependency-light (no taskiq), so scheduling works even without the queue broker configured.
+        # Bound lazily — Schedule is dependency-light, so scheduling works without a queue broker configured.
         def make_schedule(_app: Container) -> Schedule:
             from arvel.queue.scheduler import Schedule
 

@@ -1,5 +1,5 @@
-"""Money value object (moneyphp parity): immutable integer-minor-unit amounts + Currency, arithmetic
-with a same-currency guard, penny-perfect allocate, comparison, predicates, and locale-aware formatting."""
+"""Money value object (moneyphp parity): integer-minor-unit amounts with a same-currency guard,
+penny-perfect allocate, and locale-aware formatting."""
 
 from __future__ import annotations
 
@@ -75,8 +75,7 @@ def test_format_honors_the_active_locale() -> None:
     token = current_locale.set("fr_FR")
     try:
         fr = Money.of("1234.5", "EUR").format()
-        # French: comma decimal + trailing euro, differs from the en default.
-        # Exact whitespace (narrow/no-break spaces) varies by CLDR version — assert shape.
+        # assert shape only: exact whitespace (narrow/no-break spaces) varies by CLDR version
         assert ",50" in fr and "€" in fr and fr != "€1,234.50"
         assert Money.of("1234.5", "USD").format("en_US") == "$1,234.50"  # explicit wins
     finally:

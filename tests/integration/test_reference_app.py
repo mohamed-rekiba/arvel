@@ -1,12 +1,8 @@
-"""Integration (doc 20) — a reference app exercised end to end against REAL infrastructure.
+"""A small project/task API — auth, CRUD, pagination, a relationship, a queued job — assembled through
+arvel's production bootstrap and driven over HTTP against live Postgres, Redis, and RabbitMQ.
 
-This is the brief's "definition of done" in miniature: a small project/task API — token auth, validated
-CRUD, pagination, a model relationship, and a queued job — assembled through arvel's **production**
-fluent bootstrap and driven over HTTP against a live **PostgreSQL** (models), **Redis** (cache), and
-**RabbitMQ** (queue). It proves these features compose on real services, not just in unit fakes.
-
-The app is driven via ``httpx.ASGITransport`` (not litestar's TestClient) so the request handlers, the
-loop-bound asyncpg/redis pools, and the in-process queue worker all share the test's single event loop.
+Uses ``httpx.ASGITransport`` (not litestar's TestClient) so the request handlers, the loop-bound
+asyncpg/redis pools, and the in-process queue worker all share the test's single event loop.
 """
 
 from __future__ import annotations
@@ -61,16 +57,14 @@ class RefTask(
 
 
 class RefTaskObserver:
-    """A model observer: bumps a Redis counter whenever a task is saved (proving observers compose on
-    real infra — the dispatcher fires, the handler hits the real cache)."""
+    """Bumps a Redis counter whenever a task is saved — proves observers compose on real infra."""
 
     async def saved(self, task: Any) -> None:
         await Cache.increment("ref_tasks_observed")
 
 
 class RefTaskCreatedJob(Job):
-    """On task creation, bump a Redis counter — proving the job travels through the real broker and
-    its handler reaches the real cache."""
+    """Bumps a Redis counter — proves the job travels through the real broker."""
 
     def __init__(self, task_id: int) -> None:
         self.task_id = task_id
@@ -168,21 +162,19 @@ async def test_reference_app_end_to_end(
         .create()
     )
     try:
-        # setup is INSIDE the try so the finally always tears down — a failure here (e.g. leftover
-        # ref_* tables from an aborted run) must not leak the global app / asyncpg pool into later tests
-        bootstrap_app(app)  # binds the router + discovers framework providers (sync)
-        _register_routes()  # facade registration — after the router is bound
+        # setup is inside the try so a failed setup still tears down and doesn't leak the global app
+        bootstrap_app(app)
+        _register_routes()
         await app.boot()
         db = app.make("db")
         for model in (RefUser, RefProject, RefTask, ApiToken):
             model.set_connection(db)
             await db.execute(sa.schema.CreateTable(model.__table__))
-        RefTask.observe(RefTaskObserver())  # wire the observer to RefTask's lifecycle events
+        RefTask.observe(RefTaskObserver())
         await RefUser.create(name="Ada", email="ada@example.com", password="secret123")
 
         transport = httpx.ASGITransport(app=app.as_asgi())
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-            # auth: bad creds + no token are rejected; valid creds issue a bearer token
             assert (
                 await c.post("/login", json={"email": "ada@example.com", "password": "x"})
             ).status_code == 401
@@ -192,19 +184,16 @@ async def test_reference_app_end_to_end(
             ).json()["token"]
             h = {"Authorization": f"Bearer {tok}"}
 
-            # validation: a missing field is a clean 400, not a 500
             assert (await c.post("/projects", json={}, headers=h)).status_code == 400
             for name in ("Alpha", "Beta", "Gamma"):
                 assert (
                     await c.post("/projects", json={"name": name}, headers=h)
                 ).status_code == 201
 
-            # pagination against real Postgres
             page = (await c.get("/projects", headers=h)).json()
             assert page["total"] == 3 and page["per_page"] == 2 and page["last_page"] == 2
             assert len(page["data"]) == 2
 
-            # relationship (has_many) + 404
             assert (
                 await c.post("/projects/1/tasks", json={"title": "T1"}, headers=h)
             ).status_code == 201
@@ -215,22 +204,19 @@ async def test_reference_app_end_to_end(
             assert shown["tasks"] == ["T1", "T2"]
             assert (await c.get("/projects/999", headers=h)).status_code == 404
 
-        # the observer fired on each task save (synchronously, in-request) → Redis counter == 2
+        # observer fires synchronously in-request, so the counter is already 2 here
         assert int(await Cache.get("ref_tasks_observed", 0)) == 2
 
-        # eager-loading (with_) batches the relation — 2 tasks loaded, no N+1
         loaded = await RefProject.with_("tasks").where("id", "=", 1).first()
         assert loaded is not None
         assert sorted(t.title for t in await loaded.tasks().get()) == ["T1", "T2"]
 
-        # soft deletes: delete() hides the row from default queries but with_trashed() still finds it
         task = await RefTask.where("title", "=", "T1").first()
         assert task is not None
         await task.delete()
-        assert await RefTask.where("title", "=", "T1").first() is None  # hidden
-        assert await RefTask.with_trashed().where("title", "=", "T1").first() is not None  # soft
+        assert await RefTask.where("title", "=", "T1").first() is None
+        assert await RefTask.with_trashed().where("title", "=", "T1").first() is not None
 
-        # the two task-create jobs travelled through RabbitMQ; their handler bumped the Redis counter
         worker = asyncio.create_task(app.make("queue").work(release_interval=0.2))
         count = 0
         for _ in range(150):
@@ -243,8 +229,7 @@ async def test_reference_app_end_to_end(
             await worker
         assert count == 2, "queued jobs did not run through the real AMQP broker"
     finally:
-        # defensive: resolve bindings via the container (not the local `db`) so cleanup runs even if
-        # setup failed before `db` was assigned; never let a teardown error mask the test outcome
+        # resolve via the container, not the local `db`, so cleanup still runs if setup failed early
         with contextlib.suppress(Exception):
             await app.make("queue").broker.shutdown()
         with contextlib.suppress(Exception):

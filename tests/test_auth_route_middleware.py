@@ -1,4 +1,4 @@
-"""Auth (G1 hardening) — route-protection middleware: auth / guest / verified / Authorize.
+"""Route-protection middleware: auth / guest / verified / Authorize.
 
 Unit tests drive each middleware's handle() against the current_user ContextVar; the E2E drives a
 real protected route through the HttpKernel + test client.
@@ -195,7 +195,7 @@ def test_protected_route_e2e() -> None:
         set_application(None)
 
 
-# --- security hardening (from the P1a security review) -------------------------
+# --- security hardening ---------------------------------------------------------
 
 
 @pytest.mark.asyncio

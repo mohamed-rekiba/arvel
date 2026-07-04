@@ -1,6 +1,4 @@
-"""ch04 — maintenance mode is wired into the global pipeline. PreventRequestsDuringMaintenance
-existed and was documented to return 503 while `arvel down`, but was never added to
-global_middleware, so maintenance mode never affected HTTP. use_default_global() fixes it."""
+"""ch04 — maintenance mode is wired into the global pipeline via use_default_global()."""
 
 from __future__ import annotations
 
@@ -23,8 +21,7 @@ async def _ok(request: Any) -> dict[str, str]:
 
 def test_use_default_global_wires_maintenance_early() -> None:
     kernel = HttpKernel().use_default_global()
-    # telemetry is outermost (its span covers the whole request); request-id next (M3, so all logs
-    # carry it); maintenance runs right after, before validation.
+    # order: telemetry outermost, then request-id (M3), then maintenance before validation
     assert kernel.global_middleware[0] is TelemetryMiddleware
     assert kernel.global_middleware[1] is RequestContextMiddleware
     assert PreventRequestsDuringMaintenance in kernel.global_middleware

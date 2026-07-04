@@ -43,8 +43,7 @@ def test_no_manifest_returns_none(tmp_path: Path) -> None:
 def test_discover_providers_reads_from_manifest_without_scanning(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """When a manifest exists, ``discover_providers`` loads from it and skips the entry-point scan
-    entirely (the cold-start fast path) — not just ``_load_manifest`` in isolation."""
+    """When a manifest exists, ``discover_providers`` skips the entry-point scan entirely."""
     from arvel.kernel.application import Application
     from arvel.kernel.service_provider import ServiceProvider
 
@@ -68,8 +67,7 @@ def test_discover_providers_reads_from_manifest_without_scanning(
 
 
 def test_manifest_skips_stale_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A stale manifest ref (package uninstalled/renamed) is warned + skipped, not fatal — the rest
-    of the manifest still loads."""
+    """A stale manifest ref (package uninstalled/renamed) is warned + skipped, not fatal."""
     from arvel.kernel.service_provider import ServiceProvider
 
     cache = tmp_path / "bootstrap" / "cache"

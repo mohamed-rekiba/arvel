@@ -49,8 +49,7 @@ def test_none_return_is_a_response() -> None:
 
 
 def test_date_value_serializes_to_iso_string() -> None:
-    # an arvel Date (what a model's date column hydrates to) must encode to an ISO string in a
-    # response, not raise SerializationException — the canonical `return User::paginate()` path.
+    # arvel Date must serialize to ISO in a response, not raise SerializationException.
     from arvel.dates import Date
 
     when = Date.now()

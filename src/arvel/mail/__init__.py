@@ -67,10 +67,8 @@ def _global_from() -> str:
 class Mailable:
     """Base mail message: subclass and override ``build()`` (Laravel ``Mailable``)."""
 
-    # Class-level defaults so the base fields exist even when a subclass defines its own ``__init__``
-    # without calling ``super().__init__()`` (the normal Laravel shape) OR is rebuilt via
-    # ``__new__`` (a queued mailable decoded by the worker — see SendQueuedMailable). Immutable
-    # defaults are safe to share; the mutable attachment list is lazily created per-instance.
+    # Class-level defaults so base fields exist even if a subclass skips super().__init__() or is
+    # rebuilt via __new__ (a queued mailable decoded by the worker; see SendQueuedMailable).
     _subject: str = ""
     _html: str = ""
     _from: str = ""  # sender address; defaults to the transport/agent if unset
@@ -284,8 +282,7 @@ class PendingMail:
         if self._cc:
             message["Cc"] = ", ".join(self._cc)
         if self._bcc:
-            # aiosmtplib strips Bcc from the wire but uses it for envelope recipients; the log
-            # transport keeps it so tests can assert it.
+            # Stripped from the wire by aiosmtplib; kept here so the log transport lets tests assert it.
             message["Bcc"] = ", ".join(self._bcc)
         result: bool = await self._mailer.transport().send(message)
         return result

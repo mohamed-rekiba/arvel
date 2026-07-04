@@ -1,4 +1,4 @@
-"""Auth (L8) — per-user session generation: 'log out other devices' for live sessions."""
+"""Per-user session generation: 'log out other devices' for live sessions."""
 
 from __future__ import annotations
 

@@ -49,9 +49,8 @@ class SendQueuedNotification(Job):
 
         self.notifiable = notifiable
         self.notification = encode_instance(notification)  # serializable repr (not the live object)
-        # the channel slice this job delivers (None = all of via()); the ShouldQueue rail enqueues
-        # one job PER channel (Laravel parity) so a mail failure retries only mail and can never
-        # re-run — i.e. double-store — an already-delivered database channel
+        # one job per channel (None = all of via()), so retrying a failed mail job can't double-store
+        # an already-delivered database channel.
         self.channels = channels
 
     async def handle(self) -> dict[str, Any]:
@@ -93,8 +92,6 @@ class NotificationManager:
             and hasattr(app, "bound")
             and app.bound("queue")
         ):
-            # one queued job PER channel (Laravel parity): channel failures are isolated, so a
-            # retrying mail job can never re-run (double-store) the database channel
             queue = app.make("queue")
             for channel in notification.via(notifiable):
                 await queue.push_instance(
@@ -227,8 +224,7 @@ class AnonymousNotifiable:
 
 
 def __getattr__(name: str) -> Any:
-    # Lazy re-export: importing DatabaseNotification pulls in arvel.database (SQLAlchemy), so we only
-    # resolve it on access — `import arvel.notifications` for the in-memory channels stays light.
+    # DatabaseNotification pulls in arvel.database (SQLAlchemy); resolve lazily to keep import light.
     if name == "DatabaseNotification":
         from arvel.notifications.database import DatabaseNotification
 

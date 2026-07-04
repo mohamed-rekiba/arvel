@@ -197,9 +197,8 @@ def _factory() -> ViewFactory:
 __all__ = ["View", "ViewFactory", "view"]
 
 
-# Wire pagination's page-link-bar renderer (views→pagination is a legal downward edge;
-# pagination must not import views — DR-0026). Importing arvel.views is enough for
-# ``paginator.links()`` to render through the view layer.
+# Wire pagination's page-link-bar renderer (views->pagination is a legal downward edge; the
+# reverse isn't, DR-0026), so importing arvel.views makes paginator.links() render through Jinja.
 import arvel.pagination as _pagination  # noqa: E402
 
 

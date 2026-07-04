@@ -21,8 +21,8 @@ class FlashBag:
 
     KEY = "_flash"
     ERRORS_KEY = "_errors"
-    FRESH_KEY = "_flash_fresh"  # keys flashed THIS request — survive the next age(); internal
-    OLD_INPUT_KEY = "_old_input"  # the previous request's input, for old() form repopulation
+    FRESH_KEY = "_flash_fresh"  # keys flashed this request; survive the next age()
+    OLD_INPUT_KEY = "_old_input"
 
     def __init__(self, session: dict[str, Any]) -> None:
         self._session = session
@@ -87,7 +87,7 @@ class FlashBag:
         Run once per request at session load. Keeps anything (re)flashed during the previous request,
         expires everything older — the one-request flash lifecycle. Leaves no empty bookkeeping keys
         in the session (so callers that snapshot the session see only their own data)."""
-        fresh = set(self._session.pop(self.FRESH_KEY, []))  # consume this cycle's fresh marks
+        fresh = set(self._session.pop(self.FRESH_KEY, []))
         bag = self._session.get(self.KEY)
         if isinstance(bag, dict):
             bag_d = cast("dict[str, Any]", bag)

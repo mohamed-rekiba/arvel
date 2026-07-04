@@ -37,7 +37,7 @@ def test_mail_default_driver_and_config_from_app() -> None:
 
     app = Application()
     app.make("config").set("mail", {"default": "smtp", "smtp": {"host": "mail.test", "port": 25}})
-    set_application(app)  # config() is the single source of truth (DR-0016)
+    set_application(app)  # config() is the single source of truth
     try:
         assert MailManager(app).default_driver() == "smtp"
         assert MailSettings().smtp.host == "mail.test"

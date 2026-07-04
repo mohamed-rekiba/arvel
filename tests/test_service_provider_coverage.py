@@ -27,7 +27,7 @@ def test_load_config_file_uppercase_fallback(tmp_path: Path) -> None:
 
 
 def test_load_config_file_rejects_non_py(tmp_path: Path) -> None:
-    # M1: a config file is executed as Python — a non-.py path fails clearly, not as an exec error.
+    # a config file is executed as Python — a non-.py path fails clearly, not as an exec error.
     cfg = tmp_path / "cfg.json"
     cfg.write_text('{"k": "v"}')
     import pytest

@@ -43,8 +43,7 @@ def test_query_entry_classmethods_return_a_typed_builder() -> None:
         Item.order_by("price"),
     ):
         assert isinstance(builder, Builder)
-    # `when` is intentionally NOT a Model classmethod (it would shadow a column named `when`); it
-    # stays a Builder method, chained: Model.query()/Model.where(...).when(...).
+    # `when` is intentionally not a Model classmethod — it would shadow a column named `when`
     assert isinstance(Item.query().when(True, lambda q: q), Builder)
 
 

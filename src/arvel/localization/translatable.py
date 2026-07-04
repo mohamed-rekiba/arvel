@@ -73,9 +73,8 @@ class HasTranslations:
     def set_translation(self, key: str, locale: str, value: str) -> HasTranslations:
         data = _load(self._attributes.get(key))
         data[locale] = value
-        # Store the DICT (not json.dumps(...)) so a JSON/jsonb column serializes it exactly once —
-        # matching Translatable.set. Writing a pre-stringified value double-encodes on jsonb and breaks
-        # ->>' / json_extract lookups (the dict-assignment path stores it correctly, so they must agree).
+        # store the dict, not json.dumps(...) — a pre-stringified value double-encodes on jsonb
+        # and breaks ->>/json_extract lookups (must agree with Translatable.set)
         self._attributes[key] = data
         return self
 

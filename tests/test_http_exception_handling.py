@@ -1,5 +1,4 @@
-"""E1 — uncaught exceptions are reported through the bound ExceptionHandler and rendered as a proper
-(content-negotiated, debug-gated) 500, not silently turned into Litestar's generic 500."""
+"""E1 — uncaught exceptions are reported and rendered as a content-negotiated, debug-gated 500."""
 
 from __future__ import annotations
 
@@ -65,11 +64,10 @@ def test_debug_surfaces_the_real_error() -> None:
     with client:
         resp = client.get("/boom", headers={"accept": "application/json"})
     assert resp.status_code == 500
-    assert "ValueError" in resp.json()["message"]  # debug surfaces the real error
+    assert "ValueError" in resp.json()["message"]
 
 
 def test_5xx_detail_is_never_leaked_in_production() -> None:
-    # a 5xx exception carrying a sensitive `.detail` must render generically in prod (no leak).
     client, _ = _client(debug=False)
     with client:
         resp = client.get("/boom-detail", headers={"accept": "application/json"})

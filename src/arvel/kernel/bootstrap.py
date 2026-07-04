@@ -49,10 +49,8 @@ def bootstrap_app(app: Application) -> None:
     app.bootstrapped = True
 
 
-# Named route groups → kernel middleware group + URL prefix. Mirrors Laravel: `web` routes are
-# stateful (session/CSRF) with no prefix; `api` routes are stateless + URL-prefixed `/api`. An
-# unrecognized name maps to a kernel group of the same name (no prefix). `console` is excluded —
-# it's a CLI-command file (reserved for the console kernel; loader pending), not an HTTP route.
+# Named route groups → kernel middleware group + URL prefix (Laravel: web=stateful/no-prefix,
+# api=stateless+/api). An unrecognized name maps to a same-named group with no prefix.
 _ROUTE_GROUPS: dict[str, dict[str, str]] = {
     "web": {"group": "web"},
     "api": {"group": "api", "prefix": "/api"},
@@ -111,8 +109,7 @@ def _import_route_file(
         return
     seen.add(resolved)
     if not path.is_file():
-        # recorded deliberately (load_routes_from / with_routing) → a missing file is a bug, not a
-        # silent no-op; warn so "my routes 404" is diagnosable rather than mysterious.
+        # a deliberately-recorded route file gone missing is a bug, not a silent no-op
         log.warning("route_file_not_found", path=raw)
         return
     spec = importlib.util.spec_from_file_location(f"_arvel_routes_{index}", path)
@@ -144,7 +141,7 @@ async def lifespan(app: Application) -> AsyncGenerator[Application]:
     try:
         await app.boot()
     except BaseException:
-        await safe_terminate(app)  # M7: a failed boot still runs terminate() before propagating
+        await safe_terminate(app)  # a failed boot still runs terminate() before propagating
         raise
     try:
         yield app

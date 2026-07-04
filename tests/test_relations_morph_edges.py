@@ -1,5 +1,5 @@
-"""ORM depth (doc 07) — morph relationship EDGE cases (the Testing Standard's morph checklist):
-empty relation, polymorphic type collision, null morph_to, and single-query (N+1 absence)."""
+"""ORM depth (doc 07) — morph relationship edge cases: empty relation, type collision, null
+morph_to, and single-query (N+1 absence)."""
 
 from __future__ import annotations
 
@@ -49,8 +49,7 @@ async def test_empty_morph_relation_returns_empty_list() -> None:
 
 
 async def test_polymorphic_type_collision_resolves_correct_parent() -> None:
-    # Post#1 and Video#1 share the same primary key across different tables — morph_to must
-    # disambiguate by the *_type, not just the *_id.
+    # Post#1 and Video#1 share the same primary key; morph_to must disambiguate by *_type, not *_id
     db = await _setup()
     try:
         post = await MePost.create(title="P")

@@ -1,11 +1,5 @@
-"""Integration (doc 20) — the e-commerce catalog ORM behaviors against real PostgreSQL.
-
-Exercises the relationship + serialization fixes the proof app (arvel-ecommerce-kit) surfaced, on a
-real Postgres testcontainer (SQLite's loose typing/behaviour can hide gaps):
-  * ``with_(...)`` eager-loads through ``.first()`` and ``.get()`` (no N+1),
-  * ``to_dict()`` includes the loaded relations (Laravel ``toArray`` parity),
-  * ``when``/``unless`` conditional filtering, and an Enum-cast column,
-  * ``paginate()`` returns Laravel's shape with relation-bearing rows.
+"""Catalog ORM behaviors (eager-loading, serialization, conditional filtering, pagination) against
+real PostgreSQL — SQLite's looser typing can hide gaps these depend on.
 """
 
 from __future__ import annotations
@@ -70,14 +64,12 @@ async def test_catalog_eager_load_and_serialization_on_postgres(postgres_url: st
         await Variant.create(product_id=active.id, sku="AERO-S", stock=5)
         await Variant.create(product_id=active.id, sku="AERO-M", stock=8)
 
-        # with_(...).first() eager-loads; to_dict() nests the loaded relations
         product = await Product.with_("category", "variants").where("name", "Aero").first()
         data = product.to_dict()
-        assert data["status"] == "active"  # Enum cast → string in JSON
+        assert data["status"] == "active"
         assert data["category"]["name"] == "Shirts"
         assert sorted(v["sku"] for v in data["variants"]) == ["AERO-M", "AERO-S"]
 
-        # when/unless conditional filtering on the real dialect
         only_active = (
             await Product.query()
             .when(True, lambda q, _: q.where("status", ProductStatus.ACTIVE.value))
@@ -85,7 +77,6 @@ async def test_catalog_eager_load_and_serialization_on_postgres(postgres_url: st
         )
         assert [p.name for p in only_active] == ["Aero"]
 
-        # pagination returns Laravel's shape; rows carry eager-loaded relations
         page = await Category.with_("products").paginate(per_page=10)
         as_dict = page.to_dict()
         assert as_dict["total"] == 1

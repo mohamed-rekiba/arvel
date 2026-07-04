@@ -1,4 +1,4 @@
-"""HTTP (doc 04) — ValidateCsrfToken web-group middleware. Test-first."""
+"""HTTP — ValidateCsrfToken web-group middleware."""
 
 from __future__ import annotations
 

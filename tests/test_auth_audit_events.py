@@ -1,4 +1,4 @@
-"""Auth (L2b) — security-audit events emitted on the framework Log `security` channel."""
+"""Security-audit events emitted on the framework Log `security` channel."""
 
 from __future__ import annotations
 

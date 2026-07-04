@@ -1,4 +1,4 @@
-"""Events (doc 11) — auto-discovery registers listeners by their handle(self, event: X) hint."""
+"""Events — auto-discovery registers listeners by their handle(self, event: X) hint."""
 
 from __future__ import annotations
 

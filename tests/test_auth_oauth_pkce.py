@@ -1,4 +1,4 @@
-"""Auth (G9 hardening) — OAuth2 PKCE (RFC 7636) + userinfo. No network."""
+"""OAuth2 PKCE (RFC 7636) + userinfo. No network."""
 
 from __future__ import annotations
 

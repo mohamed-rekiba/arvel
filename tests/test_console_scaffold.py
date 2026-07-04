@@ -1,4 +1,4 @@
-"""Scaffold acceptance (foundation It.5b): `arvel new` produces a RUNNABLE project (CLI-2/D1/D2).
+"""Scaffold acceptance: `arvel new` produces a RUNNABLE project.
 
 The consumer-path proof at the pytest layer: a freshly-scaffolded app has the `create_app()` factory
 (the in_project marker + what the CLI/asgi load), is recognized as a project, and serves its `/` route
@@ -26,7 +26,7 @@ def test_new_scaffolds_a_runnable_project(tmp_path: Path, monkeypatch: pytest.Mo
     assert (
         "def create_app()" in app_py
     )  # the factory the CLI + asgi load (also the in_project marker)
-    assert "with_routing(" in app_py and "web.py" in app_py  # routes wired so they're served (D2)
+    assert "with_routing(" in app_py and "web.py" in app_py  # routes wired so they're served
     assert (
         "create_app()" in (proj / "asgi.py").read_text()
     )  # asgi uses the factory, not bare Application()
@@ -35,7 +35,7 @@ def test_new_scaffolds_a_runnable_project(tmp_path: Path, monkeypatch: pytest.Mo
     from arvel.kernel import set_application
 
     monkeypatch.chdir(proj)
-    assert in_project() is True  # fresh project is recognized (D1)
+    assert in_project() is True  # fresh project is recognized
     try:
         result = runner.invoke(build_cli(), ["route:list"])  # boots the app via the console kernel
         assert result.exit_code == 0, result.output
@@ -49,7 +49,7 @@ def test_new_scaffolds_a_runnable_project(tmp_path: Path, monkeypatch: pytest.Mo
 def test_new_scaffolds_a_laravel_like_structure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # It.5b enrichment: a fresh app ships a minimal-but-real structure (cf. `laravel new`).
+    # a fresh app ships a minimal-but-real structure (cf. `laravel new`)
     monkeypatch.chdir(tmp_path)
     assert runner.invoke(build_cli(), ["new", "blog"]).exit_code == 0
     proj = tmp_path / "blog"

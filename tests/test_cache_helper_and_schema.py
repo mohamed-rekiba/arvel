@@ -1,4 +1,4 @@
-"""Helpers (doc 06/10) — global cache() helper + arvel.Schema native wrapper."""
+"""The global cache() helper + arvel.Schema native wrapper."""
 
 from __future__ import annotations
 
@@ -7,8 +7,7 @@ from arvel.support import cache
 
 
 async def test_cache_helper_returns_default_driver() -> None:
-    # cache() resolves the container-bound CacheManager; support is a leaf and no longer
-    # constructs one app-less (DR-0026). Boot a minimal app with the cache provider.
+    # cache() resolves the container-bound CacheManager, so boot a minimal app with the provider
     from arvel.cache.provider import CacheServiceProvider
     from arvel.kernel import Application, set_application
 

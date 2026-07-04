@@ -48,9 +48,7 @@ async def test_window_reset_allows_again() -> None:
 
 
 async def test_reset_rate_limiter_clears_state_for_test_isolation() -> None:
-    # The in-process limiter state is process-global (correct for one running app, but it leaks
-    # across app instances built within a single test process). reset_rate_limiter() clears it so
-    # each test starts fresh — without it the api throttle 429s spuriously mid-suite.
+    # limiter state is process-global and leaks across app instances within one test process
     from arvel.http import reset_rate_limiter
 
     throttle = ThrottleRequests(max_attempts=1, decay_seconds=60, name="t-reset-helper")
@@ -59,9 +57,9 @@ async def test_reset_rate_limiter_clears_state_for_test_isolation() -> None:
     with pytest.raises(ValidationException):
         await throttle.handle(request, _ok)  # 2 → 429
 
-    reset_rate_limiter()  # clear the global window state
+    reset_rate_limiter()
 
-    assert await throttle.handle(request, _ok) == "ok"  # allowed again after reset
+    assert await throttle.handle(request, _ok) == "ok"
 
 
 def test_reset_sessions_clears_the_in_process_session_store() -> None:

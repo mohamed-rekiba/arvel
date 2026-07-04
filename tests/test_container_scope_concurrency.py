@@ -1,5 +1,5 @@
-"""Container depth (doc 01/06) — scoped bindings isolate per scope AND per concurrent async task
-(the per-request ContextVar model), while singletons stay shared."""
+"""Scoped bindings isolate per scope AND per concurrent async task (the per-request ContextVar
+model), while singletons stay shared."""
 
 from __future__ import annotations
 

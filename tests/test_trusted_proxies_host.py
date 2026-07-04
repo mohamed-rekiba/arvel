@@ -1,6 +1,6 @@
-"""ch04 / finding A1 — TrustProxies (config-gated forwarded headers on Request) + ValidateHost
-(400 on an untrusted Host). Forwarded headers are honored only when config('app.trusted_proxies')
-trusts the peer; Host is validated against config('app.trusted_hosts') when set."""
+"""TrustProxies (config-gated forwarded headers on Request) + ValidateHost (400 on an untrusted
+Host). Forwarded headers are honored only when config('app.trusted_proxies') trusts the peer;
+Host is validated against config('app.trusted_hosts') when set."""
 
 from __future__ import annotations
 

@@ -1,11 +1,6 @@
-"""G2 — startup performance NFR.
-
-The load-bearing invariant: ``import arvel`` must pull in **zero** heavy libraries.
-This is what lets the framework stay light and the CLI fast. Measured in a clean
-subprocess (the current process has already imported things under pytest).
-
-See knowledge/port/00-porting-strategy.md §5b.
-"""
+"""Startup performance NFR: `import arvel` must pull in zero heavy libraries, measured in a clean
+subprocess (the current process already imported things under pytest).
+See knowledge/port/00-porting-strategy.md §5b."""
 
 from __future__ import annotations
 

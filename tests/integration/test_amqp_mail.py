@@ -1,10 +1,7 @@
-"""Integration (doc 20) — a queued Mailable survives a round-trip through a REAL AMQP broker.
+"""A queued Mailable survives a round-trip through a REAL AMQP broker.
 
-A ``ShouldQueue`` mailable is enqueued (the mail ShouldQueue rail dispatches ``SendQueuedMailable`` via
-``push_instance``, so the job is JSON-serialized onto the broker), then the worker consumes it, rebuilds
-the mailable from its encoded state, and delivers it. In-process FakeQueue tests never serialize, so this
-is the path that would expose a non-serializable queued mailable — it doesn't, because the mailable is
-stored as a JSON-safe ``encode_instance`` view, not the live object. This locks that on real infra.
+In-process FakeQueue tests never serialize the job, so they'd miss a non-serializable queued mailable;
+this exercises the real JSON-encode/decode path end to end.
 """
 
 from __future__ import annotations
@@ -24,7 +21,7 @@ pytestmark = pytest.mark.integration
 
 
 class WelcomeQueuedMail(Mailable, ShouldQueue):
-    """A queued mailable carrying state (the recipient's name) that must survive broker serialization."""
+    """Carries state that must survive broker serialization."""
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -49,12 +46,11 @@ async def test_queued_mailable_round_trips_real_amqp_broker(rabbitmq_url: str) -
         bootstrap_app(app)
         await app.boot()
 
-        # ShouldQueue + a bound queue → send() enqueues SendQueuedMailable (serialized onto RabbitMQ)
         await Mail.to("ada@example.com").send(WelcomeQueuedMail("Ada"))
 
         worker = asyncio.create_task(app.make("queue").work(release_interval=0.2))
         delivered = None
-        for _ in range(150):  # up to ~15s for the broker round-trip + worker delivery
+        for _ in range(150):  # up to ~15s for broker round-trip + delivery
             sent = app.make("mail").transport().sent
             if sent:
                 delivered = sent[-1]
@@ -65,7 +61,6 @@ async def test_queued_mailable_round_trips_real_amqp_broker(rabbitmq_url: str) -
             await worker
 
         assert delivered is not None, "queued mailable was not delivered after the AMQP round-trip"
-        # the rebuilt mailable ran build() on the worker side — its state (the name) survived
         assert delivered["Subject"] == "Welcome, Ada"
         assert delivered["To"] == "ada@example.com"
     finally:

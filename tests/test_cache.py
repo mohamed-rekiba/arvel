@@ -1,4 +1,4 @@
-"""Phase 6 — Cache manager (cashews-backed) behaviour."""
+"""Cache manager (cashews-backed) behaviour."""
 
 from __future__ import annotations
 
@@ -37,9 +37,8 @@ async def test_remember_computes_once() -> None:
 
 
 async def test_redis_driver_fails_loudly_when_backend_is_down() -> None:
-    """A dead Redis must RAISE, not silently no-op (Laravel parity). cashews' Redis backend
-    defaults ``suppress=True`` — get→None / put→no-op / a Cache.lock that isn't a lock — which
-    turns an infra outage into silent data-correctness bugs (surfaced by the kit's S1 tier)."""
+    """A dead Redis must RAISE, not silently no-op. cashews' Redis backend defaults
+    ``suppress=True``, which would otherwise turn an infra outage into silent data-correctness bugs."""
     pytest.importorskip("cashews.backends.redis")
     from cashews.exceptions import CacheBackendInteractionError
 

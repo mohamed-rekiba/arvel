@@ -14,8 +14,7 @@ from typing import TYPE_CHECKING, Any
 from arvel.auth.gate import AuthorizationError, Gate, GateResponse
 from arvel.auth.permissions import HasRoles, Permission, Role
 
-# The current-principal ContextVar lives in the core ``support`` leaf so ``http`` can baseline/read
-# it without an illegal http→auth edge; auth re-exports it as its public ``current_user`` (DR-0026).
+# Lives in core `support` (not here) so `http` can read it without an illegal http→auth edge.
 from arvel.support import current_user
 
 
@@ -87,7 +86,7 @@ class AuthManager:
 
     def __init__(self, app: Any = None, *, limiter: Any = None) -> None:
         self.app = app
-        self._limiter = limiter  # optional LoginRateLimiter for failed-login lockout (G3)
+        self._limiter = limiter  # optional LoginRateLimiter for failed-login lockout
 
     def user(self) -> Any:
         return current_user.get()
@@ -125,7 +124,7 @@ class AuthManager:
         limiter = self._limiter
         if limiter is not None and identifier and await limiter.too_many_attempts(identifier):
             audit("auth.login.blocked", level="warning", identifier=identifier, reason="locked_out")
-            return False  # locked out — don't even try
+            return False
 
         user = await provider(credentials)
         ok = False
@@ -167,7 +166,7 @@ class AuthManager:
             return
         from arvel.security import resolve_hasher
 
-        hasher = resolve_hasher()  # container-bound hasher when an app is running
+        hasher = resolve_hasher()
         if hasher.needs_rehash(password, stored):
             user.set_auth_password(hasher.make(password))
             await user.save()

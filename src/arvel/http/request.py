@@ -11,8 +11,7 @@ import contextvars
 from typing import Any, cast
 
 current_request: contextvars.ContextVar[Request] = contextvars.ContextVar("arvel_request")
-# Re-exported from the core ``support`` leaf so http can read/baseline the principal without an
-# illegal http→auth edge; ``auth`` re-exports the same object as its public ``current_user`` (DR-0026).
+# re-exported from the core `support` leaf so http reads the principal without an http->auth edge
 from arvel.support import current_user as current_user  # noqa: E402  (explicit re-export)
 
 
@@ -206,9 +205,8 @@ class UploadedFile:
         return path
 
 
-# Wire pagination's current-request resolver (http→pagination is a legal downward edge;
-# pagination must not import http — DR-0026). Importing arvel.http.request is enough to make
-# ``await Post.paginate()`` resolve the bound request for URL/page building.
+# importing this module wires pagination's current-request resolver, so `await Post.paginate()`
+# can resolve the bound request for URL/page building
 import arvel.pagination as _pagination  # noqa: E402
 
 _pagination.set_request_resolver(lambda: current_request.get(None))

@@ -1,4 +1,4 @@
-"""Phase 1 — identity layer: Principal + UserProvider linking/JIT/lockout policy (DR-0010/0012).
+"""Identity layer: Principal + UserProvider linking/JIT/lockout policy.
 
 The security policy is unit-tested against an in-memory IdentityStore fake, so no DB is needed.
 """
@@ -83,7 +83,7 @@ async def test_known_identity_resolves_to_its_user() -> None:
     assert resolved is ada
 
 
-# --- resolve: linking by email (DR-0010) --------------------------------------
+# --- resolve: linking by email --------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -156,7 +156,7 @@ async def test_no_jit_returns_none_for_unknown() -> None:
     assert resolved is None
 
 
-# --- unlink: last-credential lockout (DR-0012) --------------------------------
+# --- unlink: last-credential lockout --------------------------------------------
 
 
 @pytest.mark.asyncio

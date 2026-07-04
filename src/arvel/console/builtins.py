@@ -255,13 +255,12 @@ def serve(
     app: str = typer.Option("asgi:asgi_app", help="ASGI app target (module:attr)."),
 ) -> None:
     """Run the development server (granian) serving the app's ASGI entrypoint."""
-    # launch granian as a subprocess — a fixed argv list, no shell, no untrusted input
     import subprocess  # nosec B404
 
     cmd = _serve_command(host, port, reload=reload, app=app)
     typer.echo(f"[arvel serve] http://{host}:{port}  ({app}, granian)")
     try:
-        # cmd is a fixed argv list (granian + the developer's own CLI flags); shell=False
+        # fixed argv list, no shell=True — nothing here is untrusted input
         code = subprocess.call(cmd)  # nosec B603
         raise typer.Exit(code)
     except FileNotFoundError:

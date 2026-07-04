@@ -112,8 +112,7 @@ def test_configure_exports_logs() -> None:
     result = configure(log_exporter=exporter)  # logs-only setup; auto-attaches a root handler
     assert result is not None and result.logger_provider is not None
 
-    # Emit through stdlib logging — configure() attached the OTel handler to the root logger,
-    # so records propagate to it and export (the real production behavior).
+    # emit through stdlib logging — configure() attached the OTel handler to the root logger.
     log = logging.getLogger("arvel.telemetry.logtest")
     log.setLevel(logging.INFO)
     log.info("checkout-complete")
@@ -139,7 +138,7 @@ def test_metric_reader_and_log_exporter_select_from_config() -> None:
 
 
 def test_arvel_log_facade_exports_to_otel_with_trace_context() -> None:
-    """The gap-closer: arvel's public ``Log`` facade flows into OTel logs, correlated to the trace."""
+    """arvel's public ``Log`` facade flows into OTel logs, correlated to the trace."""
     import structlog
     from opentelemetry import trace
     from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
@@ -220,8 +219,8 @@ def test_span_helper_is_a_noop_when_tracing_off(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_disabled_telemetry_does_no_opentelemetry_work(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The 'off = free' guarantee: with telemetry off, the instrumentation helpers short-circuit to
-    a no-op (a bool check + a no-op context manager) — they create no spans and touch no OTel state."""
+    """'off = free': with telemetry off, instrumentation helpers short-circuit to a no-op —
+    no spans, no OTel state touched."""
     import arvel.telemetry
     from arvel.telemetry import span
 

@@ -25,8 +25,7 @@ async def test_metrics_handler_returns_prometheus_exposition() -> None:
 
 
 def test_provider_registers_metrics_route_when_prometheus_on() -> None:
-    # Route registration moved from the telemetry provider to the routing provider (DR-0026):
-    # telemetry must not import arvel.http, so the layer that legally imports both wires /metrics.
+    # telemetry must not import arvel.http (DR-0026); the routing provider wires /metrics instead.
     from arvel.kernel import Application, set_application
     from arvel.routing import Router
     from arvel.routing.provider import RoutingServiceProvider

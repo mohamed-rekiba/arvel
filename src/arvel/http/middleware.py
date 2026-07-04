@@ -106,11 +106,11 @@ class ThrottleRequests(Middleware):
             if count == 1:
                 await self._cache.expire(key, self.decay_seconds)
             return int(count)
-        import time  # in-process fixed window
+        import time
 
         now = time.monotonic()
         count, start = _THROTTLE_HITS.get(key, (0, now))
-        if now - start >= self.decay_seconds:  # window elapsed → reset
+        if now - start >= self.decay_seconds:
             count, start = 0, now
         count += 1
         _THROTTLE_HITS[key] = (count, start)
@@ -153,17 +153,16 @@ class StartSession(Middleware):
         secure: bool | None = None,
         host_prefix: bool | None = None,
     ) -> None:
-        settings = SessionSettings()  # typed view over session config (validates lifetime/secure)
+        settings = SessionSettings()
         self._store = store if store is not None else _SESSIONS
         self._cache = cache  # CacheRepository for distributed sessions; None → in-process dict
-        # Precedence: explicit arg > session.* config > built-in default. lifetime is in MINUTES;
-        # _max_age is the seconds value used for the cookie max-age + cache TTL (DR-0019).
+        # precedence: explicit arg > session.* config > built-in default
         minutes = lifetime if lifetime is not None else settings.lifetime
         self._max_age = minutes * 60
         self._secure = (  # mark the cookie Secure (HTTPS-only); set False for plain-HTTP dev
             secure if secure is not None else settings.secure
         )
-        # __Host- prefix defaults ON whenever the cookie is Secure (it requires Secure to be accepted).
+        # __Host- prefix defaults on whenever the cookie is Secure (browsers require Secure for it)
         host_prefix = host_prefix if host_prefix is not None else settings.host_prefix
         use_prefix = host_prefix if host_prefix is not None else self._secure
         self._cookie_name = "__Host-session" if (use_prefix and self._secure) else "session"
@@ -215,8 +214,6 @@ class StartSession(Middleware):
             await self._save(request._session_id, request.session)
 
     async def terminate(self, request: Any, response: Any) -> None:
-        # Issue/rotate the session cookie after the response is built (new session, or regenerate/
-        # invalidate flipped the flag). HttpOnly + SameSite=Lax + Secure by default.
         if not getattr(request, "_session_set_cookie", False):
             return
         setter = getattr(response, "set_cookie", None)
@@ -254,7 +251,7 @@ class ValidateCsrfToken(Middleware):
     def __init__(self) -> None:
         settings = SessionSettings()  # share the session cookie's Secure flag + lifetime
         self._secure = settings.secure
-        self._max_age = settings.lifetime * 60  # minutes (DR-0019) -> seconds for max-age
+        self._max_age = settings.lifetime * 60  # minutes -> seconds for max-age
 
     async def _submitted(self, request: Any) -> Any:
         header = request.header(self.HEADER) or request.header("x-xsrf-token")
@@ -288,9 +285,8 @@ class ValidateCsrfToken(Middleware):
             return await call_next(request)
         expected = self._expected(request)
         submitted = await self._submitted(request)
-        # Constant-time compare: token verification must not leak the secret via timing.
-        # Compare as bytes so an attacker-supplied non-ASCII header yields a clean 419,
-        # not a 500 (secrets.compare_digest rejects non-ASCII str).
+        # constant-time compare (must not leak the secret via timing); bytes so a non-ASCII
+        # header yields a clean 419 instead of a 500 (compare_digest rejects non-ASCII str)
         if (
             not isinstance(expected, str)
             or not expected

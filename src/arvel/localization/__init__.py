@@ -63,8 +63,7 @@ class Translator:
         self.fallback = fallback
 
     def add(self, locale: str, data: Mapping[str, Any]) -> None:
-        # Merge one level deep so a later source (the app's lang/) can override *individual* keys in a
-        # group (e.g. one validation rule) without dropping the rest of the group (the framework defaults).
+        # one level deep, so a later source can override individual keys without dropping the rest
         bucket = self._translations.setdefault(locale, {})
         for key, value in data.items():
             existing = bucket.get(key)

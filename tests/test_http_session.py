@@ -89,8 +89,7 @@ class _FakeResponse:
 
 
 async def test_lifetime_is_minutes_converted_to_seconds_for_cookie_and_ttl() -> None:
-    """`session.lifetime` is in MINUTES (Laravel parity, DR-0019); the cookie max-age + cache TTL
-    are seconds = lifetime x 60."""
+    """`session.lifetime` is in MINUTES; cookie max-age + cache TTL are seconds = lifetime x 60."""
     from arvel.kernel import Application, set_application
 
     app = Application()

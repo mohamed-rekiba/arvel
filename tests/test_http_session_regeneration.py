@@ -28,7 +28,7 @@ class FakeResponse:
         self.cookies.append((key, value, kw))
 
 
-# --- cookie issuance ----------------------------------------------------------
+# --- cookie issuance ---
 
 
 @pytest.mark.asyncio
@@ -83,7 +83,7 @@ async def test_existing_session_without_rotation_sets_no_cookie() -> None:
     assert store["abc"] == {"user_id": 7}
 
 
-# --- regeneration (anti session-fixation) -------------------------------------
+# --- regeneration (anti session-fixation) ---
 
 
 @pytest.mark.asyncio
@@ -93,7 +93,7 @@ async def test_regenerate_rotates_id_preserves_data_and_drops_old() -> None:
     req = FakeRequest(session_id="attacker-fixed")
 
     async def dest(r: Any) -> str:
-        r.session["user_id"] = 7  # the user logs in
+        r.session["user_id"] = 7
         regenerate_session(r)  # rotate the (possibly fixed) id
         return "ok"
 
@@ -105,7 +105,7 @@ async def test_regenerate_rotates_id_preserves_data_and_drops_old() -> None:
 
     resp = FakeResponse()
     await mw.terminate(req, resp)
-    assert resp.cookies[0][1] == new_sid  # new cookie issued
+    assert resp.cookies[0][1] == new_sid
 
 
 @pytest.mark.asyncio
@@ -115,7 +115,7 @@ async def test_invalidate_clears_data_and_drops_old() -> None:
     req = FakeRequest(session_id="sid1")
 
     async def dest(r: Any) -> str:
-        invalidate_session(r)  # logout
+        invalidate_session(r)
         return "ok"
 
     await mw.handle(req, dest)
@@ -129,7 +129,7 @@ async def test_invalidate_clears_data_and_drops_old() -> None:
     assert resp.cookies[0][1] == new_sid
 
 
-# --- __Host- cookie prefix (L2 hardening) -------------------------------------
+# --- __Host- cookie prefix (L2 hardening) ---
 
 
 @pytest.mark.asyncio
@@ -143,7 +143,7 @@ async def test_host_prefix_cookie_name_when_secure() -> None:
     await mw.handle(req, dest)
     resp = FakeResponse()
     await mw.terminate(req, resp)
-    assert resp.cookies[0][0] == "__Host-session"  # prefixed name issued
+    assert resp.cookies[0][0] == "__Host-session"
 
 
 @pytest.mark.asyncio
@@ -195,13 +195,12 @@ async def test_prefixed_sid_is_read_back_and_session_loads() -> None:
     assert resp.cookies == []  # had a valid cookie, nothing rotated → no Set-Cookie
 
 
-# --- cookie emission is success-path only (documented; fail-closed server-side) ---
+# --- cookie emission is success-path only (fail-closed server-side) ---
 
 
 @pytest.mark.asyncio
 async def test_handler_error_still_forgets_old_session_id_server_side() -> None:
-    """If the handler raises after a regenerate, terminate (cookie emit) is skipped — but handle's
-    teardown has already forgotten the old id and saved the new one, so no live old id survives."""
+    """A raise after regenerate skips terminate, but the old id is already forgotten server-side."""
     store: dict[str, dict[str, Any]] = {"attacker-fixed": {"cart": [1]}}
     mw = StartSession(store=store, secure=False)
     req = FakeRequest(session_id="attacker-fixed")

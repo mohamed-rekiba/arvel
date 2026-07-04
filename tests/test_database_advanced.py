@@ -1,4 +1,4 @@
-"""C3d — advanced DB: transactions (callback), raw SQL, pessimistic locking."""
+"""Advanced DB: transactions (callback), raw SQL, pessimistic locking."""
 
 from __future__ import annotations
 

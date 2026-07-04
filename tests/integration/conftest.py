@@ -27,11 +27,8 @@ pytestmark = pytest.mark.skipif(not _docker_available(), reason="Docker not avai
 
 @pytest.fixture
 def configure_app() -> Iterator[Any]:
-    """Build a real ``Application`` with the given config sections and make it the global app, so the
-    managers' typed ``Settings`` (which read the global ``config()``) see them. Resets on teardown.
-
-    Usage: ``app = configure_app(cache={"default": "redis", "url": url})``. A plain dict fake won't do
-    — ``Settings`` read ``config(section)`` off the **global** app's config repository (DR-0016)."""
+    """Build a real ``Application`` and make it the global app — managers' typed ``Settings`` read
+    config off the global app, so a plain dict fake won't do. Resets on teardown."""
     from arvel.kernel import Application, set_application
 
     def _make(**sections: Any) -> Any:
@@ -61,8 +58,8 @@ def postgres_url() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def pgvector_url() -> Iterator[str]:
-    """A throwaway Postgres with the pgvector **server extension** preinstalled (the stock
-    postgres image lacks it — `CREATE EXTENSION vector` needs the control file on the server)."""
+    """A throwaway Postgres with the pgvector server extension preinstalled — the stock image
+    lacks the control file `CREATE EXTENSION vector` needs."""
     from testcontainers.postgres import PostgresContainer
 
     with PostgresContainer("pgvector/pgvector:pg16", driver="asyncpg") as pg:
@@ -81,8 +78,8 @@ def redis_url() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def rustfs_s3() -> Iterator[dict[str, str]]:
-    """A throwaway RustFS (the S3-compatible store named by doc 20); yields the endpoint +
-    credentials for the s3 disk. Waits for the server to actually accept S3 calls."""
+    """A throwaway RustFS (S3-compatible store); yields endpoint + credentials for the s3 disk,
+    waiting until the server actually accepts S3 calls."""
     import time
 
     import s3fs
@@ -90,7 +87,7 @@ def rustfs_s3() -> Iterator[dict[str, str]]:
     from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
     container = (
-        DockerContainer("rustfs/rustfs:latest")  # default creds
+        DockerContainer("rustfs/rustfs:latest")
         .with_exposed_ports(9000)
         .waiting_for(LogMessageWaitStrategy("Starting:").with_startup_timeout(60))
     )
@@ -112,7 +109,7 @@ def rustfs_s3() -> Iterator[dict[str, str]]:
 
 @pytest.fixture(scope="session")
 def azurite_conn() -> Iterator[str]:
-    """A throwaway Azurite (Azure blob emulator, named by doc 20); yields the connection string."""
+    """A throwaway Azurite (Azure blob emulator); yields the connection string."""
     pytest.importorskip("adlfs")
     from testcontainers.core.generic import DockerContainer
     from testcontainers.core.wait_strategies import LogMessageWaitStrategy
@@ -139,11 +136,8 @@ def azurite_conn() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def mysql_url() -> Iterator[str]:
-    """A throwaway MySQL-family server, yielded as an asyncmy URL; torn down after the session.
-
-    Defaults to MariaDB (MySQL wire-compatible — same ``asyncmy`` driver + ``mysql`` SQLAlchemy
-    dialect, so it exercises the identical MySQL code path). Override ``ARVEL_MYSQL_IMAGE`` to test
-    against ``mysql:8.4`` etc. where that image is available."""
+    """A throwaway MySQL-family server, yielded as an asyncmy URL. Defaults to MariaDB (same
+    driver/dialect as MySQL); override ``ARVEL_MYSQL_IMAGE`` to test against e.g. ``mysql:8.4``."""
     import os
 
     pytest.importorskip("testcontainers.mysql")
@@ -156,8 +150,7 @@ def mysql_url() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def rabbitmq_url() -> Iterator[str]:
-    """A throwaway RabbitMQ (any AMQP broker — LavinMQ works the same); yields an ``amqp://`` URL.
-    Uses the generic container so no extra ``pika`` dependency is needed for readiness."""
+    """A throwaway RabbitMQ (any AMQP broker works); yields an ``amqp://`` URL."""
     from testcontainers.core.generic import DockerContainer
     from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
@@ -174,9 +167,8 @@ def rabbitmq_url() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def otel_collector() -> Iterator[Any]:
-    """A throwaway OpenTelemetry Collector receiving OTLP/HTTP on 4318 and printing received signals
-    via the debug exporter; yields the container so a test can read its logs. Backend-agnostic — the
-    same OTLP push works against Grafana/Tempo/any OTLP endpoint."""
+    """A throwaway OpenTelemetry Collector receiving OTLP/HTTP on 4318 and printing signals via the
+    debug exporter; yields the container so a test can read its logs."""
     from pathlib import Path
 
     from testcontainers.core.generic import DockerContainer

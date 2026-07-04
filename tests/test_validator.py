@@ -1,4 +1,4 @@
-"""C6 — rule-based Validator (Laravel-style rules + custom messages)."""
+"""Rule-based Validator (Laravel-style rules + custom messages)."""
 
 from __future__ import annotations
 

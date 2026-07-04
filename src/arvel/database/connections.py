@@ -22,8 +22,7 @@ if TYPE_CHECKING:
 
 _DEFAULT_CONFIG: dict[str, dict[str, Any]] = {"default": {"url": "sqlite+aiosqlite://"}}
 
-# The connection of the innermost open transaction in this async context, so nested
-# `transaction()` calls become SAVEPOINTs rather than separate top-level transactions.
+# the innermost open transaction's connection, so nested transaction() calls become SAVEPOINTs
 _active_conn: ContextVar[Any] = ContextVar("arvel_db_active_conn", default=None)
 
 # Connections that have had a write this async context — sticky reads route to the writer.

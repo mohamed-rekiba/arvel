@@ -18,9 +18,7 @@ class DatabaseNotification(HasUuids, Model):
     """A stored notification row. UUID primary key; ``data`` is JSON; ``read_at`` is null until read."""
 
     __table_name__ = "notifications"
-    # NB: `data` is JSON text; `read_at` is a real DateTime column (DR-0023) — the datetime cast
-    # stores/reads a real datetime (read back as a Date). Both match the scaffold migration's
-    # TEXT/DATETIME columns.
+    # `data` is JSON text; `read_at` is a real DateTime column (DR-0023), matching the migration.
     __fields__: ClassVar[dict[str, type]] = {
         "type": str,
         "notifiable_type": str,

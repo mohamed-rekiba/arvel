@@ -1,5 +1,5 @@
-"""C6 — validation messages resolve through the bound translator for the current locale,
-falling back to the built-in English defaults. Test-first."""
+"""Validation messages resolve through the bound translator for the current locale,
+falling back to the built-in English defaults."""
 
 from __future__ import annotations
 

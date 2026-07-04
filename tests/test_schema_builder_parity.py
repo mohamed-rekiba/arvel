@@ -1,6 +1,5 @@
-"""Schema builder — Laravel Blueprint column-type parity. The laravel/laravel skeleton's migrations use
-``timestamp`` / ``longText`` / ``mediumText`` / ``char`` / ``unsignedInteger`` (+ small/big/tiny). These
-must exist (snake_case) so a Laravel migration ports verbatim and runs."""
+"""Schema builder: Laravel Blueprint column types (timestamp/longText/mediumText/char/
+unsignedInteger family) must exist in snake_case so a Laravel migration ports verbatim."""
 
 from __future__ import annotations
 
@@ -45,7 +44,7 @@ def test_unsigned_is_truly_unsigned_on_mysql() -> None:
 
 
 def test_cross_dialect_ddl_rendering() -> None:
-    # the point of the change: MySQL gets its specific types; Postgres/SQLite get portable ones
+    # MySQL gets its specific types; Postgres/SQLite get portable ones
     from sqlalchemy.dialects import sqlite
 
     bp = Blueprint("t4")
@@ -70,8 +69,7 @@ def test_timestamp_is_nullable_chainable() -> None:
 
 
 def test_primary_marks_a_non_integer_primary_key() -> None:
-    # t.uuid("id").primary() must produce a non-autoincrement PK (CHAR/uuid can't autoincrement),
-    # while the integer t.id() PK still autoincrements.
+    # uuid PK can't autoincrement (CHAR); integer id() PK still does.
     bp = Blueprint("notifications")
     bp.uuid("id").primary()
     bp.string("type")

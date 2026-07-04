@@ -82,34 +82,29 @@ def is_inertia(request: Any) -> bool:
 def render_exception(request: Any, exc: Any, *, debug: bool = False) -> Any:
     import litestar
 
-    # arvel HttpException carries `.status`; litestar's own HTTPException carries `.status_code`;
-    # any other uncaught exception is a 500.
+    # arvel's HttpException carries `.status`; litestar's HTTPException carries `.status_code`.
     status = int(getattr(exc, "status", None) or getattr(exc, "status_code", None) or 500)
     errors = getattr(exc, "errors", None)
-    if isinstance(
-        exc, HttpException
-    ):  # abort()/HttpException carries its own (author-controlled) text
+    if isinstance(exc, HttpException):
         message = str(exc)
     elif status >= 500:
-        # 5xx: NEVER leak the exception text/detail in production — even a litestar HTTPException's
-        # `.detail` may carry sensitive internals. Generic in prod; the real error only in debug.
+        # never leak exception detail in production; it may carry sensitive internals.
         message = f"{type(exc).__name__}: {exc}" if debug else _status_text(status)
     else:
-        detail = getattr(exc, "detail", None)  # 4xx client error → litestar's detail ("Not Found")
+        detail = getattr(exc, "detail", None)
         message = str(detail) if detail else _status_text(status)
     headers = _headers(request)
     accept = headers.get("accept")
 
-    if wants_json(accept) or is_inertia(request):  # API / JSON / Inertia → 422 JSON
+    if wants_json(accept) or is_inertia(request):
         body: dict[str, Any] = {"message": message}
         if errors is not None:
             body["errors"] = errors
         return litestar.Response(body, status_code=status, media_type="application/json")
 
-    # web → flash the errors to the session error bag and redirect back
-    try:  # litestar's request.session is a property that raises without session middleware
+    try:  # request.session is a property that raises without session middleware configured
         session: Any = getattr(request, "session", None)
-    except Exception:  # absent/unconfigured session → just skip the flash
+    except Exception:
         session = None
     if isinstance(session, dict) and errors is not None:
         from arvel.http.flash import FlashBag
@@ -130,7 +125,7 @@ def _same_origin_or_root(target: str, host: str) -> str:
 
     parts = urlsplit(target)
     if not parts.scheme and not parts.netloc:
-        return target or "/"  # relative path → same origin
+        return target or "/"
     if host and parts.netloc == host:
-        return target  # absolute but same host
+        return target
     return "/"

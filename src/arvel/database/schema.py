@@ -90,13 +90,10 @@ class ColumnDefinition:
             "index": self._index or None,
         }
         if self._primary_key:
-            # autoincrement only applies to integer PKs; a uuid/string PK (t.uuid("id").primary())
-            # must opt out or SQLAlchemy rejects it (CHAR is not autoincrementable).
+            # a uuid/string PK must opt out of autoincrement, or SQLAlchemy rejects it (CHAR isn't autoincrementable)
             kwargs["autoincrement"] = isinstance(col_type, sa.Integer)
         if self._has_default:
-            # Laravel ->default() is a SERVER-side DDL default (so raw inserts and ALTER TABLE
-            # ADD COLUMN on populated tables honor it), not just an ORM-side value. Keep the
-            # client default too so Core/ORM inserts behave as before.
+            # a SERVER-side DDL default too, so raw inserts / ALTER TABLE ADD COLUMN honor it, not just ORM inserts
             kwargs["default"] = self._default
             server_default = self._server_default_clause(sa, self._default)
             if server_default is not None:
@@ -132,8 +129,7 @@ class Blueprint:
     def _index_using(self, using: str, columns: tuple[str, ...], name: str | None) -> None:
         if not columns:
             raise ValueError(f"{using}_index requires at least one column")
-        # auto-name from the columns; an expression column (e.g. "name->>'en'") isn't a valid
-        # identifier, so sanitize non-word chars to keep the generated index name legal.
+        # sanitize non-word chars so an expression column (e.g. "name->>'en'") yields a legal index name
         slug = re.sub(r"\W+", "_", "_".join(columns)).strip("_")
         self._indexes.append(
             {
@@ -343,9 +339,7 @@ class Blueprint:
     def uuid(self, name: str) -> ColumnDefinition:
         import sqlalchemy as sa
 
-        # Native UUID on Postgres, CHAR(32) on SQLite — Core maps the dialect. as_uuid=False so the
-        # Python side is a *string* (SQLAlchemy converts to/from the native uuid): models generate
-        # string uuids (HasUuids → str(uuid7())), which otherwise mismatch a native uuid column on PG.
+        # as_uuid=False: the Python side stays a string, matching what HasUuids generates
         return self._add(ColumnDefinition(name, lambda: sa.Uuid(as_uuid=False)))
 
     def enum(self, name: str, *values: str) -> ColumnDefinition:
@@ -379,8 +373,7 @@ class Blueprint:
         def factory() -> Any:
             import importlib.util
 
-            # pgvector is an optional extra; load it dynamically so the static checkers
-            # don't require the (untyped, possibly-uninstalled) package. Portable JSON else.
+            # loaded dynamically so static checkers don't require the untyped, optional package
             if importlib.util.find_spec("pgvector") is None:
                 import sqlalchemy as sa
 
@@ -398,9 +391,7 @@ class Blueprint:
         import sqlalchemy as sa
 
         meta = metadata if metadata is not None else sa.MetaData()
-        # btree/GIN/GiST indexes are built then passed as Table args so SQLAlchemy binds them (incl.
-        # expression indexes): a plain column is referenced by name; anything else (e.g. "name->>'en'")
-        # becomes a text() expression index.
+        # a plain column is referenced by name; anything else becomes a text() expression index
         indexes = [
             sa.Index(
                 spec["name"],

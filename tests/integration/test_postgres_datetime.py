@@ -1,10 +1,5 @@
-"""Integration (doc 20) — datetimes round-trip as real ``timestamptz`` on PostgreSQL.
-
-Regression for DR-0023: a model with ``__timestamps__`` (and a ``datetime`` field) used to store ISO
-strings, which raised ``DatatypeMismatchError`` against real ``timestamp with time zone`` columns —
-so no timestamped model could be inserted on Postgres via the migration path. Now timestamps + datetime
-columns persist as real datetimes and read back as ``Date``.
-"""
+"""Regression: a model with ``__timestamps__`` used to store ISO strings, raising
+``DatatypeMismatchError`` against real ``timestamp with time zone`` columns on Postgres."""
 
 from __future__ import annotations
 
@@ -29,7 +24,7 @@ class Meeting(Model):
 async def test_datetime_columns_round_trip_on_postgres(postgres_url: str) -> None:
     db = ConnectionResolver({"default": {"url": postgres_url}})
     Meeting.set_connection(db)
-    # timestamps + the datetime field compile to real timestamptz columns (not VARCHAR)
+    # timestamps + the datetime field compile to real timestamptz columns, not VARCHAR
     assert isinstance(Meeting.__table__.c.created_at.type, sa.DateTime)
     assert isinstance(Meeting.__table__.c.starts_at.type, sa.DateTime)
     try:
@@ -40,13 +35,11 @@ async def test_datetime_columns_round_trip_on_postgres(postgres_url: str) -> Non
 
         found = await Meeting.find(m.id)
         assert found is not None
-        # real datetimes persisted; read back as tz-aware Date (Laravel parity)
         assert isinstance(found.created_at, Date)
         assert isinstance(found.starts_at, Date)
         assert found.starts_at.to_iso().startswith("2026-06-29T09:30:00")
 
-        # a datetime range query works against the real timestamptz column — pass a Date directly
-        # (no .to_py()): the builder adapts it at the bind boundary
+        # a Date passed straight to where() binds against the real timestamptz column
         later = await Meeting.where(
             "starts_at", "<", Date.parse("2026-07-01T00:00:00+00:00[UTC]")
         ).get()

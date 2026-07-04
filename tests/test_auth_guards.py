@@ -1,4 +1,4 @@
-"""Phase 1 — authentication guards: LocalGuard, SessionGuard, GuardManager, recast AuthManager.attempt.
+"""Authentication guards: LocalGuard, SessionGuard, GuardManager, recast AuthManager.attempt.
 
 LocalGuard is tested with an injected lookup (no DB); SessionGuard over the current_user ContextVar.
 """

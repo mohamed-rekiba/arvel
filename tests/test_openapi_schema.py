@@ -1,6 +1,5 @@
-"""OpenAPI: the document's identity comes from typed OpenApiSettings (config 'openapi', DR-0016), the
-served path is configurable, and request/response schemas + clean operationIds are generated from the
-handlers' arvel.Schema types (the dynamic-route adapter no longer erases them)."""
+"""OpenAPI: document identity comes from typed OpenApiSettings (DR-0016); request/response schemas
+and clean operationIds are generated from the handlers' arvel.Schema types."""
 
 from __future__ import annotations
 
@@ -85,8 +84,7 @@ def test_request_and_response_schemas_are_generated(client: TestClient[Any]) -> 
     resp = post["responses"]["201"]["content"]["application/json"]["schema"]
     assert resp["$ref"].endswith("ThingOut")
     assert s["paths"]["/health"]["get"]["operationId"] == "health"
-    # the handler's docstring becomes the operation description (use_handler_docstrings) — the
-    # synthetic route adapter must carry the original handler's __doc__, not be blank.
+    # the synthetic route adapter must carry the original handler's __doc__, not go blank
     assert post["description"] == "Create a thing from the posted name."
 
 
@@ -97,7 +95,7 @@ def test_typed_body_is_parsed_and_passed_to_the_handler(client: TestClient[Any])
     assert r.json() == {"id": 1, "name": "ada"}
 
 
-# --- expanded config surface + auth/security -------------------------------------------------
+# --- expanded config surface + auth/security ---
 
 
 @contextmanager

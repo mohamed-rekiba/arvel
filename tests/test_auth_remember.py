@@ -1,4 +1,4 @@
-"""Auth (G5 hardening) — persistent login ("remember me"), selector/validator pattern."""
+"""Persistent login ("remember me"), selector/validator pattern."""
 
 from __future__ import annotations
 

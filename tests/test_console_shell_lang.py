@@ -1,4 +1,4 @@
-"""C8c — shell (REPL) namespace + lang:list locale discovery."""
+"""Shell (REPL) namespace + lang:list locale discovery."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ def test_shell_namespace_has_public_surface() -> None:
 
 
 def test_shell_namespace_loads_app_and_autoloads_models() -> None:
-    # It.5d: with an app loaded, the REPL namespace exposes `app` + every registered model by name.
+    # with an app loaded, the REPL namespace exposes `app` + every registered model by name
     from arvel.database import Model
     from arvel.kernel import Application
 

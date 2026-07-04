@@ -1,4 +1,4 @@
-"""T1.6 — support (Collection/Str), dates (whenever), localization (Translator)."""
+"""Support (Collection/Str), dates (whenever), localization (Translator)."""
 
 from __future__ import annotations
 

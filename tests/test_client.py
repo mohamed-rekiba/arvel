@@ -1,4 +1,4 @@
-"""T4.2 — Http client over httpx (MockTransport — no network)."""
+"""Http client over httpx (MockTransport — no network)."""
 
 from __future__ import annotations
 
@@ -57,8 +57,7 @@ async def test_base_url_and_headers() -> None:
 
 
 async def test_timeout_is_chainable_from_the_client() -> None:
-    # Client.timeout proxies to a PendingRequest (parity with base_url/with_headers/with_token),
-    # so `Http.timeout(5).get(...)` works without first calling another builder method.
+    # Client.timeout proxies to a PendingRequest, so it's chainable without another builder call first
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200)
 

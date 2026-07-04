@@ -1,4 +1,4 @@
-"""Auth (doc 15) — email-verification + password-reset signed tokens. Test-first."""
+"""Email-verification + password-reset signed tokens."""
 
 from __future__ import annotations
 

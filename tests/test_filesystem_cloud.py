@@ -1,4 +1,4 @@
-"""Managers (doc 16) — GCS/Azure disk drivers (wiring verified via a fake fsspec)."""
+"""GCS/Azure disk drivers (wiring verified via a fake fsspec)."""
 
 from __future__ import annotations
 

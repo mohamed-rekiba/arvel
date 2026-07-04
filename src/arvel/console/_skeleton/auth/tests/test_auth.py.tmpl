@@ -16,8 +16,8 @@ from app.models.user import User
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    # Sync fixture: TestClient runs the app in its own event loop, so do the async migrate+seed via
-    # asyncio.run (not an async fixture, which would start the client inside a running loop).
+    # sync fixture: TestClient runs its own event loop, so migrate+seed via asyncio.run, not an
+    # async fixture (which would start the client inside an already-running loop)
     url = f"sqlite+aiosqlite:///{tmp_path / 'auth.sqlite'}"
     monkeypatch.setenv("DATABASE_URL", url)
 
@@ -31,8 +31,7 @@ def client(tmp_path, monkeypatch):
 
     asyncio.run(migrate_and_seed())
 
-    # Build a fresh app so it reads the overridden DATABASE_URL (the module-level asgi_app may already
-    # be bootstrapped against the default DB from an earlier test).
+    # a fresh app, not the module-level asgi_app, so it picks up the overridden DATABASE_URL
     from bootstrap.app import create_app
 
     with TestClient(app=create_app().as_asgi()) as test_client:

@@ -50,12 +50,12 @@ def test_run_closure_passes_cli_args_and_runs_handler(app: Application) -> None:
         ran.append(name)
 
     Console.command("greet {name}", greet)
-    run_closure_command("greet", {"name": "Ada"})  # dispatch through the (active) app
+    run_closure_command("greet", {"name": "Ada"})
     assert ran == ["Ada"]
 
 
 def test_run_closure_autowires_container_deps_alongside_cli_args(app: Application) -> None:
-    app.instance(Greeter, Greeter())  # a typed container binding
+    app.instance(Greeter, Greeter())
     seen: dict[str, Any] = {}
 
     async def greet(

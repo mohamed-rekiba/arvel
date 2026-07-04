@@ -26,8 +26,7 @@ from arvel.kernel.settings import Settings
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-# Friendly ``.secure("bearer")`` / ``security.bearer`` names → the OpenAPI security-scheme component
-# key they reference. Keeps app-facing config readable while the document uses canonical scheme ids.
+# friendly `.secure("bearer")` names -> the OpenAPI security-scheme component key they reference.
 _SECURITY_SCHEME_KEYS = {"bearer": "bearerAuth", "api_key": "apiKeyAuth"}
 
 
@@ -65,9 +64,7 @@ class OpenApiSettings(Settings, forbid_unknown_fields=True):
 
 
 _PARAM = re.compile(r"\{(\w+)(?::(\w+))?\}")
-# Litestar's built-in path-param converters: a `{name:<conv>}` of these passes through to
-# Litestar untouched. Any *other* `{name:<field>}` suffix is an arvel route-key field — the
-# implicit model binding then resolves by that column (e.g. `{post:slug}` → Post by slug).
+# a `{name:<field>}` suffix outside this set is an arvel route-key field resolved by that column
 _LITESTAR_CONVERTERS = frozenset(
     {"str", "int", "float", "uuid", "decimal", "date", "datetime", "time", "timedelta", "path"}
 )
@@ -87,7 +84,7 @@ class HttpKernel:
         self._aliases: dict[str, Any] = {}  # short name -> middleware class
         self.bindings: dict[str, Any] = {}  # route-param -> resolver (model/enum binding)
 
-    # --- middleware group customization (doc 04) ---------------------------
+    # --- middleware group customization ---------------------------
     def append_to_group(self, group: str, *middleware: Any) -> HttpKernel:
         """Append middleware to a group (creating it if new)."""
         self.groups.setdefault(group, []).extend(middleware)
@@ -131,9 +128,7 @@ class HttpKernel:
         from arvel.telemetry.middleware import TelemetryMiddleware
 
         defaults = (
-            # TelemetryMiddleware is outermost so its request span covers everything below it; it's a
-            # no-op passthrough (no OpenTelemetry import) unless telemetry is enabled in config.
-            TelemetryMiddleware,
+            TelemetryMiddleware,  # outermost so its span covers everything below it
             RequestContextMiddleware,
             PreventRequestsDuringMaintenance,
             ValidatePostSize,
@@ -159,16 +154,9 @@ class HttpKernel:
 
         if not self.groups.get("web"):
             session_mw: Any = StartSession
-            # session.driver == "redis" → the app's own bound "cache" service backs sessions (so
-            # they survive restarts and are shared across every worker/host), instead of
-            # StartSession's in-process dict default. Built here (not left to container DI) since
-            # `cache: Any` isn't a type DI can resolve, and "no cache bound" is a legitimate
-            # config, not an error to raise on.
+            # redis sessions share the app's bound "cache" service, so they survive restarts
             if self.app is not None and self.app.bound("cache"):
-                # from_source (not a bare SessionSettings()) reads THIS app's config section
-                # directly — the bare form reads the *global* config() (see Manager(app)'s own
-                # docstring on Settings.from_source), which use_default_groups() shouldn't depend
-                # on some earlier set_application(app) call having happened.
+                # from_source reads this app's own config section, not the global config()
                 section = self.app.make("config").get("session", {})
                 if SessionSettings.from_source(section).driver == "redis":
                     session_mw = StartSession(cache=self.app.make("cache"))
@@ -254,9 +242,7 @@ class HttpKernel:
         from arvel.http.exceptions import HttpException, render_exception
         from arvel.validation import ValidationException
 
-        # Serialize an arvel Model returned from a handler (or nested in a list/paginator) to its
-        # to_dict() form — the Laravel ``return $user`` / ``return User::all()`` JSON path. Imported
-        # lazily + via the contract base so the http layer takes no hard edge on the database module.
+        # imported lazily so the http layer takes no hard dependency on the database module
         model_encoder: dict[Any, Callable[[Any], Any]] = {}
         extra_exception_handlers: dict[Any, Any] = {}
         try:
@@ -264,8 +250,7 @@ class HttpKernel:
             from arvel.database.model import ModelNotFound
 
             model_encoder = {_Model: lambda value: value.to_dict()}
-            # find_or_fail/first_or_fail raise ModelNotFound — render it as 404 (Laravel findOrFail
-            # parity) rather than letting it fall to the generic 500 path. http→database is legal.
+            # find_or_fail/first_or_fail raise ModelNotFound; render it as 404 instead of a 500
             extra_exception_handlers = {ModelNotFound: render_exception}
         except Exception:  # pragma: no cover - database extra not installed
             model_encoder = {}
@@ -289,17 +274,13 @@ class HttpKernel:
             route_handlers=handlers,
             cors_config=self._cors_config(),
             openapi_config=self._openapi_config(),
-            # Serialize the arvel Date value object to an ISO-8601 string in responses, so a handler
-            # can return a model (or a paginator of models) whose date columns hydrate to Date — the
-            # canonical Laravel ``return User::paginate()`` JSON path — without a SerializationException.
-            # The Model encoder lets a handler return a model / collection of models directly.
+            # serializes Date-typed model fields to ISO-8601 without a SerializationException
             type_encoders={Date: lambda value: value.to_iso(), **model_encoder},
             exception_handlers={
                 ValidationException: render_exception,
                 HttpException: render_exception,
-                **extra_exception_handlers,  # ModelNotFound → 404 (when the database module is present)
-                # E1: every OTHER uncaught exception is reported through the bound ExceptionHandler
-                # and rendered (content-negotiated) — not silently turned into Litestar's generic 500.
+                **extra_exception_handlers,
+                # every other uncaught exception is reported then rendered, not left to Litestar's 500
                 Exception: self._handle_uncaught,
             },
             lifespan=[lifespan] if lifespan is not None else [],
@@ -322,7 +303,7 @@ class HttpKernel:
             Tag,
         )
 
-        s = OpenApiSettings()  # auto-loads + validates config('openapi'); defaults when unset
+        s = OpenApiSettings()
         kwargs: dict[str, Any] = {
             "title": s.title,
             "version": s.version,
@@ -419,7 +400,7 @@ class HttpKernel:
         ``config('openapi').security`` — that would emit a dangling ``securitySchemes`` reference (a
         technically-invalid OpenAPI document). Non-fatal: the doc still serves."""
         secured = {scheme for *_, security, _status in self._routes for scheme in security}
-        if not secured:  # the common case — no per-route security, nothing to validate
+        if not secured:
             return
         defined, _ = self._security_schemes(OpenApiSettings().security)
         from arvel.kernel.logging import LogManager
@@ -497,10 +478,8 @@ class HttpKernel:
         body_name = body[0] if body is not None else None
         query_params = self._query_params(handler, litestar_path, body_name)
 
-        # One synthetic adapter. Litestar reads its `__signature__` to know what to inject + document:
-        # the request, the typed body (as `data` → request schema), and each typed query parameter
-        # (non-path, non-body handler args → documented query params). Injected args arrive by name in
-        # ``injected``; we split out the body and forward the rest as query kwargs to the handler.
+        # Litestar reads `__signature__` below to know what to inject and document; split the
+        # body back out of the injected kwargs and forward the rest to the handler as query args.
         async def adapter(request: Any, **injected: Any) -> Any:
             body_arg = (body_name, injected.pop(body_name)) if body_name is not None else None
             return await kernel._dispatch(
@@ -524,27 +503,20 @@ class HttpKernel:
         adapter.__signature__ = inspect.Signature(sig_params, return_annotation=return_hint)  # type: ignore[attr-defined]
         adapter.__annotations__ = annotations
 
-        # Name the adapter from the route's name when given (e.g. "home"/"api.health" →
-        # home / api_health) so the OpenAPI operationId + summary are clean — not the mangled
-        # method+path fallback ("ArvelGetApiHealth"). Fall back to a unique method+path id.
+        # named from the route's name so the OpenAPI operationId/summary are clean, not a mangled fallback
         safe = re.sub(r"\W+", "_", f"{'_'.join(methods).lower()}{path}")
         adapter.__name__ = re.sub(r"\W+", "_", name) if name else f"arvel_{safe}"
-        # Carry the original handler's docstring onto the synthetic adapter so Litestar's
-        # use_handler_docstrings turns it into the OpenAPI operation description (otherwise the
-        # adapter is blank and the operation has only a name-derived summary).
+        # carried over so Litestar's use_handler_docstrings can turn it into the OpenAPI description
         adapter.__doc__ = handler.__doc__
-        # DELETE defaults to 204 (no body) in Litestar; arvel handlers may return a
-        # body, so pin DELETE routes to 200. GET/POST keep Litestar's 200/201 defaults.
-        # explicit per-route status wins; else DELETE → 200 (arvel handlers may return a body);
-        # else Litestar's per-method default (GET 200 / POST 201).
+        # Litestar defaults DELETE to 204 (no body); arvel handlers may return one, so pin it to 200
         extra: dict[str, Any] = {}
         if status_code is not None:
             extra["status_code"] = status_code
         elif "DELETE" in methods:
             extra["status_code"] = 200
-        if name:  # explicit operationId = the route name (else Litestar doubles the path prefix)
+        if name:
             extra["operation_id"] = name
-        if security:  # this route requires auth → mark it (the Swagger lock + 'Authorize' use)
+        if security:
             extra["security"] = [{_SECURITY_SCHEME_KEYS.get(s, s): []} for s in security]
         return route_handler(path=litestar_path, http_method=methods, **extra)(adapter)
 
@@ -587,7 +559,7 @@ class HttpKernel:
             return []
         result: list[tuple[str, Any, Any]] = []
         for index, param in enumerate(signature.parameters.values()):
-            if index == 0:  # the request
+            if index == 0:
                 continue
             if param.name == body_name or param.name in path_names:
                 continue
@@ -613,21 +585,18 @@ class HttpKernel:
 
         request = Request(litestar_request)
         token = current_request.set(request)
-        # Per-request identity baseline: guarantees current_user never survives a request boundary,
-        # so route-protection middleware fail closed even if AuthenticateMiddleware isn't wired or a
-        # handler sets the user without resetting (e.g. AuthManager.login()). Defence-in-depth.
+        # reset every request so a stale current_user can never leak across a request boundary
         user_token = current_user.set(None)
-        # S1: open a per-request container scope so `scoped` bindings share one instance for the
-        # duration of the request (and are released at the end), not rebuilt per make().
+        # a per-request container scope so `scoped` bindings share one instance for the request
         scope = self.app.scope() if self.app is not None else contextlib.nullcontext()
         try:
             async with scope:
                 params = dict(litestar_request.path_params)
                 await self._resolve_bindings(params)
                 await self._resolve_implicit_bindings(handler, params, key_fields or {})
-                if body is not None:  # typed request body → pass under the handler's param name
+                if body is not None:
                     params[body[0]] = body[1]
-                if query:  # typed query parameters → forwarded to the handler by name
+                if query:
                     params.update(query)
 
                 return await self._handle(handler, request, params, group, route_middleware)
@@ -652,8 +621,7 @@ class HttpKernel:
                 result = await result
             return result
 
-        # Instantiate each middleware once so a terminable one shares state between its
-        # handle() (request in) and terminate() (response out). Order: global → group → route.
+        # instantiate once so a terminable middleware shares state between handle() and terminate()
         instances = [
             self._make(self.resolve_middleware(m))
             for m in (
@@ -740,8 +708,7 @@ class HttpKernel:
         raise ValidationException(trans("http.not_found"), status=404)
 
     def _make(self, middleware_cls: Any) -> Any:
-        # An already-built instance (e.g. use_default_groups' cache-backed StartSession) is used
-        # as-is — Container.make() expects a class/string abstract, not an arbitrary instance.
+        # an already-built instance is used as-is; Container.make() expects a class/string abstract
         if not isinstance(middleware_cls, type):
             return middleware_cls
         return self.app.make(middleware_cls) if self.app is not None else middleware_cls()
@@ -753,15 +720,13 @@ class HttpKernel:
 
         if isinstance(result, litestar.Response):
             return cast("Any", result)
-        if isinstance(result, Response):  # arvel Response → carry status/headers across
+        if isinstance(result, Response):
             return litestar.Response(
                 result.content, status_code=result.status, headers=result.headers
             )
         from arvel.pagination import AbstractPaginator
 
-        if isinstance(result, AbstractPaginator):  # paginator → Laravel JSON shape (auto-serialize)
+        if isinstance(result, AbstractPaginator):
             return cast("Any", litestar.Response(result.to_dict()))
-        # plain dict/list/str/bytes/None → a Litestar Response; no explicit status_code so the
-        # route's method-aware default still applies (e.g. POST → 201), and Litestar infers the
-        # media type from the content.
+        # no explicit status_code, so the route's method-aware default still applies (e.g. POST -> 201)
         return cast("Any", litestar.Response(result))

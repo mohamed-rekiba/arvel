@@ -21,9 +21,7 @@ def _build_served_kernel(app: Application) -> Any:
     kernel = HttpKernel(app=app)
     kernel.use_default_global()  # maintenance-mode 503 gate runs on every request
     kernel.use_default_groups()  # web=session+CSRF, api=throttle
-    # Global middleware registered via the fluent builder (`with_middlewares([...])`) — applied to
-    # the real served kernel here (it is built on demand, not bound under "http", which is the
-    # HTTP client). Runs on every request, after the default global gate.
+    # applied here since the served kernel is built on demand, not bound under "http" (the HTTP client)
     for middleware in app.builder_middlewares:
         kernel.global_middleware.append(kernel.resolve_middleware(middleware))
     if app.bound("router"):
@@ -48,12 +46,11 @@ class RoutingServiceProvider(ServiceProvider):
                 return Router()
 
             self.app.singleton("router", make_router)
-        # The kernel resolves this builder in Application.as_asgi() (DR-0026).
+        # resolved by Application.as_asgi()
         self.app.instance("http.asgi_builder", _build_served_asgi)
         self.app.instance("http.kernel_builder", _build_served_kernel)
-        # Prometheus scrape route — registered here (not in the telemetry provider) so telemetry needn't
-        # import arvel.http; routing legally imports both http (the handler) and telemetry (DR-0026).
-        # Registered at `register` so it lands before the router compiles into the served app.
+        # registered here (not the telemetry provider) so telemetry needn't import arvel.http;
+        # done in `register` so it lands before the router compiles into the served app
         from arvel.telemetry import TelemetrySettings
 
         if TelemetrySettings().prometheus and self.app.bound("router"):

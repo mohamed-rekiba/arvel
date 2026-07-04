@@ -1,8 +1,5 @@
-"""R2 — route/group middleware wiring (spec 05 routing section 60-64, doc 04 two-tier pipeline).
-
-The Router can assign a group label and per-route/group middleware; apply_to threads them into
-the HttpKernel so group middleware (web=session+CSRF, api=throttle) actually runs on app routes.
-Middleware run order is global -> group -> route. Test-first."""
+"""Router/HttpKernel middleware wiring: group + per-route middleware run in order
+global -> group -> route (web=session+CSRF, api=throttle)."""
 
 from __future__ import annotations
 
@@ -56,7 +53,7 @@ def _client(router: Router, **groups: list[Any]) -> TestClient[Any]:
     return TestClient(kernel.build())
 
 
-def test_group_label_runs_group_middleware() -> None:  # AC1
+def test_group_label_runs_group_middleware() -> None:
     router = Router()
     with router.group(group="web"):
         router.get("/in", _ok)
@@ -70,7 +67,7 @@ def test_group_label_runs_group_middleware() -> None:  # AC1
         assert CALLS == []
 
 
-def test_per_route_middleware() -> None:  # AC2
+def test_per_route_middleware() -> None:
     router = Router()
     router.get("/a", _ok).middleware(RouteMw)
     router.get("/b", _ok)
@@ -83,7 +80,7 @@ def test_per_route_middleware() -> None:  # AC2
         assert CALLS == []
 
 
-def test_group_middleware_via_context_manager() -> None:  # AC3
+def test_group_middleware_via_context_manager() -> None:
     router = Router()
     with router.group(middleware=[WebMw]):
         router.get("/in", _ok)
@@ -97,7 +94,7 @@ def test_group_middleware_via_context_manager() -> None:  # AC3
         assert CALLS == []
 
 
-def test_nested_groups_compose_and_restore() -> None:  # AC4
+def test_nested_groups_compose_and_restore() -> None:
     router = Router()
     with router.group(middleware=[OuterMw]):
         router.get("/outer", _ok)
@@ -120,7 +117,7 @@ def test_nested_groups_compose_and_restore() -> None:  # AC4
         assert CALLS == []
 
 
-def test_pipeline_order_global_group_route() -> None:  # AC5
+def test_pipeline_order_global_group_route() -> None:
     router = Router()
     with router.group(group="web"):
         router.get("/x", _ok).middleware(RouteMw)
@@ -134,7 +131,7 @@ def test_pipeline_order_global_group_route() -> None:  # AC5
         assert CALLS == ["global", "web", "route"]
 
 
-def test_apply_to_threads_group_and_middleware() -> None:  # AC6
+def test_apply_to_threads_group_and_middleware() -> None:
     router = Router()
     with router.group(group="api", middleware=[RouteMw]):
         router.get("/u", _ok)
@@ -146,7 +143,7 @@ def test_apply_to_threads_group_and_middleware() -> None:  # AC6
     assert RouteMw in entry[4]  # middleware slot
 
 
-def test_as_asgi_wires_default_groups(monkeypatch: Any) -> None:  # AC7
+def test_as_asgi_wires_default_groups(monkeypatch: Any) -> None:
     import arvel.http as http
     from arvel.kernel.application import Application
 
@@ -163,7 +160,7 @@ def test_as_asgi_wires_default_groups(monkeypatch: Any) -> None:  # AC7
     assert called["v"] is True
 
 
-def test_web_group_runs_real_csrf_end_to_end() -> None:  # AC7 (behavioral)
+def test_web_group_runs_real_csrf_end_to_end() -> None:
     """A web-group route actually runs the real default web stack (StartSession +
     ValidateCsrfToken): a state-changing POST with no CSRF token is rejected 419."""
 
@@ -183,7 +180,7 @@ def test_web_group_runs_real_csrf_end_to_end() -> None:  # AC7 (behavioral)
         )  # safe method exempt (or no GET route)
 
 
-def test_no_group_no_middleware_is_global_only() -> None:  # AC8 regression
+def test_no_group_no_middleware_is_global_only() -> None:
     router = Router()
     router.get("/plain", _ok)
     kernel = HttpKernel()

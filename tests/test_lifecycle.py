@@ -28,7 +28,7 @@ class FakeLogger:
     def info(self, event: str, **kw: Any) -> None: ...
 
 
-# --- logging ---------------------------------------------------------------
+# --- logging ---
 def test_logmanager_channel_and_bind_return_logmanager() -> None:
     log = LogManager()
     assert isinstance(log.channel("audit"), LogManager)
@@ -36,7 +36,7 @@ def test_logmanager_channel_and_bind_return_logmanager() -> None:
     log.info("hello", k=1)  # must not raise
 
 
-# --- exception handler -----------------------------------------------------
+# --- exception handler ---
 def test_report_logs_when_should_report() -> None:
     logger = FakeLogger()
     handler = ExceptionHandler(logger)
@@ -62,7 +62,7 @@ async def test_render_and_console() -> None:
     assert "RuntimeError: nope" in buf.getvalue()
 
 
-# --- kernel provider bindings ---------------------------------------------
+# --- kernel provider bindings ---
 def test_kernel_provider_binds_log_and_exceptions() -> None:
     app = Application()
     KernelServiceProvider(app).register()
@@ -71,7 +71,7 @@ def test_kernel_provider_binds_log_and_exceptions() -> None:
     set_application(None)
 
 
-# --- boot reporter ---------------------------------------------------------
+# --- boot reporter ---
 async def test_boot_reporter_reports_startup_and_shutdown() -> None:
     buf = io.StringIO()  # a StringIO is not a TTY → output must carry no ANSI escape codes
     app = Application()

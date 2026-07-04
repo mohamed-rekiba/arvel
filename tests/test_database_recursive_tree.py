@@ -1,4 +1,4 @@
-"""Advanced DB (doc 08) — recursive CTE returns a FULL tree of descendants. Test-first."""
+"""Recursive CTE returns a FULL tree of descendants."""
 
 from __future__ import annotations
 

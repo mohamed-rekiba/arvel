@@ -4,7 +4,7 @@ from arvel import Route, view
 
 
 async def home(request):
-    # Render resources/views/welcome.html (Jinja2) with data, as an HTML response.
+    # renders resources/views/welcome.html (Jinja2)
     return await view("welcome", {"title": "{{name}}", "tagline": "Your arvel app is running."}).to_response()
 
 

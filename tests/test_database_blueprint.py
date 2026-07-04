@@ -1,4 +1,4 @@
-"""Advanced DB (doc 08) — the Blueprint schema DSL over SQLAlchemy Core. Test-first."""
+"""The Blueprint schema DSL over SQLAlchemy Core."""
 
 from __future__ import annotations
 

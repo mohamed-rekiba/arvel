@@ -53,9 +53,7 @@ def test_plain_middleware_without_terminate_override_is_fine() -> None:
 
 
 def test_session_cookie_emitted_on_success_but_not_on_handler_error() -> None:
-    """L2 fail-closed invariant: the session cookie is set in terminate, which the kernel skips when
-    a handler raises — so an errored request emits no Set-Cookie (the old id is already forgotten
-    server-side; the client just starts fresh next time)."""
+    """L2 fail-closed: terminate (which sets the cookie) is skipped when the handler raises."""
     from arvel.http.middleware import StartSession
 
     def ok(_request: Any) -> Response:

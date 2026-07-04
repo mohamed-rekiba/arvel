@@ -57,9 +57,7 @@ async def test_nested_eager_load_no_n_plus_1() -> None:
 
 
 async def test_to_dict_includes_loaded_relations() -> None:
-    """Laravel ``toArray`` parity: an eager-loaded relation appears (nested) in ``to_dict()``.
-    A has-many serializes to a list of dicts; a belongs-to to a single nested dict; an unloaded
-    relation is NOT included (Laravel only serializes loaded relations)."""
+    """An eager-loaded relation appears nested in to_dict(); an unloaded relation is not included."""
     db = await _setup()
     try:
         user = await User.create(name="ada")

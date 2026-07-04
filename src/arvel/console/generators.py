@@ -214,8 +214,7 @@ _STUBS: dict[str, tuple[str, str]] = {
     ),
 }
 
-# pytest discovers ``test_*.py``, so make:test writes ``tests/test_<name>.py`` (not the generic
-# ``<name>.py`` path the other generators use).
+# pytest discovers `test_*.py`, so make:test writes `tests/test_<name>.py`, unlike the other generators
 _TEST_STUB = (
     "from __future__ import annotations\n\n\n"
     "def test_{name}() -> None:\n"

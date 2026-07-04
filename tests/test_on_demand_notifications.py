@@ -1,6 +1,5 @@
-"""On-demand notifications (Laravel ``Notification::route(...)``): send to an ad-hoc recipient with no
-stored model via ``AnonymousNotifiable().route(channel, route)``. The manager reads the per-channel
-route through ``route_notification_for`` (Laravel ``routeNotificationFor``)."""
+"""On-demand notifications: send to an ad-hoc recipient with no stored model via
+``AnonymousNotifiable().route(channel, route)``."""
 
 from __future__ import annotations
 
@@ -37,7 +36,7 @@ def test_anonymous_notifiable_routes_are_chainable_and_read_back() -> None:
 
 
 def test_route_falls_back_to_default_for_a_plain_notifiable() -> None:
-    # an ordinary notifiable (no route_notification_for) keeps the old behavior — the default is used
+    # no route_notification_for on this notifiable → the default is used
     assert (
         NotificationManager._route("ada@example.com", "mail", "ada@example.com")
         == "ada@example.com"

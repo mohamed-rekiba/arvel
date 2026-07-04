@@ -23,8 +23,7 @@ class ViewServiceProvider(ServiceProvider):
     def register(self) -> None:
         def make_view(_app: Application) -> ViewFactory:
             factory = ViewFactory(ViewSettings().paths)  # auto-loads + validates config("view")
-            # Ship the framework's pagination link templates under the ``pagination`` namespace
-            # so ``paginator.links()`` works out of the box (``pagination::default`` / ``::simple``).
+            # Ship the pagination link templates so paginator.links() works out of the box.
             from pathlib import Path
 
             import arvel.pagination

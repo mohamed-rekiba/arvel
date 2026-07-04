@@ -46,9 +46,7 @@ def test_set_translation_merges_and_helpers_read() -> None:
 
 
 def test_set_translation_stores_a_dict_not_a_double_encoded_string() -> None:
-    # Regression: set_translation must store a DICT so a jsonb column serializes it exactly once.
-    # A pre-stringified value double-encodes on jsonb and breaks ->>' / json_extract lookups — and the
-    # helper reads tolerate a string, so only checking the stored type catches it.
+    # must store a DICT — a pre-stringified value double-encodes on jsonb and breaks ->>'/json_extract lookups.
     post = _Post(title={"en": "Hello"})
     post.set_translation("title", "fr", "Bonjour")
     stored = post._attributes["title"]

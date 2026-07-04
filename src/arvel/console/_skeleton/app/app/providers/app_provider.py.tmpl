@@ -6,7 +6,7 @@ from arvel.kernel import ServiceProvider
 class AppServiceProvider(ServiceProvider):
     def register(self) -> None:
         """Bind your services into the container."""
-        # Make `arvel db:seed` run the root seeder.
+        # so `arvel db:seed` runs this
         from database.seeders.database_seeder import DatabaseSeeder
 
         self.app.singleton("seeder", lambda _app: DatabaseSeeder())

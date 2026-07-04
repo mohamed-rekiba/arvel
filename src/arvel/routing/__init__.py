@@ -270,9 +270,8 @@ class Router:
             from arvel.http.response import Response
 
             if not target.is_file():
-                # The one case this can't be a real file: spa_fallback's own index.html doesn't
-                # exist yet (public/ not built, or misconfigured) — a clear, diagnosable error
-                # instead of a raw FileNotFoundError surfacing as an opaque 500.
+                # spa_fallback's own index.html is missing (public/ not built) -> a clear error
+                # instead of a raw FileNotFoundError surfacing as an opaque 500
                 abort(500, f"public directory has no index.html — did you build it? ({target})")
             immutable = target.parent.name == assets_dirname
             content_type = guess_type(target.name)[0] or "application/octet-stream"
@@ -284,9 +283,9 @@ class Router:
             )
 
         if spa_fallback:
-            # Two thin handlers rather than one shared function taking an optional `path` — the
-            # root route's template has no `{path}` placeholder, so a shared handler's `path`
-            # param would be (wrongly) inferred as a documented query parameter on that route.
+            # two thin handlers, not one shared function with an optional `path`: the root route's
+            # template has no `{path}` placeholder, so a shared `path` param would be wrongly
+            # inferred as a documented query parameter on that route
             async def _serve_root(request: Any) -> Any:
                 return await _to_response(_real_file("") or root / "index.html")
 

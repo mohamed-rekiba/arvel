@@ -1,9 +1,5 @@
-"""Integration: the SERVED ASGI app boots the arvel application via its lifespan (foundation It.2 — B1/M7).
-
-This exercises the production path the unit tests miss (note: test path ≠ prod path) — building the app
-through ``as_asgi()`` and driving it with Litestar's TestClient so the real ASGI lifespan runs
-``bootstrap_app`` (sync) + ``boot()``/``terminate()`` (async).
-"""
+"""Integration: the SERVED ASGI app boots arvel via its real lifespan — as_asgi() + TestClient runs
+bootstrap_app (sync) and boot()/terminate() (async), the production path unit tests miss."""
 
 from __future__ import annotations
 
@@ -34,9 +30,9 @@ def test_served_app_boots_and_terminates_via_lifespan() -> None:
         assert app.booted is False
 
         with TestClient(app=asgi):  # entering runs the ASGI lifespan → boot()
-            assert app.booted is True  # B1: the served app actually boots the arvel application
+            assert app.booted is True
             assert flags.get("booted") is True
-        assert flags.get("terminated") is True  # B1: shutdown ran terminate()
+        assert flags.get("terminated") is True  # shutdown ran terminate()
     finally:
         set_application(None)
 
@@ -57,20 +53,18 @@ def test_boot_failure_runs_terminate_and_propagates() -> None:
     app.app_provider_classes.append(BadProvider)
     try:
         asgi = app.as_asgi()
-        # BaseException (not Exception): the ASGI TaskGroup wraps a startup failure in an
-        # ExceptionGroup (a BaseException); _exception_messages unwraps it below.
+        # the TaskGroup wraps the startup failure in an ExceptionGroup; _exception_messages unwraps it
         with pytest.raises(BaseException) as exc_info, TestClient(app=asgi):
             pass
-        # boot error propagates (the ASGI TaskGroup may wrap it in an ExceptionGroup) — not swallowed
         assert any("boom during boot" in m for m in _exception_messages(exc_info.value))
-        assert flags.get("terminated") is True  # M7: a failed boot still cleans up via terminate()
+        assert flags.get("terminated") is True  # a failed boot still cleans up via terminate()
     finally:
         set_application(None)
 
 
 def test_recorded_route_files_are_imported_and_served(tmp_path: Path) -> None:
-    # B5: a route file recorded via load_routes_from / with_routing must be IMPORTED at boot so its
-    # Route.* defs register into the router — then served through the booted app (B1 + B5 end to end).
+    # a route file recorded via load_routes_from/with_routing must be IMPORTED at boot so its
+    # Route.* defs register into the router.
     from litestar.testing import TestClient
 
     (tmp_path / "web.py").write_text(
@@ -87,8 +81,8 @@ def test_recorded_route_files_are_imported_and_served(tmp_path: Path) -> None:
 
 
 def test_duplicate_route_file_entries_are_imported_once(tmp_path: Path) -> None:
-    # B5 dedup: the same file recorded under different spellings must import once (else Litestar
-    # raises on the duplicate route). "sub/../web.py" and "web.py" resolve to the same file.
+    # the same file recorded under different spellings must import once, else Litestar
+    # raises on the duplicate route.
     from litestar.testing import TestClient
 
     (tmp_path / "web.py").write_text(
@@ -109,8 +103,7 @@ def test_missing_route_file_is_skipped_with_warning(tmp_path: Path) -> None:
 
     from arvel.kernel.bootstrap import load_route_files
 
-    # load_route_files directly (not via as_asgi, which re-runs configure_logging and would clobber
-    # capture_logs): a recorded-but-absent route file is skipped with a warning, not a crash.
+    # load_route_files directly — as_asgi() re-runs configure_logging and would clobber capture_logs.
     app = Application(base_path=str(tmp_path))
     app.route_files.append("does_not_exist.py")
     with capture_logs() as logs:
@@ -122,8 +115,7 @@ def test_missing_route_file_is_skipped_with_warning(tmp_path: Path) -> None:
 
 
 def test_bootstrap_app_is_idempotent() -> None:
-    # Calling as_asgi() twice must be a no-op (the bootstrapped guard) — so providers aren't
-    # re-discovered and the boot reporter isn't subscribed twice.
+    # calling as_asgi() twice must be a no-op (the bootstrapped guard).
     app = Application()
     try:
         app.as_asgi()

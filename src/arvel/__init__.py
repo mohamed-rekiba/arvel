@@ -17,9 +17,7 @@ from typing import TYPE_CHECKING
 
 __version__ = "0.51.0"  # x-release-please-version
 
-# Public name -> (submodule, attribute). Resolved on first access by __getattr__,
-# so `from arvel import Date` imports arvel.dates only when Date is first used —
-# never on `import arvel`. Later phases extend this (Model→arvel.database, etc.).
+# name -> (submodule, attribute), resolved lazily by __getattr__ below.
 _LAZY: dict[str, tuple[str, str]] = {
     "Application": ("arvel.kernel", "Application"),
     "ApplicationBuilder": ("arvel.kernel", "ApplicationBuilder"),

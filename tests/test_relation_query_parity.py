@@ -1,6 +1,5 @@
-"""Eloquent relations are query builders (Laravel): a has-many/has-one relation proxies
-``where``/``order_by``/``count``/… to its FK-constrained query, and ``create``/``save`` set the foreign
-key to the parent automatically — ``$parent->children()->where(...)->get()`` and ``->create([...])``."""
+"""Eloquent relations are query builders: a has-many/has-one relation proxies where/order_by/count to
+its FK-constrained query, and create/save set the foreign key to the parent automatically."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Auth (G7 hardening) — impersonation ("login as"), reversible + authorization-gated."""
+"""Impersonation ("login as"), reversible + authorization-gated."""
 
 from __future__ import annotations
 

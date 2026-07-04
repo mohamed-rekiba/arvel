@@ -37,11 +37,9 @@ from arvel.support.money import Currency, Money
 from arvel.support.number import Number
 from arvel.support.stringable import Stringable
 
-#: The authenticated principal for the current request/async context. Lives in ``support``
-#: (a core leaf both ``auth`` and ``http`` import downward) so neither has to import the other:
-#: ``auth`` owns identity but stays import-light/core-installable, and ``http`` (the [http] extra)
-#: reads/baselines it without an illegal http→auth edge (DR-0026). Re-exported as
-#: ``arvel.auth.current_user`` and ``arvel.http.request.current_user`` for back-compat.
+#: The authenticated principal for the current request/async context. Lives here (a core leaf
+#: both ``auth`` and ``http`` import downward) so neither imports the other (DR-0026); re-exported
+#: as ``arvel.auth.current_user`` / ``arvel.http.request.current_user`` for back-compat.
 current_user: contextvars.ContextVar[Any] = contextvars.ContextVar("arvel_user", default=None)
 
 _UUID_RE = re.compile(
@@ -330,9 +328,8 @@ class LazyCollection[T]:
 class Str:
     """String helpers (Laravel Str parity) over inflection / slugify / ulid."""
 
-    # The inflection-backed transforms are pure string→string over regex-heavy work and
-    # are called hot (table-name / relation-key derivation). Memoize them — bounded, keyed
-    # on the input string. ``ulid()`` and the predicates below are intentionally NOT cached.
+    # Memoized: these regex-heavy transforms are called hot (table-name / relation-key derivation).
+    # ``ulid()`` and the predicates below are intentionally NOT cached.
     @staticmethod
     @functools.lru_cache(maxsize=2048)
     def studly(value: str) -> str:

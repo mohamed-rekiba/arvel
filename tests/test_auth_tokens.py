@@ -1,4 +1,4 @@
-"""Auth (doc 15) — API token guard (Sanctum-parity): create + resolve + bearer guard. Test-first."""
+"""API token guard (Sanctum-parity): create + resolve + bearer guard."""
 
 from __future__ import annotations
 
@@ -168,7 +168,7 @@ async def test_token_guard_token_returns_record() -> None:
         await db.dispose()
 
 
-# --- L5: pruning + mint-time validation ---------------------------------------
+# --- pruning + mint-time validation ---------------------------------------------
 
 
 async def test_prune_expired_tokens_keeps_valid_and_nonexpiring() -> None:

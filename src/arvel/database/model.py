@@ -21,9 +21,7 @@ if TYPE_CHECKING:
 
     from arvel.database.connections import ConnectionResolver
 
-# Python type -> SQLAlchemy type name for ``__fields__`` columns. Temporal types are handled in
-# ``_sa_type`` (real ``DateTime``/``Date``), so datetimes round-trip as real values on every dialect
-# (incl. Postgres timestamptz), matching what migrations create. Unknown types fall back to String.
+# Python type -> SQLAlchemy type name; temporal types get their own real DateTime/Date in _sa_type.
 _PY_TO_SA = {int: "Integer", str: "String", bool: "Boolean", float: "Float", dict: "JSON"}
 
 
@@ -40,9 +38,8 @@ def _sa_type(sa: Any, field_type: Any) -> Any:
     if field_type is _datetime.date:
         return sa.Date()
     if field_type is str:
-        # default to VARCHAR(255) — Laravel's default string length, matching Blueprint.string() — so
-        # the model table is portable to MySQL (which rejects length-less VARCHAR in DDL). Declare a
-        # sa.Text()/sa.String(n) in __fields__ for longer columns.
+        # VARCHAR(255) default — MySQL rejects length-less VARCHAR in DDL; declare sa.Text()/String(n)
+        # in __fields__ for longer columns.
         return sa.String(255)
     return getattr(sa, _PY_TO_SA.get(field_type, "String"))()
 
@@ -199,9 +196,7 @@ def _build_table(cls: type[Any]) -> Any:
     columns: list[Any] = []
     if pk not in cls.__fields__:
         if HasUuids in cls.__mro__:
-            # sa.Uuid(as_uuid=False): native UUID on Postgres, CHAR(32) elsewhere, with a *string*
-            # Python side — so the string uuid HasUuids generates binds correctly against a native
-            # `uuid` column (t.uuid("id")) on PG instead of being sent as a mismatched VARCHAR.
+            # as_uuid=False: the Python side stays a string, matching what HasUuids generates
             columns.append(sa.Column(pk, sa.Uuid(as_uuid=False), primary_key=True))
         elif HasUlids in cls.__mro__:
             # a ULID is a 26-char string, NOT a uuid — keep a length-bearing VARCHAR PK
@@ -210,18 +205,13 @@ def _build_table(cls: type[Any]) -> Any:
             columns.append(sa.Column(pk, sa.Integer, primary_key=True, autoincrement=True))
     for field_name, field_type in cls.__fields__.items():
         cast = cls.__casts__.get(field_name)
-        # a "datetime"-cast field is a real DateTime column even if declared `str` (the cast now
-        # stores/returns real datetimes), so the column type and the cast can't disagree on Postgres.
+        # a "datetime"-cast field gets a real DateTime column even if declared `str`, so the column
+        # type and the cast never disagree on Postgres
         if cast == "datetime" and not isinstance(field_type, sa.types.TypeEngine):
             col_type: Any = sa.DateTime(timezone=True)
         elif cast == "json":
-            # A "json"-cast field lands in a plain TEXT column, NOT a native sa.JSON column — even
-            # when declared `dict`. arvel's "json" cast already owns serialization (json.dumps on
-            # set / json.loads on get, Laravel parity). A native sa.JSON column adds a SECOND layer,
-            # and the two are asymmetric: the Builder read path returns raw column text (it bypasses
-            # SQLAlchemy's JSON *result* processor), while writes go through Core statements that DO
-            # apply the JSON *bind* processor. So every write re-encodes the value and it corrupts
-            # monotonically (double-, then triple-encoded…). One serialization layer, in the cast.
+            # plain TEXT, not sa.JSON: the cast already owns (de)serialization, and a native JSON
+            # column's asymmetric read/write processors would double-encode the value on every write
             col_type = sa.Text()
         else:
             col_type = _sa_type(sa, field_type)
@@ -242,9 +232,8 @@ def _build_table(cls: type[Any]) -> Any:
 class ModelMeta(type):
     def __new__(mcs, name: str, bases: tuple[type, ...], ns: dict[str, Any]) -> type:
         cls = cast("type[Model]", super().__new__(mcs, name, bases, ns))
-        # Collect Attribute accessor/mutator methods, inheriting from bases. Each is
-        # removed from the class so `instance.<name>` resolves to the attribute value
-        # (via __getattr__), not the (shadowing) method.
+        # Attribute accessor/mutator methods are stripped from the class so `instance.<name>`
+        # resolves to the attribute value (via __getattr__), not the shadowing method.
         from arvel.database.attribute import returns_attribute
 
         meta: dict[str, Any] = {}
@@ -258,8 +247,7 @@ class ModelMeta(type):
                 if attr_name in cls.__dict__:
                     delattr(cls, attr_name)
             elif callable(member) and getattr(member, "_arvel_scope", False):
-                # @scope methods are stripped so `Model.<name>` forwards to the builder
-                # (via __getattr__) instead of returning the shadowing function.
+                # stripped so `Model.<name>` forwards to the builder instead of the shadowing method
                 scopes[attr_name] = member
                 if attr_name in cls.__dict__:
                     delattr(cls, attr_name)
@@ -271,7 +259,7 @@ class ModelMeta(type):
         return cls
 
     def __getattr__(cls, item: str) -> Any:
-        # User.where(...) → User.where(...)  (proxy class-level calls to a fresh query)
+        # proxies class-level calls to a fresh query, e.g. User.where(...) -> User.query().where(...)
         return getattr(cls.query(), item)
 
 
@@ -339,10 +327,8 @@ class Model(metaclass=ModelMeta):
     def query(cls) -> Builder:
         return cls._base_query()
 
-    # Typed classmethod query entry-points (Laravel `Model::where(...)`). The metaclass
-    # `__getattr__` already forwards ANY builder method to `query()`, but as `Any` — untyped,
-    # so it trips strict type-checking. These explicit proxies give the everyday starters a real
-    # `Builder` return type, so `Product.where(...).first()` is fully type-safe without `.query()`.
+    # Typed proxies: __getattr__ already forwards any builder method to query(), but untyped (Any),
+    # which trips strict type-checking — these give the common ones a real Builder return type.
     @classmethod
     def where(cls, *args: Any, **kwargs: Any) -> Builder:
         return cls.query().where(*args, **kwargs)
@@ -550,8 +536,6 @@ class Model(metaclass=ModelMeta):
                 self._attributes[key] = self._cast_set(key, val)
             else:
                 discarded.append(key)
-        # Laravel parity: a totally-guarded model raises rather than silently dropping the attributes
-        # (which would persist an empty row). Declare __fillable__ / __guarded__ = [] to allow them.
         if discarded and self._totally_guarded():
             raise MassAssignmentException(type(self).__name__, discarded)
         return self
@@ -683,9 +667,8 @@ class Model(metaclass=ModelMeta):
             return self._cast_get(item, attributes[item])
         if item in type(self).__attributes_meta__:  # computed accessor (no stored value)
             return self._cast_get(item, None)
-        # A declared column that simply isn't set on this instance reads as None — Laravel parity
-        # (``$model->column`` is null, e.g. a nullable column right after ``create()``). An unknown
-        # attribute (typo / missing relation) still raises.
+        # a declared column that isn't set on this instance reads as None (Laravel parity); an
+        # unknown attribute (typo / missing relation) still raises
         table = type(self).__table__
         if table is not None and item in table.columns:
             return self._cast_get(item, None)

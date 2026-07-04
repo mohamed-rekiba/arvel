@@ -40,7 +40,7 @@ def test_make_model_already_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPat
 
 
 def test_route_list_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # route:list now boots the project app via the console kernel (CLI-1) — provide a bootstrap/app.py.
+    # route:list boots the project app via the console kernel, so it needs a bootstrap/app.py
     (tmp_path / "bootstrap").mkdir()
     (tmp_path / "bootstrap" / "app.py").write_text(
         "from arvel.kernel import Application\n\n"

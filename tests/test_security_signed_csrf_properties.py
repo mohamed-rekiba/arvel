@@ -1,10 +1,5 @@
-"""Security — abuse/property coverage for the signed-URL and CSRF boundaries.
-
-Companion to the example-based ``test_signed_urls.py`` / ``test_http_csrf.py``:
-proves the refusal invariants across generated inputs, plus the two abuse cases the
-example tests miss — a tampered signed URL must never validate, and CSRF comparison
-must be constant-time and not crash on a hostile (non-ASCII) token.
-"""
+"""Security — abuse/property coverage for signed-URL and CSRF: a tampered signed URL must never
+validate, and CSRF comparison must be constant-time and not crash on a hostile (non-ASCII) token."""
 
 from __future__ import annotations
 
@@ -33,10 +28,8 @@ def _router() -> Router:
 @given(post=st.integers(min_value=0, max_value=10_000), index=st.integers(min_value=0))
 @settings(max_examples=200)
 def test_signed_url_path_tamper_never_validates(post: int, index: int) -> None:
-    """The load-bearing invariant: altering the *protected* path/query (the part the
-    signature authorizes) must never validate. (Re-encoding the signature token itself
-    can be base64-redundant and re-validate the SAME url — that's harmless and out of
-    scope here; what matters is an attacker cannot change which resource is signed.)"""
+    """Altering the protected path/query must never validate; re-encoding the signature
+    token itself can be base64-redundant (harmless) — what matters is the signed resource can't change."""
     r = _router()
     signed = r.signed_url("posts.show", key=KEY, post=post)
     base, sep, token = signed.partition("?signature=")
@@ -93,8 +86,7 @@ async def test_csrf_matching_token_passes() -> None:
 
 
 async def test_csrf_non_ascii_token_is_rejected_cleanly() -> None:
-    """A hostile non-ASCII header must yield a 419, not a 500 — secrets.compare_digest
-    rejects non-ASCII str, so the impl must compare as bytes."""
+    """A hostile non-ASCII header must yield a 419, not a 500 — secrets.compare_digest rejects non-ASCII str, so the impl must compare as bytes."""
     csrf = ValidateCsrfToken()
     with pytest.raises(ValidationException) as exc:
         await csrf.handle(_Req("POST", "tökén", "tok"), _ok)

@@ -1,5 +1,5 @@
-"""ORM — recursive relations (adjacency-list trees): Model.recursive() → descendants/
-ancestors with depth (.get() flat, .tree().get() nested). Test-first."""
+"""ORM — recursive relations (adjacency-list trees): Model.recursive() → descendants/ancestors
+with depth (.get() flat, .tree().get() nested)."""
 
 from __future__ import annotations
 

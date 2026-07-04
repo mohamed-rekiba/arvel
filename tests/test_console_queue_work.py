@@ -43,8 +43,7 @@ def test_queue_work_invokes_manager_work() -> None:
 
 
 def test_queue_failed_lists_and_retry_redispatches(tmp_path: Any) -> None:
-    """queue:failed lists the failed_jobs rows; queue:retry re-dispatches one and deletes it
-    (Laravel parity). Seeded via a file-backed sqlite so the CLI's own event loop sees it."""
+    """queue:failed lists failed_jobs rows; queue:retry re-dispatches one and deletes it."""
     import asyncio
 
     import sqlalchemy as sa

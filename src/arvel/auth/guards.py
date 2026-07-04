@@ -51,7 +51,7 @@ class LocalGuard:
         if self._hasher is None:
             from arvel.security import resolve_hasher
 
-            self._hasher = resolve_hasher()  # container-bound hasher when an app is running
+            self._hasher = resolve_hasher()
         return self._hasher
 
     async def attempt(self, identifier: str, password: str) -> Principal | None:
@@ -127,8 +127,7 @@ class GuardManager(Manager):
             raw = self.app.config("auth.oidc")
             if isinstance(raw, dict):
                 config = cast("dict[str, Any]", raw)
-        # Fail loud on misconfiguration rather than building a verifier that silently rejects all
-        # tokens (empty issuer/audience would never match) — surfaces operator error early.
+        # fail loud here, rather than build a verifier that silently rejects every token
         missing = [key for key in ("jwks_uri", "issuer", "audience") if not config.get(key)]
         if missing:
             raise ValueError(f"auth.oidc is missing required keys: {', '.join(missing)}")

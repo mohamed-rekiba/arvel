@@ -1,19 +1,8 @@
-"""Security — property-based / fuzz coverage for the crypto boundary.
+"""Security — property-based/fuzz coverage for the crypto boundary (Encrypter, Hasher, Signer).
 
-The example-based happy paths live in ``test_security.py``. This file proves the
-*security invariants* hold across the input space, not just for hand-picked values —
-the core of adversarial testing: prove the framework *refuses* the unintended.
-
-Invariants asserted here:
-- ``Encrypter`` is authenticated encryption: round-trips any text, and any mutation
-  or truncation of a token is either rejected (``InvalidToken``) or decodes to the
-  *same* plaintext — never a *different* one. (base64 has redundant encodings of
-  identical bytes, so a single-char flip can be a no-op; what must never happen is a
-  tamper forging *different* content past the MAC.)
-- ``Hasher`` (argon2): verifies the right password for any input, rejects wrong ones,
-  and is salted (two hashes of the same password differ).
-- ``Signer`` (itsdangerous): round-trips, and any tamper is rejected or yields the
-  same value — never a different accepted value (a forgery).
+Proves the refusal invariants (tamper -> rejected or same plaintext, never a different one)
+hold across generated inputs, not just hand-picked values. Happy-path examples live in
+``test_security.py``.
 """
 
 from __future__ import annotations
@@ -53,10 +42,8 @@ def test_encrypter_roundtrips_any_text(plaintext: str) -> None:
 @given(plaintext=st.text(min_size=1), index=st.integers(min_value=0))
 @settings(max_examples=300)
 def test_encrypter_mutation_never_yields_different_plaintext(plaintext: str, index: int) -> None:
-    """The authenticated-encryption invariant: a single-char mutation is either
-    rejected (``InvalidToken``) OR decodes to the *same* plaintext (base64 has
-    redundant encodings of identical bytes). It must NEVER yield a *different*
-    plaintext — that would mean the MAC could be bypassed to forge content."""
+    """A single-char mutation must be rejected or decode to the same plaintext —
+    never a different one (that would mean the MAC was bypassed)."""
     enc = Encrypter(Encrypter.generate_key())
     token = enc.encrypt(plaintext)
     tampered = _flip_char(token, index)
@@ -83,8 +70,7 @@ def test_encrypter_rejects_truncated_token(plaintext: str, cut: int) -> None:
 @given(blob=st.binary(max_size=200))
 @settings(max_examples=200)
 def test_encrypter_rejects_arbitrary_bytes(blob: bytes) -> None:
-    """Arbitrary attacker-supplied input is rejected, never mis-decrypted or crashing
-    with an unexpected error type."""
+    """Arbitrary attacker-supplied input is rejected, never mis-decrypted or crashing with an unexpected error type."""
     enc = Encrypter(Encrypter.generate_key())
     candidate = blob.decode("latin-1")
     try:
@@ -148,9 +134,7 @@ def test_signer_roundtrips(value: str) -> None:
 @given(value=st.text(min_size=1), index=st.integers(min_value=0))
 @settings(max_examples=300)
 def test_signer_tamper_never_yields_different_value(value: str, index: int) -> None:
-    """A tamper is either rejected (``BadData``) or, where base64 has a redundant
-    encoding, round-trips to the *same* value. It must NEVER produce a *different*
-    accepted value — that would be a signature forgery."""
+    """A tamper must be rejected or round-trip to the same value — never a different accepted one (a forgery)."""
     s = Signer("secret-key")
     signed = s.sign(value)
     tampered = _flip_char(signed, index)

@@ -80,8 +80,7 @@ class LoginRateLimiter:
         try:
             key = self._key(identifier)
             count = int(await self._cache.increment(key))
-            # Set the TTL on EVERY failure (not just the first) so a missed-first-hit / non-atomic
-            # incr+expire can never strand a no-TTL key (→ permanent lockout). Sliding window.
+            # re-set the TTL on every failure so a missed first-hit can never strand a no-TTL key
             await self._cache.expire(key, self.decay_seconds)
             await self._cache.put(
                 self._until_key(identifier),

@@ -1,6 +1,5 @@
 """BelongsTo parity (Laravel): the inverse relation is a query builder too (where/order_by proxy to the
-owner query), and associate/dissociate set/clear the child's foreign key. Extends the has-one/has-many
-query-proxy (iter 4) to the belongs-to side."""
+owner query), and associate/dissociate set/clear the child's foreign key."""
 
 from __future__ import annotations
 

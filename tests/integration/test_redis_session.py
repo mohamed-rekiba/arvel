@@ -1,4 +1,4 @@
-"""Integration (doc 04/16) — sessions persist across StartSession instances on real Redis."""
+"""Sessions persist across StartSession instances on real Redis."""
 
 from __future__ import annotations
 
@@ -19,8 +19,7 @@ class Req:
         self.session: dict[str, Any] = {}
 
     def cookie(self, name: str) -> str | None:
-        # the client returns whatever session cookie the server set (plain "session" here, since the
-        # test runs StartSession with secure=False → no __Host- prefix)
+        # secure=False here → no __Host- prefix on the cookie name
         return self._sid if name == "session" else None
 
 
@@ -38,7 +37,7 @@ async def test_session_persists_over_redis(redis_url: str, configure_app: Any) -
     cache = CacheManager(app).driver("redis")
     sid = f"sid-{uuid.uuid4().hex[:8]}"
 
-    await StartSession(cache=cache, secure=False).handle(Req(sid), _set_user)  # worker A writes
+    await StartSession(cache=cache, secure=False).handle(Req(sid), _set_user)
     r = Req(sid)
-    await StartSession(cache=cache, secure=False).handle(r, _read_user)  # worker B reads
+    await StartSession(cache=cache, secure=False).handle(r, _read_user)
     assert r.session["user_id"] == 7

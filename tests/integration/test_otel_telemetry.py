@@ -1,8 +1,5 @@
-"""Integration (doc 20) — telemetry exports spans to a real OTLP collector (Grafana-stack-agnostic).
-
-Telemetry's unit tests use an in-memory exporter; this proves the real OTLP/HTTP export path end to
-end: enable telemetry pointing at a live OpenTelemetry Collector, emit a span, force-flush, and assert
-the collector actually received it (read back from the collector's debug-exporter logs).
+"""Telemetry's unit tests use an in-memory exporter; this proves the real OTLP/HTTP export path end
+to end against a live OpenTelemetry Collector.
 """
 
 from __future__ import annotations
@@ -37,17 +34,16 @@ def test_span_reaches_a_real_otlp_collector(otel_collector: object) -> None:
     try:
         result = configure()
         assert result is not None and result.tracer_provider is not None, "tracing not configured"
-        # emit on the configured provider directly (OTel's global set-tracer-provider is once-per-process)
+        # emit on the configured provider directly — OTel's global set-tracer-provider is once-per-process
         with result.tracer_provider.get_tracer("itest").start_as_current_span(span_name):
             pass
-        assert result.tracer_provider.force_flush() is True  # push the batch to the collector now
+        assert result.tracer_provider.force_flush() is True
     finally:
         set_application(None)
 
-    # the collector's debug exporter prints received spans; the unique name proves real receipt
     received = False
     for _ in range(40):  # up to ~10s for the collector to log the export
-        out, err = otel_collector.get_logs()  # type: ignore[attr-defined]  # (stdout, stderr)
+        out, err = otel_collector.get_logs()  # type: ignore[attr-defined]
         if span_name in out.decode(errors="ignore") + err.decode(errors="ignore"):
             received = True
             break

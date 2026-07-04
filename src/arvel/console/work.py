@@ -35,7 +35,7 @@ def queue_failed() -> None:
     from arvel.console.kernel import run_app_command
 
     async def _handler(app: Any) -> None:
-        # reached through the container-bound queue manager — console imports no queue internals (G2)
+        # reached through the container-bound queue manager; console imports no queue internals
         jobs = await app.make("queue").failed_jobs()
         if not jobs:
             typer.echo("no failed jobs")

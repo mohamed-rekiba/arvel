@@ -1,4 +1,4 @@
-"""Auth (doc 15) — AuthenticateMiddleware binds current_user per request. Test-first."""
+"""AuthenticateMiddleware binds current_user per request."""
 
 from __future__ import annotations
 

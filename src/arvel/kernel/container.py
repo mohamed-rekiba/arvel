@@ -103,8 +103,7 @@ def _init_signature(concrete: Any) -> tuple[inspect.Signature | None, dict[str, 
     try:
         hints = typing.get_type_hints(concrete.__init__)
     except Exception:
-        # An unresolvable forward ref raises NameError (and odd annotations other errors) — fall
-        # back to the raw, un-resolved annotations rather than failing the whole build (C3).
+        # an unresolvable forward ref raises NameError — fall back to raw annotations rather than fail
         hints = {}
     return sig, hints
 
@@ -314,8 +313,7 @@ class Container:
         if not inspect.isclass(concrete):
             raise BindingResolutionError(f"Target [{concrete!r}] is not instantiable.")
         if concrete in _UNBUILDABLE_BUILTINS:
-            # make(list)/make(dict) used to silently return an empty container — a footgun. A bare
-            # builtin collection is never a service; require an explicit bind()/instance().
+            # a bare builtin collection is never a service; require an explicit bind()/instance()
             raise BindingResolutionError(
                 f"Cannot autowire the builtin {concrete.__name__!r} — bind it explicitly "
                 f"(container.instance(...) / container.bind(...))."
@@ -381,9 +379,8 @@ class Container:
                     except CircularDependencyError:
                         raise  # a dependency cycle is always fatal — never silently fall back
                     except BindingResolutionError:
-                        # inner is a class but unbuildable (unbound/abstract) → fall back below.
-                        # Only the container's own signal is caught: a real TypeError/NameError from
-                        # a buildable dep's __init__ propagates, never masked as "unresolvable".
+                        # inner is unbuildable (unbound/abstract) → fall back; a real error from a
+                        # buildable dep's __init__ still propagates, never masked as "unresolvable"
                         if not (has_default or nullable):
                             raise
                 if value is _UNSET:
@@ -450,7 +447,7 @@ class Container:
         try:
             hints = typing.get_type_hints(func)
         except Exception:
-            hints = {}  # unresolvable hints → inject only what we can introspect (C3)
+            hints = {}  # unresolvable hints → inject only what we can introspect
         kwargs: dict[str, Any] = {}
         for name, param in sig.parameters.items():
             if name == "self":

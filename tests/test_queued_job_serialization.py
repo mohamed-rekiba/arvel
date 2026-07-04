@@ -1,9 +1,5 @@
-"""Queued mail/notification jobs must survive serialization across a real broker.
-
-These are the unit-level regression locks for the green-but-broken class an in-process FakeQueue
-hides: ``serialize_instance`` must not raise (it would over redis/AMQP), and the worker's rebuild
-(``__new__`` + restore state, bypassing ``__init__``) must still render/deliver.
-"""
+"""Queued mail/notification jobs must survive serialization across a real broker — an in-process
+FakeQueue would hide a ``serialize_instance`` failure that only shows up over redis/AMQP."""
 
 from __future__ import annotations
 
@@ -33,7 +29,7 @@ class WelcomeNotification(Notification):
 
 async def test_queued_mailable_serializes_and_rebuilds_renderable() -> None:
     job = SendQueuedMailable(["ada@example.com"], WelcomeMail("Ada"))
-    payload = serialize_instance(job)  # must not raise (would, over a real broker, pre-fix)
+    payload = serialize_instance(job)  # must not raise (only surfaces over a real broker)
 
     rebuilt = await deserialize_any(payload)
     mailable = await rebuilt._rebuild_mailable()  # __new__ + restore: no Mailable.__init__
@@ -53,8 +49,7 @@ class MailWithAttachment(Mailable, ShouldQueue):
 
 
 async def test_queued_mailable_attachment_bytes_survive_serialization() -> None:
-    # binary attachments must round-trip as bytes (msgspec base64-encodes bytes but decodes to str
-    # without type info — the recursive bytes-tagging in model_ref/_rehydrate preserves them).
+    # msgspec decodes to str without type info; model_ref/_rehydrate's bytes-tagging preserves bytes
     job = SendQueuedMailable(["ada@example.com"], MailWithAttachment())
     payload = serialize_instance(job)
 
@@ -68,9 +63,7 @@ async def test_queued_mailable_attachment_bytes_survive_serialization() -> None:
 
 async def test_queued_notification_serializes_and_rebuilds() -> None:
     job = SendQueuedNotification(notifiable=None, notification=WelcomeNotification("Ada"))
-    payload = serialize_instance(
-        job
-    )  # was: msgspec TypeError "Encoding objects of type ... unsupported"
+    payload = serialize_instance(job)  # regression: msgspec can't encode a bare notification object
 
     rebuilt = await deserialize_any(payload)
     notification = await decode_instance(rebuilt.notification)

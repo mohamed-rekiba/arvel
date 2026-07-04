@@ -1,4 +1,4 @@
-"""Container autowiring on non-trivial ctor shapes (foundation hardening It.1 — M1, M2, C3).
+"""Container autowiring on non-trivial ctor shapes.
 
 These shapes (``Any``-typed, keyword-only, unresolvable forward-ref params) previously leaked raw
 ``TypeError``/``NameError`` out of ``make()``; they land on the real default middleware, so each is
@@ -101,12 +101,12 @@ def test_forward_ref_without_default_raises_clear_error() -> None:
 # --- the real payoff: default middleware autowire via the container ----------
 
 
-# --- the fallback must not mask real errors (reviewer F1/F2) ------------------
+# --- the fallback must not mask real errors ------------------
 
 
 def test_real_typeerror_in_dependency_is_not_masked() -> None:
-    # A genuine error inside a buildable dependency's __init__ must propagate, even when the consumer
-    # param has a default — it must NOT be swallowed as "unresolvable → use default".
+    # a genuine error in a buildable dependency's __init__ must propagate, not be swallowed as
+    # "unresolvable → use default"
     class Consumer:
         def __init__(self, dep: _Exploding | None = None) -> None:
             self.dep = dep
@@ -124,8 +124,7 @@ def test_cycle_with_defaults_still_raises() -> None:
 
 
 def test_default_middleware_autowire_via_container() -> None:
-    # StartSession (web) and ThrottleRequests (api) both have keyword-only + Any-typed ctor params;
-    # the HTTP kernel builds them with app.make(cls), so they must autowire (M1 + M2 together).
+    # both have keyword-only + Any-typed ctor params; the HTTP kernel builds them via app.make(cls)
     from arvel.http.middleware import StartSession, ThrottleRequests
     from arvel.kernel import Application
 

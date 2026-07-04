@@ -1,6 +1,4 @@
-"""Advanced DB (doc 08) — Alembic-driven migrations (upgrade + downgrade). Test-first.
-
-This is doc 08's mandated acceptance check: migrations run through Alembic Operations
+"""Alembic-driven migrations (upgrade + downgrade): run through Alembic Operations
 (create_table/drop_table), not a raw-SQL migrator.
 """
 
@@ -37,8 +35,7 @@ class AddSubtitleToPosts(Migration):
 
 
 async def test_schema_table_adds_and_drops_columns() -> None:
-    """schema.table() ADDs the blueprint's columns to an existing table (ALTER TABLE), and
-    schema.drop_column() removes them — the Schema::table / dropColumn Laravel surface."""
+    """schema.table() ADDs columns to an existing table; schema.drop_column() removes them."""
     db = ConnectionResolver()
     migrator = Migrator(db)
     try:
@@ -105,8 +102,7 @@ async def test_schema_table_creates_indexes_and_degrades_gin_off_postgres() -> N
 
 
 def test_server_default_clause_covers_the_scalar_literals() -> None:
-    """->default() emits DDL defaults for bools/numbers/strings (quotes escaped); other values
-    stay client-side only."""
+    """->default() emits DDL defaults for bools/numbers/strings; other values stay client-side."""
     import sqlalchemy as sa
 
     from arvel.database.schema import ColumnDefinition

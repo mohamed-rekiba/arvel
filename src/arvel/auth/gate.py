@@ -131,8 +131,7 @@ class Gate:
             if result is not None:
                 break
         if result is None:
-            # a policy-level before() (Laravel) runs before its ability methods — a non-None return
-            # decides the check (e.g. a super-admin grant) without consulting the method.
+            # a policy's own before() runs before its ability methods (Laravel parity)
             if ability not in self._abilities:
                 instance = self._policy_instance(args)
                 pre = getattr(instance, "before", None) if instance is not None else None

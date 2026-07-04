@@ -175,11 +175,8 @@ files = ["src"]
 namespace_packages = true
 explicit_package_bases = true
 mypy_path = "src"
-# We run BOTH mypy and pyright in strict mode. Pyright tracks "Unknown" more aggressively
-# than mypy: isinstance-narrowing an `Any` gives pyright `list[Unknown]` (flagged) but mypy
-# `list[Any]`. We resolve those spots with an explicit `cast(...)` for pyright — which mypy
-# then sees as redundant. Disabling this one check keeps the dual-checker setup consistent
-# without weakening real type safety (every real cast still type-checks).
+# Pyright narrows Any to Unknown more aggressively than mypy, so casts that satisfy pyright
+# read as redundant to mypy — disable this one check rather than fight the two checkers.
 warn_redundant_casts = false
 
 [[tool.mypy.overrides]]
@@ -192,9 +189,7 @@ typeCheckingMode = "strict"
 pythonVersion = "3.14"
 venvPath = "."
 venv = ".venv"
-# Third-party engines (fsspec, av, …) ship no type stubs — silence the "missing stubs"
-# noise about *their* packaging. This does NOT relax any check on our own code:
-# reportUnknown* stay on; we funnel untyped boundaries through explicit Any.
+# Third-party engines (fsspec, av, …) ship no stubs; reportUnknown* stays on for our own code.
 reportMissingTypeStubs = false
 
 # --- Tests ----------------------------------------------------------------
@@ -227,12 +222,8 @@ exclude_type_checking_imports = true
 [[tool.importlinter.contracts]]
 name = "G1 — module dependency DAG (layered, acyclic)"
 type = "layers"
-# The full module DAG as a topological order (highest first; a higher layer may import any
-# lower one, never the reverse). Each module is its own layer, so this forbids EVERY back-edge —
-# i.e. it mechanically enforces "no module cycles" + the dependency direction of DR-0003/DR-0026.
-# Consequences it locks in: `kernel` imports only `contracts`; `support` imports nothing above it
-# (no capability); cross-capability behaviour goes through a contract resolved from the container,
-# never a sibling import. `ignore_imports` is intentionally EMPTY — a new back-edge is a red build.
+# Topological order, highest first — each module is its own layer, so any back-edge is a red
+# build. Enforces the DR-0003/DR-0026 dependency direction; `ignore_imports` stays empty on purpose.
 layers = [
   "arvel.routing",
   "arvel.views",

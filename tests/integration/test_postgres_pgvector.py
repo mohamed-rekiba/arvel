@@ -1,5 +1,4 @@
-"""Integration (doc 08) — `t.vector` works as a real pgvector column on Postgres (CREATE EXTENSION
-vector), incl. a nearest-neighbour query. Requires the [vector] extra + Docker."""
+"""`t.vector` works as a real pgvector column on Postgres, incl. a nearest-neighbour query."""
 
 from __future__ import annotations
 
@@ -30,7 +29,7 @@ async def test_vector_column_and_knn_on_postgres(pgvector_url: str) -> None:
         await db.execute(table.insert().values(name="b", embedding=[0.0, 1.0, 0.0]))
         await db.execute(table.insert().values(name="c", embedding=[0.9, 0.1, 0.0]))
 
-        # nearest neighbour to [1,0,0] by L2 distance — should be "a", then "c"
+        # nearest neighbour to [1,0,0] by L2 distance
         query = (
             sa.select(table.c.name)
             .order_by(table.c.embedding.l2_distance([1.0, 0.0, 0.0]))

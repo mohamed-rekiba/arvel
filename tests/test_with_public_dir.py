@@ -1,6 +1,5 @@
-"""`Application.configure(...).with_public_dir(...)` — Laravel's public/ needs zero lines in
-routes/web.php; same here. RoutingServiceProvider registers Route.public() automatically at boot
-when a public dir is configured, with no route-file code needed at all."""
+"""`Application.configure(...).with_public_dir(...)`: RoutingServiceProvider registers Route.public()
+automatically at boot when a public dir is configured — no route-file code needed, same as Laravel's public/."""
 
 from __future__ import annotations
 
@@ -64,9 +63,8 @@ def test_with_public_dir_accepts_a_sub_path(tmp_path: Path) -> None:
 
 
 def test_with_public_dir_spa_fallback_false_serves_static_only(tmp_path: Path) -> None:
-    """with_public_dir(directory, spa_fallback=False) — for an app with no client-side router:
-    only real files are served, an unmatched path 404s normally, and the root isn't claimed (so
-    the app's own "/" route stays reachable)."""
+    """with_public_dir(spa_fallback=False): only real files are served, unmatched paths 404, and the
+    root isn't claimed — the app's own "/" route stays reachable."""
     public = _build_public_dir(tmp_path)
 
     web_routes = tmp_path / "web.py"
@@ -100,11 +98,8 @@ def test_with_public_dir_spa_fallback_false_serves_static_only(tmp_path: Path) -
 
 
 def test_coexists_with_real_routes_registered_via_with_routing_web(tmp_path: Path) -> None:
-    """A real routes/web.py (loaded through with_routing(web=...), the actual production path —
-    not a hand-built Router) can still register its own specific routes; RoutingServiceProvider's
-    auto-registered public() runs first (register() happens before load_route_files()), but
-    is_fallback sorting (Router.apply_to) means registration order never matters — a specific
-    route always wins over the catch-all regardless of which one was added first."""
+    """A real routes/web.py can still register specific routes alongside the auto-registered public()
+    fallback — is_fallback sorting means a specific route always wins, regardless of registration order."""
     public = _build_public_dir(tmp_path)
     web_routes = tmp_path / "web.py"
     web_routes.write_text(

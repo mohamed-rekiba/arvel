@@ -1,5 +1,5 @@
-"""Delayed-job release is single-take: release_due_jobs reserves each row (reserved_at) with an atomic
-compare-and-set before dispatching, so two concurrent workers never double-release the same job."""
+"""release_due_jobs reserves each row with an atomic compare-and-set, so two concurrent workers
+never double-release the same job."""
 
 from __future__ import annotations
 

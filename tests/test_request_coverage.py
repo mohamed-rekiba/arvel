@@ -57,8 +57,7 @@ class _EmptyBody(FakeRequest):
 
 
 async def test_request_json_empty_body_returns_empty_dict() -> None:
-    # Request.json() defaults to {} so `(...).get(x)` doesn't crash with "'NoneType' has no attribute
-    # 'get'" (the --auth login 500 a user hit on an empty POST)
+    # Request.json() defaults to {} so `(...).get(x)` doesn't crash with "'NoneType' has no attribute 'get'"
     body = await Request(_EmptyBody()).json()
     assert body == {}
     assert body.get("email") is None  # no AttributeError

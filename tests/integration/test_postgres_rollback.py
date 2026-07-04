@@ -1,4 +1,4 @@
-"""Integration (doc 20) — database_transaction rolls back on a real Postgres (isolation fixture)."""
+"""database_transaction rolls back on a real Postgres (isolation fixture)."""
 
 from __future__ import annotations
 
@@ -22,14 +22,13 @@ async def test_rollback_isolates_writes_on_postgres(postgres_url: str) -> None:
     db = ConnectionResolver({"default": {"url": postgres_url}})
     Account.set_connection(db)
     try:
-        await db.execute(sa.schema.CreateTable(Account.__table__))  # committed: table persists
+        await db.execute(sa.schema.CreateTable(Account.__table__))
 
         async with database_transaction(db):
             await Account.create(owner="ada", balance=100)
-            assert await Account.count() == 1  # visible inside the transaction
+            assert await Account.count() == 1
         assert await Account.count() == 0  # rolled back on a real DB
 
-        # a committed row, by contrast, survives
         await Account.create(owner="grace", balance=50)
         assert await Account.count() == 1
     finally:

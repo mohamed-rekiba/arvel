@@ -68,8 +68,7 @@ class HasRoles:
         return type(model).__name__, model._attributes[model.__primary_key__]
 
     def _connection(self) -> Any:
-        # NB: call Model's _resolve() method (not the _resolver ClassVar, which Model
-        # exposes under that name and which would shadow a same-named mixin method).
+        # call Model's _resolve() method, not the same-named _resolver ClassVar (would shadow it)
         return self._as_model()._resolve()
 
     def _roles_pivot(self, *, teams: bool) -> Any:
@@ -204,7 +203,7 @@ class HasRoles:
         ids = await self._effective_permission_ids()
         perms: list[Any] = await Permission.where_in("id", list(ids)).get() if ids else []
         resolved = {p.name for p in perms}
-        # DR-0011: union permissions granted via ephemeral IdP-derived roles (not persisted).
+        # union in permissions granted via ephemeral IdP-derived roles (never persisted)
         idp_roles = self._carried_idp_roles()
         if idp_roles:
             resolved |= await self._permission_names_for_role_names(idp_roles)
