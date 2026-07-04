@@ -12,6 +12,7 @@ every stored value serializes; QUEUE-RELIABILITY wires this into job carry-over.
 from __future__ import annotations
 
 import contextvars
+import copy
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Any, TypedDict
@@ -139,15 +140,20 @@ class Context:
     # --- dehydrate / hydrate -------------------------------------------------------
     @staticmethod
     def dehydrate() -> ContextPayload:
-        payload: ContextPayload = {"visible": dict(_visible_get()), "hidden": dict(_hidden_get())}
+        # deep-copied so the payload is isolated from the live context (a later push/pop
+        # must not mutate an already-captured payload, and vice versa)
+        payload: ContextPayload = {
+            "visible": copy.deepcopy(_visible_get()),
+            "hidden": copy.deepcopy(_hidden_get()),
+        }
         for callback in _dehydrating:
             callback(payload)
         return payload
 
     @staticmethod
     def hydrate(payload: ContextPayload) -> None:
-        _visible.set(dict(payload["visible"]))
-        _hidden.set(dict(payload["hidden"]))
+        _visible.set(copy.deepcopy(payload["visible"]))
+        _hidden.set(copy.deepcopy(payload["hidden"]))
         for callback in _hydrated:
             callback(payload)
 
@@ -160,3 +166,9 @@ class Context:
     def hydrated(callback: Callable[[ContextPayload], None]) -> None:
         """Register a callback fired (with the incoming payload) on every `hydrate()`."""
         _hydrated.append(callback)
+
+    @staticmethod
+    def flush_callbacks() -> None:
+        """Clear every dehydrating/hydrated callback (test hygiene between cases)."""
+        _dehydrating.clear()
+        _hydrated.clear()

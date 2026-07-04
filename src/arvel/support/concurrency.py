@@ -48,5 +48,7 @@ class Concurrency:
     @staticmethod
     async def _run_process(callables: Sequence[Callable[[], Any]]) -> list[Any]:
         loop = asyncio.get_running_loop()
+        # a fresh pool per call keeps lifecycle simple; worker-spawn cost is acceptable for
+        # coarse CPU jobs — share an executor at the call site if invoked hot
         with ProcessPoolExecutor() as pool:
             return list(await asyncio.gather(*(loop.run_in_executor(pool, fn) for fn in callables)))

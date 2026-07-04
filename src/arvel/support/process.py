@@ -159,6 +159,11 @@ class Process:
             _kill(process)
             await process.wait()
             raise ProcessTimedOut(command, timeout) from None
+        except asyncio.CancelledError:
+            # caller cancelled (incl. a pool sibling failing under gather) — never orphan the child
+            _kill(process)
+            await process.wait()
+            raise
         return ProcessResult(
             command=command,
             exit_code=_exit_code(process),

@@ -100,6 +100,7 @@ async def test_dehydrating_and_hydrated_callbacks_fire() -> None:
     Context.hydrate(payload)
 
     assert seen == ["dehydrating", "hydrated"]
+    Context.flush_callbacks()  # don't leak registrations into later tests
 
 
 async def test_context_is_isolated_across_concurrent_tasks() -> None:
