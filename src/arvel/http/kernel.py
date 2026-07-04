@@ -634,12 +634,14 @@ class HttpKernel:
     ) -> Any:
         import contextlib
 
-        from arvel.support import current_user
+        from arvel.support import access_token, current_user
 
         request = Request(litestar_request)
         token = current_request.set(request)
-        # reset every request so a stale current_user can never leak across a request boundary
+        # reset every request so a stale current_user / access token can never leak across a
+        # request boundary (the execution context is reused between requests)
         user_token = current_user.set(None)
+        access_token_ctx = access_token.set(None)
         # a per-request container scope so `scoped` bindings share one instance for the request
         scope = self.app.scope() if self.app is not None else contextlib.nullcontext()
         try:
@@ -655,6 +657,7 @@ class HttpKernel:
                 return await self._handle(handler, request, params, group, route_middleware)
         finally:
             current_user.reset(user_token)
+            access_token.reset(access_token_ctx)
             current_request.reset(token)
 
     async def _handle(

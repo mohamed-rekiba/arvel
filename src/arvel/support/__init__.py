@@ -51,6 +51,12 @@ from arvel.support.stringable import Stringable
 #: both ``auth`` and ``http`` import downward) so neither imports the other (DR-0026); re-exported
 #: as ``arvel.auth.current_user`` / ``arvel.http.request.current_user`` for back-compat.
 current_user: contextvars.ContextVar[Any] = contextvars.ContextVar("arvel_user", default=None)
+#: The active Sanctum access token (``ApiToken | None``, typed ``Any`` to avoid a support→database
+#: import) — lives here beside ``current_user`` so the http kernel resets it per request (auth is
+#: above http and can't be imported by the kernel). ``auth.tokens`` sets/reads it via this handle.
+access_token: contextvars.ContextVar[Any] = contextvars.ContextVar(
+    "arvel_access_token", default=None
+)
 
 _UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"

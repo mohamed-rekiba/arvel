@@ -19,7 +19,6 @@ from __future__ import annotations
 import hashlib
 import secrets
 from collections.abc import Iterable
-from contextvars import ContextVar
 from typing import Any, ClassVar, cast
 
 import sqlalchemy as sa
@@ -28,7 +27,9 @@ from arvel.database import Model
 from arvel.http.middleware import Middleware
 
 #: the ApiToken active for this request — set by TokenGuard once it resolves a valid bearer token.
-_current_token: ContextVar[ApiToken | None] = ContextVar("arvel_access_token", default=None)
+#: Backed by the support-layer contextvar so the http kernel resets it per request (like
+#: current_user), closing a cross-request token-identity leak.
+from arvel.support import access_token as _current_token
 
 
 class ApiToken(Model):
@@ -204,7 +205,7 @@ def current_access_token() -> ApiToken | None:
     """The ``ApiToken`` active for this request — set by :class:`TokenGuard` once it resolves a valid
     bearer token; ``None`` outside a token-authenticated request (Sanctum's
     ``$request->user()->currentAccessToken()``, request-scoped here instead of hung off the user)."""
-    return _current_token.get()
+    return cast("ApiToken | None", _current_token.get())
 
 
 def token_can(ability: str) -> bool:

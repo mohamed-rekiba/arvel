@@ -224,7 +224,15 @@ async def complete_two_factor_challenge(
     """Verify ``code`` (TOTP or recovery) against the pending ``user`` and, on success, clear the
     session's pending flag. The caller then completes the *real* login (e.g.
     ``SessionGuard.login(user, request)``); on a failed ``code`` the pending flag is left untouched
-    so the challenge can be retried."""
+    so the challenge can be retried.
+
+    The security-critical first-factor bind is enforced HERE, not delegated to app wiring: the
+    passed ``user`` must be the one the session is actually awaiting (``pending_two_factor_user_id``)
+    — otherwise a caller who loads ``user`` from a request param could sidestep first-factor auth."""
+    pending = pending_two_factor_user_id(request)
+    subject = user.get_auth_identifier() if hasattr(user, "get_auth_identifier") else user.id
+    if pending is None or pending != subject:
+        return False
     if not await verify_two_factor(user, code, hasher=hasher):
         return False
     session = getattr(request, "session", None)

@@ -422,3 +422,20 @@ async def test_abilities_middleware_401s_with_no_bearer_token() -> None:
     with pytest.raises(Exception) as ei:
         await guarded.handle(_Bearer(None), _call_next)
     assert getattr(ei.value, "status", None) == 401
+
+
+async def test_current_access_token_does_not_leak_across_requests() -> None:
+    # CRITICAL (security review): the per-request token contextvar must be reset so req B
+    # never sees req A's token via current_access_token()/token_can().
+    from arvel.auth.tokens import current_access_token
+    from arvel.support import access_token
+
+    class _Tok:
+        abilities = ["*"]
+
+    ctx = access_token.set(_Tok())  # simulate req A resolving a token
+    try:
+        assert current_access_token() is not None
+    finally:
+        access_token.reset(ctx)  # kernel does this per request in _dispatch's finally
+    assert current_access_token() is None  # req B (no token) sees nothing

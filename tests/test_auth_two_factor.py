@@ -184,3 +184,36 @@ async def test_complete_two_factor_challenge_leaves_pending_flag_on_failure() ->
 
     assert await complete_two_factor_challenge(request, user, "000000") is False
     assert pending_two_factor_user_id(request) == user.id  # retry still possible
+
+
+async def test_challenge_completion_is_bound_to_the_pending_user() -> None:
+    # MEDIUM (security review): completing a challenge for a user the session isn't awaiting
+    # must fail, even with a valid code — the first-factor bind is enforced here, not by app wiring.
+    import contextlib
+
+    import pyotp  # already a dep of two_factor
+
+    from arvel.auth.two_factor import (
+        TwoFactorRequired,
+        begin_two_factor_challenge,
+        complete_two_factor_challenge,
+    )
+
+    class _U:
+        def __init__(self, uid: int, secret: str) -> None:
+            self._id = uid
+            self.two_factor_secret = secret
+            self.two_factor_confirmed_at = "2026-01-01"
+
+        def get_auth_identifier(self) -> int:
+            return self._id
+
+    secret = pyotp.random_base32()
+    alice = _U(1, secret)
+    mallory = _U(2, secret)  # knows a valid code for THIS secret
+    req: Any = type("R", (), {"session": {}})()
+    with contextlib.suppress(TwoFactorRequired):
+        begin_two_factor_challenge(req, alice)  # session awaits user 1 (raises the signal)
+    code = pyotp.TOTP(secret).now()
+    # a valid code but for the wrong (non-pending) user → rejected
+    assert await complete_two_factor_challenge(req, mallory, code) is False
