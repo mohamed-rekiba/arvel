@@ -13,6 +13,35 @@ users = await User.with_("posts").get()                # eager — one batched W
 post = await Post.with_("author").first()              # with_(...).first() eager-loads too (Laravel)
 ```
 
+## Eloquent Collection
+
+`Model.all()`, `Model.query().get()`, and every many-relation `get()` return an
+**`EloquentCollection`** (`arvel.database.collection.EloquentCollection`) — a model-aware
+`Collection`, not a plain `list` (though list-style iteration/indexing/`len()` still work; it
+implements `collections.abc.Sequence`):
+
+```python
+posts = await Post.all()
+posts.model_keys()                     # [1, 2, 3, ...] — every member's primary key
+posts.find(7)                          # the member with pk == 7, or None
+posts.contains(7)                      # True — by pk or by passing the model itself
+await posts.load("comments")           # batch eager-load onto every member — one WHERE IN, no N+1
+await posts.load_missing("comments")   # like load(), but skips members that already have it
+await posts.fresh()                    # reload every member in ONE batched query
+posts.make_hidden("body")              # fans Model.make_hidden to every member
+posts.only([1, 2])                     # members whose pk is in [1, 2]
+posts.except_([1, 2])                  # the inverse
+posts.to_dict()                        # [{...}, {...}] — every member's to_dict()
+posts.to_query()                       # a fresh Builder: WHERE pk IN (these members' keys)
+```
+
+`EloquentCollection` also carries the full `arvel.support.Collection` surface (`map`/`filter`/
+`pluck`/`where`/…) — a transform that returns a new collection (`map`, `filter`, …) yields a
+plain `Collection`, not another `EloquentCollection`, since the callback's output isn't
+guaranteed to still be models. A **raw** (non-model) table builder's `get()` — no `Model` bound —
+still returns a plain `list[dict]` (typed simplicity; Laravel's query builder returns a
+Collection there too, this is an intentional arvel divergence).
+
 **Loaded relations serialize.** Like Laravel's `toArray()`, an eager-loaded relation is included
 (nested) in `to_dict()` / a JSON response — a has-many as a list, a has-one/belongs-to as a single
 nested object, an empty relation as `null`. Only *loaded* relations are serialized:
@@ -45,7 +74,7 @@ class User(Model):
 
 await user.roles().attach(role_id, assigned_by="admin")  # extra pivot columns supported
 await user.roles().detach(role_id)                       # detach() with no arg clears all
-await user.roles().sync([1, 2, 3])                       # exact set
+await user.roles().sync([1, 2, 3])                       # exact set — see below
 await user.roles().sync_without_detaching([4])           # add missing, keep the rest
 await user.roles().toggle([1, 2])                        # attach absent / detach present
 await user.roles().update_existing_pivot(role_id, assigned_by="system")
@@ -53,6 +82,32 @@ await user.roles().with_pivot("assigned_by").get()       # expose pivot data on 
 await user.roles().where_pivot("assigned_by", "admin").count()
 await user.roles().where("active", "=", True).get()      # constrain the related model
 ```
+
+### `sync` — diff-based, pivot-preserving
+
+`sync`/`sync_without_detaching`/`sync_with_pivot_values` are **diff-based**, not
+detach-then-reattach: they compare the given ids against what's currently attached, then only
+attach the missing ones, detach the extras (when `detaching=True`), and update pivot columns for
+retained ids whose given attrs differ. A retained pivot row is **never** dropped and recreated —
+any extra pivot data you didn't ask to change survives untouched:
+
+```python
+result = await user.roles().sync([1, 3])                 # bare id list — no pivot attrs given
+result = await user.roles().sync({1: {"note": "x"}, 3: {}})  # or {id: pivot_attrs}
+result.attached   # [3]      — ids newly attached
+result.detached   # [2]      — ids removed (only when detaching=True, the default)
+result.updated    # [1]      — retained ids whose given pivot attrs differed from what's stored
+
+await user.roles().sync_without_detaching([4])           # sync(..., detaching=False): never detaches
+await user.roles().sync_with_pivot_values([1, 2], {"note": "bulk"})  # same pivot values on every id
+
+changes = await user.roles().toggle([1, 2])              # {"attached": [...], "detached": [...]}
+```
+
+`sync`/`sync_without_detaching`/`sync_with_pivot_values` return a `SyncResult`
+(`arvel.database.relations.SyncResult`) — a frozen `attached`/`detached`/`updated` changes map
+(Laravel's `sync()` return shape); `toggle` returns a plain `{"attached": [...], "detached": [...]}`
+dict.
 
 The full relation set: `has_one`/`has_many`/`belongs_to`/`belongs_to_many`,
 `has_one_through`/`has_many_through`, and the polymorphic family

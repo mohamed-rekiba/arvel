@@ -10,7 +10,19 @@ Grounded in knowledge/port/07-orm-active-record.md.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any, cast
+
+
+@dataclass(frozen=True)
+class SyncResult:
+    """The "changes" map returned by ``BelongsToMany.sync``/``sync_without_detaching``/
+    ``sync_with_pivot_values`` (Laravel parity) — which related ids were attached, detached, and
+    had their pivot columns updated (A5)."""
+
+    attached: list[Any] = field(default_factory=list[Any])
+    detached: list[Any] = field(default_factory=list[Any])
+    updated: list[Any] = field(default_factory=list[Any])
 
 
 class Relation:
@@ -35,7 +47,9 @@ class Relation:
         return await self.query().first()
 
     def _match(self, items: list[Any]) -> Any:
-        return items
+        from arvel.database.collection import EloquentCollection
+
+        return EloquentCollection(items)
 
     def _eager_query(self, keys: list[Any]) -> Any:
         """The batched query loading all children for ``keys`` (subclasses add extra filters)."""
@@ -173,13 +187,15 @@ class BelongsToMany(Relation):
         return self.parent._attributes[self.parent_key]
 
     async def get(self) -> Any:
+        from arvel.database.collection import EloquentCollection
+
         query = self._pivot_query().where(self.foreign_pivot_key, "=", self._parent_id())
         for column, value in self._pivot_wheres:
             query = query.where(column, "=", value)
         rows = await query.get()
         by_related = {row[self.related_pivot_key]: row for row in rows}
         if not by_related:
-            return []
+            return EloquentCollection[Any]()
         models_query = self.related.where_in(self.related_key, list(by_related))
         for constrain in self._related_constraints:  # where()/order_by() on the related model
             constrain(models_query)
@@ -212,37 +228,92 @@ class BelongsToMany(Relation):
             query = query.where(self.related_pivot_key, "=", related_id)
         await query.delete()
 
-    async def sync(self, related_ids: list[Any]) -> None:
-        await self.detach()
-        for related_id in related_ids:
-            await self.attach(related_id)
+    async def _attached_ids(self) -> set[Any]:
+        return set(await self._attached_rows())
+
+    async def _attached_rows(self) -> dict[Any, dict[str, Any]]:
+        """Currently-attached pivot rows for the parent, keyed by related id — the full row
+        (including any extra pivot columns), used by ``sync`` to diff against."""
+        query = self._pivot_query().where(self.foreign_pivot_key, "=", self._parent_id())
+        for column, value in self._pivot_wheres:
+            query = query.where(column, "=", value)
+        return {row[self.related_pivot_key]: dict(row) for row in await query.get()}
+
+    async def sync(
+        self, ids_or_mapping: list[Any] | dict[Any, dict[str, Any]], *, detaching: bool = True
+    ) -> SyncResult:
+        """Diff ``ids_or_mapping`` (a bare id list, or ``{id: pivot_attrs}``) against the currently
+        attached ids: attach the missing ones (with any given pivot attrs), update pivot attrs for
+        **retained** ids whose given attrs differ from what's stored, and — only when
+        ``detaching`` — detach the extras. Retained pivot rows are never dropped/recreated, so
+        their data survives untouched unless explicitly given new values (A5: the prior
+        detach-then-reattach implementation destroyed it). Laravel ``sync``/
+        ``syncWithoutDetaching``/``toggle`` parity; returns the changes map."""
+        wanted: dict[Any, dict[str, Any]] = (
+            dict(ids_or_mapping)
+            if isinstance(ids_or_mapping, dict)
+            else {related_id: {} for related_id in ids_or_mapping}
+        )
+        # the synthetic pivot Table must declare every column any wanted row carries, BEFORE
+        # reading back the current rows below, or a not-yet-registered column silently reads as
+        # absent from `existing` and every retained row looks "changed".
+        for attrs in wanted.values():
+            self._pivot_columns.extend(col for col in attrs if col not in self._pivot_columns)
+
+        existing = await self._attached_rows()
+
+        attached: list[Any] = []
+        updated: list[Any] = []
+        for related_id, attrs in wanted.items():
+            if related_id not in existing:
+                await self.attach(related_id, **attrs)
+                attached.append(related_id)
+            elif attrs and any(existing[related_id].get(k) != v for k, v in attrs.items()):
+                await self.update_existing_pivot(related_id, **attrs)
+                updated.append(related_id)
+
+        detached: list[Any] = []
+        if detaching:
+            for related_id in existing:
+                if related_id not in wanted:
+                    await self.detach(related_id)
+                    detached.append(related_id)
+
+        return SyncResult(attached=attached, detached=detached, updated=updated)
+
+    async def sync_without_detaching(
+        self, ids_or_mapping: list[Any] | dict[Any, dict[str, Any]]
+    ) -> SyncResult:
+        """Attach missing ids (or update given pivot attrs for retained ones), never detaching
+        (Laravel ``syncWithoutDetaching``) — ``sync(x, detaching=False)``."""
+        return await self.sync(ids_or_mapping, detaching=False)
+
+    async def sync_with_pivot_values(
+        self, related_ids: list[Any], values: dict[str, Any], *, detaching: bool = True
+    ) -> SyncResult:
+        """``sync(related_ids)``, attaching/updating every one of them with the same extra pivot
+        ``values`` (Laravel ``syncWithPivotValues``)."""
+        mapping = {related_id: dict(values) for related_id in related_ids}
+        return await self.sync(mapping, detaching=detaching)
 
     async def count(self) -> int:
         """Number of related models currently attached (honors where()/where_pivot())."""
         return len(await self.get())
 
-    async def _attached_ids(self) -> set[Any]:
-        query = self._pivot_query().where(self.foreign_pivot_key, "=", self._parent_id())
-        for column, value in self._pivot_wheres:
-            query = query.where(column, "=", value)
-        return {row[self.related_pivot_key] for row in await query.get()}
-
-    async def sync_without_detaching(self, related_ids: list[Any]) -> None:
-        """Attach any ``related_ids`` not already attached, leaving existing links intact
-        (Laravel ``syncWithoutDetaching``)."""
+    async def toggle(self, related_ids: list[Any]) -> dict[str, list[Any]]:
+        """Attach the ids that are missing and detach the ones already present (Laravel
+        ``toggle``); returns the changes map ``{"attached": [...], "detached": [...]}``."""
         existing = await self._attached_ids()
-        for related_id in related_ids:
-            if related_id not in existing:
-                await self.attach(related_id)
-
-    async def toggle(self, related_ids: list[Any]) -> None:
-        """Attach the ids that are missing and detach the ones already present (Laravel ``toggle``)."""
-        existing = await self._attached_ids()
+        attached: list[Any] = []
+        detached: list[Any] = []
         for related_id in related_ids:
             if related_id in existing:
                 await self.detach(related_id)
+                detached.append(related_id)
             else:
                 await self.attach(related_id)
+                attached.append(related_id)
+        return {"attached": attached, "detached": detached}
 
     async def update_existing_pivot(self, related_id: Any, **values: Any) -> None:
         """Update pivot-table columns for an existing attachment (Laravel ``updateExistingPivot``)."""
@@ -277,12 +348,14 @@ class HasManyThrough(Relation):
         self.second_local_key = second_local_key
 
     async def get(self) -> Any:
+        from arvel.database.collection import EloquentCollection
+
         intermediates = await self.through.where(
             self.first_key, "=", self.parent._attributes[self.local_key]
         ).get()
         keys = [row._attributes[self.second_local_key] for row in intermediates]
         if not keys:
-            return []
+            return EloquentCollection[Any]()
         return await self.related.where_in(self.second_key, keys).get()
 
 
@@ -390,7 +463,9 @@ class MorphToMany(Relation):
         )
         related_ids = [row[self.related_pivot_key] for row in rows]
         if not related_ids:
-            return []
+            from arvel.database.collection import EloquentCollection
+
+            return EloquentCollection[Any]()
         return await self.related.where_in("id", related_ids).get()
 
 
@@ -428,7 +503,9 @@ class MorphedByMany(Relation):
         )
         related_ids = [row[f"{self.morph_name}_id"] for row in rows]
         if not related_ids:
-            return []
+            from arvel.database.collection import EloquentCollection
+
+            return EloquentCollection[Any]()
         return await self.related.where_in("id", related_ids).get()
 
 
@@ -544,7 +621,11 @@ class RecursiveRelation:
         resolver = self.related._resolve()
         rows = [dict(r) for r in await resolver.fetch_all(self._statement())]
         models = [await self.related._hydrate_and_fire(r) for r in rows]
-        return self._nest(models) if self._as_tree else models
+        if self._as_tree:
+            return self._nest(models)  # a nested list of dicts, not model instances
+        from arvel.database.collection import EloquentCollection
+
+        return EloquentCollection(models)
 
     async def eager_load(self, parents: list[Any], name: str, constrain: Any = None) -> None:
         """Batch the whole tree for many parents in **one** ``WITH RECURSIVE`` query (so
@@ -563,6 +644,8 @@ class RecursiveRelation:
         step = sa.select(t, cte.c["__root"], (cte.c[dk] + 1).label(dk)).join(cte, join_on)
         full = cte.union_all(step)
 
+        from arvel.database.collection import EloquentCollection
+
         resolver = self.related._resolve()
         rows = [dict(r) for r in await resolver.fetch_all(sa.select(full).where(full.c[dk] > 0))]
         grouped: dict[Any, list[Any]] = {}
@@ -570,7 +653,9 @@ class RecursiveRelation:
             root = row.pop("__root")  # discriminator, not a model column
             grouped.setdefault(root, []).append(await self.related._hydrate_and_fire(row))
         for parent in parents:
-            parent._relations[name] = grouped.get(parent._attributes.get(lk), [])
+            parent._relations[name] = EloquentCollection(
+                grouped.get(parent._attributes.get(lk), [])
+            )
 
     def _nest(self, models: list[Any]) -> list[dict[str, Any]]:
         """Fold the flat, depth-tagged rows into nested ``{…, <key>: [...]}`` dicts. Descendants

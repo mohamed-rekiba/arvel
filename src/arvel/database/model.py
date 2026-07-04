@@ -24,6 +24,7 @@ from arvel.database.model_serialization import SerializesModels
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from arvel.database.collection import EloquentCollection
     from arvel.database.connections import ConnectionResolver
 
 # Python type -> SQLAlchemy type name; temporal types get their own real DateTime/Date in _sa_type.
@@ -393,8 +394,8 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return found
 
     @classmethod
-    async def all(cls) -> list[Self]:
-        rows: list[Self] = await cls.get()
+    async def all(cls) -> EloquentCollection[Self]:
+        rows: EloquentCollection[Self] = await cls.get()
         return rows
 
     @classmethod

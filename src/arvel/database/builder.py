@@ -17,7 +17,13 @@ if TYPE_CHECKING:
     from sqlalchemy import Select
 
     from arvel.database.connections import ConnectionResolver, WriteResult
-    from arvel.pagination import LengthAwarePaginator, Paginator
+    from arvel.pagination import CursorPaginator, LengthAwarePaginator, Paginator
+
+
+class UnsupportedDriverOperation(Exception):
+    """Raised when an operation has no correct implementation for the connection's dialect —
+    e.g. ``upsert()`` on a dialect that's neither ``postgresql``/``sqlite`` (``ON CONFLICT``) nor
+    ``mysql``/``mariadb`` (``ON DUPLICATE KEY UPDATE``). Never silently emit the wrong SQL (A4)."""
 
 
 async def _maybe_await(value: Any) -> Any:
@@ -56,9 +62,14 @@ class Builder:
         self._model = model  # the Model class, for resolving relations in where_has/with_count
         self._wheres: list[tuple[str, Any]] = []  # (connector, clause)
         self._order: list[Any] = []
+        self._order_specs: list[
+            tuple[str, str]
+        ] = []  # (column, direction) — powers cursor_paginate
         self._columns: list[str] | None = None
         self._raw_selects: list[Any] = []  # select_raw() expressions (spec 08 §42)
         self._group_by: list[str] = []  # group_by() column / alias names
+        self._havings: list[tuple[str, Any]] = []  # (connector, clause) — HAVING, post-group_by
+        self._joins: list[tuple[str, str, str, str, str]] = []  # (table, first, op, second, kind)
         self._distinct = False
         self._limit: int | None = None
         self._offset: int | None = None
@@ -119,16 +130,39 @@ class Builder:
 
         return value.raw.to_tz("UTC").to_stdlib() if isinstance(value, Date) else value
 
+    def _value_comparison(self, expr: Any, operator: str, value: Any) -> Any:
+        """Compare an arbitrary SQL expression (a column, or a derived expression like
+        ``sa.func.date(col)``/``sa.extract("year", col)``) against a bound ``value``."""
+        if operator == "like":
+            return expr.like(value)
+        if operator == "in":
+            return expr.in_([self._bind(v) for v in value])
+        return getattr(expr, _COMPARISONS[operator])(self._bind(value))
+
     def _comparison(self, column: str, operator: str, value: Any) -> Any:
         col = self._table.c[column]
-        if operator == "like":
-            return col.like(value)
         if operator == "ilike":
             # native ILIKE on PostgreSQL; SQLAlchemy lowers both sides elsewhere
             return col.ilike(value)
-        if operator == "in":
-            return col.in_([self._bind(v) for v in value])
-        return getattr(col, _COMPARISONS[operator])(self._bind(value))
+        return self._value_comparison(col, operator, value)
+
+    def _column_or_literal(self, name: str) -> Any:
+        """``name`` as a real column of this query's table, or — for a ``group_by``/``select_raw``
+        alias like ``"total"`` that isn't a table column — a raw SQL identifier."""
+        import sqlalchemy as sa
+
+        cols = self._table.c
+        return cast("Any", cols[name] if name in cols else sa.literal_column(name))
+
+    def _column_ref(self, name: str) -> Any:
+        """A column reference for ``where_column``/joins: ``"other.col"`` (a joined table) resolves
+        to a raw dotted identifier; a bare name resolves against this query's own table (or, same
+        as :meth:`_column_or_literal`, a raw identifier when it isn't one of this table's columns)."""
+        import sqlalchemy as sa
+
+        if "." in name:
+            return cast("Any", sa.literal_column(name))
+        return self._column_or_literal(name)
 
     def _apply_conditions(
         self, args: tuple[Any, ...], kwargs: dict[str, Any], connector: str
@@ -375,11 +409,54 @@ class Builder:
                 return
             outcome = callback(rows)
             if inspect.isawaitable(outcome):
-                await outcome
+                outcome = await outcome
+            if outcome is False:  # Laravel parity: the callback can stop the chunk walk early
+                return
             tail = rows[-1]
             last = tail._attributes[key] if hasattr(tail, "_attributes") else tail[key]
             if len(rows) < size:
                 return
+
+    async def chunk(self, size: int, callback: Any) -> None:
+        """Page through results in fixed-size **offset** batches, calling ``callback`` per chunk
+        (sync or async; returning ``False`` stops early — Laravel parity). Simpler than
+        ``chunk_by_id`` but not safe under concurrent writes that shift rows between pages
+        (prefer ``chunk_by_id``/``cursor`` for a frequently-written table)."""
+        import inspect
+
+        page = 0
+        base_limit, base_offset = self._limit, self._offset
+        try:
+            while True:
+                self._limit = size
+                self._offset = page * size
+                rows = await self.get()
+                if not rows:
+                    return
+                outcome = callback(rows)
+                if inspect.isawaitable(outcome):
+                    outcome = await outcome
+                if outcome is False or len(rows) < size:
+                    return
+                page += 1
+        finally:
+            self._limit, self._offset = base_limit, base_offset
+
+    async def each(self, callback: Any, chunk_size: int = 1000) -> None:
+        """Process every row individually, streaming ``chunk_size`` at a time under the hood
+        (Laravel ``each``). ``callback`` returning ``False`` stops the whole walk early."""
+        import inspect
+
+        async def _per_row(rows: Any) -> Any:
+            for row in rows:
+                outcome = callback(row)
+                if inspect.isawaitable(outcome):
+                    outcome = await outcome
+                if outcome is False:
+                    return False
+            return None
+
+        await self.chunk(chunk_size, _per_row)
 
     def with_count(self, relation: str, alias: str | None = None) -> Self:
         """Add a ``{relation}_count`` column counting the related rows."""
@@ -448,6 +525,154 @@ class Builder:
         self._add(self._table.c[column].is_not(None))
         return self
 
+    def where_column(
+        self, first: str, operator: str, second: str | None = None, *, connector: str = "and"
+    ) -> Self:
+        """``WHERE`` comparing two **columns** (Laravel ``whereColumn``), e.g.
+        ``where_column("updated_at", ">", "created_at")``. The 2-arg form
+        (``where_column("a", "b")``) implies ``=``. Either side may be ``"other_table.col"`` to
+        compare against a joined table."""
+        if second is None:
+            second, operator = operator, "="
+        left, right = self._column_ref(first), self._column_ref(second)
+        clause = (
+            left.like(right) if operator == "like" else getattr(left, _COMPARISONS[operator])(right)
+        )
+        self._add(clause, connector)
+        return self
+
+    def where_date(self, column: str, operator: str, value: Any, *, connector: str = "and") -> Self:
+        """``WHERE`` on just the DATE portion of a datetime column (Laravel ``whereDate``) —
+        cross-dialect via SQL ``date(...)`` (Postgres/MySQL/SQLite all support it)."""
+        import sqlalchemy as sa
+
+        expr = sa.func.date(self._table.c[column])
+        self._add(self._value_comparison(expr, operator, self._date_operand(value)), connector)
+        return self
+
+    def where_time(self, column: str, operator: str, value: Any, *, connector: str = "and") -> Self:
+        """``WHERE`` on just the TIME portion of a datetime column (Laravel ``whereTime``) —
+        cross-dialect via SQL ``time(...)``."""
+        import sqlalchemy as sa
+
+        expr = sa.func.time(self._table.c[column])
+        self._add(self._value_comparison(expr, operator, value), connector)
+        return self
+
+    def where_year(self, column: str, operator: str, value: Any, *, connector: str = "and") -> Self:
+        """``WHERE`` on the YEAR of a datetime column (Laravel ``whereYear``) — via SQL
+        ``EXTRACT(year FROM ...)``."""
+        return self._where_date_part("year", column, operator, value, connector=connector)
+
+    def where_month(
+        self, column: str, operator: str, value: Any, *, connector: str = "and"
+    ) -> Self:
+        """``WHERE`` on the MONTH of a datetime column (Laravel ``whereMonth``)."""
+        return self._where_date_part("month", column, operator, value, connector=connector)
+
+    def where_day(self, column: str, operator: str, value: Any, *, connector: str = "and") -> Self:
+        """``WHERE`` on the DAY-of-month of a datetime column (Laravel ``whereDay``)."""
+        return self._where_date_part("day", column, operator, value, connector=connector)
+
+    def _where_date_part(
+        self, part: str, column: str, operator: str, value: Any, *, connector: str
+    ) -> Self:
+        import sqlalchemy as sa
+
+        expr = sa.extract(part, self._table.c[column])
+        self._add(self._value_comparison(expr, operator, value), connector)
+        return self
+
+    @staticmethod
+    def _date_operand(value: Any) -> Any:
+        """``where_date`` compares against a plain calendar date — narrow an arvel ``Date``/stdlib
+        ``datetime`` down to its date portion so it compares correctly against SQL ``date(...)``."""
+        import datetime as _dt
+
+        from arvel.dates import Date
+
+        if isinstance(value, Date):
+            return value.raw.to_tz("UTC").to_stdlib().date()
+        if isinstance(value, _dt.datetime):
+            return value.date()
+        return value
+
+    # --- joins ---------------------------------------------------------------
+    def join(
+        self, table: str, first: str, operator: str, second: str, *, type_: str = "inner"
+    ) -> Self:
+        """SQL ``JOIN`` (Laravel ``join``): ``first``/``second`` are ``"table.column"`` (or a bare
+        column, resolved against this query's own table). Built as a real SQLAlchemy Core
+        ``Table.join()`` on the ``FROM`` clause — not a raw string. The default select stays
+        ``SELECT <this table>.*``; pull in joined columns with ``select_raw("other.col")``."""
+        self._joins.append((table, first, operator, second, type_))
+        return self
+
+    def left_join(self, table: str, first: str, operator: str, second: str) -> Self:
+        return self.join(table, first, operator, second, type_="left")
+
+    def right_join(self, table: str, first: str, operator: str, second: str) -> Self:
+        return self.join(table, first, operator, second, type_="right")
+
+    def _apply_joins(self, stmt: Any) -> Any:
+        import sqlalchemy as sa
+
+        from_clause: Any = self._table
+        for table_name, first, operator, second, kind in self._joins:
+            right = sa.table(table_name)
+            onclause = getattr(self._column_ref(first), _COMPARISONS[operator])(
+                self._column_ref(second)
+            )
+            if kind == "right":
+                # SQLAlchemy Core has no RIGHT JOIN primitive — a right join is a left join with
+                # the two sides swapped (semantically identical; matches Laravel's rightJoin).
+                from_clause = right.join(from_clause, onclause, isouter=True)
+            else:
+                from_clause = from_clause.join(right, onclause, isouter=(kind == "left"))
+        return stmt.select_from(from_clause)
+
+    # --- having (post-group_by, doc B3) --------------------------------------
+    def having(self, column: str, operator: str, value: Any, *, connector: str = "and") -> Self:
+        """A ``HAVING`` predicate over a grouped/aggregate column (Laravel ``having``) — e.g.
+        ``.group_by("user_id").select_raw("count(*) AS total").having("total", ">", 5)``."""
+        col = self._column_or_literal(column)
+        clause = (
+            col.like(value)
+            if operator == "like"
+            else getattr(col, _COMPARISONS[operator])(self._bind(value))
+        )
+        self._havings.append((connector, clause))
+        return self
+
+    def having_raw(self, sql: str, bindings: Sequence[Any] = (), *, connector: str = "and") -> Self:
+        """A raw ``HAVING`` predicate (Laravel ``havingRaw``) for an aggregate comparison the
+        structural ``having()`` can't express, e.g. ``having_raw("COUNT(*) > ?", [5])``. ``?``
+        placeholders bind positionally. The SQL itself is trusted — never interpolate user input;
+        pass values through ``bindings``."""
+        import sqlalchemy as sa
+
+        params: dict[str, Any] = {}
+        for i, val in enumerate(bindings):
+            name = f"_having_{i}"
+            sql = sql.replace("?", f":{name}", 1)
+            params[name] = val
+        clause: Any = sa.text(sql).bindparams(**params) if params else sa.text(sql)
+        self._havings.append((connector, clause))
+        return self
+
+    def _having_expression(self) -> Any:
+        import sqlalchemy as sa
+
+        expr: Any = None
+        for connector, clause in self._havings:
+            if expr is None:
+                expr = clause
+            elif connector == "or":
+                expr = sa.or_(expr, clause)
+            else:
+                expr = sa.and_(expr, clause)
+        return expr
+
     # --- shaping -----------------------------------------------------------
     def select(self, *columns: str) -> Self:
         self._columns = list(columns)
@@ -474,6 +699,17 @@ class Builder:
     def order_by(self, column: str, direction: str = "asc") -> Self:
         col = self._table.c[column]
         self._order.append(col.desc() if direction == "desc" else col.asc())
+        self._order_specs.append((column, direction))
+        return self
+
+    def order_by_raw(self, sql: str) -> Self:
+        """A raw ``ORDER BY`` expression (Laravel ``orderByRaw``), e.g. a ``CASE``/``FIELD()``
+        custom ordering the structural ``order_by`` can't express. Not tracked in
+        ``cursor_paginate``'s keyset ordering — pair it with an explicit ``order_by`` tiebreaker
+        if you need seekable pages."""
+        import sqlalchemy as sa
+
+        self._order.append(sa.text(sql))
         return self
 
     def limit(self, count: int) -> Self:
@@ -542,16 +778,15 @@ class Builder:
         return [*targets, *self._aggregates]
 
     def _group_targets(self) -> list[Any]:
-        import sqlalchemy as sa
-
-        cols = self._table.c
-        return [cols[name] if name in cols else sa.literal_column(name) for name in self._group_by]
+        return [self._column_or_literal(name) for name in self._group_by]
 
     def to_select(self) -> Any:
         import sqlalchemy as sa
 
         stmt = sa.select(*self._select_targets())
-        if self._raw_selects:  # raw columns carry no table ref → pin the FROM explicitly
+        if self._joins:  # the joined construct IS the FROM (subsumes the plain-table case below)
+            stmt = self._apply_joins(stmt)
+        elif self._raw_selects:  # raw columns carry no table ref → pin the FROM explicitly
             stmt = stmt.select_from(self._table)
         if self._distinct:
             stmt = stmt.distinct()
@@ -560,6 +795,9 @@ class Builder:
             stmt = stmt.where(expr)
         if self._group_by:
             stmt = stmt.group_by(*self._group_targets())
+        having = self._having_expression()
+        if having is not None:
+            stmt = stmt.having(having)
         for clause in self._order:
             stmt = stmt.order_by(clause)
         if self._limit is not None:
@@ -603,7 +841,11 @@ class Builder:
             raise RuntimeError("Builder has no connection resolver bound.")
         return self._resolver
 
-    async def get(self) -> list[Any]:
+    async def get(self) -> Any:
+        """Every matching row. A **hydrating** (model-bound) query returns an
+        :class:`~arvel.database.collection.EloquentCollection` (doc B3); a raw table builder (no
+        ``hydrate``) returns a plain ``list[dict]`` — Laravel's query builder returns a Collection
+        too, but arvel keeps raw rows as plain dicts (typed simplicity over exact parity)."""
         rows = await self._require_resolver().fetch_all(self.to_select())
         records = [dict(row) for row in rows]
         if self._hydrate is None:
@@ -611,25 +853,44 @@ class Builder:
         models = [await _maybe_await(self._hydrate(r)) for r in records]
         for spec in self._eager:
             await self._eager_load_path(models, spec.split("."), self._eager_constraints.get(spec))
-        return models
+        from arvel.database.collection import EloquentCollection
+
+        return EloquentCollection(models)
 
     async def upsert(
         self, rows: list[dict[str, Any]], unique_by: list[str], update: list[str] | None = None
     ) -> Any:
-        """Insert ``rows``; on a conflict over ``unique_by``, update ``update`` columns
-        (defaults to all non-key columns). Dialect-aware ON CONFLICT (Core, doc 07)."""
+        """Insert ``rows``; on a conflict over ``unique_by``, update ``update`` columns (defaults
+        to all non-key columns). Dialect-aware: Postgres/SQLite use ``ON CONFLICT DO UPDATE``;
+        MySQL/MariaDB use ``ON DUPLICATE KEY UPDATE`` (``unique_by`` is implicit there — MySQL has
+        no ``ON CONFLICT(cols)`` targeting, so it's honored by documentation only, matching
+        Laravel, which ignores ``$uniqueBy`` on MySQL too). An unrecognized dialect raises
+        :class:`UnsupportedDriverOperation` rather than silently emitting the wrong SQL (A4)."""
         import importlib
 
         resolver = self._require_resolver()
-        # ON CONFLICT lives on the dialect-specific insert(); load it by name (pg vs sqlite)
-        name = "postgresql" if resolver.engine().dialect.name == "postgresql" else "sqlite"
-        dialect_dml: Any = importlib.import_module(f"sqlalchemy.dialects.{name}")
-        statement = dialect_dml.insert(self._table).values(rows)
+        dialect = resolver.engine().dialect.name
         columns = update or [c for c in rows[0] if c not in unique_by]
-        statement = statement.on_conflict_do_update(
-            index_elements=unique_by,
-            set_={c: statement.excluded[c] for c in columns},
-        )
+
+        if dialect in ("postgresql", "sqlite"):
+            dialect_dml: Any = importlib.import_module(f"sqlalchemy.dialects.{dialect}")
+            statement = dialect_dml.insert(self._table).values(rows)
+            statement = statement.on_conflict_do_update(
+                index_elements=unique_by,
+                set_={c: statement.excluded[c] for c in columns},
+            )
+        elif dialect in ("mysql", "mariadb"):
+            from sqlalchemy.dialects.mysql import insert as mysql_insert
+
+            statement = mysql_insert(self._table).values(rows)
+            statement = statement.on_duplicate_key_update(
+                **{c: statement.inserted[c] for c in columns}
+            )
+        else:
+            raise UnsupportedDriverOperation(
+                f"upsert() has no ON CONFLICT/ON DUPLICATE KEY implementation for the "
+                f"{dialect!r} dialect."
+            )
         return await resolver.execute(statement)
 
     async def cursor(self) -> AsyncIterator[Any]:
@@ -657,10 +918,14 @@ class Builder:
         else:
             await relation.eager_load(models, name)
         if len(segments) > 1:  # descend into the freshly-loaded related models
+            from arvel.support import Collection
+
             nested: list[Any] = []
             for model in models:
                 loaded = model._relations.get(name)
-                if isinstance(loaded, list):
+                if isinstance(
+                    loaded, (list, Collection)
+                ):  # a many-relation: list or EloquentCollection
                     nested.extend(cast("list[Any]", loaded))
                 elif loaded is not None:
                     nested.append(loaded)
@@ -776,3 +1041,102 @@ class Builder:
         self.limit(per_page + 1).offset((page - 1) * per_page)
         data = await self.get()
         return Paginator(data, per_page, page)
+
+    # --- cursor (keyset) pagination -----------------------------------------------------------
+    def _coerce_cursor_value(self, column: str, value: Any) -> Any:
+        """A decoded cursor value round-trips over JSON as a plain str/int/bool — parse a
+        datetime/date column's value back from its ISO string so binding stays type-correct."""
+        import datetime as _dt
+
+        import sqlalchemy as sa
+
+        if not isinstance(value, str):
+            return value
+        col_type = self._table.c[column].type
+        if isinstance(col_type, sa.DateTime):
+            return _dt.datetime.fromisoformat(value)
+        if isinstance(col_type, sa.Date):
+            return _dt.date.fromisoformat(value)
+        return value
+
+    def _seek_predicate(self, specs: list[tuple[str, str]], position: dict[str, Any]) -> Any:
+        """The keyset ``WHERE`` clause: rows strictly after ``position`` in the lexicographic
+        order of ``specs`` — ``(col1 > v1) OR (col1 = v1 AND col2 > v2) OR ...`` — the standard,
+        fully-portable seek predicate (no ``ROW()`` comparison needed)."""
+        import sqlalchemy as sa
+
+        clauses: list[Any] = []
+        for i, (column, direction) in enumerate(specs):
+            equals = [
+                self._table.c[c] == self._coerce_cursor_value(c, position[c]) for c, _ in specs[:i]
+            ]
+            col = self._table.c[column]
+            bound = self._coerce_cursor_value(column, position[column])
+            tie = col > bound if direction == "asc" else col < bound
+            clauses.append(sa.and_(*equals, tie) if equals else tie)
+        return sa.or_(*clauses)
+
+    def _cursor_boundary(self, row: Any, specs: list[tuple[str, str]]) -> dict[str, Any]:
+        return {column: self._column_of(row, column) for column, _ in specs}
+
+    async def cursor_paginate(
+        self, per_page: int = 15, cursor: str | None = None
+    ) -> CursorPaginator:
+        """A keyset (cursor) paginator (Laravel ``cursorPaginate``): seeks past the last row's
+        ordering values instead of ``OFFSET``, so pages stay correct even when rows are inserted
+        before the cursor mid-scan — the "page drift" ``paginate()``/``simple_paginate()`` can't
+        avoid. Requires an ``order_by`` (defaults to the primary key ascending); the primary key is
+        always appended as a tiebreaker if not already part of the ordering, so paging over a
+        non-unique column stays stable. The opaque ``cursor`` — pass back
+        ``CursorPaginator.next_cursor()``/``.previous_cursor()`` to walk forward/back — is a
+        base64 encoding of the ordering columns' values at the seek point (DR-0022 object shape)."""
+        from arvel.pagination import CursorPaginator, decode_cursor, encode_cursor
+
+        per_page = max(1, per_page)
+        pk = self._model.__primary_key__ if self._model is not None else "id"
+        if not self._order_specs:
+            self.order_by(pk, "asc")
+        if pk not in [c for c, _ in self._order_specs]:
+            self.order_by(pk, "asc")
+        specs = list(self._order_specs)
+
+        position: dict[str, Any] | None = None
+        backward = False
+        if cursor is not None:
+            position, backward = decode_cursor(cursor)
+
+        scan_specs = [(c, ("desc" if d == "asc" else "asc") if backward else d) for c, d in specs]
+        if position is not None:
+            self._add(self._seek_predicate(scan_specs, position))
+        self._order = [
+            (self._table.c[c].desc() if d == "desc" else self._table.c[c].asc())
+            for c, d in scan_specs
+        ]
+
+        self._limit = per_page + 1
+        rows = await self.get()
+        has_extra = len(rows) > per_page
+        page_rows = list(rows[:per_page])
+        if backward:
+            page_rows.reverse()  # scanned in reverse to seek backward; restore natural order
+
+        next_cursor: str | None = None
+        prev_cursor: str | None = None
+        if page_rows:
+            if backward:
+                next_cursor = encode_cursor(self._cursor_boundary(page_rows[-1], specs))
+                if has_extra:
+                    prev_cursor = encode_cursor(
+                        self._cursor_boundary(page_rows[0], specs), backward=True
+                    )
+            else:
+                if position is not None:
+                    prev_cursor = encode_cursor(
+                        self._cursor_boundary(page_rows[0], specs), backward=True
+                    )
+                if has_extra:
+                    next_cursor = encode_cursor(self._cursor_boundary(page_rows[-1], specs))
+
+        return CursorPaginator(
+            page_rows, per_page, next_cursor=next_cursor, prev_cursor=prev_cursor
+        )

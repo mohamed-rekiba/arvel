@@ -18,6 +18,8 @@ Grounded in knowledge/laravel (Illuminate\\Pagination).
 
 from __future__ import annotations
 
+import base64
+import json as _json
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
@@ -451,10 +453,123 @@ class Paginator(AbstractPaginator):
         }
 
 
+# --- cursor (keyset) ------------------------------------------------------------------------
+
+
+def encode_cursor(position: dict[str, Any], *, backward: bool = False) -> str:
+    """Encode a keyset ``position`` (the ordering columns' values at the seek point) as an
+    opaque, URL-safe base64 cursor (Laravel ``Cursor::encode``). This is a wire format, not
+    encryption — don't treat it as a security/tamper-proofing boundary."""
+    payload = _json.dumps({"p": position, "b": backward}, default=str, sort_keys=True)
+    return base64.urlsafe_b64encode(payload.encode()).decode()
+
+
+def decode_cursor(cursor: str) -> tuple[dict[str, Any], bool]:
+    """Decode a cursor produced by :func:`encode_cursor` back to ``(position, backward)``."""
+    payload = _json.loads(base64.urlsafe_b64decode(cursor.encode()))
+    return payload["p"], bool(payload["b"])
+
+
+class CursorPaginator:
+    """A keyset (cursor) paginator (Laravel ``CursorPaginator``): pages by an opaque cursor over
+    the query's ordering columns instead of ``OFFSET``/page numbers, so paging stays correct even
+    as rows are inserted before the cursor mid-scan — the "page drift" the offset-based
+    :class:`LengthAwarePaginator`/:class:`Paginator` can't avoid. Iterable over its page of items;
+    :meth:`to_dict` mirrors Laravel's cursor-paginator JSON shape (DR-0022 object shape — built by
+    :meth:`Builder.cursor_paginate`, not constructed directly in normal use)."""
+
+    def __init__(
+        self,
+        items: list[Any],
+        per_page: int,
+        *,
+        next_cursor: str | None = None,
+        prev_cursor: str | None = None,
+        path: str | None = None,
+        query: dict[str, Any] | None = None,
+        cursor_name: str = "cursor",
+    ) -> None:
+        self._items = list(items)
+        self._per_page = max(1, per_page)
+        self._next_cursor = next_cursor
+        self._prev_cursor = prev_cursor
+        self._path = (path if path is not None else resolve_current_path()).rstrip("/") or "/"
+        self._query: dict[str, Any] = dict(query) if query else {}
+        self._cursor_name = cursor_name
+
+    def items(self) -> Collection[Any]:
+        from arvel.support import Collection
+
+        return Collection(self._items)
+
+    def per_page(self) -> int:
+        return self._per_page
+
+    def count(self) -> int:
+        """Items on this page."""
+        return len(self._items)
+
+    def is_empty(self) -> bool:
+        return not self._items
+
+    def is_not_empty(self) -> bool:
+        return not self.is_empty()
+
+    def on_first_page(self) -> bool:
+        return self._prev_cursor is None
+
+    def has_more_pages(self) -> bool:
+        return self._next_cursor is not None
+
+    def next_cursor(self) -> str | None:
+        return self._next_cursor
+
+    def previous_cursor(self) -> str | None:
+        return self._prev_cursor
+
+    def path(self) -> str:
+        return self._path
+
+    def _url_for(self, cursor: str | None) -> str | None:
+        if cursor is None:
+            return None
+        params = {**self._query, self._cursor_name: cursor}
+        return f"{self._path}?{urlencode(params)}"
+
+    def next_page_url(self) -> str | None:
+        return self._url_for(self._next_cursor)
+
+    def previous_page_url(self) -> str | None:
+        return self._url_for(self._prev_cursor)
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(self._items)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+    def __getitem__(self, index: Any) -> Any:
+        return self._items[index]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "data": [_serialize(item) for item in self._items],
+            "path": self._path,
+            "per_page": self._per_page,
+            "next_cursor": self._next_cursor,
+            "next_page_url": self.next_page_url(),
+            "prev_cursor": self._prev_cursor,
+            "prev_page_url": self.previous_page_url(),
+        }
+
+
 __all__ = [
     "AbstractPaginator",
+    "CursorPaginator",
     "LengthAwarePaginator",
     "Paginator",
+    "decode_cursor",
+    "encode_cursor",
     "resolve_current_page",
     "resolve_current_path",
 ]

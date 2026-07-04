@@ -11,7 +11,8 @@ from __future__ import annotations
 from typing import Any
 
 from arvel.database.attribute import Attribute
-from arvel.database.builder import Builder
+from arvel.database.builder import Builder, UnsupportedDriverOperation
+from arvel.database.collection import EloquentCollection
 from arvel.database.connections import ConnectionResolver, QueryExecuted, WriteResult
 from arvel.database.factory import Factory, FactoryBatch
 from arvel.database.migrations import Migration, Migrator, Schema, discover_migrations
@@ -25,6 +26,7 @@ from arvel.database.model import (
     SoftDeletes,
     scope,
 )
+from arvel.database.relations import SyncResult
 from arvel.database.resources import JsonResource, ResourceCollection
 from arvel.database.schema import Blueprint
 from arvel.database.seeder import Seeder
@@ -42,6 +44,7 @@ __all__ = [
     "Blueprint",
     "Builder",
     "ConnectionResolver",
+    "EloquentCollection",
     "Factory",
     "FactoryBatch",
     "HasUlids",
@@ -58,6 +61,8 @@ __all__ = [
     "Schema",
     "Seeder",
     "SoftDeletes",
+    "SyncResult",
+    "UnsupportedDriverOperation",
     "WriteResult",
     "discover_migrations",
     "raw",
