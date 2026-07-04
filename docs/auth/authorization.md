@@ -151,6 +151,54 @@ spelling and use it on both sides. To mirror Laravel's standard resource policie
 (and abilities) in camelCase — `viewAny`, `view`, `create`, `update`, `delete`, `restore`,
 `forceDelete` — and call them with the same string: `can("viewAny", Post)`.
 
+### Policy auto-discovery
+
+You don't have to call `gate.policy(Model, Policy)` for every model. `Gate.resolve_policy(model)`
+checks three tiers, in order:
+
+1. An **explicit** `gate.policy(Model, Policy)` registration — wins over everything else.
+2. A `__policy__` classvar on the model itself — typed, preferred:
+
+   ```python
+   class Post(Model):
+       __policy__ = PostPolicy
+   ```
+
+3. A **provider-registered convention map** — the closest arvel gets to Laravel's automatic
+   `Model` → `ModelPolicy` guess. Python has no PSR-4 class-name convention to exploit, so there's no
+   filesystem/import magic here: your app's `AuthServiceProvider` scans its own `policies/` package
+   and hands the resulting map to `register_policies`:
+
+   ```python
+   gate.register_policies({Post: PostPolicy, Comment: CommentPolicy})
+   ```
+
+`user.can(...)`, `gate.allows(...)`, and every other check already call `resolve_policy` under the
+hood — there's nothing else to wire up once a policy is registered by any of the three routes. An
+unregistered model with no matching ability falls through to `Gate.define`/deny, same as always.
+
+### Guests (unauthenticated checks)
+
+A gate can be asked about a guest — `user=None` — e.g. a public-content check run before login. Two
+outcomes, decided by the callback's **first parameter's type hint**:
+
+```python
+gate.define("view", lambda user: True)              # untyped → called with None (permissive)
+gate.define("view", lambda user: user.is_admin)      # untyped → called with None too (may raise!)
+
+def view(user: User) -> bool:                        # non-Optional → guest auto-denied,
+    return user.is_admin                             # never called with None (no AttributeError)
+
+def view(user: User | None) -> bool:                 # Optional/nullable → called with None;
+    return user is not None and user.is_admin         # the policy opted into guest evaluation
+```
+
+An **untyped** parameter (the common case — plain lambdas) is treated as nullable for backward
+compatibility; only an *explicit*, non-`Optional` type hint (`User`, not `User | None`) triggers the
+auto-deny. `before` hooks still run first regardless (a `before` returning non-`None` short-circuits
+before this check ever happens) — this only guards the ability/policy-method call itself. The
+annotation inspection is cached per callback, so it costs nothing beyond the first check.
+
 ### Super-admin override with `before`
 
 A `before` callback runs ahead of every check — return `True` to grant everything (the classic
@@ -236,8 +284,10 @@ in production; impersonation is a privileged action and accountability is requir
 `flush_permission_cache()` after granting/revoking). The match is wildcard-aware: an exact name, the
 super-admin `*`, or a `prefix.*` that covers `prefix` and anything beneath it. The `Gate` resolves a
 check in order: a `before` callback (short-circuits if it returns non-`None`) → a registered policy
-method for the model → a named ability callback; `authorize` turns a denial into an
-`AuthorizationError`.
+method for the model (`resolve_policy`: explicit registration → `__policy__` classvar → provider
+registry) → a named ability callback; `authorize` turns a denial into an `AuthorizationError`. A
+guest (`user=None`) is only ever handed to a callback whose first parameter's type hint admits
+`None` — otherwise the Gate denies without calling it.
 
 ## See also
 

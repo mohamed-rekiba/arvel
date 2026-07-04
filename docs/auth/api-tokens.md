@@ -62,7 +62,9 @@ token.is_expired()                                              # False now, Tru
 await resolve_token(expired_plaintext)                          # → None (rejected)
 ```
 
-Omit `expires_in` for a non-expiring token. `create_token` **validates at mint** — a positive
+Omit `expires_in` for a non-expiring token — unless config `sanctum.expiration` (minutes) is set, in
+which case that's the default lifetime applied whenever a caller doesn't pass `expires_in` explicitly
+(an explicit `expires_in` always overrides it). `create_token` **validates at mint** — a positive
 `expires_in` (or `None`) and a non-empty set of non-empty ability strings — and raises `ValueError`
 rather than store a footgun token (a bare string like `abilities="posts.read"` is treated as one
 ability, not split into characters).
@@ -108,8 +110,44 @@ record = await resolve_token(plaintext)    # ApiToken or None
 ```
 
 Tokens live in the `api_tokens` table — `name`, the hashed `token`, `tokenable_id` (the owner),
-`abilities` (JSON scopes), and `expires_at` (nullable). Add it in a migration (`ApiToken.__table__`
-describes it).
+`abilities` (JSON scopes), `expires_at`, and `last_used_at` (all nullable). Add it in a migration
+(`ApiToken.__table__` describes it).
+
+## Tracking last use
+
+`resolve_token` (and therefore anything that authenticates via it) stamps `last_used_at` — but
+**throttled**: at most once per config `sanctum.last_used_throttle` seconds (default 60), not on
+every single request. Laravel Sanctum writes `last_used_at` unconditionally each request; arvel's
+throttle is a documented, idiomatic divergence that trades a little staleness for far fewer writes on
+a hot endpoint. Lower the throttle (or set it to `0`) if you need per-request precision.
+
+## `current_access_token()` and scoping a route by ability
+
+Inside a token-authenticated request, `current_access_token()` returns the active `ApiToken` (set by
+`TokenGuard` the moment it resolves a valid bearer token) and `token_can(ability)` checks it:
+
+```python
+from arvel.auth.tokens import current_access_token, token_can
+
+async def delete_post(request, post_id):
+    if not token_can("posts.delete"):
+        return "Forbidden", 403
+    token = current_access_token()   # the ApiToken itself, if you need more than .can()
+    ...
+```
+
+For route-level enforcement, `abilities()`/`ability()` build a middleware class that both
+authenticates the bearer token (**401** if missing/invalid/expired) and enforces its scope
+(**403** if it doesn't match) — Sanctum's `abilities:a,b` (require **all**) and `ability:a` (require
+**any**), built from explicit string args like `Authorize()` rather than parsed from a
+colon-separated alias string:
+
+```python
+from arvel.auth.tokens import abilities, ability
+
+router.get("/reports", export_report, middleware=[abilities("reports.read", "reports.export")])
+router.post("/posts/{id}", update_post, middleware=[ability("posts.write", "posts.admin")])
+```
 
 ## Common mistakes & gotchas
 
@@ -129,7 +167,9 @@ describes it).
 hash, so the database never holds a usable token. Authentication hashes the presented bearer token the
 same way and looks for a matching row (`resolve_token`); `TokenGuard.user_id` wraps that, reading the
 `Authorization: Bearer` header and returning the matched `tokenable_id`. Because lookups are by hash,
-a leaked table can't be replayed.
+a leaked table can't be replayed. `TokenGuard.token()` is the single choke point: it resolves the
+record, stamps `last_used_at` (throttled), and sets a request-scoped `current_access_token()` — the
+`abilities()`/`ability()` middleware just call it and check `.can()`.
 
 ## See also
 

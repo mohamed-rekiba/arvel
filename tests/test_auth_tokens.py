@@ -10,11 +10,16 @@ import sqlalchemy as sa
 from arvel.auth.tokens import (
     ApiToken,
     TokenGuard,
+    abilities,
+    ability,
     create_token,
+    current_access_token,
     prune_expired_tokens,
     resolve_token,
+    token_can,
 )
 from arvel.database import ConnectionResolver, Model
+from arvel.kernel import Application, set_application
 
 
 class Account(Model):
@@ -218,3 +223,202 @@ async def test_create_token_validates_expires_in() -> None:
         assert token.is_expired() is False
     finally:
         await db.dispose()
+
+
+# --- last_used_at (throttled write) -------------------------------------------
+
+
+async def test_resolve_token_stamps_last_used_at_once() -> None:
+    db = await _setup()
+    try:
+        user = await Account.create(email="ada@example.com")
+        plaintext, token = await create_token(user)
+        assert token.last_used_at is None  # never used yet
+
+        resolved = await resolve_token(plaintext)
+        assert resolved is not None
+        assert resolved.last_used_at is not None  # stamped on first use
+    finally:
+        await db.dispose()
+
+
+async def test_last_used_at_write_is_throttled() -> None:
+    db = await _setup()
+    app = Application()
+    app.make("config").set("sanctum.last_used_throttle", 3600)  # 1h — won't elapse in this test
+    set_application(app)
+    try:
+        user = await Account.create(email="ada@example.com")
+        plaintext, _token = await create_token(user)
+
+        first = await resolve_token(plaintext)
+        assert first is not None
+        stamped_at = first.last_used_at
+
+        second = await resolve_token(plaintext)
+        assert second is not None
+        assert second.last_used_at == stamped_at  # within the throttle window — no rewrite
+    finally:
+        set_application(None)
+        await db.dispose()
+
+
+async def test_last_used_at_rewrites_once_throttle_elapses() -> None:
+    db = await _setup()
+    app = Application()
+    app.make("config").set("sanctum.last_used_throttle", 60)
+    set_application(app)
+    try:
+        user = await Account.create(email="ada@example.com")
+        plaintext, token = await create_token(user)
+
+        first = await resolve_token(plaintext)
+        assert first is not None
+        from arvel.dates import Date
+
+        # age the stamp past the throttle window, then resolve again
+        token.last_used_at = Date.now().subtract(seconds=120)
+        await token.save()
+
+        second = await resolve_token(plaintext)
+        assert second is not None
+        assert second.last_used_at > first.last_used_at
+    finally:
+        set_application(None)
+        await db.dispose()
+
+
+# --- current_access_token() / token_can() -------------------------------------
+
+
+async def test_current_access_token_set_by_token_guard() -> None:
+    db = await _setup()
+    try:
+        assert current_access_token() is None  # nothing resolved yet
+        user = await Account.create(email="ada@example.com")
+        plaintext, _ = await create_token(user, abilities=["posts.read"])
+
+        class Authed:
+            def header(self, name: str, default: Any = None) -> Any:
+                return f"Bearer {plaintext}" if name == "authorization" else default
+
+        resolved = await TokenGuard().token(Authed())
+        assert current_access_token() is resolved
+        assert token_can("posts.read") is True
+        assert token_can("posts.delete") is False
+    finally:
+        await db.dispose()
+
+
+def test_token_can_false_with_no_active_token() -> None:
+    assert token_can("anything") is False  # fail closed, contextvar default is None
+
+
+# --- global default expiration (config sanctum.expiration) --------------------
+
+
+async def test_create_token_applies_global_default_expiration() -> None:
+    db = await _setup()
+    app = Application()
+    app.make("config").set("sanctum.expiration", 60)  # minutes
+    set_application(app)
+    try:
+        user = await Account.create(email="ada@example.com")
+        _, token = await create_token(user)  # expires_in omitted → config default applies
+        assert token.expires_at is not None
+        assert token.is_expired() is False
+    finally:
+        set_application(None)
+        await db.dispose()
+
+
+async def test_create_token_explicit_expires_in_overrides_config_default() -> None:
+    db = await _setup()
+    app = Application()
+    app.make("config").set("sanctum.expiration", 60)
+    set_application(app)
+    try:
+        user = await Account.create(email="ada@example.com")
+        _, token = await create_token(user, expires_in=5)
+        from arvel.dates import Date
+
+        assert token.expires_at is not None
+        # ~5s lifetime, not 60 minutes
+        assert token.expires_at.to_py() < Date.now().add(seconds=30).to_py()
+    finally:
+        set_application(None)
+        await db.dispose()
+
+
+async def test_create_token_without_config_stays_non_expiring() -> None:
+    db = await _setup()
+    try:
+        user = await Account.create(email="ada@example.com")
+        _, token = await create_token(user)  # no app running → no config default
+        assert token.expires_at is None
+    finally:
+        await db.dispose()
+
+
+# --- abilities()/ability() route middleware (all vs any) ----------------------
+
+
+class _Resp:
+    def __init__(self, status: int, body: Any = None) -> None:
+        self.status = status
+        self.body = body
+
+
+async def _call_next(_request: Any) -> _Resp:
+    return _Resp(200, "ok")
+
+
+class _Bearer:
+    def __init__(self, plaintext: str | None) -> None:
+        self._plaintext = plaintext
+
+    def header(self, name: str, default: Any = None) -> Any:
+        if name == "authorization" and self._plaintext:
+            return f"Bearer {self._plaintext}"
+        return default
+
+
+async def test_abilities_middleware_requires_all() -> None:
+    db = await _setup()
+    try:
+        user = await Account.create(email="ada@example.com")
+        plaintext, _ = await create_token(user, abilities=["posts.read", "posts.write"])
+
+        allowed = abilities("posts.read", "posts.write")()
+        assert (await allowed.handle(_Bearer(plaintext), _call_next)).status == 200
+
+        missing_one = abilities("posts.read", "posts.delete")()
+        with pytest.raises(Exception) as ei:  # HttpException, checked below
+            await missing_one.handle(_Bearer(plaintext), _call_next)
+        assert getattr(ei.value, "status", None) == 403
+    finally:
+        await db.dispose()
+
+
+async def test_ability_middleware_requires_any() -> None:
+    db = await _setup()
+    try:
+        user = await Account.create(email="ada@example.com")
+        plaintext, _ = await create_token(user, abilities=["posts.read"])
+
+        any_match = ability("posts.write", "posts.read")()
+        assert (await any_match.handle(_Bearer(plaintext), _call_next)).status == 200
+
+        no_match = ability("posts.write", "posts.delete")()
+        with pytest.raises(Exception) as ei:
+            await no_match.handle(_Bearer(plaintext), _call_next)
+        assert getattr(ei.value, "status", None) == 403
+    finally:
+        await db.dispose()
+
+
+async def test_abilities_middleware_401s_with_no_bearer_token() -> None:
+    guarded = abilities("posts.read")()
+    with pytest.raises(Exception) as ei:
+        await guarded.handle(_Bearer(None), _call_next)
+    assert getattr(ei.value, "status", None) == 401
