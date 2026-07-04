@@ -101,6 +101,13 @@ class Http(Facade):
     def accessor(cls) -> str:
         return "http"
 
+    @classmethod
+    def fake(cls, mapping: Any = None) -> Any:
+        """``Http.fake({...})`` overrides the generic ``Facade.fake()`` (which takes no args and
+        swaps in a ``fake_class()`` instance) — the HTTP fake takes a URL-pattern → stub mapping
+        and swaps the client's transport instead. See ``arvel.client.Client.fake``."""
+        return cls._resolve_root().fake(mapping)
+
 
 class Route(Facade):
     @classmethod

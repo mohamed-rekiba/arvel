@@ -44,8 +44,8 @@ def test_resolve_hasher_uses_container_when_bound() -> None:
 
 
 class _FakeResp:
-    def raise_for_status(self) -> None:
-        return None
+    def throw(self) -> _FakeResp:
+        return self
 
     def json(self) -> dict[str, Any]:
         return {"sub": "x"}

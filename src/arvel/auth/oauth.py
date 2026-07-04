@@ -110,13 +110,15 @@ async def fetch_userinfo(
 
     For plain-OAuth providers (no ``id_token``) this is how you read the profile after the exchange.
     Uses the framework ``http`` client (``arvel.client.Client``) when an app is running, so it shares
-    the app's timeouts/instrumentation; falls back to a lazy ``httpx`` client otherwise. Pass
-    ``client`` to inject one in tests. The ``userinfo_endpoint`` **must be https** in production — the
-    access token is sent as a bearer header, so a cleartext endpoint would leak it. A non-2xx response
-    raises (no partial profile).
+    the app's timeouts/instrumentation (and returns a ``ClientResponse``); falls back to a lazy
+    ``httpx`` client otherwise (wrapped in the same ``ClientResponse`` for a uniform ``.throw()``/
+    ``.json()`` call site). Pass ``client`` to inject one in tests — its ``get()`` must return (or
+    await to) a ``ClientResponse``-shaped object. The ``userinfo_endpoint`` **must be https** in
+    production — the access token is sent as a bearer header, so a cleartext endpoint would leak it.
+    A non-2xx response raises (no partial profile).
     """
     owns = False
-    http = client
+    http: Any = client
     if http is None:
         from arvel.kernel import app, has_application
 
@@ -131,10 +133,15 @@ async def fetch_userinfo(
             http = httpx.AsyncClient()  # self-created → we must close it
             owns = True
     try:
-        response = await http.get(
+        raw: Any = await http.get(
             userinfo_endpoint, headers={"Authorization": f"Bearer {access_token}"}
         )
-        response.raise_for_status()
+        response: Any = raw
+        if owns:
+            from arvel.client import ClientResponse
+
+            response = ClientResponse(raw)
+        response.throw()
         return dict(response.json())
     finally:
         if owns:

@@ -96,8 +96,8 @@ class _FakeResponse:
     def __init__(self, data: dict[str, Any]) -> None:
         self._data = data
 
-    def raise_for_status(self) -> None:
-        return None
+    def throw(self) -> _FakeResponse:
+        return self
 
     def json(self) -> dict[str, Any]:
         return self._data
@@ -123,7 +123,7 @@ async def test_fetch_userinfo_sends_bearer_and_returns_profile() -> None:
 class _FailingHttp:
     async def get(self, url: str, headers: dict[str, str] | None = None) -> Any:
         class _Resp:
-            def raise_for_status(self) -> None:
+            def throw(self) -> None:
                 raise RuntimeError("401 Unauthorized")
 
             def json(self) -> dict[str, Any]:
@@ -137,3 +137,40 @@ async def test_fetch_userinfo_raises_on_non_2xx_no_partial_profile() -> None:
 
     with pytest.raises(RuntimeError, match="401"):
         await fetch_userinfo("tok", "https://idp.test/userinfo", client=_FailingHttp())
+
+
+async def test_fetch_userinfo_falls_back_to_raw_httpx_wrapped_in_client_response(
+    monkeypatch: Any,
+) -> None:
+    """No injected ``client`` and no running app → the lazy ``httpx.AsyncClient`` fallback, its
+    response still wrapped in ``ClientResponse`` (uniform ``.throw()``/``.json()`` call site)."""
+    import httpx
+
+    from arvel.client import RequestFailed
+
+    real_async_client = httpx.AsyncClient  # capture before patching (avoid re-wrapping ourselves)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["authorization"] == "Bearer tok-raw"
+        return httpx.Response(200, json={"sub": "raw"})
+
+    class _PatchedAsyncClient(real_async_client):  # type: ignore[misc]
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, transport=httpx.MockTransport(handler), **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", _PatchedAsyncClient)
+    info = await fetch_userinfo("tok-raw", "https://idp.test/userinfo")
+    assert info == {"sub": "raw"}
+
+    def failing_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401)
+
+    class _FailingAsyncClient(real_async_client):  # type: ignore[misc]
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, transport=httpx.MockTransport(failing_handler), **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FailingAsyncClient)
+    import pytest
+
+    with pytest.raises(RequestFailed):
+        await fetch_userinfo("tok-raw", "https://idp.test/userinfo")

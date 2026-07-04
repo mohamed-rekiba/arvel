@@ -22,9 +22,9 @@ async def test_client_verbs() -> None:
 
 async def test_client_fluent_config() -> None:
     client = Client(transport=_transport())
-    assert (await client.with_token("tok").get("https://x.test/")).status_code == 200
-    assert (await client.with_headers({"X-A": "1"}).get("https://x.test/")).status_code == 200
-    assert (await client.base_url("https://x.test").get("/path")).status_code == 200
+    assert (await client.with_token("tok").get("https://x.test/")).status() == 200
+    assert (await client.with_headers({"X-A": "1"}).get("https://x.test/")).status() == 200
+    assert (await client.base_url("https://x.test").get("/path")).status() == 200
 
 
 async def test_pending_request_verbs_and_timeout() -> None:
