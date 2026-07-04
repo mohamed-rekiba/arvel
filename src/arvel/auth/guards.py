@@ -74,7 +74,68 @@ class LocalGuard:
 
 
 class SessionGuard:
-    """Reflects the established session — a ``Principal`` for the ``current_user``, else ``None``."""
+    """Reflects the established session — a ``Principal`` for the ``current_user``, else ``None``.
+
+    :meth:`login`/:meth:`logout` are the request-aware, session-persisting counterpart to
+    ``AuthManager.login``/``logout`` (which only ever touch the ``current_user`` ContextVar — no
+    session, no fixation defence, no remember-me). :meth:`user_id` is the read-half: feed it to your
+    ``user_resolver`` binding (mirrors ``TokenGuard.user_id`` for the bearer-token path) so a later
+    request re-authenticates from the session instead of the (per-request) ContextVar.
+    """
+
+    #: the session key ``login``/``user_id`` read+write — shared with ``arvel.auth.remember``,
+    #: ``arvel.auth.impersonation``, and ``arvel.auth.sessions.EnsureSessionCurrent``.
+    SESSION_KEY = "_user_id"
+
+    async def login(self, user: Any, request: Any, *, remember: bool = False) -> None:
+        """Log ``user`` in for this request: rotate the session id **before** persisting the user id
+        (fixation defence — a pre-login, possibly attacker-fixed, id is never reused for an
+        authenticated session), persist it to ``request.session`` so a later request re-authenticates
+        without the user re-submitting credentials, and set ``current_user`` for the rest of this
+        request. When ``remember``, also issue a rotating remember-me cookie
+        (:func:`arvel.auth.remember.remember`)."""
+        from arvel.http.session import regenerate_session
+
+        regenerate_session(request)  # BEFORE writing the session user id (fixation defence)
+        session = getattr(request, "session", None)
+        if isinstance(session, dict):
+            from arvel.auth import Authenticatable
+
+            subject = (
+                user.get_auth_identifier()
+                if isinstance(user, Authenticatable)
+                else getattr(user, "id", None)
+            )
+            cast("dict[str, Any]", session)[self.SESSION_KEY] = subject
+
+        from arvel.auth import current_user
+
+        current_user.set(user)
+        if remember:
+            from arvel.auth.remember import remember as issue_remember_cookie
+
+            await issue_remember_cookie(request, user)
+
+    async def logout(self, request: Any) -> None:
+        """Log out for this request: clear the remember cookie/token, invalidate the session (new id,
+        all data — including the persisted user id — dropped), and clear ``current_user``."""
+        from arvel.auth.remember import forget_remember
+        from arvel.http.session import invalidate_session
+
+        await forget_remember(request)  # delete the token row + flag the cookie cleared
+        invalidate_session(request)  # new id; drops SESSION_KEY and everything else
+
+        from arvel.auth import current_user
+
+        current_user.set(None)
+
+    async def user_id(self, request: Any) -> Any:
+        """The session-persisted user id (the read-half of :meth:`login`), else ``None`` when there's
+        no session or nobody's logged in over it."""
+        session = getattr(request, "session", None)
+        if not isinstance(session, dict):
+            return None
+        return cast("dict[str, Any]", session).get(self.SESSION_KEY)
 
     async def verify(self, request: Any = None) -> Principal | None:
         from arvel.auth import Authenticatable, current_user

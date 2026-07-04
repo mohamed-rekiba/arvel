@@ -1,14 +1,21 @@
-"""arvel.auth.flows — email-verification + password-reset tokens (signed URLs).
+"""arvel.auth.flows — email-verification tokens (signed URLs).
 
-A purpose-tagged, time-limited token over ``arvel.security.Signer`` (itsdangerous). The token
-carries ``<purpose>:<user_id>`` signed with the app key; verifying checks the signature, the
-expiry, and that the purpose matches — so a verification link can't be replayed as a reset.
-Route handlers (send link / confirm) are app-side. Grounded in knowledge/port/15.
+A purpose-tagged, time-limited token over ``arvel.security.Signer`` (itsdangerous). The payload binds
+a **hash of the email** the link was issued for (``verify:<user_id>:<email_hash>``); ``verify_email_token``
+recomputes the hash from the *current* user email and rejects on mismatch, so a link survives neither a
+signature forgery nor a since-changed email address. Default TTL is 60 minutes (Laravel parity).
+
+Password reset moved to :mod:`arvel.auth.password_reset` (a stored, single-use, throttled broker — the
+old stateless signed token here was replayable within its TTL, audit finding A6). Route handlers (send
+link / confirm) are app-side. Grounded in knowledge/port/15 + projects/arvel/specs/14-auth-session.md.
 """
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
+
+DEFAULT_TTL_SECONDS = 3600  # 60 minutes (Laravel default; down from the prior 24h)
 
 
 def _signer(secret: str) -> Any:
@@ -17,36 +24,32 @@ def _signer(secret: str) -> Any:
     return Signer(secret)
 
 
-def _issue(purpose: str, user_id: int, secret: str) -> str:
-    return str(_signer(secret).sign(f"{purpose}:{user_id}"))
+def _email_hash(email: str) -> str:
+    """A stable (non-secret) hash of ``email``, normalized so casing/whitespace variants match the
+    same address a user actually has on file."""
+    return hashlib.sha256(email.strip().casefold().encode()).hexdigest()
 
 
-def _verify(token: str, purpose: str, secret: str, max_age: int) -> int | None:
+def email_verification_token(user_id: int, email: str, secret: str) -> str:
+    """A signed token proving ownership of ``email`` *at issuance time* — the payload binds
+    ``sha256(email)`` so :func:`verify_email_token` can reject it once the user's email changes."""
+    payload = f"verify:{user_id}:{_email_hash(email)}"
+    return str(_signer(secret).sign(payload))
+
+
+def verify_email_token(
+    token: str, current_email: str, secret: str, *, max_age: int = DEFAULT_TTL_SECONDS
+) -> int | None:
+    """The user id if ``token`` is validly signed, unexpired, and its bound email hash matches
+    ``current_email`` — else ``None``. Passing the user's *current* email (not the one at issuance)
+    is what invalidates a link after an email change; default ``max_age`` is 60 minutes."""
     try:
         value = _signer(secret).unsign(token, max_age=max_age)
     except Exception:
         return None
-    prefix, _, raw_id = str(value).partition(":")
-    if prefix != purpose or not raw_id.isdigit():
+    parts = str(value).split(":", 2)
+    if len(parts) != 3 or parts[0] != "verify" or not parts[1].isdigit():
         return None
-    return int(raw_id)
-
-
-def email_verification_token(user_id: int, secret: str) -> str:
-    """A signed token proving ownership of an email address."""
-    return _issue("verify", user_id, secret)
-
-
-def verify_email_token(token: str, secret: str, *, max_age: int = 86400) -> int | None:
-    """The user id if the verification token is valid + unexpired, else ``None`` (24h default)."""
-    return _verify(token, "verify", secret, max_age)
-
-
-def password_reset_token(user_id: int, secret: str) -> str:
-    """A signed token authorizing a password reset."""
-    return _issue("reset", user_id, secret)
-
-
-def verify_password_reset_token(token: str, secret: str, *, max_age: int = 3600) -> int | None:
-    """The user id if the reset token is valid + unexpired, else ``None`` (1h default)."""
-    return _verify(token, "reset", secret, max_age)
+    if parts[2] != _email_hash(current_email):
+        return None
+    return int(parts[1])

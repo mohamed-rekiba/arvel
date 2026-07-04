@@ -106,6 +106,11 @@ class AuthManager:
         return getattr(user, "id", None)
 
     def login(self, user: Any) -> Any:
+        """Set ``current_user`` directly — for **non-HTTP** contexts (jobs, console commands) where
+        there's no request/session to persist to. This does **not** touch a session or rotate a
+        session id; for a web login use ``arvel.auth.guards.SessionGuard.login(user, request)``
+        instead, which does both (fixation defence + a session a later request can re-authenticate
+        from)."""
         current_user.set(user)
         return user
 

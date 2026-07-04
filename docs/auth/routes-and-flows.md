@@ -9,12 +9,13 @@ callback), refresh-token rotation for APIs, password reset, and email verificati
 
 ## Session login & logout
 
-A login route is just: validate the form, `attempt` the credentials, and on success `login` the user
-(see [Authentication](authentication.md)):
+A login route is just: validate the form, `attempt` the credentials, and on success hand off to
+`SessionGuard.login` — which rotates the session id **and** persists the user id so later requests
+stay logged in (see [Authentication](authentication.md#logging-in-over-http-sessionguard)):
 
 ```python
 from arvel.auth import AuthManager
-from arvel.http.session import invalidate_session, regenerate_session
+from arvel.auth.guards import SessionGuard
 
 auth = AuthManager()
 
@@ -24,13 +25,12 @@ async def find_user(credentials):
 async def login(request):
     credentials = await request.form()
     if await auth.attempt(credentials, find_user):
-        regenerate_session(request)        # rotate the session id on privilege change (see below)
+        await SessionGuard().login(auth.user(), request)   # rotate id + persist user id (see below)
         return redirect("/dashboard")
     return "Invalid credentials", 401
 
 async def logout(request):
-    auth.logout()
-    invalidate_session(request)            # drop the session entirely
+    await SessionGuard().logout(request)   # clears remember + invalidates the session + current_user
     return redirect("/")
 ```
 
@@ -41,8 +41,10 @@ Register them as ordinary routes. CSRF-protect the login form like any other ses
 
 A **session-fixation** attack plants a known session id in the victim's browser *before* they log in,
 then rides that same id afterwards. The defence is to **issue a new session id the moment privilege
-changes** — so call `regenerate_session(request)` right after a successful `attempt`/`login`, and
-`invalidate_session(request)` on logout:
+changes**: `SessionGuard.login` calls `regenerate_session(request)` internally, **before** writing the
+persisted user id, so a pre-login (possibly attacker-fixed) id is never reused for an authenticated
+session; `SessionGuard.logout` calls `invalidate_session(request)`. Reach for the lower-level helpers
+directly only if you're composing your own login/logout outside `SessionGuard`:
 
 - `regenerate_session(request)` — new id, **keeps** the session data (cart, flash, CSRF token).
 - `invalidate_session(request)` — new id, **drops** all data (a clean logout).
@@ -73,26 +75,25 @@ A session ends when the browser session does. To keep a user logged in across re
 pattern: only a hash is stored, and the validator rotates on every use so a stolen-and-replayed cookie
 is detected and the token destroyed).
 
-Issue it on login when the user ticked "remember me", and clear it on logout:
+`SessionGuard.login`'s `remember=` flag issues it on login; `SessionGuard.logout` always clears it:
 
 ```python
-from arvel.auth.remember import remember, forget_remember
+from arvel.auth.guards import SessionGuard
 
 async def login(request):
     form = await request.form()
     if await auth.attempt(form, find_user):
-        regenerate_session(request)
-        if form.get("remember"):
-            await remember(request, auth.user())   # sets the remember cookie
+        await SessionGuard().login(auth.user(), request, remember=bool(form.get("remember")))
         return redirect("/dashboard")
     return "Invalid credentials", 401
 
 async def logout(request):
-    await forget_remember(request)                 # deletes the token + clears the cookie
-    auth.logout()
-    invalidate_session(request)
+    await SessionGuard().logout(request)   # clears the remember cookie/token too
     return redirect("/")
 ```
+
+(Composing your own flow instead of `SessionGuard`? `arvel.auth.remember.remember(request, user)` /
+`forget_remember(request)` are the same primitives, callable directly.)
 
 Then add the `RememberMe` middleware to the **web** group, **after** `AuthenticateMiddleware`. When a
 request arrives with no logged-in user but a valid remember cookie, it logs the user in for that
@@ -150,7 +151,7 @@ kernel.append_to_group("web", EnsureSessionCurrent())   # cache resolved from th
 
 # 2) right after a successful login, stamp the session:
 if await auth.attempt(form, find_user):
-    regenerate_session(request)
+    await SessionGuard().login(auth.user(), request)
     await stamp_session(request.session, auth.id())
     ...
 
@@ -210,48 +211,79 @@ have). For minting the access token itself, see [SSO / OIDC](sso-oidc.md) (valid
 
 ## Password reset
 
-`flows.py` issues **signed, time-boxed** tokens — no extra table needed. Generate one, email the link,
-and verify it on the way back:
+`PasswordBroker` (`arvel.auth.password_reset`) is a **stored**, single-use, per-email-throttled
+broker — Laravel's `PasswordBroker`, not a signed token. A used *or* expired token row is **deleted**,
+so a replay never succeeds even inside the original TTL (the old stateless-signed-token approach was
+replayable within its TTL — audit finding A6). The `password_reset_tokens` table is a **framework**
+migration (`arvel new` ships it, like `users`/`api_tokens`/`failed_jobs`) — no table to author yourself:
 
 ```python
-from arvel.auth.flows import password_reset_token, verify_password_reset_token
+from arvel.auth.password_reset import PasswordBroker, PasswordResetStatus
 from arvel.security import Hasher
+
+async def find_user(email):
+    return await User.where(email=email).first()
+
+broker = PasswordBroker(find_user)   # throttle=60s, ttl=1h by default
 
 async def request_reset(request):
     email = (await request.form())["email"]
-    user = await User.where(email=email).first()
-    if user is not None:
-        token = password_reset_token(user.id, app_secret)
-        await mail_reset_link(email, f"https://acme.com/reset?token={token}")
-    return "If that email exists, a link is on its way."   # don't reveal whether it does
+    status = await broker.send_reset_link(email)
+    # RESET_THROTTLED / INVALID_USER are both fine to fold into the same generic response
+    # (don't leak whether the email exists, or that it was just sent moments ago)
+    return "If that email exists, a link is on its way."
 
 async def do_reset(request):
     form = await request.form()
-    user_id = verify_password_reset_token(form["token"], app_secret)   # default max_age 1h
-    if user_id is None:
-        return "This link is invalid or expired.", 400
-    user = await User.find(user_id)
-    user.password = Hasher().make(form["password"])   # guarded field — set directly, then save
-    await user.save()
+
+    def set_password(user, new_password):
+        user.password = Hasher().make(new_password)   # guarded field — set directly
+
+    status = await broker.reset(form["email"], form["token"], form["password"], set_password)
+    if status is not PasswordResetStatus.RESET_SUCCESS:
+        return "This link is invalid, expired, or already used.", 400
     return redirect("/login")
 ```
 
+Listen for the events to actually mail the link / notify on completion:
+
+```python
+from arvel.auth.password_reset import PasswordReset, PasswordResetRequested
+from arvel.support.facades import Event
+
+async def mail_the_link(event: PasswordResetRequested) -> None:
+    await mail_reset_link(event.email, f"https://acme.com/reset?email={event.email}&token={event.token}")
+
+Event.listen(PasswordResetRequested, mail_the_link)
+Event.listen(PasswordReset, lambda event: audit_password_changed(event.email))
+```
+
+A successful `reset()` also **rotates the user's remember token** (`clear_all_remember_tokens`) — a
+stolen remember cookie stops working the moment the password is reset — and fires `PasswordReset`.
+`send_reset_link` throttles to one send per email per `throttle_seconds` (default 60s) regardless of
+whether the previous link was ever used.
+
 ## Email verification
 
-Same shape, a longer default lifetime (24h):
+Same signed-URL shape as before, but the payload now binds a **hash of the email** the link was issued
+for, and the default lifetime is down to **60 minutes** (from 24h) — Laravel parity:
 
 ```python
 from arvel.auth.flows import email_verification_token, verify_email_token
 
 async def send_verification(user):
-    token = email_verification_token(user.id, app_secret)
+    token = email_verification_token(user.id, user.email, app_secret)
     await mail_verify_link(user.email, f"https://acme.com/verify?token={token}")
 
 async def verify(request):
-    user_id = verify_email_token(request.query("token"), app_secret)   # default max_age 24h
-    if user_id is None:
+    # route as e.g. /email/verify/{id} — the path segment says WHICH user, the token PROVES it
+    user = await User.find(request.path_param("id"))
+    if user is None:
         return "This link is invalid or expired.", 400
-    user = await User.find(user_id)
+    # pass the user's CURRENT email — a changed email invalidates the old link (hash mismatch)
+    user_id = verify_email_token(request.query("token"), user.email, app_secret)
+    if user_id is None or user_id != user.id:
+        return "This link is invalid or expired.", 400
     user.email_verified_at = Date.now()
     await user.save()
     return redirect("/dashboard")
@@ -259,11 +291,13 @@ async def verify(request):
 
 ## Schema & indexes for the auth token tables
 
-arvel builds each model's `__table__` for *querying*; the **production schema is yours to create in a
-migration** (the framework ships the [Blueprint](../database/index.md) toolkit, not the tables). For the
-token tables, add the columns **plus the integrity/lookup indexes** below — without them the by-hash
-lookups table-scan, and `remember_tokens.selector` (the indexed handle the validator is checked
-against) lacks the uniqueness its single-row lookup assumes:
+arvel builds each model's `__table__` for *querying*; for **most** token tables the production schema
+is yours to create in a migration (the framework ships the [Blueprint](../database/index.md) toolkit,
+not the tables) — `password_reset_tokens` is the one exception, shipped as a **framework migration**
+(`arvel new` includes it, same as `users`/`api_tokens`/`failed_jobs`) since every app needs it. For the
+ones you author yourself, add the columns **plus the integrity/lookup indexes** below — without them
+the by-hash lookups table-scan, and `remember_tokens.selector` (the indexed handle the validator is
+checked against) lacks the uniqueness its single-row lookup assumes:
 
 ```python
 from arvel.database.migrations import Migration
@@ -308,10 +342,10 @@ per-user family operations, and expiry pruning. These models declare no timestam
   for you: replaying an already-rotated token makes `rotate_refresh_token` **revoke that user's whole
   token family** and return `None`, forcing a fresh login. A benign double-submit therefore logs the
   user out — clients should never replay a refresh token.
-- **Long-lived reset/verification links.** They're signed and time-boxed — keep `max_age` tight
-  (reset ~1h, verification ~24h). Don't widen it "to be friendly."
+- **Long-lived verification links.** They're signed and time-boxed — keep `max_age` tight (~1h,
+  the default). Don't widen it "to be friendly."
 - **Leaking account existence.** Password-reset and login responses should look identical whether or
-  not the email is registered.
+  not the email is registered — fold `INVALID_USER`/`RESET_THROTTLED` into the same generic copy.
 - **Skipping CSRF on session forms.** Session login/logout are state-changing POSTs — protect them.
 - **Not re-checking the user.** A token only proves *who*; on every flow re-load the user and confirm
   they still exist and are active before acting.
@@ -322,9 +356,15 @@ Refresh tokens are rows in `refresh_tokens` storing only a SHA-256 hash; `rotate
 up the presented token by hash, and — when it's still active — marks it revoked, saves, and issues a
 fresh token (atomic revoke-and-reissue, so each token works exactly once). If the looked-up token is
 **already revoked**, that's reuse: `revoke_all_refresh_tokens(user)` kills the whole family and the
-call returns `None`. `revoke_all_refresh_tokens` is also handy for "log out of all devices." The `flows.py` reset/verification tokens are **stateless**: a signed
-payload (your app secret) carrying the user id, validated with a `max_age` expiry — no database row to
-store or clean up. Both keep secrets out of the database in usable form.
+call returns `None`. `revoke_all_refresh_tokens` is also handy for "log out of all devices."
+
+`PasswordBroker` stores one `password_reset_tokens` row **per email** (a Hasher hash of the token, plus
+`created_at`, which drives both the throttle and the TTL); `send_reset_link` overwrites it past the
+throttle window, and `reset` **deletes** it on every terminal outcome (success or expiry) — so a token
+is never live for a second use. `flows.py`'s email-verification token is still a **stateless** signed
+payload (your app secret) carrying `user_id` + `sha256(email)`, validated with a `max_age` expiry — no
+database row to store or clean up, but the email hash means it's invalidated the moment the user's
+email changes.
 
 ## See also
 

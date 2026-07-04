@@ -88,6 +88,57 @@ async def profile(request):
 The current user is stored in a `ContextVar`, so it is **isolated per request / per async task** —
 two concurrent requests never see each other's user.
 
+!!! warning "`AuthManager.login`/`attempt` don't persist a session"
+    `auth.login(user)` only sets the `current_user` ContextVar — it's the right call from a **non-HTTP**
+    context (a job, a console command) where there's no request to persist to, but on its own it means
+    every request re-authenticates from scratch. For a web login, use `SessionGuard.login` below.
+
+## Logging in over HTTP (`SessionGuard`)
+
+A browser session needs two things `AuthManager.login` doesn't do: **rotate the session id** (so a
+pre-login, possibly attacker-fixed, id is never reused — session fixation) and **persist the user id**
+to the session (so the *next* request is still logged in). `arvel.auth.guards.SessionGuard` does both:
+
+```python
+from arvel.auth.guards import SessionGuard
+
+async def login(request):
+    credentials = await request.form()
+    user = await find_user(credentials)
+    if user is None or not await auth.attempt(credentials, find_user):
+        return "Invalid credentials", 401
+    await SessionGuard().login(user, request, remember=bool(credentials.get("remember")))
+    return redirect("/dashboard")
+
+async def logout(request):
+    await SessionGuard().logout(request)
+    return redirect("/")
+```
+
+`login(user, request, *, remember=False)` regenerates the session id **before** writing the user id
+(fixation defence), sets `current_user` for the rest of this request, and — when `remember` — issues a
+rotating remember-me cookie ([Routes & flows](routes-and-flows.md#stay-logged-in-remember-me)).
+`logout(request)` clears the remember cookie/token, invalidates the session (new id, all data
+dropped), and clears `current_user`.
+
+### Wiring the *read* half: `user_resolver`
+
+Persisting the user id to the session is only half the story — something has to read it back on the
+*next* request. That's the app's `user_resolver` binding ([Providers &
+middleware](providers-and-middleware.md)); `SessionGuard.user_id(request)` is the primitive it calls
+for a session-based app (mirrors `TokenGuard.user_id(request)` for the bearer-token path):
+
+```python
+async def resolve_user(request):
+    user_id = await SessionGuard().user_id(request)   # reads back what login() persisted
+    return await User.find(user_id) if user_id is not None else None
+
+self.app.singleton("user_resolver", lambda app: resolve_user)
+```
+
+Without this, `login()` still rotates/persists correctly, but `AuthenticateMiddleware` has nothing to
+read it back with — every request but the login one itself looks like a guest.
+
 ## The local guard
 
 Under the hood, "verify a request by some method" is the job of a **guard** (the full system is in
