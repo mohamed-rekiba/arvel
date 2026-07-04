@@ -201,6 +201,38 @@ Collection([1, 2, 3]).when(flag, lambda c: c.reverse()) # conditional transform
 Collection(records).sort_by_desc("score").pluck("name") # order + project
 ```
 
+`sum`/`avg` take an optional key **or** callable, the same as `pluck`/`group_by`/`sort_by`:
+
+```python
+Collection([{"n": 1}, {"n": 2}]).sum("n")                    # 3
+Collection([{"n": 1}, {"n": 2}]).avg(lambda r: r["n"])       # 1.5
+Collection([1, 2, 3]).sum()                                  # 6   (no key: sums the items)
+```
+
+`zip`/`combine` pair a collection with other iterables:
+
+```python
+Collection([1, 2, 3]).zip([4, 5, 6])       # Collection of Collections: [1,4], [2,5], [3,6]
+Collection(["a", "b"]).combine([1, 2])     # {"a": 1, "b": 2}   (a plain dict, like key_by/group_by)
+```
+
+`duplicates` returns the items that repeat an earlier value, preserving first-seen order — keyed
+by **list index** (Laravel keys by the original array key; there's no dict-backed array here):
+
+```python
+Collection([1, 2, 1, 3, 2, 2]).duplicates()          # {2: 1, 4: 2, 5: 2}
+Collection(rows).duplicates("email")                 # by key, same shape
+```
+
+`when_empty`/`when_not_empty` run a callback only in the matching case (Laravel `when` semantics:
+the callback's result wins when it returns a `Collection`, otherwise `self` is returned unchanged
+— so both are safe to chain):
+
+```python
+Collection([]).when_empty(lambda c: log.warning("no rows"))       # runs; still get `self` back
+Collection(rows).when_not_empty(lambda c: c.first()).id           # only when non-empty
+```
+
 Filter by an item's key/attribute (same `_get` resolution as `pluck`/`group_by`):
 
 ```python
@@ -214,6 +246,17 @@ Collection([1, 2, 3, 4, 5]).take(2)                     # [1, 2]  (take(-2) → 
 `reverse`/`skip`/`slice`/`nth`/`take`, `where`/`where_in`/`where_not_in`/`where_null`/`where_not_null`,
 `merge`/`concat`/`flat_map`, `search`/`value`/`every`, and `tap` round out the set — all returning a
 new `Collection` (or a plain value for terminals).
+
+**No higher-order proxy.** Laravel's `$collection->map->name` (a magic proxy over `map`/`each`/…)
+is intentionally **not** ported here (DR-0031): a dynamic `__getattr__` proxy can't be typed —
+every call through it would collapse to `Any`, which conflicts with arvel's strict-typing mandate.
+The idiomatic Python replacement is a lambda, and it types end-to-end:
+
+```python
+# Laravel:  $users->map->name
+Collection(users).map(lambda u: u.name)         # typed: Collection[str], not Any
+Collection(users).each(lambda u: u.activate())
+```
 
 For large or streaming sources, `lazy()` gives a **deferred** view — `map`/`filter`/`take`
 don't run until you materialize, and only as many elements as you consume are produced:

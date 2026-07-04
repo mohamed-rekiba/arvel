@@ -17,6 +17,8 @@ import inflection
 from slugify import slugify as _slugify
 from ulid import ULID
 
+from arvel.support.concurrency import Concurrency
+from arvel.support.context import Context
 from arvel.support.helpers import (
     Arr,
     blank,
@@ -35,6 +37,14 @@ from arvel.support.helpers import (
 )
 from arvel.support.money import Currency, Money
 from arvel.support.number import Number
+from arvel.support.pipeline import Pipeline
+from arvel.support.process import (
+    InvokedProcess,
+    Process,
+    ProcessFailed,
+    ProcessResult,
+    ProcessTimedOut,
+)
 from arvel.support.stringable import Stringable
 
 #: The authenticated principal for the current request/async context. Lives here (a core leaf
@@ -128,8 +138,10 @@ class Collection[T]:
     def count(self) -> int:
         return len(self._items)
 
-    def sum(self) -> Any:
-        return sum(cast("Iterable[Any]", self._items))
+    def sum(self, key: str | Callable[[T], Any] | None = None) -> Any:
+        if key is None:
+            return sum(cast("Iterable[Any]", self._items))
+        return sum(key(item) if callable(key) else self._get(item, key) for item in self._items)
 
     def sort(
         self, key: Callable[[T], Any] | None = None, *, reverse: bool = False
@@ -172,8 +184,10 @@ class Collection[T]:
         return dict(fn(item) for item in self._items)
 
     # --- aggregates --------------------------------------------------------
-    def avg(self) -> Any:
-        return sum(cast("Iterable[Any]", self._items)) / len(self._items) if self._items else None
+    def avg(self, key: str | Callable[[T], Any] | None = None) -> Any:
+        if not self._items:
+            return None
+        return self.sum(key) / len(self._items)
 
     def max(self) -> Any:
         return max(cast("Iterable[Any]", self._items)) if self._items else None
@@ -187,6 +201,20 @@ class Collection[T]:
             group = item if key is None else (key(item) if callable(key) else self._get(item, key))
             counts[group] = counts.get(group, 0) + 1
         return counts
+
+    def duplicates(self, key: str | Callable[[T], Any] | None = None) -> dict[int, T]:
+        """Items that repeat an earlier value (by ``key``, or the item itself), preserving
+        first-seen order — Laravel ``duplicates``, keyed by **list index** here rather than
+        Laravel's original array keys."""
+        seen: set[Any] = set()
+        result: dict[int, T] = {}
+        for index, item in enumerate(self._items):
+            marker = item if key is None else (key(item) if callable(key) else self._get(item, key))
+            if marker in seen:
+                result[index] = item
+            else:
+                seen.add(marker)
+        return result
 
     # --- filtering / selection ---------------------------------------------
     def reject(self, fn: Callable[[T], bool]) -> Collection[T]:
@@ -241,6 +269,16 @@ class Collection[T]:
     def flat_map[R](self, fn: Callable[[T], Iterable[R]]) -> Collection[R]:
         return Collection(y for x in self._items for y in fn(x))
 
+    def zip(self, *iterables: Iterable[Any]) -> Collection[Collection[Any]]:
+        """Pair this collection's items index-wise with each iterable — Laravel ``zip``. Stops at
+        the shortest input, like the builtin ``zip``."""
+        return Collection(Collection(row) for row in zip(self._items, *iterables, strict=False))
+
+    def combine(self, values: Iterable[Any]) -> dict[Any, Any]:
+        """This collection's items as keys, paired with ``values`` — Laravel ``combine``. The two
+        must be the same length (a mismatch raises), same as Laravel's underlying ``array_combine``."""
+        return dict(zip(self._items, values, strict=True))
+
     def implode(self, glue: str, key: str | None = None) -> str:
         parts = self._items if key is None else [self._get(x, key) for x in self._items]
         return glue.join(str(p) for p in parts)
@@ -268,6 +306,14 @@ class Collection[T]:
 
     def unless(self, condition: Any, callback: Any, default: Any = None) -> Collection[T]:
         return self.when(not condition, callback, default)
+
+    def when_empty(self, callback: Any, default: Any = None) -> Collection[T]:
+        """Run ``callback`` only when this collection is empty — Laravel ``whenEmpty``."""
+        return self.when(self.is_empty(), callback, default)
+
+    def when_not_empty(self, callback: Any, default: Any = None) -> Collection[T]:
+        """Run ``callback`` only when this collection is NOT empty — Laravel ``whenNotEmpty``."""
+        return self.when(not self.is_empty(), callback, default)
 
     def lazy(self) -> LazyCollection[T]:
         """A deferred, re-iterable view over this collection's items (Laravel ``lazy()``)."""
@@ -630,10 +676,18 @@ class Str:
 __all__ = [
     "Arr",
     "Collection",
+    "Concurrency",
+    "Context",
     "Currency",
+    "InvokedProcess",
     "LazyCollection",
     "Money",
     "Number",
+    "Pipeline",
+    "Process",
+    "ProcessFailed",
+    "ProcessResult",
+    "ProcessTimedOut",
     "Str",
     "Stringable",
     "blank",
