@@ -414,14 +414,38 @@ class HttpKernel:
                     )
 
     def _handle_uncaught(self, request: Any, exc: BaseException) -> Any:
-        """Report (5xx only) via the bound ``ExceptionHandler`` then render content-negotiated (E1).
+        """Report (5xx only) via the bound ``ExceptionHandler`` then render: a registered
+        ``renderable`` callback wins (Laravel errors.md), else content-negotiated default (E1).
         4xx (e.g. Litestar's NotFound) render through the same path but aren't reported as bugs."""
         from arvel.http.exceptions import render_exception
 
+        handler = (
+            self.app.make("exceptions")
+            if self.app is not None and self.app.bound("exceptions")
+            else None
+        )
         status = int(getattr(exc, "status", None) or getattr(exc, "status_code", None) or 500)
-        if status >= 500 and self.app is not None and self.app.bound("exceptions"):
-            self.app.make("exceptions").report(exc)  # log unhandled (respects dont_report)
+        if status >= 500 and handler is not None:
+            handler.report(exc)  # log unhandled (respects dont_report + reportables)
+        if handler is not None and callable(getattr(handler, "try_render", None)):
+            rendered = handler.try_render(request, exc)
+            if rendered is not None:
+                return self._to_litestar_response(rendered)
         return render_exception(request, exc, debug=self._debug())
+
+    @staticmethod
+    def _to_litestar_response(rendered: Any) -> Any:
+        """An ``arvel.http.Response`` from a renderable becomes a litestar response; anything
+        else (already a litestar Response, or a serializable body) passes through as-is."""
+        from arvel.http.response import Response as ArvelResponse
+
+        if isinstance(rendered, ArvelResponse):
+            import litestar
+
+            return litestar.Response(
+                rendered.content, status_code=rendered.status, headers=rendered.headers
+            )
+        return rendered
 
     def _debug(self) -> bool:
         if self.app is None or not self.app.bound("config"):
