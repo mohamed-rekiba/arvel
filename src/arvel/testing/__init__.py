@@ -115,11 +115,88 @@ def fake(facade: Any) -> Any:
     return fake_obj
 
 
+class FakeFilesystem:
+    """A temp-dir local disk swapped in for a real one (Laravel ``Storage::fake``), plus
+    assertion helpers. Wraps a :class:`arvel.filesystem.Filesystem` rather than subclassing it —
+    ``Filesystem`` isn't designed for extension, and every disk method it needs is proxied
+    through ``__getattr__``, so it's a drop-in stand-in wherever ``Storage.disk(name)`` hands
+    one out."""
+
+    def __init__(self, disk: Any) -> None:
+        self._disk = disk
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._disk, name)
+
+    async def assert_exists(self, path: str) -> None:
+        if not await self._disk.exists(path):
+            raise AssertionError(f"expected {path!r} to exist on the faked disk")
+
+    async def assert_missing(self, path: str) -> None:
+        if await self._disk.exists(path):
+            raise AssertionError(f"expected {path!r} to be missing from the faked disk")
+
+    async def assert_count(self, directory: str, count: int) -> None:
+        found = await self._disk.all_files(directory)
+        if len(found) != count:
+            raise AssertionError(
+                f"expected {count} files in {directory!r}; found {len(found)}: {found}"
+            )
+
+
+_faked_disks: set[str] = set()
+
+
+def fake_storage(disk: str = "local") -> FakeFilesystem:
+    """Swap ``disk`` for a fresh temp-dir local disk (Laravel ``Storage::fake``); returns a
+    :class:`FakeFilesystem` with ``assert_exists``/``assert_missing``/``assert_count``. Restore
+    the real driver with :func:`restore_storage` (or let ``reset_fakes`` handle every swap,
+    including this one, in teardown).
+
+    Implemented against ``FilesystemManager.swap_disk`` rather than the generic facade
+    ``swap()``: ``Storage`` proxies its *default* disk, but a fake usually targets one named disk
+    (often not the default) while leaving the others real — swapping the whole facade root can't
+    express that, so this reaches into the manager's per-disk cache instead."""
+    import tempfile
+
+    import fsspec
+
+    from arvel.filesystem import Filesystem, FilesystemManager
+    from arvel.kernel.globals import app
+
+    manager: FilesystemManager = app("filesystem")
+    # fsspec ships no full stubs (see arvel.filesystem._fsspec) — funnel through Any at this
+    # one boundary rather than let a partially-typed stub leak into a strict pyright error.
+    fsspec_any: Any = fsspec
+    fake_disk = Filesystem(
+        fsspec_any.filesystem("file"), root=tempfile.mkdtemp(prefix="arvel-fake-")
+    )
+    manager.swap_disk(disk, fake_disk)
+    _faked_disks.add(disk)
+    return FakeFilesystem(fake_disk)
+
+
+def restore_storage(disk: str | None = None) -> None:
+    """Restore the real driver for ``disk`` (or every faked disk, if omitted) after
+    :func:`fake_storage`. A no-op if nothing was faked."""
+    names = list(_faked_disks) if disk is None else [disk]
+    if not names:
+        return
+    from arvel.filesystem import FilesystemManager
+    from arvel.kernel.globals import app
+
+    manager: FilesystemManager = app("filesystem")
+    for name in names:
+        manager.forget(name)
+        _faked_disks.discard(name)
+
+
 def reset_fakes() -> None:
-    """Clear all swapped facade roots (call in test teardown)."""
+    """Clear all swapped facade roots and restore any faked storage disks (call in test teardown)."""
     from arvel.support.facades import Facade
 
     Facade.clear_swapped()
+    restore_storage()
 
 
 def client(asgi: Any) -> Any:
@@ -205,6 +282,7 @@ def freeze_time(moment: Any = None) -> Generator[Any]:
 
 __all__ = [
     "FakeEvents",
+    "FakeFilesystem",
     "FakeMailer",
     "FakeQueue",
     "assert_database_has",
@@ -213,8 +291,10 @@ __all__ = [
     "client",
     "database_transaction",
     "fake",
+    "fake_storage",
     "freeze_time",
     "reset_fakes",
+    "restore_storage",
     "travel_back",
     "travel_to",
 ]
