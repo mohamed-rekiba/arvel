@@ -123,26 +123,25 @@ class ConnectionResolver:
 
     @contextlib.contextmanager
     def _trace_query(self, statement: Any, name: str | None) -> Any:
-        """Wrap a query in an OpenTelemetry CLIENT span when tracing is on; a no-op (and no
-        opentelemetry import) otherwise. ``db.statement`` is the unbound SQL — placeholders only,
-        never bind values (DR-0020)."""
+        """Wrap a query in a CLIENT span when tracing is on, via ``arvel.telemetry.span()`` — the
+        same gated helper every other module (cache, the HTTP client, …) instruments through, not
+        OpenTelemetry's own API directly (that helper already sets ERROR status + records the
+        exception on a raise, then re-raises unchanged). A no-op (no opentelemetry import, and —
+        the early return below — no SQL-compiling ``str(statement)`` either) when tracing is off.
+        ``db.statement`` is the unbound SQL — placeholders only, never bind values (DR-0020)."""
         from arvel.telemetry import is_tracing_enabled
+        from arvel.telemetry import span as _span
 
         if not is_tracing_enabled():
             yield
             return
-        from opentelemetry import trace
-        from opentelemetry.trace import SpanKind
-
         sql = str(statement)
         operation = sql.split(None, 1)[0].upper() if sql.strip() else "QUERY"
-        # start_as_current_span records the exception + sets ERROR status on a raise by default,
-        # then re-raises — so a failed query is marked and propagates unchanged.
-        with trace.get_tracer("arvel.database").start_as_current_span(
-            f"db {operation}", kind=SpanKind.CLIENT
-        ) as span:
-            span.set_attribute("db.system", self._dialect(name))
-            span.set_attribute("db.statement", sql)
+        with _span(
+            f"db {operation}",
+            kind="client",
+            attributes={"db.system": self._dialect(name), "db.statement": sql},
+        ):
             yield
 
     # --- reads / writes -----------------------------------------------------

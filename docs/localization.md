@@ -25,6 +25,16 @@ Put translations under a `lang/` directory, one file per locale (JSON or grouped
 The app's `lang/` directory is loaded automatically at boot, so `lang/<code>.json` and
 `lang/<code>/<group>.json` files are available through `trans`/`__` with no wiring.
 
+Prefer a different location (e.g. `resources/lang`, the pre-Laravel-9 convention)?
+`with_lang_dir(...)` overrides the default:
+
+```python
+Application.configure(base_path=".").with_lang_dir("resources/lang").create()
+```
+
+`vendor:publish --tag=lang` (below) also respects this override — it publishes into whichever
+directory is actually configured, not always `lang/`.
+
 ## Default messages & publishing
 
 arvel ships default translations for its own framework messages — `validation`, `auth`, and `http`
@@ -40,11 +50,11 @@ by adding the same groups under other locales (`lang/fr/http.json` with `{"statu
 To customize them, publish the defaults into your app and edit the copies:
 
 ```bash
-arvel vendor:publish --tag=lang     # copies the framework defaults into ./lang/en/
+arvel vendor:publish --tag=lang     # copies the framework defaults into your lang dir's en/
 ```
 
-This writes `lang/en/validation.json`, `auth.json`, and `http.json`. Your app's
-`lang/` **overrides**
+This writes `en/validation.json`, `auth.json`, and `http.json` under `lang/` (or your
+`with_lang_dir(...)` override). Your app's translations **override**
 the framework defaults **key by key** (a one-level-deep merge), so you can change a single message
 without re-declaring the rest:
 

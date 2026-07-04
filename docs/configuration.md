@@ -143,6 +143,17 @@ with `_` are skipped (use them for shared helpers); a missing `config/` director
     treat a config path with the same care as any code you import. Loaders restrict to `.py` files as
     light defense-in-depth, but the real boundary is *where the path comes from*.
 
+Prefer a different location? `Application.configure(...)` has an override for each conventional
+directory arvel looks for at your project root:
+
+```python
+Application.configure(base_path=".")
+    .with_config_dir("settings")           # instead of {base_path}/config
+    .with_public_dir("public")             # static/SPA front door — see Routing
+    .with_lang_dir("resources/lang")       # instead of {base_path}/lang — see Localization
+    .create()
+```
+
 ### Precedence
 
 When the same key is set in more than one place, the winner is, highest first:

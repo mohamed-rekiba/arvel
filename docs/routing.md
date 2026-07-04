@@ -268,6 +268,35 @@ Route.get("/api/stats", stats, group="api")    # throttled
 Route.fallback(not_found)                        # matched when nothing else does
 ```
 
+## Serving a public/ directory (SPA, static assets)
+
+`Router.public(directory)` serves `directory` as the app's public web root — Laravel's `public/`:
+a request whose path matches a real file gets it back as-is (anything under `assets/` is assumed
+content-hashed by a bundler and cached forever; everything else stays revalidate-able), and any
+path that ISN'T a real file falls back to `directory/index.html` so a client-side router (Vue
+Router, React Router, …) decides what it renders:
+
+```python
+Route.public("public")                              # serve ./public at the root
+Route.public("public", path="/app")                 # …or mounted under a sub-path
+Route.public("public", spa_fallback=False)           # static files only, no SPA shell/root claim
+```
+
+Prefer configuring it once at the app level instead of a route file — `with_public_dir(...)`
+registers it automatically at boot (no route-file code needed at all, same as Laravel's own
+webserver-served `public/` needing zero lines in `routes/web.php`):
+
+```python
+Application.configure(base_path=".").with_public_dir("public").create()
+```
+
+`with_public_dir` takes the same `path`/`spa_fallback` as `Router.public()`:
+`.with_public_dir("public", path="/app", spa_fallback=False)`.
+
+Both registered routes are marked as a fallback, so this is safe to call before or after your
+other routes — a more specific route (`/api/*`, an admin group, …) always wins on its own path
+regardless of registration order.
+
 ## Common mistakes & gotchas
 
 - **Reversing an unknown name.** `url("typo")` raises `KeyError` — keep names in sync with

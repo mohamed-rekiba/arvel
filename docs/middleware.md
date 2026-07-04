@@ -111,7 +111,11 @@ Group / opt-in:
   raises a `429`. Keyed by `request.ip()` (the first trusted `X-Forwarded-For` hop, else the socket
   peer).
 - **`StartSession`** — attaches a `request.session` dict loaded from (and saved back to) the
-  session store, keyed by the `session` cookie.
+  session store, keyed by the `session` cookie. The store is an in-process dict by default (lost
+  on restart, not shared across workers); set `session.driver = "redis"` in config (the app's own
+  bound `Cache` service — the same Redis/Valkey connection already configured for caching, not a
+  second one) to persist sessions across restarts and share them across every worker/host —
+  `HttpKernel.use_default_groups()` wires this automatically, no route/middleware code needed.
 - **`ShareErrorsFromSession`** — exposes the session's flashed validation errors to views as
   `errors` (see [Validation](validation.md)).
 - **`ValidateCsrfToken`** — seeds a per-session CSRF token, then requires state-changing requests
