@@ -149,6 +149,37 @@ def mysql_url() -> Iterator[str]:
 
 
 @pytest.fixture(scope="session")
+def meilisearch_url() -> Iterator[dict[str, str]]:
+    """A throwaway Meilisearch server; yields ``{"url": ..., "key": ...}``. Probed with the real
+    client's ``health()`` until it answers — Meilisearch's startup log format isn't stable enough
+    across versions to key a ``LogMessageWaitStrategy`` off, unlike the other fixtures here."""
+    import time
+
+    import meilisearch
+    from testcontainers.core.generic import DockerContainer
+
+    master_key = "arvel-test-master-key"  # fixed test-only key, not a real secret
+    container = (
+        DockerContainer("getmeili/meilisearch:v1.11")
+        .with_exposed_ports(7700)
+        .with_env("MEILI_MASTER_KEY", master_key)
+        .with_env("MEILI_NO_ANALYTICS", "true")
+    )
+    with container:
+        host = container.get_container_host_ip()
+        port = container.get_exposed_port(7700)
+        url = f"http://{host}:{port}"
+        client = meilisearch.Client(url, master_key)
+        for _ in range(60):
+            try:
+                client.health()
+                break
+            except Exception:
+                time.sleep(0.5)
+        yield {"url": url, "key": master_key}
+
+
+@pytest.fixture(scope="session")
 def rabbitmq_url() -> Iterator[str]:
     """A throwaway RabbitMQ (any AMQP broker works); yields an ``amqp://`` URL."""
     from testcontainers.core.generic import DockerContainer

@@ -33,7 +33,7 @@ def test_shell_namespace_loads_app_and_autoloads_models() -> None:
 
 
 def test_import_app_models_registers_them_for_autoload(tmp_path: Path) -> None:
-    from arvel.console.shell import _import_app_models
+    from arvel.console.shell import import_app_models
     from arvel.kernel import Application
 
     models = tmp_path / "app" / "models"
@@ -42,7 +42,7 @@ def test_import_app_models_registers_them_for_autoload(tmp_path: Path) -> None:
         "from arvel.database import Model\n\n\nclass Gadget(Model):\n    __table_name__ = 'gadgets'\n"
     )
     app = Application(base_path=str(tmp_path))
-    _import_app_models(app)  # imports app/models/*.py so they self-register
+    import_app_models(app)  # imports app/models/*.py so they self-register
     assert "Gadget" in build_namespace(app)
 
 

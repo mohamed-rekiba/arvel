@@ -47,6 +47,8 @@ class LazyGroup(TyperGroup):
         "make:exception": "arvel.console.generators:make_exception_app",
         "make:test": "arvel.console.generators:make_test_app",
         "db:seed": "arvel.console.seed:seed_app",
+        "scout:import": "arvel.console.scout:scout_import_app",
+        "scout:flush": "arvel.console.scout:scout_flush_app",
         "db:wipe": "arvel.console.migrate:wipe_app",
         "migrate": "arvel.console.migrate:migrate_app",
         "migrate:rollback": "arvel.console.migrate:rollback_app",

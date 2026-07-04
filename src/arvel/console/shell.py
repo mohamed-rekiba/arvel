@@ -22,11 +22,11 @@ def build_namespace(app: Any = None) -> dict[str, Any]:
     namespace: dict[str, Any] = {name: getattr(arvel, name) for name in arvel.__all__}
     if app is not None:
         namespace["app"] = app
-        namespace.update(_defined_models())  # autoload models by short name (Laravel-tinker style)
+        namespace.update(defined_models())  # autoload models by short name (Laravel-tinker style)
     return namespace
 
 
-def _defined_models() -> dict[str, type]:
+def defined_models() -> dict[str, type]:
     """Every defined ``Model`` subclass, by short name. Walks the live subclass tree (not the morph
     ``_MODEL_REGISTRY``, which only holds table-backed models) so even a freshly-generated model
     without ``__fields__`` yet is reachable in the REPL.
@@ -47,7 +47,7 @@ def _defined_models() -> dict[str, type]:
     return found
 
 
-def _import_app_models(app: Any) -> None:
+def import_app_models(app: Any) -> None:
     """Import the app's models (``app/models/*.py``) so they self-register into the model registry and
     can be autoloaded. Best-effort: a broken model file is skipped, not fatal to the REPL."""
     import contextlib
@@ -110,5 +110,5 @@ def shell() -> None:
         app = load_project_app()
         if app is not None:
             bootstrap_app(app)  # sync: register providers (bindings) + set the app + import routes
-            _import_app_models(app)  # register the app's models so they autoload by name
+            import_app_models(app)  # register the app's models so they autoload by name
     _launch_repl(build_namespace(app))

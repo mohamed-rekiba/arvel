@@ -2,8 +2,8 @@
 
 Full-text search over your models, kept in sync automatically. A **searchable** model is mirrored
 into a search index every time it's saved and removed when it's deleted — so the index always
-reflects your data, and you query it with one call instead of hand-rolling `LIKE` queries or
-managing an external index yourself.
+reflects your data, and you query it with a fluent builder instead of hand-rolling `LIKE` queries
+or managing an external index yourself.
 
 It's a model mixin plus a swappable **engine** (driver). The
 built-in `array` engine keeps the index in memory — perfect for tests and small apps — and a
@@ -26,9 +26,54 @@ That's it. Creating, updating, or deleting an `Article` now keeps the index in s
 
 ```python
 article = await Article.create(title="Async Python", body="fast web apps")
-hits = await Article.search("python")      # -> [<Article …>]  (hydrated models)
-await article.delete()                     # removed from the index too
+hits = await Article.search("python").get()   # -> [<Article …>]  (hydrated models)
+await article.delete()                        # removed from the index too
 ```
+
+## The fluent query builder
+
+`Model.search(query)` returns a `SearchBuilder` — chain `where`/`order_by`/`take`, then run it with
+`get`/`first`/`paginate` (Laravel Scout parity):
+
+```python
+page = await (
+    Article.search("python")
+    .where("published", True)          # equality filter
+    .order_by("views", "desc")         # sort
+    .paginate(per_page=10, page=1)     # a LengthAwarePaginator (DR-0022 shape)
+)
+
+first = await Article.search("python").first()      # one hydrated model, or None
+top5  = await Article.search("python").take(5).get() # at most 5 hydrated models
+```
+
+Two escape hatches skip hydration:
+
+- `await builder.keys()` — the matched records' raw index keys, unhydrated, in engine order.
+- `await builder.raw()` — the engine's raw `SearchResult(hits, total)` payload.
+
+Hydration runs a `whereIn(pk, keys)` fetch and re-orders the rows to match the engine's hit order
+(the DB doesn't promise to preserve it). Soft-deleted models are excluded by default; call
+`.with_trashed()` to include them.
+
+### Declaring filterable/sortable fields (Meilisearch)
+
+Meilisearch only honors `where`/`order_by` on fields declared as filterable/sortable index
+settings. Declare them on the model — `scout:import` pushes them for you:
+
+```python
+class Article(Searchable, Model):
+    @classmethod
+    def searchable_filterable(cls) -> list[str]:
+        return ["published"]
+
+    @classmethod
+    def searchable_sortable(cls) -> list[str]:
+        return ["views"]
+```
+
+The `array` engine ignores these (it filters/sorts on any field, declared or not) — they only
+matter once you're on `meilisearch`.
 
 ## Controlling what's indexed
 
@@ -48,6 +93,50 @@ class Article(Searchable, Model):
 You can also drive the index by hand: `await article.searchable()` (index now) and
 `await article.unsearchable()` (remove now).
 
+## Bulk import / flush (`scout:import` / `scout:flush`)
+
+Auto-sync only covers *future* saves. Backfill an existing table, or rebuild after a driver
+change, with the CLI — it chunks rows (so a large table doesn't load into memory at once) and
+pushes the model's filterable/sortable settings first:
+
+```bash
+arvel scout:import app.models.article:Article   # dotted module:ClassName path
+arvel scout:import Article                      # or the bare class name, inside a project
+                                                 # (resolved from app/models, like the shell's autoload)
+arvel scout:flush Article                       # empty the index
+```
+
+## Queued indexing (`search.queue`)
+
+By default, a save/delete writes to the engine **inline**, on the request path. Set `search.queue`
+to move that write off the request path instead:
+
+```python
+# config/search.py
+search = {"driver": "array", "queue": True}
+```
+
+With `search.queue = True`, `Searchable` emits a `ModelIndexRequested(model_class, key, record)`
+event through the events dispatcher instead of writing inline (`record` is `None` for a delete).
+`SearchServiceProvider.boot()` auto-registers the shipped listener,
+`arvel.search.listeners.handle_index_request`, whenever `search.queue` is on and an events
+dispatcher is bound — so the seam works out of the box:
+
+```python
+# equivalent manual registration, e.g. in your own provider:
+from arvel.search import ModelIndexRequested
+from arvel.search.listeners import handle_index_request
+
+app.make("events").listen(ModelIndexRequested, handle_index_request)
+```
+
+This story ships the event + the listener proof (a save no longer calls the engine inline — the
+listener does, when the event fires). Actually running that listener on a background worker
+(rather than inline in the same dispatch call) is `arvel.queue`'s own story
+(QUEUE-RELIABILITY) — `arvel.search` never imports `arvel.queue` (the G1 layer contract forbids
+that back-edge). Want the write to genuinely run later, off-process? Register your own
+`ShouldQueue` listener that pushes a job instead of writing directly.
+
 ## Engines
 
 The engine is chosen by `config('search.driver')` (default `array`):
@@ -66,7 +155,10 @@ search = {
 | `meilisearch` | Meilisearch server | production (`uv add 'arvel[search]'`) |
 
 Add your own with `app("search").extend("algolia", lambda app: MyEngine(...))` — any object
-implementing the `SearchEngine` protocol (`index`/`delete`/`search`/`flush`).
+implementing the `SearchEngine` protocol (`index`/`delete`/`search`/`flush`/`configure`). The
+`meilisearch` engine runs every client call in a worker thread (the client is synchronous) and
+waits for each write's server-side task to finish before returning — trading a little write
+latency for read-your-writes consistency, since Meilisearch indexing is otherwise asynchronous.
 
 !!! warning "Mix `Searchable` before `Model`"
     Python resolves methods left-to-right, so `class Article(Searchable, Model)` is required for the
@@ -81,18 +173,24 @@ implementing the `SearchEngine` protocol (`index`/`delete`/`search`/`flush`).
 - **Indexing everything.** The default indexes the whole model; override `to_searchable_array` to
   send only the fields you actually search, keeping the index lean and avoiding leaking hidden
   columns into it.
-- **Forgetting an existing table needs backfilling.** Auto-sync only covers *future* saves — import
-  current rows once (re-save them, or push each through `searchable()`) when you first add the mixin.
+- **Forgetting an existing table needs backfilling.** Auto-sync only covers *future* saves — run
+  `scout:import` (or re-save the rows / push each through `searchable()`) once, when you first add
+  the mixin.
+- **`where`/`order_by` doing nothing on Meilisearch.** The field must be declared via
+  `searchable_filterable`/`searchable_sortable` *and* re-imported (`scout:import`) so Meilisearch
+  picks up the new index settings.
 
 ## How it works
 
 `Searchable` hooks the model's lifecycle (the `_fire` override): a successful save calls
 `searchable()` to push `to_searchable_array()` into the index under `searchable_as()`, and a delete
-calls `unsearchable()` to remove it. `Model.search(query)` resolves the configured engine from the
-`search` binding (a `SearchManager`, driver from `config('search.driver')`), runs the query, and
-hydrates the matched records back into model instances. Engines are just objects implementing the
-`SearchEngine` protocol, so swapping `array` ↔ `meilisearch` ↔ your own changes nothing at the call
-site.
+calls `unsearchable()` to remove it — inline by default, or via the `ModelIndexRequested` event when
+`search.queue` is on. `Model.search(query)` returns a `SearchBuilder` that resolves the configured
+engine from the `search` binding (a `SearchManager`, driver from `config('search.driver')`) lazily,
+only once you run it (`get`/`first`/`paginate`/`keys`/`raw`), and hydrates matched records back into
+model instances by primary key, preserving the engine's hit order. Engines are just objects
+implementing the `SearchEngine` protocol, so swapping `array` ↔ `meilisearch` ↔ your own changes
+nothing at the call site.
 
 ## See also
 
