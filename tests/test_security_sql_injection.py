@@ -15,7 +15,7 @@ from arvel.database import Builder
 from arvel.database.builder import _COMPARISONS
 
 # Sourced from the real whitelist so this can't drift, plus the specially-handled like/in.
-_KNOWN_OPERATORS = set(_COMPARISONS) | {"like", "in"}
+_KNOWN_OPERATORS = set(_COMPARISONS) | {"like", "ilike", "in"}  # keep in sync with Builder.where
 
 _md = sa.MetaData()
 users = sa.Table(
