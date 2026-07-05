@@ -1,5 +1,67 @@
 # Changelog
 
+## [0.52.0](https://github.com/mohamed-rekiba/arvel/compare/v0.51.0...v0.52.0) (2026-07-05)
+
+
+### Features
+
+* **auth:** policy discovery + Gate guest-deny + Sanctum completeness + Fortify 2FA ([8b2c7fd](https://github.com/mohamed-rekiba/arvel/commit/8b2c7fda0a7968038a1c3fa7d40b2d37e8556a4b))
+* **auth:** session login security + single-use password-reset broker + email-hash verification ([4de7c41](https://github.com/mohamed-rekiba/arvel/commit/4de7c4149ba97ee3d7b4aac6e3325be9ea8e01ad))
+* **broadcasting,mail,notifications:** channels+auth, multipart/markdown mail, notification broadcast ([4508a65](https://github.com/mohamed-rekiba/arvel/commit/4508a65b5ae195f6b0820d2167cf2ba39edc7fe0))
+* **cache:** full verb set + owner-tokened locks + tags + Redis facade ([d50d6b0](https://github.com/mohamed-rekiba/arvel/commit/d50d6b0d5576c62e72e75b678bc5c7475393ec02))
+* **client:** HTTP-client parity — builders, response wrapper, pool, fake ([a9ed3bc](https://github.com/mohamed-rekiba/arvel/commit/a9ed3bc91c6655b9e5268ac1e176477313c575ed))
+* **console:** A8 scaffold-name fix + I/O, prompts, signature grammar, Artisan.call, maintenance, stub:publish ([3a96de9](https://github.com/mohamed-rekiba/arvel/commit/3a96de9754bd79cfd928d70b4013eed1cb46f54d))
+* **database:** EloquentCollection, QB breadth, dialect upsert + diff sync, cursor pagination ([45ce2b8](https://github.com/mohamed-rekiba/arvel/commit/45ce2b8b94986c32b86f79548832cbd6271ef673))
+* **database:** schema evolution + seeder controls + relationship factories ([71ec98a](https://github.com/mohamed-rekiba/arvel/commit/71ec98a63f13cd4d5da306fc65a39c3b713cf80b))
+* **db,http,client:** add builder/accessor capabilities the proof-app needed ([fb3b711](https://github.com/mohamed-rekiba/arvel/commit/fb3b711c78cbc8f46dd47e42b74d7f35ed1d0327))
+* **features:** Pennant-style feature flags (array/database/cache drivers) ([1dcab2f](https://github.com/mohamed-rekiba/arvel/commit/1dcab2fbe0fce23b3d89049d15087ebb7a17cda5))
+* **filesystem:** full Storage surface + visibility + fake ([dc5acf8](https://github.com/mohamed-rekiba/arvel/commit/dc5acf8075a66e6d880f691732d3917b8bcde439))
+* **http:** fluent responses/redirects/cookies, url helpers, CSRF except, controller middleware, typed seams ([da1c220](https://github.com/mohamed-rekiba/arvel/commit/da1c2203e9d1a24e548058c93ff9298f77f761b9))
+* **http:** RateLimiter + named throttle limiters with rate-limit headers ([e13f75e](https://github.com/mohamed-rekiba/arvel/commit/e13f75e7cfc74ce05279018e28eaebbe2c105f4f))
+* **kernel:** -parity exception handler lifecycle ([d461df6](https://github.com/mohamed-rekiba/arvel/commit/d461df64c5693322d5c3e9c62c667db61e321214))
+* **queue:** batching + unique jobs + job middleware + scheduler hardening (A3) ([1901aa0](https://github.com/mohamed-rekiba/arvel/commit/1901aa006505da793bc8a6ffc13871daaff77b1b))
+* **queue:** reliability — sequential chains, queued listeners, retry-release, visibility, timeout, worker flags, Context ([11afc42](https://github.com/mohamed-rekiba/arvel/commit/11afc425a26811a5b2653f76bcf6705cf40827d9))
+* **search:** Scout-parity fluent builder, queued-indexing seam, scout CLI ([058f315](https://github.com/mohamed-rekiba/arvel/commit/058f315df8ecd6d5bc6c117ca0609ae5ee4f2ea7))
+* **security:** hash driver manager + AES-256-GCM serialize-aware Encrypter ([d23d729](https://github.com/mohamed-rekiba/arvel/commit/d23d7293c71cca23f490660ce847b265c7812d4c))
+* **support:** Pipeline, Context, Process, Concurrency + Collection parity ops ([c6b464d](https://github.com/mohamed-rekiba/arvel/commit/c6b464d4a1e0a4c3ed03c47e662f9884a8143118))
+* **testing:** notification/bus/http fakes + response assertions + artisan() helper ([d204d2d](https://github.com/mohamed-rekiba/arvel/commit/d204d2de2e916043eebd40792d42443659633c38))
+* **validation:** A7 url/email fixes + ~35 new rules + FormRequest rules() bridge ([6832e84](https://github.com/mohamed-rekiba/arvel/commit/6832e8495acc3a45eb90e026fb0adceb328eda9d))
+
+
+### Bug Fixes
+
+* **auth:** login drops a stale _impersonator_id (defence in depth) ([f44b6e8](https://github.com/mohamed-rekiba/arvel/commit/f44b6e821064eaff41d481d1953e44c03c8dcbfd))
+* **auth:** reset access-token per request + bind 2FA challenge to pending user ([fffa098](https://github.com/mohamed-rekiba/arvel/commit/fffa098e604ae05f7d0f74dd3f9ce372a29c56f0))
+* **broadcasting,mail:** story-19 hardening nits ([a278bf2](https://github.com/mohamed-rekiba/arvel/commit/a278bf2f161e88bad4d6012fc800bebc55189411))
+* **cache:** story-06 review nits ([751e9a1](https://github.com/mohamed-rekiba/arvel/commit/751e9a1e17de95dcd77d6119693230db3e502432))
+* **console:** constant-time maintenance secret + Artisan.call works from a running loop ([6abe6e9](https://github.com/mohamed-rekiba/arvel/commit/6abe6e961bdc3f7dc4e808486b82d0c1b86e3a61))
+* **database:** story-10 review nits ([69d4398](https://github.com/mohamed-rekiba/arvel/commit/69d439807a6f4b20340f57c9a48b5aa0c1d51cd0))
+* **database:** to_dict/to_json unwraps collection/object/stringable/decimal casts ([b2bfe2c](https://github.com/mohamed-rekiba/arvel/commit/b2bfe2c46065ad89d18e8b96eb1c8bdedcd31826))
+* **filesystem:** contain path traversal — reject ../ escaping the disk root ([219e2f8](https://github.com/mohamed-rekiba/arvel/commit/219e2f8a18ee4a93166bfc83071d98c989bc7d72))
+* **http:** __Host- cookie forces Secure (prefix invariant) ([0c8ce3c](https://github.com/mohamed-rekiba/arvel/commit/0c8ce3c83b36ceddb2adf688d40a509aad0d7793))
+* **kernel:** exception-handler review follow-ups ([68a5d42](https://github.com/mohamed-rekiba/arvel/commit/68a5d42872e285127b534e3e3c18145349a80c50))
+* **pagination:** malformed cursor degrades to first page, not a 500 ([dca7356](https://github.com/mohamed-rekiba/arvel/commit/dca73566459bd15837ce85773eb79e52884e3934))
+* **queue:** scheduler after-hooks skip lost ticks + empty batch finalizes ([8d3445a](https://github.com/mohamed-rekiba/arvel/commit/8d3445ad8cc3819c3e800897290874c7c75bbee0))
+* **routing:** bind limiter in a provider so any boot resolves the full graph ([e0aa916](https://github.com/mohamed-rekiba/arvel/commit/e0aa9162a88c772db08fa91402c07ec8b05ad617))
+* **scaffold:** e2e migration count + scaffold token table's last_used_at ([b87b435](https://github.com/mohamed-rekiba/arvel/commit/b87b4354a3ecba06cba908cc03323cfe12e96778))
+* **search:** guard filter field names + fail loud on queued-without-dispatcher ([512e738](https://github.com/mohamed-rekiba/arvel/commit/512e73889d846ab9d57e676b668fc3eecde8d579))
+* **security:** crypto review fixes — corrupt-hash robustness on the auth path ([90ef712](https://github.com/mohamed-rekiba/arvel/commit/90ef712151cd852e5cd357a9b94700137b185ac0))
+* **security:** resolve bandit findings at the source, not by skipping rules ([fdc87cf](https://github.com/mohamed-rekiba/arvel/commit/fdc87cfa6fe823a442e689af90c224b63a9a3c77))
+* **support:** story-02 review follow-ups ([72bb711](https://github.com/mohamed-rekiba/arvel/commit/72bb711d3247f100d7621e63e07d56d3262db222))
+* **testing:** story-11 review nits ([3da10e4](https://github.com/mohamed-rekiba/arvel/commit/3da10e414cd04fa9c929cb80719159c3c8636528))
+
+
+### Refactors
+
+* **database:** split Model god-object into mixins + full event lifecycle + casts + API Resources ([d3a93e0](https://github.com/mohamed-rekiba/arvel/commit/d3a93e0967d879282819a83bc4f91dc9d8091032))
+
+
+### Documentation
+
+* **client:** clarify retry(when=) exhaustion + blanket-fake stray semantics ([99bdfc0](https://github.com/mohamed-rekiba/arvel/commit/99bdfc073195784ae5e89da338d49eb69110385a))
+* drop comparison references across code and docs ([23f49e5](https://github.com/mohamed-rekiba/arvel/commit/23f49e590b06d22eff7f06e9bb71679f57abb9c3))
+* **validation:** note FormRequest structural-before-semantic divergence ([1aa9303](https://github.com/mohamed-rekiba/arvel/commit/1aa930363fcacee969f5fadf08bb5835ab3bb798))
+
 ## [0.51.0](https://github.com/mohamed-rekiba/arvel/compare/v0.50.0...v0.51.0) (2026-07-04)
 
 
