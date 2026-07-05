@@ -14,6 +14,17 @@ from dataclasses import dataclass, field
 from typing import Any, cast
 
 
+def _pk_type(model: Any, key: str) -> Any:
+    """The SQLAlchemy column type of ``model``'s ``key`` column, so a synthetic pivot column
+    matches the real PK type (int / uuid / string) rather than assuming Integer."""
+    import sqlalchemy as sa
+
+    try:
+        return model.__table__.c[key].type
+    except (AttributeError, KeyError):
+        return sa.Integer()
+
+
 @dataclass(frozen=True)
 class SyncResult:
     """The "changes" map returned by ``BelongsToMany.sync``/``sync_without_detaching``/
@@ -169,8 +180,8 @@ class BelongsToMany(Relation):
 
         extra = {*self._pivot_columns, *(col for col, _ in self._pivot_wheres)}
         columns: list[Any] = [
-            sa.Column(self.foreign_pivot_key, sa.Integer),
-            sa.Column(self.related_pivot_key, sa.Integer),
+            sa.Column(self.foreign_pivot_key, _pk_type(self.parent, self.parent_key)),
+            sa.Column(self.related_pivot_key, _pk_type(self.related, self.related_key)),
             *[cast("Any", sa.Column(col)) for col in extra],
         ]
         return sa.Table(self.pivot, sa.MetaData(), *columns)
@@ -439,9 +450,9 @@ class MorphToMany(Relation):
         return sa.Table(
             self.pivot,
             sa.MetaData(),
-            sa.Column(f"{self.morph_name}_id", sa.Integer),
+            sa.Column(f"{self.morph_name}_id", _pk_type(self.parent, self.parent.__primary_key__)),
             sa.Column(f"{self.morph_name}_type", sa.String),
-            sa.Column(self.related_pivot_key, sa.Integer),
+            sa.Column(self.related_pivot_key, _pk_type(self.related, self.related.__primary_key__)),
         )
 
     def _pivot_query(self) -> Any:
@@ -450,7 +461,7 @@ class MorphToMany(Relation):
         return Builder(self._pivot_table(), self.related._resolve())
 
     def _parent_id(self) -> Any:
-        return self.parent._attributes["id"]
+        return self.parent._attributes[self.parent.__primary_key__]
 
     async def attach(self, related_id: Any) -> None:
         await self._pivot_query().insert(
@@ -473,7 +484,7 @@ class MorphToMany(Relation):
             from arvel.database.collection import EloquentCollection
 
             return EloquentCollection[Any]()
-        return await self.related.where_in("id", related_ids).get()
+        return await self.related.where_in(self.related.__primary_key__, related_ids).get()
 
 
 class MorphedByMany(Relation):
@@ -495,8 +506,8 @@ class MorphedByMany(Relation):
         table = sa.Table(
             self.pivot,
             sa.MetaData(),
-            sa.Column(self.parent_pivot_key, sa.Integer),
-            sa.Column(f"{self.morph_name}_id", sa.Integer),
+            sa.Column(self.parent_pivot_key, _pk_type(self.parent, self.parent.__primary_key__)),
+            sa.Column(f"{self.morph_name}_id", _pk_type(self.related, self.related.__primary_key__)),
             sa.Column(f"{self.morph_name}_type", sa.String),
         )
         return Builder(table, self.related._resolve())
@@ -504,7 +515,7 @@ class MorphedByMany(Relation):
     async def get(self) -> Any:
         rows = await (
             self._pivot_query()
-            .where(self.parent_pivot_key, "=", self.parent._attributes["id"])
+            .where(self.parent_pivot_key, "=", self.parent._attributes[self.parent.__primary_key__])
             .where(f"{self.morph_name}_type", "=", self.related.__name__)
             .get()
         )
@@ -513,7 +524,7 @@ class MorphedByMany(Relation):
             from arvel.database.collection import EloquentCollection
 
             return EloquentCollection[Any]()
-        return await self.related.where_in("id", related_ids).get()
+        return await self.related.where_in(self.related.__primary_key__, related_ids).get()
 
 
 class BelongsTo(Relation):
