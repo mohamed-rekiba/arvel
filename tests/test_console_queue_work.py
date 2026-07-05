@@ -26,18 +26,26 @@ def test_queue_work_invokes_manager_work() -> None:
     class FakeManager:
         def __init__(self) -> None:
             self.queues: Any = None
+            self.kwargs: dict[str, Any] = {}
 
-        async def work(self, queues: Any = None) -> None:
+        async def work(self, queues: Any = None, **kwargs: Any) -> None:
             self.queues = queues
+            self.kwargs = kwargs
 
     fake = FakeManager()
     app = Application()
     app.instance("queue", fake)
     set_application(app)
     try:
-        result = runner.invoke(build_cli(), ["queue:work", "--queue", "default,mail"])
+        result = runner.invoke(
+            build_cli(),
+            ["queue:work", "--queue", "default,mail", "--max-jobs", "5", "--stop-when-empty"],
+        )
         assert result.exit_code == 0, result.output
         assert fake.queues == ["default", "mail"]
+        assert fake.kwargs["max_jobs"] == 5  # flag wired through to the manager
+        assert fake.kwargs["stop_when_empty"] is True
+        assert fake.kwargs["max_time"] is None  # 0 → unlimited
     finally:
         set_application(None)
 

@@ -46,23 +46,19 @@ class _Container:
 
 
 async def test_should_queue_listener_is_pushed() -> None:
-    class FakeQueue:
-        def __init__(self) -> None:
-            self.pushed: list[Any] = []
+    pushed: list[Any] = []
 
-        def push(self, listener: Any, args: Any) -> None:
-            self.pushed.append(listener)
-
-    queue = FakeQueue()
+    async def queue_dispatcher(listener: Any, args: Any) -> None:
+        pushed.append(listener)
 
     class QueuedListener(ShouldQueue):
         def handle(self, *args: Any) -> None:  # should NOT run inline
             raise AssertionError("should have been queued")
 
-    dispatcher = Dispatcher(_Container(queue=queue))
+    dispatcher = Dispatcher(_Container(queue_dispatcher=queue_dispatcher))
     dispatcher.listen("e", QueuedListener)
     await dispatcher.dispatch("e")
-    assert queue.pushed == [QueuedListener]
+    assert pushed == [QueuedListener]
 
 
 async def test_should_broadcast_event() -> None:

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
 from arvel.kernel import Settings
@@ -28,15 +29,19 @@ class QueueSettings(Settings):
 
     ``default`` names the broker driver — ``memory`` (core), ``redis`` (the ``[queue-redis]`` extra),
     or ``amqp`` (RabbitMQ/any AMQP broker, the ``[queue-amqp]`` extra). ``url`` is the single DSN for
-    the active driver (a ``redis://`` or ``amqp://`` endpoint); ``memory`` ignores it.
+    the active driver (a ``redis://`` or ``amqp://`` endpoint); ``memory`` ignores it. ``retry_after``
+    is the visibility timeout (seconds): a reserved ``jobs`` row older than this is assumed to belong
+    to a dead worker and is reclaimed (Laravel's per-connection ``retry_after``); a job's own
+    ``retry_after`` class attribute overrides this default when set.
     """
 
     __config_key__ = "queue"
     default: str = "memory"
     url: str = "redis://localhost:6379/0"
+    retry_after: int = 90
 
 
-def _qualified_name(cls: type) -> str:
+def _qualified_name(cls: Any) -> str:
     return f"{cls.__module__}:{cls.__qualname__}"
 
 
@@ -63,6 +68,10 @@ def model_ref(value: Any) -> Any:
         import base64
 
         return {"__bytes__": base64.b64encode(value).decode("ascii")}
+    if isinstance(value, datetime):
+        # msgspec has no type hint to decode back to `datetime` from a generic `json.decode` (no
+        # schema) — tag it, mirroring the `bytes` case, so e.g. a job's `retry_until` round-trips.
+        return {"__datetime__": value.isoformat()}
     if isinstance(value, (list, tuple)):
         return [model_ref(item) for item in cast("list[Any]", value)]
     if isinstance(value, dict):
@@ -83,6 +92,8 @@ async def _rehydrate(value: Any) -> Any:
         import base64
 
         return base64.b64decode(str(cast("dict[str, Any]", value)["__bytes__"]))
+    if isinstance(value, dict) and "__datetime__" in value:
+        return datetime.fromisoformat(str(cast("dict[str, Any]", value)["__datetime__"]))
     if isinstance(value, list):
         return [await _rehydrate(item) for item in cast("list[Any]", value)]
     if isinstance(value, dict):
@@ -105,8 +116,16 @@ def _trace_carrier() -> dict[str, str]:
     return carrier
 
 
+#: Job attributes that are envelope bookkeeping (trace/Context carry-over), not job state — excluded
+#: from `serialize_instance`'s state walk (each is re-applied explicitly on deserialize instead, so a
+#: re-serialized-in-flight job — a chain link, a retry-release — doesn't double them into `state`).
+_ENVELOPE_ATTRS = ("__arvel_trace__", "__arvel_context__")
+
+
 def serialize(job_cls: type, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
     import msgspec
+
+    from arvel.support.context import Context
 
     return msgspec.json.encode(
         {
@@ -114,8 +133,16 @@ def serialize(job_cls: type, args: tuple[Any, ...], kwargs: dict[str, Any]) -> s
             "args": [model_ref(a) for a in args],
             "kwargs": {k: model_ref(v) for k, v in kwargs.items()},
             "_trace": _trace_carrier(),
+            "_context": Context.dehydrate(),
         }
     ).decode()
+
+
+def _apply_envelope(job: Job, data: dict[str, Any]) -> None:
+    """Stamp the trace carrier + dehydrated Context captured at dispatch time onto ``job`` — the
+    worker hydrates the Context from this before running `handle()` (see `QueueManager._invoke`)."""
+    job.__arvel_trace__ = data.get("_trace")  # type: ignore[attr-defined]  # parent trace for the job span
+    job.__arvel_context__ = data.get("_context")  # type: ignore[attr-defined]  # SUPPORT-FOUNDATION carry-over
 
 
 async def deserialize(payload: str) -> Job:
@@ -126,7 +153,7 @@ async def deserialize(payload: str) -> Job:
     args = [await _rehydrate(a) for a in data["args"]]
     kwargs = {k: await _rehydrate(v) for k, v in data["kwargs"].items()}
     job: Job = job_cls(*args, **kwargs)
-    job.__arvel_trace__ = data.get("_trace")  # type: ignore[attr-defined]  # parent trace for the job span
+    _apply_envelope(job, data)
     return job
 
 
@@ -137,9 +164,16 @@ def serialize_instance(job: Job) -> str:
     """
     import msgspec
 
-    state = {key: model_ref(val) for key, val in vars(job).items() if key != "__arvel_trace__"}
+    from arvel.support.context import Context
+
+    state = {key: model_ref(val) for key, val in vars(job).items() if key not in _ENVELOPE_ATTRS}
     return msgspec.json.encode(
-        {"job": _qualified_name(type(job)), "state": state, "_trace": _trace_carrier()}
+        {
+            "job": _qualified_name(type(job)),
+            "state": state,
+            "_trace": _trace_carrier(),
+            "_context": Context.dehydrate(),
+        }
     ).decode()
 
 
@@ -151,7 +185,7 @@ async def deserialize_instance(payload: str) -> Job:
     job: Job = job_cls.__new__(job_cls)  # bypass __init__; restore attribute state directly
     for key, val in cast("dict[str, Any]", data["state"]).items():
         setattr(job, key, await _rehydrate(val))
-    job.__arvel_trace__ = data.get("_trace")  # type: ignore[attr-defined]  # parent trace for the job span
+    _apply_envelope(job, data)
     return job
 
 
@@ -193,6 +227,14 @@ class Job:
     tries: int = 3
     backoff: int | list[int] = 5
     timeout: int = 60
+    #: Visibility-timeout override (seconds) for this job's class; ``None`` -> the
+    #: ``queue.retry_after`` config default (see `QueueManager._reclaim_stuck_jobs`).
+    retry_after: int | None = None
+    #: An extra cap on attempts, alongside `tries` (ponytail: a simple shared ceiling, not
+    #: Laravel's full manual-release-vs-exception distinction — add that nuance if a job needs it).
+    max_exceptions: int | None = None
+    #: Stop retrying past this moment regardless of `tries` left (Laravel ``retryUntil()``).
+    retry_until: datetime | None = None
 
     async def handle(self) -> Any:
         raise NotImplementedError(f"{type(self).__name__} must implement handle()")
@@ -255,31 +297,113 @@ def _job_span(job: Job) -> Any:
         yield span
 
 
-async def run_job_with_retries(job: Job, *, runner: Any = None, sleep: Any = None) -> Any:
-    """Run a job, retrying on failure up to ``job.tries`` with ``job.backoff`` between attempts;
-    invoke ``job.failed(exc)`` once the attempts are exhausted. This is the worker's per-job
-    execution policy. ``runner`` overrides how ``handle`` is called (e.g. with DI); ``sleep``
-    is injectable for tests."""
+def _backoff_for(backoff: int | list[int] | tuple[int, ...], attempt: int) -> float:
+    """The delay before ``attempt``'s retry: a flat number, or per-attempt from a list (its last
+    entry repeats once the list is exhausted)."""
+    if isinstance(backoff, (list, tuple)):
+        return backoff[min(attempt - 1, len(backoff) - 1)]
+    return backoff
+
+
+def _retry_should_stop(job: Job, attempt: int, tries: int) -> bool:
+    """Whether to give up after this failed ``attempt`` rather than retry again: ``tries``
+    exhausted, ``max_exceptions`` capped (ponytail: a simple shared ceiling — see the attribute's
+    docstring), or past ``retry_until``."""
+    max_exceptions = getattr(job, "max_exceptions", None)
+    if max_exceptions is not None and attempt >= max_exceptions:
+        return True
+    retry_until = getattr(job, "retry_until", None)
+    if retry_until is not None:
+        from arvel.dates import Date
+
+        if Date.now() >= Date.from_py(retry_until):
+            return True
+    return attempt >= tries
+
+
+def _hydrate_context(job: Job) -> None:
+    """Restore the Context dehydrated at dispatch time (SUPPORT-FOUNDATION carry-over) before
+    running the job — scoped to this job's own asyncio task (contextvars), never leaking to a
+    sibling job running concurrently."""
+    payload = getattr(job, "__arvel_context__", None)
+    if payload:
+        from arvel.support.context import Context
+
+        Context.hydrate(payload)
+
+
+async def run_job_with_retries(
+    job: Job,
+    *,
+    runner: Any = None,
+    sleep: Any = None,
+    release: Any = None,
+    on_success: Any = None,
+    on_exhausted: Any = None,
+) -> Any:
+    """Run a job, retrying on failure up to ``job.tries`` (honoring ``max_exceptions``/
+    ``retry_until``) with ``job.backoff`` between attempts; invoke ``job.failed(exc)`` + record a
+    ``FailedJob`` once retries are exhausted. Hydrates the dispatch-time ``Context`` first. Each
+    attempt is bounded by ``job.timeout`` (a timeout counts as a failed attempt — cooperative
+    cancel via ``asyncio.wait_for``). This is the worker's per-job execution policy.
+
+    ``runner`` overrides how ``handle`` is called (e.g. with DI). Two retry strategies:
+
+    - ``release`` given (a durable queue — DB/redis/amqp): try **once** this pass; on a non-final
+      failure, ``await release(job, delay, attempt)`` releases the job back to the queue store
+      instead of blocking this worker with an inline sleep. The next attempt happens on a later
+      worker pass (``release_due_jobs`` redispatches it), resuming from ``job.__arvel_attempts__``.
+    - ``release`` omitted (the in-memory/sync driver, or a direct/test call): the classic inline
+      loop — ``sleep`` (injectable) between attempts, all within this one call.
+
+    ``on_success``/``on_exhausted`` are ``QueueManager``'s chain-continuation hooks (dispatch the
+    next chained job / run the chain's ``catch``); optional, so direct callers (tests) are
+    unaffected.
+    """
     import asyncio
 
+    _hydrate_context(job)
     invoke = runner if runner is not None else job.handle
-    wait = sleep if sleep is not None else asyncio.sleep
+    timeout = getattr(job, "timeout", None)
     tries = max(1, int(getattr(job, "tries", 1)))
-    backoff = job.backoff
+
+    async def _call() -> Any:
+        return await asyncio.wait_for(invoke(), timeout=timeout) if timeout else await invoke()
+
+    async def _give_up(exc: BaseException) -> None:
+        await job.failed(exc)
+        await _record_failed_job(job, exc)
+        if on_exhausted is not None:
+            await on_exhausted(exc)
+
+    async def _succeed(result: Any) -> Any:
+        if on_success is not None:
+            await on_success(result)
+        return result
+
+    if release is not None:
+        attempt = int(getattr(job, "__arvel_attempts__", 0)) + 1
+        try:
+            result = await _call()
+        except Exception as exc:
+            if _retry_should_stop(job, attempt, tries):
+                await _give_up(exc)
+                return None
+            await release(job, _backoff_for(job.backoff, attempt), attempt)
+            return None
+        return await _succeed(result)
+
+    wait = sleep if sleep is not None else asyncio.sleep
     for attempt in range(1, tries + 1):
         try:
-            return await invoke()
+            result = await _call()
         except Exception as exc:
-            if attempt >= tries:
-                await job.failed(exc)
-                await _record_failed_job(job, exc)
+            if _retry_should_stop(job, attempt, tries):
+                await _give_up(exc)
                 return None
-            delay = (
-                backoff[min(attempt - 1, len(backoff) - 1)]
-                if isinstance(backoff, (list, tuple))
-                else backoff
-            )
-            await wait(delay)
+            await wait(_backoff_for(job.backoff, attempt))
+        else:
+            return await _succeed(result)
     return None
 
 
@@ -301,6 +425,46 @@ async def _record_failed_job(job: Job, exc: BaseException) -> None:
     )
 
 
+class _WorkerOptions:
+    """Bookkeeping for one active ``work()`` run — worker-flag state (max-jobs/rest/idle
+    detection). ``None`` on the manager outside an active ``work()`` call, so dispatch paths that
+    reuse ``_invoke`` (e.g. release-due, a same-process ``dispatch``) are unaffected."""
+
+    __slots__ = ("last_tick_processed", "max_jobs", "processed", "rest", "stop_when_empty")
+
+    def __init__(self, *, max_jobs: int | None, rest: float, stop_when_empty: bool) -> None:
+        self.max_jobs = max_jobs
+        self.rest = rest
+        self.stop_when_empty = stop_when_empty
+        self.processed = 0
+        self.last_tick_processed = 0
+
+
+async def _stop_after(stop: Any, seconds: float) -> None:
+    """``--max-time``: request a stop once ``seconds`` have elapsed."""
+    import asyncio
+
+    await asyncio.sleep(seconds)
+    stop.set()
+
+
+async def _stop_on_memory(stop: Any, limit_mb: float, interval: float) -> None:
+    """``--memory``: request a stop once this process's RSS exceeds ``limit_mb`` (a supervisor
+    restarts the worker fresh — Laravel's memory-leak safety valve)."""
+    import asyncio
+    import resource
+    import sys
+
+    # ru_maxrss: KiB on Linux, bytes on macOS — a well-known stdlib quirk (no portable API).
+    unit = 1024 * 1024 if sys.platform == "darwin" else 1024
+    while True:
+        await asyncio.sleep(interval)
+        rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / unit
+        if rss_mb >= limit_mb:
+            stop.set()
+            return
+
+
 class QueueManager(Manager):
     """Pushes jobs onto a config-selected taskiq broker (the Manager 'driver': ``memory``/``redis``/
     ``amqp``) and runs them via a single wrapper task."""
@@ -310,6 +474,8 @@ class QueueManager(Manager):
         self._broker = broker  # an explicit broker passed in wins over the config-selected one
         self._task: Any = None
         self._started = False
+        self._worker_options: _WorkerOptions | None = None  # set only while work() is running
+        self._worker_stop: Any = None  # the active work() run's stop/finish event
 
     def default_driver(self) -> str:
         driver: str = self._settings(QueueSettings).default
@@ -344,12 +510,90 @@ class QueueManager(Manager):
     def broker(self) -> Any:
         return self._broker if self._broker is not None else self.driver()
 
+    def _is_durable(self) -> bool:
+        """Whether a failed attempt should be released back to the ``jobs`` table rather than
+        retried inline. The release mechanism is DB-table-based regardless of which broker carries
+        messages (B1/spec: DB/redis/amqp release-back), so the only real requirement is a bound
+        DB. Without one there's nowhere to persist the release — the in-memory/sync driver
+        typically has no DB either, so it naturally takes the documented inline-retry fallback."""
+        from arvel.kernel import app, has_application
+
+        return has_application() and app().bound("db")
+
+    async def _release_for_retry(self, job: Job, delay: float, attempt: int) -> None:
+        """B1: release a failed job back to the queue store with ``available_at = now + delay``
+        instead of an inline ``asyncio.sleep`` — this worker keeps draining other jobs meanwhile.
+        ``attempt`` rides along on the job instance so the next pass (via ``release_due_jobs``)
+        resumes counting from where this one left off."""
+        job.__arvel_attempts__ = attempt  # type: ignore[attr-defined]
+        await self.dispatch_after(
+            delay, job, queue=getattr(job, "queue", "default"), attempts=attempt
+        )
+
+    async def _dispatch_next_link(self, job: Job) -> None:
+        """A1: on success, dispatch the next link of ``job``'s chain (if any) — the remaining
+        chain travels serialized on the job itself (``__arvel_chain__``, set by
+        ``PendingChain.dispatch``/carried forward here), so each link only runs after the prior
+        one succeeds."""
+        chain: list[str] | None = getattr(job, "__arvel_chain__", None)
+        if not chain:
+            return
+        payload, *rest = chain
+        next_job = await deserialize_instance(payload)
+        next_job.__arvel_chain__ = rest  # type: ignore[attr-defined]
+        next_job.__arvel_chain_catch__ = getattr(job, "__arvel_chain_catch__", None)  # type: ignore[attr-defined]
+        await self.push_instance(next_job)
+
+    async def _run_chain_catch(self, job: Job, exc: BaseException) -> None:
+        """A1: a chain's ``catch`` (if set) fires once a link exhausts its retries, and the rest
+        of the chain never runs. ``catch`` must be a module-level callable (its qualified name is
+        what actually travels in the payload — a closure/lambda can't survive serialization)."""
+        catch_ref = getattr(job, "__arvel_chain_catch__", None)
+        if not catch_ref:
+            return
+        import inspect
+
+        outcome = _load(catch_ref)(exc)
+        if inspect.isawaitable(outcome):
+            await outcome
+
+    def _note_job_processed(self) -> float:
+        """Worker-flag bookkeeping for the just-finished job: bumps the processed count (checking
+        ``--max-jobs``) and returns the configured ``--rest`` seconds to pause before the next one
+        (``0`` outside an active ``work()`` run)."""
+        options = self._worker_options
+        if options is None:
+            return 0.0
+        options.processed += 1
+        if options.max_jobs is not None and options.processed >= options.max_jobs:
+            self._worker_stop.set()
+        return options.rest
+
     async def _invoke(self, job: Job) -> Any:
+        import asyncio
+
         runner = None
         if self.app is not None and hasattr(self.app, "call"):
             runner = lambda: self.app.call(job.handle)  # noqa: E731
+
+        async def _on_success(_result: Any) -> None:
+            await self._dispatch_next_link(job)
+
+        async def _on_exhausted(exc: BaseException) -> None:
+            await self._run_chain_catch(job, exc)
+
         with _job_span(job):
-            return await run_job_with_retries(job, runner=runner)
+            result = await run_job_with_retries(
+                job,
+                runner=runner,
+                release=self._release_for_retry if self._is_durable() else None,
+                on_success=_on_success,
+                on_exhausted=_on_exhausted,
+            )
+        rest = self._note_job_processed()
+        if rest:
+            await asyncio.sleep(rest)
+        return result
 
     def _runner(self) -> Any:
         if self._task is None:
@@ -397,13 +641,33 @@ class QueueManager(Manager):
             await job.retry()
         return jobs
 
-    async def work(self, queues: list[str] | None = None, *, release_interval: float = 1.0) -> None:
-        """Run an in-process worker: consume + execute jobs from the broker until cancelled.
+    async def work(
+        self,
+        queues: list[str] | None = None,
+        *,
+        release_interval: float = 1.0,
+        max_jobs: int | None = None,
+        max_time: float | None = None,
+        stop_when_empty: bool = False,
+        rest: float = 0.0,
+        memory: float | None = None,
+    ) -> None:
+        """Run an in-process worker: consume + execute jobs from the broker until stopped.
 
         Backs ``arvel queue:work``. For production scale, run taskiq's own worker process
         against the broker; this is the convenient in-process equivalent.
+
+        Worker flags (Laravel ``queue:work`` parity): ``max_jobs`` stops after N jobs processed;
+        ``max_time`` stops after S seconds; ``stop_when_empty`` stops once idle (no job has run and
+        nothing was due across a release tick, checked after at least one job has run);
+        ``rest`` pauses between jobs; ``memory`` stops once this process's RSS exceeds the given MB
+        (for a supervisor to restart it fresh). SIGTERM/SIGINT request the same cooperative stop —
+        the in-flight job finishes before the worker exits (taskiq's ``Receiver.listen`` drains
+        outstanding tasks once its stop event is set, rather than cancelling them).
         """
         import asyncio
+        import contextlib
+        import signal
 
         from taskiq import InMemoryBroker
 
@@ -418,35 +682,90 @@ class QueueManager(Manager):
         self.broker.is_worker_process = True
         await self.broker.startup()
         self._started = True
-        releaser = asyncio.create_task(self._release_loop(release_interval))
+
+        finish = asyncio.Event()  # the single stop signal: flags, signals, and taskiq's Receiver
+        self._worker_options = _WorkerOptions(
+            max_jobs=max_jobs, rest=rest, stop_when_empty=stop_when_empty
+        )
+        self._worker_stop = finish
+
+        loop = asyncio.get_running_loop()
+        handled_signals: list[signal.Signals] = []
+        for sig_num in (signal.SIGTERM, signal.SIGINT):
+            with contextlib.suppress(NotImplementedError, RuntimeError):
+                loop.add_signal_handler(sig_num, finish.set)
+                handled_signals.append(sig_num)
+
+        watchers = (
+            [asyncio.create_task(_stop_after(finish, max_time))] if max_time is not None else []
+        )
+        if memory is not None:
+            watchers.append(asyncio.create_task(_stop_on_memory(finish, memory, release_interval)))
+
+        releaser = asyncio.create_task(self._release_loop(release_interval, finish))
         try:
             if isinstance(self.broker, InMemoryBroker):
-                # runs jobs inline on dispatch and can't be listened to; just release due delayed jobs.
-                await releaser
+                # runs jobs inline on dispatch and can't be listened to; just wait for a stop condition.
+                await finish.wait()
             else:
                 from taskiq.receiver import Receiver
 
-                finish = asyncio.Event()  # taskiq's Receiver.listen requires a stop event
-                try:
-                    await Receiver(self.broker).listen(finish)
-                finally:
-                    finish.set()
+                await Receiver(self.broker).listen(finish)  # cooperative: drains in-flight work
         finally:
-            releaser.cancel()
+            # `finish.set()` covers exiting via an external `task.cancel()` too (not just a worker
+            # flag) — either way, `_release_loop` then notices cooperatively (never mid-DB-call,
+            # which a raw `.cancel()` could interrupt and wedge the connection) and returns on its
+            # own, almost always within one tick. The timeout is a last-resort fallback for a truly
+            # stuck DB call — same as an unconditional `.cancel()` would risk, just the rare case
+            # now instead of the common one.
+            finish.set()
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(releaser, timeout=release_interval + 1.0)
+            for watcher in watchers:
+                watcher.cancel()
+            for sig_num in handled_signals:
+                with contextlib.suppress(NotImplementedError, RuntimeError):
+                    loop.remove_signal_handler(sig_num)
+            self._worker_options = None
+            self._worker_stop = None
 
-    async def _release_loop(self, interval: float = 1.0) -> None:
-        """Periodically push due delayed jobs onto the broker. A transient error never kills the worker."""
+    def _on_release_tick(self, released: int) -> None:
+        """``--stop-when-empty`` bookkeeping: a tick is idle when nothing was released *and* no
+        job has finished since the previous tick. Requires at least one processed job first, so a
+        freshly-started worker with nothing dispatched yet doesn't stop before any work arrives."""
+        options = self._worker_options
+        if options is None or not options.stop_when_empty:
+            return
+        idle = released == 0 and options.processed == options.last_tick_processed
+        options.last_tick_processed = options.processed
+        if idle and options.processed > 0:
+            self._worker_stop.set()
+
+    async def _release_loop(self, interval: float, stop: Any) -> None:
+        """Periodically reclaim stuck reservations + push due delayed jobs onto the broker. A
+        transient error never kills the worker.
+
+        Checks ``stop`` (the ``work()`` run's stop event) cooperatively **before** each DB call —
+        never mid-call — and returns on its own once set, so ``work()``'s cleanup never has to
+        cancel this task while it's mid-flight in a DB operation (which can otherwise wedge an
+        async DB connection: cancelling a coroutine bridged onto a sync driver — e.g. aiosqlite's
+        greenlet trampoline — mid-operation can leave it unable to close cleanly)."""
         import asyncio
         import contextlib
 
         from arvel.kernel import app, has_application
 
-        while True:
-            await asyncio.sleep(interval)
+        while not stop.is_set():
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(stop.wait(), timeout=interval)
+            if stop.is_set():
+                return
+            released = 0
             if has_application() and app().bound("db"):
                 # a transient DB hiccup must not kill the worker; try again next tick
                 with contextlib.suppress(Exception):
-                    await self.release_due_jobs()
+                    released = await self.release_due_jobs()
+            self._on_release_tick(released)
 
     async def push_instance(self, job: Job, *, queue: str | None = None) -> Any:
         task = self._runner()
@@ -456,10 +775,14 @@ class QueueManager(Manager):
         label = queue or getattr(job, "queue", "default")
         return await task.kicker().with_labels(queue=label).kiq(serialize_instance(job))
 
-    async def dispatch_after(self, delay: float, job: Job, *, queue: str | None = None) -> Any:
+    async def dispatch_after(
+        self, delay: float, job: Job, *, queue: str | None = None, attempts: int = 0
+    ) -> Any:
         """Delay a job (Laravel ``dispatch()->delay()``): persist it to the ``jobs`` table with
         ``available_at = now + delay`` instead of enqueuing now. A worker/scheduler calls
-        :meth:`release_due_jobs` to push the due ones. Durable (survives restart); needs a DB."""
+        :meth:`release_due_jobs` to push the due ones. Durable (survives restart); needs a DB.
+        ``attempts`` records how many times the job has already run — B1's retry-release reuses
+        this same mechanism, so a released-for-retry row shows its real attempt count."""
         import time
 
         from arvel.kernel import app, has_application
@@ -475,19 +798,50 @@ class QueueManager(Manager):
         return await QueuedJob.create(
             queue=queue or getattr(job, "queue", "default"),
             payload=serialize_instance(job),
-            attempts=0,
+            attempts=attempts,
             available_at=now + int(delay),
             created_at=now,
         )
 
+    async def _reclaim_stuck_jobs(self, moment: int) -> None:
+        """Visibility timeout: a row whose ``reserved_at`` predates its ``retry_after`` window
+        means the worker that claimed it died before finishing (a crash between the atomic claim
+        and the delete in :meth:`release_due_jobs`) — free it (clear ``reserved_at``) so another
+        worker can pick it up. ``retry_after`` is the job's own class attribute if set, else the
+        ``queue.retry_after`` config default."""
+        from arvel.queue.jobs import QueuedJob
+
+        default_retry_after = self._settings(QueueSettings).retry_after
+        stuck = await QueuedJob.where_not_null("reserved_at").get()
+        for row in stuck:
+            reserved_at = row.reserved_at
+            if reserved_at is None:
+                continue
+            retry_after = default_retry_after
+            with contextlib.suppress(
+                Exception
+            ):  # an undeserializable row falls back to the default
+                job = await deserialize_instance(row.payload)
+                override = getattr(job, "retry_after", None)
+                if override is not None:
+                    retry_after = override
+            if moment - int(reserved_at) >= retry_after:
+                await (
+                    QueuedJob.where("id", "=", row.id)
+                    .where("reserved_at", "=", reserved_at)
+                    .update({"reserved_at": None})
+                )
+
     async def release_due_jobs(self, now: int | None = None) -> int:
-        """Push every stored job whose ``available_at`` has passed onto the broker and delete its row.
-        Returns how many were released. A worker (``queue:work``) / scheduler calls this periodically."""
+        """Reclaim any visibility-timed-out reservations, then push every stored job whose
+        ``available_at`` has passed onto the broker and delete its row. Returns how many were
+        released. A worker (``queue:work``) / scheduler calls this periodically."""
         import time
 
         from arvel.queue.jobs import QueuedJob
 
         moment = now if now is not None else int(time.time())
+        await self._reclaim_stuck_jobs(moment)
         due = await QueuedJob.where("available_at", "<=", moment).where_null("reserved_at").get()
         released = 0
         for row in due:
@@ -516,15 +870,34 @@ def _queue_manager() -> Any:
 
 
 class PendingChain:
-    """A sequence of jobs dispatched in order (each is queued after the prior is enqueued)."""
+    """A sequence of jobs that run **strictly in order**: job N+1 only starts after N succeeds,
+    and a failure stops the chain (running ``catch`` if set) instead of continuing.
+
+    Only the head job is dispatched now — the remaining links travel serialized on it
+    (``Job.__arvel_chain__``); the worker dispatches each next link after the prior one succeeds
+    (see ``QueueManager._dispatch_next_link``). This replaces pushing every link at once, which
+    ran them all concurrently rather than in sequence.
+    """
 
     def __init__(self, jobs: list[Job]) -> None:
         self.jobs = list(jobs)
+        self._catch: str | None = None
 
-    async def dispatch(self, *, manager: Any = None) -> None:
+    def catch(self, callback: Any) -> PendingChain:
+        """Run ``callback(exc)`` once any link in the chain exhausts its retries (Laravel
+        ``catch()``). ``callback`` must be a module-level function: its *qualified name* is what
+        actually travels in the job payload, so a lambda/closure can't survive serialization."""
+        self._catch = _qualified_name(callback)
+        return self
+
+    async def dispatch(self, *, manager: Any = None) -> Any:
+        if not self.jobs:
+            return None
         mgr = manager or _queue_manager()
-        for job in self.jobs:
-            await mgr.push_instance(job)
+        head, *rest = self.jobs
+        head.__arvel_chain__ = [serialize_instance(j) for j in rest]  # type: ignore[attr-defined]
+        head.__arvel_chain_catch__ = self._catch  # type: ignore[attr-defined]
+        return await mgr.push_instance(head)
 
 
 class PendingBatch:

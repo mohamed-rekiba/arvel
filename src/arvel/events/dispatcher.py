@@ -160,7 +160,7 @@ class Dispatcher:
         name, args = self._parse(event, payload)
         results: list[Any] = []
         for listener in self._gather(name):
-            if self._queue_if_needed(listener, args):
+            if await self._queue_if_needed(listener, args):
                 continue
             handler = self._resolve(listener)
             outcome = handler(*args)
@@ -199,13 +199,18 @@ class Dispatcher:
             return self.container.make(listener_cls)
         return listener_cls()
 
-    def _queue_if_needed(self, listener: Any, args: tuple[Any, ...]) -> bool:
-        """Enqueue a ShouldQueue listener if a queue is bound; else run inline."""
+    async def _queue_if_needed(self, listener: Any, args: tuple[Any, ...]) -> bool:
+        """Enqueue a ``ShouldQueue`` listener via the container-bound ``queue_dispatcher`` contract
+        (A2) — events sits *below* queue in the module DAG and must not import it; the queue
+        provider binds this seam instead (see ``queue.provider.QueueServiceProvider``). No
+        ``queue_dispatcher`` bound (no queue provider registered) -> run inline (documented
+        fallback), same as a non-queued listener."""
         is_queued = (
             isinstance(listener, type) and issubclass(listener, ShouldQueue)
         ) or isinstance(listener, ShouldQueue)
-        if is_queued and self.container is not None and self.container.bound("queue"):
-            self.container.make("queue").push(listener, args)
+        if is_queued and self.container is not None and self.container.bound("queue_dispatcher"):
+            dispatch = self.container.make("queue_dispatcher")
+            await dispatch(listener, args)
             return True
         return False
 

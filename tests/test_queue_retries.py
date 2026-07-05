@@ -70,3 +70,49 @@ async def test_backoff_list_delays_between_attempts() -> None:
     slept: list[float] = []
     await run_job_with_retries(job, sleep=lambda d: _no_sleep(d, slept))
     assert slept == [10, 30]  # waited backoff[0], then backoff[1] (2 gaps for 3 attempts)
+
+
+class MaxExceptionsCapped(Job):
+    tries = 10
+    backoff = 0
+    max_exceptions = 2  # a lower ceiling than `tries` — should win
+
+    def __init__(self) -> None:
+        self.attempts = 0
+
+    async def handle(self) -> None:
+        self.attempts += 1
+        raise ValueError("boom")
+
+    async def failed(self, exc: BaseException) -> None: ...
+
+
+async def test_max_exceptions_caps_attempts_below_tries() -> None:
+    job = MaxExceptionsCapped()
+    slept: list[float] = []
+    await run_job_with_retries(job, sleep=lambda d: _no_sleep(d, slept))
+    assert job.attempts == 2  # capped by max_exceptions, well under tries=10
+
+
+class RetryUntilAlreadyPast(Job):
+    tries = 10
+    backoff = 0
+
+    def __init__(self) -> None:
+        from datetime import UTC, datetime, timedelta
+
+        self.attempts = 0
+        self.retry_until = datetime.now(UTC) - timedelta(seconds=1)
+
+    async def handle(self) -> None:
+        self.attempts += 1
+        raise ValueError("boom")
+
+    async def failed(self, exc: BaseException) -> None: ...
+
+
+async def test_retry_until_in_the_past_stops_after_one_attempt() -> None:
+    job = RetryUntilAlreadyPast()
+    slept: list[float] = []
+    await run_job_with_retries(job, sleep=lambda d: _no_sleep(d, slept))
+    assert job.attempts == 1  # `tries=10` never mattered — retry_until already passed

@@ -69,25 +69,71 @@ Run several jobs in order, or fire a group at once, with `Bus`:
 ```python
 from arvel.queue import Bus
 
-# chain — sequential; each job is queued after the previous one
+# chain — strictly sequential: job N+1 only starts once N has *succeeded*; a failure stops the
+# rest of the chain (they never run)
 await Bus.chain([ResizeImage(id), Watermark(id), Notify(id)]).dispatch()
 
 # batch — a group dispatched together; returns each push's handle
 await Bus.batch([SendDigest(u.id) for u in users]).dispatch()
 ```
 
+Only the head job is pushed to the broker right away — the remaining links travel serialized on
+it, and the worker dispatches each next link once the prior one's `handle()` returns without
+raising. Run something when the chain gives up with `catch` — it must be a **module-level
+function** (a lambda/closure can't survive serialization onto the job):
+
+```python
+def alert_pipeline_failed(exc: BaseException) -> None:
+    log.error("image pipeline failed", error=str(exc))
+
+chain = Bus.chain([ResizeImage(id), Watermark(id), Notify(id)]).catch(alert_pipeline_failed)
+await chain.dispatch()
+```
+
 ## Retries & failures
 
-A job retries up to `tries` times, waiting `backoff` seconds between attempts. Provide a list for
-escalating delays:
+A job retries up to `tries` times. `max_exceptions` is an extra, lower ceiling on attempts (handy
+when `tries` is generous but you still want to give up sooner); `retry_until` stops retrying past a
+fixed point in time regardless of `tries` left:
 
 ```python
 class ChargeCard(Job):
     tries = 4
-    backoff = [10, 30, 120]   # wait 10s, then 30s, then 120s
+    backoff = [10, 30, 120]        # wait 10s, then 30s, then 120s
+    max_exceptions = 2             # give up after 2 failures even though tries=4
+    retry_until = datetime(2026, 1, 1)  # never retry past this moment
 ```
 
 When every attempt fails, `failed()` is invoked so you can alert or record the failure.
+
+### How a retry actually waits: release vs. inline sleep
+
+On a **durable** setup (a database bound — the `jobs` table backs this regardless of which broker
+carries messages), a failed attempt is **released back to the queue store** with
+`available_at = now + backoff` instead of blocking the worker with `asyncio.sleep`: the worker
+keeps draining other jobs, and a later pass (`release_due_jobs`, run periodically by `queue:work`)
+redispatches it once due. The attempt count travels with the job across these passes, so
+`tries`/`backoff` are honored exactly the same either way — just without stalling the worker.
+
+Without a database bound (the common in-memory/dev setup), there's nowhere to persist a release, so
+the worker falls back to the classic **inline** loop: every attempt happens in one call,
+`asyncio.sleep`-ing between them. Fine for a single dev process; not what you want in production,
+where a slow backoff would otherwise stall the whole worker.
+
+### Job timeout
+
+`timeout` (seconds) bounds each attempt via `asyncio.wait_for` — an attempt that runs past it is
+cancelled (cooperatively; the coroutine gets `asyncio.CancelledError`) and the timeout counts as a
+failed attempt, retried/failed exactly like a raised exception.
+
+### Visibility timeout (recovering from a crashed worker)
+
+A worker that claims a delayed/released job (`reserved_at` set) but crashes before finishing would
+otherwise leak that row forever. `retry_after` (seconds — the `queue.retry_after` config, default
+`90`; override per job with a `retry_after` class attribute) is the **visibility timeout**: once a
+reservation is older than that, `release_due_jobs` reclaims it (clears `reserved_at`) so the next
+pass picks it back up. A worker still legitimately working a job well within `retry_after` is left
+alone.
 
 ### Failed jobs
 
@@ -116,7 +162,53 @@ arvel queue:work                 # consume jobs from the configured broker
 ```
 
 Scale by running more worker processes (taskiq also ships its own worker for production). Whichever
-worker picks up a job, it runs under that job's `tries`/`backoff`/`failed()` policy.
+worker picks up a job, it runs under that job's `tries`/`backoff`/`timeout`/`failed()` policy.
+
+### Worker flags
+
+`QueueManager.work(...)` (what `queue:work` calls) takes lifecycle flags — Laravel `queue:work`
+parity, for a custom worker entrypoint/supervisor script:
+
+```python
+await app.make("queue").work(
+    max_jobs=100,        # stop after 100 jobs processed
+    max_time=3600,       # stop after an hour (a supervisor restarts it)
+    stop_when_empty=True,  # stop once idle instead of running forever
+    rest=1,              # pause 1s between jobs (ease off a hammered downstream)
+    memory=512,          # stop if RSS exceeds 512MB (a supervisor restarts it fresh)
+)
+```
+
+Ctrl-C (`SIGINT`) or `SIGTERM` request the same **graceful** stop regardless of which flags are
+set: the in-flight job finishes before the worker exits — nothing is left half-run. Run it under a
+process supervisor (systemd/supervisord/your platform's process manager) that restarts it when it
+stops, and these flags become "restart periodically" knobs rather than a way to lose work.
+
+## Context in a job
+
+A value set with `Context` (see [Context](context.md)) at dispatch time is carried across the
+broker and restored before `handle()` runs — a request-scoped value (a tenant id, a correlation id)
+set before you dispatch is still there inside the job, even on a different worker process:
+
+```python
+from arvel.support.context import Context
+
+Context.add("tenant", tenant.id)
+await SendWelcomeEmail.dispatch(user_id=42)   # "tenant" rides along in the job payload
+
+class SendWelcomeEmail(Job):
+    async def handle(self) -> None:
+        tenant_id = Context.get("tenant")     # the *dispatch-time* value, not whatever's ambient
+        ...
+```
+
+## Queued event listeners
+
+An event listener marked `ShouldQueue` (see [Events](events.md)) runs on the queue instead of
+inline — the event dispatcher enqueues it through the same broker as everything else, and a worker
+runs it under the normal `tries`/`backoff`/`timeout` policy. This needs the queue provider
+registered (it binds the `queue_dispatcher` seam the event dispatcher calls); without one, a queued
+listener still runs — inline, same as a plain listener — rather than silently vanishing.
 
 ## Brokers (memory / redis / amqp)
 
@@ -162,7 +254,10 @@ imported lazily, so `import arvel` stays light until you actually queue somethin
 
 ## See also
 
-- [Events](events.md) — fire-and-forget *in-process* hooks (versus out-of-process jobs).
+- [Events](events.md) — fire-and-forget *in-process* hooks (versus out-of-process jobs), and the
+  `ShouldQueue` listener rail this page's [Queued event listeners](#queued-event-listeners) covers.
+- [Context](context.md) — the ambient key/value store this page's [Context in a job](#context-in-a-job)
+  carries across the broker.
 - [Mail](mail.md) · [Notifications](notifications.md) — common work to push onto a queue.
 - [Console (CLI)](console.md) — `queue:work` and the scheduler.
 - [Telemetry](telemetry.md) — when telemetry is on, each job run is auto-traced as a `job <Name>` span

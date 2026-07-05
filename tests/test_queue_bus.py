@@ -58,11 +58,14 @@ async def test_instance_serialize_roundtrip_with_model_ref() -> None:
         await db.dispose()
 
 
-async def test_bus_chain_dispatches_in_order() -> None:
+async def test_bus_chain_pushes_only_the_head_job() -> None:
+    """A1: `PendingChain.dispatch` pushes only the head job now — the rest travel serialized on
+    it and are dispatched by the worker one at a time (see `test_queue_chain.py` for the full
+    sequential-execution + middle-failure-stops-the-chain behavior)."""
     rec = RecordingManager()
     a, b, c = Noop(), Noop(), Noop()
     await Bus.chain([a, b, c]).dispatch(manager=rec)
-    assert rec.pushed == [a, b, c]
+    assert rec.pushed == [a]
 
 
 async def test_bus_batch_dispatches_all() -> None:

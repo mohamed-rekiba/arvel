@@ -97,14 +97,15 @@ async def test_forget() -> None:
 
 
 async def test_should_queue_listener_enqueued_when_queue_bound() -> None:
+    """A2: a ShouldQueue listener is enqueued via the container-bound `queue_dispatcher` seam
+    (not inline) — a spy dispatcher proves it was actually called, awaited, with the right args."""
     app = Application()
     pushed: list[Any] = []
 
-    class FakeQueue:
-        def push(self, listener: Any, args: tuple[Any, ...]) -> None:
-            pushed.append((listener, args))
+    async def fake_queue_dispatcher(listener: Any, args: tuple[Any, ...]) -> None:
+        pushed.append((listener, args))
 
-    app.instance("queue", FakeQueue())
+    app.instance("queue_dispatcher", fake_queue_dispatcher)
     d = Dispatcher(app)
 
     class QueuedListener(ShouldQueue):
@@ -113,4 +114,41 @@ async def test_should_queue_listener_enqueued_when_queue_bound() -> None:
 
     d.listen(UserRegistered, QueuedListener)
     await d.dispatch(UserRegistered("dan"))
-    assert len(pushed) == 1
+    assert pushed == [(QueuedListener, (UserRegistered("dan"),))]
+
+
+async def test_non_queued_listener_runs_inline_even_with_queue_bound() -> None:
+    """A non-ShouldQueue listener always runs inline, even when a `queue_dispatcher` is bound."""
+    app = Application()
+    pushed: list[Any] = []
+
+    async def fake_queue_dispatcher(listener: Any, args: tuple[Any, ...]) -> None:
+        pushed.append((listener, args))
+
+    app.instance("queue_dispatcher", fake_queue_dispatcher)
+    d = Dispatcher(app)
+    ran: list[str] = []
+
+    class PlainListener:
+        def handle(self, event: UserRegistered) -> None:
+            ran.append(event.name)
+
+    d.listen(UserRegistered, PlainListener)
+    await d.dispatch(UserRegistered("eve"))
+    assert ran == ["eve"]
+    assert pushed == []
+
+
+async def test_should_queue_listener_runs_inline_without_queue_dispatcher_bound() -> None:
+    """Documented fallback: no `queue_dispatcher` bound (no queue provider registered) -> a
+    ShouldQueue listener still runs, inline, rather than silently vanishing."""
+    d = Dispatcher(Application())
+    ran: list[str] = []
+
+    class QueuedListener(ShouldQueue):
+        def handle(self, event: UserRegistered) -> None:
+            ran.append(event.name)
+
+    d.listen(UserRegistered, QueuedListener)
+    await d.dispatch(UserRegistered("finn"))
+    assert ran == ["finn"]
