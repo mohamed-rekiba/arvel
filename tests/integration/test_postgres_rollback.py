@@ -22,6 +22,8 @@ async def test_rollback_isolates_writes_on_postgres(postgres_url: str) -> None:
     db = ConnectionResolver({"default": {"url": postgres_url}})
     Account.set_connection(db)
     try:
+        # self-heal against a table leaked by a prior interrupted run on the reused container
+        await db.execute(sa.schema.DropTable(Account.__table__, if_exists=True))
         await db.execute(sa.schema.CreateTable(Account.__table__))
 
         async with database_transaction(db):
