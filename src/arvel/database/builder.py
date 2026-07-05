@@ -420,9 +420,10 @@ class Builder:
 
         key = column or (self._model.__primary_key__ if self._model is not None else "id")
         base_wheres = list(self._wheres)
-        last: Any = 0
+        last: Any = None  # no lower bound on the first page — works for string/uuid PKs, not just int
         while True:
-            self._wheres = [*base_wheres, ("and", self._table.c[key] > last)]
+            bound = [("and", self._table.c[key] > last)] if last is not None else []
+            self._wheres = [*base_wheres, *bound]
             self._order = [self._table.c[key].asc()]
             self._limit = size
             rows = await self.get()
