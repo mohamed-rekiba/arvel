@@ -303,8 +303,11 @@ class Router:
             immutable = target.parent.name == assets_dirname
             content_type = guess_type(target.name)[0] or "application/octet-stream"
             cache = "public, max-age=31536000, immutable" if immutable else "no-cache"
+            from anyio.to_thread import run_sync
+
+            content = await run_sync(target.read_bytes)  # keep the file read off the event loop
             return Response(
-                content=target.read_bytes(),
+                content=content,
                 status=200,
                 headers={"content-type": content_type, "cache-control": cache},
             )
