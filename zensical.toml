@@ -69,6 +69,7 @@ nav = [
     { "Encryption" = "encryption.md" },
     { "HTTP Client" = "http-client.md" },
     { "Cache" = "cache.md" },
+    { "Feature Flags" = "features.md" },
     { "Search" = "search.md" },
     { "Activity Log" = "activitylog.md" },
     { "Queues & Jobs" = "queues.md" },

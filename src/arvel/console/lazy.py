@@ -59,6 +59,8 @@ class LazyGroup(TyperGroup):
         "queue:failed": "arvel.console.work:failed_app",
         "queue:retry": "arvel.console.work:retry_app",
         "cache:clear": "arvel.console.ops:cache_clear_app",
+        "feature:list": "arvel.console.features:feature_list_app",
+        "feature:purge": "arvel.console.features:feature_purge_app",
         "key:generate": "arvel.console.ops:key_generate_app",
         "storage:link": "arvel.console.ops:storage_link_app",
         "package:discover": "arvel.console.discover:discover_app",

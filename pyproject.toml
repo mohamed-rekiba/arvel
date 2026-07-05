@@ -127,6 +127,7 @@ validation = "arvel.validation.provider:ValidationServiceProvider"
 dates = "arvel.dates.provider:DateServiceProvider"
 localization = "arvel.localization.provider:LocalizationServiceProvider"
 search = "arvel.search.provider:SearchServiceProvider"
+features = "arvel.features.provider:FeatureServiceProvider"
 telemetry = "arvel.telemetry.provider:TelemetryServiceProvider"
 broadcasting = "arvel.broadcasting.provider:BroadcastServiceProvider"
 
@@ -238,6 +239,7 @@ layers = [
   "arvel.testing",
   "arvel.media",
   "arvel.activitylog",
+  "arvel.features",
   "arvel.database",
   "arvel.client",
   "arvel.cache",
