@@ -83,9 +83,36 @@ apprise channels take a URL (or list of URLs).
 | `mail` | renders `to_mail()` and sends it through the [Mail](mail.md) manager |
 | `apprise` | pushes to every URL from `apprise_urls()` — Slack, Discord, Telegram, SMS, push, … |
 | `database` | persists `to_array()` as a row in the `notifications` table (see below) |
+| `broadcast` | sends `to_broadcast()`'s payload through the Broadcast manager, on the notifiable's channel |
 
 A recipient's channels come from the notification's `via()` — different users can receive the
 same notification on different channels.
+
+### The `broadcast` channel
+
+```python
+class OrderShipped(Notification):
+    def via(self, notifiable):
+        return ["broadcast", "database"]
+
+    def to_broadcast(self, notifiable):
+        return {"order_id": self.order.id}   # defaults to to_array() if you skip this
+```
+
+Delivery is a `BroadcastNotification` event on the notifiable's channel — by default
+`PrivateChannel(f"{type(notifiable).__name__}.{notifiable.id}")`; override
+`receives_broadcast_notifications_on()` on the notifiable to pick a different channel.
+
+### Skipping a channel per send: `should_send`
+
+Override `should_send(notifiable, channel)` to silently skip one channel for a given send (no
+error, no result entry) while the rest of `via()` still runs — e.g. a muted digest:
+
+```python
+class WeeklyDigest(Notification):
+    def should_send(self, notifiable, channel):
+        return not (channel == "broadcast" and notifiable.digest_muted)
+```
 
 ## Stored (database) notifications
 
@@ -147,12 +174,14 @@ await SendInvoicePaid.dispatch(user, invoice)
 
 ## How it works
 
-`NotificationManager.send` asks the notification's `via(notifiable)` for the channel list, then
-dispatches to each: the `mail` channel renders `to_mail()` and hands it to the mail manager; the
-`database` channel persists a `DatabaseNotification` row keyed to the notifiable (or, with no
-database bound, returns the `to_array()` payload); the `apprise` channel feeds `apprise_urls()` into
-an Apprise instance (lazily imported) that fans the message out to every configured service. Each
-channel reports its result, and the manager returns them keyed by channel.
+`NotificationManager.send` asks the notification's `via(notifiable)` for the channel list, checks
+`should_send(notifiable, channel)` for each (skipping silently on `False`), then dispatches the
+rest: `mail` renders `to_mail()` and hands it to the mail manager; `database` persists a
+`DatabaseNotification` row keyed to the notifiable (or, with no database bound, returns the
+`to_array()` payload); `broadcast` sends a `BroadcastNotification` event through the Broadcast
+manager; `apprise` feeds `apprise_urls()` into an Apprise instance (lazily imported) that fans the
+message out to every configured service. Each channel reports its result, keyed by channel — a
+skipped channel has no entry at all.
 
 ## See also
 

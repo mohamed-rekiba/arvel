@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
+from arvel.broadcasting import PrivateChannel
+from arvel.events import ShouldBroadcast
 from arvel.queue import Job
 
 if TYPE_CHECKING:
@@ -30,8 +32,42 @@ class Notification:
     def to_array(self, notifiable: Any) -> dict[str, Any]:
         return {}
 
+    def to_broadcast(self, notifiable: Any) -> dict[str, Any]:
+        """The payload for the ``broadcast`` channel (Laravel ``toBroadcast``) — defaults to
+        ``to_array()``."""
+        return self.to_array(notifiable)
+
     def apprise_urls(self, notifiable: Any) -> list[str]:
         return []
+
+    def should_send(self, notifiable: Any, channel: str) -> bool:
+        """Consulted before EACH channel send; ``False`` skips that channel silently (no error, no
+        result entry) while the rest of ``via()`` still runs. Override for per-notifiable/per-channel
+        opt-out (e.g. a muted digest)."""
+        return True
+
+
+class BroadcastNotification(ShouldBroadcast):
+    """The event a notification's ``broadcast`` channel sends (Laravel ``BroadcastNotificationCreated``
+    parity): ``to_broadcast()``'s payload, on the notifiable's channel."""
+
+    def __init__(self, notifiable: Any, notification: Notification) -> None:
+        self.notifiable = notifiable
+        self.notification = notification
+
+    def broadcast_on(self) -> list[Any]:
+        channel = getattr(self.notifiable, "receives_broadcast_notifications_on", None)
+        if callable(channel):
+            return [channel()]
+        key_name = getattr(self.notifiable, "__primary_key__", "id")
+        pk = getattr(self.notifiable, key_name, "")
+        return [PrivateChannel(f"{type(self.notifiable).__name__}.{pk}")]
+
+    def broadcast_as(self) -> str:
+        return type(self.notification).__name__
+
+    def broadcast_with(self) -> dict[str, Any]:
+        return self.notification.to_broadcast(self.notifiable)
 
 
 class SendQueuedNotification(Job):
@@ -107,9 +143,13 @@ class NotificationManager:
         channels: list[str] | None = None,
     ) -> dict[str, Any]:
         """Fan out immediately, bypassing the queue rail — across all of ``via()``, or only the
-        given ``channels`` slice (the per-channel worker path)."""
+        given ``channels`` slice (the per-channel worker path). ``should_send(notifiable, channel)``
+        is consulted first; ``False`` skips that channel silently — no result entry, no error — while
+        the rest of the channels still send."""
         results: dict[str, Any] = {}
         for channel in channels if channels is not None else notification.via(notifiable):
+            if not notification.should_send(notifiable, channel):
+                continue
             results[channel] = await self._dispatch(channel, notifiable, notification)
         return results
 
@@ -144,12 +184,24 @@ class NotificationManager:
                 return routed
         return default
 
+    def _broadcaster(self) -> Any:
+        """The bound ``broadcast`` manager, else a fresh in-process one (mirrors ``_mailer()``'s
+        fallback — e.g. an on-demand send with no bound app)."""
+        if self.app is not None and hasattr(self.app, "bound") and self.app.bound("broadcast"):
+            return self.app.make("broadcast")
+        from arvel.broadcasting import BroadcastManager
+
+        return BroadcastManager(self.app)
+
     async def _dispatch(self, channel: str, notifiable: Any, notification: Notification) -> Any:
         if channel == "mail":
             recipient = self._route(notifiable, "mail", notifiable)
             return await self._mailer().to(recipient).send(notification.to_mail(notifiable))
         if channel == "database":
             return await self._store_database(notifiable, notification)
+        if channel == "broadcast":
+            await self._broadcaster().broadcast(BroadcastNotification(notifiable, notification))
+            return True
         client = self.apprise()
         urls = self._route(notifiable, channel, None) or notification.apprise_urls(notifiable)
         for url in urls:
@@ -234,6 +286,7 @@ def __getattr__(name: str) -> Any:
 
 __all__ = [
     "AnonymousNotifiable",
+    "BroadcastNotification",
     "DatabaseNotification",
     "Notifiable",
     "Notification",

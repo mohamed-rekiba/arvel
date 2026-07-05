@@ -35,14 +35,32 @@ class WelcomeMail(Mailable):
 `subject()` and `html()` return `self`, so they chain. `build()` is called for you when the
 message is rendered — you never call it directly.
 
-You can also write the body in **Markdown** (rendered to HTML) — needs the `[mail]` extra:
+You can also write the body in **Markdown**, rendered through a small component **theme**
+(styled buttons/panels/tables, not raw md→html) — needs the `[mail]` extra:
 
 ```python
 def build(self):
-    return self.subject("Welcome").markdown("# Hi\n\nThanks for **joining** Acme.")
+    return self.subject("Welcome").markdown(
+        "# Hi\n\nThanks for **joining** Acme.\n\n[button: Get Started](https://acme.test/start)"
+    )
 ```
 
+`[button: Text](url)` on its own line becomes a centered, styled call-to-action; blockquotes
+become shaded "panels"; GFM tables get borders/padding — all inline CSS (email-safe).
+
 You can also attach files: `.attach("invoices/2026.pdf")` or `.attach_data(png_bytes, "logo.png")`.
+
+### Plain-text alternative
+
+Every send is `multipart/alternative` with **both** an HTML and a text/plain part — mail clients
+that prefer plain text (and spam filters) get real content, not an empty body. Without any
+`text()`, one is auto-derived by stripping tags from the HTML/markdown body; set an explicit one
+when the auto-derived version isn't good enough:
+
+```python
+def build(self):
+    return self.subject("Welcome").html("<h1>Hi</h1>").text("Hi — thanks for joining!")
+```
 
 ## Sending
 
@@ -157,10 +175,11 @@ mail.assert_sent(WelcomeMail)
 ## How it works
 
 `Mail` is a facade over a `MailManager` (a driver manager). `to()` returns a `PendingMail`
-holding the recipients; `send()` renders the Mailable to a stdlib `EmailMessage` (subject +
-HTML body), stamps the `To` header, and hands it to the active transport. The `log` transport
-appends to an in-memory list; the `smtp` transport opens an `aiosmtplib.SMTP` connection and
-sends. aiosmtplib is imported lazily, so `import arvel` stays light until you actually send.
+holding the recipients; `send()` renders the Mailable to a stdlib `EmailMessage`
+(`multipart/alternative`: text then HTML), stamps the `To` header, and hands it to the active
+transport. The `log` transport appends to an in-memory list; the `smtp` transport opens an
+`aiosmtplib.SMTP` connection and sends. aiosmtplib is imported lazily, so `import arvel` stays
+light until you actually send.
 
 ## See also
 

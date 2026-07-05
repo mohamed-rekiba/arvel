@@ -58,6 +58,17 @@ class RoutingServiceProvider(ServiceProvider):
 
             self.app.make("router").get("/metrics", prometheus_metrics, name="telemetry.metrics")
 
+        # The channel-authorization endpoint (spec 19): needs BOTH the authenticated user (auth)
+        # and the channel-callback registry (broadcasting) — routing is the top layer, so it can
+        # see both without either importing the other (broadcasting must never import auth, G1).
+        if self.app.bound("router"):
+            from arvel.auth.middleware import Authenticate
+            from arvel.routing.broadcasting_auth import broadcasting_auth
+
+            self.app.make("router").post(
+                "/broadcasting/auth", broadcasting_auth, name="broadcasting.auth"
+            ).middleware(Authenticate)
+
         # with_public_dir(...) — Laravel's public/ needs zero lines in routes/web.php; same here.
         if self.app.public_dir is not None and self.app.bound("router"):
             self.app.make("router").public(

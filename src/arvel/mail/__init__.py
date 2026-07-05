@@ -8,7 +8,9 @@ aiosmtplib is imported lazily. Grounded in knowledge/port/16-managers.md.
 
 from __future__ import annotations
 
+import re
 from email.message import EmailMessage
+from html.parser import HTMLParser
 from typing import Any, Literal, cast
 
 import msgspec
@@ -47,6 +49,40 @@ def _address(recipient: Any) -> str:
     return str(getattr(recipient, "email", recipient))
 
 
+class _TagStripper(HTMLParser):
+    """Collects text data, turning block-level tags into line breaks — used to auto-derive a
+    readable plain-text alternative from an HTML body."""
+
+    _BLOCK_TAGS = frozenset(
+        {"p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote"}
+    )
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._chunks: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in self._BLOCK_TAGS:
+            self._chunks.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        self._chunks.append(data)
+
+    def text(self) -> str:
+        collapsed = re.sub(r"\n{2,}", "\n\n", "".join(self._chunks))
+        return collapsed.strip()
+
+
+def _strip_tags(html_body: str) -> str:
+    """A readable plain-text derivation from an HTML body (block tags become line breaks) — the
+    text/plain alternative a ``Mailable`` gets for free when it sets only ``html()``/``markdown()``
+    (no explicit ``text()``); mail deliverability wants both parts (spec 19)."""
+    stripper = _TagStripper()
+    stripper.feed(html_body)
+    stripper.close()
+    return stripper.text()
+
+
 def _global_from() -> str:
     """The app-wide default sender (Laravel ``mail.from``): ``config('mail.from.address')`` formatted
     as ``Name <address>``. Applied when a mailable doesn't set ``from_`` — SMTP requires a From header,
@@ -71,6 +107,7 @@ class Mailable:
     # rebuilt via __new__ (a queued mailable decoded by the worker; see SendQueuedMailable).
     _subject: str = ""
     _html: str = ""
+    _text: str = ""  # explicit plain-text alternative; auto-derived from _html when unset
     _from: str = ""  # sender address; defaults to the transport/agent if unset
     _reply_to: str = ""
 
@@ -104,16 +141,26 @@ class Mailable:
         self._html = body
         return self
 
+    def text(self, body: str) -> Mailable:
+        """Set an explicit plain-text alternative (Laravel ``Mailable::text``). Without this, one
+        is auto-derived from the HTML body by stripping tags — this only overrides that default."""
+        self._text = body
+        return self
+
     def markdown(self, body: str) -> Mailable:
-        """Set the body from Markdown, rendered to HTML (Laravel markdown mailables). Needs the
-        ``markdown-it-py`` engine — the optional ``[mail]`` extra; raises if it isn't installed."""
+        """Set the body from Markdown, rendered through the component theme — styled buttons
+        (``[button: Text](url)``), panels (blockquotes), and tables, not raw md→html (Laravel
+        markdown mailables). Needs the ``markdown-it-py`` engine — the optional ``[mail]`` extra;
+        raises if it isn't installed."""
         try:
             from markdown_it import MarkdownIt
         except ImportError as exc:
             from arvel.support.manager import MissingExtraError
 
             raise MissingExtraError("markdown", "mail") from exc
-        self._html = MarkdownIt().render(body)
+        from arvel.mail.markdown_theme import render_themed
+
+        self._html = render_themed(body, MarkdownIt)
         return self
 
     def attach(self, path: str, *, name: str | None = None, mime: str | None = None) -> Mailable:
@@ -145,7 +192,11 @@ class Mailable:
             message["From"] = sender
         if self._reply_to:
             message["Reply-To"] = self._reply_to
-        message.set_content(self._html, subtype="html")
+        # Always multipart/alternative (deliverability, spec 19): the text part first, then HTML —
+        # add_alternative's LAST part is a mail client's preferred one, so HTML still renders when
+        # both are supported, while a text-only client (or a spam filter) still gets real content.
+        message.set_content(self._text or _strip_tags(self._html), subtype="plain")
+        message.add_alternative(self._html, subtype="html")
         for data, filename, ctype in self._attachment_list:
             maintype, _, subtype = ctype.partition("/")
             message.add_attachment(
