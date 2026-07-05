@@ -159,13 +159,16 @@ class MediaAdder:
         # Conversions are image transforms (PIL); non-image files are stored as-is, untouched.
         conversions = model.register_media_conversions()
         if conversions and self._is_image():
+            from anyio.to_thread import run_sync
+
             from arvel.media import Image
 
-            source = Image.open(self._contents)
+            # PIL decode/transform is CPU-bound — keep it off the event loop
+            source = await run_sync(Image.open, self._contents)
             generated: dict[str, str] = {}
             for conversion in conversions:
                 path = f"{base_dir}/conversions/{conversion.name}.{conversion.fmt.lower()}"
-                await filesystem.put(path, conversion.apply(source))
+                await filesystem.put(path, await run_sync(conversion.apply, source))
                 generated[conversion.name] = path
             media.generated_conversions = generated
             await media.save()
