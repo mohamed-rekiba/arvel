@@ -1,10 +1,10 @@
 """arvel.queue.batch — job batches: `job_batches` tracking + the `Batch` handle (`Bus::batch()`).
 
 `JobBatch` is the DB row (the scaffold ships its migration); counter updates (`pending_jobs`/
-`failed_jobs`) are a **compare-and-swap retry loop** — the same optimistic-concurrency pattern
-`QueueManager.release_due_jobs` already uses for its atomic claim (`UPDATE ... WHERE <column> =
-<value-just-read>`, retry on a zero rowcount) — so two jobs finishing at the same moment never
-lose a decrement, without needing a DB-specific `RETURNING` clause. Kept in its own module so
+`failed_jobs`) are a single **atomic `UPDATE ... SET pending_jobs = pending_jobs - 1`** — the DB
+does the arithmetic, so two jobs finishing at the same moment never lose a decrement, without an
+app-space read-modify-write or a DB-specific `RETURNING` clause. The exactly-once batch lifecycle
+transitions (`cancel`/`finish`) stay guarded by `WHERE <ts> IS NULL`. Kept in its own module so
 importing `arvel.queue` doesn't pull in `arvel.database` (mirrors `queue/jobs.py`/`queue/failed.py`).
 """
 
@@ -123,27 +123,23 @@ async def _record_job_outcome(batch_id: str, *, failed: bool) -> JobBatch:
     """Atomically apply one job's outcome to its batch's counters: decrement `pending_jobs`,
     and on a failure also increment `failed_jobs`.
 
-    Compare-and-swap retry loop — no arbitrary retry cap (a batch has a bounded number of jobs, so
-    contention always resolves within `total_jobs` retries at worst): read the current counters,
-    then `UPDATE ... WHERE pending_jobs = <value just read> AND failed_jobs = <value just read>`.
-    A `rowcount` of 1 means nothing else changed the row between the read and the write — this
-    caller owns that exact transition and its returned counts are authoritative. A `rowcount` of 0
-    means a concurrent job's outcome landed first — re-read and retry.
+    One atomic `UPDATE ... SET pending_jobs = pending_jobs - 1` — the DB does the arithmetic, so
+    two jobs settling at the same moment each land their own decrement with no read-modify-write in
+    app space (a compare-and-swap retry loop here was flaky: it relied on `rowcount` behaving as a
+    lock, which a shared SQLite connection under `asyncio.gather` doesn't guarantee). Re-read after
+    for the post-decrement counts — they may reflect a concurrent job's decrement too, which is
+    fine: the caller that lands the final decrement always re-reads `pending_jobs <= 0`, and the
+    guarded `_finish_batch_once` makes the finish transition fire exactly once regardless.
     """
-    while True:
-        row = await JobBatch.find_or_fail(batch_id)
-        new_pending = row.pending_jobs - 1
-        new_failed = row.failed_jobs + (1 if failed else 0)
-        claim = (
-            await JobBatch.where("id", "=", batch_id)
-            .where("pending_jobs", "=", row.pending_jobs)
-            .where("failed_jobs", "=", row.failed_jobs)
-            .update({"pending_jobs": new_pending, "failed_jobs": new_failed})
-        )
-        if claim.rowcount == 1:
-            row.pending_jobs = new_pending
-            row.failed_jobs = new_failed
-            return row
+    columns = JobBatch.__table__.c
+    delta = 1 if failed else 0
+    await JobBatch.where("id", "=", batch_id).update(
+        {
+            "pending_jobs": columns["pending_jobs"] - 1,
+            "failed_jobs": columns["failed_jobs"] + delta,
+        }
+    )
+    return await JobBatch.find_or_fail(batch_id)
 
 
 async def _cancel_batch_once(batch_id: str) -> bool:
