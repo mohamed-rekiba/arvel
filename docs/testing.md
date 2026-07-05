@@ -16,38 +16,65 @@ This page covers the test client, fakes, database assertions, and freezing time.
 ## Feature tests with the test client
 
 `client(asgi)` wraps Litestar's `TestClient` over your app, so requests run the actual routing,
-middleware, and handlers:
+middleware, and handlers — and every verb call (`get`/`post`/`put`/`patch`/`delete`) returns a
+response with expressive assertions instead of a bare status code to check by hand:
 
 ```python
 from arvel.testing import client
 
 def test_homepage():
     c = client(app.as_asgi())
-    response = c.get("/")
-    assert response.status_code == 200
-    assert "Welcome" in response.text
+    c.get("/").assert_ok().assert_see("Welcome")
 ```
 
 Because it's the real Litestar client, the OpenAPI schema, validation, and middleware all run —
-you're testing the app, not a mock of it.
+you're testing the app, not a mock of it. `.raw` is the escape hatch to the underlying `httpx`
+response for anything not covered below.
+
+### Response assertions
+
+Every assertion returns the response, so they chain:
+
+```python
+response = c.post("/users", json={"name": "Ada"})
+response.assert_created()
+response.assert_json({"data.name": "Ada"})          # subset match — extra keys are tolerated
+response.assert_json_path("data.id", 1)              # dotted path into the parsed JSON
+response.assert_header("content-type", "application/json")
+```
+
+| Assertion | Checks |
+|-----------|--------|
+| `assert_status(n)` | the exact status code |
+| `assert_ok()` / `assert_created()` / `assert_no_content()` | 200 / 201 / 204 |
+| `assert_not_found()` / `assert_forbidden()` / `assert_unauthorized()` / `assert_unprocessable()` | 404 / 403 / 401 / 422 |
+| `assert_redirect(to=None)` | a 3xx status, and (with `to`) the `Location` header — pass `follow_redirects=False` to the request so the client doesn't chase the redirect itself |
+| `assert_json(fragment)` | a dotted-key subset of the parsed JSON (extra keys tolerated) |
+| `assert_json_path(path, value)` | one dotted-key value (`"items.0.id"` indexes into a list) |
+| `assert_json_count(n, path=None)` | `len(...)` at `path` (or the root) |
+| `assert_json_missing(fragment)` | none of the dotted keys are present |
+| `assert_see(text)` | the raw body contains `text` |
+| `assert_header(name, value=None)` | the header is present (and, with `value`, matches) |
 
 ## Fakes: assert side effects without doing them
 
 Swap a recording fake behind a facade and assert what *would* have happened — no email sent, no
-job queued:
+job queued, no notification delivered, no real HTTP request made:
 
 ```python
-from arvel.testing import fake, reset_fakes
+from arvel.testing import fake, fake_notifications, fake_http, reset_fakes
 from arvel import Mail, Queue, Event
 
 def test_registration_sends_welcome():
     mail = fake(Mail)
     queue = fake(Queue)
+    notifications = fake_notifications()
 
     register_user({"email": "ada@example.com"})
 
     mail.assert_sent(WelcomeMail)
     queue.assert_pushed(ProvisionWorkspace)
+    notifications.assert_sent_to(user, WelcomeAboard)
     reset_fakes()                      # restore real implementations (do this in teardown)
 ```
 
@@ -56,8 +83,13 @@ def test_registration_sends_welcome():
 | `fake(Mail)` | `assert_sent(Mailable)` · `assert_nothing_sent()` |
 | `fake(Queue)` | `assert_pushed(Job)` · `assert_nothing_pushed()` |
 | `fake(Event)` | `assert_dispatched(EventType)` |
+| `fake_notifications()` | `assert_sent_to(notifiable, cls, cb=None)` · `assert_not_sent_to(...)` · `assert_nothing_sent()` · `assert_count(n)` |
+| `fake_bus()` | same object as `fake(Queue)` — `assert_dispatched(Job)`/`assert_not_dispatched(Job)` (Laravel `Bus::fake` naming; arvel models `Bus`/`Queue` dispatch as the one push path, not two fakes) |
+| `fake_http(mapping=None)` | `Http.fake(...)` under the hood, returned for `assert_sent`/`assert_not_sent`/`assert_sent_count`/`recorded` — see [HTTP Client](http-client.md) for the mapping/`Http.response(...)` shape |
+| `fake_storage(disk="local")` | see [File Storage](storage.md) |
 
-Call `reset_fakes()` in teardown so a swapped fake doesn't leak into the next test.
+Call `reset_fakes()` in teardown so a swapped fake doesn't leak into the next test — it restores
+every facade swap plus the faked storage disk, HTTP transport, and notification binding.
 
 ## Isolating process-global state
 
@@ -93,6 +125,37 @@ async def test_create_and_delete(db):
     await assert_soft_deleted(db, "posts", title="Hello")     # deleted_at is set
     await assert_database_missing(db, "audit_log", action="purge")
 ```
+
+## Console commands
+
+`artisan(app, command, input=None)` runs an app-registered command (a `Command` class on
+`app.command_classes`, or a `routes/console.py` `Console.command(...)` closure) against a booted
+app and captures its exit code + output — Laravel's `$this->artisan(...)`:
+
+```python
+from arvel.testing import artisan
+
+def test_greet_command(app):
+    result = artisan(app, "greet Ada --loud", input=["Bob"])   # input pre-seeds ask()/confirm()/...
+    result.assert_exit_code(0).assert_output_contains("hello Bob")
+```
+
+`input` answers prompts (`Command.ask`/`secret`/`confirm`/`choice`/`anticipate`) in the order
+they're asked — an exhausted or empty seeded answer falls back to the prompt's own default, same as
+a real `Prompter`.
+
+!!! note "Built-in framework commands aren't reachable this way"
+    `artisan()` only dispatches **your** commands (app/provider `Command` classes and
+    `Console.command(...)` closures) — a built-in (`migrate`, `make:*`, `db:seed`, ...) isn't. Test
+    those with Typer's own `CliRunner` directly:
+
+    ```python
+    from typer.testing import CliRunner
+    from arvel.console import build_cli
+
+    result = CliRunner().invoke(build_cli(), ["route:list"])
+    assert result.exit_code == 0
+    ```
 
 ## Freezing time
 

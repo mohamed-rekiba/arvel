@@ -9,7 +9,7 @@ testing-strategy in knowledge/port/ (golden-path).
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Generator
+from collections.abc import Callable, Generator, Mapping, Sequence
 from typing import Any, cast
 
 
@@ -77,6 +77,17 @@ class FakeQueue:
         if self.pushed:
             raise AssertionError("expected no jobs pushed")
 
+    def assert_dispatched(self, job_cls: type) -> None:
+        """Alias of :meth:`assert_pushed` — Laravel ``Bus::assertDispatched`` naming. arvel models
+        job dispatch as one fake regardless of facade (``Queue``/``Bus`` are the same push path);
+        see :func:`fake_bus`."""
+        self.assert_pushed(job_cls)
+
+    def assert_not_dispatched(self, job_cls: type) -> None:
+        """Alias of the inverse of :meth:`assert_pushed` — Laravel ``Bus::assertNotDispatched``."""
+        if any(job is job_cls for job, _, _ in self.pushed):
+            raise AssertionError(f"expected {job_cls.__name__} NOT to be pushed")
+
 
 class FakeEvents:
     """Records dispatched events instead of invoking listeners."""
@@ -100,6 +111,61 @@ class FakeEvents:
             raise AssertionError(f"expected a {event_type.__name__} to be dispatched")
 
 
+class FakeNotifications:
+    """Records notifications instead of delivering them (Laravel ``Notification::fake``).
+    ``sent[i]`` is ``(notifiable, notification, channels)``."""
+
+    def __init__(self) -> None:
+        self.sent: list[tuple[Any, Any, list[str]]] = []
+
+    async def send(self, notifiable: Any, notification: Any) -> dict[str, Any]:
+        channels = notification.via(notifiable)
+        self.sent.append((notifiable, notification, channels))
+        return dict.fromkeys(channels, "faked")
+
+    async def send_now(
+        self, notifiable: Any, notification: Any, channels: list[str] | None = None
+    ) -> dict[str, Any]:
+        return await self.send(notifiable, notification)
+
+    def assert_sent_to(
+        self,
+        notifiable: Any,
+        notification_cls: type,
+        callback: Callable[[Any], bool] | None = None,
+    ) -> None:
+        matches = [
+            note
+            for who, note, _ in self.sent
+            if who is notifiable and isinstance(note, notification_cls)
+        ]
+        if callback is not None:
+            matches = [note for note in matches if callback(note)]
+        if not matches:
+            raise AssertionError(
+                f"expected a {notification_cls.__name__} sent to {notifiable!r}; sent={self.sent!r}"
+            )
+
+    def assert_not_sent_to(self, notifiable: Any, notification_cls: type) -> None:
+        matches = [
+            note
+            for who, note, _ in self.sent
+            if who is notifiable and isinstance(note, notification_cls)
+        ]
+        if matches:
+            raise AssertionError(
+                f"expected no {notification_cls.__name__} sent to {notifiable!r}; found {matches!r}"
+            )
+
+    def assert_nothing_sent(self) -> None:
+        if self.sent:
+            raise AssertionError(f"expected no notifications sent; sent={self.sent!r}")
+
+    def assert_count(self, n: int) -> None:
+        if len(self.sent) != n:
+            raise AssertionError(f"expected {n} notification(s) sent; found {len(self.sent)}")
+
+
 _FAKE_FOR_ACCESSOR: dict[str, type] = {
     "mail": FakeMailer,
     "queue": FakeQueue,
@@ -113,6 +179,50 @@ def fake(facade: Any) -> Any:
     fake_obj = _FAKE_FOR_ACCESSOR[accessor]()
     facade.swap(fake_obj)
     return fake_obj
+
+
+def fake_bus() -> FakeQueue:
+    """Fake job dispatch (Laravel ``Bus::fake``) — an alias of ``fake(Queue)``: arvel already
+    models ``Bus``/``Queue`` dispatch as the one push path, so this returns the same
+    :class:`FakeQueue` rather than a second, duplicate double. Extend with
+    ``assert_dispatched_chain``/``assert_batched`` once batching (story 18) lands."""
+    from arvel.support.facades import Queue
+
+    return cast("FakeQueue", fake(Queue))
+
+
+_faked_notifications = False
+
+
+def fake_notifications() -> FakeNotifications:
+    """Swap the ``notifications`` container binding for a recording double (Laravel
+    ``Notification::fake``) so ``notifiable.notify(...)`` records instead of delivering.
+
+    Reaches into the container directly (``app().instance(...)``) rather than a ``Facade`` — there's
+    no ``Notification`` facade in arvel (notifications are sent via the ``Notifiable`` mixin, which
+    resolves ``app().make("notifications")`` itself); :func:`restore_notifications` (or
+    ``reset_fakes``) undoes it."""
+    from arvel.kernel.globals import app
+
+    global _faked_notifications
+    fake_obj = FakeNotifications()
+    app().instance("notifications", fake_obj)
+    _faked_notifications = True
+    return fake_obj
+
+
+def restore_notifications() -> None:
+    """Restore the real ``notifications`` binding after :func:`fake_notifications`. A no-op if
+    nothing was faked (or the app that held the swap is already gone — best-effort, like
+    :func:`restore_storage`)."""
+    global _faked_notifications
+    if not _faked_notifications:
+        return
+    from arvel.kernel.globals import app, has_application
+
+    if has_application():
+        app().forget("notifications")
+    _faked_notifications = False
 
 
 class FakeFilesystem:
@@ -191,19 +301,198 @@ def restore_storage(disk: str | None = None) -> None:
         _faked_disks.discard(name)
 
 
+_http_faked = False
+
+
+def fake_http(mapping: Mapping[str, Any] | None = None) -> Any:
+    """Fake the ``Http`` client for this test (Laravel ``Http::fake``) — routes through
+    ``arvel.support.facades.Http.fake`` so ``arvel.testing`` is the one import surface; returns the
+    underlying client (``assert_sent``/``assert_not_sent``/``assert_sent_count``/``recorded``, plus
+    ``Http.response(...)`` for canned bodies). :func:`reset_fakes` restores the real transport."""
+    from arvel.kernel.globals import app
+    from arvel.support.facades import Http
+
+    global _http_faked
+    Http.fake(mapping)
+    _http_faked = True
+    return app("http")
+
+
+def restore_http() -> None:
+    """Restore the real ``Http`` transport after :func:`fake_http`. A no-op if nothing was faked
+    (or the app that held the swap is already gone — best-effort, like :func:`restore_storage`)."""
+    global _http_faked
+    if not _http_faked:
+        return
+    from arvel.kernel.globals import app, has_application
+
+    if has_application():
+        app("http").restore()
+    _http_faked = False
+
+
 def reset_fakes() -> None:
-    """Clear all swapped facade roots and restore any faked storage disks (call in test teardown)."""
+    """Clear all swapped facade roots and restore any faked storage disks/HTTP transport/notification
+    binding (call in test teardown)."""
     from arvel.support.facades import Facade
 
     Facade.clear_swapped()
     restore_storage()
+    restore_http()
+    restore_notifications()
+
+
+def _dotted_get(data: Any, key: str, default: Any) -> Any:
+    """Laravel-style dotted-key lookup into parsed JSON (``"user.name"``, ``"items.0.id"``)."""
+    current: Any = data
+    for part in key.split("."):
+        if isinstance(current, Mapping) and part in current:
+            mapping = cast("Mapping[str, Any]", current)
+            current = mapping[part]
+            continue
+        if isinstance(current, list) and part.lstrip("-").isdigit():
+            items = cast("list[Any]", current)
+            index = int(part)
+            if -len(items) <= index < len(items):
+                current = items[index]
+                continue
+        return default
+    return current
+
+
+_MISSING = object()
+
+
+class TestResponse:
+    """Wraps an HTTP test response with expressive assertions (Laravel ``http-tests.md`` parity).
+    ``.raw`` is the escape hatch to the full underlying response (an ``httpx.Response`` — Litestar's
+    ``TestClient`` is an ``httpx.Client``). Every assertion returns ``self`` (fluent)."""
+
+    def __init__(self, raw: Any) -> None:
+        self.raw = raw
+
+    def assert_status(self, n: int) -> TestResponse:
+        if self.raw.status_code != n:
+            raise AssertionError(
+                f"expected status {n}, got {self.raw.status_code}: {self.raw.text!r}"
+            )
+        return self
+
+    def assert_ok(self) -> TestResponse:
+        return self.assert_status(200)
+
+    def assert_created(self) -> TestResponse:
+        return self.assert_status(201)
+
+    def assert_no_content(self) -> TestResponse:
+        return self.assert_status(204)
+
+    def assert_not_found(self) -> TestResponse:
+        return self.assert_status(404)
+
+    def assert_forbidden(self) -> TestResponse:
+        return self.assert_status(403)
+
+    def assert_unauthorized(self) -> TestResponse:
+        return self.assert_status(401)
+
+    def assert_unprocessable(self) -> TestResponse:
+        return self.assert_status(422)
+
+    def assert_redirect(self, to: str | None = None) -> TestResponse:
+        if not (300 <= self.raw.status_code < 400):
+            raise AssertionError(f"expected a redirect status, got {self.raw.status_code}")
+        if to is not None:
+            location = self.raw.headers.get("location")
+            if location != to:
+                raise AssertionError(f"expected a redirect to {to!r}, got {location!r}")
+        return self
+
+    def assert_json(self, fragment: Mapping[str, Any]) -> TestResponse:
+        """Subset match (extra keys tolerated); ``fragment`` keys are dotted paths."""
+        data = self.raw.json()
+        for key, expected in fragment.items():
+            actual = _dotted_get(data, key, _MISSING)
+            if actual != expected:
+                raise AssertionError(
+                    f"expected json[{key!r}] == {expected!r}; got {actual!r} (body: {data!r})"
+                )
+        return self
+
+    def assert_json_path(self, path: str, value: Any) -> TestResponse:
+        actual = _dotted_get(self.raw.json(), path, _MISSING)
+        if actual != value:
+            raise AssertionError(f"expected json path {path!r} == {value!r}; got {actual!r}")
+        return self
+
+    def assert_json_count(self, n: int, path: str | None = None) -> TestResponse:
+        data = self.raw.json() if path is None else _dotted_get(self.raw.json(), path, [])
+        if len(data) != n:
+            raise AssertionError(f"expected {n} item(s) at {path or '<root>'!r}; got {len(data)}")
+        return self
+
+    def assert_json_missing(self, fragment: Mapping[str, Any]) -> TestResponse:
+        data = self.raw.json()
+        for key in fragment:
+            if _dotted_get(data, key, _MISSING) is not _MISSING:
+                raise AssertionError(f"expected json to be missing {key!r}; found in {data!r}")
+        return self
+
+    def assert_see(self, text: str) -> TestResponse:
+        if text not in self.raw.text:
+            raise AssertionError(f"expected body to contain {text!r}; body was {self.raw.text!r}")
+        return self
+
+    def assert_header(self, name: str, value: str | None = None) -> TestResponse:
+        actual = self.raw.headers.get(name)
+        if actual is None:
+            raise AssertionError(
+                f"expected header {name!r} to be present; headers={self.raw.headers!r}"
+            )
+        if value is not None and actual != value:
+            raise AssertionError(f"expected header {name!r} == {value!r}, got {actual!r}")
+        return self
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.raw, name)
+
+
+_RESPONSE_VERBS = frozenset({"get", "post", "put", "patch", "delete", "head", "options", "request"})
+
+
+class _WrappedTestClient:
+    """Wraps Litestar's ``TestClient`` so every verb call returns a :class:`TestResponse` instead of
+    the raw response; everything else (the context-manager protocol, cookies, ...) proxies straight
+    through to the real client."""
+
+    def __init__(self, raw: Any) -> None:
+        self._raw = raw
+
+    def __getattr__(self, name: str) -> Any:
+        attr = getattr(self._raw, name)
+        if name not in _RESPONSE_VERBS:
+            return attr
+
+        def _wrapped(*args: Any, **kwargs: Any) -> TestResponse:
+            return TestResponse(attr(*args, **kwargs))
+
+        return _wrapped
+
+    def __enter__(self) -> _WrappedTestClient:
+        self._raw.__enter__()
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self._raw.__exit__(*exc_info)
 
 
 def client(asgi: Any) -> Any:
-    """A Litestar ``TestClient`` over an ASGI app (``app.as_asgi()`` / ``kernel.build()``)."""
+    """A Litestar ``TestClient`` over an ASGI app (``app.as_asgi()`` / ``kernel.build()``), wrapped
+    so every verb call (``get``/``post``/...) returns a :class:`TestResponse` with expressive
+    assertions."""
     from litestar.testing import TestClient
 
-    return TestClient(asgi)
+    return _WrappedTestClient(TestClient(asgi))
 
 
 async def _matching_count(
@@ -280,20 +569,260 @@ def freeze_time(moment: Any = None) -> Generator[Any]:
         Date.set_test_now(previous)
 
 
+# --- console test helpers --------------------------------------------------------------
+#
+# ponytail: this section duck-types just enough of `arvel.console` (Command/Prompter/signature
+# parsing/Artisan dispatch) to run an app-registered command or closure, rather than importing it —
+# import-linter's G1 layers contract puts `arvel.console` *above* `arvel.testing` (console may
+# import testing; testing may not import console), so `Artisan.call`/`Command`/`Prompter` aren't
+# reachable from here even via a lazy import (import-linter's static analysis catches those too).
+# Ceiling: only app-registered `Command` classes/`Console.command(...)` closures are reachable this
+# way (mirrors `arvel.console.kernel._artisan_dispatch`'s own split) — a *built-in* framework
+# command (`migrate`, `make:*`, ...) isn't; drive those with Typer's own `CliRunner` directly
+# (``from typer.testing import CliRunner``). Upgrade path: if a shared parser/dispatcher ever moves
+# below the layer line, swap this out for the real thing.
+
+
+class ConsoleResult:
+    """The outcome of :func:`artisan` — exit code + captured stdout/stderr."""
+
+    def __init__(self, exit_code: int, output: str) -> None:
+        self.exit_code = exit_code
+        self.output = output
+
+    def assert_exit_code(self, n: int) -> ConsoleResult:
+        if self.exit_code != n:
+            raise AssertionError(
+                f"expected exit code {n}, got {self.exit_code}; output:\n{self.output}"
+            )
+        return self
+
+    def assert_output_contains(self, s: str) -> ConsoleResult:
+        if s not in self.output:
+            raise AssertionError(f"expected output to contain {s!r}; output was:\n{self.output}")
+        return self
+
+
+def _command_name(cls: type) -> str:
+    """Mirrors ``arvel.console.kernel.command_name`` (can't import it — see the module note)."""
+    signature = (getattr(cls, "signature", "") or "").strip()
+    if signature:
+        return signature.split()[0]
+    from arvel.support import Str
+
+    return Str.snake(cls.__name__)
+
+
+def _parse_signature_tokens(signature: str) -> list[tuple[str, bool]]:
+    """``(name, is_option)`` per ``{...}`` token — the common forms only (``{name}``/``{name?}``/
+    ``{name=default}``/``{--flag}``/``{--opt=}``); no variadics (``{arg*}``) or shortcuts
+    (``{--S|flag}``). Mirrors ``arvel.console.closure.parse_signature`` (can't import it)."""
+    import re
+
+    tokens: list[tuple[str, bool]] = []
+    for raw in re.findall(r"\{([^{}]+)\}", signature):
+        if raw.startswith("--"):
+            body = raw[2:]
+            tokens.append((body[:-1] if body.endswith("=") else body, True))
+        elif "=" in raw:
+            tokens.append((raw.split("=", 1)[0], False))
+        elif raw.endswith("?"):
+            tokens.append((raw[:-1], False))
+        else:
+            tokens.append((raw, False))
+    return tokens
+
+
+def _bind_command_line(signature: str, rest: Sequence[str]) -> dict[str, Any]:
+    """Raw CLI tokens (post command-name) -> ``{token_name: value}``, per ``signature``'s grammar —
+    positionals assigned in order, ``--name``/``--name=value`` recognized as options (a bare
+    ``--flag`` becomes ``True``)."""
+    tokens = _parse_signature_tokens(signature)
+    positionals = [name for name, is_option in tokens if not is_option]
+    option_names = {name for name, is_option in tokens if is_option}
+    values: dict[str, Any] = {}
+    pos_i = 0
+    for tok in rest:
+        if tok.startswith("--"):
+            key, sep, val = tok[2:].partition("=")
+            if key in option_names:
+                values[key] = val if sep else True
+            continue
+        if pos_i < len(positionals):
+            values[positionals[pos_i]] = tok
+            pos_i += 1
+    return values
+
+
+class _SeededPrompter:
+    """Duck-typed stand-in for ``arvel.console.prompts.Prompter`` — the same seeded-answers
+    semantics (an exhausted/empty seeded answer means "accept the default"), for the ``ask``/
+    ``secret``/``confirm``/``choice``/``anticipate`` names ``Command`` delegates to."""
+
+    def __init__(self, answers: Sequence[str] | None) -> None:
+        self._answers = list(answers) if answers is not None else []
+        self._i = 0
+
+    def _next(self) -> str:
+        value = self._answers[self._i] if self._i < len(self._answers) else ""
+        self._i += 1
+        return value
+
+    def ask(self, label: str, default: str | None = None) -> str:
+        return self._next() or (default or "")
+
+    def secret(self, label: str) -> str:
+        return self._next()
+
+    def confirm(self, label: str, default: bool = False) -> bool:
+        seeded = self._next()
+        return seeded.strip().lower() in ("y", "yes", "true", "1") if seeded else default
+
+    def choice(self, label: str, options: Sequence[str], default: str | None = None) -> str:
+        return self._next() or (default or "")
+
+    def anticipate(self, label: str, suggestions: Sequence[str], default: str | None = None) -> str:
+        return self._next() or (default or "")
+
+
+class _TestOutput:
+    """Duck-typed stand-in for ``arvel.console.ConsoleOutput`` — everything a ``Command`` writes
+    goes into one buffer (:attr:`ConsoleResult.output`); no color/table-width fidelity, just text
+    a test can search with ``assert_output_contains``."""
+
+    def __init__(self, buffer: list[str]) -> None:
+        self._buffer = buffer
+
+    def info(self, message: str) -> None:
+        self._buffer.append(message)
+
+    def line(self, message: str = "") -> None:
+        self._buffer.append(message)
+
+    def comment(self, message: str) -> None:
+        self._buffer.append(message)
+
+    def question(self, message: str) -> None:
+        self._buffer.append(message)
+
+    def error(self, message: str) -> None:
+        self._buffer.append(message)
+
+    def warn(self, message: str) -> None:
+        self._buffer.append(message)
+
+    def new_line(self, n: int = 1) -> None:
+        self._buffer.extend([""] * n)
+
+    def table(self, headers: Sequence[str], rows: Sequence[Sequence[Any]]) -> None:
+        self._buffer.append("  ".join(str(h) for h in headers))
+        for row in rows:
+            self._buffer.append("  ".join(str(cell) for cell in row))
+
+    def with_progress_bar(self, iterable: Any, *, label: str = "") -> Any:
+        yield from iterable
+
+
+def _run_capturing_exit(run: Callable[[], None]) -> int:
+    """Run ``run`` (an ``asyncio.run(...)`` call), turning a clean ``typer.Exit``/``SystemExit``
+    into its exit code — mirrors ``arvel.console.kernel._run_and_capture_exit`` (can't import it)."""
+    import typer
+
+    try:
+        run()
+    except typer.Exit as exc:
+        return exc.exit_code
+    except SystemExit as exc:
+        return exc.code if isinstance(exc.code, int) else 1
+    return 0
+
+
+def artisan(app: Any, command: str, input: Sequence[str] | None = None) -> ConsoleResult:
+    """Run an app-registered console command (a ``Command`` class or a ``routes/console.py``
+    ``Console.command(...)`` closure) against a booted ``app`` and capture its exit code + output
+    (Laravel's ``$this->artisan(...)``). ``input`` pre-seeds prompt answers in the order they're
+    asked (``Command.ask``/``confirm``/``choice``/...). Only app-registered commands are reachable
+    this way — see the module note above ``ConsoleResult`` for why, and the built-in-command
+    workaround."""
+    import asyncio
+    import contextlib
+    import inspect
+    import io
+
+    from arvel.kernel.globals import app as _active_app
+    from arvel.kernel.globals import has_application, set_application
+
+    name, *rest = command.split()
+    buffer: list[str] = []
+    prompter = _SeededPrompter(input)
+
+    closure = getattr(app, "console_commands", {}).get(name)
+    cls = None
+    if closure is None:
+        cls = next(
+            (c for c in getattr(app, "command_classes", []) if _command_name(c) == name), None
+        )
+    if closure is None and cls is None:
+        raise ValueError(f"artisan(): {name!r} is not registered on this app")
+
+    previous = _active_app() if has_application() else None
+    set_application(app)
+    stray_output = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(stray_output), contextlib.redirect_stderr(stray_output):
+            if closure is not None:
+                # ponytail: closures have no injectable prompter (unlike Command) — `input` only
+                # pre-seeds prompts for the Command-class branch below.
+                values = _bind_command_line(getattr(closure, "signature", "") or "", rest)
+
+                async def _run_closure() -> None:
+                    result = app.call(closure.handler, **values)
+                    if inspect.isawaitable(result):
+                        await result
+
+                exit_code = _run_capturing_exit(lambda: asyncio.run(_run_closure()))
+            else:
+                assert cls is not None  # noqa: S101 - invariant: the guard above raised otherwise
+                values = _bind_command_line(getattr(cls, "signature", "") or "", rest)
+                instance = cls(output=_TestOutput(buffer), prompter=prompter)
+                instance.bind_parsed(values)
+
+                async def _run_class() -> None:
+                    result = app.call((instance, "handle"))
+                    if inspect.isawaitable(result):
+                        await result
+
+                exit_code = _run_capturing_exit(lambda: asyncio.run(_run_class()))
+    finally:
+        set_application(previous)
+    if stray := stray_output.getvalue():
+        buffer.append(stray.rstrip("\n"))
+    return ConsoleResult(exit_code, "\n".join(buffer))
+
+
 __all__ = [
+    "ConsoleResult",
     "FakeEvents",
     "FakeFilesystem",
     "FakeMailer",
+    "FakeNotifications",
     "FakeQueue",
+    "TestResponse",
+    "artisan",
     "assert_database_has",
     "assert_database_missing",
     "assert_soft_deleted",
     "client",
     "database_transaction",
     "fake",
+    "fake_bus",
+    "fake_http",
+    "fake_notifications",
     "fake_storage",
     "freeze_time",
     "reset_fakes",
+    "restore_http",
+    "restore_notifications",
     "restore_storage",
     "travel_back",
     "travel_to",
