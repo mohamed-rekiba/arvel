@@ -1,9 +1,7 @@
 """BroadcastServiceProvider — binds the Broadcast manager.
 
-Not yet wired into ``[project.entry-points."arvel.providers"]`` (that one-line pyproject edit is
-outside this change's scope — see the story-19 handoff notes); an app that wants auto-discovery
-needs it added there. Until then, bind manually: ``app.instance("broadcast",
-BroadcastManager(app))``, or call this provider's ``register()`` yourself.
+Auto-discovered via ``[project.entry-points."arvel.providers"]``, so a fresh app resolves
+``broadcast`` without manual wiring.
 """
 
 from __future__ import annotations
