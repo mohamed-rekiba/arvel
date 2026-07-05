@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.54.0](https://github.com/mohamed-rekiba/arvel/compare/v0.53.0...v0.54.0) (2026-07-05)
+
+
+### Features
+
+* **console:** seeders get the command output handle (progress bars) ([e2330a3](https://github.com/mohamed-rekiba/arvel/commit/e2330a3fe8192c49b86fcf51f87a40d3e1ca96cf))
+
 ## [0.53.0](https://github.com/mohamed-rekiba/arvel/compare/v0.52.1...v0.53.0) (2026-07-05)
 
 
