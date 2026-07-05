@@ -306,6 +306,15 @@ shape) msgspec itself would raise for a bad type — one error bag either way, n
 Types stay in the annotations; semantics go in `rules()`. Skip `rules()` entirely (the default —
 an empty dict) when annotations already say everything you need.
 
+!!! note "Structural errors surface before semantic ones"
+    This is the one place arvel's typed-first `FormRequest` diverges from Laravel's array-based
+    validator: `rules()` can only run against a payload msgspec could **decode**, so if a request
+    has *both* a structural error (a mistyped field) and a semantic one (a `rules()` failure), the
+    structural error comes back first — you can't run a cross-field rule on a field that isn't the
+    right type yet. Fix the types, resend, and the semantic errors appear. Both are the same 422
+    shape; they just aren't always in the *same* response. Use a plain `Validator` (array-in,
+    all-rules-at-once) if you need Laravel's single combined bag for untyped input.
+
 ## Common mistakes & gotchas
 
 - **Forgetting `nullable` before a type rule.** `"age": "integer|min:18"` rejects a missing value;
