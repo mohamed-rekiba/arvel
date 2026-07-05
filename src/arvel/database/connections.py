@@ -20,6 +20,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Mapping
 
+    from arvel.database.builder import Builder
+
 _DEFAULT_CONFIG: dict[str, dict[str, Any]] = {"default": {"url": "sqlite+aiosqlite://"}}
 
 # the innermost open transaction's connection, so nested transaction() calls become SAVEPOINTs
@@ -81,6 +83,42 @@ class ConnectionResolver:
             actual = "write"
         sub = config.get(actual) or config.get("write") or config.get("read")
         return self._engine_for(f"{key}:{actual}", str(sub["url"]))
+
+    def dialect(self, name: str | None = None) -> str:
+        """The active connection's SQL dialect name — ``"postgresql"``, ``"sqlite"``, ``"mysql"``,
+        ``"mariadb"`` — for dialect-specific branches without reaching into the engine."""
+        return str(self.engine(name).dialect.name)
+
+    def table(self, name: str, connection: str | None = None) -> Builder:
+        """A query builder over a raw table or view by ``name`` — arvel's ``DB::table()``. Unlike a
+        model query it does **not** hydrate: ``get()`` yields plain ``dict`` rows. Use it for views,
+        aggregates, and reporting reads that have no model. Columns resolve as raw identifiers, so
+        bare and ``"table.column"`` names both work."""
+        import sqlalchemy as sa
+
+        from arvel.database.builder import Builder
+
+        return Builder(sa.table(name), self)
+
+    async def refresh_materialized_view(
+        self, name: str, *, concurrently: bool = False, connection: str | None = None
+    ) -> None:
+        """Refresh a Postgres materialized view (created via ``Schema.create_materialized_view``).
+
+        With ``concurrently=True`` readers are not blocked, but the view needs a unique index and the
+        refresh runs outside a transaction (so this uses an ``AUTOCOMMIT`` connection, not the
+        transactional :meth:`statement`). A no-op on dialects without materialized views — sqlite/
+        mysql degrade them to live plain views, which have nothing to refresh."""
+        import sqlalchemy as sa
+
+        engine = self.engine(connection)
+        if engine.dialect.name != "postgresql":
+            return
+        quoted = engine.dialect.identifier_preparer.quote(name)  # injection-safe DDL identifier
+        clause = "CONCURRENTLY " if concurrently else ""
+        async with engine.connect() as conn:
+            autocommit = await conn.execution_options(isolation_level="AUTOCOMMIT")
+            await autocommit.execute(sa.text(f"REFRESH MATERIALIZED VIEW {clause}{quoted}"))
 
     def _mark_sticky(self, name: str | None) -> None:
         key = name or self._default

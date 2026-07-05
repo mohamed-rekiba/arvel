@@ -74,6 +74,11 @@ class ClientResponse:
     def body(self) -> str:
         return self.raw.text
 
+    def content(self) -> bytes:
+        """The raw response body as **bytes** — use this for binary payloads (images, files, PDFs);
+        :meth:`body` is the text-decoded ``str`` and is lossy for non-text content."""
+        return self.raw.content
+
     def json(self, key: str | None = None, default: Any = None) -> Any:
         """The parsed JSON body, or ``default`` if the body isn't valid JSON. With ``key``, a
         dotted-path lookup into the parsed value (``response.json("user.name")``)."""

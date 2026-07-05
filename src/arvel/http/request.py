@@ -33,6 +33,11 @@ class Request:
     def raw(self) -> Any:
         return self._r
 
+    async def body(self) -> bytes:
+        """The raw request body bytes, before any parsing — e.g. to verify an HMAC signature over the
+        exact received payload. Use :meth:`json`/:meth:`form` for parsed access."""
+        return cast("bytes", await self._r.body())
+
     def method(self) -> str:
         return str(self._r.method)
 

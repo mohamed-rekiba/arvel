@@ -24,6 +24,14 @@ def test_200_is_ok_and_successful_not_failed() -> None:
     assert response.json() == {"id": 1}
 
 
+def test_content_returns_raw_bytes_not_decoded_text() -> None:
+    """``content()`` is the raw bytes (for images/files); ``body()`` is the lossy text decode."""
+    binary = b"\x89PNG\r\n\x1a\n\x00\xff\xfe raw"
+    response = _response(200, content=binary)
+    assert response.content() == binary
+    assert isinstance(response.content(), bytes)
+
+
 def test_404_is_a_client_error_and_failed() -> None:
     response = _response(404)
     assert response.client_error() is True

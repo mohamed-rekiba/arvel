@@ -9,6 +9,7 @@ reimplement* (doc 00 §5b). Grounded in knowledge/port/07-orm-active-record.md.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any, Self, cast
 
 if TYPE_CHECKING:
@@ -44,6 +45,11 @@ _COMPARISONS = {
     "<": "__lt__",
     "<=": "__le__",
 }
+
+# A strict SQL identifier — bare ``column`` or ``table.column``, letters/digits/underscore only.
+# Guards the schema-less ``DB.table`` builder's column names (no Table.c to validate against) so an
+# injection payload like ``"id; DROP TABLE users--"`` can never become a literal column.
+_SAFE_COLUMN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")
 
 
 class Builder:
@@ -140,7 +146,7 @@ class Builder:
         return getattr(expr, _COMPARISONS[operator])(self._bind(value))
 
     def _comparison(self, column: str, operator: str, value: Any) -> Any:
-        col = self._table.c[column]
+        col = self._where_column(column)
         if operator == "ilike":
             # native ILIKE on PostgreSQL; SQLAlchemy lowers both sides elsewhere
             return col.ilike(value)
@@ -164,13 +170,30 @@ class Builder:
             return cast("Any", sa.literal_column(name))
         return self._column_or_literal(name)
 
+    def _where_column(self, name: str) -> Any:
+        """Resolve a **filter/order** column safely (SQL-injection defense).
+
+        A schema-backed table (a model query) validates ``name`` against its declared columns —
+        an unknown identifier raises ``KeyError`` rather than being injected; filter joined or
+        computed columns with ``where_raw`` (the app owns those). A schema-less ``DB.table`` builder
+        has no ``Table.c`` to check, so a strictly-validated bare/``table.column`` identifier becomes
+        a literal; anything else is rejected."""
+        import sqlalchemy as sa
+
+        cols = self._table.c
+        if len(cols):
+            return cols[name]  # KeyError on unknown = rejected, never interpolated
+        if _SAFE_COLUMN.match(name):
+            return cast("Any", sa.literal_column(name))
+        raise KeyError(name)
+
     def _apply_conditions(
         self, args: tuple[Any, ...], kwargs: dict[str, Any], connector: str
     ) -> None:
         for column, val in kwargs.items():
-            self._add(self._table.c[column] == self._bind(val), connector)
+            self._add(self._where_column(column) == self._bind(val), connector)
         if len(args) == 2:
-            self._add(self._table.c[args[0]] == self._bind(args[1]), connector)
+            self._add(self._where_column(args[0]) == self._bind(args[1]), connector)
         elif len(args) == 3:
             self._add(self._comparison(args[0], args[1], args[2]), connector)
 
@@ -185,27 +208,27 @@ class Builder:
     def where_in(self, column: str, values: Sequence[Any] | Select[Any]) -> Self:
         """``WHERE col IN (...)``. ``values`` is a list **or a subquery** ``Select`` (``whereIn('id', $subquery)``) — pass ``sa.select(other.c.id)`` to filter DB-side without
         materializing the id list in the app (e.g. ``where_in('id', select(retrievable.c.id))``)."""
-        self._add(self._table.c[column].in_(values))
+        self._add(self._where_column(column).in_(values))
         return self
 
     def where_not_in(self, column: str, values: Sequence[Any] | Select[Any]) -> Self:
-        self._add(self._table.c[column].not_in(values))
+        self._add(self._where_column(column).not_in(values))
         return self
 
     def or_where_in(self, column: str, values: Sequence[Any]) -> Self:
-        self._add(self._table.c[column].in_(values), "or")
+        self._add(self._where_column(column).in_(values), "or")
         return self
 
     def where_between(self, column: str, values: Sequence[Any]) -> Self:
         low, high = values
-        self._add(self._table.c[column].between(low, high))
+        self._add(self._where_column(column).between(low, high))
         return self
 
     def where_not_between(self, column: str, values: Sequence[Any]) -> Self:
         import sqlalchemy as sa
 
         low, high = values
-        self._add(sa.not_(self._table.c[column].between(low, high)))
+        self._add(sa.not_(self._where_column(column).between(low, high)))
         return self
 
     def where_raw(self, sql: str, *, connector: str = "and") -> Self:
@@ -515,11 +538,11 @@ class Builder:
         return self
 
     def where_null(self, column: str) -> Self:
-        self._add(self._table.c[column].is_(None))
+        self._add(self._where_column(column).is_(None))
         return self
 
     def where_not_null(self, column: str) -> Self:
-        self._add(self._table.c[column].is_not(None))
+        self._add(self._where_column(column).is_not(None))
         return self
 
     def where_column(
@@ -694,7 +717,7 @@ class Builder:
         return self
 
     def order_by(self, column: str, direction: str = "asc") -> Self:
-        col = self._table.c[column]
+        col = self._where_column(column)
         self._order.append(col.desc() if direction == "desc" else col.asc())
         self._order_specs.append((column, direction))
         return self
@@ -766,12 +789,15 @@ class Builder:
         return expr
 
     def _select_targets(self) -> list[Any]:
+        import sqlalchemy as sa
+
         targets: list[Any] = []
         if self._columns:
-            targets.extend(self._table.c[c] for c in self._columns)
+            targets.extend(self._column_ref(c) for c in self._columns)
         targets.extend(self._raw_selects)
         if not targets:  # no select()/select_raw() → the whole table (SELECT *)
-            targets.append(self._table)
+            # a bare table clause (DB.table over a table/view with no declared columns) → SELECT *
+            targets.append(self._table if len(self._table.c) else sa.literal_column("*"))
         return [*targets, *self._aggregates]
 
     def _group_targets(self) -> list[Any]:
@@ -783,7 +809,7 @@ class Builder:
         stmt = sa.select(*self._select_targets())
         if self._joins:  # the joined construct IS the FROM (subsumes the plain-table case below)
             stmt = self._apply_joins(stmt)
-        elif self._raw_selects:  # raw columns carry no table ref → pin the FROM explicitly
+        elif self._raw_selects or not len(self._table.c):  # raw/`*` carry no table ref → pin FROM
             stmt = stmt.select_from(self._table)
         if self._distinct:
             stmt = stmt.distinct()
