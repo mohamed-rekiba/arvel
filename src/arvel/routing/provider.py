@@ -49,6 +49,19 @@ class RoutingServiceProvider(ServiceProvider):
         # resolved by Application.as_asgi()
         self.app.instance("http.asgi_builder", _build_served_asgi)
         self.app.instance("http.kernel_builder", _build_served_kernel)
+
+        # `limiter` (the RateLimiter facade root) over the app's cache — bound in a provider so it
+        # resolves on ANY boot (not only the served HttpKernel path), and routing→http.rate_limiter
+        # is a legal downward edge. Lazy: the factory resolves "cache" at make-time, so an app with
+        # no cache only fails if something actually asks for the limiter.
+        if not self.app.bound("limiter"):
+
+            def make_limiter(app: Container) -> Any:
+                from arvel.http.rate_limiter import RateLimiter
+
+                return RateLimiter(app.make("cache"))
+
+            self.app.singleton("limiter", make_limiter)
         # registered here (not the telemetry provider) so telemetry needn't import arvel.http;
         # done in `register` so it lands before the router compiles into the served app
         from arvel.telemetry import TelemetrySettings

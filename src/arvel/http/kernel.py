@@ -177,23 +177,7 @@ class HttpKernel:
             self.groups["web"] = [session_mw, ShareErrorsFromSession, ValidateCsrfToken]
         if not self.groups.get("api"):
             self.groups["api"] = [ThrottleRequests]
-        self._bind_limiter()
         return self
-
-    def _bind_limiter(self) -> None:
-        """Bind ``limiter`` (the ``RateLimiter`` facade's root) over the app's own ``cache``
-        service — lazy, and only if an app is present, has a cache, and hasn't bound one itself.
-        No dedicated service provider: with no ``arvel.http`` entry in ``[project.entry-points.
-        "arvel.providers"]``, the served kernel (the one place both "cache" and route middleware
-        meet) is where this wiring naturally lives, mirroring the redis-session wiring above."""
-        if self.app is None or not self.app.bound("cache") or self.app.bound("limiter"):
-            return
-        from arvel.http.rate_limiter import RateLimiter
-
-        def make_limiter(app: Any) -> RateLimiter:
-            return RateLimiter(app.make("cache"))
-
-        self.app.singleton("limiter", make_limiter)
 
     def add_route(
         self,
