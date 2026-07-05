@@ -195,3 +195,18 @@ async def test_concurrent_completions_do_not_lose_a_decrement() -> None:
         assert fresh.finished_at is not None
     finally:
         await db.dispose()
+
+
+async def test_empty_batch_finalizes_immediately() -> None:
+    # review nit: a 0-job batch has nothing to settle it — then/finally must fire at dispatch,
+    # not never (Laravel finalizes an empty batch right away)
+    from arvel.queue import Bus
+
+    _mgr, db = await _manager()
+    try:
+        batch = await Bus.batch([]).then(_record_then).finally_(_record_then).dispatch()
+        row = await JobBatch.find(batch.id)
+        assert row is not None and row.finished_at is not None  # finished at dispatch
+        assert await batch.finished() is True
+    finally:
+        await db.dispose()

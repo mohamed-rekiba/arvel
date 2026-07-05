@@ -250,3 +250,37 @@ async def test_without_overlapping_skips_a_tick_while_the_prior_run_is_in_flight
     await event.run()  # a second tick while the first is still in flight -> skipped
     await first
     assert ran == ["start", "end"]  # never two concurrent starts
+
+
+async def test_after_hook_does_not_fire_on_a_lost_one_server_tick() -> None:
+    # review BLOCKING: after() must fire only when the event actually ran — not on the N-1
+    # instances that lose the one_server race (else .on_one_server().after(report) fires everywhere)
+    import asyncio
+
+    from arvel.cache import CacheManager
+
+    cache = CacheManager().driver()
+    ran: list[str] = []
+    after: list[str] = []
+
+    async def _tick() -> None:
+        await asyncio.sleep(0.02)
+        ran.append("ran")
+
+    a = (
+        Schedule(cache=cache)
+        .call(_tick)
+        .every_minute()
+        .on_one_server()
+        .after(lambda: after.append("after"))
+    )
+    b = (
+        Schedule(cache=cache)
+        .call(_tick)
+        .every_minute()
+        .on_one_server()
+        .after(lambda: after.append("after"))
+    )
+    await asyncio.gather(a.run(), b.run())
+    assert ran == ["ran"]  # exactly one ran
+    assert after == ["after"]  # ...and after fired exactly once, not on the lost tick

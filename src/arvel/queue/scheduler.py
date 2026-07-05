@@ -237,6 +237,7 @@ class ScheduledEvent:
 
     async def run(self) -> Any:
         locks: list[Any] = []
+        ran = False  # set only once past the locks — so before/after/callback all skip a lost tick
         try:
             if self.one_server:
                 lock = self._lock(f"schedule:one_server:{self._identity()}", _ONE_SERVER_LOCK_TTL)
@@ -249,6 +250,7 @@ class ScheduledEvent:
                     return None  # a prior run of this event is still in flight
                 locks.append(lock)
 
+            ran = True
             await self._fire(self._before)
             try:
                 result = self.callback()
@@ -260,8 +262,9 @@ class ScheduledEvent:
             await self._fire(self._on_success)
             return result
         finally:
-            await self._fire(self._after)
-            for lock in locks:
+            if ran:  # after-hooks fire only when the event actually ran, not on a skipped tick
+                await self._fire(self._after)
+            for lock in locks:  # release is unconditional — a lost tick acquired no lock anyway
                 await lock.release()
 
 

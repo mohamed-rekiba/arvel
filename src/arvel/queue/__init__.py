@@ -1059,6 +1059,11 @@ class PendingBatch:
             created_at=int(time.time()),
             finished_at=None,
         )
+        if not self.jobs:  # an empty batch has nothing to settle it — finish it immediately
+            from arvel.queue.batch import finalize_empty_batch
+
+            await finalize_empty_batch(row.id)
+            return Batch(row.id)
         for job in self.jobs:
             job.__arvel_batch__ = row.id  # type: ignore[attr-defined]
         for job in self.jobs:

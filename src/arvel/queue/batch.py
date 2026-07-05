@@ -181,6 +181,20 @@ async def _run_callbacks(refs: list[str], *args: Any) -> None:
             await outcome
 
 
+async def finalize_empty_batch(batch_id: str) -> None:
+    """Finish a batch that was dispatched with zero jobs — no job will ever settle to trigger the
+    normal transition, so `then`/`finally` fire here immediately (Laravel finalizes an empty batch
+    right away)."""
+    if not await _finish_batch_once(batch_id):
+        return
+    row = await JobBatch.find(batch_id)
+    if row is None:
+        return
+    batch = Batch(batch_id)
+    await _run_callbacks(row.options.get("then", []), batch)
+    await _run_callbacks(row.options.get("finally", []), batch)
+
+
 async def apply_job_outcome(batch_id: str, exc: BaseException | None) -> None:
     """The worker's bookkeeping hook, called once a batched job settles (success — `exc is None`
     — or exhausts its retries). Atomically updates the batch's counters and, on whichever
