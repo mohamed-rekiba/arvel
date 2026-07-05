@@ -16,9 +16,7 @@ def test_fake_response_bytes_body() -> None:
 
 
 def test_recorded_request_accessors_and_json() -> None:
-    raw = httpx.Request(
-        "POST", "https://api.test/v1/items?a=1", json={"name": "widget", "qty": 3}
-    )
+    raw = httpx.Request("POST", "https://api.test/v1/items?a=1", json={"name": "widget", "qty": 3})
     rec = RecordedRequest(raw)
     assert rec.method == "POST"
     assert rec.url == "https://api.test/v1/items?a=1"

@@ -35,7 +35,7 @@ class _FakePubSub:
     async def subscribe(self, channel: str) -> None:
         self.subscribed.append(channel)
 
-    async def listen(self):  # noqa: ANN202
+    async def listen(self):
         for message in self._messages:
             yield message
 

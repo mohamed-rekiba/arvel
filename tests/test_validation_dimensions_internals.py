@@ -8,9 +8,11 @@ import io
 
 from PIL import Image
 
-from arvel.validation import _check_dimensions  # pyright: ignore[reportPrivateUsage]
-from arvel.validation import _parse_ratio  # pyright: ignore[reportPrivateUsage]
-from arvel.validation import _upload_bytes  # pyright: ignore[reportPrivateUsage]
+from arvel.validation import (
+    _check_dimensions,  # pyright: ignore[reportPrivateUsage]
+    _parse_ratio,  # pyright: ignore[reportPrivateUsage]
+    _upload_bytes,  # pyright: ignore[reportPrivateUsage]
+)
 
 
 def _png(width: int, height: int) -> bytes:

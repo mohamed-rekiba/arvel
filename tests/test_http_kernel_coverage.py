@@ -39,21 +39,21 @@ def test_handler_io_detects_a_struct_body() -> None:
     def handler(request: Any, body: _Body) -> dict[str, Any]:
         return {}
 
-    return_hint, body = HttpKernel._handler_io(handler)  # pyright: ignore[reportPrivateUsage]
+    _return_hint, body = HttpKernel._handler_io(handler)  # pyright: ignore[reportPrivateUsage]
     assert body == ("body", _Body)
 
 
 def test_handler_io_degrades_on_unresolvable_hints() -> None:
-    def handler(request: Any, x: "NopeUndefined") -> None:  # noqa: F821 - intentional bad ref
+    def handler(request: Any, x: NopeUndefined) -> None:  # noqa: F821 - intentional bad ref
         return None
 
-    return_hint, body = HttpKernel._handler_io(handler)  # pyright: ignore[reportPrivateUsage]
+    _return_hint, body = HttpKernel._handler_io(handler)  # pyright: ignore[reportPrivateUsage]
     assert body is None  # string annotations can't be a Struct subclass
 
 
 def test_handler_io_on_an_uninspectable_object() -> None:
     # inspect.signature(object()) raises TypeError -> the (return_hint, None) fallback
-    return_hint, body = HttpKernel._handler_io(object())  # pyright: ignore[reportPrivateUsage]
+    _return_hint, body = HttpKernel._handler_io(object())  # pyright: ignore[reportPrivateUsage]
     assert body is None
 
 
@@ -69,7 +69,7 @@ def test_query_params_skips_request_body_path_and_varargs() -> None:
 
 
 def test_query_params_degrades_on_unresolvable_hints() -> None:
-    def handler(request: Any, x: "NopeUndefined") -> None:  # noqa: F821 - intentional bad ref
+    def handler(request: Any, x: NopeUndefined) -> None:  # noqa: F821 - intentional bad ref
         return None
 
     assert (

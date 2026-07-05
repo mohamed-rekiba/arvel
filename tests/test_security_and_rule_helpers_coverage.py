@@ -9,10 +9,12 @@ import base64
 import pytest
 
 from arvel.security import _decode_key  # pyright: ignore[reportPrivateUsage]
-from arvel.validation.rules import _check_decimal  # pyright: ignore[reportPrivateUsage]
-from arvel.validation.rules import _check_ip  # pyright: ignore[reportPrivateUsage]
-from arvel.validation.rules import _check_multiple_of  # pyright: ignore[reportPrivateUsage]
-from arvel.validation.rules import _is_number  # pyright: ignore[reportPrivateUsage]
+from arvel.validation.rules import (
+    _check_decimal,  # pyright: ignore[reportPrivateUsage]
+    _check_ip,  # pyright: ignore[reportPrivateUsage]
+    _check_multiple_of,  # pyright: ignore[reportPrivateUsage]
+    _is_number,  # pyright: ignore[reportPrivateUsage]
+)
 
 
 def test_decode_key_accepts_raw_bytes() -> None:

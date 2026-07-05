@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import pytest
 
-from arvel.console.kernel import Artisan
-from arvel.console.kernel import _artisan_argv  # pyright: ignore[reportPrivateUsage]
+from arvel.console.kernel import (
+    Artisan,
+    _artisan_argv,  # pyright: ignore[reportPrivateUsage]
+)
 from arvel.kernel import set_application
 from arvel.kernel.application import Application
 

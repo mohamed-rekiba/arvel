@@ -32,9 +32,7 @@ def test_multipart_field_missing_boundary_or_field() -> None:
 
 
 def test_form_method_override_urlencoded_multipart_and_other() -> None:
-    assert (
-        _form_method_override("application/x-www-form-urlencoded", b"_method=patch") == "PATCH"
-    )
+    assert _form_method_override("application/x-www-form-urlencoded", b"_method=patch") == "PATCH"
     ctype, body = _multipart("B", "_method", "delete")
     assert _form_method_override(ctype, body) == "DELETE"
     assert _form_method_override("application/json", b"{}") == ""  # unhandled content type
