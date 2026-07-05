@@ -385,21 +385,21 @@ class Rule:
 
     message: str = "The:attribute is invalid."
 
-    async def passes(self, attribute: str, value: Any) -> bool:
+    def passes(self, attribute: str, value: Any) -> bool:
         raise NotImplementedError(f"{type(self).__name__} must implement passes()")
 
 
 class Enum(Rule):
     """Rule object: value-in-enum membership. No string
     form — the enum class *is* the closed set, so it's typed rather than stringly-parsed:
-    ``{"status": [Enum(Status)]}``. A plain ``Rule`` subclass, so it runs on the same async path
-    as any custom rule (``passes_async`` / ``validate_async``) — no extra dispatch needed."""
+    ``{"status": [Enum(Status)]}``. A plain ``Rule`` subclass, so it runs wherever the ruleset
+    runs — sync ``passes()`` and async ``passes_async()`` alike."""
 
     def __init__(self, enum_cls: type[_PyEnum]) -> None:
         self._enum_cls = enum_cls
         self.message = f"The:attribute is not a valid {enum_cls.__name__}."
 
-    async def passes(self, attribute: str, value: Any) -> bool:
+    def passes(self, attribute: str, value: Any) -> bool:
         try:
             self._enum_cls(value)
         except ValueError:
@@ -488,7 +488,15 @@ class Validator:
                 continue
             bail = "bail" in rules  # stop THIS field's rules at its first failure
             for rule in rules:
-                if not isinstance(rule, str):  # custom Rule object → handled in passes_async
+                if isinstance(rule, Rule):  # custom rule object — sync predicate
+                    if not rule.passes(field, value):
+                        self._errors.setdefault(field, []).append(
+                            rule.message.replace(":attribute", field)
+                        )
+                        if bail:
+                            break
+                    continue
+                if not isinstance(rule, str):
                     continue
                 if rule in ("nullable", "sometimes", "bail"):
                     continue
@@ -525,7 +533,15 @@ class Validator:
         for index, value in enumerate(values_list):
             key = field.replace("*", str(index), 1)
             for rule in rules:
-                if not isinstance(rule, str):  # custom Rule object → handled in passes_async
+                if isinstance(rule, Rule):  # custom rule object — sync predicate
+                    if not rule.passes(key, value):
+                        self._errors.setdefault(key, []).append(
+                            rule.message.replace(":attribute", key)
+                        )
+                        if bail:
+                            break
+                    continue
+                if not isinstance(rule, str):
                     continue
                 if rule in ("nullable", "sometimes", "bail", "distinct"):
                     continue
@@ -542,10 +558,11 @@ class Validator:
         return not self.passes()
 
     async def passes_async(self) -> bool:
-        """Run sync rules, then the async DB rules (``unique``/``exists``)."""
+        """Run the synchronous rules (incl. custom ``Rule``/``Enum`` objects), then the async DB
+        rules (``unique``/``exists``) that can't run on the sync path."""
         from arvel.support.helpers import data_get
 
-        self.passes()  # populates _errors from the synchronous rules first
+        self.passes()  # sync rules, custom Rule objects included — not re-run below
         for field, ruleset in self.rules.items():
             rules = self._parse_rules(ruleset)
             if "sometimes" in rules and field not in self.data:
@@ -553,17 +570,17 @@ class Validator:
             value = data_get(self.data, field)
             if value is None and "nullable" in rules:
                 continue
+            bail = "bail" in rules
             for rule in rules:
-                if isinstance(rule, Rule):  # custom rule object
-                    if not await rule.passes(field, value):
-                        message = rule.message.replace(":attribute", field)
-                        self._errors.setdefault(field, []).append(message)
+                if not isinstance(rule, str):
                     continue
                 name, _, arg = rule.partition(":")
                 if name in ("unique", "exists") and not await self._check_db(
                     name, value, arg, field
                 ):
                     self._errors.setdefault(field, []).append(self._message(field, name, arg))
+                    if bail:
+                        break
         return not self._errors
 
     async def fails_async(self) -> bool:

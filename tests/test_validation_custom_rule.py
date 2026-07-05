@@ -1,4 +1,4 @@
-"""Validation (doc 10) — custom rule objects (class X(Rule): async def passes)."""
+"""Validation (doc 10) — custom rule objects (class X(Rule): def passes)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from arvel.validation import Rule, ValidationException, Validator
 class Uppercase(Rule):
     message = "The :attribute must be uppercase."
 
-    async def passes(self, attribute: str, value: Any) -> bool:
+    def passes(self, attribute: str, value: Any) -> bool:
         return isinstance(value, str) and value.isupper()
 
 
