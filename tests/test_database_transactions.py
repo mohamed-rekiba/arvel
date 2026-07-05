@@ -54,12 +54,15 @@ async def test_transact_retries_on_transient_error() -> None:
     try:
         calls = {"n": 0}
 
+        class _Deadlock(Exception):
+            sqlstate = "40P01"  # how a real driver surfaces a deadlock (transient → retry)
+
         async def work(conn: sa.Connection) -> None:
             calls["n"] += 1
             if calls["n"] == 1:
                 from sqlalchemy.exc import OperationalError
 
-                raise OperationalError("stmt", {}, Exception("deadlock detected"))
+                raise OperationalError("stmt", {}, _Deadlock("deadlock detected"))
             await conn.execute(sa.update(accounts).values(balance=500))
 
         await db.transact(work, attempts=3)

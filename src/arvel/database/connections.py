@@ -24,6 +24,25 @@ if TYPE_CHECKING:
 
 _DEFAULT_CONFIG: dict[str, dict[str, Any]] = {"default": {"url": "sqlite+aiosqlite://"}}
 
+# SQLSTATE class 40 = transaction rollback: 40001 serialization_failure, 40P01 deadlock_detected.
+# MySQL surfaces these as vendor codes 1213 (deadlock) / 1205 (lock wait timeout) with no SQLSTATE.
+_TRANSIENT_SQLSTATES = frozenset({"40001", "40P01"})
+_TRANSIENT_MYSQL_CODES = frozenset({1213, 1205})
+
+
+def _is_transient(exc: Any) -> bool:
+    """Whether a DBAPI error is a retryable deadlock/serialization failure (vs a permanent
+    constraint/programming error). Reads the driver's own SQLSTATE / vendor code, not the
+    SQLAlchemy wrapper type — those subclass a common base and can't be told apart by class."""
+    orig = getattr(exc, "orig", None)
+    if orig is None:
+        return False
+    sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+    if sqlstate in _TRANSIENT_SQLSTATES:
+        return True
+    args: Any = getattr(orig, "args", None)
+    return bool(args) and args[0] in _TRANSIENT_MYSQL_CODES
+
 # the innermost open transaction's connection, so nested transaction() calls become SAVEPOINTs
 _active_conn: ContextVar[Any] = ContextVar("arvel_db_active_conn", default=None)
 
@@ -292,16 +311,19 @@ class ConnectionResolver:
         return wrapper
 
     async def transact(self, callback: Any, name: str | None = None, *, attempts: int = 1) -> Any:
-        """Run ``callback(conn)`` in a transaction; retry on a transient operational
-        error (deadlock / serialization failure) up to ``attempts`` times (doc 08)."""
-        from sqlalchemy.exc import DBAPIError, OperationalError
+        """Run ``callback(conn)`` in a transaction; retry only on a *transient* failure
+        (deadlock / serialization failure) up to ``attempts`` times. A permanent error
+        (constraint violation, bad SQL) raises immediately without burning retries (doc 08)."""
+        from sqlalchemy.exc import DBAPIError
 
         last: Exception | None = None
         for _ in range(max(1, attempts)):
             try:
                 async with self.transaction(name) as conn:
                     return await callback(conn)
-            except (OperationalError, DBAPIError) as exc:  # transient → retry
+            except DBAPIError as exc:
+                if not _is_transient(exc):
+                    raise  # permanent (integrity/programming/data) — don't retry
                 last = exc
         raise last if last is not None else RuntimeError("transaction failed")
 
