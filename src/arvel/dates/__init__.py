@@ -122,6 +122,41 @@ class Date:
     def start_of_day(self) -> Date:
         return Date(self._dt.start_of("day"))
 
+    def start_of_month(self) -> Date:
+        return Date(self._dt.start_of("month"))
+
+    def start_of_year(self) -> Date:
+        return Date(self._dt.start_of("year"))
+
+    def start_of_week(self) -> Date:
+        # Monday-based week start (ISO); whenever has no "week" unit for start_of
+        iso_weekday = self._dt.to_stdlib().isoweekday()  # 1=Mon .. 7=Sun
+        return Date(self._dt.start_of("day").add(days=-(iso_weekday - 1)))
+
+    def is_past(self) -> bool:
+        return self._dt < self.now(str(self._dt.tz)).raw
+
+    def is_future(self) -> bool:
+        return self._dt > self.now(str(self._dt.tz)).raw
+
+    def is_today(self) -> bool:
+        return self.start_of_day() == self.now(str(self._dt.tz)).start_of_day()
+
+    def diff_in_days(self, other: Date) -> int:
+        # calendar days between the two local dates — DST-safe, unlike 24h-delta arithmetic
+        return (other.raw.to_stdlib().date() - self._dt.to_stdlib().date()).days
+
+    # signed whole time units from self to other (future -> positive), truncated toward zero;
+    # hours/minutes/seconds are exact elapsed time, so DST-safe (unlike calendar days above)
+    def diff_in_hours(self, other: Date) -> int:
+        return int((other.raw - self._dt).total("hours"))
+
+    def diff_in_minutes(self, other: Date) -> int:
+        return int((other.raw - self._dt).total("minutes"))
+
+    def diff_in_seconds(self, other: Date) -> int:
+        return int((other.raw - self._dt).total("seconds"))
+
     def is_weekend(self) -> bool:
         """Whether this date falls on a weekend — per ``config('app.weekend_days')`` (day names),
         defaulting to Saturday/Sunday. Carbon parity (weekend days are region-specific)."""

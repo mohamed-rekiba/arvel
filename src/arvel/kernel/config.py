@@ -108,4 +108,6 @@ def env(key: str, default: Any = None) -> Any:
     raw = os.environ.get(key)
     if raw is None:
         return default
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in ("'", '"'):
+        return raw[1:-1]  # a quoted value is a literal string — no true/false/null coercion
     return _ENV_LITERALS.get(raw.lower(), raw)
