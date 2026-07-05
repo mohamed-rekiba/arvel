@@ -1,5 +1,4 @@
-"""Flash aging — flashed data (status messages + the error bag) survives **exactly one request**
-(Laravel ``ageFlashData``). Regression for the latent bug where flashes persisted across every
+"""Flash aging — flashed data (status messages + the error bag) survives **exactly one request**. Regression for the latent bug where flashes persisted across every
 subsequent request because nothing ever aged the bag.
 
 ``StartSession`` ages the bag at request *start* (when the session loads), so the aging is uniform

@@ -1,4 +1,4 @@
-"""Query-builder parity (Laravel): common methods that were entirely absent — where_not_in /
+"""Query-builder parity: common methods that were entirely absent — where_not_in /
 where_between / where_not_between / or_where_in, the `when` conditional clause, skip/take aliases,
 pluck / value, and first_or_fail. A real app reaches for these constantly."""
 
@@ -85,8 +85,8 @@ async def test_when_conditional_clause() -> None:
         await db.dispose()
 
 
-async def test_when_passes_value_laravel_style() -> None:
-    """Laravel parity: ``when($value, fn($query, $value))`` passes the truthy value as the
+async def test_when_passes_value_style() -> None:
+    """parity: ``when($value, fn($query, $value))`` passes the truthy value as the
     callback's second argument. A 1-arg callback (close-over style) must keep working."""
     db = await _seed()
     try:
@@ -130,7 +130,7 @@ async def test_when_unless_edge_callbacks() -> None:
 
 
 async def test_unless_conditional_clause() -> None:
-    """Laravel ``unless`` — the inverse of ``when`` (applies the callback when the condition is
+    """``unless`` — the inverse of ``when`` (applies the callback when the condition is
     falsy), with the same value-passing + default-branch semantics."""
     db = await _seed()
     try:

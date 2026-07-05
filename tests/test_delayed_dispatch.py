@@ -1,4 +1,4 @@
-"""Delayed dispatch (Laravel ``dispatch()->delay()``) — durable, DB-backed via the ``jobs`` table.
+"""Delayed dispatch — durable, DB-backed via the ``jobs`` table.
 ``dispatch_after(seconds, job)`` persists a row with ``available_at`` in the future instead of
 enqueuing immediately; a worker/scheduler calls ``release_due_jobs()`` to push the due ones onto the
 broker and delete their rows. Durable across restarts (rows persist); needs a configured database."""

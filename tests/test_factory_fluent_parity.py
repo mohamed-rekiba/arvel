@@ -1,4 +1,4 @@
-"""Model-factory fluent parity (Laravel): the factory had make/create/make_many/create_many but lacked
+"""Model-factory fluent parity: the factory had make/create/make_many/create_many but lacked
 state (dict or callable), sequence, raw, and the fluent count() batch. state() is immutable (returns a
 copy); count() routes through FactoryBatch so make/create return lists."""
 

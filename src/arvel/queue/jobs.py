@@ -1,4 +1,4 @@
-"""Delayed-job storage — the ``jobs`` table backing ``dispatch_after`` (Laravel's delayed queue).
+"""Delayed-job storage — the ``jobs`` table backing ``dispatch_after``.
 
 A ``dispatch_after(seconds, job)`` writes a ``QueuedJob`` row with ``available_at`` set in the future
 instead of enqueuing immediately; ``QueueManager.release_due_jobs`` pushes the due rows onto the broker

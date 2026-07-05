@@ -1,6 +1,6 @@
 # Concurrency
 
-`Concurrency.run` (Laravel `Concurrency` parity) runs a batch of zero-arg callables concurrently
+`Concurrency.run` runs a batch of zero-arg callables concurrently
 and returns their results **in the same order you passed them** — regardless of which one finishes
 first.
 

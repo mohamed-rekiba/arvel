@@ -33,7 +33,7 @@ class Notification:
         return {}
 
     def to_broadcast(self, notifiable: Any) -> dict[str, Any]:
-        """The payload for the ``broadcast`` channel (Laravel ``toBroadcast``) — defaults to
+        """The payload for the ``broadcast`` channel — defaults to
         ``to_array()``."""
         return self.to_array(notifiable)
 
@@ -48,8 +48,7 @@ class Notification:
 
 
 class BroadcastNotification(ShouldBroadcast):
-    """The event a notification's ``broadcast`` channel sends (Laravel ``BroadcastNotificationCreated``
-    parity): ``to_broadcast()``'s payload, on the notifiable's channel."""
+    """The event a notification's ``broadcast`` channel sends: ``to_broadcast()``'s payload, on the notifiable's channel."""
 
     def __init__(self, notifiable: Any, notification: Notification) -> None:
         self.notifiable = notifiable
@@ -154,7 +153,7 @@ class NotificationManager:
         return results
 
     async def _store_database(self, notifiable: Any, notification: Notification) -> Any:
-        """Persist a row in the ``notifications`` table (Laravel ``database`` channel). When no DB is
+        """Persist a row in the ``notifications`` table. When no DB is
         bound (e.g. an on-demand send, or tests without a connection) gracefully return the ``to_array``
         payload instead of persisting — the channel still reports a result, nothing is silently lost."""
         data = notification.to_array(notifiable)
@@ -176,7 +175,7 @@ class NotificationManager:
     @staticmethod
     def _route(notifiable: Any, channel: str, default: Any) -> Any:
         """The recipient/route for ``channel`` — a notifiable's ``route_notification_for(channel)``
-        (Laravel ``routeNotificationFor``) when it defines one (e.g. on-demand sends), else ``default``."""
+        when it defines one (e.g. on-demand sends), else ``default``."""
         fn = getattr(notifiable, "route_notification_for", None)
         if callable(fn):
             routed = fn(channel)
@@ -254,7 +253,7 @@ class Notifiable:
 
 
 class AnonymousNotifiable:
-    """An on-demand recipient with no stored model (Laravel ``Notification::route(...)``):
+    """An on-demand recipient with no stored model:
 
         await AnonymousNotifiable().route("mail", "ops@acme.test").notify(AlertRaised(incident))
 

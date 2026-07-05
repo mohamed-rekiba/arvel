@@ -61,7 +61,7 @@ await user.notify(InvoicePaid(invoice))            # routes to the user's channe
 ### On-demand (no stored model)
 
 To notify an ad-hoc recipient that isn't a model — a raw email, a Slack webhook — use
-`AnonymousNotifiable` and set a route per channel (Laravel `Notification::route`):
+`AnonymousNotifiable` and set a route per channel:
 
 ```python
 from arvel.notifications import AnonymousNotifiable
@@ -73,7 +73,7 @@ await (AnonymousNotifiable()
 ```
 
 Each `route(channel, route)` tells that channel where to deliver; the manager reads it via
-`route_notification_for(channel)` (Laravel `routeNotificationFor`) — `mail` takes an address,
+`route_notification_for(channel)` — `mail` takes an address,
 apprise channels take a URL (or list of URLs).
 
 ## Channels

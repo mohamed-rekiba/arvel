@@ -1,6 +1,6 @@
-"""More Laravel validation rules that were SILENT no-ops (`_check`'s `case _: return True`) — every one
+"""More validation rules that were SILENT no-ops (`_check`'s `case _: return True`) — every one
 silently accepted bad data. Implements size / digits / digits_between / alpha_dash / json / ip and the
-field-comparison family gt/gte/lt/lte (Laravel sizes both operands by the field-under-validation's rules)."""
+field-comparison family gt/gte/lt/lte."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def test_digits_rules() -> None:
 
 
 def test_gt_gte_lt_lte_compare_fields() -> None:
-    # Laravel: gt:other_field — compare sizes; numeric rule makes it a value comparison
+    # gt:other_field — compare sizes; numeric rule makes it a value comparison
     assert _passes({"a": "10", "b": "5"}, {"a": "numeric|gt:b"})
     assert not _passes({"a": "3", "b": "5"}, {"a": "numeric|gt:b"})
     assert _passes({"a": "5", "b": "5"}, {"a": "numeric|gte:b"})
@@ -51,7 +51,7 @@ def test_alpha_dash_json_ip() -> None:
     assert _passes({"x": "192.168.1.1"}, {"x": "ip"})
     assert _passes({"x": "::1"}, {"x": "ip"})  # IPv6
     assert not _passes({"x": "999.999.0.1"}, {"x": "ip"})
-    assert not _passes({"x": 12345}, {"x": "ip"})  # Laravel: ip requires a string, not a bare int
+    assert not _passes({"x": 12345}, {"x": "ip"})  # ip requires a string, not a bare int
 
 
 def test_new_rules_have_messages() -> None:

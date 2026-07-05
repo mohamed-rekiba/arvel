@@ -129,7 +129,7 @@ finally:
 - `force_release()` frees the lock unconditionally, regardless of owner (an operator's escape
   hatch for a wedged lock).
 - `restore_lock(name, owner)` recreates a lock handle from a stored owner token — release a lock
-  from a different process/instance than the one that acquired it (Laravel `Cache::restoreLock`).
+  from a different process/instance than the one that acquired it.
 - The `seconds` TTL bounds how long the lock is held even if the holder crashes, so a dead process
   can't wedge it forever.
 

@@ -8,7 +8,7 @@ authentication (2FA) adds *something you have*: a rotating 6-digit code from an 
   code verification, recovery-code generation). Use these directly if you want full control.
 - The **Fortify-parity lifecycle** (`enable_two_factor`/`confirm_two_factor`/`verify_two_factor`/
   `disable_two_factor`/`regenerate_recovery_codes`) plus a **login-challenge state machine** — the
-  batteries-included path this page mostly covers, matching Laravel Fortify's enable → confirm →
+  batteries-included path this page mostly covers, matching Fortify's enable → confirm →
   challenge flow.
 
 !!! note "Install the extra"
@@ -22,7 +22,7 @@ authentication (2FA) adds *something you have*: a rotating 6-digit code from an 
 
 The lifecycle functions store three plain attributes on the `user` you pass in —
 `two_factor_secret`, `two_factor_recovery_codes` (a list of *hashed* codes), and
-`two_factor_confirmed_at`. Exactly like Laravel Fortify, arvel does not encrypt these for you: your
+`two_factor_confirmed_at`. Exactly like Fortify, arvel does not encrypt these for you: your
 user model owns that by declaring the model casts (and a migration adding the three nullable
 columns — arvel ships no migration for them, since they live on *your* user model, not a framework
 table):

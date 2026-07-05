@@ -3,7 +3,7 @@
 A stdlib, dotted-key store implementing ``contracts.ConfigRepository`` — pure-Python,
 nothing heavy. For *typed* settings, subclass ``arvel.kernel.settings.Settings`` — a typed,
 validated **view** over a ``config()`` section, built on **msgspec** (core, no extra; pydantic
-is banned — DR-0005/DR-0016). ``env()`` here reads raw environment variables with Laravel-style
+is banned — DR-0005/DR-0016). ``env()`` here reads raw environment variables with -style
 literal coercion.
 
 Grounded in knowledge/port/03-application-providers-bootstrap.md + DR-0005/DR-0016.
@@ -17,7 +17,7 @@ from typing import Any, cast
 
 _MISSING: Any = object()
 
-# Laravel-style env literal coercion.
+# env literal coercion.
 _ENV_LITERALS: dict[str, Any] = {
     "true": True,
     "(true)": True,
@@ -103,7 +103,7 @@ def config_default(key: str, fallback: Any) -> Any:
 
 
 def env(key: str, default: Any = None) -> Any:
-    """Read an environment variable with Laravel-style literal coercion
+    """Read an environment variable with literal coercion
     (``true``/``false``/``null``/``empty``); returns ``default`` when unset."""
     raw = os.environ.get(key)
     if raw is None:

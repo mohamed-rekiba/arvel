@@ -1,5 +1,4 @@
-"""arvel.database.model_events — ``HasEvents``: the full model lifecycle-event mixin
-(Laravel eloquent events parity, doc 07/11). Events dispatch through the ``EventDispatcher``
+"""arvel.database.model_events — ``HasEvents``: the full model lifecycle-event mixin. Events dispatch through the ``EventDispatcher``
 **contract resolved from the container** — this module never imports ``arvel.events`` (G1
 boundary).
 """
@@ -16,7 +15,7 @@ from typing import Any, ClassVar
 _pending_tasks: set[asyncio.Task[Any]] = set()
 
 # The seam `arvel.database.seeder.WithoutModelEvents` flips while seeding so bulk inserts don't fan
-# out observer work (Laravel's `WithoutModelEvents` trait). A ContextVar (not a plain module global)
+# out observer work. A ContextVar (not a plain module global)
 # so it's scoped to the current task tree and never leaks across concurrently-running requests/tests.
 EVENTS_SUPPRESSED: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "arvel_events_suppressed", default=False
@@ -24,12 +23,12 @@ EVENTS_SUPPRESSED: contextvars.ContextVar[bool] = contextvars.ContextVar(
 
 
 class HasEvents:
-    """Model lifecycle events: :meth:`observe` registers an observer's hook methods;
+    """Model lifecycle events::meth:`observe` registers an observer's hook methods;
     :meth:`_fire`/:meth:`_fire_sync` dispatch them. ``creating``/``updating``/``saving``/
-    ``deleting``/``restoring`` are **cancelable** — an observer returning ``False`` aborts the
-    operation and the calling method returns ``False`` (Laravel parity)."""
+        ``deleting``/``restoring`` are **cancelable** — an observer returning ``False`` aborts the
+        operation and the calling method returns ``False``."""
 
-    #: lifecycle hooks an observer may handle, in Laravel's canonical order (doc 07/11).
+    #: lifecycle hooks an observer may handle, in the canonical order (doc 07/11).
     #: `creating`/`updating`/`saving`/`deleting`/`restoring` may return `False` to cancel.
     OBSERVABLE_EVENTS: ClassVar[tuple[str, ...]] = (
         "retrieved",
@@ -51,8 +50,8 @@ class HasEvents:
 
     @classmethod
     def observe(cls, observer: Any) -> None:
-        """Register a model observer (Laravel ``Model::observe``). For each lifecycle hook the
-        observer defines a method for (any subset of :attr:`OBSERVABLE_EVENTS`), wire that method
+        """Register a model observer. For each lifecycle hook the
+        observer defines a method for (any subset of:attr:`OBSERVABLE_EVENTS`), wire that method
         to this model's event so it runs when the model fires it. A cancelable hook returning
         ``False`` cancels the operation. Call from a provider's ``boot()`` (the events dispatcher
         must be bound). No-op without an app/dispatcher."""
@@ -82,7 +81,7 @@ class HasEvents:
 
     def _fire_sync(self, hook: str) -> None:
         """Best-effort dispatch from a **sync** lifecycle point (``replicate()`` keeps its public
-        sync signature — Laravel parity). Schedules the async dispatch on the running loop
+        sync signature. Schedules the async dispatch on the running loop
         without blocking the caller; a no-op with no loop running (nothing would ever run the
         scheduled task anyway). Not cancelable — a sync caller can't await a verdict."""
         try:

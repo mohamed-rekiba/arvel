@@ -1,5 +1,5 @@
 """arvel.mail.markdown_theme — a minimal Markdown "component theme" for markdown mailables:
-inline-styled buttons/panels/tables + a container wrapper (Laravel ``mail::`` component parity),
+inline-styled buttons/panels/tables + a container wrapper,
 rendered through markdown-it-py alone — no template engine, no extra dependency.
 
 ``[button: Text](url)`` on its own line becomes a centered, styled call-to-action; blockquotes

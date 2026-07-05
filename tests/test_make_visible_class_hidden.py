@@ -1,4 +1,4 @@
-"""ch 07 — make_visible() must reveal a class-__hidden__ attribute (Laravel makeVisible),
+"""ch 07 — make_visible() must reveal a class-__hidden__ attribute,
 not only un-hide one previously hidden via make_hidden()."""
 
 from __future__ import annotations

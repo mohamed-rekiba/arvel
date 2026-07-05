@@ -1,4 +1,4 @@
-"""arvel.queue.scheduler — the task scheduler (Laravel ``Schedule`` parity).
+"""arvel.queue.scheduler — the task scheduler.
 
 Define recurring work with a fluent cadence (``daily_at``/``hourly``/``cron``/frequency helpers/…);
 a periodic runner (``arvel schedule:run``, doc 13) ticks once a minute and calls ``run_due(now)``.

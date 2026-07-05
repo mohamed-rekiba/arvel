@@ -180,7 +180,7 @@ class Container:
     def extend(self, abstract: Any, closure: Callable[[Any, Container], Any]) -> None:
         """Wrap the resolution of ``abstract`` with ``closure(instance, container)``.
         If ``abstract`` is already resolved as a shared instance, the closure is applied to
-        that instance *immediately* (it will never rebuild), mirroring Laravel ``extend``;
+        that instance *immediately* (it will never rebuild), mirroring ``extend``;
         otherwise the closure runs at the next build."""
         key = self._alias_of(abstract)
         if key in self._instances:
@@ -199,11 +199,11 @@ class Container:
 
     def after_resolving(self, abstract: Any, callback: Callable[[Any, Container], None]) -> None:
         """Register ``callback(instance, container)`` to fire on each resolve of ``abstract``,
-        *after* its ``resolving`` callbacks (Laravel ``afterResolving``)."""
+        *after* its ``resolving`` callbacks."""
         self._after_resolving_cbs.setdefault(self._alias_of(abstract), []).append(callback)
 
     def bind_method(self, target: Sequence[Any], callback: Callable[[Any, Container], Any]) -> None:
-        """Override how a method is resolved by ``call`` (Laravel ``bindMethod``). ``target`` is
+        """Override how a method is resolved by ``call``. ``target`` is
         ``[Cls, "method"]``; ``call((instance, "method"))`` then invokes ``callback(instance,
         container)`` instead of the original method."""
         cls, method = target[0], target[1]
@@ -220,8 +220,8 @@ class Container:
         return a in self._bindings or a in self._instances
 
     def forget(self, abstract: Any) -> None:
-        """Drop ``abstract``'s cached shared instance + any current-scope instance (Laravel
-        ``forgetInstance``) so the next ``make`` rebuilds it. The *binding* is kept."""
+        """Drop ``abstract``'s cached shared instance + any current-scope instance so the next
+        ``make`` rebuilds it. The *binding* is kept."""
         key = self._alias_of(abstract)
         self._instances.pop(key, None)
         scope = _scope.get()
@@ -229,7 +229,7 @@ class Container:
             scope.pop(key, None)
 
     def flush(self) -> None:
-        """Clear all bindings, shared instances, aliases, tags, and extenders (Laravel ``flush``).
+        """Clear all bindings, shared instances, aliases, tags, and extenders.
         Resolution hooks/contextual bindings are kept; mostly used to reset a container in tests."""
         self._bindings.clear()
         self._instances.clear()

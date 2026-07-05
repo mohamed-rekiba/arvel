@@ -61,7 +61,7 @@ def test_date_value_serializes_to_iso_string() -> None:
         assert r.json() == {"at": when.to_iso()}
 
 
-def test_paginator_return_serializes_to_laravel_shape() -> None:
+def test_paginator_return_serializes_to_shape() -> None:
     from arvel.pagination import LengthAwarePaginator
 
     def handler(request: Any) -> Any:

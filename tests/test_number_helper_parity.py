@@ -1,4 +1,4 @@
-"""Number-helper parity (Laravel Number): abbreviate / for_humans / ordinal / file_size / clamp / trim."""
+"""Number-helper parity: abbreviate / for_humans / ordinal / file_size / clamp / trim."""
 
 from __future__ import annotations
 

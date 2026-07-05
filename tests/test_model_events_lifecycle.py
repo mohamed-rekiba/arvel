@@ -1,4 +1,4 @@
-"""Full model event lifecycle (spec 08 §2 — Laravel eloquent events parity): every
+"""Full model event lifecycle (spec 08 §2
 ``HasEvents.OBSERVABLE_EVENTS`` fires at the right point, in the right order, and
 ``creating``/``updating``/``saving``/``deleting``/``restoring`` cancel the operation when an
 observer returns ``False`` (row unchanged, reload-verified)."""
@@ -273,7 +273,7 @@ async def test_replicating_fires_best_effort_on_the_original() -> None:
         Widget.observe(Recorder(calls))
         clone = widget.replicate()
         assert clone._exists is False
-        # replicate() is sync (Laravel parity); the event dispatch it schedules is fire-and-forget
+        # replicate() is sync; the event dispatch it schedules is fire-and-forget
         # on the running loop — yield so the scheduled task actually runs before asserting.
         await asyncio.sleep(0.01)
         assert calls == ["replicating"]

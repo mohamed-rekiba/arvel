@@ -40,11 +40,11 @@ class MiddlewareProtocol(Protocol):
 
 
 class SessionSettings(Settings):
-    """Typed, validated view over the ``session`` config section (DR-0016) — matches Laravel's
+    """Typed, validated view over the ``session`` config section (DR-0016) — matches 's
     ``config/session.php`` and the scaffold's ``config/session.py`` (and the top-level-key pattern of
     the other Settings: database/cache/mail).
 
-    ``lifetime`` is in **minutes** (Laravel ``config/session.php`` parity, DR-0019); the middleware
+    ``lifetime`` is in **minutes**; the middleware
     converts it to seconds for the cookie ``max-age`` and the cache TTL. Default 120 min = 2h.
 
     ``host_prefix`` is ``None`` by default so it derives from ``secure`` (the ``__Host-`` prefix
@@ -59,12 +59,12 @@ class SessionSettings(Settings):
     instead of silently falling back to in-process.
 
     ``csrf_except`` — URI glob patterns (``request.is_()``-style, e.g. ``"webhooks/*"``) exempt from
-    ``ValidateCsrfToken`` (Laravel ``$except``), merged with any subclass-level override.
+    ``ValidateCsrfToken``, merged with any subclass-level override.
     """
 
     __config_key__ = "session"
     driver: Literal["cookie", "redis"] = "cookie"
-    lifetime: int = 120  # minutes (Laravel parity); x60 for cookie max-age / cache TTL
+    lifetime: int = 120  # minutes; x60 for cookie max-age / cache TTL
     secure: bool = True
     host_prefix: bool | None = None
     csrf_except: list[str] = msgspec.field(default_factory=_empty_str_list)
@@ -77,7 +77,7 @@ _SESSIONS: dict[str, dict[str, Any]] = {}
 
 
 def reset_rate_limiter() -> None:
-    """Clear the in-process rate-limiter window state (Laravel ``RateLimiter::clear`` for all keys).
+    """Clear the in-process rate-limiter window state.
 
     The default ``ThrottleRequests`` state is **process-global** — correct for one running app, but
     it leaks across the multiple app instances a test suite builds in a single process, so the api
@@ -105,7 +105,7 @@ class Middleware:
 
 
 def _default_segment(request: Any) -> str:
-    """The default throttle segment key (Laravel): the authenticated user's id, else the client
+    """The default throttle segment key: the authenticated user's id, else the client
     IP. Prefixed so a numeric user id can never collide with an IP string."""
     from arvel.support import current_user
 
@@ -122,21 +122,21 @@ def _default_segment(request: Any) -> str:
 class ThrottleRequests(Middleware):
     """Rate-limit by client: at most ``max_attempts`` per ``decay_seconds`` window (api group).
 
-    By default state lives in a process-shared dict keyed by ``name:client``. Pass a ``cache``
-    (a ``CacheRepository``) to count over a shared backend instead — that makes limiting
-    **distributed** across processes/hosts (e.g. Redis). A 429 ``ValidationException`` is raised
-    when the limit is exceeded.
+        By default state lives in a process-shared dict keyed by ``name:client``. Pass a ``cache``
+        (a ``CacheRepository``) to count over a shared backend instead — that makes limiting
+        **distributed** across processes/hosts (e.g. Redis). A 429 ``ValidationException`` is raised
+        when the limit is exceeded.
 
-    Pass ``limiter_name`` instead (what the ``throttle:<name>`` route-middleware string builds,
-    e.g. ``Route.get(...).middleware("throttle:api")``) to rate-limit via a **named limiter**
-    registered on the app's ``limiter`` (:class:`~arvel.http.rate_limiter.RateLimiter`) with
-    ``RateLimiter.for_(name, resolver)``: ``resolver(request)`` returns a
+        Pass ``limiter_name`` instead (what the ``throttle:<name>`` route-middleware string builds,
+        e.g. ``Route.get(...).middleware("throttle:api")``) to rate-limit via a **named limiter**
+        registered on the app's ``limiter`` (:class:`~arvel.http.rate_limiter.RateLimiter`) with
+        ``RateLimiter.for_(name, resolver)``: ``resolver(request)`` returns a
     :class:`~arvel.http.rate_limiter.Limit`, a ``list[Limit]``, or ``None`` (unlimited). A limit
-    with no explicit ``.by(key)`` segments by :func:`_default_segment` (user id, else IP). Over any
-    limit renders a 429 with ``Retry-After``/``X-RateLimit-Limit``/``X-RateLimit-Remaining``
-    headers (or the limit's own ``.response(cb)`` builder); a successful response carries the
-    ``X-RateLimit-*`` headers too. This named-limiter mode never raises — it returns the response
-    directly, so it (unlike the plain mode above) needs no exception-header plumbing.
+        with no explicit ``.by(key)`` segments by:func:`_default_segment` (user id, else IP). Over any
+        limit renders a 429 with ``Retry-After``/``X-RateLimit-Limit``/``X-RateLimit-Remaining``
+        headers (or the limit's own ``.response(cb)`` builder); a successful response carries the
+        ``X-RateLimit-*`` headers too. This named-limiter mode never raises — it returns the response
+        directly, so it (unlike the plain mode above) needs no exception-header plumbing.
     """
 
     def __init__(
@@ -277,7 +277,7 @@ class StartSession(Middleware):
         store: dict[str, dict[str, Any]] | None = None,
         *,
         cache: Any = None,
-        lifetime: int | None = None,  # MINUTES (Laravel parity); converted to seconds below
+        lifetime: int | None = None,  # MINUTES; converted to seconds below
         secure: bool | None = None,
         host_prefix: bool | None = None,
     ) -> None:
@@ -367,17 +367,17 @@ class ValidateCsrfToken(Middleware):
     """Reject state-changing requests whose CSRF token doesn't match the session (web group).
 
     Safe methods (GET/HEAD/OPTIONS) are exempt. The submitted token comes from the ``X-CSRF-TOKEN``
-    (or ``X-XSRF-TOKEN``) header, or the ``_token`` field of a form/JSON body (Laravel); the expected
+    (or ``X-XSRF-TOKEN``) header, or the ``_token`` field of a form/JSON body; the expected
     token is the session's ``_token`` (seeded by this middleware on each web request, so the form can
-    render + submit it). A mismatch (or a missing token) raises a 419 ``ValidationException`` (Laravel's
+    render + submit it). A mismatch (or a missing token) raises a 419 ``ValidationException`` ('s
     page-expired status).
 
-    On the way out it mirrors the token into a **JS-readable ``XSRF-TOKEN`` cookie** (Laravel/Sanctum)
+    On the way out it mirrors the token into a **JS-readable ``XSRF-TOKEN`` cookie**
     so a decoupled SPA can read it and echo it back as ``X-XSRF-TOKEN`` — no server-rendered meta tag
     needed. That cookie is intentionally **not** ``HttpOnly`` (it's the double-submit token, not a
     secret — the session id cookie stays ``HttpOnly``); it inherits the session's Secure flag.
 
-    ``except_`` (Laravel ``$except``) exempts URI glob patterns from CSRF entirely — e.g. a webhook
+    ``except_`` exempts URI glob patterns from CSRF entirely — e.g. a webhook
     endpoint a third party posts to with no session/token. Override the ``except_`` class attribute
     in a subclass, and/or configure ``session.csrf_except`` (both apply — merged, not replaced).
     Patterns are matched via ``request.is_()`` (``fnmatch`` against the path with no leading slash).
@@ -386,7 +386,7 @@ class ValidateCsrfToken(Middleware):
     SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
     HEADER = "x-csrf-token"
     COOKIE = "XSRF-TOKEN"
-    #: URI glob patterns exempt from CSRF (Laravel ``$except``) — override in a subclass; merged
+    #: URI glob patterns exempt from CSRF — override in a subclass; merged
     #: with ``config('session.csrf_except')`` at construction.
     except_: ClassVar[list[str]] = []
 
@@ -448,7 +448,7 @@ class ValidateCsrfToken(Middleware):
 
     async def terminate(self, request: Any, response: Any) -> None:
         """Expose the session token as a readable ``XSRF-TOKEN`` cookie so a decoupled SPA (no
-        server-rendered meta tag) can read it and send it back as ``X-XSRF-TOKEN`` — Laravel/Sanctum.
+        server-rendered meta tag) can read it and send it back as ``X-XSRF-TOKEN`` — Sanctum.
         Not ``HttpOnly`` (JS must read it); inherits the session's Secure flag; ``SameSite=Lax``."""
         session = getattr(request, "session", None)
         token = cast("dict[str, Any]", session).get("_token") if isinstance(session, dict) else None
@@ -542,8 +542,7 @@ class LocaleMiddleware(Middleware):
 
 
 class ValidatePostSize(Middleware):
-    """Reject an over-large request body with **413** before the handler runs (Laravel
-    ``ValidatePostSize``). The limit is ``config('app.max_request_size')`` bytes (default 10 MiB);
+    """Reject an over-large request body with **413** before the handler runs (``ValidatePostSize``). The limit is ``config('app.max_request_size')`` bytes (default 10 MiB);
     pass ``max_bytes`` to override. A missing/invalid ``Content-Length`` is not enforced here
     (chunked/streamed bodies are bounded by the ASGI server)."""
 
@@ -576,9 +575,8 @@ class ValidatePostSize(Middleware):
 
 
 class ValidateHost(Middleware):
-    """Reject a request whose Host is not in ``config('app.trusted_hosts')`` with **400**
-    (Laravel ``ValidateHost`` / Symfony trusted-hosts). When the list is unset/empty all hosts
-    are allowed (Laravel's default), so this is a no-op until an app opts in."""
+    """Reject a request whose Host is not in ``config('app.trusted_hosts')`` with **400**. When the list is unset/empty all hosts
+    are allowed, so this is a no-op until an app opts in."""
 
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         from arvel.kernel import app, has_application
@@ -595,9 +593,8 @@ class ValidateHost(Middleware):
 
 class ShareErrorsFromSession(Middleware):
     """Share session-flashed data as view globals on every request: the validation ``errors`` bag
-    (Laravel ``ShareErrorsFromSession`` → ``$errors``) and the ``old`` callable for form repopulation
-    (Laravel ``old()``). Web group, runs after ``StartSession`` (which sets ``request.session`` and
-    ages the flash). No-op when no session or view is bound, so non-view apps are unaffected."""
+    and the ``old`` callable for form repopulation. Web group, runs after ``StartSession`` (which sets ``request.session`` and
+       ages the flash). No-op when no session or view is bound, so non-view apps are unaffected."""
 
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         from arvel.kernel import app, has_application
@@ -612,9 +609,9 @@ class ShareErrorsFromSession(Middleware):
 
 
 class ValidateSignature(Middleware):
-    """Laravel's ``signed`` middleware: reject (**403**) a request whose URL lacks a valid signature.
+    """the ``signed`` middleware: reject (**403**) a request whose URL lacks a valid signature.
 
-    Pair it with :meth:`arvel.routing.Router.signed_url` (``Route.signed_url(name, ...)``): the
+    Pair it with:meth:`arvel.routing.Router.signed_url` (``Route.signed_url(name,...)``): the
     signature is an itsdangerous MAC over the route's path+query (plus an optional ``expires`` unix
     timestamp), and the signing key defaults to the app key. Apply per route, e.g.
     ``Route.get("/unsubscribe/{id}", handler).middleware(ValidateSignature)``. A tampered or expired
@@ -669,7 +666,7 @@ def _form_method_override(ctype: str, body: bytes) -> str:
 
 
 class MethodOverride:
-    """ASGI middleware for HTML form method-spoofing (Laravel ``@method``): a POST whose form body
+    """ASGI middleware for HTML form method-spoofing: a POST whose form body
     carries ``_method=PUT|PATCH|DELETE`` is **routed as that method**.
 
     It runs at the ASGI layer — *before* the router matches by HTTP method — so it rewrites

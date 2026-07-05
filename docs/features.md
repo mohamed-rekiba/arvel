@@ -2,7 +2,7 @@
 
 Feature flags let you ship code behind a switch — roll a change out to one user, one team, or
 everyone, without a deploy for every flip. arvel's feature-flag module follows
-[Laravel Pennant](https://laravel.com/docs/pennant): define a flag once with a **resolver**, then
+[Pennant]: define a flag once with a **resolver**, then
 ask whether it's active for a given **scope** (a user, a team, or nothing at all for a global
 flag).
 
@@ -41,8 +41,8 @@ Feature.define("new-dashboard", NewDashboard)
 ## Checking a flag
 
 ```python
-await Feature.active("new-dashboard", user)     # bool
-await Feature.inactive("new-dashboard", user)    # not active
+await Feature.active("new-dashboard", user) # bool
+await Feature.inactive("new-dashboard", user) # not active
 await Feature.for_(user).active("new-dashboard") # same thing, scope bound up front
 ```
 
@@ -57,17 +57,16 @@ JSON-able:
 ```python
 Feature.define("checkout-variant", lambda scope: "purple" if scope.id % 2 else "orange")
 
-await Feature.value("checkout-variant", user)   # "purple" / "orange"
-await Feature.active("checkout-variant", user)  # True — active() is just truthiness
+await Feature.value("checkout-variant", user) # "purple" / "orange"
+await Feature.active("checkout-variant", user) # True — active() is just truthiness
 ```
 
 ## `when` — branch on the resolved value
 
 ```python
-await Feature.when(
-    "checkout-variant", user,
-    lambda variant: render(variant),   # called with the resolved value when active/truthy
-    lambda variant: render_default(),  # called when falsy
+await Feature.when("checkout-variant", user,
+    lambda variant: render(variant), # called with the resolved value when active/truthy
+    lambda variant: render_default(), # called when falsy
 )
 ```
 
@@ -77,24 +76,24 @@ await Feature.when(
 an admin toggle or a test:
 
 ```python
-await Feature.activate("new-dashboard", user)            # force it on
-await Feature.deactivate("new-dashboard", user)           # force it off
-await Feature.activate("checkout-variant", user, value="purple")  # force a rich value
+await Feature.activate("new-dashboard", user) # force it on
+await Feature.deactivate("new-dashboard", user) # force it off
+await Feature.activate("checkout-variant", user, value="purple") # force a rich value
 ```
 
 `forget` clears one scope's stored value (the resolver runs again next time it's checked);
 `purge` clears **every** stored scope for a flag — reach for it after changing a resolver's logic:
 
 ```python
-await Feature.forget("new-dashboard", user)   # this user only
-await Feature.purge("new-dashboard")          # every scope, everywhere
+await Feature.forget("new-dashboard", user) # this user only
+await Feature.purge("new-dashboard") # every scope, everywhere
 ```
 
 ## CLI
 
 ```bash
-arvel feature:list          # every flag registered via Feature.define()
-arvel feature:purge <name>  # clear every stored value for <name>
+arvel feature:list # every flag registered via Feature.define()
+arvel feature:purge <name> # clear every stored value for <name>
 ```
 
 ## Configuration
@@ -102,7 +101,7 @@ arvel feature:purge <name>  # clear every stored value for <name>
 ```python
 # config/features.py
 config = {
-    "driver": "database",       # "array" | "database" | "cache"
+    "driver": "database", # "array" | "database" | "cache"
     "default_scope": "__global__",
 }
 ```

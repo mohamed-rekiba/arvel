@@ -1,4 +1,4 @@
-"""Cache (doc 16, spec 06-cache-parity §1) — Laravel-parity verbs on the array driver:
+"""Cache (doc 16, spec 06-cache-parity §1) — parity verbs on the array driver:
 add/pull/forever/touch/decrement."""
 
 from __future__ import annotations

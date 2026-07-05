@@ -1,4 +1,4 @@
-"""Model observers (Laravel ``Model::observe``): an observer's hook methods run when the model fires
+"""Model observers: an observer's hook methods run when the model fires
 the matching lifecycle event, and a ``saving`` that returns ``False`` cancels the save."""
 
 from __future__ import annotations
@@ -56,9 +56,7 @@ async def test_observer_runs_on_save_and_delete() -> None:
 async def test_saving_returning_false_cancels_the_save() -> None:
     class Veto:
         async def saving(self, gadget: Any) -> bool:
-            return (
-                False  # cancel every save (Laravel: returning false from saving/creating halts it)
-            )
+            return False  # cancel every save
 
     db = ConnectionResolver()
     _app_with_events(db)

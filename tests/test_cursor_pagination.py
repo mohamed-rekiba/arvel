@@ -131,7 +131,7 @@ async def test_cursor_paginate_ties_are_stable_via_pk_tiebreak() -> None:
         await db.dispose()
 
 
-async def test_cursor_paginate_to_dict_matches_laravel_json_shape() -> None:
+async def test_cursor_paginate_to_dict_matches_json_shape() -> None:
     db = await _seed(3)
     try:
         page = await Builder(items, db).order_by("id").cursor_paginate(per_page=10)

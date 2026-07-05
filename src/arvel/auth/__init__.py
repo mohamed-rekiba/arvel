@@ -46,14 +46,13 @@ class Authenticatable:
     async def can(self, ability: str, *args: Any) -> bool:
         return await _gate().allows(ability, *args, user=self)
 
-    # --- email verification (Laravel MustVerifyEmail parity) -----------------
+    # --- email verification -----------------
     def has_verified_email(self) -> bool:
-        """Whether the user's email is verified — the ``email_verified_at`` timestamp is set
-        (Laravel ``MustVerifyEmail::hasVerifiedEmail``). Drives the ``verified`` route middleware."""
+        """Whether the user's email is verified — the ``email_verified_at`` timestamp is set. Drives the ``verified`` route middleware."""
         return getattr(self, "email_verified_at", None) is not None
 
     async def mark_email_as_verified(self) -> bool:
-        """Stamp the email verified **now** and persist (Laravel ``markEmailAsVerified``). Returns
+        """Stamp the email verified **now** and persist. Returns
         ``False`` (a no-op) when already verified, else ``True`` — so callers can skip re-notifying."""
         if self.has_verified_email():
             return False
@@ -65,12 +64,12 @@ class Authenticatable:
 
     async def mark_email_as_unverified(self) -> None:
         """Clear the verified timestamp and persist (e.g. after an email change), so the user must
-        re-verify. The inverse of :meth:`mark_email_as_verified`."""
+        re-verify. The inverse of:meth:`mark_email_as_verified`."""
         self.email_verified_at = None
         await self.save()
 
     def email_for_verification(self) -> Any:
-        """The address a verification link is sent to (Laravel ``getEmailForVerification``)."""
+        """The address a verification link is sent to."""
         return getattr(self, "email", None)
 
     if (

@@ -1,5 +1,5 @@
 """Seeder (doc 10): `call_once` skips a seeder class already run this process; `WithoutModelEvents`
-suppresses model lifecycle events for its duration (Laravel `WithoutModelEvents` trait)."""
+suppresses model lifecycle events for its duration."""
 
 from __future__ import annotations
 

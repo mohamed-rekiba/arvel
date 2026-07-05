@@ -72,7 +72,7 @@ def test_timestamp_and_field_columns_are_real_datetime() -> None:
 
 
 class Plain(Model):
-    # NO explicit __timestamps__ — Laravel's $timestamps is true by default
+    # NO explicit __timestamps__ — the $timestamps is true by default
     __fields__: ClassVar = {"name": str}
     __fillable__: ClassVar = ["name"]
 
@@ -110,7 +110,7 @@ async def test_timestamps_round_trip_as_date() -> None:
         a = await Appt.create(name="x", starts_at=Date.parse("2026-06-29T09:00:00+00:00[UTC]"))
         found = await Appt.find(a.id)
         assert found is not None
-        # timestamps read back as Date (Laravel parity), not str
+        # timestamps read back as Date, not str
         assert isinstance(found.created_at, Date)
         assert isinstance(found.updated_at, Date)
         # a datetime-cast field stores a real datetime and reads back as Date

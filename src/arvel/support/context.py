@@ -1,4 +1,4 @@
-"""arvel.support.context — an ambient, contextvars-backed key/value store (Laravel `Context`
+"""arvel.support.context — an ambient, contextvars-backed key/value store (`Context`
 parity), safe across concurrent `asyncio` tasks: each task gets its own copy-on-write snapshot,
 so a request/job never sees another's context. Every mutator replaces the backing dict wholesale
 rather than mutating it in place — that's what makes the per-task isolation hold.

@@ -1,4 +1,4 @@
-"""arvel.auth.confirm — password confirmation / "sudo mode" (Laravel password.confirm parity).
+"""arvel.auth.confirm — password confirmation / "sudo mode".
 
 Sensitive actions (changing email, deleting an account, rotating keys) should re-verify the password
 even for an already-logged-in user. ``confirm_password`` checks the current user's password and
@@ -16,7 +16,7 @@ from arvel.http.middleware import Middleware
 
 _SESSION_KEY = "_password_confirmed_at"
 _SUBJECT_KEY = "_password_confirmed_for"  # identity the confirmation belongs to (anti cross-user)
-DEFAULT_WINDOW = 10800  # 3 hours, matching Laravel's auth.password_timeout default
+DEFAULT_WINDOW = 10800  # 3 hours, matching the auth.password_timeout default
 
 
 def _subject(user: Any) -> Any:

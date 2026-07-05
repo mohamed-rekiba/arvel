@@ -1,4 +1,4 @@
-"""API Resources (spec 08 §4 — Laravel eloquent-resources 13.x parity): ``JsonResource``/
+"""API Resources (spec 08 §4
 ``ResourceCollection`` — ``when``/``when_loaded``/``merge_when``/``additional``, data-wrapping,
 the paginator meta/links shape, and the HTTP kernel's resource-recognition (a route handler
 returning a resource "just works", golden JSON)."""

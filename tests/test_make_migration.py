@@ -1,4 +1,4 @@
-"""make:migration — timestamped migration generator (Laravel artisan parity). ``create_X_table``
+"""make:migration — timestamped migration generator. ``create_X_table``
 names get a create/drop stub; other names get a generic up/down stub. The generated create migration
 is proven functional: it actually creates and drops the table through the real Migrator."""
 

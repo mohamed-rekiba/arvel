@@ -1,4 +1,4 @@
-"""arvel.support.manager — the driver/Strategy ``Manager`` base (Laravel ``Manager``).
+"""arvel.support.manager — the driver/Strategy ``Manager`` base.
 
 One contract, a config-selected backend, and an ``extend`` seam for ecosystem
 packages. The Manager does driver *dispatch* only (``create_<name>_driver`` or a

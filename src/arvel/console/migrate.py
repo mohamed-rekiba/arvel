@@ -1,4 +1,4 @@
-"""``migrate`` / ``migrate:rollback`` — apply or revert migrations (Laravel ``migrate``).
+"""``migrate`` / ``migrate:rollback`` — apply or revert migrations.
 
 Resolves the app's bound ``migrator`` (an Alembic-backed Migrator) and its ``migrations``
 list and drives them. The command imports nothing from ``arvel.database`` so the console stays
@@ -59,7 +59,7 @@ fresh_app = typer.Typer()
 
 @fresh_app.command()
 def migrate_fresh() -> None:
-    """Drop all tables, then re-run every migration (Laravel `migrate:fresh`)."""
+    """Drop all tables, then re-run every migration."""
     from arvel.console.kernel import run_app_command
 
     run_app_command(_fresh)
@@ -79,7 +79,7 @@ refresh_app = typer.Typer()
 def migrate_refresh(
     seed: bool = typer.Option(False, "--seed", help="Run the app's seeder after refreshing."),
 ) -> None:
-    """Roll back all migrations, then re-run them (Laravel `migrate:refresh`)."""
+    """Roll back all migrations, then re-run them."""
     from arvel.console.kernel import run_app_command
 
     async def _handler(app: Any) -> None:
@@ -104,7 +104,7 @@ wipe_app = typer.Typer()
 
 @wipe_app.command()
 def db_wipe() -> None:
-    """Drop all tables without re-migrating (Laravel `db:wipe`)."""
+    """Drop all tables without re-migrating."""
     from arvel.console.kernel import run_app_command
 
     run_app_command(_wipe)

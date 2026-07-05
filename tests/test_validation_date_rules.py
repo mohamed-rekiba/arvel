@@ -1,5 +1,5 @@
-"""Date validation rules (Laravel) — deferred from the validation-rules pass because they need a
-format-code decision. arvel is Python, so date_format uses Python strftime codes (not Laravel's PHP
+"""Date validation rules — deferred from the validation-rules pass because they need a
+format-code decision. arvel is Python, so date_format uses Python strftime codes (not the PHP
 codes). date/before/after/date_equals parse via stdlib datetime (ISO + common formats); before/after
 resolve their arg as another field if present, else a literal date string. All were silent no-ops."""
 
@@ -39,7 +39,7 @@ def test_before_after_literal() -> None:
 
 
 def test_before_after_field_reference() -> None:
-    # arg resolves to another field when present (Laravel: before:end_date)
+    # arg resolves to another field when present
     assert _passes({"start": "2020-01-01", "end": "2020-06-01"}, {"start": "before:end"})
     assert not _passes({"start": "2020-06-01", "end": "2020-01-01"}, {"start": "before:end"})
     assert _passes({"start": "2020-01-01", "end": "2020-06-01"}, {"end": "after:start"})

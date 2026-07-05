@@ -31,7 +31,7 @@ def test_totally_guarded_fill_raises_listing_the_attributes() -> None:
         m.fill({"name": "x", "evil_admin": True})
     msg = str(ei.value)
     assert "name" in msg and "evil_admin" in msg
-    assert "_Guarded" in msg  # names the model, like Laravel
+    assert "_Guarded" in msg  # names the model, like
 
 
 def test_fillable_model_silently_discards_non_fillable() -> None:

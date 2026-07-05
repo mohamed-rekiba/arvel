@@ -1,4 +1,4 @@
-"""arvel.console.prompts — Laravel Prompts parity: ask/secret/confirm/choice/anticipate.
+"""arvel.console.prompts.
 
 Built on click's prompt primitives (already vendored via typer — no new dependency), imported
 lazily so this stays cheap to import. Each function takes an optional injectable ``prompter``
@@ -77,7 +77,7 @@ class Prompter:
         )
 
     def anticipate(self, label: str, suggestions: Sequence[str], default: str | None = None) -> str:
-        """Free-text with suggestions shown as a hint (Laravel ``suggest``/``anticipate``) — unlike
+        """Free-text with suggestions shown as a hint — unlike
         :meth:`choice`, any answer is accepted."""
         seeded = self._next()
         if seeded is not None:

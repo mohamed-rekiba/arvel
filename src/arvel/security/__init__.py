@@ -51,7 +51,7 @@ class DecryptionFailed(Exception):
 
 
 def _decode_key(key: str | bytes) -> bytes:
-    """32 raw bytes, or a string — a Laravel-style ``base64:<b64>``-prefixed or bare base64
+    """32 raw bytes, or a string — a ``base64:<b64>``-prefixed or bare base64
     string (standard or urlsafe alphabet, so a key from any common base64 key generator
     decodes) that resolves to exactly 32 bytes (AES-256)."""
     if isinstance(key, bytes):
@@ -74,7 +74,7 @@ class Encrypter:
     """Symmetric encryption on cryptography's AESGCM (AES-256-GCM), keyed by APP_KEY (DR-0032).
 
     Payload: ``v1.<b64 nonce>.<b64 ciphertext+tag>``. ``encrypt``/``decrypt`` are serialize-aware
-    (a JSON envelope — Laravel ``Crypt::encrypt`` parity, minus pickle's RCE-on-key-leak history);
+    (a JSON envelope — ``Crypt::encrypt`` parity, minus pickle's RCE-on-key-leak history);
     ``encrypt_string``/``decrypt_string`` skip serialization for plain strings (``encryptString``
     parity). Pass ``previous_keys`` to support key rotation: data is always encrypted under the
     current (first) key, but ``decrypt``/``decrypt_string`` accept ciphertext from any provided

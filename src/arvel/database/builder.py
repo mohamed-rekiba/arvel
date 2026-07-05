@@ -125,7 +125,7 @@ class Builder:
     def _bind(value: Any) -> Any:
         """Adapt an arvel value object to what the DB driver binds: an arvel ``Date`` becomes its
         UTC-aware stdlib datetime, so ``where("col", "<", Date.now())`` works without the caller
-        dropping to ``.to_py()`` (Laravel accepts a Carbon directly). Other values pass through."""
+        dropping to ``.to_py()``. Other values pass through."""
         from arvel.dates import Date
 
         return value.raw.to_tz("UTC").to_stdlib() if isinstance(value, Date) else value
@@ -157,7 +157,7 @@ class Builder:
     def _column_ref(self, name: str) -> Any:
         """A column reference for ``where_column``/joins: ``"other.col"`` (a joined table) resolves
         to a raw dotted identifier; a bare name resolves against this query's own table (or, same
-        as :meth:`_column_or_literal`, a raw identifier when it isn't one of this table's columns)."""
+        as:meth:`_column_or_literal`, a raw identifier when it isn't one of this table's columns)."""
         import sqlalchemy as sa
 
         if "." in name:
@@ -183,8 +183,7 @@ class Builder:
         return self
 
     def where_in(self, column: str, values: Sequence[Any] | Select[Any]) -> Self:
-        """``WHERE col IN (...)``. ``values`` is a list **or a subquery** ``Select`` (Laravel
-        ``whereIn('id', $subquery)``) — pass ``sa.select(other.c.id)`` to filter DB-side without
+        """``WHERE col IN (...)``. ``values`` is a list **or a subquery** ``Select`` (``whereIn('id', $subquery)``) — pass ``sa.select(other.c.id)`` to filter DB-side without
         materializing the id list in the app (e.g. ``where_in('id', select(retrievable.c.id))``)."""
         self._add(self._table.c[column].in_(values))
         return self
@@ -210,7 +209,7 @@ class Builder:
         return self
 
     def where_raw(self, sql: str, *, connector: str = "and") -> Self:
-        """A raw SQL boolean predicate (Laravel ``whereRaw``) — e.g. a correlated ``EXISTS(...)``.
+        """A raw SQL boolean predicate — e.g. a correlated ``EXISTS(...)``.
         The SQL is **trusted**: never interpolate user input here; use bound ``where(...)`` for values."""
         import sqlalchemy as sa
 
@@ -218,7 +217,7 @@ class Builder:
         return self
 
     def where_exists(self, subquery: Select[Any], *, connector: str = "and") -> Self:
-        """``WHERE EXISTS (subquery)`` (Laravel ``whereExists``). ``subquery`` is a ``Select`` — correlate
+        """``WHERE EXISTS (subquery)``. ``subquery`` is a ``Select`` — correlate
         it to the outer query (``where(other.c.id == self.table.c['id'])``) for a per-row check."""
         import sqlalchemy as sa
 
@@ -231,7 +230,7 @@ class Builder:
         return self._table
 
     def _apply_conditional(self, callback: Any, value: Any) -> None:
-        """Invoke a ``when``/``unless`` callback Laravel-style. Laravel passes ``($query, $value)``;
+        """Invoke a ``when``/``unless`` callback -style. passes ``($query, $value)``;
         we pass the value as the 2nd argument when the callback accepts one, and fall back to
         ``callback(self)`` for the common close-over-the-value 1-arg form."""
         import inspect
@@ -251,11 +250,11 @@ class Builder:
             callback(self)
 
     def when(self, condition: Any, callback: Any, default: Any = None) -> Self:
-        """Laravel ``when`` — apply ``callback(self, condition)`` only if ``condition`` is truthy,
+        """``when`` — apply ``callback(self, condition)`` only if ``condition`` is truthy,
         else ``default(self, condition)`` if given. Lets conditional clauses stay in the fluent chain.
 
-        Matches Laravel's ``when($value, fn($query, $value))``: the truthy value is passed to the
-        callback's 2nd argument. A 1-arg callback (``lambda q: ...``, closing over the value
+        Matches the ``when($value, fn($query, $value))``: the truthy value is passed to the
+        callback's 2nd argument. A 1-arg callback (``lambda q:...``, closing over the value
         directly) also works — the value is only passed when the callback accepts it.
         """
         if condition:
@@ -265,7 +264,7 @@ class Builder:
         return self
 
     def unless(self, condition: Any, callback: Any, default: Any = None) -> Self:
-        """Laravel ``unless`` — the inverse of ``when``: apply ``callback(self, condition)`` only
+        """``unless`` — the inverse of ``when``: apply ``callback(self, condition)`` only
         when ``condition`` is **falsy**, else ``default(self, condition)`` if given. Same
         value-passing semantics as ``when`` (the value is passed to a 2-arg callback)."""
         if not condition:
@@ -285,7 +284,7 @@ class Builder:
         return expr
 
     def where_json(self, column: str, path: str, value: Any, *, connector: str = "and") -> Self:
-        """Filter on a value *inside* a JSON column — Laravel ``where('data->lang', 'en')``.
+        """Filter on a value *inside* a JSON column — ``where('data->lang', 'en')``.
         ``path`` is a key, a nested ``a->b`` / ``a.b`` path, or an array index. Compares the
         extracted value as text, so it works across SQLite and Postgres."""
         self._add(self._json_path(column, path).as_string() == value, connector)
@@ -294,14 +293,14 @@ class Builder:
     def where_json_like(
         self, column: str, path: str, value: str, *, connector: str = "and"
     ) -> Self:
-        """``LIKE`` against a value inside a JSON column — Laravel ``where('data->name', 'like', '%x%')``.
+        """``LIKE`` against a value inside a JSON column — ``where('data->name', 'like', '%x%')``.
         Handy for searching a per-locale translatable attribute, e.g.
         ``where_json_like('name', 'en', '%phone%')``. Cross-dialect (json_extract / ``->>``)."""
         self._add(self._json_path(column, path).as_string().like(value), connector)
         return self
 
     def where_json_contains(self, column: str, value: Any, *, connector: str = "and") -> Self:
-        """Postgres/MySQL JSON containment — Laravel ``whereJsonContains('data->tags', 'x')``:
+        """Postgres/MySQL JSON containment — ``whereJsonContains('data->tags', 'x')``:
         rows where ``column`` contains ``value`` (the ``@>`` operator). Postgres-targeted; build
         the query on a Postgres connection."""
         import json as _json
@@ -315,7 +314,7 @@ class Builder:
     def where_fulltext(
         self, column: str, query: str, *, language: str = "english", connector: str = "and"
     ) -> Self:
-        """Postgres full-text search — Laravel ``whereFullText``: rows whose ``column`` matches
+        """Postgres full-text search — ``whereFullText``: rows whose ``column`` matches
         the natural-language ``query``. Emits ``to_tsvector(language, column) @@
         plainto_tsquery(language, query)``. Postgres-targeted (build on a Postgres connection); for
         a precomputed ``tsvector`` column, back it with a ``gin_index`` so the match stays fast."""
@@ -374,8 +373,7 @@ class Builder:
 
     def with_where_has(self, relation: str, callback: Any = None) -> Self:
         """Filter parents by the constrained relation AND eager-load only the rows matching
-        that *same* constraint (Laravel ``withWhereHas`` parity — one constraint, both
-        effects). D2."""
+        that *same* constraint. D2."""
         self.where_has(relation, callback)
         self._eager.append(relation)
         self._eager_constraints[relation] = callback
@@ -410,7 +408,7 @@ class Builder:
             outcome = callback(rows)
             if inspect.isawaitable(outcome):
                 outcome = await outcome
-            if outcome is False:  # Laravel parity: the callback can stop the chunk walk early
+            if outcome is False:  # parity: the callback can stop the chunk walk early
                 return
             tail = rows[-1]
             last = tail._attributes[key] if hasattr(tail, "_attributes") else tail[key]
@@ -419,7 +417,7 @@ class Builder:
 
     async def chunk(self, size: int, callback: Any) -> None:
         """Page through results in fixed-size **offset** batches, calling ``callback`` per chunk
-        (sync or async; returning ``False`` stops early — Laravel parity). Simpler than
+        (sync or async; returning ``False`` stops early. Simpler than
         ``chunk_by_id`` but not safe under concurrent writes that shift rows between pages
         (prefer ``chunk_by_id``/``cursor`` for a frequently-written table)."""
         import inspect
@@ -443,8 +441,7 @@ class Builder:
             self._limit, self._offset = base_limit, base_offset
 
     async def each(self, callback: Any, chunk_size: int = 1000) -> None:
-        """Process every row individually, streaming ``chunk_size`` at a time under the hood
-        (Laravel ``each``). ``callback`` returning ``False`` stops the whole walk early."""
+        """Process every row individually, streaming ``chunk_size`` at a time under the hood. ``callback`` returning ``False`` stops the whole walk early."""
         import inspect
 
         async def _per_row(rows: Any) -> Any:
@@ -528,7 +525,7 @@ class Builder:
     def where_column(
         self, first: str, operator: str, second: str | None = None, *, connector: str = "and"
     ) -> Self:
-        """``WHERE`` comparing two **columns** (Laravel ``whereColumn``), e.g.
+        """``WHERE`` comparing two **columns**, e.g.
         ``where_column("updated_at", ">", "created_at")``. The 2-arg form
         (``where_column("a", "b")``) implies ``=``. Either side may be ``"other_table.col"`` to
         compare against a joined table."""
@@ -542,7 +539,7 @@ class Builder:
         return self
 
     def where_date(self, column: str, operator: str, value: Any, *, connector: str = "and") -> Self:
-        """``WHERE`` on just the DATE portion of a datetime column (Laravel ``whereDate``) —
+        """``WHERE`` on just the DATE portion of a datetime column —
         cross-dialect via SQL ``date(...)`` (Postgres/MySQL/SQLite all support it)."""
         import sqlalchemy as sa
 
@@ -551,7 +548,7 @@ class Builder:
         return self
 
     def where_time(self, column: str, operator: str, value: Any, *, connector: str = "and") -> Self:
-        """``WHERE`` on just the TIME portion of a datetime column (Laravel ``whereTime``) —
+        """``WHERE`` on just the TIME portion of a datetime column —
         cross-dialect via SQL ``time(...)``."""
         import sqlalchemy as sa
 
@@ -560,18 +557,18 @@ class Builder:
         return self
 
     def where_year(self, column: str, operator: str, value: Any, *, connector: str = "and") -> Self:
-        """``WHERE`` on the YEAR of a datetime column (Laravel ``whereYear``) — via SQL
-        ``EXTRACT(year FROM ...)``."""
+        """``WHERE`` on the YEAR of a datetime column — via SQL
+        ``EXTRACT(year FROM...)``."""
         return self._where_date_part("year", column, operator, value, connector=connector)
 
     def where_month(
         self, column: str, operator: str, value: Any, *, connector: str = "and"
     ) -> Self:
-        """``WHERE`` on the MONTH of a datetime column (Laravel ``whereMonth``)."""
+        """``WHERE`` on the MONTH of a datetime column."""
         return self._where_date_part("month", column, operator, value, connector=connector)
 
     def where_day(self, column: str, operator: str, value: Any, *, connector: str = "and") -> Self:
-        """``WHERE`` on the DAY-of-month of a datetime column (Laravel ``whereDay``)."""
+        """``WHERE`` on the DAY-of-month of a datetime column."""
         return self._where_date_part("day", column, operator, value, connector=connector)
 
     def _where_date_part(
@@ -601,7 +598,7 @@ class Builder:
     def join(
         self, table: str, first: str, operator: str, second: str, *, type_: str = "inner"
     ) -> Self:
-        """SQL ``JOIN`` (Laravel ``join``): ``first``/``second`` are ``"table.column"`` (or a bare
+        """SQL ``JOIN``: ``first``/``second`` are ``"table.column"`` (or a bare
         column, resolved against this query's own table). Built as a real SQLAlchemy Core
         ``Table.join()`` on the ``FROM`` clause — not a raw string. The default select stays
         ``SELECT <this table>.*``; pull in joined columns with ``select_raw("other.col")``."""
@@ -625,7 +622,7 @@ class Builder:
             )
             if kind == "right":
                 # SQLAlchemy Core has no RIGHT JOIN primitive — a right join is a left join with
-                # the two sides swapped (semantically identical; matches Laravel's rightJoin).
+                # the two sides swapped (semantically identical; matches the rightJoin).
                 from_clause = right.join(from_clause, onclause, isouter=True)
             else:
                 from_clause = from_clause.join(right, onclause, isouter=(kind == "left"))
@@ -633,7 +630,7 @@ class Builder:
 
     # --- having (post-group_by, doc B3) --------------------------------------
     def having(self, column: str, operator: str, value: Any, *, connector: str = "and") -> Self:
-        """A ``HAVING`` predicate over a grouped/aggregate column (Laravel ``having``) — e.g.
+        """A ``HAVING`` predicate over a grouped/aggregate column — e.g.
         ``.group_by("user_id").select_raw("count(*) AS total").having("total", ">", 5)``."""
         col = self._column_or_literal(column)
         clause = (
@@ -645,7 +642,7 @@ class Builder:
         return self
 
     def having_raw(self, sql: str, bindings: Sequence[Any] = (), *, connector: str = "and") -> Self:
-        """A raw ``HAVING`` predicate (Laravel ``havingRaw``) for an aggregate comparison the
+        """A raw ``HAVING`` predicate for an aggregate comparison the
         structural ``having()`` can't express, e.g. ``having_raw("COUNT(*) > ?", [5])``. ``?``
         placeholders bind positionally. The SQL itself is trusted — never interpolate user input;
         pass values through ``bindings``."""
@@ -703,7 +700,7 @@ class Builder:
         return self
 
     def order_by_raw(self, sql: str) -> Self:
-        """A raw ``ORDER BY`` expression (Laravel ``orderByRaw``), e.g. a ``CASE``/``FIELD()``
+        """A raw ``ORDER BY`` expression, e.g. a ``CASE``/``FIELD()``
         custom ordering the structural ``order_by`` can't express. Not tracked in
         ``cursor_paginate``'s keyset ordering — pair it with an explicit ``order_by`` tiebreaker
         if you need seekable pages."""
@@ -721,11 +718,11 @@ class Builder:
         return self
 
     def take(self, count: int) -> Self:
-        """Laravel alias for ``limit``."""
+        """alias for ``limit``."""
         return self.limit(count)
 
     def skip(self, count: int) -> Self:
-        """Laravel alias for ``offset``."""
+        """alias for ``offset``."""
         return self.offset(count)
 
     def lock_for_update(self) -> Self:
@@ -844,8 +841,8 @@ class Builder:
     async def get(self) -> Any:
         """Every matching row. A **hydrating** (model-bound) query returns an
         :class:`~arvel.database.collection.EloquentCollection` (doc B3); a raw table builder (no
-        ``hydrate``) returns a plain ``list[dict]`` — Laravel's query builder returns a Collection
-        too, but arvel keeps raw rows as plain dicts (typed simplicity over exact parity)."""
+                ``hydrate``) returns a plain ``list[dict]`` — the query builder returns a Collection
+                too, but arvel keeps raw rows as plain dicts (typed simplicity over exact parity)."""
         rows = await self._require_resolver().fetch_all(self.to_select())
         records = [dict(row) for row in rows]
         if self._hydrate is None:
@@ -861,10 +858,10 @@ class Builder:
         self, rows: list[dict[str, Any]], unique_by: list[str], update: list[str] | None = None
     ) -> Any:
         """Insert ``rows``; on a conflict over ``unique_by``, update ``update`` columns (defaults
-        to all non-key columns). Dialect-aware: Postgres/SQLite use ``ON CONFLICT DO UPDATE``;
-        MySQL/MariaDB use ``ON DUPLICATE KEY UPDATE`` (``unique_by`` is implicit there — MySQL has
-        no ``ON CONFLICT(cols)`` targeting, so it's honored by documentation only, matching
-        Laravel, which ignores ``$uniqueBy`` on MySQL too). An unrecognized dialect raises
+                to all non-key columns). Dialect-aware: Postgres/SQLite use ``ON CONFLICT DO UPDATE``;
+                MySQL/MariaDB use ``ON DUPLICATE KEY UPDATE`` (``unique_by`` is implicit there — MySQL has
+                no ``ON CONFLICT(cols)`` targeting, so it's honored by documentation only, matching
+        , which ignores ``$uniqueBy`` on MySQL too). An unrecognized dialect raises
         :class:`UnsupportedDriverOperation` rather than silently emitting the wrong SQL (A4)."""
         import importlib
 
@@ -939,13 +936,13 @@ class Builder:
         if self._hydrate is None:
             return record
         model = await _maybe_await(self._hydrate(record))
-        # Laravel parity: ``with('rel')->first()`` eager-loads the relation, just like ``get()``.
+        # parity: ``with('rel')->first()`` eager-loads the relation, just like ``get()``.
         for spec in self._eager:
             await self._eager_load_path([model], spec.split("."), self._eager_constraints.get(spec))
         return model
 
     async def first_or_fail(self) -> Any:
-        """``first()`` or raise ``ModelNotFound`` (Laravel ``firstOrFail``)."""
+        """``first()`` or raise ``ModelNotFound``."""
         row = await self.first()
         if row is None:
             from arvel.database.model import ModelNotFound
@@ -961,13 +958,13 @@ class Builder:
         return getattr(row, column)
 
     async def value(self, column: str) -> Any:
-        """The given column from the first matching row, or ``None`` (Laravel ``value``)."""
+        """The given column from the first matching row, or ``None``."""
         row = await self.first()
         return None if row is None else self._column_of(row, column)
 
     async def pluck(self, column: str, key: str | None = None) -> Any:
         """A list of a single column's values — or a ``{key: column}`` dict when ``key`` is
-        given (Laravel ``pluck``)."""
+        given."""
         rows = await self.get()
         if key is not None:
             return {self._column_of(r, key): self._column_of(r, column) for r in rows}
@@ -1017,7 +1014,7 @@ class Builder:
         return await self.first() is not None
 
     async def paginate(self, per_page: int = 15, page: int | None = None) -> LengthAwarePaginator:
-        """A length-aware paginator (Laravel ``paginate``): runs a ``count`` for the grand total
+        """A length-aware paginator: runs a ``count`` for the grand total
         so it can render a full numbered page list. ``page`` defaults to the current request's
         ``?page=`` (1 outside a request)."""
         from arvel.pagination import LengthAwarePaginator, resolve_current_page
@@ -1031,7 +1028,7 @@ class Builder:
         return LengthAwarePaginator(data, total, per_page, page)
 
     async def simple_paginate(self, per_page: int = 15, page: int | None = None) -> Paginator:
-        """A lean prev/next paginator (Laravel ``simplePaginate``): no ``count`` query — it fetches
+        """A lean prev/next paginator: no ``count`` query — it fetches
         one extra row to know whether a *next* page exists. ``page`` defaults to ``?page=``."""
         from arvel.pagination import Paginator, resolve_current_page
 
@@ -1061,7 +1058,7 @@ class Builder:
 
     def _seek_predicate(self, specs: list[tuple[str, str]], position: dict[str, Any]) -> Any:
         """The keyset ``WHERE`` clause: rows strictly after ``position`` in the lexicographic
-        order of ``specs`` — ``(col1 > v1) OR (col1 = v1 AND col2 > v2) OR ...`` — the standard,
+        order of ``specs`` — ``(col1 > v1) OR (col1 = v1 AND col2 > v2) OR...`` — the standard,
         fully-portable seek predicate (no ``ROW()`` comparison needed)."""
         import sqlalchemy as sa
 
@@ -1082,7 +1079,7 @@ class Builder:
     async def cursor_paginate(
         self, per_page: int = 15, cursor: str | None = None
     ) -> CursorPaginator:
-        """A keyset (cursor) paginator (Laravel ``cursorPaginate``): seeks past the last row's
+        """A keyset (cursor) paginator: seeks past the last row's
         ordering values instead of ``OFFSET``, so pages stay correct even when rows are inserted
         before the cursor mid-scan — the "page drift" ``paginate()``/``simple_paginate()`` can't
         avoid. Requires an ``order_by`` (defaults to the primary key ascending); the primary key is

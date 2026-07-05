@@ -1,4 +1,4 @@
-"""``db:seed`` — run the app's database seeder (Laravel ``db:seed``)."""
+"""``db:seed`` — run the app's database seeder."""
 
 from __future__ import annotations
 
@@ -23,6 +23,6 @@ async def run_seed(app: Any) -> None:
     if not app.bound("seeder"):
         typer.echo("no seeder bound; register one as 'seeder' in your app")
         raise typer.Exit(1)
-    reset_called_once()  # scope call_once dedup to this run (Laravel semantics)
+    reset_called_once()  # scope call_once dedup to this run
     await app.make("seeder").run()
     typer.echo("seeding complete")

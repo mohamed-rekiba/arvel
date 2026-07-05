@@ -1,4 +1,4 @@
-"""KERNEL-ERR — Laravel-parity exception-handler lifecycle (errors.md):
+"""KERNEL-ERR — parity exception-handler lifecycle (errors.md):
 type-keyed reportable/renderable registration, context() merge, once-per-instance
 report de-duplication, dont_report suppression, and the HTTP renderable path."""
 
@@ -67,7 +67,7 @@ def test_reportable_returning_false_stops_default_log() -> None:
     handler.report(TeapotError("t"))
 
     assert calls == ["cb"]
-    assert logger.errors == []  # default write suppressed, Laravel `return false`
+    assert logger.errors == []  # default write suppressed, `return false`
 
 
 def test_same_instance_reported_at_most_once() -> None:

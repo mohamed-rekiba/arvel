@@ -1,4 +1,4 @@
-"""Routing parity (Laravel): convenience routes Route::redirect / permanentRedirect / view were absent.
+"""Routing parity: convenience routes Route::redirect / permanentRedirect / view were absent.
 The redirect handlers are pure (Response with a Location header), so they're unit-tested directly; view
 rendering is exercised end-to-end through the serve path (tools/e2e + the iteration's scaffold proof)."""
 

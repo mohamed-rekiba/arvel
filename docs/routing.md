@@ -30,7 +30,7 @@ Route.any("/legacy", legacy)                       # all verbs
 A handler is any callable (sync or async); it receives the request and any path params, and
 returns a dict/list/str (Litestar serializes it) or an explicit `Response`.
 
-**Return a model or a collection directly** (Laravel parity) — the framework serializes an arvel
+**Return a model or a collection directly** — the framework serializes an arvel
 `Model`, a list of models, or a paginator of models to JSON via each model's `to_dict()` (hidden
 fields and loaded relations honored):
 
@@ -39,7 +39,7 @@ async def show(request):
     return await Product.with_("variants").find(request.path_param("id"))   # → a JSON object
 
 async def index(request):
-    return await Product.paginate()      # → Laravel's paginator JSON shape
+    return await Product.paginate() # → the paginator JSON shape
 ```
 
 **Pin the response status** with `.status(code)` — handy for a 200 action (login/logout) that
@@ -83,7 +83,7 @@ slips through with a literal `{user}` in it).
 
 ### Global URL helpers
 
-Outside a `Router` instance, the same generation is available as plain functions — Laravel's
+Outside a `Router` instance, the same generation is available as plain functions
 `url()`/`route()`/`to_route()`:
 
 ```python
@@ -111,7 +111,7 @@ url().query("/search", {"q": "books"})   # "/search?q=books"
 calls); outside one they raise a `RuntimeError` rather than returning a nonsense path. `.previous()`
 always degrades to its `fallback` instead (no active request, or no Referer header).
 
-A signed URL that expires relative to *now* (Laravel `URL::temporarySignedRoute`):
+A signed URL that expires relative to *now*:
 
 ```python
 from arvel.routing import temporary_signed_route
@@ -136,7 +136,7 @@ The signature is an itsdangerous MAC appended as a `signature` query param; veri
 both integrity and (if present) that `expires` is still in the future. The signing key defaults to
 the app key (`config('app.key')`); pass `key=` to override (a rotated key invalidates old links).
 
-Protect a route declaratively with the **signed** middleware (Laravel's `signed`) instead of
+Protect a route declaratively with the **signed** middleware instead of
 checking by hand:
 
 ```python
@@ -173,7 +173,7 @@ Route.resource("posts", PostController, except_=["destroy"])
 
 ### Controller middleware
 
-Attach middleware to specific controller actions in one place (Laravel's `HasMiddleware`), instead
+Attach middleware to specific controller actions in one place, instead
 of repeating `.middleware(...)` on every route the controller ends up bound to:
 
 ```python
@@ -348,7 +348,7 @@ Route.fallback(not_found)                        # matched when nothing else doe
 
 ## Serving a public/ directory (SPA, static assets)
 
-`Router.public(directory)` serves `directory` as the app's public web root — Laravel's `public/`:
+`Router.public(directory)` serves `directory` as the app's public web root — the `public/`:
 a request whose path matches a real file gets it back as-is (anything under `assets/` is assumed
 content-hashed by a bundler and cached forever; everything else stays revalidate-able), and any
 path that ISN'T a real file falls back to `directory/index.html` so a client-side router (Vue
@@ -361,7 +361,7 @@ Route.public("public", spa_fallback=False)           # static files only, no SPA
 ```
 
 Prefer configuring it once at the app level instead of a route file — `with_public_dir(...)`
-registers it automatically at boot (no route-file code needed at all, same as Laravel's own
+registers it automatically at boot (no route-file code needed at all, same as the own
 webserver-served `public/` needing zero lines in `routes/web.php`):
 
 ```python

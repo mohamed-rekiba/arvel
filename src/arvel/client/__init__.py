@@ -1,6 +1,6 @@
 """arvel.client — the ``Http`` client over **httpx** (core; DR-0002).
 
-A fluent, async HTTP client (Laravel ``Http`` facade parity): request builders
+A fluent, async HTTP client: request builders
 (``retry``/``timeout``/``as_form``/``as_multipart``/``attach``/auth helpers/…), a typed
 ``ClientResponse`` wrapper (``ok``/``json``/``throw``/…), ``pool`` for concurrent requests, and
 ``fake``/``assert_sent`` for testing without the network. Separate from the ``[http]`` web module.
@@ -41,7 +41,7 @@ class StrayRequest(Exception):
 
 
 def _dotted_get(data: Any, key: str, default: Any) -> Any:
-    """Laravel-style dotted-key lookup into parsed JSON (``"user.name"``, ``"items.0.id"``)."""
+    """dotted-key lookup into parsed JSON (``"user.name"``, ``"items.0.id"``)."""
     current: Any = data
     for part in key.split("."):
         if isinstance(current, Mapping) and part in current:
@@ -587,7 +587,7 @@ class Client:
     async def pool(self, callback: Callable[[PoolBuilder], list[Any]]) -> list[Any]:
         """Run the ``PendingRequest`` calls the callback queues concurrently on one shared
         connection; returns ordered results — a failed slot holds the exception, it isn't
-        raised (Laravel pool semantics)."""
+        raised."""
         async with httpx.AsyncClient(transport=self._current_transport()) as shared:
             builder = PoolBuilder(shared_client=shared)
             awaitables = callback(builder)

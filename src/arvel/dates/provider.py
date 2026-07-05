@@ -1,7 +1,7 @@
 """DateServiceProvider — binds ``date`` (root of the Date facade).
 
 The Date facade proxies to the :class:`~arvel.dates.Date` class, whose classmethods
-(``now``/``today``/``parse``) are the Laravel ``Date`` factory surface. The root ``arvel.Date``
+(``now``/``today``/``parse``) are the ``Date`` factory surface. The root ``arvel.Date``
 remains the class itself (ergonomic + ``isinstance``-friendly); the facade is the formal
 Facade-pattern accessor over the same ``date`` binding.
 """

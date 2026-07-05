@@ -10,7 +10,7 @@ from arvel.queue import decode_instance, deserialize_any, serialize_instance
 
 
 class WelcomeMail(Mailable, ShouldQueue):
-    """A queued mailable with its own __init__ (no super()) — the normal Laravel shape."""
+    """A queued mailable with its own __init__ (no super()) — the normal shape."""
 
     def __init__(self, name: str) -> None:
         self.name = name

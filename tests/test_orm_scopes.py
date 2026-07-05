@@ -1,4 +1,4 @@
-"""ORM — query scopes (Laravel parity): local scope_* methods + global scopes. Test-first."""
+"""ORM — query scopes: local scope_* methods + global scopes. Test-first."""
 
 from __future__ import annotations
 

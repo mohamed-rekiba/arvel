@@ -1,4 +1,4 @@
-"""Fluent bootstrap (Laravel-style `bootstrap/app.py`): the builder loads providers/middleware from
+"""Fluent bootstrap: the builder loads providers/middleware from
 Python files, applies a custom config dir, and `with_routing(web=, api=)` imports route files inside
 their kernel middleware group (api also URL-prefixed `/api`); `console` is not an HTTP route file."""
 

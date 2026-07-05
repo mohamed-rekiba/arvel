@@ -29,7 +29,7 @@ async def _cannot(ability: str, *args: Any) -> bool:
 
 
 def _auth() -> Any:
-    """Template ``auth()`` — the current authenticated user, or ``None`` (Laravel ``@auth``/``auth()``).
+    """Template ``auth()`` — the current authenticated user, or ``None``.
     ``{% if auth() %}Hi {{ auth().name }}{% endif %}``."""
     from arvel.support import current_user
 
@@ -37,7 +37,7 @@ def _auth() -> Any:
 
 
 def _guest() -> bool:
-    """Template ``guest()`` — ``True`` when no user is authenticated (Laravel ``@guest``)."""
+    """Template ``guest()`` — ``True`` when no user is authenticated."""
     return _auth() is None
 
 
@@ -83,7 +83,7 @@ def _csrf_token() -> str:
 
 
 def _csrf_field() -> Any:
-    """Template ``csrf_field()`` — a hidden ``_token`` input for HTML forms (Laravel ``@csrf``).
+    """Template ``csrf_field()`` — a hidden ``_token`` input for HTML forms.
     The token is interpolated via ``Markup.format`` so it is escaped, not trusted verbatim."""
     from markupsafe import Markup
 
@@ -92,7 +92,7 @@ def _csrf_field() -> Any:
 
 def _method_field(method: str) -> Any:
     """Template ``method_field('PUT')`` — a hidden ``_method`` input so an HTML form can target a
-    PUT/PATCH/DELETE route (Laravel ``@method``; honored by the ``MethodOverride`` middleware)."""
+    PUT/PATCH/DELETE route."""
     from markupsafe import Markup
 
     return Markup('<input type="hidden" name="_method" value="{}">').format(method.upper())
@@ -176,7 +176,7 @@ class ViewFactory:
         return self
 
     def share(self, **globals_: Any) -> None:
-        """Register globals available to every template (Laravel ``View::share``)."""
+        """Register globals available to every template."""
         self.env.globals.update(globals_)
 
     async def render(self, view_obj: View) -> str:

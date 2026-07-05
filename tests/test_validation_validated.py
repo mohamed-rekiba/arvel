@@ -1,5 +1,4 @@
-"""Validation (doc 10) — ``validated()`` returns the validated subset with nesting preserved
-(Laravel ``$validator->validated()``). A ``user.email`` rule validates the nested value via dot-path,
+"""Validation (doc 10) — ``validated()`` returns the validated subset with nesting preserved. A ``user.email`` rule validates the nested value via dot-path,
 so ``validated()`` must rebuild that nesting — not drop the field or return a flat ``"user.email"`` key.
 """
 

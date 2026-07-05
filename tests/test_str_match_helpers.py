@@ -1,4 +1,4 @@
-"""Str — after_last / before_last / is_ (Laravel Str::afterLast/beforeLast/is parity). after_last/
+"""Str — after_last / before_last / is_. after_last/
 before_last split on the LAST occurrence (return the whole string when absent); is_ matches a pattern
 where only ``*`` is a wildcard (every other char is literal)."""
 

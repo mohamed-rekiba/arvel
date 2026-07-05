@@ -1,4 +1,4 @@
-"""BelongsToMany parity (Laravel): pivot/query methods that were absent — count, where/order_by on the
+"""BelongsToMany parity: pivot/query methods that were absent — count, where/order_by on the
 related model, toggle, sync_without_detaching, update_existing_pivot — plus a fix so attach() accepts
 extra pivot columns (the synthetic pivot Table now declares them)."""
 

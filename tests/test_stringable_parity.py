@@ -1,4 +1,4 @@
-"""Stringable fluent parity (Laravel): Str::of(...) chaining was missing ~40 methods that Str (static)
+"""Stringable fluent parity: Str::of(...) chaining was missing ~40 methods that Str (static)
 gained in the helpers pass. Each transform returns a new Stringable so calls chain; terminals return
 plain values; explode bridges to a Collection."""
 

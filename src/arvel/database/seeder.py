@@ -1,4 +1,4 @@
-"""arvel.database.seeder — the Seeder base (Laravel ``Seeder``).
+"""arvel.database.seeder — the Seeder base.
 
 Subclass and implement ``run()`` to insert seed data; ``call(*Seeders)`` chains child seeders
 from a ``DatabaseSeeder``. The ``db:seed`` command runs the app's bound root seeder. Grounded
@@ -10,7 +10,7 @@ from __future__ import annotations
 from arvel.database.model_events import EVENTS_SUPPRESSED
 
 # Which seeder classes `call_once` has already run in the current seeding run, so a seeder
-# reachable from multiple `call()` chains runs once (Laravel `callOnce`). Reset per run (see
+# reachable from multiple `call()` chains runs once. Reset per run (see
 # `reset_called_once`, invoked by the seed entrypoint) — NOT process-lifetime, or a long-lived
 # worker / repeated `db:seed` would silently skip every once-seeder after the first run.
 _called_once: set[type[Seeder]] = set()
@@ -44,12 +44,12 @@ class Seeder:
 
 class WithoutModelEvents:
     """Context manager: suppress model lifecycle events (``creating``/``saved``/…) for its duration
-    (Laravel's ``WithoutModelEvents`` trait) — wrap a seeder's bulk inserts in it so observers don't
-    fan out per row::
+    — wrap a seeder's bulk inserts in it so observers don't
+       fan out per row::
 
-        async def run(self) -> None:
-            with WithoutModelEvents():
-                await UserFactory().count(1000).create()
+           async def run(self) -> None:
+               with WithoutModelEvents():
+                   await UserFactory().count(1000).create()
     """
 
     def __enter__(self) -> None:

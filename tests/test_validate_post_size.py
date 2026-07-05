@@ -1,5 +1,5 @@
 """ValidatePostSize global middleware: an over-large request body is rejected with 413 before
-the handler runs (Laravel ValidatePostSize), and it's wired into the default global pipeline."""
+the handler runs, and it's wired into the default global pipeline."""
 
 from __future__ import annotations
 

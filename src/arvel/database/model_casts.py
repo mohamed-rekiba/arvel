@@ -1,12 +1,11 @@
-"""arvel.database.model_casts — ``HasCasts``: attribute accessors/mutators + the cast registry
-(Laravel eloquent-mutators parity, doc 07). Grounded in knowledge/port/07-orm-active-record.md.
+"""arvel.database.model_casts — ``HasCasts``: attribute accessors/mutators + the cast registry. Grounded in knowledge/port/07-orm-active-record.md.
 
 Cast keys: ``datetime``/``bool``/``int``/``json``/``array``/``collection``/``object``/
 ``decimal:<scale>``/``hashed``/``encrypted``/``encrypted:array``/``encrypted:json``/
 ``stringable``, a native ``enum.Enum`` subclass, or a custom object exposing ``get``/``set``
 (the ``Cast`` protocol). ``immutable_datetime`` is deliberately **not** added — arvel's
 ``datetime`` cast already returns the immutable, whenever-based ``Date`` (a built-in
-divergence from Laravel, which needs a separate cast because its default is mutable Carbon).
+divergence from, which needs a separate cast because its default is mutable Carbon).
 """
 
 from __future__ import annotations
@@ -40,7 +39,7 @@ def json_default(value: Any) -> Any:
 
 
 def to_serializable(value: Any) -> Any:
-    """Unwrap a cast-get result to a JSON-native value for ``to_dict`` (Laravel ``toArray``):
+    """Unwrap a cast-get result to a JSON-native value for ``to_dict``:
     ``collection`` -> list, ``object`` -> dict, ``stringable`` -> str, ``Decimal`` -> str.
     Read-path only; ``_cast_set`` already unwraps for the write path."""
     from decimal import Decimal
@@ -61,7 +60,7 @@ def _to_db_datetime(value: Any) -> Any:
     """Normalize a Date / stdlib datetime / ISO string to a **UTC-aware** stdlib ``datetime`` for
     storage. UTC is the on-disk timezone so the round-trip is instant-faithful on every dialect:
     Postgres ``timestamptz`` keeps the instant regardless, and SQLite (which drops the offset and
-    reads back a naive value) then stores a UTC wall-clock that :func:`_from_db_datetime` reads as
+    reads back a naive value) then stores a UTC wall-clock that:func:`_from_db_datetime` reads as
     UTC — so a value stored in a non-UTC zone is not silently shifted on SQLite."""
     from arvel.dates import Date
 
@@ -76,11 +75,11 @@ def _to_db_datetime(value: Any) -> Any:
 
 def _from_db_datetime(value: Any) -> Any:
     """Interpret a value read back from a DateTime column. A **naive** datetime means SQLite (which
-    dropped the offset) — it was stored as a UTC wall-clock (see :func:`_to_db_datetime`), so attach
+    dropped the offset) — it was stored as a UTC wall-clock (see:func:`_to_db_datetime`), so attach
     UTC. The Builder's RAW read path (``select_raw``) skips result processors entirely, so on
     SQLite the very same column arrives as its stored **string** (``'2026-07-02 21:41:10.506842'``)
     — parse it (stdlib ``fromisoformat`` accepts the space separator) and apply the same naive-
-    means-UTC rule. Anything unparseable passes through for :meth:`Date.from_py` to reject."""
+    means-UTC rule. Anything unparseable passes through for:meth:`Date.from_py` to reject."""
     import datetime as _datetime
 
     if isinstance(value, str):
@@ -132,7 +131,7 @@ class HasCasts:
 
     def _effective_cast(self, key: str) -> Any:
         """The cast for ``key`` — an explicit ``__casts__`` entry, an implicit ``datetime`` for the
-        timestamp/soft-delete columns (Laravel casts created_at/updated_at/deleted_at to Carbon by
+        timestamp/soft-delete columns (casts created_at/updated_at/deleted_at to Carbon by
         default), or for a field *declared* with a ``datetime`` type — so a real ``DateTime`` column
         always normalizes on write (→ datetime) and reads back as ``Date``, without a redundant cast."""
         import datetime as _datetime
@@ -267,7 +266,7 @@ def _decimal_scale(cast: str) -> int:
 
 def _to_decimal(value: Any, cast: str) -> Any:
     """``decimal:<scale>`` on read — a quantized ``decimal.Decimal`` (arvel's idiomatic divergence:
-    Laravel's ``decimal`` cast returns a formatted string, arvel returns a real ``Decimal``)."""
+    the ``decimal`` cast returns a formatted string, arvel returns a real ``Decimal``)."""
     from decimal import Decimal
 
     quantum = Decimal(1).scaleb(-_decimal_scale(cast))
@@ -276,7 +275,7 @@ def _to_decimal(value: Any, cast: str) -> Any:
 
 def _from_decimal(value: Any, cast: str) -> str:
     """``decimal:<scale>`` on write — quantized, stored as its exact string form (a plain TEXT
-    column keeps the precision dialect-independent — see :data:`TEXT_CASTS`)."""
+    column keeps the precision dialect-independent — see:data:`TEXT_CASTS`)."""
     from decimal import Decimal
 
     quantum = Decimal(1).scaleb(-_decimal_scale(cast))

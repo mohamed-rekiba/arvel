@@ -82,7 +82,7 @@ def test_lazy_builds_a_click_command_from_the_signature() -> None:
 def test_malformed_signature_required_after_optional_raises_clear_error() -> None:
     from arvel.console.lazy import LazyGroup
 
-    # an optional positional must come last; a required arg after it is invalid (also illegal in Laravel)
+    # an optional positional must come last; a required arg after it is invalid (also illegal in most CLIs)
     with pytest.raises(ValueError, match="cannot follow an optional"):
         LazyGroup._closure_command("weird", ClosureCommand("weird {a?} {b}", lambda: None))
 

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 class ConsoleOutput:
-    """Command stdout/stderr I/O (Laravel Command I/O parity): ``info``/``line``/``comment``/
+    """Command stdout/stderr I/O: ``info``/``line``/``comment``/
     ``question`` go to stdout, ``error``/``warn`` to stderr, ``table``/``with_progress_bar`` render
     to stdout. Built on click's ``echo``/``style``/``progressbar`` (typer's own backing library —
     ``arvel.console`` may not import ``rich`` directly; see import-linter's G2 contract) — no new
@@ -72,7 +72,7 @@ class ConsoleOutput:
             self._echo(_row(r))
 
     def with_progress_bar(self, iterable: Iterable[Any], *, label: str = "") -> Iterator[Any]:
-        """Advance a progress bar over ``iterable`` (Laravel ``withProgressBar``) — click's own
+        """Advance a progress bar over ``iterable`` — click's own
         ``progressbar`` context manager, rendered to this output's stdout sink."""
         import click
 
@@ -111,7 +111,7 @@ class Command:
     async def handle(self, *deps: Any) -> Any:  # DI-injected by the kernel
         raise NotImplementedError
 
-    # -- output (Laravel Command I/O parity) --------------------------------------------
+    # -- output --------------------------------------------
     def info(self, message: str) -> None:
         self.output.info(message)
 
@@ -139,7 +139,7 @@ class Command:
     def with_progress_bar(self, iterable: Iterable[Any], *, label: str = "") -> Iterator[Any]:
         return self.output.with_progress_bar(iterable, label=label)
 
-    # -- prompts (Laravel Prompts parity) ------------------------------------------------
+    # -- prompts ------------------------------------------------
     def ask(self, label: str, default: str | None = None) -> str:
         return self._prompter.ask(label, default)
 

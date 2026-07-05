@@ -1,5 +1,5 @@
 """Integration (doc 20/16, spec 06-cache-parity) — the cache compiles + round-trips against a
-real Redis (cashews), including the Laravel-parity verbs, atomic locks, tags, and the direct
+real Redis (cashews), including the parity verbs, atomic locks, tags, and the direct
 Redis facade (command/pipeline/pub-sub)."""
 
 from __future__ import annotations

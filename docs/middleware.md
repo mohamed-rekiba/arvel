@@ -139,11 +139,11 @@ Limit.per_minute(5).response(lambda request: {"message": "Slow down."})
 ```
 
 **Segmenting.** A `Limit` with no explicit `.by(key)` is keyed by the authenticated user's id, else
-the client IP (Laravel's default) — call `.by(...)` yourself to segment differently (per tenant,
+the client IP — call `.by(...)` yourself to segment differently (per tenant,
 per API key, …).
 
 **Window.** Counting is fixed-window (a cache TTL arms on the first hit in a window) — the same
-technique the plain `ThrottleRequests` mode and Laravel's own limiter use. A burst can straddle two
+technique the plain `ThrottleRequests` mode and the own limiter use. A burst can straddle two
 windows (e.g. a client could squeeze in ~2x the limit right at a window boundary); it's not a
 sliding-window limiter. Good enough for the vast majority of rate-limiting needs; reach for a
 dedicated rate-limiting proxy/service if you need a hard sliding-window guarantee.
@@ -166,7 +166,7 @@ Global (every request, on by default):
   10 MiB) with `413`, before the handler runs.
 - **`ValidateHost`** — `400` when the `Host` isn't in `config('app.trusted_hosts')` (a no-op until
   you configure it).
-- **`MethodOverride`** — HTML form method-spoofing (Laravel `@method`): a `POST` whose form body
+- **`MethodOverride`** — HTML form method-spoofing: a `POST` whose form body
   (`application/x-www-form-urlencoded` or `multipart/form-data`) carries `_method=PUT|PATCH|DELETE` is
   routed as that verb, so a `<form method="post">` can reach a PUT/PATCH/DELETE route. Runs at the ASGI
   layer before routing; emit the field with `{{ method_field('PUT') }}`.
@@ -196,7 +196,7 @@ Group / opt-in:
 ### Excepting routes from CSRF
 
 A route a third party posts to with no session (a webhook) can't carry a CSRF token — exempt it
-by URI glob pattern (Laravel `$except`), either in config or on a subclass:
+by URI glob pattern, either in config or on a subclass:
 
 ```python
 # config/session.py
@@ -241,7 +241,7 @@ See [API tokens](auth/api-tokens.md) for issuing tokens.
 
 **Decoupled SPA using the session cookie (the `web` group) → the `XSRF-TOKEN` cookie flow.** The
 session-id cookie is `HttpOnly` (JS can't read it), so the web group also sets a **readable
-`XSRF-TOKEN` cookie** holding the token — exactly Laravel/Sanctum. The SPA never needs a
+`XSRF-TOKEN` cookie** holding the token — exactly Sanctum. The SPA never needs a
 server-rendered page:
 
 1. On startup, make a `GET` to any web-group route (add a no-op `Route.get("/csrf-cookie", …)` for

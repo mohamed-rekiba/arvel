@@ -1,4 +1,4 @@
-"""Relationship factories (Laravel `has`/`for`/`recycle`/hooks/`Model::factory()`), doc 10.
+"""Relationship factories, doc 10.
 
 `has`/`for_`/`recycle` are wired through `create`/`create_many` only (they need a persisted parent
 row) — against in-memory SQLite.

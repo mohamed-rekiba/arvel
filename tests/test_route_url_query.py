@@ -1,4 +1,4 @@
-"""R3 — named-route url() query-param handling (Laravel route()): extra params become a
+"""R3 — named-route url() query-param handling: extra params become a
 query string; a missing required path param raises. Grounded in arvel-correctness-review R3."""
 
 from __future__ import annotations

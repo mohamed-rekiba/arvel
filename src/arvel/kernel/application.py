@@ -1,6 +1,6 @@
 """The Application — a container that registers providers and boots them.
 
-``Application`` extends :class:`~arvel.kernel.container.Container` with the
+``Application`` extends:class:`~arvel.kernel.container.Container` with the
 register→boot lifecycle, a lifecycle **hook bus** (``booting``/``booted``/
 ``terminating``), ``terminating()`` shutdown callbacks, and dotted ``config()``.
 ``ApplicationBuilder`` is the fluent front door (``Application.configure(...)``).
@@ -113,9 +113,9 @@ class Application(Container):
 
     def resolvable(self, abstract: Any) -> bool:
         """Whether ``abstract`` can be resolved — it's ``bound()`` OR provided by a not-yet-loaded
-        deferred provider (which registers on first ``make``). Distinct from ``bound()``, which (like
-        Laravel) reports only *materialized* bindings — a deferred service isn't ``bound()`` until it
-        first resolves."""
+                deferred provider (which registers on first ``make``). Distinct from ``bound()``, which (like
+        ) reports only *materialized* bindings — a deferred service isn't ``bound()`` until it
+                first resolves."""
         return self.bound(abstract) or self._alias_of(abstract) in self._deferred
 
     def flush(self) -> None:
@@ -306,9 +306,9 @@ class ApplicationBuilder:
     def with_public_dir(
         self, directory: str | Path, *, path: str = "/", spa_fallback: bool = True
     ) -> ApplicationBuilder:
-        """Serve ``directory`` as the app's public web root — Laravel's ``public/`` (see
+        """Serve ``directory`` as the app's public web root — the ``public/`` (see
         ``Router.public()`` for the full rationale). Registers automatically at boot
-        (``RoutingServiceProvider``); no route-file code needed at all, matching how Laravel's
+        (``RoutingServiceProvider``); no route-file code needed at all, matching how 's
         own webserver-served ``public/`` needs zero lines in ``routes/web.php``. ``path`` mounts
         it under a sub-path (e.g. ``/app``) instead of the root; ``spa_fallback=False`` serves
         only real files (favicon/robots/storage/...) and 404s on an unmatched path instead of
@@ -321,14 +321,14 @@ class ApplicationBuilder:
 
     def with_lang_dir(self, directory: str | Path) -> ApplicationBuilder:
         """Load translations from ``directory`` instead of the default ``{base_path}/lang``
-        (e.g. ``resources/lang``, the pre-Laravel-9 convention) — ``LocalizationServiceProvider``
+        (e.g. ``resources/lang``, the pre--9 convention) — ``LocalizationServiceProvider``
         loads the app's own translations from here, after the framework's bundled defaults."""
         self._lang_dir = str(directory)
         return self
 
     def with_providers(self, providers: str | Path | Sequence[ProviderInput]) -> ApplicationBuilder:
         """Register service providers — a list of provider classes/instances, OR a path to a Python
-        file exposing a ``providers = [...]`` list (Laravel's ``bootstrap/providers.php`` shape)."""
+        file exposing a ``providers = [...]`` list."""
         if isinstance(providers, str | Path):
             module = _load_bootstrap_module(Path(providers))
             resolved: Sequence[ProviderInput] = (

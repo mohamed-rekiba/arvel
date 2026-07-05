@@ -3,7 +3,7 @@
 On IPython (the ``[console]`` extra) you get **top-level await** (autoawait) and autocomplete; without
 it, it falls back to the stdlib REPL (no await). Inside a project it runs the sync bootstrap so the
 container bindings exist and imports the app's models so they're **autoloaded by short name** (like
-Laravel Tinker). Async work (``await User.find(1)``) runs on IPython's loop; arvel's pools bind lazily
+Tinker). Async work (``await User.find(1)``) runs on IPython's loop; arvel's pools bind lazily
 to that loop. Grounded in knowledge/port/13-console.md.
 """
 
@@ -22,7 +22,7 @@ def build_namespace(app: Any = None) -> dict[str, Any]:
     namespace: dict[str, Any] = {name: getattr(arvel, name) for name in arvel.__all__}
     if app is not None:
         namespace["app"] = app
-        namespace.update(defined_models())  # autoload models by short name (Laravel-tinker style)
+        namespace.update(defined_models())  # autoload models by short name
     return namespace
 
 

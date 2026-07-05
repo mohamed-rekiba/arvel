@@ -61,8 +61,8 @@ def resolve_model(name: str) -> type | None:
 
 def scope[F: "Any"](method: F) -> F:
     """Mark a model method as a **local query scope** so it's callable on a query without the
-    ``scope_`` prefix — the decorator counterpart to the ``scope_<name>`` convention (Laravel's
-    ``#[Scope]`` attribute). ``@scope def published(self, query): ...`` lets you write
+    ``scope_`` prefix — the decorator counterpart to the ``scope_<name>`` convention ('s
+    ``#[Scope]`` attribute). ``@scope def published(self, query):...`` lets you write
     ``Post.published()``. The method takes the query builder and constrains it in place."""
     method._arvel_scope = True  # marker read by Builder.__getattr__
     return method
@@ -71,8 +71,7 @@ def scope[F: "Any"](method: F) -> F:
 class ModelNotFound(Exception):
     """Raised by ``find_or_fail`` / ``first_or_fail`` when no row matches.
 
-    Carries ``status = 404`` so the HTTP kernel renders it as a 404 (Laravel ``findOrFail`` →
-    ``ModelNotFoundException`` → 404), letting a handler use ``await Post.find_or_fail(id)`` without
+    Carries ``status = 404`` so the HTTP kernel renders it as a 404, letting a handler use ``await Post.find_or_fail(id)`` without
     a manual ``if post is None: abort(404)`` guard. The exception renderer reads ``.status``/``.detail``."""
 
     status = 404
@@ -89,7 +88,7 @@ class ReadOnlyModelError(Exception):
 class MassAssignmentException(Exception):
     """Raised by ``fill``/``create`` when a *totally-guarded* model (the default ``__guarded__ ==
     ['*']`` with no ``__fillable__``) is mass-assigned attributes — they would otherwise be silently
-    discarded into an empty row. Laravel parity: "Add [...] to fillable property to allow mass
+    discarded into an empty row. parity: "Add [...] to fillable property to allow mass
     assignment". Declare ``__fillable__`` (or set ``__guarded__ = []``) to allow it."""
 
     def __init__(self, model: str, keys: list[str]) -> None:
@@ -370,7 +369,7 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
     # --- route-model binding -------------------------------------------------
     @classmethod
     def get_route_key_name(cls) -> str:
-        """The column a route param resolves against (Laravel ``getRouteKeyName``).
+        """The column a route param resolves against.
 
         Defaults to the primary key; override to bind by a different column, e.g.::
 
@@ -383,11 +382,11 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
 
     @classmethod
     async def resolve_route_binding(cls, value: Any, field: str | None = None) -> Self | None:
-        """Resolve a route param to a model (Laravel ``resolveRouteBinding``).
+        """Resolve a route param to a model.
 
         Used by the framework for **implicit** binding: a controller action typed
         ``async def show(self, post: Post)`` resolves ``{post}`` via this method
-        (against :meth:`get_route_key_name`, or ``field`` for a custom key like
+        (against:meth:`get_route_key_name`, or ``field`` for a custom key like
         ``{post:slug}``). Returns ``None`` on no match — the HTTP layer turns that
         into a 404.
         """
@@ -409,7 +408,7 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
 
     @classmethod
     def factory(cls) -> Factory[Self]:
-        """This model's factory (Laravel ``Model::factory()``): ``__factory__`` if set, else the
+        """This model's factory: ``__factory__`` if set, else the
         ``<Model>Factory`` registered for this class (registered automatically when that ``Factory``
         subclass is defined — make sure it's imported, e.g. from a seeder or test)."""
         if cls.__factory__ is not None:
@@ -466,7 +465,7 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return key not in self.__guarded__
 
     def _totally_guarded(self) -> bool:
-        """Laravel ``totallyGuarded()`` — no fillable allow-list and everything guarded, so *nothing*
+        """``totallyGuarded()`` — no fillable allow-list and everything guarded, so *nothing*
         is mass-assignable. In that state a discarded attribute is a developer error, not a silent drop."""
         return not self.__fillable__ and self.__guarded__ == ["*"]
 
@@ -488,7 +487,7 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
             return self._cast_get(item, attributes[item])
         if item in type(self).__attributes_meta__:  # computed accessor (no stored value)
             return self._cast_get(item, None)
-        # a declared column that isn't set on this instance reads as None (Laravel parity); an
+        # a declared column that isn't set on this instance reads as None; an
         # unknown attribute (typo / missing relation) still raises
         table = type(self).__table__
         if table is not None and item in table.columns:
@@ -527,9 +526,9 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
     def replicate(self, *, exclude: tuple[str, ...] = ()) -> Self:
         """A new *unsaved* copy: attributes minus the primary key, timestamps, and ``exclude``.
 
-        Fires ``replicating`` on ``self`` before returning (Laravel parity). ``replicate()``
+        Fires ``replicating`` on ``self`` before returning. ``replicate()``
         keeps its public **sync** signature, so the (async) event dispatch is best-effort —
-        see :meth:`HasEvents._fire_sync`."""
+        see:meth:`HasEvents._fire_sync`."""
         skip = {self.__primary_key__, "created_at", "updated_at", *exclude}
         data = {k: v for k, v in self._attributes.items() if k not in skip}
         clone = type(self)()
@@ -605,7 +604,7 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return True
 
     async def _touch_owners(self) -> None:
-        """Bump ``updated_at`` on the parents named in ``__touches__`` (Laravel ``$touches``)."""
+        """Bump ``updated_at`` on the parents named in ``__touches__``."""
         for name in self.__touches__:
             relation = getattr(self, name)()
             parent = await relation.first()
@@ -619,7 +618,7 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
 
     async def delete(self) -> bool:
         """Soft-delete (stamps ``deleted_at``, keeps the row — a ``SoftDeletes`` model) or
-        delegates entirely to :meth:`force_delete`. ``deleting`` is cancelable — an observer
+        delegates entirely to:meth:`force_delete`. ``deleting`` is cancelable — an observer
         returning ``False`` aborts and the row is left untouched."""
         self._guard_writable()
         if await self._fire("deleting") is False:

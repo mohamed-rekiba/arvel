@@ -1,4 +1,4 @@
-"""arvel.security.hashing — driver-based password hashing (Laravel ``Hash`` parity, DR-0032).
+"""arvel.security.hashing — driver-based password hashing.
 
 ``HashDriver`` is a typed Protocol (``make``/``check``/``needs_rehash``/``info``); two concrete
 drivers implement it directly over their underlying crypto packages (no pwdlib indirection):
@@ -45,7 +45,7 @@ class HashDriver(Protocol):
 
 
 class Argon2Driver:
-    """Argon2id via argon2-cffi — arvel's default (stronger than Laravel's bcrypt default)."""
+    """Argon2id via argon2-cffi — arvel's default (stronger than the bcrypt default)."""
 
     algorithm: Literal["argon2id"] = "argon2id"
 
@@ -100,7 +100,7 @@ class Argon2Driver:
 
 
 class BcryptDriver:
-    """Bcrypt via the ``bcrypt`` package — parity + migration interop with Laravel's default."""
+    """Bcrypt via the ``bcrypt`` package — parity + migration interop with the default."""
 
     algorithm: Literal["bcrypt"] = "bcrypt"
 
@@ -109,7 +109,7 @@ class BcryptDriver:
 
     def make(self, plain: str) -> str:
         # bcrypt only reads the first 72 bytes; bcrypt>=4 rejects longer input instead of
-        # silently truncating — truncate explicitly (Laravel behavior) so registration never 500s
+        # silently truncating — truncate explicitly so registration never 500s
         return bcrypt.hashpw(plain.encode()[:72], bcrypt.gensalt(rounds=self._rounds)).decode()
 
     def check(self, plain: str, hashed: str) -> bool:
@@ -151,7 +151,7 @@ _RECOGNIZERS: dict[DriverName, Callable[[str], bool]] = {
 
 
 class HashManager:
-    """Hash driver manager (Laravel ``Hash`` facade parity). ``make`` uses the configured driver;
+    """Hash driver manager. ``make`` uses the configured driver;
     ``check``/``info``/``is_hashed`` auto-detect the hash's own driver by format; ``needs_rehash``
     is True whenever the hash isn't the *configured* driver+params (never taking plaintext)."""
 

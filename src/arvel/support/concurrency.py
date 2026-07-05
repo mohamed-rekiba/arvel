@@ -1,4 +1,4 @@
-"""arvel.support.concurrency — offload a batch of callables concurrently (Laravel `Concurrency`
+"""arvel.support.concurrency — offload a batch of callables concurrently (`Concurrency`
 parity), results returned in call order regardless of completion order.
 
 Default driver `"async"`: coroutine-functions are gathered directly; sync callables run via

@@ -5,7 +5,7 @@ The kernel registers ``render_exception`` as a Litestar exception handler for
 - **API / JSON / Inertia** (``Accept: application/json``, the default, or ``X-Inertia: true``)
   → a JSON body ``{message, errors}`` with the real status (422/403/404/…).
 - **web** (``Accept: text/html``) → the errors are flashed to the session **error bag** and the
-  client is **redirected back** (302) to the ``Referer`` (or ``/``) — Laravel's redirect-back.
+  client is **redirected back** (302) to the ``Referer`` (or ``/``) — the redirect-back.
 Litestar is imported lazily here (serve path only).
 Grounded in knowledge/port/10-validation.md + 04-http-kernel-middleware.md.
 """

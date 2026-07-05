@@ -1,4 +1,4 @@
-"""make:* generators — second batch (Laravel artisan parity). Each scaffolds a typed, parseable stub
+"""make:* generators — second batch. Each scaffolds a typed, parseable stub
 that imports a real arvel base class, into the conventional folder. Exercises the unit-testable
 ``generate()`` core (it takes a base path)."""
 

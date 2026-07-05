@@ -14,17 +14,17 @@ page  = await Post.paginate(per_page=20)   # a LengthAwarePaginator — see Pagi
 ```
 
 `paginate()` returns a [paginator](../pagination.md) (iterable over the page of rows, with
-`total()`/`current_page()`/`last_page()` accessors, Laravel JSON shape, and `links()` HTML),
+`total()`/`current_page()`/`last_page()` accessors, JSON shape, and `links()` HTML),
 not a plain dict.
 
-The builder carries the everyday Laravel query methods:
+The builder carries the everyday query methods:
 
 ```python
 await Post.where_in("status", ["draft", "review"]).get()
 await Post.where_not_in("status", ["archived"]).get()
 await Post.where_between("views", [100, 1000]).get()        # also where_not_between
 await Post.when(tag, lambda q, value: q.where(tag=value)).get()  # conditional clause; the truthy
-                                                                # value is passed (Laravel style)
+                                                                # value is passed
 await Post.when(tag, lambda q: q.where(tag=tag)).get()      # 1-arg form (close over it) also works
 await Post.unless(archived, lambda q: q.where("status", "!=", "archived")).get()  # inverse of when
 await Post.order_by("views", "desc").skip(10).take(5).get() # skip/take alias offset/limit
@@ -77,7 +77,7 @@ rows = await app("db").fetch_all(stmt)
 ```
 
 **Postgres divergence:** unlike SQLite/MySQL, Postgres rejects a SELECT-list alias in `HAVING`
-(a SQL-standard restriction Laravel's `having()` hits too, not an arvel gap) — repeat the
+(a SQL-standard restriction the `having()` hits too, not an arvel gap) — repeat the
 aggregate expression with `having_raw("sum(amount) > ?", [1000])` instead.
 
 
@@ -92,7 +92,7 @@ async for post in Post.query().cursor():                                      # 
 ```
 
 `chunk`/`chunk_by_id`/`each` accept a sync or async callback; returning `False` stops the walk
-early (Laravel parity). Prefer `chunk_by_id`/`cursor` over `chunk` for a table with concurrent
+early. Prefer `chunk_by_id`/`cursor` over `chunk` for a table with concurrent
 writes — offset-based paging can skip/repeat rows as earlier pages shift.
 
 
@@ -142,7 +142,7 @@ await Product.upsert(
 
 Dialect-correct: Postgres/SQLite compile `ON CONFLICT ... DO UPDATE`; MySQL/MariaDB compile
 `ON DUPLICATE KEY UPDATE` (`unique_by` is honored by documentation only there — MySQL has no
-`ON CONFLICT(cols)` targeting, matching Laravel, which ignores `$uniqueBy` on MySQL too). An
+`ON CONFLICT(cols)` targeting, matching, which ignores `$uniqueBy` on MySQL too). An
 unrecognized dialect raises `UnsupportedDriverOperation` rather than silently emitting the wrong
 SQL.
 

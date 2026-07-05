@@ -49,7 +49,7 @@ def bootstrap_app(app: Application) -> None:
     app.bootstrapped = True
 
 
-# Named route groups → kernel middleware group + URL prefix (Laravel: web=stateful/no-prefix,
+# Named route groups → kernel middleware group + URL prefix (web=stateful/no-prefix,
 # api=stateless+/api). An unrecognized name maps to a same-named group with no prefix.
 _ROUTE_GROUPS: dict[str, dict[str, str]] = {
     "web": {"group": "web"},

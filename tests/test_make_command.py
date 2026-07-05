@@ -1,4 +1,4 @@
-"""make:command — scaffold a console Command (Laravel artisan make:command). The stub subclasses the
+"""make:command — scaffold a console Command. The stub subclasses the
 real arvel.console.Command (signature/description/handle) and imports against real arvel."""
 
 from __future__ import annotations

@@ -15,7 +15,7 @@ from typing import Any, cast
 
 class FakeMailer:
     """Records sent mailables instead of delivering them. ``sent[i]`` is the mailable and
-    ``recipients[i]`` the recipient list of the same send (Laravel assertSent-with-callback
+    ``recipients[i]`` the recipient list of the same send (assertSent-with-callback
     parity: tests can assert WHO a mail went to, not just that it went)."""
 
     def __init__(self) -> None:
@@ -78,13 +78,13 @@ class FakeQueue:
             raise AssertionError("expected no jobs pushed")
 
     def assert_dispatched(self, job_cls: type) -> None:
-        """Alias of :meth:`assert_pushed` — Laravel ``Bus::assertDispatched`` naming. arvel models
+        """Alias of:meth:`assert_pushed` — ``Bus::assertDispatched`` naming. arvel models
         job dispatch as one fake regardless of facade (``Queue``/``Bus`` are the same push path);
-        see :func:`fake_bus`."""
+        see:func:`fake_bus`."""
         self.assert_pushed(job_cls)
 
     def assert_not_dispatched(self, job_cls: type) -> None:
-        """Alias of the inverse of :meth:`assert_pushed` — Laravel ``Bus::assertNotDispatched``."""
+        """Alias of the inverse of:meth:`assert_pushed` — ``Bus::assertNotDispatched``."""
         if any(job is job_cls for job, _, _ in self.pushed):
             raise AssertionError(f"expected {job_cls.__name__} NOT to be pushed")
 
@@ -112,7 +112,7 @@ class FakeEvents:
 
 
 class FakeNotifications:
-    """Records notifications instead of delivering them (Laravel ``Notification::fake``).
+    """Records notifications instead of delivering them.
     ``sent[i]`` is ``(notifiable, notification, channels)``."""
 
     def __init__(self) -> None:
@@ -182,10 +182,10 @@ def fake(facade: Any) -> Any:
 
 
 def fake_bus() -> FakeQueue:
-    """Fake job dispatch (Laravel ``Bus::fake``) — an alias of ``fake(Queue)``: arvel already
-    models ``Bus``/``Queue`` dispatch as the one push path, so this returns the same
+    """Fake job dispatch — an alias of ``fake(Queue)``: arvel already
+        models ``Bus``/``Queue`` dispatch as the one push path, so this returns the same
     :class:`FakeQueue` rather than a second, duplicate double. Extend with
-    ``assert_dispatched_chain``/``assert_batched`` once batching (story 18) lands."""
+        ``assert_dispatched_chain``/``assert_batched`` once batching (story 18) lands."""
     from arvel.support.facades import Queue
 
     return cast("FakeQueue", fake(Queue))
@@ -195,12 +195,11 @@ _faked_notifications = False
 
 
 def fake_notifications() -> FakeNotifications:
-    """Swap the ``notifications`` container binding for a recording double (Laravel
-    ``Notification::fake``) so ``notifiable.notify(...)`` records instead of delivering.
+    """Swap the ``notifications`` container binding for a recording double (``Notification::fake``) so ``notifiable.notify(...)`` records instead of delivering.
 
     Reaches into the container directly (``app().instance(...)``) rather than a ``Facade`` — there's
     no ``Notification`` facade in arvel (notifications are sent via the ``Notifiable`` mixin, which
-    resolves ``app().make("notifications")`` itself); :func:`restore_notifications` (or
+    resolves ``app().make("notifications")`` itself);:func:`restore_notifications` (or
     ``reset_fakes``) undoes it."""
     from arvel.kernel.globals import app
 
@@ -212,8 +211,8 @@ def fake_notifications() -> FakeNotifications:
 
 
 def restore_notifications() -> None:
-    """Restore the real ``notifications`` binding after :func:`fake_notifications`. A no-op if
-    nothing was faked (or the app that held the swap is already gone — best-effort, like
+    """Restore the real ``notifications`` binding after:func:`fake_notifications`. A no-op if
+        nothing was faked (or the app that held the swap is already gone — best-effort, like
     :func:`restore_storage`)."""
     global _faked_notifications
     if not _faked_notifications:
@@ -226,8 +225,8 @@ def restore_notifications() -> None:
 
 
 class FakeFilesystem:
-    """A temp-dir local disk swapped in for a real one (Laravel ``Storage::fake``), plus
-    assertion helpers. Wraps a :class:`arvel.filesystem.Filesystem` rather than subclassing it —
+    """A temp-dir local disk swapped in for a real one, plus
+    assertion helpers. Wraps a:class:`arvel.filesystem.Filesystem` rather than subclassing it —
     ``Filesystem`` isn't designed for extension, and every disk method it needs is proxied
     through ``__getattr__``, so it's a drop-in stand-in wherever ``Storage.disk(name)`` hands
     one out."""
@@ -258,15 +257,15 @@ _faked_disks: set[str] = set()
 
 
 def fake_storage(disk: str = "local") -> FakeFilesystem:
-    """Swap ``disk`` for a fresh temp-dir local disk (Laravel ``Storage::fake``); returns a
+    """Swap ``disk`` for a fresh temp-dir local disk; returns a
     :class:`FakeFilesystem` with ``assert_exists``/``assert_missing``/``assert_count``. Restore
-    the real driver with :func:`restore_storage` (or let ``reset_fakes`` handle every swap,
-    including this one, in teardown).
+        the real driver with:func:`restore_storage` (or let ``reset_fakes`` handle every swap,
+        including this one, in teardown).
 
-    Implemented against ``FilesystemManager.swap_disk`` rather than the generic facade
-    ``swap()``: ``Storage`` proxies its *default* disk, but a fake usually targets one named disk
-    (often not the default) while leaving the others real — swapping the whole facade root can't
-    express that, so this reaches into the manager's per-disk cache instead."""
+        Implemented against ``FilesystemManager.swap_disk`` rather than the generic facade
+        ``swap()``: ``Storage`` proxies its *default* disk, but a fake usually targets one named disk
+        (often not the default) while leaving the others real — swapping the whole facade root can't
+        express that, so this reaches into the manager's per-disk cache instead."""
     import tempfile
 
     import fsspec
@@ -305,10 +304,10 @@ _http_faked = False
 
 
 def fake_http(mapping: Mapping[str, Any] | None = None) -> Any:
-    """Fake the ``Http`` client for this test (Laravel ``Http::fake``) — routes through
+    """Fake the ``Http`` client for this test — routes through
     ``arvel.support.facades.Http.fake`` so ``arvel.testing`` is the one import surface; returns the
     underlying client (``assert_sent``/``assert_not_sent``/``assert_sent_count``/``recorded``, plus
-    ``Http.response(...)`` for canned bodies). :func:`reset_fakes` restores the real transport."""
+    ``Http.response(...)`` for canned bodies).:func:`reset_fakes` restores the real transport."""
     from arvel.kernel.globals import app
     from arvel.support.facades import Http
 
@@ -319,8 +318,8 @@ def fake_http(mapping: Mapping[str, Any] | None = None) -> Any:
 
 
 def restore_http() -> None:
-    """Restore the real ``Http`` transport after :func:`fake_http`. A no-op if nothing was faked
-    (or the app that held the swap is already gone — best-effort, like :func:`restore_storage`)."""
+    """Restore the real ``Http`` transport after:func:`fake_http`. A no-op if nothing was faked
+    (or the app that held the swap is already gone — best-effort, like:func:`restore_storage`)."""
     global _http_faked
     if not _http_faked:
         return
@@ -343,7 +342,7 @@ def reset_fakes() -> None:
 
 
 def _dotted_get(data: Any, key: str, default: Any) -> Any:
-    """Laravel-style dotted-key lookup into parsed JSON (``"user.name"``, ``"items.0.id"``)."""
+    """dotted-key lookup into parsed JSON (``"user.name"``, ``"items.0.id"``)."""
     current: Any = data
     for part in key.split("."):
         if isinstance(current, Mapping) and part in current:
@@ -364,7 +363,7 @@ _MISSING = object()
 
 
 class TestResponse:
-    """Wraps an HTTP test response with expressive assertions (Laravel ``http-tests.md`` parity).
+    """Wraps an HTTP test response with expressive assertions.
     ``.raw`` is the escape hatch to the full underlying response (an ``httpx.Response`` — Litestar's
     ``TestClient`` is an ``httpx.Client``). Every assertion returns ``self`` (fluent)."""
 
@@ -429,7 +428,7 @@ class TestResponse:
         data = self.raw.json() if path is None else _dotted_get(self.raw.json(), path, _MISSING)
         if data is _MISSING:
             raise AssertionError(f"expected a countable array at {path!r}; the path is absent")
-        # Laravel assertJsonCount targets arrays — a dict/str at the path is not a countable
+        # assertJsonCount targets arrays — a dict/str at the path is not a countable
         # collection (counting its keys/chars would silently pass on the wrong shape)
         if not isinstance(data, (list, tuple)):
             raise AssertionError(
@@ -470,8 +469,8 @@ _RESPONSE_VERBS = frozenset({"get", "post", "put", "patch", "delete", "head", "o
 
 
 class _WrappedTestClient:
-    """Wraps Litestar's ``TestClient`` so every verb call returns a :class:`TestResponse` instead of
-    the raw response; everything else (the context-manager protocol, cookies, ...) proxies straight
+    """Wraps Litestar's ``TestClient`` so every verb call returns a:class:`TestResponse` instead of
+    the raw response; everything else (the context-manager protocol, cookies,...) proxies straight
     through to the real client."""
 
     def __init__(self, raw: Any) -> None:
@@ -497,7 +496,7 @@ class _WrappedTestClient:
 
 def client(asgi: Any) -> Any:
     """A Litestar ``TestClient`` over an ASGI app (``app.as_asgi()`` / ``kernel.build()``), wrapped
-    so every verb call (``get``/``post``/...) returns a :class:`TestResponse` with expressive
+    so every verb call (``get``/``post``/...) returns a:class:`TestResponse` with expressive
     assertions."""
     from litestar.testing import TestClient
 
@@ -542,21 +541,21 @@ async def assert_soft_deleted(connection: Any, table: str, **conditions: Any) ->
 
 
 def database_transaction(connection: Any, name: str | None = None) -> Any:
-    """``async with database_transaction(db): ...`` — run a test in a transaction that's
+    """``async with database_transaction(db):...`` — run a test in a transaction that's
     always rolled back, so its DB writes don't leak into the next test."""
     return connection.begin_test_transaction(name)
 
 
 def travel_to(moment: Any) -> None:
-    """Freeze the clock at ``moment`` (a ``Date``) for the rest of the test — Laravel
-    ``travelTo``. Pair with :func:`travel_back`. Isolated per async task (ContextVar)."""
+    """Freeze the clock at ``moment`` (a ``Date``) for the rest of the test
+    ``travelTo``. Pair with:func:`travel_back`. Isolated per async task (ContextVar)."""
     from arvel.dates import Date
 
     Date.set_test_now(moment)
 
 
 def travel_back() -> None:
-    """Unfreeze the clock (Laravel ``travelBack``)."""
+    """Unfreeze the clock."""
     from arvel.dates import Date
 
     Date.set_test_now(None)
@@ -564,7 +563,7 @@ def travel_back() -> None:
 
 @contextlib.contextmanager
 def freeze_time(moment: Any = None) -> Generator[Any]:
-    """``with freeze_time(): ...`` — freeze the clock at ``moment`` (or the current now) inside
+    """``with freeze_time():...`` — freeze the clock at ``moment`` (or the current now) inside
     the block and restore the prior state on exit, even on error."""
     from arvel.dates import Date
     from arvel.dates import now as _now
@@ -587,13 +586,13 @@ def freeze_time(moment: Any = None) -> Generator[Any]:
 # reachable from here even via a lazy import (import-linter's static analysis catches those too).
 # Ceiling: only app-registered `Command` classes/`Console.command(...)` closures are reachable this
 # way (mirrors `arvel.console.kernel._artisan_dispatch`'s own split) — a *built-in* framework
-# command (`migrate`, `make:*`, ...) isn't; drive those with Typer's own `CliRunner` directly
+# command (`migrate`, `make:*`,...) isn't; drive those with Typer's own `CliRunner` directly
 # (``from typer.testing import CliRunner``). Upgrade path: if a shared parser/dispatcher ever moves
 # below the layer line, swap this out for the real thing.
 
 
 class ConsoleResult:
-    """The outcome of :func:`artisan` — exit code + captured stdout/stderr."""
+    """The outcome of:func:`artisan` — exit code + captured stdout/stderr."""
 
     def __init__(self, exit_code: int, output: str) -> None:
         self.exit_code = exit_code
@@ -734,9 +733,9 @@ class _TestOutput:
         self._buffer.extend([""] * n)
 
     def table(self, headers: Sequence[str], rows: Sequence[Sequence[Any]]) -> None:
-        self._buffer.append("  ".join(str(h) for h in headers))
+        self._buffer.append(" ".join(str(h) for h in headers))
         for row in rows:
-            self._buffer.append("  ".join(str(cell) for cell in row))
+            self._buffer.append(" ".join(str(cell) for cell in row))
 
     def with_progress_bar(self, iterable: Any, *, label: str = "") -> Any:
         yield from iterable
@@ -757,9 +756,7 @@ def _run_capturing_exit(run: Callable[[], None]) -> int:
 
 
 def artisan(app: Any, command: str, input: Sequence[str] | None = None) -> ConsoleResult:
-    """Run an app-registered console command (a ``Command`` class or a ``routes/console.py``
-    ``Console.command(...)`` closure) against a booted ``app`` and capture its exit code + output
-    (Laravel's ``$this->artisan(...)``). ``input`` pre-seeds prompt answers in the order they're
+    """Run an app-registered console command (a ``Command`` class or a ``routes/console.pyConsole.command(...)`` closure) against a booted ``app`` and capture its exit code + output. ``input`` pre-seeds prompt answers in the order they're
     asked (``Command.ask``/``confirm``/``choice``/...). Only app-registered commands are reachable
     this way — see the module note above ``ConsoleResult`` for why, and the built-in-command
     workaround."""

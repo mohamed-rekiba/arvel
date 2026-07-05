@@ -1,4 +1,4 @@
-"""arvel.auth.permissions — RBAC roles & permissions (Spatie laravel-permission parity).
+"""arvel.auth.permissions — RBAC roles & permissions (Spatie's permission parity).
 
 ``Role``/``Permission`` are arvel models; the ``HasRoles`` mixin (combined with the app's
 user model) assigns roles, grants direct permissions, and resolves effective permissions

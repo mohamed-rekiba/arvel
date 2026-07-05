@@ -1,7 +1,7 @@
 # Pipeline
 
 `Pipeline` sends a value **through** a list of pipes to a final destination — the same shape
-Laravel uses for its HTTP middleware. The key thing to unlearn coming from a simple `map`/`reduce`
+uses for its HTTP middleware. The key thing to unlearn coming from a simple `map`/`reduce`
 chain: a pipe isn't a plain transform. It receives `(value, next)` and decides **whether and how**
 to call `next` — so it can run logic before *and after* the rest of the pipeline, or stop the
 chain entirely. That's what makes it an **onion**, not a pipe in the Unix sense.
@@ -119,7 +119,7 @@ await Pipeline().send(1).through([sync_pipe, async_pipe]).then_return()
 
 ## No container coupling (v1)
 
-Unlike Laravel, pipes here are **instances or callables you construct yourself** — not class
+Unlike, pipes here are **instances or callables you construct yourself** — not class
 names resolved through a container. That keeps the API dependency-free; DI-based pipe resolution
 can layer on top later without breaking this contract.
 

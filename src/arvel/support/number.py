@@ -46,12 +46,12 @@ class Number:
 
     @staticmethod
     def abbreviate(value: float) -> str:
-        """Compact K/M/B form — Laravel ``Number::abbreviate`` (alias of ``human``)."""
+        """Compact K/M/B form — ``Number::abbreviate`` (alias of ``human``)."""
         return Number.human(value)
 
     @staticmethod
     def for_humans(value: float) -> str:
-        """Full-word magnitude — Laravel ``Number::forHumans`` (1500 → ``1.5 thousand``)."""
+        """Full-word magnitude — ``Number::forHumans`` (1500 → ``1.5 thousand``)."""
         for threshold, word in (
             (1_000_000_000_000, "trillion"),
             (1_000_000_000, "billion"),
@@ -65,7 +65,7 @@ class Number:
 
     @staticmethod
     def ordinal(number: int) -> str:
-        """Ordinal form — Laravel ``Number::ordinal`` (1 → ``1st``, 22 → ``22nd``)."""
+        """Ordinal form — ``Number::ordinal`` (1 → ``1st``, 22 → ``22nd``)."""
         n = int(number)
         if 11 <= (abs(n) % 100) <= 13:
             suffix = "th"
@@ -75,7 +75,7 @@ class Number:
 
     @staticmethod
     def file_size(bytes_: float, precision: int = 0) -> str:
-        """Human file size (1024-based) — Laravel ``Number::fileSize`` (1024 → ``1 KB``)."""
+        """Human file size (1024-based) — ``Number::fileSize`` (1024 → ``1 KB``)."""
         units = ("B", "KB", "MB", "GB", "TB", "PB")
         size = float(bytes_)
         index = 0
@@ -86,11 +86,11 @@ class Number:
 
     @staticmethod
     def clamp(value: float, minimum: float, maximum: float) -> float:
-        """Constrain ``value`` to ``[minimum, maximum]`` — Laravel ``Number::clamp``."""
+        """Constrain ``value`` to ``[minimum, maximum]`` — ``Number::clamp``."""
         return maximum if value > maximum else (minimum if value < minimum else value)
 
     @staticmethod
     def trim(value: float) -> float:
-        """Drop trailing zeros — Laravel ``Number::trim`` (12.0 → 12, 12.30 → 12.3)."""
+        """Drop trailing zeros — ``Number::trim`` (12.0 → 12, 12.30 → 12.3)."""
         number = float(value)
         return int(number) if number.is_integer() else number

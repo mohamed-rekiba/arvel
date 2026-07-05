@@ -1,4 +1,4 @@
-"""arvel.auth.gate — authorization Gate + Policy resolution (Laravel ``Gate``).
+"""arvel.auth.gate — authorization Gate + Policy resolution.
 
 Abilities are defined inline (``Gate.define``) or resolved to a Policy class method
 (``Gate.policy(Post, PostPolicy)``); ``before`` hooks short-circuit (super-admins).
@@ -10,7 +10,7 @@ Policy resolution (:meth:`Gate.resolve_policy`) has three tiers, checked in orde
 convention map (:meth:`Gate.register_policies`). "Auto-discovery" here means that last, provider-built
 map — an app's ``AuthServiceProvider`` scans its own ``policies/`` package and hands the resulting
 ``{Model: Policy}`` dict to ``register_policies``. There is no filesystem/import magic on arvel's
-side (Python has no PSR-4 class-name guess like Laravel's); the scan is the app's to write.
+side (Python has no PSR-4 class-name guess like 's); the scan is the app's to write.
 
 Gate guest handling: before invoking an ability/policy callback with ``user=None`` (no authenticated
 user), :func:`_accepts_none` inspects the callback's first parameter type annotation. A non-nullable
@@ -36,7 +36,7 @@ class AuthorizationError(Exception):
     Carries the **status** (``.status``, default 403 — e.g. 404 for ``deny_as_not_found``) and the
     **message** (``.detail``) from the policy's :class:`GateResponse`. The HTTP kernel's exception
     renderer reads ``.status``/``.detail`` (see ``render_exception``), so a denial renders as the
-    right status + custom message instead of a generic 500 — Laravel ``AuthorizationException``."""
+    right status + custom message instead of a generic 500 — ``AuthorizationException``."""
 
     def __init__(self, ability: str, message: str | None = None, code: int = 403) -> None:
         self.ability = ability
@@ -67,7 +67,7 @@ class GateResponse:
 
     @classmethod
     def deny_as_not_found(cls, message: str = "Not Found", code: int = 404) -> GateResponse:
-        """Deny but render as **404** — hide a resource's existence (Laravel ``denyAsNotFound``)."""
+        """Deny but render as **404** — hide a resource's existence."""
         return cls(False, message, code)
 
 
@@ -203,7 +203,7 @@ class Gate:
             if result is not None:
                 break
         if result is None:
-            # a policy's own before() runs before its ability methods (Laravel parity)
+            # a policy's own before() runs before its ability methods
             if ability not in self._abilities:
                 instance = self._policy_instance(args)
                 pre = getattr(instance, "before", None) if instance is not None else None

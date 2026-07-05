@@ -64,7 +64,7 @@ def _merge_defaults(repo: Any, key: str, defaults: Mapping[str, Any]) -> None:
 
 
 def load_config_directory(app: Application, directory: str | None = None) -> None:
-    """Auto-load ``{base_path}/config/*.py`` into the config repository (Laravel-style).
+    """Auto-load ``{base_path}/config/*.py`` into the config repository.
 
     Each file contributes its ``config`` mapping (or its UPPERCASE module vars) under the file's
     **stem** — ``config/app.py`` → the ``app`` namespace. **Existing values win**, so anything set via

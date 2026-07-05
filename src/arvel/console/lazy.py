@@ -69,7 +69,7 @@ class LazyGroup(TyperGroup):
         "openapi:export": "arvel.console.openapi:openapi_export_app",
         "schedule:run": "arvel.console.schedule:schedule_app",
         "shell": "arvel.console.shell:shell_app",
-        "tinker": "arvel.console.shell:shell_app",  # alias for shell, Laravel Tinker style
+        "tinker": "arvel.console.shell:shell_app",  # alias for shell, Tinker style
         "lang:list": "arvel.console.lang:lang_app",
     }
 
@@ -164,7 +164,7 @@ class LazyGroup(TyperGroup):
 
     @staticmethod
     def _closure_command(cmd_name: str, closure: Any) -> Any:
-        """Build a command from a closure's Laravel-style signature — required/optional positional args
+        """Build a command from a closure's signature — required/optional positional args
         + boolean ``--flags``. Built **through Typer** (a synthetic-signature callback) so it gets the
         same clean usage-error rendering as the built-in commands (a raw click.Command escapes Typer's
         error handling and surfaces a traceback on a missing argument). The callback dispatches the
@@ -196,7 +196,7 @@ def _signature_typer_params(cmd_name: str, tokens: list[Any]) -> tuple[list[Any]
     """Build the ``inspect.Parameter`` list + annotations for a synthetic Typer callback from parsed
     signature tokens (shared by closure commands and app/provider ``Command`` classes — see
     ``console.closure`` for the grammar). A required positional after an optional one is rejected
-    (an optional positional must come last, same rule Laravel enforces)."""
+    (an optional positional must come last, same rule enforces)."""
     import inspect
 
     import typer

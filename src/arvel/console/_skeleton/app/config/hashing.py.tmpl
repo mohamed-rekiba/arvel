@@ -1,7 +1,7 @@
 """Hashing config — the default password-hashing driver + its cost params.
 
-`argon2id` (the default) needs nothing extra. `bcrypt` is parity with Laravel's default and
-useful when migrating hashes from a Laravel/PHP app — switching `HASH_DRIVER` still verifies
+`argon2id` (the default) needs nothing extra. `bcrypt` is parity with the default and
+useful when migrating hashes from a /PHP app — switching `HASH_DRIVER` still verifies
 existing hashes under either driver (`Hash::check` auto-detects the hash's own format);
 `Hash::needsRehash` flags a hash for upgrade once it isn't the configured driver/params.
 """

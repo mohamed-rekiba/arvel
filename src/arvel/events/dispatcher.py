@@ -57,22 +57,22 @@ class Dispatcher:
         self._wildcards.pop(event, None)
 
     def has_listeners(self, event: Any) -> bool:
-        """Whether any listener (direct or wildcard) is registered for ``event`` — Laravel
+        """Whether any listener (direct or wildcard) is registered for ``event``
         ``Event::hasListeners``. Accepts an event class, a string name, or an instance."""
         name = event if isinstance(event, (str, type)) else type(event)
         return bool(self._gather(name))
 
     def push(self, event: Any, *payload: Any) -> None:
-        """Register a **deferred** event to fire later via ``flush`` (Laravel ``Event::push``)."""
+        """Register a **deferred** event to fire later via ``flush``."""
         self._pushed.setdefault(event, []).append(payload)
 
     async def flush(self, event: Any) -> None:
-        """Dispatch all events previously ``push``-ed under ``event`` (Laravel ``Event::flush``)."""
+        """Dispatch all events previously ``push``-ed under ``event``."""
         for payload in self._pushed.pop(event, []):
             await self.dispatch(event, *payload)
 
     def forget_pushed(self) -> None:
-        """Discard all pending pushed events (Laravel ``Event::forgetPushed``)."""
+        """Discard all pending pushed events."""
         self._pushed.clear()
 
     def subscribe(self, subscriber: Any) -> None:

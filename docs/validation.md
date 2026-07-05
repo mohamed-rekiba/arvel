@@ -131,7 +131,7 @@ v.errors()                   # {"code": ["The code must be uppercase."]}
 allow-list, `"url:ftp,https"`), the host must be non-empty, and there's no embedded whitespace —
 `"http://"`, `"javascript:alert(1)"`, and `"http://x y.com"` all now correctly fail (previously
 `url` was just an `http(s)://`-prefix check). `email` is an RFC-lite regex: `local@domain.tld`,
-no leading/trailing/consecutive dots in either part, and Laravel's length caps (local ≤ 64,
+no leading/trailing/consecutive dots in either part, and the length caps (local ≤ 64,
 domain ≤ 255 chars). Neither rule does a DNS lookup or mailbox probe (no `active_url` equivalent
 — a network call on every validation is a footgun) — they're format checks, by design.
 
@@ -271,7 +271,7 @@ post = CreatePost.parse({"title": "Hello World"})   # → slug "hello-world", ti
 
 `Schema`/`FormRequest` annotations are the **type/shape** layer — msgspec owns them, and for most
 request bodies that's the whole story. When a request needs a check msgspec's type system can't
-express — a cross-field or conditional rule like Laravel's `rules()` — override `rules()` (a normal
+express — a cross-field or conditional rule like the `rules()` — override `rules()` (a normal
 rule-`Validator` ruleset) on the `FormRequest`, plus the optional `messages()` / `attributes()` /
 `with_validator()` hooks:
 
@@ -307,13 +307,13 @@ Types stay in the annotations; semantics go in `rules()`. Skip `rules()` entirel
 an empty dict) when annotations already say everything you need.
 
 !!! note "Structural errors surface before semantic ones"
-    This is the one place arvel's typed-first `FormRequest` diverges from Laravel's array-based
+    This is the one place arvel's typed-first `FormRequest` diverges from the array-based
     validator: `rules()` can only run against a payload msgspec could **decode**, so if a request
     has *both* a structural error (a mistyped field) and a semantic one (a `rules()` failure), the
     structural error comes back first — you can't run a cross-field rule on a field that isn't the
     right type yet. Fix the types, resend, and the semantic errors appear. Both are the same 422
     shape; they just aren't always in the *same* response. Use a plain `Validator` (array-in,
-    all-rules-at-once) if you need Laravel's single combined bag for untyped input.
+    all-rules-at-once) if you need the single combined bag for untyped input.
 
 ## Common mistakes & gotchas
 

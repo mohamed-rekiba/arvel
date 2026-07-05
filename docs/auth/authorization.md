@@ -120,7 +120,7 @@ resp.allowed, resp.message, resp.code
 ```
 
 Use `GateResponse.deny_as_not_found()` to deny **as a 404** — hiding a resource's existence from a
-user who may not even know it's there (Laravel `denyAsNotFound`):
+user who may not even know it's there:
 
 ```python
 def view(self, user, post):
@@ -147,7 +147,7 @@ await user.can("update", post)     # routed to PostPolicy.update
 
 The ability name is the **method name, exactly** — `can("update", …)` calls `update`, and there's no
 snake↔camel conversion, so `can("view_any", …)` looks for a `view_any` method, not `viewAny`. Pick one
-spelling and use it on both sides. To mirror Laravel's standard resource policies, name your methods
+spelling and use it on both sides. To mirror the standard resource policies, name your methods
 (and abilities) in camelCase — `viewAny`, `view`, `create`, `update`, `delete`, `restore`,
 `forceDelete` — and call them with the same string: `can("viewAny", Post)`.
 
@@ -164,7 +164,7 @@ checks three tiers, in order:
        __policy__ = PostPolicy
    ```
 
-3. A **provider-registered convention map** — the closest arvel gets to Laravel's automatic
+3. A **provider-registered convention map** — the closest arvel gets to the automatic
    `Model` → `ModelPolicy` guess. Python has no PSR-4 class-name convention to exploit, so there's no
    filesystem/import magic here: your app's `AuthServiceProvider` scans its own `policies/` package
    and hands the resulting map to `register_policies`:

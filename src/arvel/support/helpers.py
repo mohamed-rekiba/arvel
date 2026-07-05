@@ -1,4 +1,4 @@
-"""arvel.support.helpers — Arr, data_get/data_set, and flow helpers (Laravel parity).
+"""arvel.support.helpers — Arr, data_get/data_set, and flow helpers.
 
 Dynamic by nature (arbitrary nested data + callables); mypy-strict still checks it.
 Grounded in knowledge/port/06-facades.md §helpers.
@@ -109,7 +109,7 @@ def throw_unless(condition: Any, exc: type[BaseException] | BaseException) -> An
 
 
 class _Optional:
-    """Null-safe proxy (Laravel ``optional()``): attribute/item access on a wrapped
+    """Null-safe proxy: attribute/item access on a wrapped
     ``None`` yields ``None`` instead of raising; otherwise proxies to the value."""
 
     __slots__ = ("_value",)
@@ -135,7 +135,7 @@ class _Optional:
 
 
 def optional(value: Any) -> Any:
-    """Wrap ``value`` so first-level attribute/item access is null-safe (Laravel parity)."""
+    """Wrap ``value`` so first-level attribute/item access is null-safe."""
     return _Optional(value)
 
 
@@ -226,17 +226,17 @@ class Arr:
     # --- keys / membership -------------------------------------------------
     @staticmethod
     def except_(target: dict[str, Any], keys: Iterable[str]) -> dict[str, Any]:
-        """Laravel ``Arr::except`` — alias of ``excluding``."""
+        """``Arr::except`` — alias of ``excluding``."""
         return Arr.excluding(target, keys)
 
     @staticmethod
     def exists(target: dict[str, Any], key: str) -> bool:
-        """Plain (non-dot) key membership — Laravel ``Arr::exists``."""
+        """Plain (non-dot) key membership — ``Arr::exists``."""
         return key in target
 
     @staticmethod
     def add(target: dict[str, Any], key: str, item: Any) -> dict[str, Any]:
-        """Set ``key`` (dot-aware) only if it's missing/None — Laravel ``Arr::add``."""
+        """Set ``key`` (dot-aware) only if it's missing/None — ``Arr::add``."""
         existing = data_get(target, key, _MISSING)
         if existing is _MISSING or existing is None:
             data_set(target, key, item)
@@ -244,7 +244,7 @@ class Arr:
 
     @staticmethod
     def forget(target: dict[str, Any], keys: str | Iterable[str]) -> dict[str, Any]:
-        """Remove one or more dot-keys in place — Laravel ``Arr::forget``."""
+        """Remove one or more dot-keys in place — ``Arr::forget``."""
         key_list = [keys] if isinstance(keys, str) else list(keys)
         for key in key_list:
             parts = key.split(".")
@@ -270,7 +270,7 @@ class Arr:
 
     @staticmethod
     def divide(target: dict[str, Any]) -> tuple[list[Any], list[Any]]:
-        """``(keys, values)`` — Laravel ``Arr::divide``."""
+        """``(keys, values)`` — ``Arr::divide``."""
         return list(target.keys()), list(target.values())
 
     # --- shape ------------------------------------------------------------
@@ -284,7 +284,7 @@ class Arr:
 
     @staticmethod
     def dot(target: dict[str, Any], prepend: str = "") -> dict[str, Any]:
-        """Flatten a nested dict into a single dot-keyed dict — Laravel ``Arr::dot``."""
+        """Flatten a nested dict into a single dot-keyed dict — ``Arr::dot``."""
         result: dict[str, Any] = {}
         for key, item in target.items():
             if isinstance(item, dict) and item:
@@ -295,7 +295,7 @@ class Arr:
 
     @staticmethod
     def undot(target: dict[str, Any]) -> dict[str, Any]:
-        """Expand a dot-keyed dict back into a nested dict — Laravel ``Arr::undot``."""
+        """Expand a dot-keyed dict back into a nested dict — ``Arr::undot``."""
         result: dict[str, Any] = {}
         for key, item in target.items():
             data_set(result, key, item)
@@ -303,7 +303,7 @@ class Arr:
 
     @staticmethod
     def collapse(items: Iterable[Any]) -> list[Any]:
-        """Collapse a list of lists into a single list — Laravel ``Arr::collapse``."""
+        """Collapse a list of lists into a single list — ``Arr::collapse``."""
         result: list[Any] = []
         for item in items:
             if isinstance(item, (list, tuple)):
@@ -313,27 +313,27 @@ class Arr:
     # --- transform / order ------------------------------------------------
     @staticmethod
     def where(target: Any, predicate: Callable[[Any], bool]) -> Any:
-        """Filter by a value predicate, preserving dict keys / list order — Laravel ``Arr::where``
-        (the predicate here takes the value only, not Laravel's ``($value, $key)``)."""
+        """Filter by a value predicate, preserving dict keys / list order — ``Arr::where``
+        (the predicate here takes the value only, not the ``($value, $key)``)."""
         if isinstance(target, dict):
             return {k: v for k, v in cast("dict[Any, Any]", target).items() if predicate(v)}
         return [v for v in target if predicate(v)]
 
     @staticmethod
     def where_not_null(target: Any) -> Any:
-        """Drop entries whose value is ``None``, preserving keys/order — Laravel ``Arr::whereNotNull``."""
+        """Drop entries whose value is ``None``, preserving keys/order — ``Arr::whereNotNull``."""
         return Arr.where(target, lambda value: value is not None)
 
     @staticmethod
     def pull(target: dict[str, Any], key: str, default: Any = None) -> Any:
-        """Read a dot-key's value then remove it in place — Laravel ``Arr::pull``."""
+        """Read a dot-key's value then remove it in place — ``Arr::pull``."""
         value = data_get(target, key, default)
         Arr.forget(target, key)
         return value
 
     @staticmethod
     def has_any(target: Any, keys: str | Iterable[str]) -> bool:
-        """Whether ANY of the dot-keys is present — Laravel ``Arr::hasAny``."""
+        """Whether ANY of the dot-keys is present — ``Arr::hasAny``."""
         key_list = [keys] if isinstance(keys, str) else list(keys)
         return any(data_get(target, key, _MISSING) is not _MISSING for key in key_list)
 
@@ -357,13 +357,13 @@ class Arr:
 
     @staticmethod
     def take(items: Iterable[Any], limit: int) -> list[Any]:
-        """First ``limit`` items, or the last ``-limit`` when negative — Laravel ``Arr::take``."""
+        """First ``limit`` items, or the last ``-limit`` when negative — ``Arr::take``."""
         seq = list(items)
         return seq[:limit] if limit >= 0 else seq[limit:]
 
     @staticmethod
     def join(items: Iterable[Any], glue: str, final_glue: str = "") -> str:
-        """Join with ``glue``; if ``final_glue`` is set, the last item uses it — Laravel ``Arr::join``."""
+        """Join with ``glue``; if ``final_glue`` is set, the last item uses it — ``Arr::join``."""
         parts = [str(x) for x in items]
         if not final_glue or len(parts) < 2:
             return glue.join(parts)
@@ -371,8 +371,8 @@ class Arr:
 
     @staticmethod
     def random(items: Iterable[Any], number: int | None = None) -> Any:
-        """A random element, or a list of ``number`` distinct elements — Laravel ``Arr::random``.
-        Uses ``secrets`` for selection (strong randomness; a superset of Laravel's needs)."""
+        """A random element, or a list of ``number`` distinct elements — ``Arr::random``.
+        Uses ``secrets`` for selection (strong randomness; a superset of the needs)."""
         import secrets
 
         pool = list(items)

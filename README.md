@@ -148,10 +148,10 @@ uv venv && uv pip install -e '.[dev]'
 ./tools/validate.sh    # ruff · mypy · pyright · import-linter · bandit · pip-audit · pytest
 ```
 
-## Inspired by Laravel
+## Inspired by
 
 If you're coming from PHP, arvel will feel familiar: facades, the service container, providers,
-migrations, factories, gates & policies, and a Laravel-style project layout are all here.
+migrations, factories, gates & policies, and a project layout are all here.
 Arvel is built natively for async Python, embraces the type system end to end, and stands
 on best-in-class Python engines (Litestar · SQLAlchemy Core · Alembic · whenever · Typer · taskiq ·
 Babel · msgspec · cashews · fsspec · Jinja2).

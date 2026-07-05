@@ -1,5 +1,4 @@
-"""C5 — custom route-key binding: {param} resolves a model by a non-PK column
-(Laravel ``{post:slug}``), 404 on miss. Test-first."""
+"""C5 — custom route-key binding: {param} resolves a model by a non-PK column, 404 on miss. Test-first."""
 
 from __future__ import annotations
 

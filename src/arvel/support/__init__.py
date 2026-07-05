@@ -1,7 +1,7 @@
 """arvel.support — shared leaf utilities (Collection, Str, helpers).
 
 A dependency-light leaf any module may import. Uses core deps inflection /
-python-slugify / python-ulid (all light). Laravel parity for Collection + Str.
+python-slugify / python-ulid (all light). parity for Collection + Str.
 """
 
 from __future__ import annotations
@@ -65,7 +65,7 @@ _ULID_RE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$", re.IGNORECASE)
 
 
 class Collection[T]:
-    """A fluent wrapper over a list (Laravel Collection parity)."""
+    """A fluent wrapper over a list."""
 
     def __init__(self, items: Iterable[T] | None = None) -> None:
         self._items: list[T] = list(items) if items is not None else []
@@ -132,7 +132,7 @@ class Collection[T]:
         return Collection(x for x in self._items if self._get(x, key) is not None)
 
     def take(self, count: int) -> Collection[T]:
-        """The first ``count`` items, or the last ``|count|`` when negative (Laravel ``take``)."""
+        """The first ``count`` items, or the last ``|count|`` when negative."""
         return Collection(self._items[count:] if count < 0 else self._items[:count])
 
     def contains(self, item: T) -> bool:
@@ -210,8 +210,8 @@ class Collection[T]:
 
     def duplicates(self, key: str | Callable[[T], Any] | None = None) -> dict[int, T]:
         """Items that repeat an earlier value (by ``key``, or the item itself), preserving
-        first-seen order — Laravel ``duplicates``, keyed by **list index** here rather than
-        Laravel's original array keys."""
+        first-seen order — ``duplicates``, keyed by **list index** here rather than
+        the original array keys."""
         seen: set[Any] = set()
         result: dict[int, T] = {}
         for index, item in enumerate(self._items):
@@ -276,13 +276,13 @@ class Collection[T]:
         return Collection(y for x in self._items for y in fn(x))
 
     def zip(self, *iterables: Iterable[Any]) -> Collection[Collection[Any]]:
-        """Pair this collection's items index-wise with each iterable — Laravel ``zip``. Stops at
+        """Pair this collection's items index-wise with each iterable — ``zip``. Stops at
         the shortest input, like the builtin ``zip``."""
         return Collection(Collection(row) for row in zip(self._items, *iterables, strict=False))
 
     def combine(self, values: Iterable[Any]) -> dict[Any, Any]:
-        """This collection's items as keys, paired with ``values`` — Laravel ``combine``. The two
-        must be the same length (a mismatch raises), same as Laravel's underlying ``array_combine``."""
+        """This collection's items as keys, paired with ``values`` — ``combine``. The two
+        must be the same length (a mismatch raises), same as the underlying ``array_combine``."""
         return dict(zip(self._items, values, strict=True))
 
     def implode(self, glue: str, key: str | None = None) -> str:
@@ -290,7 +290,7 @@ class Collection[T]:
         return glue.join(str(p) for p in parts)
 
     def join(self, glue: str, key: str | None = None) -> str:
-        """Laravel alias for ``implode``."""
+        """alias for ``implode``."""
         return self.implode(glue, key)
 
     # --- fluent control flow -----------------------------------------------
@@ -314,15 +314,15 @@ class Collection[T]:
         return self.when(not condition, callback, default)
 
     def when_empty(self, callback: Any, default: Any = None) -> Collection[T]:
-        """Run ``callback`` only when this collection is empty — Laravel ``whenEmpty``."""
+        """Run ``callback`` only when this collection is empty — ``whenEmpty``."""
         return self.when(self.is_empty(), callback, default)
 
     def when_not_empty(self, callback: Any, default: Any = None) -> Collection[T]:
-        """Run ``callback`` only when this collection is NOT empty — Laravel ``whenNotEmpty``."""
+        """Run ``callback`` only when this collection is NOT empty — ``whenNotEmpty``."""
         return self.when(not self.is_empty(), callback, default)
 
     def lazy(self) -> LazyCollection[T]:
-        """A deferred, re-iterable view over this collection's items (Laravel ``lazy()``)."""
+        """A deferred, re-iterable view over this collection's items."""
         return LazyCollection(lambda: iter(self._items))
 
     @staticmethod
@@ -333,7 +333,7 @@ class Collection[T]:
 
 
 class LazyCollection[T]:
-    """A generator-backed Collection (Laravel ``LazyCollection`` parity): ``map``/``filter``/
+    """A generator-backed Collection: ``map``/``filter``/
     ``take`` are deferred and stream one element at a time. Built from an iterable or a
     zero-arg callable returning a fresh iterator (the latter keeps it re-iterable)."""
 
@@ -378,7 +378,7 @@ class LazyCollection[T]:
 
 
 class Str:
-    """String helpers (Laravel Str parity) over inflection / slugify / ulid."""
+    """String helpers over inflection / slugify / ulid."""
 
     # Memoized: these regex-heavy transforms are called hot (table-name / relation-key derivation).
     # ``ulid()`` and the predicates below are intentionally NOT cached.
@@ -462,7 +462,7 @@ class Str:
 
     @staticmethod
     def is_(pattern: str, value: str) -> bool:
-        """Whether ``value`` matches ``pattern`` (Laravel ``Str::is``). Only ``*`` is a wildcard
+        """Whether ``value`` matches ``pattern``. Only ``*`` is a wildcard
         (matches any run of characters, including ``/``); every other character is literal."""
         if pattern == value:
             return True
@@ -489,7 +489,7 @@ class Str:
 
     @staticmethod
     def random(length: int = 16) -> str:
-        """A cryptographically-random alphanumeric string (Laravel ``Str::random``)."""
+        """A cryptographically-random alphanumeric string."""
         import secrets
         import string
 
@@ -524,7 +524,7 @@ class Str:
 
     @staticmethod
     def take(value: str, count: int) -> str:
-        """First ``count`` chars, or the last ``-count`` when negative (Laravel ``Str::take``)."""
+        """First ``count`` chars, or the last ``-count`` when negative."""
         return value[:count] if count >= 0 else value[count:]
 
     @staticmethod
@@ -554,7 +554,7 @@ class Str:
     # --- trimming / padding / whitespace -----------------------------------
     @staticmethod
     def squish(value: str) -> str:
-        """Collapse all runs of whitespace to single spaces and trim (Laravel ``Str::squish``)."""
+        """Collapse all runs of whitespace to single spaces and trim."""
         return " ".join(value.split())
 
     @staticmethod
@@ -572,12 +572,12 @@ class Str:
     # --- prefix / suffix ---------------------------------------------------
     @staticmethod
     def start(value: str, prefix: str) -> str:
-        """Ensure ``value`` begins with a single ``prefix`` (Laravel ``Str::start``)."""
+        """Ensure ``value`` begins with a single ``prefix``."""
         return value if value.startswith(prefix) else prefix + value
 
     @staticmethod
     def finish(value: str, cap: str) -> str:
-        """Ensure ``value`` ends with a single ``cap`` (Laravel ``Str::finish``)."""
+        """Ensure ``value`` ends with a single ``cap``."""
         return value if value.endswith(cap) else value + cap
 
     @staticmethod
@@ -595,7 +595,7 @@ class Str:
     # --- search / extract --------------------------------------------------
     @staticmethod
     def between(value: str, start: str, end: str) -> str:
-        """The substring between the first ``start`` and the **last** ``end`` — Laravel's
+        """The substring between the first ``start`` and the **last** ``end``
         ``beforeLast(after($subject, $from), $to)``."""
         if start == "" or end == "":
             return value
@@ -626,7 +626,7 @@ class Str:
 
     @staticmethod
     def replace_array(search: str, replacements: Sequence[str], subject: str) -> str:
-        """Replace successive occurrences of ``search`` with each value in turn (Laravel
+        """Replace successive occurrences of ``search`` with each value in turn (
         ``Str::replaceArray``)."""
         result = subject
         for replacement in replacements:
@@ -641,7 +641,7 @@ class Str:
 
     @staticmethod
     def swap(replacements: dict[str, str], subject: str) -> str:
-        """Replace each key with its value in a SINGLE pass (Laravel ``Str::swap`` / ``strtr``):
+        """Replace each key with its value in a SINGLE pass:
         substituted text is never re-processed, so ``{'a':'b','b':'a'}`` on ``'ab'`` → ``'ba'``.
         Longer keys win on overlap."""
         if not replacements:
@@ -667,13 +667,13 @@ class Str:
 
     @staticmethod
     def is_url(value: str) -> bool:
-        """A lightweight scheme check (http/https/ftp) — intentionally simpler than Laravel's full
+        """A lightweight scheme check (http/https/ftp) — intentionally simpler than the full
         URL validator; use a Validator ``url`` rule when strict validation matters."""
         return value.startswith(("http://", "https://", "ftp://"))
 
     @staticmethod
     def uuid() -> str:
-        """A random (v4) UUID string (Laravel ``Str::uuid``)."""
+        """A random (v4) UUID string."""
         import uuid as _uuid
 
         return str(_uuid.uuid4())

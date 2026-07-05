@@ -1,4 +1,4 @@
-"""arvel.features (Laravel Pennant parity) — define/resolve/mutate feature flags: per-scope
+"""arvel.features — define/resolve/mutate feature flags: per-scope
 resolution, resolver memoization (runs once per scope, then the store is served), rich values,
 activate/deactivate/forget/purge, class-based features, and the array + sqlite-backed database
 drivers. See docs/features.md + spec 20-pennant."""

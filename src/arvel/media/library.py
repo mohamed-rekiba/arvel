@@ -1,7 +1,7 @@
-"""arvel.media.library — attach files to models, à la Spatie laravel-medialibrary.
+"""arvel.media.library — attach files to models, à la Spatie's medialibrary.
 
-A model that mixes in :class:`HasMedia` can ``add_media(...).to_media_collection("images")``; each
-file becomes a :class:`Media` row (the ``media`` table) stored on a Storage disk. Override
+A model that mixes in:class:`HasMedia` can ``add_media(...).to_media_collection("images")``; each
+file becomes a:class:`Media` row (the ``media`` table) stored on a Storage disk. Override
 ``register_media_conversions`` to derive versions (thumbnails, resized/re-encoded copies) that are
 generated on upload and addressable by name via ``media.get_url("thumb")``.
 
@@ -133,7 +133,7 @@ class MediaAdder:
     async def to_media_collection(
         self, collection: str = "default", *, disk: str = "default"
     ) -> Media:
-        """Store the file (and its conversions) on ``disk`` and record a :class:`Media` row."""
+        """Store the file (and its conversions) on ``disk`` and record a:class:`Media` row."""
         from arvel.kernel import app
 
         model = self._model
@@ -175,8 +175,8 @@ class MediaAdder:
 class HasMedia:
     """Mixin: attach files to a model via named media collections (Spatie ``InteractsWithMedia``).
 
-    Override :meth:`register_media_conversions` to declare derived versions generated on upload.
-    Override ``__media_model__`` to store media as a custom :class:`Media` subclass (e.g. one that
+    Override:meth:`register_media_conversions` to declare derived versions generated on upload.
+    Override ``__media_model__`` to store media as a custom:class:`Media` subclass (e.g. one that
     adds conversion accessors); it must keep ``__table_name__ = "media"``.
     """
 

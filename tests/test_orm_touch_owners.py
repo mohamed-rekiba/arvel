@@ -1,4 +1,4 @@
-"""ORM (doc 07) — saving a child touches the parents named in __touches__ (Laravel $touches)."""
+"""ORM (doc 07) — saving a child touches the parents named in __touches__."""
 
 from __future__ import annotations
 

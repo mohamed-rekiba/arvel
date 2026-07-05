@@ -59,7 +59,7 @@ async def test_plain_notification_sends_inline() -> None:
 
 
 class MultiChannel(Notification, ShouldQueue):
-    """database + mail — must queue one job PER channel (Laravel parity), so a mail failure
+    """database + mail — must queue one job PER channel, so a mail failure
     retries only mail and can never re-run (double-store) the database channel."""
 
     def via(self, notifiable: Any) -> list[str]:

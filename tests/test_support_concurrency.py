@@ -1,4 +1,4 @@
-"""Concurrency — a typed wrapper offloading a batch of callables (Laravel `Concurrency` parity):
+"""Concurrency — a typed wrapper offloading a batch of callables:
 `async` gathers coroutine-functions + `to_thread`s sync callables, `thread` forces every callable
 through a thread, `process` offloads to a real `ProcessPoolExecutor` (DR-0030) for CPU parallelism
 — proven here by a concurrent ticker that keeps ticking on schedule while a CPU-bound function

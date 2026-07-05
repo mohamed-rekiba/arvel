@@ -1,4 +1,4 @@
-"""Console ops commands (Laravel parity) — key:generate, storage:link, cache:clear."""
+"""Console ops commands — key:generate, storage:link, cache:clear."""
 
 from __future__ import annotations
 

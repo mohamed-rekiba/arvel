@@ -2,7 +2,7 @@
 
 A model's `to_dict()` is fine for a quick endpoint, but a public API usually needs to shape the
 output differently from the storage schema: hide internal columns, rename keys, conditionally
-include a relation only when it's eager-loaded, or add pagination metadata. `JsonResource` (Laravel
+include a relation only when it's eager-loaded, or add pagination metadata. `JsonResource` (
 `eloquent-resources` parity) is that transform layer — declare the shape once, reuse it everywhere
 the model is serialized.
 
@@ -34,7 +34,7 @@ async def show(request, post: Post):
 - **`when(condition, value, default=MISSING)`** — `value` (or `value()` if callable) when
   `condition`, else `default`. A field left at the default `MISSING` is **stripped from the
   payload** entirely, not serialized as `null`.
-- **`when_not_none(value)`** — `value` if not `None`, else `MISSING` (Laravel `whenNotNull`).
+- **`when_not_none(value)`** — `value` if not `None`, else `MISSING`.
 - **`when_loaded(relation, cb=None)`** — the eager-loaded relation's value (or `cb(value)` if
   given), or `MISSING` if `relation` wasn't eager-loaded (`Model.with_(...)`). This reads the
   model's loaded-relation bookkeeping directly — it never triggers a lazy query, so a resource is
@@ -88,7 +88,7 @@ PostResource.collection(posts).to_payload()
 
 Pass a paginator (`Builder.paginate()`/`simple_paginate()`) instead of a plain list and the
 collection's `data` is still mapped through the resource, with `meta`/`links` alongside it —
-Laravel's paginated-resource response shape (distinct from a bare paginator's own `to_dict()`,
+the paginated-resource response shape (distinct from a bare paginator's own `to_dict()`,
 which flattens those fields):
 
 ```python

@@ -1,5 +1,5 @@
 """`Application.configure(...).with_lang_dir(...)` — loads the app's translations from a custom
-directory (e.g. `resources/lang`, the pre-Laravel-9 convention) instead of the default
+directory (e.g. `resources/lang`, the pre--9 convention) instead of the default
 `{base_path}/lang`."""
 
 from __future__ import annotations

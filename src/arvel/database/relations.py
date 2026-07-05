@@ -17,7 +17,7 @@ from typing import Any, cast
 @dataclass(frozen=True)
 class SyncResult:
     """The "changes" map returned by ``BelongsToMany.sync``/``sync_without_detaching``/
-    ``sync_with_pivot_values`` (Laravel parity) — which related ids were attached, detached, and
+    ``sync_with_pivot_values`` — which related ids were attached, detached, and
     had their pivot columns updated (A5)."""
 
     attached: list[Any] = field(default_factory=list[Any])
@@ -71,8 +71,7 @@ class Relation:
 
 
 class HasOneOrMany(Relation):
-    """has-one / has-many: the child carries the foreign key. A relation **is** a query builder
-    (Laravel): it proxies ``where``/``order_by``/``count``/… to its FK-constrained query, and
+    """has-one / has-many: the child carries the foreign key. A relation **is** a query builder: it proxies ``where``/``order_by``/``count``/… to its FK-constrained query, and
     ``create``/``save`` set the foreign key to the parent automatically."""
 
     def __getattr__(self, name: str) -> Any:
@@ -82,13 +81,11 @@ class HasOneOrMany(Relation):
         return getattr(self.query(), name)
 
     async def create(self, **attributes: Any) -> Any:
-        """Create + persist a related child with the foreign key set to the parent
-        (Laravel ``$parent->children()->create([...])``)."""
+        """Create + persist a related child with the foreign key set to the parent."""
         return await self.related.create(**{**attributes, self.foreign_key: self._parent_value()})
 
     async def save(self, model: Any) -> Any:
-        """Persist an existing related model into the relation, setting its foreign key
-        (Laravel ``$parent->children()->save($child)``)."""
+        """Persist an existing related model into the relation, setting its foreign key."""
         setattr(model, self.foreign_key, self._parent_value())
         await model.save()
         return model
@@ -149,7 +146,7 @@ class BelongsToMany(Relation):
         return self
 
     def where(self, *args: Any) -> BelongsToMany:
-        """Constrain the **related** model query (Laravel ``$user->roles()->where('active', true)``).
+        """Constrain the **related** model query.
         Applied to the second-stage related-model fetch, within the pivot-filtered set."""
 
         def constrain(query: Any) -> None:
@@ -210,8 +207,7 @@ class BelongsToMany(Relation):
         return models
 
     async def attach(self, related_id: Any, **pivot: Any) -> None:
-        """Insert a pivot row linking the parent to ``related_id``, with optional extra pivot columns
-        (Laravel ``attach($id, ['col' => 'val'])``)."""
+        """Insert a pivot row linking the parent to ``related_id``, with optional extra pivot columns."""
         # the synthetic pivot Table must declare any extra columns being written
         self._pivot_columns.extend(col for col in pivot if col not in self._pivot_columns)
         await self._pivot_query().insert(
@@ -247,7 +243,7 @@ class BelongsToMany(Relation):
         **retained** ids whose given attrs differ from what's stored, and — only when
         ``detaching`` — detach the extras. Retained pivot rows are never dropped/recreated, so
         their data survives untouched unless explicitly given new values (A5: the prior
-        detach-then-reattach implementation destroyed it). Laravel ``sync``/
+        detach-then-reattach implementation destroyed it). ``sync``/
         ``syncWithoutDetaching``/``toggle`` parity; returns the changes map."""
         wanted: dict[Any, dict[str, Any]] = (
             dict(ids_or_mapping)
@@ -285,14 +281,14 @@ class BelongsToMany(Relation):
         self, ids_or_mapping: list[Any] | dict[Any, dict[str, Any]]
     ) -> SyncResult:
         """Attach missing ids (or update given pivot attrs for retained ones), never detaching
-        (Laravel ``syncWithoutDetaching``) — ``sync(x, detaching=False)``."""
+        — ``sync(x, detaching=False)``."""
         return await self.sync(ids_or_mapping, detaching=False)
 
     async def sync_with_pivot_values(
         self, related_ids: list[Any], values: dict[str, Any], *, detaching: bool = True
     ) -> SyncResult:
         """``sync(related_ids)``, attaching/updating every one of them with the same extra pivot
-        ``values`` (Laravel ``syncWithPivotValues``)."""
+        ``values``."""
         mapping = {related_id: dict(values) for related_id in related_ids}
         return await self.sync(mapping, detaching=detaching)
 
@@ -301,8 +297,7 @@ class BelongsToMany(Relation):
         return len(await self.get())
 
     async def toggle(self, related_ids: list[Any]) -> dict[str, list[Any]]:
-        """Attach the ids that are missing and detach the ones already present (Laravel
-        ``toggle``); returns the changes map ``{"attached": [...], "detached": [...]}``."""
+        """Attach the ids that are missing and detach the ones already present (``toggle``); returns the changes map ``{"attached": [...], "detached": [...]}``."""
         existing = await self._attached_ids()
         attached: list[Any] = []
         detached: list[Any] = []
@@ -316,7 +311,7 @@ class BelongsToMany(Relation):
         return {"attached": attached, "detached": detached}
 
     async def update_existing_pivot(self, related_id: Any, **values: Any) -> None:
-        """Update pivot-table columns for an existing attachment (Laravel ``updateExistingPivot``)."""
+        """Update pivot-table columns for an existing attachment."""
         # the synthetic pivot Table must declare the columns being written
         self._pivot_columns.extend(col for col in values if col not in self._pivot_columns)
         await (
@@ -512,7 +507,7 @@ class MorphedByMany(Relation):
 class BelongsTo(Relation):
     """Child belongs to an owner (child carries the foreign key → owner's key). Like the other
     relations it **is** a query builder — ``where``/``order_by``/… proxy to the FK-constrained owner
-    query — and ``associate``/``dissociate`` set/clear the child's foreign key (Laravel)."""
+    query — and ``associate``/``dissociate`` set/clear the child's foreign key."""
 
     def __init__(self, parent: Any, related: Any, foreign_key: str, owner_key: str) -> None:
         super().__init__(parent, related, foreign_key, owner_key)
@@ -534,13 +529,12 @@ class BelongsTo(Relation):
         return await self.first()
 
     def associate(self, model: Any) -> Any:
-        """Set the child's foreign key to ``model``'s owner key and return the child (Laravel
-        ``$child->owner()->associate($owner)``). Not persisted until the child is saved."""
+        """Set the child's foreign key to ``model``'s owner key and return the child (``$child->owner()->associate($owner)``). Not persisted until the child is saved."""
         setattr(self.parent, self.foreign_key, model._attributes.get(self.owner_key))
         return self.parent
 
     def dissociate(self) -> Any:
-        """Clear the child's foreign key and return the child (Laravel ``dissociate``)."""
+        """Clear the child's foreign key and return the child."""
         setattr(self.parent, self.foreign_key, None)
         return self.parent
 

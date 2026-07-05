@@ -48,7 +48,7 @@ async def test_relation_create_sets_foreign_key() -> None:
     try:
         writer = await Writer.create(name="Ada")
         article = await writer.posts().create(title="Hello", published=True)
-        assert article.writer_id == writer.id  # FK auto-set (Laravel parity)
+        assert article.writer_id == writer.id  # FK auto-set
         assert [a.title for a in await writer.posts().get()] == ["Hello"]
     finally:
         await db.dispose()

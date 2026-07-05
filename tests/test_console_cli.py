@@ -1,4 +1,4 @@
-"""The CLI command tree uses Laravel-style colon names (`make:model`, `db:seed`, …) — both as the
+"""The CLI command tree uses colon names (`make:model`, `db:seed`, …) — both as the
 invokable name AND as what `--help` displays. Regression guard: the manifest key must win over the
 name Typer derives from the handler function (`make-model`), and `shell`/`tinker` must be distinct."""
 

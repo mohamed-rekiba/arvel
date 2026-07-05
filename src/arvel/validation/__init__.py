@@ -76,7 +76,7 @@ class FormRequest(msgspec.Struct):
 
     **The rules() bridge (spec 12 §3).** msgspec stays the type/shape layer — annotations are
     the whole story for most requests. When a request needs *semantic* checks msgspec can't
-    express (cross-field, conditional — Laravel's ``rules()``), override ``rules()`` (a normal
+    express (cross-field, conditional — the ``rules()``), override ``rules()`` (a normal
     rule ``Validator`` ruleset) and optionally ``messages()`` / ``attributes()`` / a
     ``with_validator()`` hook to register ``sometimes()``/``after()``. Those run against the
     *decoded* payload right after msgspec's structural pass succeeds; a rule failure raises the
@@ -95,25 +95,24 @@ class FormRequest(msgspec.Struct):
 
     @classmethod
     def rules(cls) -> dict[str, str | list[Any]]:
-        """Optional hook: extra rule-engine checks (Laravel ``rules()``), run against the
+        """Optional hook: extra rule-engine checks, run against the
         decoded payload after msgspec's structural pass. Default: none."""
         return {}
 
     @classmethod
     def messages(cls) -> dict[str, str]:
-        """Optional hook: message overrides for ``rules()`` (Laravel ``messages()``)."""
+        """Optional hook: message overrides for ``rules()``."""
         return {}
 
     @classmethod
     def attributes(cls) -> dict[str, str]:
-        """Optional hook: friendly field-name overrides used in ``rules()`` messages
-        (Laravel ``attributes()``)."""
+        """Optional hook: friendly field-name overrides used in ``rules()`` messages."""
         return {}
 
     @classmethod
     def with_validator(cls, validator: Validator) -> None:
         """Optional hook: register ``sometimes()``/``after()`` on the rule ``Validator`` before
-        it runs (Laravel ``withValidator``). Default: no-op."""
+        it runs. Default: no-op."""
 
     @classmethod
     def parse(cls, data: Mapping[str, Any]) -> Self:
@@ -150,7 +149,7 @@ _UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 
 def _check_email(value: Any) -> bool:
     """RFC-lite (spec A7): local@domain+TLD, no leading/trailing/consecutive dots in either
-    part, Laravel's length caps (local <=64, domain <=255). A format check — no DNS/mailbox
+    part, the length caps (local <=64, domain <=255). A format check — no DNS/mailbox
     probe (that's `active_url`'s footgun, deliberately not ported; see `_check_url`)."""
     if not isinstance(value, str) or "@" not in value:
         return False
@@ -331,7 +330,7 @@ def _descend(node: Any, seg: str, *, want_list: bool) -> Any:
 
 def _assign_path(root: dict[str, Any], path: str, val: Any) -> None:
     """Set ``val`` at a dot-path into ``root``, creating nested dicts — and lists wherever the next
-    segment is an integer index — so ``items.0.price`` rebuilds ``{"items": [{"price": ...}]}``.
+    segment is an integer index — so ``items.0.price`` rebuilds ``{"items": [{"price":...}]}``.
 
     A purely-numeric segment is *always* treated as a list index (the cost of dot-notation: a literal
     digit-string dict key can't be told apart from an index). Sparse indices pad with ``None`` to keep
@@ -356,7 +355,7 @@ _DATE_FORMATS = ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%d-%m-%Y", "%d/%m/%Y")
 
 def _parse_date(value: Any, fmt: str | None = None) -> Any:
     """Parse ``value`` to a ``datetime`` for the date rules. With ``fmt`` (Python ``strftime`` codes —
-    arvel is Python, so date_format uses Python codes, not Laravel's PHP codes), only that format is
+    arvel is Python, so date_format uses Python codes, not the PHP codes), only that format is
     accepted; without it, ISO 8601 then a few common formats are tried. Returns None on failure."""
     from datetime import datetime
 
@@ -384,21 +383,21 @@ class Rule:
     instance goes straight into a field's rule list, e.g. ``{"code": [Uppercase()]}``. On
     failure ``message`` is recorded (``:attribute`` is replaced with the field name)."""
 
-    message: str = "The :attribute is invalid."
+    message: str = "The:attribute is invalid."
 
     async def passes(self, attribute: str, value: Any) -> bool:
         raise NotImplementedError(f"{type(self).__name__} must implement passes()")
 
 
 class Enum(Rule):
-    """Rule object: value-in-enum membership (Laravel ``Rule::enum()``, spec 12 §2). No string
+    """Rule object: value-in-enum membership. No string
     form — the enum class *is* the closed set, so it's typed rather than stringly-parsed:
     ``{"status": [Enum(Status)]}``. A plain ``Rule`` subclass, so it runs on the same async path
     as any custom rule (``passes_async`` / ``validate_async``) — no extra dispatch needed."""
 
     def __init__(self, enum_cls: type[_PyEnum]) -> None:
         self._enum_cls = enum_cls
-        self.message = f"The :attribute is not a valid {enum_cls.__name__}."
+        self.message = f"The:attribute is not a valid {enum_cls.__name__}."
 
     async def passes(self, attribute: str, value: Any) -> bool:
         try:
@@ -409,7 +408,7 @@ class Enum(Rule):
 
 
 class Validator:
-    """Rule-based validation (Laravel ``Validator::make``).
+    """Rule-based validation.
 
     ``rules`` maps field → a ``|``-delimited string or list, e.g.
     ``{"email": "required|email", "age": "nullable|integer|min:18"}``. ``passes()``/
@@ -435,12 +434,12 @@ class Validator:
         self._errors: dict[str, list[str]] = {}
         #: fields dropped from validated() by `exclude`/`exclude_if`/`exclude_unless`
         self._excluded: set[str] = set()
-        #: post-pass hooks registered via `after()` (Laravel `after`)
+        #: post-pass hooks registered via `after()`
         self._after: list[Callable[[Validator], None]] = []
         self._connection = connection  # for async DB rules (unique/exists)
         #: when True, an unrecognized rule name raises ``UnknownValidationRule`` instead of no-op'ing
         self.strict = strict
-        #: when True, the WHOLE pass stops at the first field to fail (Laravel `stopOnFirstFailure`)
+        #: when True, the WHOLE pass stops at the first field to fail
         self.stop_on_first_failure = stop_on_first_failure
 
     def _parse_rules(self, ruleset: str | list[Any]) -> list[Any]:
@@ -451,8 +450,7 @@ class Validator:
     def sometimes(
         self, field: str, rules: str | list[Any], condition: Callable[[Mapping[str, Any]], bool]
     ) -> Self:
-        """Add ``rules`` to ``field`` only when ``condition(self.data)`` is true (Laravel
-        ``Validator::sometimes``) — for conditions too broad for a single-field rule string."""
+        """Add ``rules`` to ``field`` only when ``condition(self.data)`` is true (``Validator::sometimes``) — for conditions too broad for a single-field rule string."""
         if condition(self.data):
             existing = self.rules.get(field)
             merged = (self._parse_rules(existing) if existing else []) + self._parse_rules(rules)
@@ -460,7 +458,7 @@ class Validator:
         return self
 
     def after(self, callback: Callable[[Validator], None]) -> Self:
-        """Register a post-pass hook (Laravel ``after``) — runs once every field's rules have
+        """Register a post-pass hook — runs once every field's rules have
         been checked; add errors via ``add_error()``."""
         self._after.append(callback)
         return self
@@ -484,7 +482,7 @@ class Validator:
                 continue
             if "sometimes" in rules and field not in self.data:
                 continue  # only validate when the field is present
-            # data_get resolves dot-paths into nested dicts (Laravel: `user.email`), not just flat keys
+            # data_get resolves dot-paths into nested dicts, not just flat keys
             value = data_get(self.data, field)
             if value is None and "nullable" in rules:
                 continue
@@ -604,10 +602,10 @@ class Validator:
         return self._errors
 
     def validated(self) -> dict[str, Any]:
-        """The validated subset of the input, with nesting preserved (Laravel ``validated()``).
+        """The validated subset of the input, with nesting preserved.
 
         Each rule's field is resolved by dot-path — so a ``user.email`` rule contributes the nested
-        value it validated — and the result rebuilds that nesting (``{"user": {"email": ...}}``)
+        value it validated — and the result rebuilds that nesting (``{"user": {"email":...}}``)
         rather than a flat ``"user.email"`` key. Wildcard rules (``items.*.price``) put each
         validated leaf back in its array position. A field absent from the input is omitted (so an
         absent ``sometimes`` field never appears); a present field whose value is ``None`` is kept.
@@ -657,7 +655,7 @@ class Validator:
             return value
         if isinstance(value, str):
             # A numeric-typed field compares by VALUE, not length (form input is strings):
-            # `integer|min:18` on "18" is 18, not len 2 — matching Laravel's getSize().
+            # `integer|min:18` on "18" is 18, not len 2 — matching the getSize().
             if field is not None and _is_number(value) and self._has_numeric_rule(field):
                 return float(value)
             return len(value)
@@ -723,7 +721,7 @@ class Validator:
             case "gt" | "gte" | "lt" | "lte":
                 from arvel.support.helpers import data_get
 
-                # Laravel sizes BOTH operands by the field-under-validation's rules (same `field`),
+                # sizes BOTH operands by the field-under-validation's rules (same `field`),
                 # so `numeric|gt:other` compares values, not the other field's string length.
                 this, other = self._size(value, field), self._size(data_get(self.data, arg), field)
                 return {"gt": this > other, "gte": this >= other, "lt": this < other}.get(
@@ -747,7 +745,7 @@ class Validator:
                 return True
             case "ip":
                 if not isinstance(value, str):
-                    return False  # Laravel's ip requires a string (rejects bare ints)
+                    return False  # the ip requires a string (rejects bare ints)
                 import ipaddress
 
                 try:

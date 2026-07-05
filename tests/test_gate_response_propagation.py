@@ -1,6 +1,6 @@
 """Gate/policy "deeper" parity: a policy's custom deny **message + status code** survive through
 inspect()/authorize() and out to the HTTP response (previously discarded → denials rendered a
-generic 500), plus policy-level before() (super-admin auto-grant). Laravel Gate/AuthorizationException."""
+generic 500), plus policy-level before() (super-admin auto-grant). Gate/AuthorizationException."""
 
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ async def test_authorize_carries_message_and_status() -> None:
 async def test_deny_as_not_found_yields_404() -> None:
     with pytest.raises(AuthorizationError) as ei:
         await _gate().authorize("view", Post(), user=User(1))
-    assert ei.value.status == 404  # hides existence (Laravel denyAsNotFound)
+    assert ei.value.status == 404  # hides existence
 
 
 async def test_policy_before_grants_super_admin_and_falls_through() -> None:

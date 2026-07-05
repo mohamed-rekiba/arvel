@@ -86,7 +86,7 @@ it, it falls back to the stdlib REPL (no `await`). Inside a project it preloads:
 
 - arvel's public surface (`Model`, `config`, `Collection`, …),
 - the running `app`,
-- **every model by its short name** (autoloaded from `app/models/`, Laravel-Tinker style).
+- **every model by its short name** (autoloaded from `app/models/`, -Tinker style).
 
 ```python
 arvel tinker
@@ -263,7 +263,7 @@ class SendReports(Command):
 ConsoleOutput(out=buf, err=buf))` (or construct a bare `ConsoleOutput(out, err)` directly) routes
 output to injected streams instead of the real terminal.
 
-**Prompts** (Laravel Prompts parity — `arvel.console.prompts`): `ask(label, default=None)`,
+**Prompts**: `ask(label, default=None)`,
 `secret(label)` (no echo), `confirm(label, default=False)`, `choice(label, options, default=None)`
 (re-prompts on an invalid pick), `anticipate(label, suggestions, default=None)` (free text, with
 suggestions shown as a hint). Available as free functions or as `Command` methods

@@ -1,4 +1,4 @@
-"""arvel.cache.redis — a direct Redis facade (Laravel ``Redis::command``/pipeline/pub-sub).
+"""arvel.cache.redis — a direct Redis facade.
 
 cashews (``arvel.cache``) covers the *cache* abstraction; this module is the redis-backed store
 slice for callers that need Redis itself — raw commands, pipelines/transactions, publish/
@@ -31,7 +31,7 @@ class RedisSettings(Settings):
     """Typed, validated view over the ``redis`` config section (DR-0016).
 
     ``url`` is the default connection's DSN; ``connections`` maps name -> ``{"url": ...}`` for
-    additional named connections (Laravel ``config/database.php``'s ``redis`` block).
+    additional named connections.
     """
 
     __config_key__ = "redis"
@@ -72,7 +72,7 @@ class RedisConnection:
         return self._client
 
     async def command(self, name: str, *args: Any) -> Any:
-        """Run a single redis command by name (Laravel ``Redis::command``), e.g.
+        """Run a single redis command by name, e.g.
         ``await redis.command("SET", "k", "v")``."""
         attrs = {"db.system": "redis", "db.operation": name}
         with span(f"redis {name}", kind="client", attributes=attrs):
@@ -126,7 +126,7 @@ class RedisConnection:
 
 
 class RedisManager:
-    """Resolves + caches named Redis connections (Laravel ``Redis::connection('name')``)."""
+    """Resolves + caches named Redis connections."""
 
     def __init__(self, app: Any = None) -> None:
         self.app = app

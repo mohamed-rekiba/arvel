@@ -1,4 +1,4 @@
-"""``make:*`` code generators (Laravel ``artisan make:``).
+"""``make:*`` code generators.
 
 Each generator is a single-command ``typer.Typer`` app (mounted lazily by
 ``LazyGroup``). They scaffold a typed stub into the app's ``app/<area>/`` package.
@@ -43,7 +43,7 @@ def _load_stub(base: Path | None, filename: str, fallback: str) -> str:
 
 
 def generate_migration(name: str, base: Path | None = None) -> Path:
-    """Write a timestamped migration ``database/migrations/<ts>_<name>.py`` (Laravel
+    """Write a timestamped migration ``database/migrations/<ts>_<name>.py`` (
     ``make:migration``). A ``create_<table>_table`` name gets a create/drop stub; any other name
     (e.g. ``add_x_to_y``) gets a generic ``up``/``down`` stub (the schema builder has no alter op)."""
     from arvel.support import Str
@@ -190,7 +190,7 @@ _STUBS: dict[str, tuple[str, str]] = {
         "app/casts",
         "from typing import Any\n\n\n"
         "class {name}:\n"
-        '    """A custom attribute cast (Laravel CastsAttributes). Use via\n'
+        '    """A custom attribute cast. Use via\n'
         '    ``__casts__ = {{"column": {name}()}}``."""\n\n'
         "    def get(self, model: Any, key: str, value: Any, attributes: dict[str, Any]) -> Any:\n"
         "        return value\n\n"
@@ -201,7 +201,7 @@ _STUBS: dict[str, tuple[str, str]] = {
         "app/observers",
         "from typing import Any\n\n\n"
         "class {name}:\n"
-        '    """A model observer (Laravel). Register in a provider\'s boot: ``Post.observe({name}())``;\n'
+        '    """A model observer. Register in a provider\'s boot: ``Post.observe({name}())``;\n'
         '    `saving` may return False to cancel the save."""\n\n'
         "    async def saving(self, model: Any) -> Any: ...\n\n"
         "    async def saved(self, model: Any) -> None: ...\n\n"
@@ -232,7 +232,7 @@ _TEST_STUB = (
 
 
 def generate_test(name: str, base: Path | None = None) -> Path:
-    """Write ``tests/test_<name>.py`` (Laravel ``make:test``)."""
+    """Write ``tests/test_<name>.py``."""
     from arvel.support import Str
 
     directory = (base or Path()) / "tests"
@@ -488,7 +488,7 @@ stub_publish_app = typer.Typer()
 def stub_publish(
     force: bool = typer.Option(False, "--force", help="Overwrite already-published stubs."),
 ) -> None:
-    """Publish the generator stubs to ./stubs so you can customize them (Laravel ``stub:publish``) —
+    """Publish the generator stubs to./stubs so you can customize them —
     a generator prefers ``stubs/<kind>.stub`` over its built-in template once one is published."""
     directory = Path() / "stubs"
     directory.mkdir(parents=True, exist_ok=True)

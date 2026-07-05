@@ -1,4 +1,4 @@
-"""``feature:list`` / ``feature:purge`` — Laravel Pennant CLI parity. Both boot the app so any
+"""``feature:list`` / ``feature:purge``. Both boot the app so any
 ``Feature.define(...)`` calls made in a provider's ``boot()`` have already run."""
 
 from __future__ import annotations

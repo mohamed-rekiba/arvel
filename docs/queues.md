@@ -50,7 +50,7 @@ context) and returns immediately — the work runs on a worker, not in the reque
 
 ### Delayed dispatch
 
-Run a job later instead of now (Laravel `dispatch()->delay()`) with `dispatch_after(seconds, …)`:
+Run a job later instead of now with `dispatch_after(seconds, …)`:
 
 ```python
 await SendWelcomeEmail.dispatch_after(600, user_id=42)   # enqueue in 10 minutes
@@ -251,7 +251,7 @@ alone.
 
 After the retries are exhausted (and `failed()` has run), the worker records the dead job in the
 `failed_jobs` table — the serialized payload, the exception, and when it failed (the scaffold ships
-the migration). Inspect them and re-dispatch later, Laravel `queue:retry`-style:
+the migration). Inspect them and re-dispatch later, `queue:retry`-style:
 
 ```python
 from arvel.queue import FailedJob
@@ -278,7 +278,7 @@ worker picks up a job, it runs under that job's `tries`/`backoff`/`timeout`/`fai
 
 ### Worker flags
 
-`QueueManager.work(...)` (what `queue:work` calls) takes lifecycle flags — Laravel `queue:work`
+`QueueManager.work(...)` (what `queue:work` calls) takes lifecycle flags
 parity, for a custom worker entrypoint/supervisor script:
 
 ```python

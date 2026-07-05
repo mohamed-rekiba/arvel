@@ -1,4 +1,4 @@
-"""Process — async subprocess runner over `asyncio.create_subprocess_exec` (Laravel `Process`
+"""Process — async subprocess runner over `asyncio.create_subprocess_exec` (`Process`
 parity, never shell=True): run/start/pool, `ProcessResult` predicates, `throw()`, and timeout
 kill."""
 

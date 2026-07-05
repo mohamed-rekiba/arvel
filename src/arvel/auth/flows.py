@@ -3,7 +3,7 @@
 A purpose-tagged, time-limited token over ``arvel.security.Signer`` (itsdangerous). The payload binds
 a **hash of the email** the link was issued for (``verify:<user_id>:<email_hash>``); ``verify_email_token``
 recomputes the hash from the *current* user email and rejects on mismatch, so a link survives neither a
-signature forgery nor a since-changed email address. Default TTL is 60 minutes (Laravel parity).
+signature forgery nor a since-changed email address. Default TTL is 60 minutes.
 
 Password reset moved to :mod:`arvel.auth.password_reset` (a stored, single-use, throttled broker — the
 old stateless signed token here was replayable within its TTL, audit finding A6). Route handlers (send
@@ -15,7 +15,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-DEFAULT_TTL_SECONDS = 3600  # 60 minutes (Laravel default; down from the prior 24h)
+DEFAULT_TTL_SECONDS = 3600  # 60 minutes
 
 
 def _signer(secret: str) -> Any:

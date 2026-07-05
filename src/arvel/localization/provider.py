@@ -6,7 +6,7 @@ Without this binding the ``Lang`` facade can't resolve, and the bound-``translat
 
 On boot it loads the framework's bundled default lang files (``validation``/``auth``/``http``), then the
 app's ``{base_path}/lang`` dir (which overrides them), and registers the bundled defaults as publishable
-(``vendor:publish --tag=lang``) so an app can copy + edit them — Laravel ``lang:publish``.
+(``vendor:publish --tag=lang``) so an app can copy + edit them — ``lang:publish``.
 """
 
 from __future__ import annotations

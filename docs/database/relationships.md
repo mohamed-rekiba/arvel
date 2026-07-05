@@ -2,15 +2,15 @@
 
 ```python
 class User(Model):
-    def posts(self):   return self.has_many(Post)
+    def posts(self): return self.has_many(Post)
     def profile(self): return self.has_one(Profile)
 
 class Post(Model):
-    def author(self):  return self.belongs_to(User)
+    def author(self): return self.belongs_to(User)
 
-await user.posts().get()                               # lazy
-users = await User.with_("posts").get()                # eager — one batched WHERE IN, no N+1
-post = await Post.with_("author").first()              # with_(...).first() eager-loads too (Laravel)
+await user.posts().get() # lazy
+users = await User.with_("posts").get() # eager — one batched WHERE IN, no N+1
+post = await Post.with_("author").first() # with_(...).first() eager-loads too
 ```
 
 ## Eloquent Collection
@@ -22,47 +22,47 @@ implements `collections.abc.Sequence`):
 
 ```python
 posts = await Post.all()
-posts.model_keys()                     # [1, 2, 3, ...] — every member's primary key
-posts.find(7)                          # the member with pk == 7, or None
-posts.contains(7)                      # True — by pk or by passing the model itself
-await posts.load("comments")           # batch eager-load onto every member — one WHERE IN, no N+1
-await posts.load_missing("comments")   # like load(), but skips members that already have it
-await posts.fresh()                    # reload every member in ONE batched query
-posts.make_hidden("body")              # fans Model.make_hidden to every member
-posts.only([1, 2])                     # members whose pk is in [1, 2]
-posts.except_([1, 2])                  # the inverse
-posts.to_dict()                        # [{...}, {...}] — every member's to_dict()
-posts.to_query()                       # a fresh Builder: WHERE pk IN (these members' keys)
+posts.model_keys() # [1, 2, 3,...] — every member's primary key
+posts.find(7) # the member with pk == 7, or None
+posts.contains(7) # True — by pk or by passing the model itself
+await posts.load("comments") # batch eager-load onto every member — one WHERE IN, no N+1
+await posts.load_missing("comments") # like load(), but skips members that already have it
+await posts.fresh() # reload every member in ONE batched query
+posts.make_hidden("body") # fans Model.make_hidden to every member
+posts.only([1, 2]) # members whose pk is in [1, 2]
+posts.except_([1, 2]) # the inverse
+posts.to_dict() # [{...}, {...}] — every member's to_dict()
+posts.to_query() # a fresh Builder: WHERE pk IN (these members' keys)
 ```
 
 `EloquentCollection` also carries the full `arvel.support.Collection` surface (`map`/`filter`/
 `pluck`/`where`/…) — a transform that returns a new collection (`map`, `filter`, …) yields a
 plain `Collection`, not another `EloquentCollection`, since the callback's output isn't
 guaranteed to still be models. A **raw** (non-model) table builder's `get()` — no `Model` bound —
-still returns a plain `list[dict]` (typed simplicity; Laravel's query builder returns a
+still returns a plain `list[dict]` (typed simplicity; the query builder returns a
 Collection there too, this is an intentional arvel divergence).
 
-**Loaded relations serialize.** Like Laravel's `toArray()`, an eager-loaded relation is included
+**Loaded relations serialize.** Like the `toArray()`, an eager-loaded relation is included
 (nested) in `to_dict()` / a JSON response — a has-many as a list, a has-one/belongs-to as a single
 nested object, an empty relation as `null`. Only *loaded* relations are serialized:
 
 ```python
 post = await Post.with_("author", "comments").first()
 post.to_dict()
-# {"id": 1, "title": "Hi", "author": {"id": 7, ...}, "comments": [{...}, {...}]}
+# {"id": 1, "title": "Hi", "author": {"id": 7,...}, "comments": [{...}, {...}]}
 ```
 
-**A relation *is* a query builder** (Laravel) — constrain it, count it, and create/save through it:
+**A relation *is* a query builder** — constrain it, count it, and create/save through it:
 
 ```python
 await user.posts().where(published=True).order_by("-created_at").get()
 await user.posts().count()
-post = await user.posts().create(title="Hi")           # foreign key set to the parent automatically
-await user.posts().save(existing_post)                  # sets the FK + persists
+post = await user.posts().create(title="Hi") # foreign key set to the parent automatically
+await user.posts().save(existing_post) # sets the FK + persists
 
 # belongs_to: associate / dissociate set or clear the child's foreign key
-post.author().associate(user)                          # post.user_id = user.id (save the post to persist)
-post.author().dissociate()                             # post.user_id = None
+post.author().associate(user) # post.user_id = user.id (save the post to persist)
+post.author().dissociate() # post.user_id = None
 owner = await post.author().where(active=True).first()
 ```
 
@@ -72,15 +72,15 @@ owner = await post.author().where(active=True).first()
 class User(Model):
     def roles(self): return self.belongs_to_many(Role)
 
-await user.roles().attach(role_id, assigned_by="admin")  # extra pivot columns supported
-await user.roles().detach(role_id)                       # detach() with no arg clears all
-await user.roles().sync([1, 2, 3])                       # exact set — see below
-await user.roles().sync_without_detaching([4])           # add missing, keep the rest
-await user.roles().toggle([1, 2])                        # attach absent / detach present
+await user.roles().attach(role_id, assigned_by="admin") # extra pivot columns supported
+await user.roles().detach(role_id) # detach() with no arg clears all
+await user.roles().sync([1, 2, 3]) # exact set — see below
+await user.roles().sync_without_detaching([4]) # add missing, keep the rest
+await user.roles().toggle([1, 2]) # attach absent / detach present
 await user.roles().update_existing_pivot(role_id, assigned_by="system")
-await user.roles().with_pivot("assigned_by").get()       # expose pivot data on each result
+await user.roles().with_pivot("assigned_by").get() # expose pivot data on each result
 await user.roles().where_pivot("assigned_by", "admin").count()
-await user.roles().where("active", "=", True).get()      # constrain the related model
+await user.roles().where("active", "=", True).get() # constrain the related model
 ```
 
 ### `sync` — diff-based, pivot-preserving
@@ -92,21 +92,20 @@ retained ids whose given attrs differ. A retained pivot row is **never** dropped
 any extra pivot data you didn't ask to change survives untouched:
 
 ```python
-result = await user.roles().sync([1, 3])                 # bare id list — no pivot attrs given
-result = await user.roles().sync({1: {"note": "x"}, 3: {}})  # or {id: pivot_attrs}
-result.attached   # [3]      — ids newly attached
-result.detached   # [2]      — ids removed (only when detaching=True, the default)
-result.updated    # [1]      — retained ids whose given pivot attrs differed from what's stored
+result = await user.roles().sync([1, 3]) # bare id list — no pivot attrs given
+result = await user.roles().sync({1: {"note": "x"}, 3: {}}) # or {id: pivot_attrs}
+result.attached # [3] — ids newly attached
+result.detached # [2] — ids removed (only when detaching=True, the default)
+result.updated # [1] — retained ids whose given pivot attrs differed from what's stored
 
-await user.roles().sync_without_detaching([4])           # sync(..., detaching=False): never detaches
-await user.roles().sync_with_pivot_values([1, 2], {"note": "bulk"})  # same pivot values on every id
+await user.roles().sync_without_detaching([4]) # sync(..., detaching=False): never detaches
+await user.roles().sync_with_pivot_values([1, 2], {"note": "bulk"}) # same pivot values on every id
 
-changes = await user.roles().toggle([1, 2])              # {"attached": [...], "detached": [...]}
+changes = await user.roles().toggle([1, 2]) # {"attached": [...], "detached": [...]}
 ```
 
 `sync`/`sync_without_detaching`/`sync_with_pivot_values` return a `SyncResult`
-(`arvel.database.relations.SyncResult`) — a frozen `attached`/`detached`/`updated` changes map
-(Laravel's `sync()` return shape); `toggle` returns a plain `{"attached": [...], "detached": [...]}`
+(`arvel.database.relations.SyncResult`) — a frozen `attached`/`detached`/`updated` changes map; `toggle` returns a plain `{"attached": [...], "detached": [...]}`
 dict.
 
 The full relation set: `has_one`/`has_many`/`belongs_to`/`belongs_to_many`,
@@ -118,8 +117,8 @@ single row (or `None`), `has_many_through` a list:
 
 ```python
 class Country(Model):
-    def first_post(self): return self.has_one_through(Post, User)   # Country → User → Post
-    def posts(self):      return self.has_many_through(Post, User)
+    def first_post(self): return self.has_one_through(Post, User) # Country → User → Post
+    def posts(self): return self.has_many_through(Post, User)
 ```
 
 **Polymorphic (morph)** relations let many models share one related table by storing a
@@ -127,13 +126,13 @@ class Country(Model):
 
 ```python
 class Comment(Model):
-    def commentable(self): return self.morph_to("commentable")     # resolves Post or Video
+    def commentable(self): return self.morph_to("commentable") # resolves Post or Video
 
 class Post(Model):
     def comments(self): return self.morph_many(Comment, "commentable")
 
 await post.comments().get()
-parent = await comment.commentable().get()             # the owning Post/Video
+parent = await comment.commentable().get() # the owning Post/Video
 ```
 
 In a migration, declare the pair with `t.morphs("commentable")` (or `t.nullable_morphs(...)`)
@@ -145,31 +144,30 @@ In a migration, declare the pair with `t.morphs("commentable")` (or `t.nullable_
 Filter by, and count, related rows without N+1:
 
 ```python
-await User.has("posts").get()                                  # users with >=1 post
+await User.has("posts").get() # users with >=1 post
 await User.doesnt_have("posts").get()
 await User.where_has("posts", lambda q: q.where(published=True)).get()
 
 # with_where_has applies ONE constraint twice: it filters the users AND eager-loads only
-# the matching posts — so each returned user's .posts holds just the published ones.
+# the matching posts — so each returned user's.posts holds just the published ones.
 await User.with_where_has("posts", lambda q: q.where(published=True)).get()
 
-await User.with_count("posts").get()         # each user gets a posts_count
-await Shop.with_sum("items", "price").get()  # items_sum
-await Shop.with_avg("items", "price").get()  # items_avg
-await Shop.with_exists("items").get()        # boolean items_exists
+await User.with_count("posts").get() # each user gets a posts_count
+await Shop.with_sum("items", "price").get() # items_sum
+await Shop.with_avg("items", "price").get() # items_avg
+await Shop.with_exists("items").get() # boolean items_exists
 ```
 
 For a **grouped** aggregate — totals per group rather than per row — pair `select_raw()` (a raw
 SQL select expression `select()` can't name) with `group_by()`:
 
 ```python
-stmt = (
-    Sale.select_raw("region, sum(amount) AS total")
-    .group_by("region")
-    .order_by("region")
-    .to_select()
+stmt = (Sale.select_raw("region, sum(amount) AS total")
+.group_by("region")
+.order_by("region")
+.to_select()
 )
-rows = await app("db").fetch_all(stmt)        # [{"region": "eu", "total": 5}, …]
+rows = await app("db").fetch_all(stmt) # [{"region": "eu", "total": 5}, …]
 ```
 
 Grouped queries return computed rows, not whole models, so read them with `fetch_all` (or feed

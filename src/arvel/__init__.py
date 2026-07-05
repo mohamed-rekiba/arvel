@@ -1,4 +1,4 @@
-"""arvel — a Laravel-grade web framework for Python.
+"""arvel — a production-grade web framework for Python.
 
 This top-level package is deliberately *light*: importing ``arvel`` must pull in
 **zero** heavy third-party libraries (Litestar, SQLAlchemy, taskiq, Pillow, …).

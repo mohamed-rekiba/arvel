@@ -3,7 +3,7 @@
 When a query returns more rows than you want on one screen, **paginate** it. arvel's
 paginators split the results into pages, build the page URLs for you (reading the current
 page from the request's `?page=`), serialize straight to JSON for an API, and render a
-ready-made HTML page-link bar for a server-rendered view — the same surface as Laravel.
+ready-made HTML page-link bar for a server-rendered view — the same surface as.
 
 ## The quick version
 
@@ -54,7 +54,7 @@ Both work on any query builder chain — `where`, `order_by`, scopes, joins, all
 
 ## In an API: JSON
 
-Return a paginator straight from a JSON handler and arvel serializes it to the Laravel
+Return a paginator straight from a JSON handler and arvel serializes it to the
 paginator shape automatically:
 
 ```python

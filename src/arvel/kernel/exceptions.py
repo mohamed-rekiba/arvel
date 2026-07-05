@@ -1,7 +1,7 @@
 """The single global exception handler (``contracts.ExceptionHandler``).
 
 Handles uncaught exceptions across every context (HTTP, console, queue, orphan
-tasks). Laravel-parity lifecycle (errors.md): type-keyed ``reportable``/``renderable``
+tasks). parity lifecycle (errors.md): type-keyed ``reportable``/``renderable``
 registration, per-exception ``context()`` merged into the report record, and
 once-per-instance report de-duplication. ``render`` stays the generic fallback;
 the HTTP kernel consults ``try_render`` for registered renderables first — the
@@ -41,7 +41,7 @@ class ExceptionHandler:
 
     def reportable(self, exc_type: type[E], callback: Callable[[E], bool | None]) -> Self:
         """Run ``callback`` when an ``exc_type`` is reported; return ``False`` from it to
-        suppress the default log write (Laravel's ``return false``). All matches run, in
+        suppress the default log write. All matches run, in
         registration order."""
         self._reportables.append((exc_type, callback))
         return self
@@ -99,7 +99,7 @@ class ExceptionHandler:
 
     def _mark_reported(self, exc: BaseException) -> bool:
         """True when ``exc`` has not been reported before. Identity-keyed (id → weakref), matching
-        Laravel's spl_object_id map — a distinct-but-``__eq__``-equal instance still reports.
+        the spl_object_id map — a distinct-but-``__eq__``-equal instance still reports.
         Instances that can't be weak-referenced skip de-duplication — double-reporting beats
         silently swallowing a distinct error via id() reuse."""
         if self._reported.get(id(exc)) is exc:

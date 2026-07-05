@@ -1,6 +1,6 @@
 # Context
 
-`Context` is an ambient, request/job-scoped key/value store (Laravel `Context` parity) — a place
+`Context` is an ambient, request/job-scoped key/value store — a place
 to stash things like a request ID, tenant, or trace span that many layers of code want to read
 without threading them through every function signature. It's backed by Python's `contextvars`,
 so it's **safe across concurrent `asyncio` tasks**: two requests running at the same time (or two

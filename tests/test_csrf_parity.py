@@ -1,4 +1,4 @@
-"""CSRF parity (Laravel) — fixes a real green-but-broken bug: the session ``_token`` was NEVER seeded,
+"""CSRF parity — fixes a real green-but-broken bug: the session ``_token`` was NEVER seeded,
 so every web-group POST got a 419 (and there was no way to obtain a token). ValidateCsrfToken now seeds
 the token, accepts it from the ``_token`` form/JSON field or the X-CSRF-TOKEN / X-XSRF-TOKEN header, and
 the view exposes csrf_token()/csrf_field()."""

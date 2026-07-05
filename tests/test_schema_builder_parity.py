@@ -1,5 +1,5 @@
-"""Schema builder: Laravel Blueprint column types (timestamp/longText/mediumText/char/
-unsignedInteger family) must exist in snake_case so a Laravel migration ports verbatim."""
+"""Schema builder: Blueprint column types (timestamp/longText/mediumText/char/
+unsignedInteger family) must exist in snake_case so a migration ports verbatim."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from sqlalchemy.dialects import mysql
 from arvel.database.schema import Blueprint
 
 
-def test_laravel_column_types_exist_and_map() -> None:
+def test_column_types_exist_and_map() -> None:
     bp = Blueprint("things")
     bp.id()
     bp.timestamp("published_at")
@@ -36,7 +36,7 @@ def test_laravel_column_types_exist_and_map() -> None:
 
 
 def test_unsigned_is_truly_unsigned_on_mysql() -> None:
-    # cross-dialect: portable Integer elsewhere, real UNSIGNED on MySQL (Laravel parity)
+    # cross-dialect: portable Integer elsewhere, real UNSIGNED on MySQL
     bp = Blueprint("t")
     bp.unsigned_integer("n")
     col_type = bp.to_table(sa.MetaData()).c.n.type

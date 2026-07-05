@@ -80,7 +80,7 @@ multiple recipients:
 await Mail.to(alice, bob, "carbon-copy@acme.test").send(DigestMail())
 ```
 
-Add `cc` / `bcc` recipients by chaining (Laravel `->cc`/`->bcc`); `bcc` recipients aren't shown to
+Add `cc` / `bcc` recipients by chaining; `bcc` recipients aren't shown to
 the others:
 
 ```python

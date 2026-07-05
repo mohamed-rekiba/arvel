@@ -1,4 +1,4 @@
-"""``route:list`` — tabulate the application's registered routes (Laravel ``route:list``).
+"""``route:list`` — tabulate the application's registered routes.
 
 The pure formatter (:func:`format_routes`) is unit-testable; the command resolves the
 router from the booted application. Grounded in knowledge/port/13-console.md.

@@ -1,5 +1,4 @@
-"""ch04 / finding A1 — HandleCors: CORS is handled by Litestar's engine, driven by config('cors')
-(Laravel HandleCors equivalent; built on Litestar, not hand-rolled)."""
+"""ch04 / finding A1 — HandleCors: CORS is handled by Litestar's engine, driven by config('cors')."""
 
 from __future__ import annotations
 

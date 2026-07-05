@@ -1,4 +1,4 @@
-"""arvel.features — Laravel-Pennant-style feature flags.
+"""arvel.features — Pennant-style feature flags.
 
 ``Feature.define(name, resolver)`` registers a flag; ``resolver(scope) -> bool | str | value`` is
 evaluated **once per scope** — the resolved value is written straight to the configured store, so
@@ -10,14 +10,14 @@ serialized to a string key (``_scope_key``) before it ever reaches a store.
 Resolvers must be **side-effect-free / idempotent**: on the database and cache drivers the
 get→resolve→put window has an ``await`` I/O suspension, so two concurrent first-time calls for the
 same scope can both miss the store and run the resolver twice (best-effort memoization, exactly as
-Laravel Pennant). The stored *value* is unaffected (the put is idempotent); only a resolver with an
+Pennant). The stored *value* is unaffected (the put is idempotent); only a resolver with an
 observable side effect would notice. The array driver has no suspension point, so it is strictly
 once.
 
 Storage drivers (the ``arvel.support.manager.Manager`` strategy base, config ``features.driver``):
 ``array`` (in-memory, default/test), ``database`` (the ``features`` table, story 10), ``cache``
 (story 06 — tagged per flag name so :meth:`FeatureManager.purge` can clear every scope for a flag
-in one call). Not part of the original ch-08 port spec — added on request, following the Laravel
+in one call). Not part of the original ch-08 port spec — added on request, following the
 Pennant design (a small, high-value addition needing no new infra beyond cache/db; DR-0029).
 """
 
@@ -63,7 +63,7 @@ def _scope_key(scope: Any, default_scope: str) -> str:
 
 def _normalize_resolver(resolver: Any) -> Callable[[Any], Any]:
     """Accept a closure, an already-instantiated callable, or a class-based feature (a bare class
-    is instantiated once and dispatched through its ``resolve`` method — Laravel Pennant's
+    is instantiated once and dispatched through its ``resolve`` method
     class-based-feature parity)."""
     if isinstance(resolver, type):
         resolver = resolver()
@@ -153,7 +153,7 @@ class CacheFeatureStore:
 
 
 class FeatureManager(Manager):
-    """Resolves the configured feature store + does per-scope resolution (Laravel Pennant's
+    """Resolves the configured feature store + does per-scope resolution (Pennant's
     ``FeatureManager``): the store only remembers already-resolved values — this class owns the
     resolver registry and the "run once per scope" behavior."""
 
@@ -186,7 +186,7 @@ class FeatureManager(Manager):
         self._resolvers[name] = _normalize_resolver(resolver)
 
     def defined(self) -> list[str]:
-        """The names of every flag registered via :meth:`define` (Laravel ``Feature::defined()``)."""
+        """The names of every flag registered via:meth:`define`."""
         return sorted(self._resolvers)
 
     async def _resolve(self, name: str, scope: Any) -> Any:
@@ -236,7 +236,7 @@ class FeatureManager(Manager):
         await self.driver().purge(name)
 
     def for_(self, scope: Any) -> ScopedFeatures:
-        """A features view bound to ``scope`` (Laravel ``Feature::for($scope)``)."""
+        """A features view bound to ``scope``."""
         return ScopedFeatures(self, scope)
 
 
@@ -271,7 +271,7 @@ class ScopedFeatures:
 
 
 class Feature:
-    """Static-looking front door (Laravel ``Feature::...``) — forwards to the app-bound
+    """Static-looking front door — forwards to the app-bound
     :class:`FeatureManager` singleton. Requires a booted application with
     ``FeatureServiceProvider`` registered (mirrors how ``Searchable`` resolves ``app("search")`` —
     no facade class here: ``arvel.support.facades`` sits below this module in the G1 layer DAG)."""

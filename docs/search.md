@@ -33,7 +33,7 @@ await article.delete()                        # removed from the index too
 ## The fluent query builder
 
 `Model.search(query)` returns a `SearchBuilder` — chain `where`/`order_by`/`take`, then run it with
-`get`/`first`/`paginate` (Laravel Scout parity):
+`get`/`first`/`paginate`:
 
 ```python
 page = await (

@@ -1,4 +1,4 @@
-"""Model — a declared-but-unset column reads as ``None`` (Laravel parity: ``$model->col`` is null), while
+"""Model — a declared-but-unset column reads as ``None``, while
 an unknown attribute still raises ``AttributeError`` (typo safety). Regression: a freshly *created*
 model used to raise on a nullable column that wasn't provided (e.g. ``user.email_verified_at`` right
 after ``create()``)."""

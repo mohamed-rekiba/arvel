@@ -1,7 +1,7 @@
 """arvel.routing — the Route registrar.
 
 Collects route definitions (method/path/handler/name) with prefix + name groups
-and compiles them onto the :class:`~arvel.http.kernel.HttpKernel` (which adapts
+and compiles them onto the:class:`~arvel.http.kernel.HttpKernel` (which adapts
 them onto Litestar). Provides named-route URL generation. The Litestar compile
 itself lives in the HTTP kernel; routing stays engine-agnostic.
 
@@ -33,7 +33,7 @@ _RESOURCE_ACTIONS: list[tuple[str, list[str], str]] = [
 ]
 
 
-# RESTful action → (policy ability, needs a model instance) (Laravel authorizeResource map).
+# RESTful action → (policy ability, needs a model instance).
 _ACTION_ABILITIES: dict[str, tuple[str, bool]] = {
     "index": ("viewAny", False),
     "create": ("create", False),
@@ -47,7 +47,7 @@ _ACTION_ABILITIES: dict[str, tuple[str, bool]] = {
 
 @dataclass
 class ControllerMiddleware:
-    """One entry of ``Controller.middleware()`` (Laravel ``HasMiddleware``): ``middleware`` is
+    """One entry of ``Controller.middleware()``: ``middleware`` is
     anything a route accepts (an alias string, a ``throttle:name`` string, or a middleware
     class/instance); ``only``/``except_`` narrow it to specific resource actions."""
 
@@ -70,15 +70,14 @@ class Controller:
 
     @classmethod
     def middleware(cls) -> list[ControllerMiddleware]:
-        """Controller-level middleware (Laravel ``HasMiddleware``): override to return
+        """Controller-level middleware: override to return
         ``ControllerMiddleware(name, only=(...), except_=(...))`` entries — honored by
         ``Router.resource``/``api_resource``, applied per bound action."""
         return []
 
     @classmethod
     def authorize_resource(cls, model: type) -> None:
-        """Authorize every resource action against ``model``'s policy automatically (Laravel
-        ``authorizeResource``): ``index``→``viewAny``, ``show``→``view``, ``store``→``create``,
+        """Authorize every resource action against ``model``'s policy automatically (``authorizeResource``): ``index``→``viewAny``, ``show``→``view``, ``store``→``create``,
         ``update``→``update``, ``destroy``→``delete``. Instance abilities authorize against the
         route-bound model; class abilities against the model itself. 403 (``AuthorizationError``)
         on denial, before the action runs."""
@@ -111,23 +110,21 @@ class RouteDefinition:
     name: str | None = None
     is_fallback: bool = False
     group: str | None = None  # named middleware group (e.g. "web"/"api") to run for this route
-    middlewares: list[Any] = field(
-        default_factory=list[Any]
-    )  # per-route middleware (Laravel ->middleware)
+    middlewares: list[Any] = field(default_factory=list[Any])  # per-route middleware
     security: list[str] = field(
         default_factory=list[str]
     )  # OpenAPI security schemes this route requires (e.g. "bearer")
     status_code: int | None = None  # explicit response status (else Litestar's per-method default)
 
     def status(self, code: int) -> RouteDefinition:
-        """Pin this route's success response status (Laravel ``response()->json($x, 200)``). Lets a
+        """Pin this route's success response status. Lets a
         typed-Schema POST return 200 instead of Litestar's default 201 (e.g. a login/logout action
         that isn't *creating* a resource)."""
         self.status_code = code
         return self
 
     def middleware(self, *mw: Any) -> RouteDefinition:
-        """Attach per-route middleware (Laravel ``Route::get(...)->middleware('auth')``).
+        """Attach per-route middleware.
         Runs after global + group middleware (global → group → route)."""
         self.middlewares.extend(mw)
         return self
@@ -183,11 +180,11 @@ class Router:
     def match(
         self, methods: Sequence[str], path: str, handler: Any, name: str | None = None
     ) -> RouteDefinition:
-        """Bind a route to several HTTP verbs at once (Laravel ``Route::match``)."""
+        """Bind a route to several HTTP verbs at once."""
         return self.add(methods, path, handler, name)
 
     def any(self, path: str, handler: Any, name: str | None = None) -> RouteDefinition:
-        """Bind a route to all standard verbs (Laravel ``Route::any``)."""
+        """Bind a route to all standard verbs."""
         return self.add(["GET", "POST", "PUT", "PATCH", "DELETE"], path, handler, name)
 
     def resource(
@@ -199,7 +196,7 @@ class Router:
         except_: Sequence[str] | None = None,
         api: bool = False,
     ) -> Router:
-        """Register the 7 RESTful routes (Laravel ``Route::resource``) for a controller.
+        """Register the 7 RESTful routes for a controller.
 
         Only actions the controller actually implements are bound. ``api=True`` drops
         the HTML-form actions (``create``/``edit``). ``only``/``except_`` narrow the set.
@@ -245,7 +242,7 @@ class Router:
         return self.resource(name, controller, only=only, except_=except_, api=True)
 
     def fallback(self, handler: Any, name: str | None = None) -> RouteDefinition:
-        """Register a catch-all route (Laravel ``Route::fallback``)."""
+        """Register a catch-all route."""
         route = self.add(["GET"], "/{fallback_path:path}", handler, name or "fallback")
         route.is_fallback = True
         return route
@@ -258,13 +255,13 @@ class Router:
         assets_dirname: str = "assets",
         spa_fallback: bool = True,
     ) -> Router:
-        """Serve ``directory`` as the app's public web root — Laravel's ``public/``: the ONE
+        """Serve ``directory`` as the app's public web root — the ``public/``: the ONE
         directory a webserver exposes (``index.php`` there is the front controller; everything
         else — ``app/``, ``routes/``, ``.env``, ``storage/`` — sits outside it and is never
         directly reachable). arvel has no separate webserver in front to split "a real file →
         serve it directly" from "everything else → the app," so this registers that split as ASGI
         routes instead: a request whose path matches a real file under ``directory`` (favicon.ico,
-        robots.txt, a published ``storage`` symlink target, a bundler's build output, ...) gets
+        robots.txt, a published ``storage`` symlink target, a bundler's build output,...) gets
         that file back as-is. Anything under ``assets_dirname`` is assumed content-hashed by a
         frontend bundler (Vite/webpack/... all use this convention) and is cached forever;
         everything else stays revalidate-able so a new deploy is picked up without a hard
@@ -273,8 +270,8 @@ class Router:
         ``spa_fallback`` (default ``True``) decides what happens when a path ISN'T a real file.
         Most arvel apps embed a client-side-routed frontend, so by default it falls back to
         ``directory/index.html`` and lets that router (history-mode) decide what to render — the
-        same trick as Laravel's own OPTIONAL catch-all ``Route::get('/{any}', ...)->where('any',
-        '.*')`` or Nginx's ``try_files $uri $uri/ /index.html``. It's optional in Laravel too — a
+        same trick as the own OPTIONAL catch-all ``Route::get('/{any}',...)->where('any',
+        '.*')`` or Nginx's ``try_files $uri $uri/ /index.html``. It's optional in too — a
         server-rendered (Blade/Inertia-SSR) or API-only app has no such route. Pass
         ``spa_fallback=False`` for those: only real files under ``directory`` are ever served
         (favicon/robots/storage/...), and an unmatched path 404s normally rather than claiming
@@ -282,7 +279,7 @@ class Router:
 
         With ``spa_fallback=True``, both registered routes are marked ``is_fallback``
         (:meth:`apply_to` sorts those last), so this is safe to call before OR after your other
-        routes — a more specific route (``/api/*``, an admin group, ...) always wins on its own
+        routes — a more specific route (``/api/*``, an admin group,...) always wins on its own
         path regardless of registration order.
         """
         from pathlib import Path as _Path
@@ -346,7 +343,7 @@ class Router:
     def redirect(
         self, uri: str, destination: str, status: int = 302, name: str | None = None
     ) -> RouteDefinition:
-        """A GET route that redirects to ``destination`` (Laravel ``Route::redirect``)."""
+        """A GET route that redirects to ``destination``."""
         from arvel.http.response import Response
 
         async def handler(request: Any) -> Response:
@@ -357,13 +354,13 @@ class Router:
     def permanent_redirect(
         self, uri: str, destination: str, name: str | None = None
     ) -> RouteDefinition:
-        """A 301 redirect route (Laravel ``Route::permanentRedirect``)."""
+        """A 301 redirect route."""
         return self.redirect(uri, destination, status=301, name=name)
 
     def view(
         self, uri: str, view_name: str, data: dict[str, Any] | None = None, name: str | None = None
     ) -> RouteDefinition:
-        """A GET route that renders a view with no controller (Laravel ``Route::view``)."""
+        """A GET route that renders a view with no controller."""
         from arvel.views import view as render_view
 
         async def handler(request: Any) -> Any:
@@ -430,7 +427,7 @@ class Router:
         return list(self._routes)
 
     def url(self, name: str, **params: Any) -> str:
-        """Generate a URL for a named route (Laravel ``route()``). Path placeholders
+        """Generate a URL for a named route. Path placeholders
         ``{param}`` are filled from ``params``; any leftover params are appended as a
         URL-encoded query string. Raises ``ValueError`` if a required path param is
         missing, ``KeyError`` if no route has that name."""
@@ -460,7 +457,7 @@ class Router:
     @staticmethod
     def _signing_key(key: str | None) -> str:
         """The signing key — an explicit ``key`` or, by default, the app key (``config('app.key')``,
-        Laravel parity). Raises a clear error if neither is available."""
+        parity). Raises a clear error if neither is available."""
         if key is not None:
             return key
         from arvel.kernel import app, has_application
@@ -475,7 +472,7 @@ class Router:
     def signed_url(
         self, name: str, *, key: str | None = None, expires: int | None = None, **params: Any
     ) -> str:
-        """A tamper-evident URL for a named route (Laravel ``URL::signedRoute``).
+        """A tamper-evident URL for a named route.
 
         ``expires`` (a unix timestamp) makes it temporary. The signature is an itsdangerous MAC over
         the URL, appended as a ``signature`` query param. ``key`` defaults to the app key.
@@ -530,10 +527,7 @@ class Router:
 
 
 def _absolute(path: str) -> str:
-    """Join ``path`` onto ``config('app.url')`` (Laravel ``url()``/``asset()``'s own join rule;
-    duplicated in miniature from ``arvel.views``'s template ``url()`` global rather than importing
-    it — pulling view-templating into the routing/URL-generation layer for four lines would be a
-    backwards dependency even though the DAG technically allows it)."""
+    """Join ``path`` onto ``config('app.url')``."""
     from arvel.kernel import app, has_application
 
     base = ""
@@ -545,7 +539,7 @@ def _absolute(path: str) -> str:
 
 
 class _UrlGenerator:
-    """The ``url()`` global (Laravel ``URL::current/full/previous`` + the ``url()`` helper):
+    """The ``url()`` global:
     ``url("/x")`` returns an absolute URL string; ``url()`` (no path) returns this generator so
     ``.current()``/``.full()``/``.previous()``/``.query()`` can chain off it — reads the active
     request via the same ``current_request`` contextvar the kernel already binds per-request."""
@@ -566,7 +560,7 @@ class _UrlGenerator:
 
     def previous(self, fallback: str = "/") -> str:
         """The ``Referer`` of the current request, or ``fallback`` when there's no active request
-        or no Referer header (never raises — Laravel ``URL::previous`` always degrades)."""
+        or no Referer header (never raises — ``URL::previous`` always degrades)."""
         from arvel.http.request import current_request
 
         request = current_request.get(None)
@@ -600,7 +594,7 @@ url = _UrlGenerator()
 
 
 def route(name: str, *, absolute: bool = True, **params: Any) -> str:
-    """The URL for a named route (Laravel ``route()``) — absolute by default; pass
+    """The URL for a named route — absolute by default; pass
     ``absolute=False`` for the bare path (what ``Router.url`` itself returns)."""
     from arvel.kernel import app
 
@@ -609,15 +603,14 @@ def route(name: str, *, absolute: bool = True, **params: Any) -> str:
 
 
 def to_route(name: str, **params: Any) -> Redirect:
-    """``redirect().route(name, **params)`` sugar (Laravel ``to_route()``)."""
+    """``redirect().route(name, **params)`` sugar."""
     from arvel.http.redirect import redirect
 
     return redirect().route(name, **params)
 
 
 def temporary_signed_route(name: str, expires_in: int, **params: Any) -> str:
-    """A signed URL that expires ``expires_in`` seconds from now (Laravel
-    ``URL::temporarySignedRoute``) — sugar over ``Router.signed_url(expires=...)``."""
+    """A signed URL that expires ``expires_in`` seconds from now (``URL::temporarySignedRoute``) — sugar over ``Router.signed_url(expires=...)``."""
     import time
 
     from arvel.kernel import app

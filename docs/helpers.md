@@ -27,7 +27,7 @@ Str.random(32)               # a cryptographically-random alphanumeric token
 (The casing transforms are pure and memoized, so repeated calls on the same input are free.
 `Str.random` is the exception — it returns a fresh value every time.)
 
-More transforms, mirroring Laravel's `Str`:
+More transforms, mirroring the `Str`:
 
 ```python
 Str.title("a nice title")        # "A Nice Title"
@@ -154,7 +154,7 @@ data_set(config, "cache.ttl", 600)             # nested write (creates intermedi
 `data_get` returns the default (`None`) instead of raising when any segment is missing — ideal
 for digging into untrusted JSON. The `*` wildcard collects across a list.
 
-More `Arr`, mirroring Laravel:
+More `Arr`, mirroring
 
 ```python
 Arr.except_({"a": 1, "b": 2}, ["b"])       # {"a": 1}     (alias: excluding)
@@ -188,7 +188,7 @@ from arvel.support import Collection
     .all())                                     # [20, 40]
 ```
 
-Beyond `map`/`filter`/`reduce`/`pluck`/`group_by`/`sort`/`sort_by` it carries the everyday Laravel
+Beyond `map`/`filter`/`reduce`/`pluck`/`group_by`/`sort`/`sort_by` it carries the everyday
 collection surface:
 
 ```python
@@ -217,14 +217,14 @@ Collection(["a", "b"]).combine([1, 2])     # {"a": 1, "b": 2}   (a plain dict, l
 ```
 
 `duplicates` returns the items that repeat an earlier value, preserving first-seen order — keyed
-by **list index** (Laravel keys by the original array key; there's no dict-backed array here):
+by **list index**:
 
 ```python
 Collection([1, 2, 1, 3, 2, 2]).duplicates()          # {2: 1, 4: 2, 5: 2}
 Collection(rows).duplicates("email")                 # by key, same shape
 ```
 
-`when_empty`/`when_not_empty` run a callback only in the matching case (Laravel `when` semantics:
+`when_empty`/`when_not_empty` run a callback only in the matching case (`when` semantics:
 the callback's result wins when it returns a `Collection`, otherwise `self` is returned unchanged
 — so both are safe to chain):
 
@@ -247,13 +247,13 @@ Collection([1, 2, 3, 4, 5]).take(2)                     # [1, 2]  (take(-2) → 
 `merge`/`concat`/`flat_map`, `search`/`value`/`every`, and `tap` round out the set — all returning a
 new `Collection` (or a plain value for terminals).
 
-**No higher-order proxy.** Laravel's `$collection->map->name` (a magic proxy over `map`/`each`/…)
+**No higher-order proxy.** the `$collection->map->name` (a magic proxy over `map`/`each`/…)
 is intentionally **not** ported here (DR-0031): a dynamic `__getattr__` proxy can't be typed —
 every call through it would collapse to `Any`, which conflicts with arvel's strict-typing mandate.
 The idiomatic Python replacement is a lambda, and it types end-to-end:
 
 ```python
-# Laravel:  $users->map->name
+# $users->map->name
 Collection(users).map(lambda u: u.name)         # typed: Collection[str], not Any
 Collection(users).each(lambda u: u.activate())
 ```

@@ -1,5 +1,4 @@
-"""``scout:import`` / ``scout:flush`` — bulk (re)index or empty a searchable model's index
-(Laravel Scout parity). ``MODEL`` is either a dotted ``module:ClassName`` path (the same shape
+"""``scout:import`` / ``scout:flush`` — bulk (re)index or empty a searchable model's index. ``MODEL`` is either a dotted ``module:ClassName`` path (the same shape
 ``LazyGroup``'s command manifest uses) or, inside a project, a model's bare class name resolved
 from ``app/models`` (like the shell's model autoload). Grounded in doc 13-console + the
 05-SEARCH-SCOUT spec.

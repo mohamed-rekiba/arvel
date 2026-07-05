@@ -1,4 +1,4 @@
-"""Failed-job persistence — Laravel parity. When a job exhausts its retries the worker
+"""Failed-job persistence. When a job exhausts its retries the worker
 records a row in the ``failed_jobs`` table (serialized payload + exception); ``FailedJob.retry()``
 re-dispatches it and removes the record. Without a bound DB the worker degrades gracefully — the
 job's ``failed()`` hook still runs, nothing is persisted, nothing crashes."""
@@ -39,7 +39,7 @@ class _Ok(Job):
 
 
 def test_schema_matches_the_canonical_migration() -> None:
-    """failed_jobs (Laravel parity) has only failed_at — no created_at/updated_at. The model must
+    """failed_jobs has only failed_at — no created_at/updated_at. The model must
     opt out of the timestamps default or its SELECTs name columns the migration never created."""
     assert FailedJob.__timestamps__ is False
     assert {c.name for c in FailedJob.__table__.columns} == {

@@ -1,4 +1,4 @@
-"""The ``database`` notification channel's storage model (Laravel parity).
+"""The ``database`` notification channel's storage model.
 
 ``DatabaseNotification`` is an arvel ``Model`` backing the ``notifications`` table — a UUID-keyed row
 per delivered notification (``type`` + the polymorphic ``notifiable_type``/``notifiable_id`` + a JSON

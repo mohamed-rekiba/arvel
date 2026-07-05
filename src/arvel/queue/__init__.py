@@ -33,7 +33,7 @@ class QueueSettings(Settings):
     or ``amqp`` (RabbitMQ/any AMQP broker, the ``[queue-amqp]`` extra). ``url`` is the single DSN for
     the active driver (a ``redis://`` or ``amqp://`` endpoint); ``memory`` ignores it. ``retry_after``
     is the visibility timeout (seconds): a reserved ``jobs`` row older than this is assumed to belong
-    to a dead worker and is reclaimed (Laravel's per-connection ``retry_after``); a job's own
+    to a dead worker and is reclaimed; a job's own
     ``retry_after`` class attribute overrides this default when set.
     """
 
@@ -223,7 +223,7 @@ async def decode_instance(data: dict[str, Any]) -> Any:
 
 
 class Job:
-    """Base job: subclass and implement ``handle()`` (Laravel ``Job``/``ShouldQueue``)."""
+    """Base job: subclass and implement ``handle()``."""
 
     queue: str = "default"
     tries: int = 3
@@ -233,9 +233,9 @@ class Job:
     #: ``queue.retry_after`` config default (see `QueueManager._reclaim_stuck_jobs`).
     retry_after: int | None = None
     #: An extra cap on attempts, alongside `tries` (ponytail: a simple shared ceiling, not
-    #: Laravel's full manual-release-vs-exception distinction — add that nuance if a job needs it).
+    #: the full manual-release-vs-exception distinction — add that nuance if a job needs it).
     max_exceptions: int | None = None
-    #: Stop retrying past this moment regardless of `tries` left (Laravel ``retryUntil()``).
+    #: Stop retrying past this moment regardless of `tries` left.
     retry_until: datetime | None = None
 
     async def handle(self) -> Any:
@@ -245,7 +245,7 @@ class Job:
         """Hook invoked when the job exhausts its retries (override to alert/log)."""
 
     def middleware(self) -> list[Any]:
-        """Job middleware this job runs `handle()` through (Laravel job middleware) — e.g.
+        """Job middleware this job runs `handle()` through — e.g.
         ``arvel.queue.middleware.WithoutOverlapping``/``RateLimited``. Empty by default."""
         return []
 
@@ -260,7 +260,7 @@ class Job:
 
     @classmethod
     async def dispatch_after(cls, delay: float, *args: Any, **kwargs: Any) -> Any:
-        """Dispatch this job to run after ``delay`` seconds (Laravel ``dispatch()->delay()``).
+        """Dispatch this job to run after ``delay`` seconds.
         Durable, DB-backed — see :meth:`QueueManager.dispatch_after`."""
         from arvel.kernel import app, has_application
 
@@ -432,7 +432,7 @@ async def run_job_with_retries(
 
 
 async def _record_failed_job(job: Job, exc: BaseException) -> None:
-    """Persist a ``failed_jobs`` row for a job that exhausted its retries (Laravel parity). No-op when
+    """Persist a ``failed_jobs`` row for a job that exhausted its retries. No-op when
     no DB is bound — the ``failed()`` hook already ran, so nothing is lost and nothing crashes."""
     from arvel.kernel import app, has_application
 
@@ -474,7 +474,7 @@ async def _stop_after(stop: Any, seconds: float) -> None:
 
 async def _stop_on_memory(stop: Any, limit_mb: float, interval: float) -> None:
     """``--memory``: request a stop once this process's RSS exceeds ``limit_mb`` (a supervisor
-    restarts the worker fresh — Laravel's memory-leak safety valve)."""
+    restarts the worker fresh — the memory-leak safety valve)."""
     import asyncio
     import resource
     import sys
@@ -693,7 +693,7 @@ class QueueManager(Manager):
             # same in-flight job, so gating there too would lock a job out against itself.
             instance = job_cls(*args, **kwargs)
             if not await unique_lock_for(instance).acquire():
-                return None  # already queued/running — silently dropped (Laravel `ShouldBeUnique`)
+                return None  # already queued/running — silently dropped
         task = self._runner()
         if not self._started:
             await self.broker.startup()
@@ -711,13 +711,13 @@ class QueueManager(Manager):
         )
 
     async def failed_jobs(self) -> list[Any]:
-        """The failed-job records, newest first (Laravel ``queue:failed``)."""
+        """The failed-job records, newest first."""
         from arvel.queue.failed import FailedJob
 
         return list(await FailedJob.order_by("failed_at", "desc").get())
 
     async def retry_failed(self, failed_id: str | None = None) -> list[Any]:
-        """Re-dispatch failed jobs — one by id, or every one (Laravel ``queue:retry``). Returns
+        """Re-dispatch failed jobs — one by id, or every one. Returns
         the records that were retried (each is re-pushed and its record deleted)."""
         from arvel.queue.failed import FailedJob
 
@@ -746,7 +746,7 @@ class QueueManager(Manager):
         Backs ``arvel queue:work``. For production scale, run taskiq's own worker process
         against the broker; this is the convenient in-process equivalent.
 
-        Worker flags (Laravel ``queue:work`` parity): ``max_jobs`` stops after N jobs processed;
+        Worker flags: ``max_jobs`` stops after N jobs processed;
         ``max_time`` stops after S seconds; ``stop_when_empty`` stops once idle (no job has run and
         nothing was due across a release tick, checked after at least one job has run);
         ``rest`` pauses between jobs; ``memory`` stops once this process's RSS exceeds the given MB
@@ -867,7 +867,7 @@ class QueueManager(Manager):
     async def dispatch_after(
         self, delay: float, job: Job, *, queue: str | None = None, attempts: int = 0
     ) -> Any:
-        """Delay a job (Laravel ``dispatch()->delay()``): persist it to the ``jobs`` table with
+        """Delay a job: persist it to the ``jobs`` table with
         ``available_at = now + delay`` instead of enqueuing now. A worker/scheduler calls
         :meth:`release_due_jobs` to push the due ones. Durable (survives restart); needs a DB.
         ``attempts`` records how many times the job has already run — B1's retry-release reuses
@@ -973,7 +973,7 @@ class PendingChain:
         self._catch: str | None = None
 
     def catch(self, callback: Any) -> PendingChain:
-        """Run ``callback(exc)`` once any link in the chain exhausts its retries (Laravel
+        """Run ``callback(exc)`` once any link in the chain exhausts its retries (the chain's
         ``catch()``). ``callback`` must be a module-level function: its *qualified name* is what
         actually travels in the job payload, so a lambda/closure can't survive serialization."""
         self._catch = _qualified_name(callback)
@@ -990,7 +990,7 @@ class PendingChain:
 
 
 class PendingBatch:
-    """A group of jobs dispatched together, with completion callbacks (Laravel ``Bus::batch()``).
+    """A group of jobs dispatched together, with completion callbacks.
 
     :meth:`dispatch` creates a ``job_batches`` row up front and stamps every job with its id
     (``__arvel_batch__``) before pushing them all, so the worker can track progress/failures and
@@ -1072,7 +1072,7 @@ class PendingBatch:
 
 
 class Bus:
-    """Dispatch jobs as a chain (sequential) or a batch (group). Laravel ``Bus`` facade."""
+    """Dispatch jobs as a chain (sequential) or a batch (group). ``Bus`` facade."""
 
     @staticmethod
     def chain(jobs: list[Job]) -> PendingChain:

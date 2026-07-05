@@ -46,10 +46,8 @@ def test_new_scaffolds_a_runnable_project(tmp_path: Path, monkeypatch: pytest.Mo
         set_application(None)
 
 
-def test_new_scaffolds_a_laravel_like_structure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # a fresh app ships a minimal-but-real structure (cf. `laravel new`)
+def test_new_scaffolds_a_like_structure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # a fresh app ships a minimal-but-real structure (a conventional app layout)
     monkeypatch.chdir(tmp_path)
     assert runner.invoke(build_cli(), ["new", "blog"]).exit_code == 0
     proj = tmp_path / "blog"
@@ -78,7 +76,7 @@ def test_new_scaffolds_a_laravel_like_structure(
         assert (proj / rel).is_file(), f"scaffold missing {rel}"
     assert "class AppServiceProvider" in (proj / "app/providers/app_provider.py").read_text()
     assert "class User" in (proj / "app/models/user.py").read_text()
-    # providers + middlewares wired via the fluent builder (Laravel-style bootstrap files)
+    # providers + middlewares wired via the fluent builder
     app_py = (proj / "bootstrap/app.py").read_text()
     assert "with_providers(" in app_py and "with_middlewares(" in app_py
     assert "providers = [AppServiceProvider]" in (proj / "bootstrap/providers.py").read_text()

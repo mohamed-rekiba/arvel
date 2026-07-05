@@ -84,7 +84,7 @@ def test_registration_sends_welcome():
 | `fake(Queue)` | `assert_pushed(Job)` · `assert_nothing_pushed()` |
 | `fake(Event)` | `assert_dispatched(EventType)` |
 | `fake_notifications()` | `assert_sent_to(notifiable, cls, cb=None)` · `assert_not_sent_to(...)` · `assert_nothing_sent()` · `assert_count(n)` |
-| `fake_bus()` | same object as `fake(Queue)` — `assert_dispatched(Job)`/`assert_not_dispatched(Job)` (Laravel `Bus::fake` naming; arvel models `Bus`/`Queue` dispatch as the one push path, not two fakes) |
+| `fake_bus()` | same object as `fake(Queue)` — `assert_dispatched(Job)`/`assert_not_dispatched(Job)` |
 | `fake_http(mapping=None)` | `Http.fake(...)` under the hood, returned for `assert_sent`/`assert_not_sent`/`assert_sent_count`/`recorded` — see [HTTP Client](http-client.md) for the mapping/`Http.response(...)` shape |
 | `fake_storage(disk="local")` | see [File Storage](storage.md) |
 
@@ -130,7 +130,7 @@ async def test_create_and_delete(db):
 
 `artisan(app, command, input=None)` runs an app-registered command (a `Command` class on
 `app.command_classes`, or a `routes/console.py` `Console.command(...)` closure) against a booted
-app and captures its exit code + output — Laravel's `$this->artisan(...)`:
+app and captures its exit code + output — the `$this->artisan(...)`:
 
 ```python
 from arvel.testing import artisan

@@ -27,9 +27,7 @@ def test_shell_namespace_loads_app_and_autoloads_models() -> None:
     app = Application()
     namespace = build_namespace(app)
     assert namespace["app"] is app
-    assert (
-        namespace.get("WidgetThing") is WidgetThing
-    )  # autoloaded by short name (Laravel-tinker style)
+    assert namespace.get("WidgetThing") is WidgetThing  # autoloaded by short name
 
 
 def test_import_app_models_registers_them_for_autoload(tmp_path: Path) -> None:

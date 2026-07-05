@@ -1,4 +1,4 @@
-"""Closure console commands — Laravel's ``routes/console.php`` ``Artisan::command``.
+"""Closure console commands — the ``routes/console.phpArtisan::command``.
 
 Define ad-hoc commands in ``routes/console.py`` with ``Console.command("greet {name}", handler)``; the
 console kernel discovers them into ``--help`` and dispatches them through the booted app, with container
@@ -68,7 +68,7 @@ def _parse_option(body: str) -> SignatureArg:
 
 
 def parse_signature(signature: str) -> list[SignatureArg]:
-    """Parse a Laravel-style console signature into typed tokens (module docstring has the grammar).
+    """Parse a console signature into typed tokens (module docstring has the grammar).
     The leading command name (``"report:send {user}"`` → ``report:send``) isn't a ``{...}`` token, so
     it's naturally skipped."""
     return [
@@ -78,7 +78,7 @@ def parse_signature(signature: str) -> list[SignatureArg]:
 
 
 class ClosureCommand:
-    """A name + Laravel-style signature + handler, registered on the app for the console kernel."""
+    """A name + signature + handler, registered on the app for the console kernel."""
 
     def __init__(self, signature: str, handler: Any) -> None:
         self.signature = signature.strip()
@@ -86,18 +86,17 @@ class ClosureCommand:
         self.name = self.signature.split()[0]
 
     def tokens(self) -> list[SignatureArg]:
-        """The full typed signature spec — see :func:`parse_signature`."""
+        """The full typed signature spec — see:func:`parse_signature`."""
         return parse_signature(self.signature)
 
     def arguments(self) -> list[tuple[str, bool, bool]]:
-        """Back-compat projection: ``(name, is_option, optional)``. See :meth:`tokens` for the full
+        """Back-compat projection: ``(name, is_option, optional)``. See:meth:`tokens` for the full
         spec (defaults, variadics, value/multi options, shortcuts)."""
         return [(t.name, t.is_option, t.optional) for t in self.tokens()]
 
 
 class _ConsoleRegistrar:
-    """``from arvel import Console`` — registers closure commands onto the current application
-    (Laravel ``Artisan::command``). Used from ``routes/console.py``."""
+    """``from arvel import Console`` — registers closure commands onto the current application. Used from ``routes/console.py``."""
 
     def command(self, signature: str, handler: Any) -> ClosureCommand:
         from arvel.kernel import app

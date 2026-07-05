@@ -1,4 +1,4 @@
-"""arvel.database.attribute — the Laravel L9+ ``Attribute`` accessor/mutator API.
+"""arvel.database.attribute — the L9+ ``Attribute`` accessor/mutator API.
 
 A model method returning ``Attribute(get=, set=, cached=)`` is discovered by ``ModelMeta``
 and consulted in ``_cast_get``/``_cast_set``. ``get``/``set`` are callables taking

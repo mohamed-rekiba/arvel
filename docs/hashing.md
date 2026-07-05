@@ -2,7 +2,7 @@
 
 Never store a password in plaintext, and never roll your own hash. arvel's `Hash` is a driver
 manager over battle-tested KDFs — **argon2id** (the default) and **bcrypt** (parity with
-Laravel's default, useful when migrating hashes from a PHP app) — with a plaintext-free
+the default, useful when migrating hashes from a PHP app) — with a plaintext-free
 `needs_rehash` so you can upgrade a stale hash without ever holding the password again.
 
 ## Basic usage
@@ -99,5 +99,5 @@ no facade or manager changes required.
 
 !!! note "bcrypt's 72-byte limit"
     bcrypt only reads the first 72 bytes of a password; arvel truncates longer input
-    explicitly (Laravel behavior) instead of erroring. The default argon2id driver has
+    explicitly instead of erroring. The default argon2id driver has
     no such limit.

@@ -1,4 +1,4 @@
-"""Ops commands — Laravel parity: ``key:generate``, ``storage:link``, ``cache:clear``.
+"""Ops commands.
 
 ``key:generate`` / ``storage:link`` are filesystem-only (no app boot — they work in a fresh project);
 ``cache:clear`` resolves the bound cache and flushes it inside the booted app. Each is a single-command
@@ -31,7 +31,7 @@ key_generate_app = typer.Typer()
 
 @key_generate_app.command()
 def key_generate() -> None:
-    """Generate an app encryption key and write it to .env as APP_KEY (Laravel `key:generate`)."""
+    """Generate an app encryption key and write it to.env as APP_KEY."""
     from arvel.security import Encrypter
 
     key = Encrypter.generate_key()
@@ -44,8 +44,8 @@ storage_link_app = typer.Typer()
 
 @storage_link_app.command()
 def storage_link() -> None:
-    """Symlink public/storage → storage/app/public so stored files are web-served (Laravel
-    `storage:link`)."""
+    """Symlink public/storage → storage/app/public so stored files are web-served (the
+    ``storage:link`` command)."""
     link = Path("public/storage")
     target = Path("storage/app/public")
     target.mkdir(parents=True, exist_ok=True)
@@ -62,7 +62,7 @@ cache_clear_app = typer.Typer()
 
 @cache_clear_app.command()
 def cache_clear() -> None:
-    """Flush the default cache store (Laravel `cache:clear`)."""
+    """Flush the default cache store."""
     from arvel.console.kernel import run_app_command
 
     run_app_command(_cache_clear)

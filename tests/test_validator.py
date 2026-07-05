@@ -1,4 +1,4 @@
-"""Rule-based Validator (Laravel-style rules + custom messages)."""
+"""Rule-based Validator."""
 
 from __future__ import annotations
 

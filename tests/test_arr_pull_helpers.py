@@ -1,4 +1,4 @@
-"""Arr — pull / has_any / where_not_null (Laravel Arr::pull/hasAny/whereNotNull parity). pull reads a
+"""Arr — pull / has_any / where_not_null. pull reads a
 dot-key then removes it in place; has_any tests whether ANY key is present; where_not_null drops None
 values preserving keys/order."""
 

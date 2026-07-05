@@ -134,7 +134,7 @@ class Cache(Facade):
 
 
 class Redis(Facade):
-    """Direct Redis access (Laravel ``Redis::command``/pipeline/pub-sub) — distinct from
+    """Direct Redis access — distinct from
     ``Cache``, which goes through the cashews cache abstraction."""
 
     @classmethod

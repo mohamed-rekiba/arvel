@@ -1,4 +1,4 @@
-"""View-global parity (Laravel Blade helpers): templates can call route()/url()/config()/asset()
+"""View-global parity: templates can call route()/url()/config()/asset()
 (alongside can/cannot/trans); they degrade safely when no app is bound, so templates never crash."""
 
 from __future__ import annotations

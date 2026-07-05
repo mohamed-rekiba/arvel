@@ -1,4 +1,4 @@
-"""``queue:work`` — process queued jobs (Laravel ``queue:work``)."""
+"""``queue:work`` — process queued jobs."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ failed_app = typer.Typer()
 
 @failed_app.command()
 def queue_failed() -> None:
-    """List the failed jobs (Laravel ``queue:failed``)."""
+    """List the failed jobs."""
     from arvel.console.kernel import run_app_command
 
     async def _handler(app: Any) -> None:
@@ -67,7 +67,7 @@ retry_app = typer.Typer()
 def queue_retry(
     id: str = typer.Argument(..., help="A failed-job id, or 'all' to retry every failed job."),
 ) -> None:
-    """Re-dispatch a failed job and delete its record (Laravel ``queue:retry``)."""
+    """Re-dispatch a failed job and delete its record."""
     from arvel.console.kernel import run_app_command
 
     async def _handler(app: Any) -> None:

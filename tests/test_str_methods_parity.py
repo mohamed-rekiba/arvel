@@ -1,4 +1,4 @@
-"""Str-helper parity (Laravel): common methods that were absent — case (lower/upper/ucfirst/lcfirst),
+"""Str-helper parity: common methods that were absent — case (lower/upper/ucfirst/lcfirst),
 length/slicing (substr/take/char_at/reverse/repeat/words), whitespace+padding (squish/pad_*),
 prefix/suffix (start/finish/chop_*/wrap), search (between/contains_all/position), replace
 (replace_first/replace_last/replace_array/remove/swap), and predicates (is_ulid/is_json/is_url/uuid)."""
@@ -49,7 +49,7 @@ def test_prefix_suffix() -> None:
 
 def test_search_and_extract() -> None:
     assert Str.between("[abc]", "[", "]") == "abc"
-    # before-LAST end (Laravel beforeLast(after(...))) — nested/repeated end chars
+    # before-LAST end — nested/repeated end chars
     assert Str.between("a[x]b]c", "[", "]") == "x]b"
     assert Str.contains_all("hello world", ["hello", "world"]) is True
     assert Str.contains_all("hi", ["hi", "yo"]) is False

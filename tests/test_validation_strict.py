@@ -1,5 +1,5 @@
 """Validation (doc 10) — opt-in strict mode. By default an unrecognized rule name is a silent no-op
-(lenient, Laravel-compatible for forward-compat); ``strict=True`` turns a typo'd rule (``requried``)
+(lenient, -compatible for forward-compat); ``strict=True`` turns a typo'd rule (``requried``)
 into a loud ``UnknownValidationRule`` instead of a silently-passing field — a programmer error, not a
 user-input error, so it is NOT a ``ValidationException``."""
 

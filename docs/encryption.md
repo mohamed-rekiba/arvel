@@ -29,7 +29,7 @@ enc.encrypt_string("x")
 
 Use `encrypt`/`decrypt` for any JSON-serializable value (dict, list, str, int, bool, `None`);
 use `encrypt_string`/`decrypt_string` when you know the value is already a string and don't want
-the JSON envelope (e.g. an `encrypted` model cast, or Laravel `encryptString` parity).
+the JSON envelope (e.g. an `encrypted` model cast, or `encryptString` parity).
 
 !!! warning "JSON-serializable values only"
     `encrypt`/`decrypt` go through `json.dumps`/`json.loads`. A value that isn't JSON-serializable
@@ -48,7 +48,7 @@ from arvel.security import Encrypter
 Encrypter.generate_key()  # "base64:<32 random bytes, base64-encoded>"
 ```
 
-A key is 32 raw bytes (AES-256). It's accepted either as a Laravel-style `base64:<b64>`-prefixed
+A key is 32 raw bytes (AES-256). It's accepted either as a `base64:<b64>`-prefixed
 string, or as bare base64 (standard or urlsafe alphabet) — whichever decodes to exactly 32 bytes.
 
 ## Tamper detection

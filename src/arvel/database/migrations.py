@@ -1,4 +1,4 @@
-"""arvel.database.migrations — Laravel-style migrations driven by **Alembic**.
+"""arvel.database.migrations — migrations driven by **Alembic**.
 
 A ``Migration`` declares ``up(schema)``/``down(schema)``; ``Schema`` is a thin facade
 over an Alembic ``Operations`` object (``create``/``drop``/views/extensions), so schema
@@ -73,9 +73,9 @@ class Schema:
             )
 
     def table(self, name: str, define: Callable[[Blueprint], Any]) -> None:
-        """ALTER an existing table (Laravel ``Schema::table``): every column defined on the
+        """ALTER an existing table: every column defined on the
         blueprint is ADDED, and its index specs are created. Column modify/rename aren't covered —
-        use ``execute`` for those (Laravel needs doctrine/dbal there for the same reason)."""
+        use ``execute`` for those."""
         blueprint = Blueprint(name)
         define(blueprint)
         for column in blueprint.core_columns():
@@ -88,7 +88,7 @@ class Schema:
             )
 
     def drop_column(self, table: str, *columns: str) -> None:
-        """Drop columns from an existing table (Laravel ``$table->dropColumn``)."""
+        """Drop columns from an existing table."""
         for column in columns:
             self._op.drop_column(table, column)
 
@@ -96,7 +96,7 @@ class Schema:
         self._op.drop_table(name)
 
     def rename(self, old_table: str, new_table: str) -> None:
-        """Rename a table (Laravel ``Schema::rename``)."""
+        """Rename a table."""
         self._op.rename_table(old_table, new_table)
 
     def _existing_column(self, table: str, column: str) -> Any:
@@ -124,7 +124,7 @@ class Schema:
             self._op.alter_column(table, name, **kwargs)
 
     def rename_column(self, table: str, old: str, new: str) -> None:
-        """Rename a column, preserving its data (Laravel ``renameColumn``)."""
+        """Rename a column, preserving its data."""
         self._alter_column(table, old, new_column_name=new)
 
     def change_column(
@@ -137,7 +137,7 @@ class Schema:
         default: Any = None,
         comment: str | None = None,
     ) -> None:
-        """Modify an existing column's type/nullable/default/comment (Laravel ``$table->change()``).
+        """Modify an existing column's type/nullable/default/comment.
         Only the kwargs given are altered; everything else on the column is left as-is."""
         kwargs: dict[str, Any] = {}
         if type is not None:
@@ -151,7 +151,7 @@ class Schema:
         self._alter_column(table, name, **kwargs)
 
     def drop_foreign(self, table: str, name: str) -> None:
-        """Drop a foreign-key constraint by name (Laravel ``dropForeign``)."""
+        """Drop a foreign-key constraint by name."""
         if self.dialect == "sqlite":
             with self._op.batch_alter_table(table) as batch_op:
                 batch_op.drop_constraint(name, type_="foreignkey")
@@ -159,7 +159,7 @@ class Schema:
             self._op.drop_constraint(name, table, type_="foreignkey")
 
     def drop_unique(self, table: str, name: str) -> None:
-        """Drop a unique constraint by name (Laravel ``dropUnique``)."""
+        """Drop a unique constraint by name."""
         if self.dialect == "sqlite":
             with self._op.batch_alter_table(table) as batch_op:
                 batch_op.drop_constraint(name, type_="unique")
@@ -167,7 +167,7 @@ class Schema:
             self._op.drop_constraint(name, table, type_="unique")
 
     def drop_index(self, table: str, name: str) -> None:
-        """Drop an index by name (Laravel ``dropIndex``). Native ``DROP INDEX`` on every dialect
+        """Drop an index by name. Native ``DROP INDEX`` on every dialect
         here (including SQLite), so no batch mode is needed."""
         self._op.drop_index(name, table_name=table)
 
@@ -219,7 +219,7 @@ _MIGRATIONS_TABLE = "arvel_migrations"
 class Migrator:
     """Runs migrations through Alembic on the write connection, recording applied migrations in the
     ``arvel_migrations`` table so ``migrate`` is **idempotent** (only pending migrations run) and
-    ``migrate:rollback`` reverts the last batch (Laravel parity)."""
+    ``migrate:rollback`` reverts the last batch."""
 
     def __init__(self, resolver: ConnectionResolver, name: str | None = None) -> None:
         self._resolver = resolver

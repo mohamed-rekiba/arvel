@@ -68,7 +68,7 @@ def test_resolvable_includes_deferred_but_bound_does_not() -> None:
 
     app = Application()
     app.register_deferred(DeferredProvider(app))
-    assert app.bound("svc") is False  # not materialized yet (Laravel semantics, unchanged)
+    assert app.bound("svc") is False  # not materialized yet
     assert app.resolvable("svc") is True  # but resolvable — a deferred provider will register it
 
 

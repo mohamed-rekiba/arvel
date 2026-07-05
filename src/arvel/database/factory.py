@@ -1,4 +1,4 @@
-"""arvel.database.factory — model factories (Laravel-style) for tests and seeders.
+"""arvel.database.factory — model factories for tests and seeders.
 
 Subclass :class:`Factory`, set ``model``, and implement ``definition()``::
 
@@ -30,7 +30,7 @@ _FACTORY_REGISTRY: dict[type, type[Factory[Any]]] = {}
 
 
 def factory_for(model: type[Any]) -> Factory[Any]:
-    """Resolve ``model``'s registered factory (Laravel ``Model::factory()``'s convention lookup).
+    """Resolve ``model``'s registered factory.
     Raises ``LookupError`` with an actionable message when nothing is registered — either the
     ``<Model>Factory`` module was never imported, or the model needs an explicit ``__factory__``."""
     factory_cls = _FACTORY_REGISTRY.get(model)
@@ -93,20 +93,20 @@ class Factory[M: Model]:
         self, overrides: dict[str, Any] | Callable[[dict[str, Any]], dict[str, Any]]
     ) -> Factory[M]:
         """A copy of this factory with an extra state layer — a dict, or a ``callable(attrs) -> dict``
-        computed from the attributes so far (Laravel ``state``). Composable."""
+        computed from the attributes so far. Composable."""
         clone = copy.copy(self)
         clone._states = [*self._states, overrides]
         return clone
 
     def sequence(self, *items: dict[str, Any]) -> Factory[M]:
-        """A copy of this factory that cycles ``items`` across a batch (Laravel ``sequence``)."""
+        """A copy of this factory that cycles ``items`` across a batch."""
         clone = copy.copy(self)
         clone._sequence = list(items)
         return clone
 
     def after_making(self, callback: Callable[[M], Any]) -> Factory[M]:
         """A copy of this factory that also runs ``callback(instance)`` right after each instance is
-        built — before it's persisted (Laravel ``afterMaking``). Runs for both ``make`` and
+        built — before it's persisted. Runs for both ``make`` and
         ``create``, in the order registered; ``callback`` may be sync or async."""
         clone = copy.copy(self)
         clone._after_making = [*self._after_making, callback]
@@ -114,7 +114,7 @@ class Factory[M: Model]:
 
     def after_creating(self, callback: Callable[[M], Any]) -> Factory[M]:
         """A copy of this factory that also runs ``callback(instance)`` right after each instance is
-        persisted (Laravel ``afterCreating``) — ``create``/``create_many`` only. Ordered with any
+        persisted — ``create``/``create_many`` only. Ordered with any
         other ``after_creating`` callbacks; ``callback`` may be sync or async."""
         clone = copy.copy(self)
         clone._after_creating = [*self._after_creating, callback]
@@ -124,7 +124,7 @@ class Factory[M: Model]:
         self, parent: Factory[Any] | Model, relation: str, *, foreign_key: str | None = None
     ) -> Factory[M]:
         """A copy of this factory that sets the **belongs-to** ``relation`` on every created
-        instance (Laravel ``for``): ``parent`` is created once (or reused via :meth:`recycle`) and
+        instance: ``parent`` is created once (or reused via:meth:`recycle`) and
         its owner key is written to the child's foreign key — derived from ``relation`` (a method on
         this factory's model, e.g. ``def user(self): return self.belongs_to(User)``), or
         ``foreign_key`` to override. An explicit keyword to ``create()``/``make()`` still wins."""
@@ -141,7 +141,7 @@ class Factory[M: Model]:
         foreign_key: str | None = None,
     ) -> Factory[M]:
         """A copy of this factory that, after creating the parent, also creates ``count`` ``related``
-        rows with their foreign key set to the parent (Laravel ``has``) — derived from ``relation``
+        rows with their foreign key set to the parent — derived from ``relation``
         (a method on the *parent* model, e.g. ``def posts(self): return self.has_many(Post)``), or
         ``foreign_key`` to override. ``related`` may be a bare factory (paired with ``count``) or a
         ``count()`` batch (``has(Post.factory().count(2), "posts")``) — its count then wins. Only
@@ -157,7 +157,7 @@ class Factory[M: Model]:
 
     def recycle(self, instances: Model | Sequence[Model]) -> Factory[M]:
         """A copy of this factory that reuses ``instances`` for any :meth:`for_` needing that model
-        class, instead of creating a new parent each time (Laravel ``recycle``)."""
+        class, instead of creating a new parent each time."""
         from arvel.database.model import Model as ModelBase
 
         pool = {key: list(value) for key, value in self._recycled.items()}
@@ -180,7 +180,7 @@ class Factory[M: Model]:
         return {**attrs, **overrides}
 
     def raw(self, **overrides: Any) -> dict[str, Any]:
-        """The resolved attribute dict for one model — no instance built (Laravel ``raw``)."""
+        """The resolved attribute dict for one model — no instance built."""
         return self._attributes(overrides)
 
     async def _run_hook(self, callback: Callable[[M], Any], instance: M) -> None:
@@ -264,7 +264,7 @@ class Factory[M: Model]:
         return instance
 
     def count(self, count: int) -> FactoryBatch[M]:
-        """Begin a fluent batch — ``factory().count(3).create()`` (Laravel ``count``)."""
+        """Begin a fluent batch — ``factory().count(3).create()``."""
         return FactoryBatch(self, count)
 
 

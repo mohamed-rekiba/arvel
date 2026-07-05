@@ -117,7 +117,7 @@ Tokens live in the `api_tokens` table — `name`, the hashed `token`, `tokenable
 
 `resolve_token` (and therefore anything that authenticates via it) stamps `last_used_at` — but
 **throttled**: at most once per config `sanctum.last_used_throttle` seconds (default 60), not on
-every single request. Laravel Sanctum writes `last_used_at` unconditionally each request; arvel's
+every single request. Sanctum writes `last_used_at` unconditionally each request; arvel's
 throttle is a documented, idiomatic divergence that trades a little staleness for far fewer writes on
 a hot endpoint. Lower the throttle (or set it to `0`) if you need per-request precision.
 

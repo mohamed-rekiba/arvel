@@ -1,4 +1,4 @@
-"""Collection parity (Laravel): common methods that were absent — aggregates (avg/max/min/count_by),
+"""Collection parity: common methods that were absent — aggregates (avg/max/min/count_by),
 reject/every/partition/search/value, ordering (reverse/sort_desc/sort_by_desc/skip/slice/nth),
 combining (merge/concat/flat_map/implode/join), and fluent control flow (tap/pipe/when/unless)."""
 
@@ -12,7 +12,7 @@ def test_aggregates() -> None:
     assert c.avg() == 3.0
     assert c.max() == 5
     assert c.min() == 1
-    assert Collection([]).avg() is None  # Laravel: null on empty, not a crash
+    assert Collection([]).avg() is None  # null on empty, not a crash
     assert Collection([]).max() is None
     assert Collection([1, 1, 2, 3, 3, 3]).count_by() == {1: 2, 2: 1, 3: 3}
     assert Collection([{"t": "x"}, {"t": "y"}, {"t": "x"}]).count_by("t") == {"x": 2, "y": 1}

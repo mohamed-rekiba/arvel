@@ -1,5 +1,5 @@
 """ShareErrorsFromSession — flashed validation errors become the `errors` view global on every
-request (Laravel ShareErrorsFromSession / $errors), and it's wired into the web group."""
+request, and it's wired into the web group."""
 
 from __future__ import annotations
 

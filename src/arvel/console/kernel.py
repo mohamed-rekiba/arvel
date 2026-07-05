@@ -205,7 +205,7 @@ def run_command_class(cls: Any, **cli_kwargs: Any) -> None:
 
 
 class Artisan:
-    """Programmatic command invocation (Laravel ``Artisan::call``/``callSilently``) — dispatches in
+    """Programmatic command invocation — dispatches in
     process and returns the exit code.
 
     Built-in framework commands (``about``, ``migrate``, ``make:*``, …) dispatch through the same
@@ -311,7 +311,7 @@ def _artisan_dispatch(name: str, args: dict[str, Any] | list[str] | None) -> int
         )
         raise TypeError(message)
     # bare param/token names (``run_closure_command``/``bind_parsed`` key on those) — a leading
-    # ``--`` (Laravel's own ``Artisan::call`` convention for options) is accepted and stripped.
+    # ``--`` is accepted and stripped.
     values: dict[str, Any] = {k.removeprefix("--"): v for k, v in (args or {}).items()}
 
     application = active_app()

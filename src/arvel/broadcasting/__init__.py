@@ -135,7 +135,7 @@ def bind_socket_id(value: str | None) -> None:
 
 class InteractsWithSockets:
     """Mixin for a ``ShouldBroadcast`` event: exclude the triggering socket (``to_others()``) or
-    suppress the broadcast under a condition (``broadcast_when()``) — Laravel parity."""
+    suppress the broadcast under a condition (``broadcast_when()``)."""
 
     _except_socket_id: str | None = None
     _when: Callable[[], bool] | None = None

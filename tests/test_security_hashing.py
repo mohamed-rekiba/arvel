@@ -105,11 +105,11 @@ def test_corrupt_argon2_hash_fails_check_instead_of_raising() -> None:
 
 def test_none_and_non_string_hashes_fail_check_instead_of_raising() -> None:
     manager = HashManager()
-    assert manager.check("pw", None) is False  # type: ignore[arg-type]  # corrupt NULL column
+    assert manager.check("pw", None) is False  # type: ignore[arg-type] # corrupt NULL column
     assert manager.is_hashed(None) is False  # type: ignore[arg-type]
 
 
-def test_bcrypt_long_password_is_truncated_like_laravel_not_rejected() -> None:
+def test_bcrypt_long_password_is_truncated_like_not_rejected() -> None:
     driver = BcryptDriver(rounds=4)
     long_password = "x" * 100
     hashed = driver.make(long_password)

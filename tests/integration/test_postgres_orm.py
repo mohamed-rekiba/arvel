@@ -278,7 +278,7 @@ async def test_qb_breadth_join_having_where_date_on_postgres(postgres_url: str) 
 
         # having over a grouped aggregate — a raw (non-hydrating) builder, per the documented
         # convention: grouped queries return computed rows, not whole models. Postgres (unlike
-        # SQLite/MySQL) rejects a SELECT-list alias in HAVING (matches Laravel's own having()
+        # SQLite/MySQL) rejects a SELECT-list alias in HAVING (matches the own having()
         # behavior — it's a real SQL-standard restriction, not an arvel gap), so `having_raw`
         # repeats the aggregate expression here rather than `having("total", ">", 1)`.
         grouped = await (

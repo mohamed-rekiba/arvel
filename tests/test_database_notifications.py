@@ -1,4 +1,4 @@
-"""Database notifications (doc 16) — Laravel parity. The ``database`` channel persists a row in the
+"""Database notifications (doc 16). The ``database`` channel persists a row in the
 ``notifications`` table; a ``Notifiable`` model retrieves them (``notifications`` / ``unread_notifications``)
 and marks them read (``mark_as_read`` / ``mark_all_notifications_as_read``). Without a bound DB the channel
 gracefully returns the payload array instead of persisting."""

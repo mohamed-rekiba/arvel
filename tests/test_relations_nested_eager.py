@@ -81,7 +81,7 @@ async def test_to_dict_includes_loaded_relations() -> None:
         bare = await User.first()
         assert "posts" not in bare.to_dict()
 
-        # a loaded-but-empty belongs-to serializes to None (Laravel → null)
+        # a loaded-but-empty belongs-to serializes to None
         orphan = await Comment.create(body="orphan", post_id=999)
         loaded = await Comment.with_("post").where("body", "orphan").first()
         assert loaded.to_dict()["post"] is None

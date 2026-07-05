@@ -1,4 +1,4 @@
-"""arvel.support.pipeline — an onion/middleware pipeline (Laravel `Pipeline` parity).
+"""arvel.support.pipeline — an onion/middleware pipeline.
 
 Each pipe is `(value, next)`, not a plain transform: it decides *whether* and *how* to call
 `next`, so pipes can wrap the rest of the pipeline (before/after logic) or short-circuit it

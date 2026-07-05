@@ -22,7 +22,7 @@ class CreatePosts(Migration):
 
 
 class AddSubtitleToPosts(Migration):
-    """Laravel ``Schema::table`` parity — alter an existing table by adding columns."""
+    """``Schema::table`` parity — alter an existing table by adding columns."""
 
     def up(self, schema: object) -> None:
         schema.table(  # type: ignore[attr-defined]

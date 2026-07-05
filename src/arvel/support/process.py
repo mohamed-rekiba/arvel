@@ -1,4 +1,4 @@
-"""arvel.support.process — an async subprocess runner (Laravel `Process` parity).
+"""arvel.support.process — an async subprocess runner.
 
 Always execs argv directly via `asyncio.create_subprocess_exec` — never a shell — so there is no
 shell-injection surface; every argument is passed through literally. A `timeout` kills the whole
@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 
 class ProcessFailed(RuntimeError):
-    """Raised by `ProcessResult.throw()` when the command exited non-zero (Laravel `throw()`)."""
+    """Raised by `ProcessResult.throw()` when the command exited non-zero."""
 
     def __init__(self, result: ProcessResult) -> None:
         super().__init__(
@@ -129,7 +129,7 @@ class InvokedProcess:
 
 
 class Process:
-    """Static namespace for running subprocesses (Laravel `Process` parity)."""
+    """Static namespace for running subprocesses."""
 
     @staticmethod
     async def start(

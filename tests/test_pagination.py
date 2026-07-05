@@ -1,4 +1,4 @@
-"""Pagination — Laravel-parity LengthAwarePaginator + simple Paginator."""
+"""Pagination — parity LengthAwarePaginator + simple Paginator."""
 
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ def test_url_clamps_non_positive_page() -> None:
 
 
 def test_per_page_zero_is_guarded() -> None:
-    # per_page <= 0 would divide-by-zero in last_page — clamp to 1 (Laravel: per_page >= 1)
+    # per_page <= 0 would divide-by-zero in last_page — clamp to 1
     p = LengthAwarePaginator([1], total=5, per_page=0, current_page=1, path="/x")
     assert p.per_page() == 1
     assert p.last_page() == 5  # no ZeroDivisionError
@@ -113,7 +113,7 @@ def test_window_small_is_single_band() -> None:
 def test_window_large_has_separators() -> None:
     p = _page([1], total=1000, per_page=10, current=50)  # last_page == 100
     elements = p.elements()
-    # first band ... slider ... last band
+    # first band... slider... last band
     assert elements[0] == {1: p.url(1), 2: p.url(2)}
     assert "..." in elements
     assert 100 in elements[-1]
@@ -153,10 +153,10 @@ def test_page_name_accessors() -> None:
     assert p.is_not_empty() is True
 
 
-# --- Laravel JSON shape ---
+# --- JSON shape ---
 
 
-def test_to_dict_laravel_shape() -> None:
+def test_to_dict_shape() -> None:
     p = _page([5, 6, 7, 8], total=23, per_page=4, current=2)
     d = p.to_dict()
     assert d["current_page"] == 2

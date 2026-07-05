@@ -1,4 +1,4 @@
-"""New cast round-trips (spec 08 §3 — Laravel eloquent-mutators parity, minus
+"""New cast round-trips (spec 08 §3
 ``immutable_datetime`` — arvel's ``datetime`` cast already returns the immutable ``Date``):
 ``array``/``json``/``collection``/``object``/``decimal:<scale>``/``encrypted:array``/
 ``encrypted:json``/``stringable``, each round-tripped write→read on SQLite."""

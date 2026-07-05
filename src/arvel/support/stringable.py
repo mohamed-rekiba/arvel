@@ -1,4 +1,4 @@
-"""arvel.support.stringable — a fluent, chainable string wrapper (Laravel Stringable).
+"""arvel.support.stringable — a fluent, chainable string wrapper.
 
 Mirrors the ``Str`` static helpers as instance methods that return a new ``Stringable`` (so calls
 chain: ``Str.of(x).trim().squish().title()``); terminal methods return plain values (str/int/bool/
@@ -241,7 +241,7 @@ class Stringable:
         return _str().is_ulid(self._value)
 
     def explode(self, delimiter: str, limit: int = -1) -> Collection[str]:
-        """Split into a ``Collection`` (Laravel ``Stringable::explode``). ``limit`` is Python
+        """Split into a ``Collection``. ``limit`` is Python
         ``str.split`` maxsplit: the default ``-1`` means no limit (all parts) and positive values cap
         the splits — note this differs from PHP ``explode``'s negative-limit "drop last N" behavior."""
         from arvel.support import Collection

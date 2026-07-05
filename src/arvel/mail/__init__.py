@@ -84,7 +84,7 @@ def _strip_tags(html_body: str) -> str:
 
 
 def _global_from() -> str:
-    """The app-wide default sender (Laravel ``mail.from``): ``config('mail.from.address')`` formatted
+    """The app-wide default sender: ``config('mail.from.address')`` formatted
     as ``Name <address>``. Applied when a mailable doesn't set ``from_`` — SMTP requires a From header,
     so without this a confirmation email built without an explicit sender fails to send."""
     from arvel.kernel import has_application
@@ -101,7 +101,7 @@ def _global_from() -> str:
 
 
 class Mailable:
-    """Base mail message: subclass and override ``build()`` (Laravel ``Mailable``)."""
+    """Base mail message: subclass and override ``build()``."""
 
     # Class-level defaults so base fields exist even if a subclass skips super().__init__() or is
     # rebuilt via __new__ (a queued mailable decoded by the worker; see SendQueuedMailable).
@@ -128,12 +128,12 @@ class Mailable:
         return self
 
     def from_(self, address: Any) -> Mailable:
-        """Set the sender (Laravel ``Mailable::from``). ``from_`` because ``from`` is a keyword."""
+        """Set the sender. ``from_`` because ``from`` is a keyword."""
         self._from = _address(address)
         return self
 
     def reply_to(self, address: Any) -> Mailable:
-        """Set the Reply-To address (Laravel ``Mailable::replyTo``)."""
+        """Set the Reply-To address."""
         self._reply_to = _address(address)
         return self
 
@@ -142,15 +142,15 @@ class Mailable:
         return self
 
     def text(self, body: str) -> Mailable:
-        """Set an explicit plain-text alternative (Laravel ``Mailable::text``). Without this, one
+        """Set an explicit plain-text alternative. Without this, one
         is auto-derived from the HTML body by stripping tags — this only overrides that default."""
         self._text = body
         return self
 
     def markdown(self, body: str) -> Mailable:
         """Set the body from Markdown, rendered through the component theme — styled buttons
-        (``[button: Text](url)``), panels (blockquotes), and tables, not raw md→html (Laravel
-        markdown mailables). Needs the ``markdown-it-py`` engine — the optional ``[mail]`` extra;
+        (``[button: Text](url)``), panels (blockquotes), and tables, not raw md→html. Needs the
+        ``markdown-it-py`` engine — the optional ``[mail]`` extra;
         raises if it isn't installed."""
         try:
             from markdown_it import MarkdownIt
@@ -164,7 +164,7 @@ class Mailable:
         return self
 
     def attach(self, path: str, *, name: str | None = None, mime: str | None = None) -> Mailable:
-        """Attach a file from disk (Laravel ``->attach``); MIME is guessed from the name if omitted."""
+        """Attach a file from disk; MIME is guessed from the name if omitted."""
         import mimetypes
         from pathlib import Path
 
@@ -176,7 +176,7 @@ class Mailable:
     def attach_data(
         self, data: bytes, name: str, *, mime: str = "application/octet-stream"
     ) -> Mailable:
-        """Attach raw in-memory bytes as ``name`` (Laravel ``->attachData``)."""
+        """Attach raw in-memory bytes as ``name``."""
         self._attachment_list.append((data, name, mime))
         return self
 
@@ -222,7 +222,7 @@ class SmtpTransport:
     aiosmtplib clients are not concurrency-safe: when a queue worker executes two mail jobs at
     once, concurrent ``async with`` on a shared client collides on the session state and hangs
     until the SMTP timeout (caught live by the kit's queue-rail integration test). Each send
-    opens its own connection (Laravel/Symfony mailer semantics)."""
+    opens its own connection."""
 
     def __init__(self, config: SmtpSettings) -> None:
         self._config = config
@@ -259,7 +259,7 @@ class SendQueuedMailable(Job):
 
     The mailable is stored as a JSON-safe ``{class, state}`` view (``encode_instance``) rather than a
     live object, so the job survives serialization across a **real broker** (redis); the worker rebuilds
-    it and runs ``build()`` there (Laravel semantics)."""
+    it and runs ``build()`` there."""
 
     def __init__(
         self,
@@ -300,12 +300,12 @@ class PendingMail:
         self._bcc: list[str] = []
 
     def cc(self, *recipients: Any) -> PendingMail:
-        """Add carbon-copy recipients (Laravel ``->cc``)."""
+        """Add carbon-copy recipients."""
         self._cc.extend(_address(r) for r in recipients)
         return self
 
     def bcc(self, *recipients: Any) -> PendingMail:
-        """Add blind-carbon-copy recipients (Laravel ``->bcc``) — not shown to other recipients."""
+        """Add blind-carbon-copy recipients — not shown to other recipients."""
         self._bcc.extend(_address(r) for r in recipients)
         return self
 

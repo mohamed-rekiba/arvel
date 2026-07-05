@@ -33,23 +33,23 @@ class Order(Model):
 ```
 
 - **`array`/`json`** — a JSON column stored as `TEXT` (the cast owns (de)serialization), read back
-  as a `dict`/`list`. `array` and `json` are the same cast under two names (Laravel parity).
+  as a `dict`/`list`. `array` and `json` are the same cast under two names.
 - **`collection`** — like `array`, but reads back as an `arvel.support.Collection` instead of a
   plain `list`; writing accepts a `Collection` or any iterable.
 - **`object`** — reads back as a `types.SimpleNamespace` (dotted access: `order.settings.theme`);
   writing accepts a `SimpleNamespace` or a plain `dict` (serialized via `vars()`).
 - **`decimal:<scale>`** — a `decimal.Decimal`, quantized to `<scale>` places on write (and
-  re-quantized on read). **Idiomatic divergence:** Laravel's `decimal` cast returns a *formatted
+  re-quantized on read). **Idiomatic divergence:** the `decimal` cast returns a *formatted
   string*; arvel returns a real `Decimal` so arithmetic doesn't round-trip through string parsing.
-- **`encrypted:array`/`encrypted:json`** — like `encrypted`, but serialize-aware (Laravel
-  `Crypt::encrypt`, not `encryptString`): the plaintext is a `dict`/`list`, not just a string.
+- **`encrypted:array`/`encrypted:json`** — like `encrypted`, but serialize-aware: the plaintext
+  is a `dict`/`list`, not just a string.
   Ciphertext at rest, plaintext in Python — needs `encrypter` bound in the container (same as
   `encrypted`).
 - **`stringable`** — reads back as an `arvel.support.Stringable` (a fluent string wrapper); writing
   accepts a `Stringable` or a plain `str`.
 - **Not added: `immutable_datetime`.** arvel's `datetime` cast already returns the immutable,
   `whenever`-based [`Date`](../dates.md) — there's no separate mutable-vs-immutable cast to choose
-  between, unlike Laravel (whose default `datetime` cast is mutable Carbon).
+  between, unlike (whose default `datetime` cast is mutable Carbon).
 
 ### Dates & timestamps
 

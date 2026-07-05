@@ -1,5 +1,5 @@
 """R1 — implicit route-model binding: a controller action typed ``show(self, user: User)``
-resolves ``{user}`` to a model via its route key (Laravel ``SubstituteBindings``), 404 on a
+resolves ``{user}`` to a model via its route key, 404 on a
 miss - with no explicit ``Route.model`` registration. Grounded in knowledge/port/05-routing.md
 (routing section 36-44). The HTTP layer duck-types models (``resolve_route_binding``) to avoid
 importing the database layer."""

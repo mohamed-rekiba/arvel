@@ -1,4 +1,4 @@
-"""Collection — filtering/selection helpers (Laravel parity): where_in / where_not_in / where_null /
+"""Collection — filtering/selection helpers: where_in / where_not_in / where_null /
 where_not_null / take. Keyed by an item attribute or dict key (same ``_get`` resolution as ``where``)."""
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ def test_where_null_and_where_not_null() -> None:
 def test_take_positive_negative_zero() -> None:
     c = Collection([1, 2, 3, 4, 5])
     assert c.take(2).all() == [1, 2]  # first 2
-    assert c.take(-2).all() == [4, 5]  # last 2 (negative, Laravel parity)
+    assert c.take(-2).all() == [4, 5]  # last 2 (negative, parity)
     assert c.take(0).all() == []
 
 

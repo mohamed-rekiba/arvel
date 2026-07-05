@@ -1,4 +1,4 @@
-"""Arr-helper parity (Laravel): common methods that were absent — except_/exists/add/forget,
+"""Arr-helper parity: common methods that were absent — except_/exists/add/forget,
 keys/values/divide, is_assoc/is_list, dot/undot/collapse, where/map_with_keys/prepend,
 sort/sort_desc/take/join/random."""
 

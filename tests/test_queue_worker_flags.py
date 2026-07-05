@@ -74,7 +74,7 @@ async def test_max_time_stops_the_worker_after_the_given_seconds() -> None:
 
 
 async def test_rest_pauses_after_each_job() -> None:
-    """`rest` (Laravel `--rest`) pauses after each job. Checked directly against `_invoke`'s own
+    """`rest` pauses after each job. Checked directly against `_invoke`'s own
     timing rather than `work()`'s overall wall time: the in-memory broker runs each dispatched job
     as its own independent background task (no real single-consumer loop for a whole-worker
     measurement to serialize against) — a real Receiver-consumed broker's actual pacing is covered

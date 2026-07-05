@@ -1,4 +1,4 @@
-"""arvel.auth.throttle — login rate-limiting / lockout (Laravel RateLimiter parity).
+"""arvel.auth.throttle — login rate-limiting / lockout.
 
 Brute-force defence for credential login: after ``max_attempts`` failures within ``decay_seconds``
 for a given identifier, further attempts are locked out until the window elapses. State is counted

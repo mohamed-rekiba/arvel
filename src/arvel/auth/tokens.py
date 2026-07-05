@@ -162,7 +162,7 @@ async def resolve_token(plaintext: str) -> ApiToken | None:
 
 async def _touch_last_used(record: ApiToken) -> None:
     """Stamp ``last_used_at`` — throttled to at most once per config ``sanctum.last_used_throttle``
-    seconds (default 60), so a hot endpoint doesn't take a write on every single request. Laravel
+    seconds (default 60), so a hot endpoint doesn't take a write on every single request.
     Sanctum updates ``last_used_at`` unconditionally each request; this throttle is an idiomatic,
     documented divergence (see docs/auth/api-tokens.md)."""
     from arvel.dates import Date

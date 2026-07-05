@@ -1,4 +1,4 @@
-"""arvel.http.maintenance — maintenance mode (Laravel ``artisan down`` / ``up``).
+"""arvel.http.maintenance — maintenance mode.
 
 State lives in the **default cache driver** — whatever the app is configured to use
 (``array`` in-process, ``redis`` shared, or any other store). So the reach of ``down`` follows
@@ -19,7 +19,7 @@ from typing import Any, cast
 #: Cache key holding the maintenance payload (absent ⇒ the app is up).
 KEY = "arvel:maintenance"
 #: The bypass cookie set on a request whose ``?secret=`` matched (so subsequent requests bypass
-#: without repeating the query param — Laravel ``down --secret``).
+#: without repeating the query param — ``down --secret``).
 SECRET_COOKIE = "arvel_maintenance_secret"  # noqa: S105 - a cookie name, not a credential
 
 
@@ -42,8 +42,7 @@ async def down(
     render: str | None = None,
 ) -> None:
     """Enter maintenance mode — store the flag (no TTL ⇒ until ``up``) with a Retry-After hint, plus
-    an optional bypass ``secret``, IP ``allow``-list, and a pre-``render``-ed page (Laravel ``down
-    --secret``/``--allow``/``--render``)."""
+    an optional bypass ``secret``, IP ``allow``-list, and a pre-``render``-ed page."""
     info: dict[str, Any] = {"message": message, "retry": retry}
     if secret:
         info["secret"] = secret
@@ -55,8 +54,7 @@ async def down(
 
 
 def _render_page(view_name: str) -> str:
-    """Read ``resources/views/<view_name>.html`` verbatim, once, at ``down`` time (Laravel
-    ``--render``). A raw file read, not the Jinja view engine: maintenance mode must not depend on
+    """Read ``resources/views/<view_name>.html`` verbatim, once, at ``down`` time (``--render``). A raw file read, not the Jinja view engine: maintenance mode must not depend on
     services that might themselves be why the app is down — and ``arvel.http`` stays below
     ``arvel.views`` in the module DAG (G1), so it can't import the view engine anyway."""
     from pathlib import Path
@@ -99,7 +97,7 @@ class PreventRequestsDuringMaintenance:
     """Middleware: return 503 (with Retry-After) while the app is in maintenance mode.
 
     Paths in ``config('app.maintenance_except')`` (e.g. a health probe) stay reachable —
-    Laravel's ``$except`` on the maintenance middleware. An IP in the ``down --allow`` list, or a
+    the ``$except`` on the maintenance middleware. An IP in the ``down --allow`` list, or a
     request whose ``?secret=``/bypass cookie matches ``down --secret``, passes straight through
     (the first ``?secret=`` hit also sets the bypass cookie for later requests)."""
 
@@ -111,7 +109,7 @@ class PreventRequestsDuringMaintenance:
             excepted = list(app().config("app.maintenance_except", []) or [])
         raw_path = getattr(request, "path", "")
         path = str(raw_path() if callable(raw_path) else raw_path or "")
-        # exact-match only (no wildcards, unlike Laravel's $except globs) — list full paths
+        # exact-match only (no wildcards, unlike the $except globs) — list full paths
         if path in excepted:
             return await call_next(request)
         if not await is_down():

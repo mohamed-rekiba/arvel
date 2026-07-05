@@ -1,4 +1,4 @@
-"""``vendor:publish`` — copy publishable resources into the app (Laravel ``vendor:publish``).
+"""``vendor:publish`` — copy publishable resources into the app.
 
 Service providers register publishable files (config, assets, migrations) via ``self.publishes({src:
 dest}, tag=...)`` / ``publishes_migrations(...)``, which populate ``app.published`` (``{tag: {src:

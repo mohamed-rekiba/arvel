@@ -1,19 +1,19 @@
-"""arvel.pagination — Laravel-parity paginators.
+"""arvel.pagination — parity paginators.
 
-``Builder.paginate()`` returns a :class:`LengthAwarePaginator` (knows the grand
+``Builder.paginate()`` returns a:class:`LengthAwarePaginator` (knows the grand
 ``total`` → can render a full page-number list) and ``simple_paginate()`` returns a
 :class:`Paginator` (a lean prev/next pager that only fetches one extra row to know
 whether a *next* page exists). Both are **iterable** over their page of items, carry
-the Laravel accessor surface (``total``/``current_page``/``last_page``/…), serialize
-to Laravel's JSON shape via :meth:`to_dict`, and render an HTML page-link bar via
+the accessor surface (``total``/``current_page``/``last_page``/…), serialize
+to the JSON shape via:meth:`to_dict`, and render an HTML page-link bar via
 :meth:`links` (a shipped Jinja template under the ``pagination`` view namespace).
 
-URL + current-page awareness mirrors Laravel's resolver pattern: the current request
+URL + current-page awareness mirrors the resolver pattern: the current request
 path and ``?page=`` are resolved lazily from the bound request (``current_request``),
 so a handler can simply ``await Post.paginate()`` and get correctly-linked pages.
 Outside a request the paginator degrades safely (path ``"/"``, page ``1``).
 
-Grounded in knowledge/laravel (Illuminate\\Pagination).
+
 """
 
 from __future__ import annotations
@@ -48,14 +48,14 @@ def set_view_renderer(renderer: Callable[[str, dict[str, Any]], Awaitable[Any]] 
     _view_renderer = renderer
 
 
-# --- per-request resolution (Laravel: Paginator::resolveCurrentPage/Path) ----------
+# --- per-request resolution ----------
 
 
 def resolve_current_page(page_name: str = "page", default: int = 1) -> int:
     """The current page from the bound request's ``?<page_name>=`` (>= 1), else ``default``.
 
     Degrades to ``default`` outside a request or on a non-positive/non-numeric value —
-    Laravel clamps a bad ``page`` to 1 rather than erroring."""
+    clamps a bad ``page`` to 1 rather than erroring."""
     raw = _request_query(page_name)
     if raw is None:
         return default
@@ -106,7 +106,7 @@ def _request_query_string(exclude: str) -> dict[str, Any]:
 
 
 def _serialize(item: Any) -> Any:
-    """Laravel ``toArray`` parity for a page item: models → ``to_dict()``, else pass through."""
+    """``toArray`` parity for a page item: models → ``to_dict()``, else pass through."""
     to_dict = getattr(item, "to_dict", None)
     return to_dict() if callable(to_dict) else item
 
@@ -129,7 +129,7 @@ class AbstractPaginator:
         page_name: str = "page",
     ) -> None:
         self._items = list(items)
-        self._per_page = max(1, per_page)  # guard div-by-zero in last_page (Laravel: per_page >= 1)
+        self._per_page = max(1, per_page)  # guard div-by-zero in last_page
         self._page_name = page_name
         self._current_page = (
             current_page if current_page is not None else resolve_current_page(page_name)
@@ -162,13 +162,13 @@ class AbstractPaginator:
         return not self.is_empty()
 
     def first_item(self) -> int | None:
-        """1-based index of the first item on this page (Laravel ``from``), or None if empty."""
+        """1-based index of the first item on this page, or None if empty."""
         if not self._items:
             return None
         return (self._current_page - 1) * self._per_page + 1
 
     def last_item(self) -> int | None:
-        """1-based index of the last item on this page (Laravel ``to``), or None if empty."""
+        """1-based index of the last item on this page, or None if empty."""
         if not self._items:
             return None
         return (self._current_page - 1) * self._per_page + len(self._items)
@@ -198,7 +198,7 @@ class AbstractPaginator:
         return self
 
     def append(self, key: str, value: Any) -> AbstractPaginator:
-        """Append a single key/value to every page URL (Laravel ``appends``)."""
+        """Append a single key/value to every page URL."""
         self._query[key] = value
         return self
 
@@ -220,7 +220,7 @@ class AbstractPaginator:
         return self
 
     def on_each_side(self, count: int) -> AbstractPaginator:
-        """Pages to show on each side of the current page in the link window (Laravel default 3)."""
+        """Pages to show on each side of the current page in the link window."""
         self._on_each_side = count
         return self
 
@@ -230,7 +230,7 @@ class AbstractPaginator:
         if page <= 0:
             page = 1
         params = {**self._query, self._page_name: page}
-        # doseq: list-valued params emit repeated keys (?tag=a&tag=b), matching Laravel's array query params.
+        # doseq: list-valued params emit repeated keys (?tag=a&tag=b), matching the array query params.
         query = urlencode(params, doseq=True)
         fragment = f"#{self._fragment}" if self._fragment else ""
         return f"{self._path}?{query}{fragment}"
@@ -256,12 +256,12 @@ class AbstractPaginator:
             from markupsafe import Markup
 
             # Already escaped by our autoescaping Jinja env; mark safe so templates don't double-escape.
-            return Markup(rendered)  # noqa: S704  # nosec B704 - trusted autoescaped Jinja output
+            return Markup(rendered)  # noqa: S704 # nosec B704 - trusted autoescaped Jinja output
         except ImportError:  # pragma: no cover - markupsafe ships with jinja2
             return rendered
 
     async def links(self, view: str | None = None, data: dict[str, Any] | None = None) -> Any:
-        """Alias of :meth:`render` (Laravel ``$paginator->links()``)."""
+        """Alias of:meth:`render`."""
         return await self.render(view, data)
 
     _default_view = "pagination::default.html"
@@ -328,7 +328,7 @@ class LengthAwarePaginator(AbstractPaginator):
     def elements(self) -> list[Any]:
         """The page-link window: a list of ``{page: url}`` bands separated by ``"..."`` strings.
 
-        Mirrors Laravel's UrlWindow — a single band when there are few pages, otherwise a
+        Mirrors the UrlWindow — a single band when there are few pages, otherwise a
         first band, a slider around the current page, and a last band with separators."""
         last = self.last_page()
         window = self._on_each_side * 2
@@ -356,7 +356,7 @@ class LengthAwarePaginator(AbstractPaginator):
         return {page: self.url(page) for page in range(start, end + 1)}
 
     def _link_collection(self) -> list[dict[str, Any]]:
-        """Laravel's flat ``links`` JSON array: Previous, each page (with ``...`` placeholders),
+        """the flat ``links`` JSON array: Previous, each page (with ``...`` placeholders),
         then Next — each ``{url, label, active}``."""
         links: list[dict[str, Any]] = [
             {"url": self.previous_page_url(), "label": "&laquo; Previous", "active": False}
@@ -395,7 +395,7 @@ class LengthAwarePaginator(AbstractPaginator):
 
 
 class Paginator(AbstractPaginator):
-    """A lean prev/next pager (Laravel ``simplePaginate``): no grand total, so no page count.
+    """A lean prev/next pager: no grand total, so no page count.
 
     ``has_more`` is normally inferred by fetching one extra row (``per_page + 1``): if an extra
     came back there *is* a next page and the extra is trimmed off."""
@@ -458,16 +458,16 @@ class Paginator(AbstractPaginator):
 
 def encode_cursor(position: dict[str, Any], *, backward: bool = False) -> str:
     """Encode a keyset ``position`` (the ordering columns' values at the seek point) as an
-    opaque, URL-safe base64 cursor (Laravel ``Cursor::encode``). This is a wire format, not
+    opaque, URL-safe base64 cursor. This is a wire format, not
     encryption — don't treat it as a security/tamper-proofing boundary."""
     payload = _json.dumps({"p": position, "b": backward}, default=str, sort_keys=True)
     return base64.urlsafe_b64encode(payload.encode()).decode()
 
 
 def decode_cursor(cursor: str) -> tuple[dict[str, Any], bool]:
-    """Decode a cursor produced by :func:`encode_cursor` back to ``(position, backward)``.
+    """Decode a cursor produced by:func:`encode_cursor` back to ``(position, backward)``.
     The cursor is untrusted query-string input, so a malformed one degrades to an empty
-    position (the first page, forward) rather than 500ing — matching Laravel, which resolves
+    position (the first page, forward) rather than 500ing — matching, which resolves
     an invalid cursor to null."""
     try:
         payload = _json.loads(base64.urlsafe_b64decode(cursor.encode()))
@@ -477,11 +477,11 @@ def decode_cursor(cursor: str) -> tuple[dict[str, Any], bool]:
 
 
 class CursorPaginator:
-    """A keyset (cursor) paginator (Laravel ``CursorPaginator``): pages by an opaque cursor over
-    the query's ordering columns instead of ``OFFSET``/page numbers, so paging stays correct even
-    as rows are inserted before the cursor mid-scan — the "page drift" the offset-based
+    """A keyset (cursor) paginator: pages by an opaque cursor over
+        the query's ordering columns instead of ``OFFSET``/page numbers, so paging stays correct even
+        as rows are inserted before the cursor mid-scan — the "page drift" the offset-based
     :class:`LengthAwarePaginator`/:class:`Paginator` can't avoid. Iterable over its page of items;
-    :meth:`to_dict` mirrors Laravel's cursor-paginator JSON shape (DR-0022 object shape — built by
+    :meth:`to_dict` mirrors the cursor-paginator JSON shape (DR-0022 object shape — built by
     :meth:`Builder.cursor_paginate`, not constructed directly in normal use)."""
 
     def __init__(

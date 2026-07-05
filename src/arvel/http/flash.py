@@ -1,9 +1,9 @@
-"""arvel.http.flash — session flash + error bag (Laravel ``session()->flash`` / ``$errors``).
+"""arvel.http.flash — session flash + error bag.
 
 A ``FlashBag`` over the request session stores one-request messages (``flash("status", ...)``)
 and validation errors (``errors()``), read back on the next request and exposed to templates.
 
-**Aging (Laravel ``ageFlashData``).** Each flash is marked *fresh* when written; ``StartSession``
+**Aging.** Each flash is marked *fresh* when written; ``StartSession``
 calls ``age()`` at the **start** of every request, which drops anything that is no longer fresh
 (it was already shown last request) and demotes the rest to stale. So a message flashed in request
 *A* is visible in request *B* and gone by *C* — surviving exactly one request. Aging at request
@@ -67,13 +67,13 @@ class FlashBag:
         return result
 
     def flash_input(self, data: dict[str, Any]) -> FlashBag:
-        """Flash the request's input for one request (Laravel ``withInput``). Stored as an ordinary
+        """Flash the request's input for one request. Stored as an ordinary
         flash entry, so the same aging expires it after the next request."""
         self.flash(self.OLD_INPUT_KEY, dict(data))
         return self
 
     def old(self, key: str | None = None, default: Any = None) -> Any:
-        """Read flashed input (Laravel ``old()``). ``old()`` → all of it; ``old("field", d)`` → one
+        """Read flashed input. ``old()`` → all of it; ``old("field", d)`` → one
         value with a fallback. Empty when nothing was flashed."""
         raw = self._read_bag().get(self.OLD_INPUT_KEY)
         data: dict[str, Any] = cast("dict[str, Any]", raw) if isinstance(raw, dict) else {}

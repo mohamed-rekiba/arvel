@@ -1,4 +1,4 @@
-"""Pipeline — onion/middleware semantics (Laravel `Pipeline` parity): each pipe receives
+"""Pipeline — onion/middleware semantics: each pipe receives
 `(value, next)` and decides whether/how to call `next`. Covers onion order, short-circuiting,
 `via()` for object pipes, sync/async mixing, and the 1-arg transform sugar."""
 

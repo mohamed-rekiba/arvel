@@ -1,11 +1,11 @@
-"""arvel.http.rate_limiter — named, cache-backed rate limiters (Laravel ``RateLimiter`` facade).
+"""arvel.http.rate_limiter — named, cache-backed rate limiters.
 
 ``Limit`` is the declarative rule (attempts per window, optionally segmented and with a custom
 429 builder); ``RateLimiter`` registers named limiters (``for_``) and exposes the low-level
 counting verbs the ``throttle:<name>`` route middleware (``arvel.http.middleware.ThrottleRequests``)
 drives. Counting is **fixed-window** over the app's own cache: ``increment`` bumps the counter,
 ``expire`` arms its decay on the first hit in a window (story 06's cache verbs — no counting
-reimplemented here). Laravel's own limiter is fixed-window too (a burst can straddle two windows),
+reimplemented here). the own limiter is fixed-window too (a burst can straddle two windows),
 so this isn't a shortcut, just the same trade-off, documented (see docs/middleware.md).
 
 Grounded in knowledge/port/13-http-parity.md §1.
@@ -62,7 +62,7 @@ class Limit:
 
 
 class RateLimiter:
-    """Named rate limiters over the app's cache (Laravel ``RateLimiter`` facade root).
+    """Named rate limiters over the app's cache.
 
     :meth:`for_` registers a named limiter's rule, resolved per-request by the
     ``throttle:<name>`` route middleware. The rest are the low-level counting verbs (usable
@@ -106,7 +106,7 @@ class RateLimiter:
         callback: Callable[[], Any],
         decay_seconds: int = 60,
     ) -> Any:
-        """Laravel ``RateLimiter::attempt``: run+count ``callback`` unless ``key`` is already over
+        """``RateLimiter::attempt``: run+count ``callback`` unless ``key`` is already over
         ``max_attempts`` (then skip it and return ``False``). A ``None`` callback result counts as
         success (``True``); any other result is returned as-is."""
         if await self.too_many_attempts(key, max_attempts):
@@ -130,7 +130,7 @@ class RateLimiter:
         return max(int(ttl), 0)
 
     async def clear(self, key: str) -> None:
-        """Reset ``key``'s counter (Laravel ``RateLimiter::clear``)."""
+        """Reset ``key``'s counter."""
         await self._cache.forget(key)
 
 

@@ -34,7 +34,7 @@ config = {
 
     # --- session cookie (StartSession) ---------------------------------------
     "session": {
-        "lifetime":    120,              # MINUTES (Laravel parity); cookie max-age / TTL = x60 (default 2h)
+        "lifetime": 120, # MINUTES; cookie max-age / TTL = x60 (default 2h)
         "secure":      True,             # mark the cookie Secure (HTTPS-only); False for plain-HTTP dev
         "host_prefix": True,             # __Host- cookie prefix (default = secure; requires Secure)
     },

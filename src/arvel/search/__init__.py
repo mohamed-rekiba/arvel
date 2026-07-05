@@ -1,4 +1,4 @@
-"""arvel.search — Laravel-Scout-style full-text indexing over a swappable engine.
+"""arvel.search.
 
 A ``Searchable`` model is mirrored into a search index on save and removed on delete; querying
 goes through the configured engine (``config('search.driver')``, default ``array``). The built-in
@@ -6,9 +6,9 @@ goes through the configured engine (``config('search.driver')``, default ``array
 optional driver behind the ``[search]`` extra. Engines are resolved by ``SearchManager`` (the
 ``arvel.support.manager.Manager`` strategy base).
 
-``Model.search(query)`` returns a fluent :class:`SearchBuilder` (``where``/``order_by``/``take``/
+``Model.search(query)`` returns a fluent:class:`SearchBuilder` (``where``/``order_by``/``take``/
 ``get``/``first``/``paginate``/``keys``/``raw``) — Scout parity. Index writes normally happen
-inline on save/delete; setting ``search.queue = True`` instead emits a :class:`ModelIndexRequested`
+inline on save/delete; setting ``search.queue = True`` instead emits a:class:`ModelIndexRequested`
 event through the events dispatcher (see ``arvel.search.listeners`` for the provided listener) so
 the write moves off the ``Searchable`` call path — the queue-seam story (no ``arvel.queue`` import
 here; that back-edge is forbidden by the G1 layer contract).
@@ -95,8 +95,8 @@ _Hit = tuple[Any, dict[str, Any]]
 
 
 def _sorted(hits: list[_Hit], sort: Sequence[str]) -> list[_Hit]:
-    """Apply ``["field:asc", "field:desc", ...]`` sort specs, last spec is the primary key
-    (each pass is a stable sort, so applying right-to-left composes them Laravel/SQL-style)."""
+    """Apply ``["field:asc", "field:desc",...]`` sort specs, last spec is the primary key
+    (each pass is a stable sort, so applying right-to-left composes them /SQL-style)."""
 
     def _field_of(pair: _Hit, field: str) -> Any:
         return pair[1].get(field)
@@ -319,7 +319,7 @@ class ModelIndexRequested:
 
 class Searchable:
     """Mixin that makes a model searchable (Scout-style): it is indexed on save and removed on
-    delete, and ``Model.search(query)`` returns a fluent :class:`SearchBuilder`. Override
+    delete, and ``Model.search(query)`` returns a fluent:class:`SearchBuilder`. Override
     ``to_searchable_array`` to control what gets indexed, ``searchable_as`` to name the index, and
     ``searchable_filterable``/``searchable_sortable`` to declare the fields ``where``/``order_by``
     need on Meilisearch (``scout:import`` pushes them as index settings)."""
@@ -410,7 +410,7 @@ class Searchable:
 
     @classmethod
     def search(cls, query: str) -> SearchBuilder[Any]:
-        """Start a fluent search query (Laravel Scout parity):
+        """Start a fluent search query:
         ``Model.search('term').where('field', v).order_by('n', 'desc').paginate(per_page=10)``."""
         return SearchBuilder(cls, query)
 
@@ -427,11 +427,11 @@ class Searchable:
 
 
 class SearchBuilder[M: Searchable]:
-    """Fluent search-query builder returned by ``Model.search(query)`` (Laravel Scout parity).
+    """Fluent search-query builder returned by ``Model.search(query)``.
 
     ``where``/``order_by``/``take`` build up the query; ``get``/``first``/``paginate`` run it and
     hydrate hits back into models (by primary key, preserving the engine's result order — a
-    ``whereIn(pk, keys)`` fetch, mirroring Laravel); ``keys``/``raw`` skip hydration for the raw
+    ``whereIn(pk, keys)`` fetch, mirroring); ``keys``/``raw`` skip hydration for the raw
     engine keys/payload. Soft-deleted models are excluded unless ``with_trashed()`` was called."""
 
     def __init__(self, model_cls: type[M], query: str) -> None:

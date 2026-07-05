@@ -96,7 +96,7 @@ async def upload_avatar(request):
 
 ## Content & metadata helpers
 
-Beyond `put`/`get`, a disk has the rest of Laravel's `Storage` surface — content helpers, copy/move,
+Beyond `put`/`get`, a disk has the rest of the `Storage` surface — content helpers, copy/move,
 metadata, directory listing, streaming, visibility, and URLs. Every method is `async`, and every
 path is relative to the disk's configured `root`.
 
@@ -193,7 +193,7 @@ await Storage.temporary_url("invoices/2026-06.pdf", timedelta(minutes=15))   # s
 `url()` resolution order: the disk's configured `url` (`disks.<name>.url`) always wins; otherwise
 `s3` builds an endpoint/bucket/key URL, and other drivers return the full disk path as a
 best-effort identifier. `temporary_url` presigns a time-boxed GET via s3fs and only works on the
-`s3` driver — every other driver raises `UnsupportedDriverOperation` (Laravel parity: `temporaryUrl`
+`s3` driver — every other driver raises `UnsupportedDriverOperation` (parity: `temporaryUrl`
 throws when the driver doesn't support it).
 
 ## Testing: `Storage.fake`
@@ -235,7 +235,7 @@ teardown) restores every faked disk alongside the regular facade fakes (`Mail`, 
 - **`append`/`prepend` aren't atomic.** Both are a read-modify-write over the whole file — fine
   for logs written from one place, risky under concurrent writers.
 - **`temporary_url` isn't universal.** Only the `s3` driver supports it; calling it on `local`/
-  `gcs`/`azure` raises `UnsupportedDriverOperation` (Laravel parity — the same call throws there
+  `gcs`/`azure` raises `UnsupportedDriverOperation` (parity — the same call throws there
   too).
 
 ## How it works

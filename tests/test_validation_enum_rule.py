@@ -1,4 +1,4 @@
-"""Spec 12 §2 — `Enum` rule object (Laravel `Rule::enum()`). No string form: the enum class IS the
+"""Spec 12 §2 — `Enum` rule object. No string form: the enum class IS the
 closed set, so it's a `Rule` object (runs on the async path, like any custom rule)."""
 
 from __future__ import annotations

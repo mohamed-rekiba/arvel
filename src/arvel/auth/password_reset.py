@@ -1,4 +1,4 @@
-"""arvel.auth.password_reset — Laravel-parity **stored** password-reset broker (A6 fix).
+"""arvel.auth.password_reset — parity **stored** password-reset broker (A6 fix).
 
 Replaces the old stateless signed-token approach (a signed token was replayable within its TTL —
 audit finding A6): ``PasswordResetToken`` holds **one row per email** — only the token's ``Hasher``
@@ -21,7 +21,7 @@ from arvel.database import Model
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-DEFAULT_THROTTLE_SECONDS = 60  # one send per email per minute (Laravel default)
+DEFAULT_THROTTLE_SECONDS = 60  # one send per email per minute
 DEFAULT_TTL_SECONDS = 3600  # 1 hour
 
 
@@ -71,7 +71,7 @@ def _age_seconds(created_at: Any) -> float:
 
 
 class PasswordBroker:
-    """Laravel ``PasswordBroker`` parity: throttled ``send_reset_link`` + single-use ``reset``.
+    """``PasswordBroker`` parity: throttled ``send_reset_link`` + single-use ``reset``.
 
     ``user_lookup(email)`` resolves the user for an email (the broker owns no user store — bring your
     own, e.g. ``User.where(email=email).first()``). ``dispatcher`` defaults to the container's bound

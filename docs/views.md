@@ -1,7 +1,7 @@
 # Views
 
 Server-rendered HTML with **Jinja2**. A handler builds a view from a dotted template name and turns
-it into an HTML response — Laravel's `view('pages.home', [...])`.
+it into an HTML response — the `view('pages.home', [...])`.
 
 ## Rendering a view
 
@@ -31,16 +31,16 @@ app and degrade safely when there's no app/session:
 | `config('app.name', 'arvel')` | read a config value |
 | `trans('messages.saved')` · `trans_choice('items', n)` | translations (see [Localization](localization.md)) |
 | `can('update', post)` · `cannot('delete', post)` | authorization gate checks |
-| `auth()` · `guest()` | the current authenticated user (or `None`) / whether nobody is logged in (Laravel `@auth`/`@guest`) |
+| `auth()` · `guest()` | the current authenticated user (or `None`) / whether nobody is logged in |
 | `csrf_token()` · `csrf_field()` | the session CSRF token / a hidden `_token` input |
-| `method_field('PUT')` | a hidden `_method` input so a form can target a PUT/PATCH/DELETE route (Laravel `@method`) |
+| `method_field('PUT')` | a hidden `_method` input so a form can target a PUT/PATCH/DELETE route |
 
 ```html
 <a href="{{ route('users.show', id=user.id) }}">{{ user.name }}</a>
 <link rel="stylesheet" href="{{ asset('css/app.css') }}">
 
 <form method="post" action="{{ url('/profile') }}">
-  {{ csrf_field() }}            {# required for web-group POSTs — see Routing/CSRF #}
+  {{ csrf_field() }} {# required for web-group POSTs — see Routing/CSRF #}
   {% if can('update', user) %}<button>Save</button>{% endif %}
 </form>
 ```
@@ -55,7 +55,7 @@ redirect), so forms can show messages after a redirect-back:
 ```
 
 Flashed data — the `errors` bag and any `flash("status", …)` message — lives for **exactly one
-request** (Laravel's flash lifecycle): it's available on the request immediately after the redirect
+request**: it's available on the request immediately after the redirect
 and then aged out, so a refresh of the destination page no longer shows it. Re-flash within a request
 to keep it for another hop.
 
@@ -71,12 +71,11 @@ redirected-back form can refill the fields the user already typed. Read it in a 
 ```
 
 Like the rest of the flash, old input lives for exactly one request. **Password fields
-(`password`, `password_confirmation`) are never flashed** — secrets stay out of the session
-(Laravel's `dontFlash`).
+(`password`, `password_confirmation`) are never flashed** — secrets stay out of the session.
 
 ## Sharing data with every view
 
-Register globals once (e.g. from a service provider's `boot`) — Laravel's `View::share`:
+Register globals once (e.g. from a service provider's `boot`) — the `View::share`:
 
 ```python
 app.make("view").share(app_name="Arvel", year=2026)

@@ -1,4 +1,4 @@
-"""Validation parity (Laravel): nested dot-path fields resolve into nested data (``user.email``), and the
+"""Validation parity: nested dot-path fields resolve into nested data (``user.email``), and the
 ``array``/``between``/``not_in``/``starts_with``/``ends_with``/``uuid`` rules actually enforce (they were
 silent no-ops via the ``case _: return True`` default — silently accepting bad data)."""
 

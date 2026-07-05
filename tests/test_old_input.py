@@ -1,5 +1,5 @@
 """old-input — a validation failure flashes submitted input for one request via ``old()``, excluding
-password fields (Laravel dontFlash)."""
+password fields."""
 
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ async def test_validate_failure_flashes_input_minus_passwords() -> None:
         await req.validate(_LoginForm)
     flashed = FlashBag(session).old()
     assert flashed.get("email") == "not-an-email"  # input repopulated for the redirected-back form
-    assert "password" not in flashed  # password NEVER flashed (Laravel dontFlash)
+    assert "password" not in flashed  # password NEVER flashed
 
 
 async def test_validate_failure_without_session_is_safe() -> None:

@@ -1,4 +1,4 @@
-"""``schedule:run`` — run the scheduled tasks that are due now (Laravel ``schedule:run``).
+"""``schedule:run`` — run the scheduled tasks that are due now.
 
 A cron entry calls this once a minute; it resolves the app's ``schedule`` binding (a
 ``Schedule``) and runs the events due at the current minute. Grounded in knowledge/port/13.

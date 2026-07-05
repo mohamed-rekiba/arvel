@@ -1,4 +1,4 @@
-"""arvel.queue.middleware — unique jobs (`ShouldBeUnique`) + job middleware (Laravel parity).
+"""arvel.queue.middleware — unique jobs (`ShouldBeUnique`) + job middleware.
 
 Job middleware wraps a job's `handle()` the same way HTTP middleware wraps a request: each pipe
 decides whether/when to call `next_`. It's the exact `arvel.support.pipeline.Pipeline` onion shape
@@ -20,7 +20,7 @@ from typing import Any
 
 class JobShouldBeReleased(BaseException):
     """Raised by a job middleware to put the job back on the queue after ``delay`` seconds
-    instead of running it now (Laravel ``$job->release($delay)``). Deliberately a
+    instead of running it now. Deliberately a
     ``BaseException`` (see module docstring) — never treated as a failed attempt."""
 
     def __init__(self, delay: float = 0) -> None:
@@ -30,7 +30,7 @@ class JobShouldBeReleased(BaseException):
 
 class ShouldBeUnique:
     """Marker mixin: at most one instance of this job — keyed by its class + :meth:`unique_id`
-    — may be queued/running at a time (Laravel ``ShouldBeUnique``). ``QueueManager.push``/
+    — may be queued/running at a time. ``QueueManager.push``/
     ``push_instance`` acquire a :class:`~arvel.cache.CacheLock` before dispatch and silently skip
     (return ``None``) a second dispatch while it's held; the worker releases it once the job
     finishes processing, or ``unique_for`` seconds expire — whichever comes first."""
@@ -56,7 +56,7 @@ def unique_lock_for(job: Any) -> Any:
 
 
 class WithoutOverlapping:
-    """Serializes concurrent runs sharing ``key`` (Laravel job middleware ``WithoutOverlapping``):
+    """Serializes concurrent runs sharing ``key``:
     a :class:`~arvel.cache.CacheLock` guards ``key``; a run that finds it already held releases the
     job back onto the queue (after ``release_after`` seconds) instead of running now. ``expire`` is
     the lock's own TTL — the safety net if a holder dies mid-run without releasing."""
@@ -79,7 +79,7 @@ class WithoutOverlapping:
 
 
 class RateLimited:
-    """Caps executions of jobs sharing ``key`` to ``max_attempts`` per ``decay_seconds`` (Laravel
+    """Caps executions of jobs sharing ``key`` to ``max_attempts`` per ``decay_seconds`` (
     job middleware ``RateLimited``) — over the limit, the job is released back onto the queue
     instead of running. ``limiter`` is duck-typed against
     :class:`arvel.http.rate_limiter.RateLimiter`'s counting verbs (``too_many_attempts``/``hit``/
@@ -100,7 +100,7 @@ class RateLimited:
 
 
 class ThrottlesExceptions:
-    """A simple circuit breaker (Laravel job middleware ``ThrottlesExceptions``): once
+    """A simple circuit breaker: once
     ``max_exceptions`` failures land within ``decay_seconds``, further attempts release the job
     back onto the queue immediately instead of calling ``handle()`` (and failing again) — built
     entirely on the cache's existing counter verbs, no new plumbing."""

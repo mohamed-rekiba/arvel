@@ -1,4 +1,4 @@
-"""Config directory autoload — Laravel-style ``config/*.py`` discovery at boot."""
+"""Config directory autoload — ``config/*.py`` discovery at boot."""
 
 from __future__ import annotations
 

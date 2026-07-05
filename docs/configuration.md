@@ -63,7 +63,7 @@ env("APP_DEBUG")                   # the value, coerced (see below)
 env("MAIL_PORT", 25)               # default when the variable is unset
 ```
 
-`env()` applies **Laravel-style literal coercion** so common boolean/null spellings come back as real
+`env()` applies **literal coercion** so common boolean/null spellings come back as real
 Python values rather than strings:
 
 | Env value (case-insensitive) | `env()` returns |

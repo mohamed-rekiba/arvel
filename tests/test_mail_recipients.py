@@ -1,5 +1,5 @@
 """Mail (doc 16) — recipient + sender parity: Mailable.from_/reply_to set From/Reply-To headers;
-PendingMail.cc/bcc add Cc/Bcc (Laravel Mail::to(...)->cc(...)->bcc(...)). Previously only `to` existed
+PendingMail.cc/bcc add Cc/Bcc. Previously only `to` existed
 and the rendered message carried no From/Reply-To."""
 
 from __future__ import annotations
@@ -104,7 +104,7 @@ async def test_queued_mailable_survives_broker_serialization_and_rebuilds() -> N
 
 def test_render_uses_global_from_when_unset() -> None:
     """A mailable without an explicit from_ falls back to config('mail.from') — SMTP needs a From
-    header, so an app-wide default sender makes confirmation mails sendable (Laravel mail.from)."""
+    header, so an app-wide default sender makes confirmation mails sendable."""
     from arvel.kernel import Application, set_application
 
     app = Application()

@@ -51,14 +51,14 @@ def _fsspec() -> Any:
 
 
 class Visibility(Enum):
-    """Public/private file visibility (Laravel parity) — a closed set, not a bare string."""
+    """Public/private file visibility — a closed set, not a bare string."""
 
     PUBLIC = "public"
     PRIVATE = "private"
 
 
 class UnsupportedDriverOperation(RuntimeError):
-    """Raised when a disk's driver doesn't support the requested operation (Laravel parity:
+    """Raised when a disk's driver doesn't support the requested operation (parity:
     ``temporaryUrl`` throws a ``RuntimeException`` on a driver without presigned-URL support)."""
 
 
@@ -70,7 +70,7 @@ class PathTraversalError(ValueError):
 
 
 class Filesystem:
-    """Laravel-style disk API over an fsspec filesystem (async via worker threads)."""
+    """disk API over an fsspec filesystem (async via worker threads)."""
 
     def __init__(
         self,
@@ -403,7 +403,7 @@ class Filesystem:
     # -- URLs -----------------------------------------------------------------
 
     def url(self, path: str) -> str:
-        """A public URL for ``path``. A configured ``url`` prefix always wins (Laravel-style
+        """A public URL for ``path``. A configured ``url`` prefix always wins (-style
         override); otherwise ``s3`` builds the endpoint/bucket/key URL and other drivers return
         the full disk path as a best-effort identifier."""
         full = self._full(path)
@@ -418,7 +418,7 @@ class Filesystem:
 
     async def temporary_url(self, path: str, expires_in: timedelta) -> str:
         """A time-boxed signed URL for ``path`` (``s3`` only, via s3fs presigning). Other drivers
-        raise :class:`UnsupportedDriverOperation` (Laravel parity: ``temporaryUrl`` throws when
+        raise:class:`UnsupportedDriverOperation` (parity: ``temporaryUrl`` throws when
         the driver doesn't support it)."""
         if not self._is("s3", "s3a"):
             raise UnsupportedDriverOperation(

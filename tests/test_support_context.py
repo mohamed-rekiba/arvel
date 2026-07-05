@@ -1,4 +1,4 @@
-"""Context — an ambient, contextvars-backed key/value store (Laravel `Context` parity): CRUD,
+"""Context — an ambient, contextvars-backed key/value store: CRUD,
 stacks, hidden values (never in `all()`), `scope()` restoring the prior snapshot, the
 dehydrate/hydrate round-trip (incl. hidden + callbacks), and per-task isolation."""
 

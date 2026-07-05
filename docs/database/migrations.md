@@ -1,6 +1,6 @@
 # Migrations & Schema
 
-In a migration's blueprint, declare columns with the Laravel-style builder:
+In a migration's blueprint, declare columns with the builder:
 
 ```python
 t.id()
@@ -18,10 +18,10 @@ t.timestamp("published_at").nullable()        # DateTime
 ```
 
 Cross-dialect types render natively where it matters (real `UNSIGNED` / `LONGTEXT` / `MEDIUMTEXT`
-on MySQL; portable equivalents elsewhere), so a ported Laravel migration runs unchanged.
+on MySQL; portable equivalents elsewhere), so a ported migration runs unchanged.
 
 A model's own `__fields__` follow the same convention: a `str` field becomes `VARCHAR(255)`
-(Laravel's default string length) and a `datetime` field a real timezone-aware `DateTime` — so the
+ and a `datetime` field a real timezone-aware `DateTime` — so the
 table is valid DDL on **every** dialect, including MySQL (which rejects a length-less `VARCHAR`). For
 a longer column declare the type explicitly, e.g. `__fields__ = {"body": sa.Text()}`.
 
@@ -49,7 +49,7 @@ await Session.prune()              # delete prunable() rows (pair with schedule:
 ## Evolving a table
 
 `Schema` (the object your migration's `up`/`down` receive) also modifies an *existing* table —
-Laravel `renameColumn`/`change`/`dropForeign`/`dropIndex`/`dropUnique`/`rename`, over Alembic:
+`renameColumn`/`change`/`dropForeign`/`dropIndex`/`dropUnique`/`rename`, over Alembic:
 
 ```python
 def up(self, schema):

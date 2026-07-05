@@ -1,6 +1,6 @@
 # Processes
 
-`Process` runs external commands (Laravel `Process` parity) over `asyncio.create_subprocess_exec`
+`Process` runs external commands over `asyncio.create_subprocess_exec`
 — **never a shell**. Every argument is passed through to the OS literally, so there's no
 shell-injection surface: a value like `"$(rm -rf /)"` is just a string argument, never
 interpreted.

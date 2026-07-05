@@ -82,7 +82,7 @@ class RoutingServiceProvider(ServiceProvider):
                 "/broadcasting/auth", broadcasting_auth, name="broadcasting.auth"
             ).middleware(Authenticate)
 
-        # with_public_dir(...) — Laravel's public/ needs zero lines in routes/web.php; same here.
+        # with_public_dir(...) — the public/ needs zero lines in routes/web.php; same here.
         if self.app.public_dir is not None and self.app.bound("router"):
             self.app.make("router").public(
                 self.app.public_dir,

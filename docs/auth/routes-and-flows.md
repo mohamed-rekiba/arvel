@@ -212,7 +212,7 @@ have). For minting the access token itself, see [SSO / OIDC](sso-oidc.md) (valid
 ## Password reset
 
 `PasswordBroker` (`arvel.auth.password_reset`) is a **stored**, single-use, per-email-throttled
-broker — Laravel's `PasswordBroker`, not a signed token. A used *or* expired token row is **deleted**,
+broker — the `PasswordBroker`, not a signed token. A used *or* expired token row is **deleted**,
 so a replay never succeeds even inside the original TTL (the old stateless-signed-token approach was
 replayable within its TTL — audit finding A6). The `password_reset_tokens` table is a **framework**
 migration (`arvel new` ships it, like `users`/`api_tokens`/`failed_jobs`) — no table to author yourself:
@@ -266,7 +266,7 @@ whether the previous link was ever used.
 ## Email verification
 
 Same signed-URL shape as before, but the payload now binds a **hash of the email** the link was issued
-for, and the default lifetime is down to **60 minutes** (from 24h) — Laravel parity:
+for, and the default lifetime is down to **60 minutes** (from 24h)
 
 ```python
 from arvel.auth.flows import email_verification_token, verify_email_token

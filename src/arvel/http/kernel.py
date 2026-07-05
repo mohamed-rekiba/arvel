@@ -112,8 +112,7 @@ class HttpKernel:
 
     def resolve_middleware(self, reference: Any) -> Any:
         """Resolve a middleware reference: an alias string -> its class; a ``throttle:<name>``
-        string -> a :class:`~arvel.http.middleware.ThrottleRequests` bound to that named limiter
-        (Laravel ``Route::middleware('throttle:api')``); else itself."""
+        string -> a:class:`~arvel.http.middleware.ThrottleRequests` bound to that named limiter; else itself."""
         if isinstance(reference, str):
             if reference in self._aliases:
                 return self._aliases[reference]
@@ -428,7 +427,7 @@ class HttpKernel:
 
     def _handle_uncaught(self, request: Any, exc: BaseException) -> Any:
         """Report (5xx only) via the bound ``ExceptionHandler`` then render: a registered
-        ``renderable`` callback wins (Laravel errors.md), else content-negotiated default (E1).
+        ``renderable`` callback wins, else content-negotiated default (E1).
         4xx (e.g. Litestar's NotFound) render through the same path but aren't reported as bugs."""
         from arvel.http.exceptions import render_exception
 
@@ -467,7 +466,7 @@ class HttpKernel:
 
     def _cors_config(self) -> Any:
         """CORS handled by Litestar's own engine (preflight + headers + origin matching) —
-        the Laravel ``HandleCors`` equivalent, not a hand-rolled middleware (doc 04: build on
+        the ``HandleCors`` equivalent, not a hand-rolled middleware (doc 04: build on
         Litestar). Driven by ``config('cors')`` (Litestar ``CORSConfig`` keys: allow_origins,
         allow_methods, allow_headers, allow_credentials, allow_origin_regex, expose_headers,
         max_age). Returns ``None`` (CORS off) when unconfigured."""
@@ -485,9 +484,9 @@ class HttpKernel:
         return CORSConfig(**kwargs)
 
     def as_asgi(self, lifespan: Any = None) -> Any:
-        """The served ASGI application: the Litestar app (from :meth:`build`) wrapped in
+        """The served ASGI application: the Litestar app (from:meth:`build`) wrapped in
         ``MethodOverride`` so a ``_method`` form field re-routes the request *before* Litestar matches
-        by HTTP method (Laravel @method). Non-HTTP scopes pass straight through to Litestar."""
+        by HTTP method. Non-HTTP scopes pass straight through to Litestar."""
         from arvel.http.middleware import MethodOverride
 
         return MethodOverride(self.build(lifespan))
@@ -718,7 +717,7 @@ class HttpKernel:
     async def _resolve_implicit_bindings(
         self, handler: Any, params: dict[str, Any], key_fields: dict[str, str] | None = None
     ) -> None:
-        """Implicit route-model binding (Laravel ``SubstituteBindings``): a path param
+        """Implicit route-model binding: a path param
         whose handler type hint is a model (duck-typed: has ``resolve_route_binding``)
         is resolved to that model by its route key; 404 on a miss. An inline ``{post:slug}``
         route-key field (from ``key_fields``) overrides the model's default route key. Params

@@ -1,6 +1,6 @@
 # HTTP Client
 
-A small, async, fluent client for calling other services — the `Http` facade (Laravel `Http`
+A small, async, fluent client for calling other services — the `Http` facade (`Http`
 parity), built on [httpx](https://www.python-httpx.org). httpx is part of the core (no extra
 needed).
 
@@ -96,7 +96,7 @@ response = await Http.get(url)
 response.status()          # int
 response.body()            # str
 response.json()            # parsed JSON (or `default=` if the body isn't valid JSON)
-response.json("user.name") # Laravel-style dotted-key lookup into the parsed JSON
+response.json("user.name") # dotted-key lookup into the parsed JSON
 response.header("ETag")    # str | None
 response.headers()         # httpx.Headers
 

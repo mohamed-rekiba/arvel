@@ -1,5 +1,5 @@
 """arvel.database.model_serialization — ``SerializesModels``: ``to_dict``/``to_json`` and the
-``__hidden__``/``__visible__`` visibility surface (Laravel Model serialization parity, doc 07).
+``__hidden__``/``__visible__`` visibility surface.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ class SerializesModels:
 
     def make_visible(self, *keys: str) -> Self:
         """Reveal attributes for this instance — including ones in the class ``__hidden__``
-        list (Laravel ``makeVisible``), not only those previously hidden via ``make_hidden``."""
+        list, not only those previously hidden via ``make_hidden``."""
         self._extra_visible.update(keys)
         self._extra_hidden.difference_update(keys)
         return self
@@ -52,7 +52,7 @@ class SerializesModels:
         hidden = (set(self.__hidden__) | self._extra_hidden) - self._extra_visible
         for key in hidden:
             data.pop(key, None)
-        # Laravel toArray parity: eager-loaded relations serialize (nested) alongside attributes —
+        # toArray parity: eager-loaded relations serialize (nested) alongside attributes —
         # a has-many/many-to-many → a list of dicts, a has-one/belongs-to → a single nested dict,
         # a null relation → None. Only LOADED relations appear (unloaded ones are not serialized).
         for name, related in self._relations.items():
@@ -63,7 +63,7 @@ class SerializesModels:
     def _relation_to_dict(related: Any) -> Any:
         from arvel.database.model import Model  # deferred: model.py imports this mixin
 
-        if related is None:  # a loaded but empty has-one / belongs-to (Laravel → null)
+        if related is None:  # a loaded but empty has-one / belongs-to
             return None
         if isinstance(related, Model):  # has-one / belongs-to → a single nested dict
             return related.to_dict()

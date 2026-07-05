@@ -1,4 +1,4 @@
-"""``openapi:export`` — write the app's OpenAPI document to a file (Laravel has no direct
+"""``openapi:export`` — write the app's OpenAPI document to a file (has no direct
 equivalent; this is the codegen seam: client generators (orval, openapi-typescript, …) consume the
 exported document in CI without booting a server)."""
 

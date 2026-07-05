@@ -54,7 +54,7 @@ class Response:
         http_only: bool = True,
         same_site: str = "lax",
     ) -> Response:
-        """Queue a cookie for the outgoing response (Laravel ``response()->cookie(...)``).
+        """Queue a cookie for the outgoing response.
 
         ``minutes`` is minutes-to-live (``None`` → a session cookie, no ``max-age``). A name
         starting with ``__Host-`` gets ``path="/"``/no ``domain`` forced by the kernel on apply
@@ -66,7 +66,7 @@ class Response:
         return self
 
     def without_cookie(self, name: str) -> Response:
-        """Queue ``name`` for expiry (Laravel ``response()->withoutCookie(...)``)."""
+        """Queue ``name`` for expiry."""
         self.forgotten_cookies.append(name)
         return self
 
@@ -85,7 +85,7 @@ class FileDownload:
 
 @dataclass
 class StreamValue:
-    """A streamed response (Laravel ``response()->stream()``/``streamDownload()``): ``content`` is
+    """A streamed response: ``content`` is
     an (async or sync) iterator of ``str``/``bytes`` chunks; the kernel wraps it in Litestar's
     ``Stream`` response."""
 
@@ -95,7 +95,7 @@ class StreamValue:
 
 
 class _ResponseFactory:
-    """The ``response()`` builder (Laravel's ``response()`` helper): callable for a plain body,
+    """The ``response()`` builder: callable for a plain body,
     plus ``.json``/``.no_content``/``.download``/``.file``/``.stream`` for the rest of the surface.
     A module-level singleton (``response = _ResponseFactory()``) so ``response(...)`` and
     ``response.json(...)`` both work off the one name."""

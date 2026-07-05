@@ -141,7 +141,7 @@ async with events.transaction():
 ## Model observers
 
 A model fires lifecycle events — `saving`, `saved`, `deleted`, `restored` — and an **observer** groups
-their handlers for one model in a class (Laravel `Model::observe`). Register it from a provider's
+their handlers for one model in a class. Register it from a provider's
 `boot()`:
 
 ```python

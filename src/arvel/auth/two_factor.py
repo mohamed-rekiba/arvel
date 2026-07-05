@@ -9,7 +9,7 @@ The Fortify-parity lifecycle below (``enable_two_factor``/``confirm_two_factor``
 ``verify_two_factor``/``disable_two_factor``/``regenerate_recovery_codes``) stores three plain
 attributes on the ``user`` you pass in: ``two_factor_secret``, ``two_factor_recovery_codes``
 (a list of *hashed* codes), and ``two_factor_confirmed_at``. arvel does not encrypt these for you —
-exactly like Laravel Fortify, your user model owns that by declaring the model casts:
+exactly like Fortify, your user model owns that by declaring the model casts:
 
     class User(Model, Authenticatable):
         __casts__ = {

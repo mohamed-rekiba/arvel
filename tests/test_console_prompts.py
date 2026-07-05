@@ -1,4 +1,4 @@
-"""Prompts (CLI-3, Laravel Prompts parity): ask/secret/confirm/choice/anticipate — driven by an
+"""Prompts (CLI-3, Prompts parity): ask/secret/confirm/choice/anticipate — driven by an
 injectable `Prompter` so tests seed answers without touching real stdin."""
 
 from __future__ import annotations

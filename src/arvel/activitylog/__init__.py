@@ -1,13 +1,13 @@
-"""arvel.activitylog — an activity log / audit trail, modelled on Spatie laravel-activitylog.
+"""arvel.activitylog — an activity log / audit trail, modelled on the Spatie-style activitylog.
 
 Two ways in:
 - ``activity()`` — a fluent logger for *any* event: ``await activity().caused_by(user)
-  .performed_on(post).with_properties({...}).log("approved")``.
+.performed_on(post).with_properties({...}).log("approved")``.
 - the ``LogsActivity`` model mixin — auto-logs every create/update/delete of a model, capturing
   the changed attributes (``{old, attributes}``) in the activity's ``properties``. That auto-log
   *is* the audit trail; ``activity()`` is the broader event stream around it.
 
-Activities are rows in the ``activity_log`` table (the :class:`Activity` model). Not part of the
+Activities are rows in the ``activity_log`` table (the:class:`Activity` model). Not part of the
 original ch-08 port spec — added on request, following the Spatie design.
 """
 
@@ -100,7 +100,7 @@ class ActivityLogger:
         return current_user.get()
 
     async def log(self, description: str) -> Activity:
-        """Persist and return the :class:`Activity`."""
+        """Persist and return the:class:`Activity`."""
         subject_type, subject_id = _identify(self._subject)
         causer_type, causer_id = _identify(self._resolve_causer())
         return await Activity.create(

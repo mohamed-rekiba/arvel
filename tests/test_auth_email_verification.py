@@ -1,4 +1,4 @@
-"""Auth — email verification (Laravel MustVerifyEmail parity): a real persisted User carries
+"""Auth — email verification: a real persisted User carries
 ``email_verified_at``; ``has_verified_email()`` / ``mark_email_as_verified()`` drive it, and the
 ``verified`` route middleware honors it on that real user (not just a hand-rolled fake)."""
 

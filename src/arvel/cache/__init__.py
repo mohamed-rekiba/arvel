@@ -2,7 +2,7 @@
 
 ``array`` (in-memory) is the core driver; ``redis`` needs the ``[redis]`` extra —
 both are real cashews backends (never a stdlib stand-in: G4). The ``CacheRepository``
-wraps a ``cashews.Cache`` with Laravel-style ``get``/``put``/``remember``/``forget``/
+wraps a ``cashews.Cache`` with ``get``/``put``/``remember``/``forget``/
 ``add``/``pull``/``forever``/``touch``/``increment``/``decrement``/``flexible`` verbs,
 an owner-tokened atomic ``CacheLock`` (``lock``/``restore_lock``), and tag-scoped
 ``tags(...)`` -> ``TaggedCache``. cashews is imported lazily so ``import arvel`` stays
@@ -48,7 +48,7 @@ class CacheSettings(Settings):
 
 
 class LockTimeout(RuntimeError):
-    """Raised by :meth:`CacheLock.block` when the wait elapses without acquiring (Laravel's
+    """Raised by:meth:`CacheLock.block` when the wait elapses without acquiring ('s
     ``LockTimeoutException``)."""
 
 
@@ -103,7 +103,7 @@ class _ArrayLockStore:
 
 
 class CacheLock:
-    """An atomic, owner-tokened lock (Laravel ``Cache::lock``).
+    """An atomic, owner-tokened lock.
 
     Only the holder that acquired it (or a handle restored with its exact owner token, via
     :meth:`CacheRepository.restore_lock`) can :meth:`release` it; :meth:`force_release` is
@@ -174,14 +174,14 @@ class CacheLock:
 
 
 class TaggedCache:
-    """A repository scoped to one or more tags (Laravel ``Cache::tags(...)``).
+    """A repository scoped to one or more tags.
 
     Entries are keyed by the exact (sorted) tag combination, so they're readable only through
     that same combination — a plain ``repository.get(key)`` or a different tag set never sees
     them. ``flush()`` deletes every entry ever written under **any** of these tags, even via a
-    different combination, mirroring Laravel's cross-combination tag invalidation.
+    different combination, mirroring the cross-combination tag invalidation.
 
-    Note: TTL-expired entries are not proactively pruned from their tag sets (Laravel has the
+    Note: TTL-expired entries are not proactively pruned from their tag sets (has the
     same limitation); a tag set reclaims its members only on ``flush()``. Long-lived tags with
     high churn of short-TTL keys should be flushed periodically.
     """
@@ -264,7 +264,7 @@ class TaggedCache:
 
 
 class CacheRepository:
-    """Laravel-style cache API over a configured ``cashews.Cache`` client."""
+    """cache API over a configured ``cashews.Cache`` client."""
 
     def __init__(self, client: Any, *, driver: str = "array") -> None:
         self._client = client
@@ -299,13 +299,13 @@ class CacheRepository:
             return True
 
     async def flush(self) -> bool:
-        """Remove every entry from the store (Laravel ``Cache::flush`` / ``cache:clear``)."""
+        """Remove every entry from the store."""
         with span("cache flush", kind="client", attributes={"cache.operation": "flush"}):
             await self._client.clear()
             return True
 
     async def add(self, key: str, value: Any, ttl: int | None = None) -> bool:
-        """Set-if-absent (Laravel ``Cache::add``) — a single atomic SET NX on redis (cashews
+        """Set-if-absent — a single atomic SET NX on redis (cashews
         ``set(..., exist=False)``); ``True`` only when this call actually stored the value."""
         with span("cache add", kind="client", attributes={"cache.operation": "add"}) as sp:
             stored = bool(await self._client.set(key, value, expire=ttl, exist=False))
@@ -314,7 +314,7 @@ class CacheRepository:
             return stored
 
     async def pull(self, key: str, default: Any = None) -> Any:
-        """Get then delete in one call (Laravel ``Cache::pull``)."""
+        """Get then delete in one call."""
         with span("cache pull", kind="client", attributes={"cache.operation": "pull"}) as sp:
             value = await self._client.get(key)
             if value is None:
@@ -325,11 +325,11 @@ class CacheRepository:
             return value
 
     async def forever(self, key: str, value: Any) -> bool:
-        """Store with no expiry (Laravel ``Cache::forever``)."""
+        """Store with no expiry."""
         return await self.put(key, value, ttl=None)
 
     async def touch(self, key: str, ttl: int) -> bool:
-        """Refresh a key's TTL (Laravel ``Cache::touch`` — the Laravel-named alias of :meth:`expire`)."""
+        """Refresh a key's TTL."""
         with span("cache touch", kind="client", attributes={"cache.operation": "touch"}):
             return await self.expire(key, ttl)
 
@@ -369,7 +369,7 @@ class CacheRepository:
         *,
         clock: Callable[[], float] = time.time,
     ) -> Any:
-        """Stale-while-revalidate (Laravel ``Cache::flexible``).
+        """Stale-while-revalidate.
 
         Stores ``(value, stored_at)``. Within ``fresh`` seconds of ``stored_at``, serves the
         cached value. Past ``fresh`` but within ``stale``, serves the (stale) cached value and
@@ -441,11 +441,11 @@ class CacheRepository:
 
     # --- locks ---------------------------------------------------------------
     def lock(self, name: str, seconds: int | None = None, owner: str | None = None) -> CacheLock:
-        """An atomic, owner-tokened lock (Laravel ``Cache::lock``)."""
+        """An atomic, owner-tokened lock."""
         return CacheLock(self, name, seconds, owner)
 
     def restore_lock(self, name: str, owner: str) -> CacheLock:
-        """Recreate a lock handle for a stored owner token (Laravel ``Cache::restoreLock``) — lets
+        """Recreate a lock handle for a stored owner token — lets
         a different process/instance than the one that acquired the lock release it."""
         return CacheLock(self, name, owner=owner)
 
@@ -493,7 +493,7 @@ class CacheRepository:
 
     # --- tags ------------------------------------------------------------------
     def tags(self, *names: str) -> TaggedCache:
-        """Scope this repository to the given tags (Laravel ``Cache::tags(...)``)."""
+        """Scope this repository to the given tags."""
         if not names:
             raise ValueError("tags() requires at least one tag name")
         return TaggedCache(self, names)

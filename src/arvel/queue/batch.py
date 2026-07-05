@@ -1,5 +1,4 @@
-"""arvel.queue.batch — job batches: `job_batches` tracking + the `Batch` handle (Laravel
-`Bus::batch()` parity).
+"""arvel.queue.batch — job batches: `job_batches` tracking + the `Batch` handle (`Bus::batch()`).
 
 `JobBatch` is the DB row (the scaffold ships its migration); counter updates (`pending_jobs`/
 `failed_jobs`) are a **compare-and-swap retry loop** — the same optimistic-concurrency pattern
@@ -76,7 +75,7 @@ class JobBatch(HasUuids, Model):
 
 
 class Batch:
-    """A dispatched batch's live handle (Laravel `Bus::batch(...)` return value) — every accessor
+    """A dispatched batch's live handle — every accessor
     re-fetches the row, so it always reflects the latest counters (a batch is mutated from worker
     processes this handle never sees)."""
 
@@ -183,7 +182,7 @@ async def _run_callbacks(refs: list[str], *args: Any) -> None:
 
 async def finalize_empty_batch(batch_id: str) -> None:
     """Finish a batch that was dispatched with zero jobs — no job will ever settle to trigger the
-    normal transition, so `then`/`finally` fire here immediately (Laravel finalizes an empty batch
+    normal transition, so `then`/`finally` fire here immediately (finalizes an empty batch
     right away)."""
     if not await _finish_batch_once(batch_id):
         return

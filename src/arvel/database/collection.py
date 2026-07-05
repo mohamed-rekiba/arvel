@@ -1,5 +1,5 @@
 """arvel.database.collection — ``EloquentCollection[M]``: the model-aware result set returned by
-``Builder.get()`` (hydrating) and relation ``get()`` (Laravel Eloquent Collection parity, doc B3).
+``Builder.get()`` (hydrating) and relation ``get()``.
 
 Subclasses ``arvel.support.Collection`` (support sits below database in the layered DAG — G1) so
 the full fluent Collection surface (``map``/``filter``/``pluck``/``where``/…) comes along for
@@ -11,9 +11,9 @@ free, and additionally implements ``collections.abc.Sequence`` directly (``__get
 ``model_keys``/``find``/``contains``, ``fresh`` (one batched re-query via ``to_query``),
 ``make_hidden``/``make_visible`` (fan to every member), ``to_dict``/``to_json``, ``only``/
 ``except_`` (filter by primary key), and ``to_query`` (a fresh ``WHERE pk IN (...)`` builder over
-these members — Laravel ``toQuery``).
+these members — ``toQuery``).
 
-**Divergence from Laravel:** a raw (non-hydrating) table-builder ``get()`` — no model bound —
+**Divergence from ** a raw (non-hydrating) table-builder ``get()`` — no model bound —
 still returns a plain ``list[dict]``; only *hydrated* results become an ``EloquentCollection``.
 Transformations that build a NEW collection from arbitrary values (``map``/``filter``/…, inherited
 from the base ``Collection``) return a plain ``Collection``, not ``EloquentCollection`` — the
@@ -53,10 +53,10 @@ class EloquentCollection[M](Collection[M], _Sequence[M]):
             return self.all() == other
         return super().__eq__(other)
 
-    __hash__ = None  # type: ignore[assignment]  # unhashable, same posture as the base Collection
+    __hash__ = None  # type: ignore[assignment] # unhashable, same posture as the base Collection
 
     def count(self, value: Any = _UNSET) -> int:
-        """Item count (Laravel ``count()``, the base ``Collection`` behavior); also satisfies
+        """Item count; also satisfies
         ``collections.abc.Sequence.count``: given a ``value``, counts its occurrences instead."""
         if value is _UNSET:
             return len(self._items)
@@ -71,26 +71,25 @@ class EloquentCollection[M](Collection[M], _Sequence[M]):
         return type(self._items[0])
 
     def model_keys(self) -> list[Any]:
-        """The primary key of every member, in order (Laravel ``modelKeys``)."""
+        """The primary key of every member, in order."""
         return [self._pk(m) for m in self._items]
 
     def find(self, key: Any, default: M | None = None) -> M | None:
-        """The member whose primary key equals ``key``, else ``default`` (Laravel ``find``)."""
+        """The member whose primary key equals ``key``, else ``default``."""
         for model in self._items:
             if self._pk(model) == key:
                 return model
         return default
 
     def contains(self, item: Any) -> bool:
-        """Whether ``item`` — a member (by primary key) OR a bare key — is present (Laravel
-        Eloquent Collection ``contains``, a key-aware variant of the base ``Collection.contains``)."""
+        """Whether ``item`` — a member (by primary key) OR a bare key — is present (Eloquent Collection ``contains``, a key-aware variant of the base ``Collection.contains``)."""
         if self._items and isinstance(item, type(self._items[0])):
             return self.find(self._pk(item)) is not None
         return self.find(item) is not None
 
     async def load(self, *relations: str) -> EloquentCollection[M]:
         """Batch eager-load ``relations`` across every member — one ``WHERE IN`` per relation, no
-        N+1 (Laravel ``load``). Reuses ``Builder._eager_load_path``, the same machinery
+        N+1. Reuses ``Builder._eager_load_path``, the same machinery
         ``Model.with_(...)`` uses."""
         if not self._items:
             return self
@@ -104,8 +103,7 @@ class EloquentCollection[M](Collection[M], _Sequence[M]):
         return self
 
     async def load_missing(self, *relations: str) -> EloquentCollection[M]:
-        """Like :meth:`load`, but only for relations not already loaded on every member
-        (Laravel ``loadMissing``)."""
+        """Like:meth:`load`, but only for relations not already loaded on every member."""
         missing = [name for name in relations if not self._all_loaded(name.split(".")[0])]
         if missing:
             await self.load(*missing)
@@ -115,7 +113,7 @@ class EloquentCollection[M](Collection[M], _Sequence[M]):
         return all(name in getattr(m, "_relations", {}) for m in self._items)
 
     async def fresh(self) -> EloquentCollection[M]:
-        """Reload every member from the database in ONE batched query (Laravel ``fresh``);
+        """Reload every member from the database in ONE batched query;
         members deleted since they were fetched are silently dropped."""
         if not self._items:
             return EloquentCollection()
@@ -144,19 +142,18 @@ class EloquentCollection[M](Collection[M], _Sequence[M]):
         return json.dumps(self.to_dict(), default=json_default, **kwargs)
 
     def only(self, keys: Iterable[Any]) -> EloquentCollection[M]:
-        """Members whose primary key is in ``keys`` (Laravel Eloquent Collection ``only`` —
+        """Members whose primary key is in ``keys`` (Eloquent Collection ``only`` —
         keyed by primary key, unlike the base ``Collection`` which has no such method)."""
         allowed = list(keys)
         return EloquentCollection([m for m in self._items if self._pk(m) in allowed])
 
     def except_(self, keys: Iterable[Any]) -> EloquentCollection[M]:
-        """Members whose primary key is NOT in ``keys`` (Laravel ``except``)."""
+        """Members whose primary key is NOT in ``keys``."""
         blocked = list(keys)
         return EloquentCollection([m for m in self._items if self._pk(m) not in blocked])
 
     def to_query(self) -> Builder:
-        """A fresh ``Builder`` constrained to ``WHERE pk IN (these members' keys)`` — Laravel
-        ``toQuery()``. Requires a non-empty collection to resolve the model class."""
+        """A fresh ``Builder`` constrained to ``WHERE pk IN (these members' keys)toQuery()``. Requires a non-empty collection to resolve the model class."""
         if not self._items:
             raise RuntimeError("to_query() requires a non-empty EloquentCollection.")
         model_cls = self._model_cls()

@@ -1,4 +1,4 @@
-"""Router.public() serves a directory as the app's public web root (Laravel's public/).
+"""Router.public() serves a directory as the app's public web root.
 spa_fallback=True (default) falls back unmatched paths to index.html (SPA); False 404s instead."""
 
 from __future__ import annotations

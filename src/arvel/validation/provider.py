@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class ValidatorFactory:
-    """Root for the ``Validator`` facade — ``Validator.make(data, rules)`` (Laravel
+    """Root for the ``Validator`` facade — ``Validator.make(data, rules)`` (
     ``Validator::make``) constructs a rule-based :class:`~arvel.validation.Validator`."""
 
     def make(

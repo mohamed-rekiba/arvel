@@ -199,7 +199,7 @@ async def test_concurrent_completions_do_not_lose_a_decrement() -> None:
 
 async def test_empty_batch_finalizes_immediately() -> None:
     # review nit: a 0-job batch has nothing to settle it — then/finally must fire at dispatch,
-    # not never (Laravel finalizes an empty batch right away)
+    # not never
     from arvel.queue import Bus
 
     _mgr, db = await _manager()

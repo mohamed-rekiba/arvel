@@ -1,5 +1,4 @@
-"""Gate.after() — a hook that runs after the ability/policy check and can override the result
-(Laravel Gate::after). Runs even when a before() hook short-circuited."""
+"""Gate.after() — a hook that runs after the ability/policy check and can override the result. Runs even when a before() hook short-circuited."""
 
 from __future__ import annotations
 

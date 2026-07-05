@@ -41,8 +41,7 @@ async def test_flush_removes_only_the_tagged_entries() -> None:
 
 
 async def test_flush_invalidates_across_combinations_sharing_the_tag() -> None:
-    """Flushing tag `a` alone also invalidates entries written via a combination that includes it
-    (Laravel's cross-combination tag invalidation)."""
+    """Flushing tag `a` alone also invalidates entries written via a combination that includes it."""
     cache = _cache()
     await cache.tags("a", "b").put("combo", "v")
     assert await cache.tags("a", "b").get("combo") == "v"

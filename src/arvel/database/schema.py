@@ -1,4 +1,4 @@
-"""arvel.database.schema — the Laravel-style ``Blueprint`` DSL over SQLAlchemy Core.
+"""arvel.database.schema — the ``Blueprint`` DSL over SQLAlchemy Core.
 
 A ``Blueprint`` collects fluent column definitions (``t.id()``, ``t.string("title")``,
 ``t.foreign_id("user_id").constrained()``, ``t.timestamps()``, ``t.vector(...)``) and
@@ -68,7 +68,7 @@ class ColumnDefinition:
         return self
 
     def primary(self) -> ColumnDefinition:
-        """Mark this column the primary key (Laravel ``->primary()``) — e.g. a non-integer
+        """Mark this column the primary key — e.g. a non-integer
         ``t.uuid("id").primary()`` when the default auto-increment ``t.id()`` doesn't fit."""
         self._primary_key = True
         self._nullable = False
@@ -241,21 +241,21 @@ class Blueprint:
 
         return self._add(ColumnDefinition(name, sa.Time))
 
-    # --- Laravel Blueprint parity (snake_case) -------------------------------
+    # --- Blueprint parity (snake_case) -------------------------------
     def timestamp(self, name: str) -> ColumnDefinition:
-        """A timestamp column (Laravel ``timestamp``) — a timezone-aware DateTime."""
+        """A timestamp column — a timezone-aware DateTime."""
         import sqlalchemy as sa
 
         return self._add(ColumnDefinition(name, lambda: sa.DateTime(timezone=True)))
 
     def char(self, name: str, length: int = 255) -> ColumnDefinition:
-        """A fixed-length string column (Laravel ``char``)."""
+        """A fixed-length string column."""
         import sqlalchemy as sa
 
         return self._add(ColumnDefinition(name, lambda: sa.CHAR(length)))
 
     def medium_text(self, name: str) -> ColumnDefinition:
-        """A medium text column (Laravel ``mediumText``). Portable ``Text``; ``MEDIUMTEXT`` on MySQL."""
+        """A medium text column. Portable ``Text``; ``MEDIUMTEXT`` on MySQL."""
         import sqlalchemy as sa
         from sqlalchemy.dialects import mysql
 
@@ -264,7 +264,7 @@ class Blueprint:
         )
 
     def long_text(self, name: str) -> ColumnDefinition:
-        """A long text column (Laravel ``longText``). Portable ``Text``; ``LONGTEXT`` on MySQL."""
+        """A long text column. Portable ``Text``; ``LONGTEXT`` on MySQL."""
         import sqlalchemy as sa
         from sqlalchemy.dialects import mysql
 
@@ -273,8 +273,8 @@ class Blueprint:
         )
 
     def unsigned_integer(self, name: str) -> ColumnDefinition:
-        """An unsigned integer (Laravel ``unsignedInteger``). Real ``UNSIGNED`` on MySQL; a portable
-        ``Integer`` on Postgres/SQLite (which have no unsigned types — matching Laravel's own fallback)."""
+        """An unsigned integer. Real ``UNSIGNED`` on MySQL; a portable
+        ``Integer`` on Postgres/SQLite (which have no unsigned types — matching the own fallback)."""
         import sqlalchemy as sa
         from sqlalchemy.dialects import mysql
 
@@ -285,7 +285,7 @@ class Blueprint:
         )
 
     def unsigned_big_integer(self, name: str) -> ColumnDefinition:
-        """An unsigned big integer (Laravel ``unsignedBigInteger``) — typical for foreign keys."""
+        """An unsigned big integer — typical for foreign keys."""
         import sqlalchemy as sa
         from sqlalchemy.dialects import mysql
 
@@ -296,7 +296,7 @@ class Blueprint:
         )
 
     def unsigned_small_integer(self, name: str) -> ColumnDefinition:
-        """An unsigned small integer (Laravel ``unsignedSmallInteger``)."""
+        """An unsigned small integer."""
         import sqlalchemy as sa
         from sqlalchemy.dialects import mysql
 
@@ -307,7 +307,7 @@ class Blueprint:
         )
 
     def unsigned_tiny_integer(self, name: str) -> ColumnDefinition:
-        """An unsigned tiny integer (Laravel ``unsignedTinyInteger``). ``SmallInteger`` portably;
+        """An unsigned tiny integer. ``SmallInteger`` portably;
         ``TINYINT UNSIGNED`` on MySQL."""
         import sqlalchemy as sa
         from sqlalchemy.dialects import mysql

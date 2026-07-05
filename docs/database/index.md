@@ -27,7 +27,7 @@ class Post(Model):
     __timestamps__ = True
 ```
 
-Reading a declared column that hasn't been set yet returns `None` (Laravel parity) — e.g.
+Reading a declared column that hasn't been set yet returns `None` — e.g.
 `post.body` after `Post.create(title="…")` is `None`, not an error. Accessing a genuinely unknown
 attribute still raises `AttributeError`.
 
@@ -41,7 +41,7 @@ attribute still raises `AttributeError`.
 
 A model with **no `__fillable__` and the default `__guarded__ = ["*"]`** is *totally guarded* —
 nothing is mass-assignable. Mass-assigning to it raises `MassAssignmentException` rather than silently
-dropping the data into an empty row (Laravel parity):
+dropping the data into an empty row:
 
 ```python
 class Account(Model):           # totally guarded — no __fillable__
@@ -50,7 +50,7 @@ class Account(Model):           # totally guarded — no __fillable__
 Account().fill({"name": "x"})   # MassAssignmentException: Add [name] to the __fillable__ property …
 ```
 
-Declare `__fillable__` to opt fields in. A model that *does* set `__fillable__` keeps Laravel's
+Declare `__fillable__` to opt fields in. A model that *does* set `__fillable__` keeps 's
 lenient behavior — an unlisted key is silently ignored (not raised), so passing a request body with
 extra fields is safe. `MassAssignmentException` is a programmer error (a missing `__fillable__`), not
 user input — it is not a `ValidationException` and renders as a 500, not a 422.
@@ -77,7 +77,7 @@ replicating
 `False` aborts the operation and the calling method (`save`/`delete`/`restore`) returns `False` —
 the row is left exactly as it was on disk. `created`/`updated` only fire when there was actually a
 row to write (an insert, or an update on a genuinely dirty model); `saved` always fires, matching
-Laravel (and this cast's prior, narrower behavior) even on a clean no-op `save()`.
+(and this cast's prior, narrower behavior) even on a clean no-op `save()`.
 
 ```python
 class PostObserver:
@@ -93,7 +93,7 @@ Only the hooks an observer defines are wired — see [Events](../events.md#model
 registration mechanics (`Model.observe`, the halting/cancel semantics shared with `Event::until`).
 
 !!! note "`replicate()` stays synchronous"
-    `post.replicate()` keeps its plain, non-`async` signature (Laravel parity) — the `replicating`
+    `post.replicate()` keeps its plain, non-`async` signature — the `replicating`
     event it fires is dispatched best-effort on the running loop rather than awaited inline.
 
 ## In this section

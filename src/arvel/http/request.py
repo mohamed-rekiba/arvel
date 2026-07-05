@@ -52,7 +52,7 @@ class Request:
         return cast("str | None", getattr(client, "host", None)) if client is not None else None
 
     def _trusts_proxies(self) -> bool:
-        """Whether X-Forwarded-* headers may be trusted — Laravel ``TrustProxies``. Driven by
+        """Whether X-Forwarded-* headers may be trusted — ``TrustProxies``. Driven by
         ``config('app.trusted_proxies')``: ``'*'`` trusts all; a list trusts only when the socket
         peer is in it; unset/empty trusts none (the secure default — forwarded headers are
         client-spoofable otherwise)."""
@@ -133,7 +133,7 @@ class Request:
             raise ValidationException(trans("http.unauthorized"), status=403)
         return dto
 
-    #: input fields never flashed back (Laravel ``dontFlash``) — keep secrets out of the session.
+    #: input fields never flashed back — keep secrets out of the session.
     _DONT_FLASH = ("password", "password_confirmation")
 
     def _flash_old_input(self, data: Any, *, except_: tuple[str, ...] = ()) -> None:
@@ -174,7 +174,7 @@ class Request:
 
 
 class UploadedFile:
-    """A thin wrapper over a framework upload (a Litestar ``UploadFile``) that adds Laravel-style
+    """A thin wrapper over a framework upload (a Litestar ``UploadFile``) that adds -style
     persistence: ``store()`` writes it to a configured disk via the filesystem manager and
     returns the stored path. Read/metadata accessors delegate to the underlying upload."""
 

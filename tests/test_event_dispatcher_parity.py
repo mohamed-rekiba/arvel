@@ -1,4 +1,4 @@
-"""Event-dispatcher parity (Laravel): has_listeners and the deferred-event trio push/flush/forget_pushed
+"""Event-dispatcher parity: has_listeners and the deferred-event trio push/flush/forget_pushed
 were absent. has_listeners honors direct + wildcard registrations and accepts a class, string, or instance."""
 
 from __future__ import annotations

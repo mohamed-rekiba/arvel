@@ -45,7 +45,7 @@ def test_has() -> None:
 def test_set_over_scalar_intermediate_clobbers_and_logs() -> None:
     from structlog.testing import capture_logs
 
-    # turning a scalar into a section auto-vivifies (Laravel parity) but logs it
+    # turning a scalar into a section auto-vivifies but logs it
     repo = Repository({"app": "a-string"})
     with capture_logs() as logs:
         repo.set("app.name", "x")

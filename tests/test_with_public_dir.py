@@ -1,5 +1,5 @@
 """`Application.configure(...).with_public_dir(...)`: RoutingServiceProvider registers Route.public()
-automatically at boot when a public dir is configured — no route-file code needed, same as Laravel's public/."""
+automatically at boot when a public dir is configured — no route-file code needed, same as the public/."""
 
 from __future__ import annotations
 

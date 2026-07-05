@@ -1,4 +1,4 @@
-"""Translatable model attributes (Laravel/Spatie ``HasTranslations`` parity).
+"""Translatable model attributes.
 
 A translatable attribute is stored as a JSON object ``{locale: value}`` (back it with a ``jsonb``
 column) and **read as the current locale's value**, falling back to the configured default locale.
