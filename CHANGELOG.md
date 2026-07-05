@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.52.1](https://github.com/mohamed-rekiba/arvel/compare/v0.52.0...v0.52.1) (2026-07-05)
+
+
+### Bug Fixes
+
+* atomic decrement for batch counters to stop lost decrements ([c764232](https://github.com/mohamed-rekiba/arvel/commit/c76423280dcccb5eaca65d178cc0a4512982d334))
+
 ## [0.52.0](https://github.com/mohamed-rekiba/arvel/compare/v0.51.0...v0.52.0) (2026-07-05)
 
 
