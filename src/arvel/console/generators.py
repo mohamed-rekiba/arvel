@@ -133,7 +133,7 @@ _STUBS: dict[str, tuple[str, str]] = {
         "from arvel.validation import Rule\n\n\n"
         "class {name}(Rule):\n"
         '    message = "The :attribute is invalid."\n\n'
-        "    async def passes(self, attribute: str, value: Any) -> bool:\n"
+        "    def passes(self, attribute: str, value: Any) -> bool:\n"
         "        return True\n",
     ),
     "seeder": (
