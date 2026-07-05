@@ -183,19 +183,29 @@ class BelongsToMany(Relation):
     def _parent_id(self) -> Any:
         return self.parent._attributes[self.parent_key]
 
-    async def get(self) -> Any:
-        from arvel.database.collection import EloquentCollection
-
+    async def _attached_related(self) -> tuple[Any, dict[Any, Any]]:
+        """The related-model query scoped to currently-attached ids — honoring where_pivot() and
+        the related where()/order_by() constraints — plus the pivot rows keyed by related id.
+        Returns ``(None, {})`` when nothing is attached. Shared by get() and count() so a count
+        filters exactly like a fetch."""
         query = self._pivot_query().where(self.foreign_pivot_key, "=", self._parent_id())
         for column, value in self._pivot_wheres:
             query = query.where(column, "=", value)
         rows = await query.get()
         by_related = {row[self.related_pivot_key]: row for row in rows}
         if not by_related:
-            return EloquentCollection[Any]()
+            return None, {}
         models_query = self.related.where_in(self.related_key, list(by_related))
         for constrain in self._related_constraints:  # where()/order_by() on the related model
             constrain(models_query)
+        return models_query, by_related
+
+    async def get(self) -> Any:
+        from arvel.database.collection import EloquentCollection
+
+        models_query, by_related = await self._attached_related()
+        if models_query is None:
+            return EloquentCollection[Any]()
         models = await models_query.get()
         if self._pivot_columns:  # attach the requested pivot data to each model
             for model in models:
@@ -293,8 +303,10 @@ class BelongsToMany(Relation):
         return await self.sync(mapping, detaching=detaching)
 
     async def count(self) -> int:
-        """Number of related models currently attached (honors where()/where_pivot())."""
-        return len(await self.get())
+        """Number of related models currently attached (honors where()/where_pivot()) — a COUNT
+        query, not a full load."""
+        models_query, _ = await self._attached_related()
+        return 0 if models_query is None else await models_query.count()
 
     async def toggle(self, related_ids: list[Any]) -> dict[str, list[Any]]:
         """Attach the ids that are missing and detach the ones already present (``toggle``); returns the changes map ``{"attached": [...], "detached": [...]}``."""
