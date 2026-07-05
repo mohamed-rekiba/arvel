@@ -426,9 +426,18 @@ class TestResponse:
         return self
 
     def assert_json_count(self, n: int, path: str | None = None) -> TestResponse:
-        data = self.raw.json() if path is None else _dotted_get(self.raw.json(), path, [])
-        if len(data) != n:
-            raise AssertionError(f"expected {n} item(s) at {path or '<root>'!r}; got {len(data)}")
+        data = self.raw.json() if path is None else _dotted_get(self.raw.json(), path, _MISSING)
+        if data is _MISSING:
+            raise AssertionError(f"expected a countable array at {path!r}; the path is absent")
+        # Laravel assertJsonCount targets arrays — a dict/str at the path is not a countable
+        # collection (counting its keys/chars would silently pass on the wrong shape)
+        if not isinstance(data, (list, tuple)):
+            raise AssertionError(
+                f"expected an array at {path or '<root>'!r}; got {type(data).__name__}"
+            )
+        count = len(cast("Sequence[Any]", data))
+        if count != n:
+            raise AssertionError(f"expected {n} item(s) at {path or '<root>'!r}; got {count}")
         return self
 
     def assert_json_missing(self, fragment: Mapping[str, Any]) -> TestResponse:
@@ -613,33 +622,39 @@ def _command_name(cls: type) -> str:
     return Str.snake(cls.__name__)
 
 
-def _parse_signature_tokens(signature: str) -> list[tuple[str, bool]]:
-    """``(name, is_option)`` per ``{...}`` token — the common forms only (``{name}``/``{name?}``/
-    ``{name=default}``/``{--flag}``/``{--opt=}``); no variadics (``{arg*}``) or shortcuts
-    (``{--S|flag}``). Mirrors ``arvel.console.closure.parse_signature`` (can't import it)."""
+def _parse_signature_tokens(signature: str) -> list[tuple[str, bool, str | None]]:
+    """``(name, is_option, default)`` per ``{...}`` token — the common forms only (``{name}``/
+    ``{name?}``/``{name=default}``/``{--flag}``/``{--opt=}``); no variadics (``{arg*}``) or shortcuts
+    (``{--S|flag}``). ``default`` is the positional's ``=value`` when present, else ``None``. Mirrors
+    ``arvel.console.closure.parse_signature`` (can't import it — console is above testing in the DAG)."""
     import re
 
-    tokens: list[tuple[str, bool]] = []
+    tokens: list[tuple[str, bool, str | None]] = []
     for raw in re.findall(r"\{([^{}]+)\}", signature):
         if raw.startswith("--"):
             body = raw[2:]
-            tokens.append((body[:-1] if body.endswith("=") else body, True))
+            tokens.append((body[:-1] if body.endswith("=") else body, True, None))
         elif "=" in raw:
-            tokens.append((raw.split("=", 1)[0], False))
+            name, default = raw.split("=", 1)
+            tokens.append((name, False, default))
         elif raw.endswith("?"):
-            tokens.append((raw[:-1], False))
+            tokens.append((raw[:-1], False, None))
         else:
-            tokens.append((raw, False))
+            tokens.append((raw, False, None))
     return tokens
 
 
 def _bind_command_line(signature: str, rest: Sequence[str]) -> dict[str, Any]:
     """Raw CLI tokens (post command-name) -> ``{token_name: value}``, per ``signature``'s grammar —
-    positionals assigned in order, ``--name``/``--name=value`` recognized as options (a bare
-    ``--flag`` becomes ``True``)."""
+    positionals assigned in order (an omitted ``{name=default}`` positional gets its default), value
+    options as ``--name=value`` (a bare ``--flag`` becomes ``True``).
+
+    ponytail: value options must use ``--opt=value``, not space-separated ``--opt value`` — matching
+    that would mean reimplementing typer's parser here (which testing can't import). Ceiling, not a
+    bug: use the ``=`` form in artisan() calls."""
     tokens = _parse_signature_tokens(signature)
-    positionals = [name for name, is_option in tokens if not is_option]
-    option_names = {name for name, is_option in tokens if is_option}
+    positionals = [(name, default) for name, is_option, default in tokens if not is_option]
+    option_names = {name for name, is_option, _default in tokens if is_option}
     values: dict[str, Any] = {}
     pos_i = 0
     for tok in rest:
@@ -649,8 +664,12 @@ def _bind_command_line(signature: str, rest: Sequence[str]) -> dict[str, Any]:
                 values[key] = val if sep else True
             continue
         if pos_i < len(positionals):
-            values[positionals[pos_i]] = tok
+            values[positionals[pos_i][0]] = tok
             pos_i += 1
+    # fill omitted positionals that declared a default (parity with the real CLI's {name=default})
+    for name, default in positionals[pos_i:]:
+        if default is not None:
+            values[name] = default
     return values
 
 

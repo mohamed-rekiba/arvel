@@ -163,7 +163,14 @@ def test_response_assertion_matrix() -> None:
         raise _Invalid({"name": ["is required"]})
 
     kernel = HttpKernel()
-    kernel.get("/users/1", lambda request: {"data": {"id": 1, "name": "Ada"}, "extra": "ignored"})
+    kernel.get(
+        "/users/1",
+        lambda request: {
+            "data": {"id": 1, "name": "Ada"},
+            "roles": ["admin", "editor"],
+            "extra": "ignored",
+        },
+    )
     kernel.get(
         "/go",
         lambda request: litestar.Response(None, status_code=302, headers={"Location": "/users/1"}),
@@ -176,7 +183,7 @@ def test_response_assertion_matrix() -> None:
             .assert_ok()
             .assert_json({"data.id": 1})  # subset match — "extra" is tolerated
             .assert_json_path("data.name", "Ada")
-            .assert_json_count(2, "data")
+            .assert_json_count(2, "roles")
             .assert_json_missing({"nope": 1})
             .assert_see("Ada")
             .assert_header("content-type")
@@ -265,3 +272,38 @@ def test_artisan_unknown_command_raises() -> None:
 
     with pytest.raises(ValueError, match="is not registered"):
         artisan(Application(), "nope")
+
+
+def test_artisan_positional_default_is_applied_when_omitted() -> None:
+    # review MEDIUM: an omitted {name=default} positional must bind its default, matching the CLI
+    from arvel.console.closure import ClosureCommand
+    from arvel.kernel import Application
+    from arvel.testing import artisan
+
+    got: list[str] = []
+
+    async def hi(name: str) -> None:
+        got.append(name)
+
+    app = Application()
+    app.console_commands["hi"] = ClosureCommand("hi {name=World}", hi)
+    artisan(app, "hi").assert_exit_code(0)  # name omitted -> default "World"
+    assert got == ["World"]
+
+
+def test_assert_json_count_flags_absent_path_and_non_array() -> None:
+    # review LOW: count must not silently pass on a missing path or count dict keys
+    import pytest
+
+    from arvel.testing import TestResponse
+
+    class _Raw:
+        def json(self) -> Any:
+            return {"items": [1, 2], "meta": {"a": 1}}
+
+    r = TestResponse(_Raw())  # type: ignore[arg-type]
+    r.assert_json_count(2, "items")  # ok
+    with pytest.raises(AssertionError, match="absent"):
+        r.assert_json_count(0, "nope.path")
+    with pytest.raises(AssertionError, match="array"):
+        r.assert_json_count(1, "meta")  # a dict, not an array
