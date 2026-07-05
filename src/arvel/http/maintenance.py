@@ -20,7 +20,7 @@ from typing import Any, cast
 KEY = "arvel:maintenance"
 #: The bypass cookie set on a request whose ``?secret=`` matched (so subsequent requests bypass
 #: without repeating the query param — ``down --secret``).
-SECRET_COOKIE = "arvel_maintenance_secret"  # noqa: S105 - a cookie name, not a credential
+SECRET_COOKIE = "arvel_maintenance_secret"  # noqa: S105 (cookie name)  # nosec B105
 
 
 def _cache() -> Any:

@@ -337,7 +337,8 @@ class PendingRequest:
                 await asyncio.sleep(self._retry_sleep_ms / 1000)
         if last_exc is not None:
             raise last_exc
-        assert last_response is not None  # noqa: S101 - invariant: exception or a response, always one
+        if last_response is None:  # invariant: the loop always ends with an exception or a response
+            raise RuntimeError("retry loop produced neither a response nor an exception")
         if self._retry_times > 0 and should_retry(ClientResponse(last_response)):
             raise RequestFailed(ClientResponse(last_response))
         return last_response

@@ -265,15 +265,16 @@ class Migrator:
         from alembic.migration import MigrationContext
         from alembic.operations import Operations
 
-        sync_conn.execute(
-            sa.text(
-                f"CREATE TABLE IF NOT EXISTS {_MIGRATIONS_TABLE} "
-                "(name VARCHAR(255) PRIMARY KEY, batch INTEGER NOT NULL)"
-            )
+        # The bookkeeping table as a SQLAlchemy Core Table — every read/write below is a Core
+        # construct (no interpolated SQL), so it is dialect-correct and has no injection surface.
+        table = sa.Table(
+            _MIGRATIONS_TABLE,
+            sa.MetaData(),
+            sa.Column("name", sa.String(255), primary_key=True),
+            sa.Column("batch", sa.Integer, nullable=False),
         )
-        applied: set[str] = set(
-            sync_conn.execute(sa.text(f"SELECT name FROM {_MIGRATIONS_TABLE}")).scalars()  # noqa: S608 # nosec B608 - trusted constant table name; values bound
-        )
+        table.create(sync_conn, checkfirst=True)
+        applied: set[str] = set(sync_conn.execute(sa.select(table.c.name)).scalars())
         context = MigrationContext.configure(sync_conn)
         schema = Schema(Operations(context))
 
@@ -283,38 +284,27 @@ class Migrator:
                 return 0
             next_batch = (
                 sync_conn.execute(
-                    sa.text(f"SELECT COALESCE(MAX(batch), 0) FROM {_MIGRATIONS_TABLE}")  # noqa: S608 # nosec B608 - trusted constant table name; values bound
+                    sa.select(sa.func.coalesce(sa.func.max(table.c.batch), 0))
                 ).scalar()
                 or 0
             ) + 1
             for migration in pending:
                 migration.up(schema)
-                sync_conn.execute(
-                    sa.text(f"INSERT INTO {_MIGRATIONS_TABLE} (name, batch) VALUES (:n, :b)"),  # noqa: S608 # nosec B608 - trusted constant table name; values bound
-                    {"n": migration.name, "b": next_batch},
-                )
+                sync_conn.execute(sa.insert(table).values(name=migration.name, batch=next_batch))
             return len(pending)
 
         # down: revert only the most recent batch, in reverse order
-        last_batch = sync_conn.execute(
-            sa.text(f"SELECT MAX(batch) FROM {_MIGRATIONS_TABLE}")  # noqa: S608 # nosec B608 - trusted constant table name; values bound
-        ).scalar()
+        last_batch = sync_conn.execute(sa.select(sa.func.max(table.c.batch))).scalar()
         if last_batch is None:
             return 0
         in_batch: set[str] = set(
-            sync_conn.execute(
-                sa.text(f"SELECT name FROM {_MIGRATIONS_TABLE} WHERE batch = :b"),  # noqa: S608 # nosec B608 - trusted constant table name; values bound
-                {"b": last_batch},
-            ).scalars()
+            sync_conn.execute(sa.select(table.c.name).where(table.c.batch == last_batch)).scalars()
         )
         reverted = 0
         for migration in reversed(migrations):
             if migration.name in in_batch:
                 migration.down(schema)
-                sync_conn.execute(
-                    sa.text(f"DELETE FROM {_MIGRATIONS_TABLE} WHERE name = :n"),  # noqa: S608 # nosec B608 - trusted constant table name; values bound
-                    {"n": migration.name},
-                )
+                sync_conn.execute(sa.delete(table).where(table.c.name == migration.name))
                 reverted += 1
         return reverted
 

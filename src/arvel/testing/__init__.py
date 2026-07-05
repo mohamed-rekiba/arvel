@@ -798,7 +798,8 @@ def artisan(app: Any, command: str, input: Sequence[str] | None = None) -> Conso
 
                 exit_code = _run_capturing_exit(lambda: asyncio.run(_run_closure()))
             else:
-                assert cls is not None  # noqa: S101 - invariant: the guard above raised otherwise
+                if cls is None:  # invariant: the guard above raised when cls was None
+                    raise RuntimeError("command class unexpectedly missing after resolution")
                 values = _bind_command_line(getattr(cls, "signature", "") or "", rest)
                 instance = cls(output=_TestOutput(buffer), prompter=prompter)
                 instance.bind_parsed(values)

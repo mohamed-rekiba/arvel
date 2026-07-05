@@ -256,7 +256,7 @@ class AbstractPaginator:
             from markupsafe import Markup
 
             # Already escaped by our autoescaping Jinja env; mark safe so templates don't double-escape.
-            return Markup(rendered)  # noqa: S704 # nosec B704 - trusted autoescaped Jinja output
+            return Markup(rendered)  # noqa: S704 (autoescaped Jinja)  # nosec B704
         except ImportError:  # pragma: no cover - markupsafe ships with jinja2
             return rendered
 

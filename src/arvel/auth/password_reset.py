@@ -29,7 +29,7 @@ class PasswordResetStatus(Enum):
     """The outcome of a ``send_reset_link``/``reset`` call — an Enum, never a bare string."""
 
     RESET_SUCCESS = "reset_success"
-    INVALID_TOKEN = "invalid_token"  # noqa: S105 - a status label, not a credential
+    INVALID_TOKEN = "invalid_token"  # noqa: S105 (enum status label)  # nosec B105
     INVALID_USER = "invalid_user"
     RESET_THROTTLED = "reset_throttled"
     EXPIRED = "expired"
