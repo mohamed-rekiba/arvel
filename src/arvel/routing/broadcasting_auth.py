@@ -56,6 +56,10 @@ async def broadcasting_auth(request: Any) -> Response:
         abort(403)
 
     secret = str(current_app.config("app.key") or "") if current_app is not None else ""
+    if not secret:
+        # an HMAC keyed with "" is forgeable — refuse to hand out a weak signature under a
+        # misconfigured (empty) APP_KEY rather than emit one (Laravel hard-errors on missing key)
+        abort(500, "broadcasting auth requires a non-empty app.key")
     payload: dict[str, Any] = {"auth": _sign(channel_name, socket_id, secret)}
     if isinstance(outcome, dict):
         payload["channel_data"] = outcome

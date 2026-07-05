@@ -103,3 +103,24 @@ def test_presence_channel_returns_member_data() -> None:
         assert r.raw.json()["channel_data"] == {"id": "ada", "room": "9"}
     finally:
         set_application(None)
+
+
+def test_empty_app_key_refuses_to_sign() -> None:
+    # review nit: an HMAC keyed with "" is forgeable — an authorized request must NOT get a weak
+    # signature under a misconfigured (empty) app.key; the endpoint 500s instead
+    manager = BroadcastManager()
+    manager.channel("chat.{id}", lambda user, chat_id: user.id == chat_id)
+    kernel = _app_and_kernel(manager)
+    from arvel.kernel import app as current_app
+
+    current_app().make("config").set("app.key", "")  # blank the key
+    try:
+        with client(kernel.build()) as http:
+            r = http.post(
+                "/broadcasting/auth",
+                headers={"authorization": "Bearer 5"},
+                data={"channel_name": "private-chat.5", "socket_id": "s1"},
+            )
+        assert r.status_code == 500  # would-be-authorized, but no weak signature handed out
+    finally:
+        set_application(None)

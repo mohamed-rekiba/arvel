@@ -29,7 +29,14 @@ _WRAPPER = (
 
 
 def _button(match: re.Match[str]) -> str:
-    return _BUTTON_HTML.format(url=match["url"], text=match["text"])
+    # escape url + text (defence in depth) — the button HTML bypasses markdown-it's own link
+    # validation, so a mail body that ever interpolates untrusted data can't inject an attribute
+    # break-out or a javascript: href through the [button:] convention
+    import html as _html
+
+    return _BUTTON_HTML.format(
+        url=_html.escape(match["url"], quote=True), text=_html.escape(match["text"])
+    )
 
 
 def _style_tables(html: str) -> str:

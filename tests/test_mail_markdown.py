@@ -62,3 +62,13 @@ def test_markdown_mail_has_a_readable_text_alternative() -> None:
     text = text_part.get_content()
     assert "Hi" in text and "Thanks for joining." in text and "Go" in text
     assert "<" not in text  # no leaked HTML tags
+
+
+def test_markdown_button_escapes_url_and_text() -> None:
+    # review nit: the [button:] convention bypasses markdown-it link validation, so escape its
+    # url/text — a crafted body can't break out of the href attribute or inject a handler
+    m = Mailable().markdown('[button: <b>hi</b>](https://x.test/a"onmouseover="x)')
+    html = m.render().get_body(("html",)).get_content()  # type: ignore[union-attr]
+    assert '"onmouseover="x' not in html  # href quote not broken out of
+    assert "&quot;onmouseover=&quot;" in html  # the button url's quotes were escaped
+    assert "<b>hi</b>" not in html  # button text escaped, not raw HTML
