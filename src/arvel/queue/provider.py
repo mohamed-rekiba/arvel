@@ -26,11 +26,16 @@ class QueueServiceProvider(ServiceProvider):
 
         self.app.singleton("queue", make_queue)
 
-        # Bound lazily — Schedule is dependency-light, so scheduling works without a queue broker configured.
-        def make_schedule(_app: Container) -> Schedule:
+        # Bound lazily — Schedule is dependency-light, so scheduling works without a queue broker
+        # configured. Threads the app's cache through (when bound) so `on_one_server`/
+        # `without_overlapping` coordinate over it without every event reaching for the global
+        # `cache()` helper itself; scheduling still works with no cache bound at all (those two
+        # features just go unused).
+        def make_schedule(app: Container) -> Schedule:
             from arvel.queue.scheduler import Schedule
 
-            return Schedule()
+            cache = app.make("cache") if app.bound("cache") else None
+            return Schedule(cache=cache)
 
         self.app.singleton("schedule", make_schedule)
 

@@ -1,0 +1,21 @@
+"""Create the job_batches table (Bus.batch() progress/then/catch/finally tracking)."""
+
+from arvel.database import Migration
+
+
+class CreateJobBatchesTable(Migration):
+    def up(self, schema):
+        def define(t):
+            t.uuid("id").primary()
+            t.integer("total_jobs")
+            t.integer("pending_jobs")
+            t.integer("failed_jobs")
+            t.json("options")
+            t.integer("cancelled_at").nullable()
+            t.integer("created_at")
+            t.integer("finished_at").nullable()
+
+        schema.create("job_batches", define)
+
+    def down(self, schema):
+        schema.drop("job_batches")

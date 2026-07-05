@@ -69,7 +69,20 @@ async def test_bus_chain_pushes_only_the_head_job() -> None:
 
 
 async def test_bus_batch_dispatches_all() -> None:
-    rec = RecordingManager()
-    jobs = [Noop(), Noop(), Noop()]
-    await Bus.batch(jobs).dispatch(manager=rec)
-    assert {id(j) for j in rec.pushed} == {id(j) for j in jobs}
+    """A `job_batches` row backs every `Bus.batch(...)` dispatch now (see test_queue_batch.py for
+    the full then/catch/finally/progress/cancel behavior) — `JobBatch` gets its own connection,
+    independent of the (fake, DB-less) `RecordingManager` standing in for the queue manager."""
+    from arvel.database import ConnectionResolver
+    from arvel.queue.batch import JobBatch
+
+    db = ConnectionResolver()
+    JobBatch.set_connection(db)
+    await db.execute(sa.schema.CreateTable(JobBatch.__table__))
+    try:
+        rec = RecordingManager()
+        jobs = [Noop(), Noop(), Noop()]
+        batch = await Bus.batch(jobs).dispatch(manager=rec)
+        assert {id(j) for j in rec.pushed} == {id(j) for j in jobs}
+        assert await batch.total_jobs() == 3
+    finally:
+        await db.dispose()

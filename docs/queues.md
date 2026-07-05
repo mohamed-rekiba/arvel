@@ -73,8 +73,8 @@ from arvel.queue import Bus
 # rest of the chain (they never run)
 await Bus.chain([ResizeImage(id), Watermark(id), Notify(id)]).dispatch()
 
-# batch — a group dispatched together; returns each push's handle
-await Bus.batch([SendDigest(u.id) for u in users]).dispatch()
+# batch — a group dispatched together, tracked as a whole
+batch = await Bus.batch([SendDigest(u.id) for u in users]).dispatch()
 ```
 
 Only the head job is pushed to the broker right away — the remaining links travel serialized on
@@ -89,6 +89,118 @@ def alert_pipeline_failed(exc: BaseException) -> None:
 chain = Bus.chain([ResizeImage(id), Watermark(id), Notify(id)]).catch(alert_pipeline_failed)
 await chain.dispatch()
 ```
+
+### Batches: progress, callbacks, cancellation
+
+`Bus.batch([...])` creates a `job_batches` row (the scaffold ships its migration) up front, then
+pushes every job with the batch id riding along on it — so the worker can track completion as
+they run, in any order, on any worker:
+
+```python
+def all_digests_sent(batch) -> None:
+    log.info("digest batch done", batch_id=batch.id)
+
+def a_digest_failed(batch, exc: BaseException) -> None:
+    log.error("digest batch failed", error=str(exc))
+
+def digests_settled(batch) -> None:
+    log.info("digest batch settled", cancelled=batch.cancelled())
+
+batch = await (
+    Bus.batch([SendDigest(u.id) for u in users])
+    .then(all_digests_sent)      # every job succeeded
+    .catch(a_digest_failed)      # the first disallowed failure
+    .finally_(digests_settled)   # always, once the batch finishes
+    .name("weekly-digest")
+    .dispatch()
+)
+```
+
+`then`/`catch`/`finally_` callbacks must be **module-level functions**, same as a chain's `catch`
+(a lambda/closure can't survive serialization). `then(batch)` fires once every job has succeeded;
+`catch(batch, exc)` fires on the batch's **first** failure and cancels it — the rest of the queued
+jobs no-op instead of running (still counted, so the batch still reaches 100%); `finally_(batch)`
+always fires once, whether the batch finished cleanly or was cancelled. `allow_failures()` turns
+off the cancel-on-failure behavior: the remaining jobs keep running, and `then` still fires once
+everything has settled (`catch` never does).
+
+`batch` (a `Batch` handle) exposes:
+
+```python
+await batch.progress()    # 0..100 — percent of jobs processed
+await batch.total_jobs()
+await batch.pending_jobs()
+await batch.failed_jobs()
+await batch.counts()      # {"total", "pending", "failed", "processed"}
+await batch.finished()    # every job has settled
+await batch.cancelled()   # a disallowed failure cancelled it
+await batch.cancel()      # cancel it yourself — idempotent
+```
+
+**Atomic counters, not a lost-update race.** Two jobs can settle at the same instant on two
+different workers; `pending_jobs`/`failed_jobs` are updated with a **compare-and-swap retry
+loop** (`UPDATE ... WHERE pending_jobs = <value just read>`, retrying on a zero rowcount — the
+same optimistic-concurrency pattern the worker's delayed-job claim already uses), so a decrement
+is never silently lost and `then`/`catch`/`finally_` each fire **exactly once**, never twice.
+
+## Unique jobs
+
+`ShouldBeUnique` caps a job to **at most one** queued/running instance at a time — a second
+dispatch while one is already in flight is silently dropped:
+
+```python
+from arvel.queue.middleware import ShouldBeUnique
+
+class GenerateInvoice(Job, ShouldBeUnique):
+    unique_for = 3600  # the lock's TTL (seconds) — a safety net if a worker dies mid-run
+
+    def __init__(self, order_id: int) -> None:
+        self.order_id = order_id
+
+    def unique_id(self) -> str:
+        return str(self.order_id)   # scope uniqueness per order, not per class
+
+    async def handle(self) -> None:
+        ...
+```
+
+Before dispatch, `Job.dispatch()` acquires a story-06 `CacheLock` keyed by the job's class +
+`unique_id()`; a second `dispatch()` for the same key while it's held returns `None` (nothing
+enqueued) instead of raising. The lock is released once the worker finishes processing the job —
+or after `unique_for` seconds, whichever comes first, so a crashed worker can't wedge it forever.
+
+## Job middleware
+
+Override `middleware()` on a job to run its `handle()` through a small onion pipeline (the same
+shape as HTTP middleware) before it actually executes:
+
+```python
+from arvel.queue.middleware import RateLimited, WithoutOverlapping
+
+class SyncInventory(Job):
+    def __init__(self, warehouse_id: int) -> None:
+        self.warehouse_id = warehouse_id
+
+    def middleware(self) -> list:
+        return [WithoutOverlapping(f"warehouse:{self.warehouse_id}", expire=300, release_after=5)]
+
+    async def handle(self) -> None:
+        ...
+```
+
+- **`WithoutOverlapping(key, expire=60, release_after=0)`** — serializes jobs sharing `key`: a run
+  that finds the lock already held is released back onto the queue (after `release_after`
+  seconds) instead of running now; `expire` bounds a stuck holder that dies without releasing.
+- **`RateLimited(limiter, key, max_attempts, decay_seconds=60)`** — caps executions sharing `key`
+  to `max_attempts` per window (`limiter` is an `arvel.http.rate_limiter.RateLimiter`); over the
+  limit, the job is deferred rather than run.
+- **`ThrottlesExceptions(max_exceptions, decay_seconds=60, key=None)`** — a small circuit breaker:
+  once `max_exceptions` failures land within the window, further attempts are deferred immediately
+  instead of calling `handle()` (and failing again).
+
+All three defer by raising internally and re-enqueuing the job after a delay — durable (the `jobs`
+table) when a database is bound, mirroring the retry-release mechanism above; an inline
+sleep-then-repush otherwise. A deferral never counts against a job's `tries`.
 
 ## Retries & failures
 

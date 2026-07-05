@@ -20,6 +20,8 @@ from arvel.kernel import Settings
 from arvel.support.manager import Manager
 
 if TYPE_CHECKING:
+    from arvel.queue.batch import Batch as Batch
+    from arvel.queue.batch import JobBatch as JobBatch
     from arvel.queue.failed import FailedJob as FailedJob
     from arvel.queue.jobs import QueuedJob as QueuedJob
 
@@ -242,6 +244,11 @@ class Job:
     async def failed(self, exc: BaseException) -> None:
         """Hook invoked when the job exhausts its retries (override to alert/log)."""
 
+    def middleware(self) -> list[Any]:
+        """Job middleware this job runs `handle()` through (Laravel job middleware) — e.g.
+        ``arvel.queue.middleware.WithoutOverlapping``/``RateLimited``. Empty by default."""
+        return []
+
     @classmethod
     async def dispatch(cls, *args: Any, **kwargs: Any) -> Any:
         from arvel.kernel import app, has_application
@@ -330,6 +337,23 @@ def _hydrate_context(job: Job) -> None:
         from arvel.support.context import Context
 
         Context.hydrate(payload)
+
+
+def _wrap_with_middleware(job: Job, base_call: Any) -> Any:
+    """Wrap ``base_call`` (the plain ``handle()`` invocation) so it runs through ``job.middleware()``
+    (queue/middleware.py's ``WithoutOverlapping``/``RateLimited``/``ThrottlesExceptions``, or a
+    user's own) via the existing onion `Pipeline` — no job-specific pipeline machinery, this is
+    the same `(value, next)` shape HTTP middleware already uses."""
+    middleware = job.middleware() if hasattr(job, "middleware") else []
+    if not middleware:
+        return base_call
+
+    async def _run() -> Any:
+        from arvel.support.pipeline import Pipeline
+
+        return await Pipeline().send(job).through(middleware).then(lambda _job: base_call())
+
+    return _run
 
 
 async def run_job_with_retries(
@@ -572,28 +596,75 @@ class QueueManager(Manager):
     async def _invoke(self, job: Job) -> Any:
         import asyncio
 
-        runner = None
-        if self.app is not None and hasattr(self.app, "call"):
-            runner = lambda: self.app.call(job.handle)  # noqa: E731
+        from arvel.queue.middleware import JobShouldBeReleased, ShouldBeUnique, unique_lock_for
+
+        batch_id = getattr(job, "__arvel_batch__", None)
+        if batch_id is not None:
+            from arvel.queue.batch import apply_job_outcome, is_batch_cancelled
+
+            if await is_batch_cancelled(batch_id):
+                # A prior sibling's failure already cancelled the batch — this job never runs,
+                # but still counts toward `pending_jobs` so the batch converges to `finished()`.
+                await apply_job_outcome(batch_id, None)
+                return None
+
+        async def _release_unique() -> None:
+            if isinstance(job, ShouldBeUnique):
+                await unique_lock_for(job).force_release()
 
         async def _on_success(_result: Any) -> None:
             await self._dispatch_next_link(job)
+            if batch_id is not None:
+                from arvel.queue.batch import apply_job_outcome
+
+                await apply_job_outcome(batch_id, None)
+            await _release_unique()
 
         async def _on_exhausted(exc: BaseException) -> None:
             await self._run_chain_catch(job, exc)
+            if batch_id is not None:
+                from arvel.queue.batch import apply_job_outcome
 
-        with _job_span(job):
-            result = await run_job_with_retries(
-                job,
-                runner=runner,
-                release=self._release_for_retry if self._is_durable() else None,
-                on_success=_on_success,
-                on_exhausted=_on_exhausted,
-            )
+                await apply_job_outcome(batch_id, exc)
+            await _release_unique()
+
+        runner: Any = None
+        if self.app is not None and hasattr(self.app, "call"):
+            runner = lambda: self.app.call(job.handle)  # noqa: E731
+        runner = _wrap_with_middleware(job, runner or job.handle)
+
+        try:
+            with _job_span(job):
+                result = await run_job_with_retries(
+                    job,
+                    runner=runner,
+                    release=self._release_for_retry if self._is_durable() else None,
+                    on_success=_on_success,
+                    on_exhausted=_on_exhausted,
+                )
+        except JobShouldBeReleased as released:
+            # A job middleware (WithoutOverlapping/RateLimited/ThrottlesExceptions) asked for this
+            # job back on the queue instead of running — not a failed attempt, so it never touches
+            # `tries`/`backoff`, and (unlike `_on_success`/`_on_exhausted`) a unique lock stays held.
+            await self._release_job(job, released.delay)
+            result = None
         rest = self._note_job_processed()
         if rest:
             await asyncio.sleep(rest)
         return result
+
+    async def _release_job(self, job: Job, delay: float) -> None:
+        """Put ``job`` back onto the queue after ``delay`` seconds (a job middleware's
+        :class:`~arvel.queue.middleware.JobShouldBeReleased`) — durable (the `jobs` table) when a
+        DB is bound, mirroring B1's retry-release; otherwise an inline sleep-then-repush."""
+        if self._is_durable():
+            await self.dispatch_after(delay, job, queue=getattr(job, "queue", "default"))
+            return
+        import asyncio
+
+        if delay:
+            await asyncio.sleep(delay)
+        await self.push_instance(job)
 
     def _runner(self) -> Any:
         if self._task is None:
@@ -614,12 +685,30 @@ class QueueManager(Manager):
         *,
         queue: str | None = None,
     ) -> Any:
+        from arvel.queue.middleware import ShouldBeUnique, unique_lock_for
+
+        if issubclass(job_cls, ShouldBeUnique):
+            # Only the original `Job.dispatch()` entry point is gated — chain/batch continuation
+            # and retry/release redispatch all go through `push_instance` directly, reusing the
+            # same in-flight job, so gating there too would lock a job out against itself.
+            instance = job_cls(*args, **kwargs)
+            if not await unique_lock_for(instance).acquire():
+                return None  # already queued/running — silently dropped (Laravel `ShouldBeUnique`)
         task = self._runner()
         if not self._started:
             await self.broker.startup()
             self._started = True
-        label = queue or getattr(job_cls, "queue", "default")
-        return await task.kicker().with_labels(queue=label).kiq(serialize(job_cls, args, kwargs))
+        # pyright's `issubclass(job_cls, ShouldBeUnique)` narrowing above leaves `job_cls` typed as
+        # a union including `type[Unknown]` for the rest of the function (a known narrowing quirk
+        # on a bare `type` parameter) — both calls below are exactly as they were before that check.
+        label = queue or getattr(job_cls, "queue", "default")  # pyright: ignore[reportUnknownArgumentType]
+        return (
+            await task.kicker()
+            .with_labels(queue=label)
+            .kiq(
+                serialize(job_cls, args, kwargs)  # pyright: ignore[reportUnknownArgumentType]
+            )
+        )
 
     async def failed_jobs(self) -> list[Any]:
         """The failed-job records, newest first (Laravel ``queue:failed``)."""
@@ -901,14 +990,80 @@ class PendingChain:
 
 
 class PendingBatch:
-    """A group of jobs dispatched together; returns each push's handle."""
+    """A group of jobs dispatched together, with completion callbacks (Laravel ``Bus::batch()``).
+
+    :meth:`dispatch` creates a ``job_batches`` row up front and stamps every job with its id
+    (``__arvel_batch__``) before pushing them all, so the worker can track progress/failures and
+    run ``then``/``catch``/``finally`` (see ``arvel.queue.batch.apply_job_outcome``) as jobs settle
+    — including two settling at the same moment (its counters are updated with a compare-and-swap
+    retry loop, not a plain read-modify-write).
+    """
 
     def __init__(self, jobs: list[Job]) -> None:
         self.jobs = list(jobs)
+        self._then: list[str] = []
+        self._catch: list[str] = []
+        self._finally: list[str] = []
+        self._name: str | None = None
+        self._allow_failures = False
 
-    async def dispatch(self, *, manager: Any = None) -> list[Any]:
+    def then(self, callback: Any) -> PendingBatch:
+        """Run ``callback(batch)`` once every job has succeeded — never fires if a disallowed
+        failure cancelled the batch first. ``callback`` must be module-level (see
+        :meth:`PendingChain.catch` — a lambda/closure can't survive serialization)."""
+        self._then.append(_qualified_name(callback))
+        return self
+
+    def catch(self, callback: Any) -> PendingBatch:
+        """Run ``callback(batch, exc)`` on the batch's first disallowed failure (skipped when
+        :meth:`allow_failures` is set)."""
+        self._catch.append(_qualified_name(callback))
+        return self
+
+    def finally_(self, callback: Any) -> PendingBatch:
+        """Run ``callback(batch)`` once the batch finishes — always, whether it completed cleanly
+        or was cancelled by a failure."""
+        self._finally.append(_qualified_name(callback))
+        return self
+
+    def name(self, name: str) -> PendingBatch:
+        """A human-readable label for this batch (purely descriptive — not used as a lookup key)."""
+        self._name = name
+        return self
+
+    def allow_failures(self, flag: bool = True) -> PendingBatch:
+        """A failed job no longer cancels the rest of the batch: the remaining jobs keep running,
+        and ``then`` still fires once every job has settled (``catch`` never fires)."""
+        self._allow_failures = flag
+        return self
+
+    async def dispatch(self, *, manager: Any = None) -> Any:
+        import time
+
+        from arvel.queue.batch import Batch, JobBatch
+
         mgr = manager or _queue_manager()
-        return [await mgr.push_instance(job) for job in self.jobs]
+        options = {
+            "then": self._then,
+            "catch": self._catch,
+            "finally": self._finally,
+            "name": self._name,
+            "allow_failures": self._allow_failures,
+        }
+        row = await JobBatch.create(
+            total_jobs=len(self.jobs),
+            pending_jobs=len(self.jobs),
+            failed_jobs=0,
+            options=options,
+            cancelled_at=None,
+            created_at=int(time.time()),
+            finished_at=None,
+        )
+        for job in self.jobs:
+            job.__arvel_batch__ = row.id  # type: ignore[attr-defined]
+        for job in self.jobs:
+            await mgr.push_instance(job)
+        return Batch(row.id)
 
 
 class Bus:
@@ -933,13 +1088,23 @@ def __getattr__(name: str) -> Any:
         from arvel.queue.jobs import QueuedJob
 
         return QueuedJob
+    if name == "Batch":
+        from arvel.queue.batch import Batch
+
+        return Batch
+    if name == "JobBatch":
+        from arvel.queue.batch import JobBatch
+
+        return JobBatch
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [
+    "Batch",
     "Bus",
     "FailedJob",
     "Job",
+    "JobBatch",
     "PendingBatch",
     "PendingChain",
     "QueueManager",

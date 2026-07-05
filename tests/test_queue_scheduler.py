@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
+
 from arvel.queue.scheduler import Schedule
 
 
@@ -64,3 +66,187 @@ async def test_a_throwing_event_does_not_kill_the_tick() -> None:
     schedule.call(fine).every_minute()
     await schedule.run_due(datetime(2026, 7, 2, 12, 0))
     assert ran == ["fine"]  # the second task still ran
+
+
+# --- 18: frequency helpers -----------------------------------------------------------------
+
+
+def test_weekly_is_due_only_sunday_midnight() -> None:
+    event = Schedule().call(_noop).weekly()
+    assert event.is_due(datetime(2026, 1, 4, 0, 0))  # a Sunday
+    assert not event.is_due(datetime(2026, 1, 5, 0, 0))  # Monday
+    assert not event.is_due(datetime(2026, 1, 4, 1, 0))
+
+
+def test_monthly_is_due_only_on_the_1st() -> None:
+    event = Schedule().call(_noop).monthly()
+    assert event.is_due(datetime(2026, 3, 1, 0, 0))
+    assert not event.is_due(datetime(2026, 3, 2, 0, 0))
+
+
+def test_quarterly_is_due_on_the_1st_of_jan_apr_jul_oct() -> None:
+    event = Schedule().call(_noop).quarterly()
+    for month in (1, 4, 7, 10):
+        assert event.is_due(datetime(2026, month, 1, 0, 0))
+    assert not event.is_due(datetime(2026, 2, 1, 0, 0))
+
+
+def test_yearly_is_due_only_jan_1st() -> None:
+    event = Schedule().call(_noop).yearly()
+    assert event.is_due(datetime(2026, 1, 1, 0, 0))
+    assert not event.is_due(datetime(2027, 2, 1, 0, 0))
+
+
+def test_twice_daily_is_due_at_both_hours() -> None:
+    event = Schedule().call(_noop).twice_daily(1, 13)
+    assert event.is_due(datetime(2026, 1, 1, 1, 0))
+    assert event.is_due(datetime(2026, 1, 1, 13, 0))
+    assert not event.is_due(datetime(2026, 1, 1, 7, 0))
+
+
+def test_weekdays_excludes_the_weekend() -> None:
+    event = Schedule().call(_noop).daily().weekdays()
+    assert event.is_due(datetime(2026, 1, 5, 0, 0))  # Monday
+    assert not event.is_due(datetime(2026, 1, 4, 0, 0))  # Sunday
+    assert not event.is_due(datetime(2026, 1, 10, 0, 0))  # Saturday
+
+
+def test_weekends_is_due_only_saturday_sunday() -> None:
+    event = Schedule().call(_noop).daily().weekends()
+    assert event.is_due(datetime(2026, 1, 4, 0, 0))  # Sunday
+    assert event.is_due(datetime(2026, 1, 10, 0, 0))  # Saturday
+    assert not event.is_due(datetime(2026, 1, 5, 0, 0))  # Monday
+
+
+def test_between_gates_by_time_of_day() -> None:
+    event = Schedule().call(_noop).every_minute().between("09:00", "17:00")
+    assert event.is_due(datetime(2026, 1, 1, 12, 0))
+    assert not event.is_due(datetime(2026, 1, 1, 8, 59))
+    assert not event.is_due(datetime(2026, 1, 1, 17, 1))
+
+
+def test_when_and_skip_gate_execution() -> None:
+    event = Schedule().call(_noop).every_minute().when(lambda: False)
+    assert not event.is_due(datetime(2026, 1, 1, 0, 0))
+
+    event = Schedule().call(_noop).every_minute().skip(lambda: True)
+    assert not event.is_due(datetime(2026, 1, 1, 0, 0))
+
+    event = Schedule().call(_noop).every_minute().when(lambda: True).skip(lambda: False)
+    assert event.is_due(datetime(2026, 1, 1, 0, 0))
+
+
+def test_environments_gates_by_app_env() -> None:
+    from arvel.kernel import Application, set_application
+
+    app = Application()
+    app.make("config").set("app", {"env": "staging"})
+    set_application(app)
+    try:
+        event = Schedule().call(_noop).every_minute().environments("production")
+        assert not event.is_due(datetime(2026, 1, 1, 0, 0))
+
+        event = Schedule().call(_noop).every_minute().environments("staging", "production")
+        assert event.is_due(datetime(2026, 1, 1, 0, 0))
+    finally:
+        set_application(None)
+
+
+def test_timezone_shifts_the_matched_moment() -> None:
+    """`moment` is treated as UTC; `timezone('...')` re-matches the cron expression against it
+    shifted into that zone."""
+    event = Schedule().call(_noop).daily_at("09:00").timezone("America/New_York")
+    # 09:00 America/New_York (UTC-5 in January) is 14:00 UTC.
+    assert event.is_due(datetime(2026, 1, 1, 14, 0))
+    assert not event.is_due(datetime(2026, 1, 1, 9, 0))
+
+
+# --- 18: hooks -------------------------------------------------------------------------------
+
+
+async def test_hooks_fire_in_order_on_success() -> None:
+    calls: list[str] = []
+    event = (
+        Schedule()
+        .call(lambda: calls.append("task"))
+        .every_minute()
+        .before(lambda: calls.append("before"))
+        .after(lambda: calls.append("after"))
+        .on_success(lambda: calls.append("on_success"))
+        .on_failure(lambda: calls.append("on_failure"))
+    )
+    await event.run()
+    assert calls == ["before", "task", "on_success", "after"]
+
+
+async def test_on_failure_fires_instead_of_on_success_and_after_still_runs() -> None:
+    calls: list[str] = []
+
+    def boom() -> None:
+        calls.append("task")
+        raise RuntimeError("boom")
+
+    event = (
+        Schedule()
+        .call(boom)
+        .every_minute()
+        .before(lambda: calls.append("before"))
+        .after(lambda: calls.append("after"))
+        .on_success(lambda: calls.append("on_success"))
+        .on_failure(lambda: calls.append("on_failure"))
+    )
+    with pytest.raises(RuntimeError):
+        await event.run()
+    assert calls == ["before", "task", "on_failure", "after"]
+
+
+# --- 18: A3 one_server + without_overlapping (real cache locks) --------------------------------
+
+
+async def test_one_server_runs_on_exactly_one_of_two_schedulers() -> None:
+    """Two separately-constructed `Schedule()`s sharing one cache backend, racing over the same
+    `on_one_server()` event: exactly one of them actually runs it (A3 — no longer a no-op)."""
+    import asyncio
+
+    from arvel.cache import CacheManager
+
+    cache = CacheManager().driver()
+    ran: list[str] = []
+
+    async def _tick() -> None:
+        # A real suspension point so the loop actually interleaves the two `run()` tasks — the
+        # array cache lock is otherwise fully synchronous (no `await` inside its body), so without
+        # one, whichever task the loop picks first would run to completion (acquire→run→release)
+        # before the other ever starts, and the lock would already be free again by then.
+        await asyncio.sleep(0.02)
+        ran.append("ran")
+
+    scheduler_a = Schedule(cache=cache)
+    scheduler_b = Schedule(cache=cache)
+    event_a = scheduler_a.call(_tick).every_minute().on_one_server()
+    event_b = scheduler_b.call(_tick).every_minute().on_one_server()
+
+    await asyncio.gather(event_a.run(), event_b.run())
+    assert ran == ["ran"]  # only one of the two actually ran it
+
+
+async def test_without_overlapping_skips_a_tick_while_the_prior_run_is_in_flight() -> None:
+    import asyncio
+
+    from arvel.cache import CacheManager
+
+    cache = CacheManager().driver()
+    ran: list[str] = []
+
+    async def _slow() -> None:
+        ran.append("start")
+        await asyncio.sleep(0.05)
+        ran.append("end")
+
+    event = Schedule(cache=cache).call(_slow).every_minute().without_overlapping(60)
+
+    first = asyncio.create_task(event.run())
+    await asyncio.sleep(0.01)  # let the first tick acquire the lock and start sleeping
+    await event.run()  # a second tick while the first is still in flight -> skipped
+    await first
+    assert ran == ["start", "end"]  # never two concurrent starts

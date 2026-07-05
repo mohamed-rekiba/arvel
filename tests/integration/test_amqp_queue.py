@@ -16,7 +16,7 @@ import asyncio
 import contextlib
 import time
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pytest
 import sqlalchemy as sa
@@ -246,5 +246,72 @@ async def test_visibility_timeout_reclaims_a_stuck_reservation_over_amqp(
             await manager.broker.shutdown()
         with contextlib.suppress(Exception):
             await db.execute(sa.schema.DropTable(QueuedJob.__table__))
+        await db.dispose()
+        set_application(None)
+
+
+class BatchStep(Job):
+    """Writes its own file — an observable per-job side effect for a batch drained concurrently
+    by a real worker."""
+
+    def __init__(self, path: str, label: str) -> None:
+        self.path = path
+        self.label = label
+
+    async def handle(self) -> None:
+        Path(self.path).write_text(self.label)
+
+
+_BATCH_THEN_FIRED: dict[str, bool] = {}
+
+
+def _mark_batch_then(batch: Any) -> None:
+    _BATCH_THEN_FIRED[batch.id] = True
+
+
+async def test_batch_completes_under_a_real_worker_draining_over_amqp_and_postgres(
+    rabbitmq_url: str, postgres_url: str, tmp_path: Path
+) -> None:
+    """18: `Bus.batch()` over real infra — several jobs dispatched together, drained concurrently
+    by a real (AMQP-backed) worker, tracked in a real Postgres `job_batches` table: `then` fires
+    once every job has settled, with progress reaching 100%."""
+    from arvel.queue.batch import JobBatch
+
+    _BATCH_THEN_FIRED.clear()
+    app = Application()
+    app.make("config").set("queue", {"default": "amqp", "url": rabbitmq_url})
+    db = ConnectionResolver({"default": {"url": postgres_url}})
+    app.instance("db", db)
+    manager = QueueManager(app=app)
+    app.instance("queue", manager)
+    set_application(app)
+    JobBatch.set_connection(db)
+    await db.execute(sa.schema.CreateTable(JobBatch.__table__))
+    try:
+        targets = [tmp_path / f"batch_{i}.txt" for i in range(5)]
+        jobs = [BatchStep(str(target), f"job-{i}") for i, target in enumerate(targets)]
+        batch = await Bus.batch(jobs).then(_mark_batch_then).dispatch(manager=manager)
+
+        worker = asyncio.create_task(manager.work(release_interval=0.2))
+        finished = False
+        for _ in range(200):  # up to ~20s for 5 real AMQP round-trips
+            if await batch.finished():
+                finished = True
+                break
+            await asyncio.sleep(0.1)
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+
+        assert finished, "the batch never finished draining over AMQP"
+        assert all(target.exists() for target in targets)
+        assert await batch.progress() == 100.0
+        assert await batch.cancelled() is False
+        assert _BATCH_THEN_FIRED.get(batch.id) is True
+    finally:
+        with contextlib.suppress(Exception):
+            await manager.broker.shutdown()
+        with contextlib.suppress(Exception):
+            await db.execute(sa.schema.DropTable(JobBatch.__table__))
         await db.dispose()
         set_application(None)
