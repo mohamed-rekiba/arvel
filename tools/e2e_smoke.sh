@@ -87,18 +87,20 @@ esac
 echo "   app pytest: passed"
 
 echo "== 7. migrations + seeder run via the CLI (the real DB path) =="
-# the 6 scaffolded migrations are discovered by convention (database/migrations) and applied;
-# the seeder is bound by AppServiceProvider so db:seed runs.
+# every scaffolded migration (database/migrations, by convention) is discovered and applied; the
+# seeder is bound by AppServiceProvider so db:seed runs. Count the files rather than hardcode a
+# number, so this doesn't drift when the skeleton gains or loses a migration.
+mig_count="$(find database/migrations -maxdepth 1 -name '*.py' ! -name '__*' | wc -l | tr -d ' ')"
 mig_out="$(arvel migrate 2>&1)"
 case "$mig_out" in
-  *"migrated 6 migration"*) ;;
-  *) echo "FAIL: 'arvel migrate' did not apply the 6 scaffolded migrations"; printf '%s\n' "$mig_out"; exit 1 ;;
+  *"migrated $mig_count migration"*) ;;
+  *) echo "FAIL: 'arvel migrate' did not apply the $mig_count scaffolded migrations"; printf '%s\n' "$mig_out"; exit 1 ;;
 esac
 seed_out="$(arvel db:seed 2>&1)" || { echo "FAIL: 'arvel db:seed' errored"; printf '%s\n' "$seed_out"; exit 1; }
 case "$seed_out" in
   *"no seeder bound"*) echo "FAIL: db:seed found no bound seeder"; printf '%s\n' "$seed_out"; exit 1 ;;
 esac
-echo "   migrate: 6 migrations applied; db:seed: ran"
+echo "   migrate: $mig_count migrations applied; db:seed: ran"
 
 # Laravel parity: the users table carries email_verified_at, and the user can be marked verified so the
 # `verified` route middleware works (it reads email_verified_at). Exercised on the real migrated DB.

@@ -12,6 +12,7 @@ class CreatePersonalAccessTokensTable(Migration):
             t.big_integer("tokenable_id").index()
             t.text("abilities")
             t.datetime("expires_at").nullable()
+            t.datetime("last_used_at").nullable()  # TokenGuard throttled-stamps this per request
             t.timestamps()
 
         schema.create("api_tokens", define)
