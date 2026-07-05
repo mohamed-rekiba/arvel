@@ -210,6 +210,26 @@ class UserSeeder(Seeder):
 arvel db:seed
 ```
 
+### Progress + output on a long seed
+
+A big seed (thousands of rows, image downloads) shouldn't run silently. `db:seed` injects a live
+console into your seeder, so a `Seeder` has the same output surface as a command — wrap a slow loop in
+`self.with_progress_bar(...)` and print section headers with `self.line(...)`:
+
+```python
+class DatabaseSeeder(Seeder):
+    async def run(self):
+        self.line("→ products")
+        for row in self.with_progress_bar(catalog, label="products"):
+            product = await Product.create(**row)
+            await download_images(product)      # the loop body may await; the bar advances per item
+```
+
+The bar renders on a terminal and is quiet when output is piped/redirected (no control codes in logs).
+Run outside `db:seed` — in a test or a script — and the output defaults to a silent no-op, so
+`with_progress_bar` just iterates. Child seeders started with `call`/`call_once` inherit the same
+console. (`self.info` and the full `self.output` handle are available too.)
+
 ## Writing your own command
 
 A command is a small Typer app the framework discovers and mounts under `arvel`:

@@ -7,7 +7,32 @@ in knowledge/port/08-advanced-database.md.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator, Sequence
+from typing import Any
+
+from arvel.contracts import CommandOutput
 from arvel.database.model_events import EVENTS_SUPPRESSED
+
+
+class _NullOutput:
+    """The default seeder output: silent no-ops, so a seeder run outside the ``db:seed`` command
+    (tests, a script) prints nothing and ``with_progress_bar`` simply iterates. The ``db:seed``
+    runner swaps in the real ``arvel.console`` output — the ``database`` layer never imports it,
+    depending on the :class:`~arvel.contracts.CommandOutput` contract instead."""
+
+    def info(self, message: str) -> None: ...
+    def line(self, message: str = "") -> None: ...
+    def comment(self, message: str) -> None: ...
+    def warn(self, message: str) -> None: ...
+    def error(self, message: str) -> None: ...
+    def new_line(self, n: int = 1) -> None: ...
+    def table(self, headers: Sequence[str], rows: Sequence[Sequence[Any]]) -> None: ...
+
+    def with_progress_bar(self, iterable: Iterable[Any], *, label: str = "") -> Iterator[Any]:
+        yield from iterable
+
+
+_NULL_OUTPUT: CommandOutput = _NullOutput()
 
 # Which seeder classes `call_once` has already run in the current seeding run, so a seeder
 # reachable from multiple `call()` chains runs once. Reset per run (see
@@ -22,14 +47,23 @@ def reset_called_once() -> None:
 
 
 class Seeder:
-    """Base seeder: override ``run()``; use ``call()`` to invoke child seeders."""
+    """Base seeder: override ``run()``; use ``call()`` to invoke child seeders.
+
+    ``output`` is the console handle the ``db:seed`` runner injects (a :class:`_NullOutput` until
+    then). Use it for feedback on a long seed: wrap a slow loop in ``self.with_progress_bar(...)``
+    and print section headers with ``self.line(...)``. Child seeders started via ``call``/
+    ``call_once`` inherit the same output, so progress is consistent across the whole tree."""
+
+    output: CommandOutput = _NULL_OUTPUT
 
     async def run(self) -> None:
         raise NotImplementedError(f"{type(self).__name__} must implement run()")
 
     async def call(self, *seeders: type[Seeder]) -> None:
         for seeder in seeders:
-            await seeder().run()
+            child = seeder()
+            child.output = self.output
+            await child.run()
 
     async def call_once(self, *seeders: type[Seeder]) -> None:
         """Like :meth:`call`, but skips a seeder class already run (by ``call_once``) this process —
@@ -39,7 +73,26 @@ class Seeder:
             if seeder in _called_once:
                 continue
             _called_once.add(seeder)
-            await seeder().run()
+            child = seeder()
+            child.output = self.output
+            await child.run()
+
+    # -- output (delegates to the injected console handle) --------------------------------------
+    def line(self, message: str = "") -> None:
+        self.output.line(message)
+
+    def info(self, message: str) -> None:
+        self.output.info(message)
+
+    def with_progress_bar(self, iterable: Iterable[Any], *, label: str = "") -> Iterator[Any]:
+        """Iterate ``iterable`` while rendering a progress bar (a no-op iteration until the
+        ``db:seed`` runner injects a real output). The loop body may ``await`` — the bar advances as
+        each item is consumed::
+
+            for user in self.with_progress_bar(rows, label='users'):
+                await User.create(**user)
+        """
+        return self.output.with_progress_bar(iterable, label=label)
 
 
 class WithoutModelEvents:

@@ -18,11 +18,14 @@ def db_seed() -> None:
 
 
 async def run_seed(app: Any) -> None:
+    from arvel.console import ConsoleOutput
     from arvel.database.seeder import reset_called_once
 
     if not app.bound("seeder"):
         typer.echo("no seeder bound; register one as 'seeder' in your app")
         raise typer.Exit(1)
     reset_called_once()  # scope call_once dedup to this run
-    await app.make("seeder").run()
+    seeder = app.make("seeder")
+    seeder.output = ConsoleOutput()  # give the seeder a live console: progress bars + section lines
+    await seeder.run()
     typer.echo("seeding complete")

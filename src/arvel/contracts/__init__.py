@@ -17,7 +17,7 @@ Grounded in knowledge/port/02-container.md and 03-application-providers-bootstra
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
 from typing import Any, Protocol, TypeVar, overload, runtime_checkable
 
 T = TypeVar("T")
@@ -142,6 +142,24 @@ class ExceptionHandler(Protocol):
 
 
 @runtime_checkable
+class CommandOutput(Protocol):
+    """The console output surface shared by CLI commands and seeders: section/line writes plus a
+    progress bar for long loops. The concrete implementation lives in ``arvel.console`` (built on
+    click's ``echo``/``progressbar`` — no heavy dependency). A seeder receives one, injected by the
+    ``db:seed`` runner, so ``self.with_progress_bar(...)`` renders progress without the ``database``
+    layer importing the higher ``console`` layer (it depends on this contract instead)."""
+
+    def info(self, message: str) -> None: ...
+    def line(self, message: str = "") -> None: ...
+    def comment(self, message: str) -> None: ...
+    def warn(self, message: str) -> None: ...
+    def error(self, message: str) -> None: ...
+    def new_line(self, n: int = 1) -> None: ...
+    def table(self, headers: Sequence[str], rows: Sequence[Sequence[Any]]) -> None: ...
+    def with_progress_bar(self, iterable: Iterable[Any], *, label: str = "") -> Iterator[Any]: ...
+
+
+@runtime_checkable
 class EventDispatcher(Protocol):
     """Event dispatch (the contract the ORM, queue, etc. resolve — they never
     import ``arvel.events`` directly)."""
@@ -156,6 +174,7 @@ class EventDispatcher(Protocol):
 __all__ = [
     "Abstract",
     "Application",
+    "CommandOutput",
     "Concrete",
     "ConfigRepository",
     "Container",

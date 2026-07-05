@@ -31,6 +31,28 @@ def test_db_seed_runs_root_seeder() -> None:
         set_application(None)
 
 
+def test_db_seed_injects_a_live_console_output_into_the_seeder() -> None:
+    from arvel.console import ConsoleOutput
+    from arvel.database.seeder import _NULL_OUTPUT
+    from arvel.kernel import Application, set_application
+
+    class RootSeeder(Seeder):
+        async def run(self) -> None: ...
+
+    seeder = RootSeeder()
+    assert seeder.output is _NULL_OUTPUT  # silent until the runner injects a console
+
+    app = Application()
+    app.instance("seeder", seeder)
+    set_application(app)
+    try:
+        result = runner.invoke(build_cli(), ["db:seed"])
+        assert result.exit_code == 0
+        assert isinstance(seeder.output, ConsoleOutput)  # runner swapped in a live console
+    finally:
+        set_application(None)
+
+
 def test_db_seed_without_binding_errors() -> None:
     from arvel.kernel import Application, set_application
 
