@@ -103,19 +103,57 @@ v.errors()                   # {"code": ["The code must be uppercase."]}
 | `required` | present and non-empty |
 | `nullable` / `sometimes` | skip when `None` / skip when the field is absent |
 | `string` / `integer` / `numeric` / `boolean` | type |
-| `array` | the value is a list |
-| `email` / `url` / `uuid` / `json` / `ip` | format |
-| `alpha` / `alpha_num` / `alpha_dash` | letters / +digits / +dashes & underscores |
+| `array` / `list` | the value is a list |
+| `email` / `url` / `uuid` / `ulid` / `json` / `ip` / `ipv4` / `ipv6` / `mac_address` / `timezone` | format |
+| `alpha` / `alpha_num` / `alpha_dash` / `ascii` / `uppercase` / `lowercase` | letters / +digits / +dashes / single-byte / case |
 | `min:n` / `max:n` / `size:n` | numbers compare by value; strings/lists by length |
-| `between:a,b` / `digits:n` / `digits_between:a,b` | range / exact digits / digit-count range |
+| `between:a,b` / `digits:n` / `digits_between:a,b` / `min_digits:n` / `max_digits:n` | range / exact digits / digit-count bounds |
+| `decimal:min[,max]` / `multiple_of:n` | decimal-place count / is a multiple of `n` |
 | `gt:f` / `gte:f` / `lt:f` / `lte:f` | compare to another **field** (numeric rule → by value) |
-| `in:a,b,c` / `not_in:a,b,c` | is / isn't one of the listed values |
-| `starts_with:a,b` / `ends_with:a,b` | prefix / suffix is one of the listed |
+| `in:a,b,c` / `not_in:a,b,c` / `in_array:other.*` | is / isn't one of the listed values / exists in another field's array |
+| `starts_with:a,b` / `ends_with:a,b` / `doesnt_start_with:a,b` / `doesnt_end_with:a,b` | prefix / suffix (positive and negative) |
+| `not_regex:pattern` / `contains:a,b` | doesn't match the pattern / array contains ALL of the listed |
 | `confirmed` / `same:f` / `different:f` | matches `<field>_confirmation` / equals / differs from field |
-| `regex:/.../` / `accepted` | matches the pattern / is yes/on/1/true |
+| `regex:/.../` / `accepted` / `accepted_if:f,v` / `declined` / `declined_if:f,v` | matches the pattern / yes-on-1-true, conditionally / no-off-0-false, conditionally |
+| `present` / `filled` / `prohibited` / `prohibited_if:f,v` / `prohibited_unless:f,v` | must exist / non-empty-if-present / must be absent-or-empty (conditionally) |
+| `required_if:f,v` / `required_unless:f,v` / `required_with(_all):f1,f2` / `required_without(_all):f1,f2` | required depending on another field's value or presence |
+| `exclude` / `exclude_if:f,v` / `exclude_unless:f,v` | drops the field from `validated()` (unconditionally / conditionally) |
+| `distinct` | (on a wildcard field `items.*.x`) every sibling value is unique |
 | `date` / `date_format:%Y-%m-%d` | parseable date / matches a **Python** strftime format |
 | `before:x` / `after:x` / `date_equals:x` | date vs another field or a literal date string |
-| `file` / `image` / `mimes:png,jpg` | uploaded file / image / allowed extension |
+| `file` / `image` / `mimes:png,jpg` / `mimetypes:image/png` / `extensions:png,jpg` | uploaded file / image / extension (by MIME type or filename) |
+| `dimensions:min_width=…,max_height=…,ratio=…` | image pixel dimensions (needs the `image` extra — Pillow) |
+| `Enum(MyEnum)` (a rule **object**, not a string — `{"status": [Enum(Status)]}`) | value is a member of `MyEnum` |
+
+### `url` / `email` — format, not a network probe
+
+`url` does a structural parse (`urlsplit`): the scheme must be `http`/`https` (or an explicit
+allow-list, `"url:ftp,https"`), the host must be non-empty, and there's no embedded whitespace —
+`"http://"`, `"javascript:alert(1)"`, and `"http://x y.com"` all now correctly fail (previously
+`url` was just an `http(s)://`-prefix check). `email` is an RFC-lite regex: `local@domain.tld`,
+no leading/trailing/consecutive dots in either part, and Laravel's length caps (local ≤ 64,
+domain ≤ 255 chars). Neither rule does a DNS lookup or mailbox probe (no `active_url` equivalent
+— a network call on every validation is a footgun) — they're format checks, by design.
+
+### Control: `bail`, `stop_on_first_failure`, `sometimes()`, `after()`
+
+```python
+# bail — stop just THIS field's rules at its first failure (one error, not every failure)
+Validator({"x": ""}, {"x": "bail|required|email"}).errors()   # {"x": ["...is required."]}
+
+# stop_on_first_failure — stop the WHOLE pass at the first field to fail
+Validator({"a": "", "b": ""}, {"a": "required", "b": "required"},
+          stop_on_first_failure=True).errors()                # {"a": [...]} — "b" never checked
+
+# sometimes() — apply a rule only when a broader condition holds (beyond one sibling field)
+v = Validator(data, {})
+v.sometimes("card_number", "required", lambda d: d.get("payment_type") == "card")
+
+# after() — a post-pass hook; add errors via add_error() for checks no single rule expresses
+v = Validator(data, {"starts_at": "date", "ends_at": "date"})
+v.after(lambda vv: vv.add_error("ends_at", "must be after starts_at")
+        if vv.data["ends_at"] < vv.data["starts_at"] else None)
+```
 
 Rule keys are dot-aware: `"user.email": "required|email"` validates the nested value, and
 `"items.*.price": "numeric"` validates every element of an array (errors key by index, e.g.
@@ -229,10 +267,44 @@ class CreatePost(FormRequest):
 post = CreatePost.parse({"title": "Hello World"})   # → slug "hello-world", title trimmed
 ```
 
-> A `with_validator()`-style hook has no place here on purpose: that pattern drives the **rule**
-> engine, so it lives on [`Validator`](#the-validator) (use a custom `Rule` or an `after` step),
-> while `FormRequest` stays type-driven. Pick the rule `Validator` when you need conditional rules;
-> pick `FormRequest` when you want a typed object.
+### The `rules()` bridge — semantics on top of types
+
+`Schema`/`FormRequest` annotations are the **type/shape** layer — msgspec owns them, and for most
+request bodies that's the whole story. When a request needs a check msgspec's type system can't
+express — a cross-field or conditional rule like Laravel's `rules()` — override `rules()` (a normal
+rule-`Validator` ruleset) on the `FormRequest`, plus the optional `messages()` / `attributes()` /
+`with_validator()` hooks:
+
+```python
+from arvel.validation import FormRequest, Validator
+
+class Register(FormRequest):
+    password: str
+    password_confirmation: str
+
+    @classmethod
+    def rules(cls) -> dict[str, str | list]:
+        return {"password": "confirmed|min:8"}          # ran AFTER msgspec's structural pass
+
+    @classmethod
+    def messages(cls) -> dict[str, str]:
+        return {"password.confirmed": "Passwords must match."}
+
+    @classmethod
+    def attributes(cls) -> dict[str, str]:
+        return {"password": "new password"}              # friendly name in messages
+
+    @classmethod
+    def with_validator(cls, validator: Validator) -> None:
+        validator.after(lambda v: v.add_error("password", "no throwaway passwords")
+                         if v.data["password"] == "password" else None)
+```
+
+`rules()` runs against the **decoded** payload once msgspec's own structural validation has already
+succeeded; a rule failure raises the *same* `ValidationException` (same 422 `{message, errors}`
+shape) msgspec itself would raise for a bad type — one error bag either way, not a dual engine.
+Types stay in the annotations; semantics go in `rules()`. Skip `rules()` entirely (the default —
+an empty dict) when annotations already say everything you need.
 
 ## Common mistakes & gotchas
 

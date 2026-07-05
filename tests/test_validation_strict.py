@@ -47,3 +47,21 @@ def test_strict_mode_does_not_flag_nullable_or_sometimes() -> None:
         {"name": "Ada"}, {"name": "required", "nick": "sometimes|nullable|string"}, strict=True
     )
     assert v.passes()
+
+
+def test_strict_mode_raises_on_a_typo_of_a_story_12_rule() -> None:
+    # the rule-breadth expansion (validation/rules.py) is checked in strict mode too — a typo'd
+    # NEW rule name (e.g. "timezon") must raise just like a typo'd original one.
+    v = Validator({"tz": "Europe/Paris"}, {"tz": "timezon"}, strict=True)
+    with pytest.raises(UnknownValidationRule) as ei:
+        v.passes()
+    assert "timezon" in str(ei.value)
+
+
+def test_strict_mode_recognizes_all_story_12_rules() -> None:
+    v = Validator(
+        {"a": "x", "n": 5},
+        {"a": "uppercase|ascii", "n": "multiple_of:5|min_digits:1"},
+        strict=True,
+    )
+    v.passes()  # must not raise — every name here is a real rule

@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import json
 import re
+from enum import Enum as _PyEnum
 from typing import TYPE_CHECKING, Any, Self, cast
 
 import msgspec
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sized
+    from collections.abc import Callable, Mapping, Sized
 
 
 class Schema(msgspec.Struct):
@@ -72,8 +73,16 @@ class FormRequest(msgspec.Struct):
 
     Lifecycle hooks (override as needed; spec 10 §81): ``prepare_for_validation`` normalizes the
     raw input *before* validation, ``passed_validation`` runs *after* a successful parse.
-    (Laravel's ``withValidator`` has no equivalent here — it belongs to the rule ``Validator``,
-    which owns the rule engine and ``after`` hooks; the msgspec FormRequest stays type-driven.)
+
+    **The rules() bridge (spec 12 §3).** msgspec stays the type/shape layer — annotations are
+    the whole story for most requests. When a request needs *semantic* checks msgspec can't
+    express (cross-field, conditional — Laravel's ``rules()``), override ``rules()`` (a normal
+    rule ``Validator`` ruleset) and optionally ``messages()`` / ``attributes()`` / a
+    ``with_validator()`` hook to register ``sometimes()``/``after()``. Those run against the
+    *decoded* payload right after msgspec's structural pass succeeds; a rule failure raises the
+    same ``ValidationException`` (same 422 shape) msgspec itself would raise. Two disjoint
+    validators, one error bag — not a dual engine: msgspec still owns types, ``rules()`` only
+    ever adds semantics on top.
     """
 
     @classmethod
@@ -85,8 +94,39 @@ class FormRequest(msgspec.Struct):
         """Hook: run after a successful parse — derive/clean fields (default: no-op)."""
 
     @classmethod
+    def rules(cls) -> dict[str, str | list[Any]]:
+        """Optional hook: extra rule-engine checks (Laravel ``rules()``), run against the
+        decoded payload after msgspec's structural pass. Default: none."""
+        return {}
+
+    @classmethod
+    def messages(cls) -> dict[str, str]:
+        """Optional hook: message overrides for ``rules()`` (Laravel ``messages()``)."""
+        return {}
+
+    @classmethod
+    def attributes(cls) -> dict[str, str]:
+        """Optional hook: friendly field-name overrides used in ``rules()`` messages
+        (Laravel ``attributes()``)."""
+        return {}
+
+    @classmethod
+    def with_validator(cls, validator: Validator) -> None:
+        """Optional hook: register ``sometimes()``/``after()`` on the rule ``Validator`` before
+        it runs (Laravel ``withValidator``). Default: no-op."""
+
+    @classmethod
     def parse(cls, data: Mapping[str, Any]) -> Self:
-        instance = validate(cls.prepare_for_validation(dict(data)), cls)
+        prepared = cls.prepare_for_validation(dict(data))
+        instance = validate(prepared, cls)
+        extra_rules = cls.rules()
+        if extra_rules:
+            validator = Validator(
+                prepared, extra_rules, cls.messages(), attributes=cls.attributes()
+            )
+            cls.with_validator(validator)
+            if validator.fails():
+                raise ValidationException(validator.errors())
         instance.passed_validation()
         return instance
 
@@ -102,8 +142,109 @@ class FormRequest(msgspec.Struct):
         return True
 
 
-_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_EMAIL_LOCAL = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+")
+_EMAIL_DOMAIN = re.compile(r"(?!-)[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
+_URL_DEFAULT_SCHEMES = ("http", "https")
 _UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+
+def _check_email(value: Any) -> bool:
+    """RFC-lite (spec A7): local@domain+TLD, no leading/trailing/consecutive dots in either
+    part, Laravel's length caps (local <=64, domain <=255). A format check — no DNS/mailbox
+    probe (that's `active_url`'s footgun, deliberately not ported; see `_check_url`)."""
+    if not isinstance(value, str) or "@" not in value:
+        return False
+    local, _, domain = value.rpartition("@")
+    if not local or not domain or len(local) > 64 or len(domain) > 255:
+        return False
+    if ".." in local or ".." in domain or local[0] == "." or local[-1] == ".":
+        return False
+    return bool(_EMAIL_LOCAL.fullmatch(local)) and bool(_EMAIL_DOMAIN.fullmatch(domain))
+
+
+def _check_url(value: Any, arg: str) -> bool:
+    """Structural parse (spec A7): scheme in the allowed set (default http/https, or the
+    `url:scheme1,scheme2` arg), a non-empty host, no whitespace. Deliberately NOT `active_url`
+    — a DNS lookup in a validation layer is a footgun (network call on every request); divergence
+    is intentional and documented in docs/validation.md."""
+    if not isinstance(value, str) or any(ch.isspace() for ch in value):
+        return False
+    from urllib.parse import urlsplit
+
+    allowed = tuple(s.strip() for s in arg.split(",")) if arg else _URL_DEFAULT_SCHEMES
+    try:
+        parts = urlsplit(value)
+    except ValueError:
+        return False
+    return parts.scheme in allowed and bool(parts.netloc)
+
+
+def _upload_bytes(value: Any) -> bytes | None:
+    """Best-effort *synchronous* byte read for `dimensions` — the rule engine is sync, so an
+    async `UploadedFile.read()` can't be awaited here. Handles raw `bytes`, litestar's
+    `UploadFile.file` (a sync `SpooledTemporaryFile`), or any file-like with a sync `read()`
+    (e.g. `io.BytesIO`). ponytail: no async bridge — read the upload yourself first
+    (`io.BytesIO(await file.read())`) for the real async-upload path; see docs."""
+    if isinstance(value, (bytes, bytearray)):
+        return bytes(value)
+    file_obj = getattr(value, "file", None)
+    if file_obj is not None and hasattr(file_obj, "read"):
+        if hasattr(file_obj, "seek"):
+            file_obj.seek(0)
+        return cast("bytes", file_obj.read())
+    reader = getattr(value, "read", None)
+    if callable(reader):
+        result = reader()
+        if isinstance(result, (bytes, bytearray)):
+            return bytes(result)
+    return None
+
+
+def _parse_ratio(raw: str) -> float:
+    if "/" in raw:
+        num, _, den = raw.partition("/")
+        return float(num) / float(den)
+    return float(raw)
+
+
+def _check_dimensions(value: Any, arg: str) -> bool:
+    """`dimensions:min_width=…,ratio=…` — reads real pixel data via Pillow (lazy import; the
+    `image` extra, already installed for `arvel.media`). Missing the extra is an honest failure
+    (`MissingExtraError`), not a silent pass."""
+    from arvel.support.manager import MissingExtraError
+
+    try:
+        from PIL import Image  # import-guard only; funneled through Any below
+    except ImportError as exc:
+        raise MissingExtraError("image", "image") from exc
+    raw = _upload_bytes(value)
+    if raw is None:
+        return False
+    import io
+
+    pil_image: Any = Image  # Pillow's typing is incomplete for our use — funnel it through Any
+    try:
+        with pil_image.open(io.BytesIO(raw)) as img:
+            width, height = cast("tuple[int, int]", img.size)
+    except OSError, ValueError:
+        return False
+    constraints = dict(pair.split("=", 1) for pair in arg.split(",") if "=" in pair)
+    if "width" in constraints and width != int(constraints["width"]):
+        return False
+    if "height" in constraints and height != int(constraints["height"]):
+        return False
+    if "min_width" in constraints and width < int(constraints["min_width"]):
+        return False
+    if "min_height" in constraints and height < int(constraints["min_height"]):
+        return False
+    if "max_width" in constraints and width > int(constraints["max_width"]):
+        return False
+    if "max_height" in constraints and height > int(constraints["max_height"]):
+        return False
+    return not (
+        "ratio" in constraints and abs(width / height - _parse_ratio(constraints["ratio"])) >= 1e-2
+    )
+
 
 _DEFAULT_MESSAGES = {
     "required": "The {field} field is required.",
@@ -149,6 +290,10 @@ _DEFAULT_MESSAGES = {
     "file": "The {field} must be an uploaded file.",
     "image": "The {field} must be an image.",
     "mimes": "The {field} must be a file of type: {arg}.",
+    # New story-12 rules deliberately have NO entry here — `_DEFAULT_MESSAGES` is guarded 1:1
+    # against the shipped `localization/lang/en/validation.json` (outside this story's scope:
+    # src/arvel/validation/, tests/, docs/validation.md only), so they fall back to the generic
+    # "The {field} is invalid." below rather than drift the two out of sync.
 }
 
 
@@ -245,6 +390,24 @@ class Rule:
         raise NotImplementedError(f"{type(self).__name__} must implement passes()")
 
 
+class Enum(Rule):
+    """Rule object: value-in-enum membership (Laravel ``Rule::enum()``, spec 12 §2). No string
+    form — the enum class *is* the closed set, so it's typed rather than stringly-parsed:
+    ``{"status": [Enum(Status)]}``. A plain ``Rule`` subclass, so it runs on the same async path
+    as any custom rule (``passes_async`` / ``validate_async``) — no extra dispatch needed."""
+
+    def __init__(self, enum_cls: type[_PyEnum]) -> None:
+        self._enum_cls = enum_cls
+        self.message = f"The :attribute is not a valid {enum_cls.__name__}."
+
+    async def passes(self, attribute: str, value: Any) -> bool:
+        try:
+            self._enum_cls(value)
+        except ValueError:
+            return False
+        return True
+
+
 class Validator:
     """Rule-based validation (Laravel ``Validator::make``).
 
@@ -262,28 +425,62 @@ class Validator:
         connection: Any = None,
         *,
         strict: bool = False,
+        stop_on_first_failure: bool = False,
+        attributes: Mapping[str, str] | None = None,
     ) -> None:
         self.data = dict(data)
-        self.rules = rules
+        self.rules: dict[str, str | list[Any]] = dict(rules)
         self.messages = dict(messages or {})
+        self.attribute_names = dict(attributes or {})
         self._errors: dict[str, list[str]] = {}
+        #: fields dropped from validated() by `exclude`/`exclude_if`/`exclude_unless`
+        self._excluded: set[str] = set()
+        #: post-pass hooks registered via `after()` (Laravel `after`)
+        self._after: list[Callable[[Validator], None]] = []
         self._connection = connection  # for async DB rules (unique/exists)
         #: when True, an unrecognized rule name raises ``UnknownValidationRule`` instead of no-op'ing
         self.strict = strict
+        #: when True, the WHOLE pass stops at the first field to fail (Laravel `stopOnFirstFailure`)
+        self.stop_on_first_failure = stop_on_first_failure
 
     def _parse_rules(self, ruleset: str | list[Any]) -> list[Any]:
         return (
             [r.strip() for r in ruleset.split("|")] if isinstance(ruleset, str) else list(ruleset)
         )
 
+    def sometimes(
+        self, field: str, rules: str | list[Any], condition: Callable[[Mapping[str, Any]], bool]
+    ) -> Self:
+        """Add ``rules`` to ``field`` only when ``condition(self.data)`` is true (Laravel
+        ``Validator::sometimes``) — for conditions too broad for a single-field rule string."""
+        if condition(self.data):
+            existing = self.rules.get(field)
+            merged = (self._parse_rules(existing) if existing else []) + self._parse_rules(rules)
+            self.rules[field] = merged
+        return self
+
+    def after(self, callback: Callable[[Validator], None]) -> Self:
+        """Register a post-pass hook (Laravel ``after``) — runs once every field's rules have
+        been checked; add errors via ``add_error()``."""
+        self._after.append(callback)
+        return self
+
+    def add_error(self, field: str, message: str) -> None:
+        """Append a validation error for ``field`` — the way an ``after()`` hook reports a
+        failure it discovered (a cross-field/business check no single rule expresses)."""
+        self._errors.setdefault(field, []).append(message)
+
     def passes(self) -> bool:
         from arvel.support.helpers import data_get
 
         self._errors = {}
+        self._excluded = set()
         for field, ruleset in self.rules.items():
             rules = self._parse_rules(ruleset)
             if "*" in field:  # nested array rule (items.*.price)
                 self._validate_wildcard(field, rules)
+                if self.stop_on_first_failure and self._errors:
+                    break
                 continue
             if "sometimes" in rules and field not in self.data:
                 continue  # only validate when the field is present
@@ -291,33 +488,57 @@ class Validator:
             value = data_get(self.data, field)
             if value is None and "nullable" in rules:
                 continue
+            bail = "bail" in rules  # stop THIS field's rules at its first failure
             for rule in rules:
                 if not isinstance(rule, str):  # custom Rule object → handled in passes_async
                     continue
-                if rule in ("nullable", "sometimes"):
+                if rule in ("nullable", "sometimes", "bail"):
                     continue
                 name, _, arg = rule.partition(":")
                 if not self._check(name, value, arg, field):
                     self._errors.setdefault(field, []).append(self._message(field, name, arg))
+                    if bail:
+                        break
+            if self.stop_on_first_failure and self._errors:
+                break
+        for hook in self._after:
+            hook(self)
         return not self._errors
 
     def _validate_wildcard(self, field: str, rules: list[Any]) -> None:
-        """Apply rules to each element of a ``a.*.b`` path, keying errors by the resolved index."""
+        """Apply rules to each element of a ``a.*.b`` path, keying errors by the resolved index.
+        ``distinct`` is checked once across all siblings (it needs the whole array, not a single
+        element) before the per-element loop runs the rest."""
         from arvel.support.helpers import data_get
 
         values = data_get(self.data, field)
         if not isinstance(values, list):
             return
-        for index, value in enumerate(cast("list[Any]", values)):
+        values_list = cast("list[Any]", values)
+        if "distinct" in rules:
+            seen: list[Any] = []
+            for index, sibling in enumerate(values_list):
+                key = field.replace("*", str(index), 1)
+                if sibling in seen:
+                    self._errors.setdefault(key, []).append(self._message(key, "distinct", ""))
+                else:
+                    seen.append(sibling)
+        bail = "bail" in rules
+        for index, value in enumerate(values_list):
             key = field.replace("*", str(index), 1)
             for rule in rules:
                 if not isinstance(rule, str):  # custom Rule object → handled in passes_async
                     continue
-                if rule in ("nullable", "sometimes"):
+                if rule in ("nullable", "sometimes", "bail", "distinct"):
                     continue
                 name, _, arg = rule.partition(":")
+                # a sibling reference in the arg (`required_if:items.*.active,yes`) resolves
+                # against THIS element's index, not every element's.
+                arg = arg.replace("*", str(index))
                 if not self._check(name, value, arg, key):
                     self._errors.setdefault(key, []).append(self._message(key, name, arg))
+                    if bail:
+                        break
 
     def fails(self) -> bool:
         return not self.passes()
@@ -395,6 +616,8 @@ class Validator:
 
         result: dict[str, Any] = {}
         for field in self.rules:
+            if field in self._excluded:  # `exclude`/`exclude_if`/`exclude_unless` (spec 12 §2)
+                continue
             for path in self._concrete_paths(field):
                 if Arr.has(self.data, path):
                     _assign_path(result, path, data_get(self.data, path))
@@ -459,9 +682,9 @@ class Validator:
             case "boolean":
                 return value in (True, False, 0, 1, "0", "1", "true", "false")
             case "email":
-                return isinstance(value, str) and bool(_EMAIL.match(value))
+                return _check_email(value)
             case "url":
-                return isinstance(value, str) and value.startswith(("http://", "https://"))
+                return _check_url(value, arg)
             case "alpha":
                 return isinstance(value, str) and value.isalpha()
             case "alpha_num":
@@ -557,21 +780,48 @@ class Validator:
                 filename = str(getattr(value, "filename", ""))
                 ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
                 return ext in [m.strip().lower() for m in arg.split(",")]
+            case "dimensions":
+                return _check_dimensions(value, arg)
+            case "exclude":
+                self._excluded.add(field)
+                return True
+            case "exclude_if":
+                from arvel.support.helpers import data_get
+
+                other_field, _, val = arg.partition(",")
+                if str(data_get(self.data, other_field)) == val:
+                    self._excluded.add(field)
+                return True
+            case "exclude_unless":
+                from arvel.support.helpers import data_get
+
+                other_field, _, val = arg.partition(",")
+                if str(data_get(self.data, other_field)) != val:
+                    self._excluded.add(field)
+                return True
             case "unique" | "exists":
                 return True  # DB rules — validated asynchronously in passes_async; no-op here
             case _:
+                from arvel.validation import rules as _rules
+
+                extra = _rules.check(self, rule, value, arg, field)
+                if extra is not None:
+                    return extra
                 if self.strict:
                     raise UnknownValidationRule(rule)
                 return True  # unknown rule is a no-op (lenient default)
 
     def _message(self, field: str, rule: str, arg: str) -> str:
+        # `attributes()` (spec 12 §3) swaps in a friendly name for display only — error keys and
+        # message-override lookups still key off the real `field`.
+        display = self.attribute_names.get(field, field)
         custom = self.messages.get(f"{field}.{rule}") or self.messages.get(rule)
         if custom is not None:
-            return custom.format(field=field, arg=arg)
+            return custom.format(field=display, arg=arg)
         localized = self._localized_message(field, rule, arg)
         if localized is not None:
             return localized
-        return _DEFAULT_MESSAGES.get(rule, "The {field} is invalid.").format(field=field, arg=arg)
+        return _DEFAULT_MESSAGES.get(rule, "The {field} is invalid.").format(field=display, arg=arg)
 
     @staticmethod
     def _localized_message(field: str, rule: str, arg: str) -> str | None:
@@ -587,6 +837,7 @@ class Validator:
 
 
 __all__ = [
+    "Enum",
     "FormRequest",
     "Rule",
     "Schema",
