@@ -291,7 +291,8 @@ class CacheRepository:
             return True
 
     async def has(self, key: str) -> bool:
-        return await self._client.get(key) is not None
+        # existence, not truthiness — a key holding None is still present
+        return bool(await self._client.exists(key))
 
     async def forget(self, key: str) -> bool:
         with span("cache forget", kind="client", attributes={"cache.operation": "forget"}):
