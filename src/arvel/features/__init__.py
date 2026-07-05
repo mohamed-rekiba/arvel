@@ -7,6 +7,13 @@ re-running the resolver (the store *is* the memoization; there is no separate in
 ``scope`` is whatever the flag varies by (a user, a team, or ``None`` for a global flag) and is
 serialized to a string key (``_scope_key``) before it ever reaches a store.
 
+Resolvers must be **side-effect-free / idempotent**: on the database and cache drivers the
+get→resolve→put window has an ``await`` I/O suspension, so two concurrent first-time calls for the
+same scope can both miss the store and run the resolver twice (best-effort memoization, exactly as
+Laravel Pennant). The stored *value* is unaffected (the put is idempotent); only a resolver with an
+observable side effect would notice. The array driver has no suspension point, so it is strictly
+once.
+
 Storage drivers (the ``arvel.support.manager.Manager`` strategy base, config ``features.driver``):
 ``array`` (in-memory, default/test), ``database`` (the ``features`` table, story 10), ``cache``
 (story 06 — tagged per flag name so :meth:`FeatureManager.purge` can clear every scope for a flag

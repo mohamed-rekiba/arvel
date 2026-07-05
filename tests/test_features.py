@@ -307,3 +307,20 @@ def test_feature_purge_clears_stored_values() -> None:
         assert asyncio.run(manager.driver().get("flag", "u1")) is _MISSING
     finally:
         set_application(None)
+
+
+async def test_a_cached_falsy_value_is_not_re_resolved() -> None:
+    # review nit: the _MISSING sentinel must distinguish "unstored" from a stored falsy value —
+    # a resolver returning False must run exactly ONCE, not re-run because the value is falsy
+    manager = FeatureManager()
+    calls: list[str] = []
+
+    def resolver(scope: Any) -> bool:
+        calls.append(scope)
+        return False  # a legitimately falsy flag value
+
+    manager.define("off", resolver)
+    assert await manager.active("off", "u1") is False
+    assert await manager.active("off", "u1") is False  # served from the store, not re-resolved
+    assert await manager.value("off", "u1") is False
+    assert calls == ["u1"]  # resolver ran exactly once despite the falsy cached value
