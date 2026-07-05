@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextvars
 import json
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -40,6 +41,24 @@ def load_translations(lang_dir: Path | str) -> dict[str, dict[str, Any]]:
 
 
 _CLDR_ORDER = ("zero", "one", "two", "few", "many", "other")
+
+# A choice segment may open with an explicit selector: {n} exact count or [a,b] interval
+# (b may be * for open-ended, a may be * for open-below). Text follows.
+_SELECTOR = re.compile(r"^(?P<open>[\[{])\s*(?P<cond>[^\]}]*?)\s*[\]}]\s*(?P<text>.*)$", re.DOTALL)
+
+
+def _ucfirst(value: str) -> str:
+    return value[:1].upper() + value[1:]
+
+
+def _selector_matches(opener: str, cond: str, n: int) -> bool:
+    if opener == "{":  # exact count
+        return cond.lstrip("-").isdigit() and int(cond) == n
+    low, _, high = cond.partition(",")
+    low, high = low.strip(), high.strip()
+    low_ok = low in ("", "*") or n >= int(low)
+    high_ok = high in ("", "*") or n <= int(high)
+    return low_ok and high_ok
 
 
 def plural_category(locale: str, n: int) -> str:
@@ -134,19 +153,32 @@ class Translator:
         return node if isinstance(node, str) else None
 
     def _replace(self, line: str, replace: Mapping[str, Any]) -> str:
-        for k, v in replace.items():
-            line = line.replace("{" + k + "}", str(v)).replace(":" + k, str(v))
+        # longest key first so :name never consumes the :name_full token when both are given
+        for k, v in sorted(replace.items(), key=lambda kv: len(kv[0]), reverse=True):
+            val = str(v)
+            line = line.replace("{" + k + "}", val)
+            line = line.replace(":" + k.upper(), val.upper())
+            line = line.replace(":" + _ucfirst(k), _ucfirst(val))
+            line = line.replace(":" + k, val)
         return line
 
     def _plural(self, line: str, n: int, locale: str) -> str:
-        segments = [s.strip() for s in line.split("|")]
-        if len(segments) == 1:
-            return segments[0]
+        # explicit selectors ({n} exact, [a,b]/[a,*]/[*,b] intervals) win; the rest
+        # are positional CLDR forms selected by plural category.
+        plain: list[str] = []
+        for segment in (s.strip() for s in line.split("|")):
+            match = _SELECTOR.match(segment)
+            if match is None:
+                plain.append(segment)
+            elif _selector_matches(match.group("open"), match.group("cond"), n):
+                return match.group("text").strip()
+        if len(plain) <= 1:
+            return plain[0] if plain else line
         category = plural_category(locale, n)
-        if len(segments) == 2:
-            return segments[0] if category == "one" else segments[1]
-        wanted = _CLDR_ORDER.index(category) if category in _CLDR_ORDER else len(segments) - 1
-        return segments[min(wanted, len(segments) - 1)]
+        if len(plain) == 2:
+            return plain[0] if category == "one" else plain[1]
+        wanted = _CLDR_ORDER.index(category) if category in _CLDR_ORDER else len(plain) - 1
+        return plain[min(wanted, len(plain) - 1)]
 
 
 _DEFAULT = Translator()
