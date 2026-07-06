@@ -69,7 +69,11 @@ class Schema:
             if spec["using"] in ("gin", "gist") and self.dialect != "postgresql":
                 _warn_pg_only(f"{spec['using'].upper()} index", self.dialect, action="plain index")
             self._op.create_index(
-                spec["name"], name, _index_columns(spec["columns"]), postgresql_using=spec["using"]
+                spec["name"],
+                name,
+                _index_columns(spec["columns"]),
+                unique=spec.get("unique", False),
+                postgresql_using=spec["using"],
             )
 
     def table(self, name: str, define: Callable[[Blueprint], Any]) -> None:
@@ -84,7 +88,11 @@ class Schema:
             if spec["using"] in ("gin", "gist") and self.dialect != "postgresql":
                 _warn_pg_only(f"{spec['using'].upper()} index", self.dialect, action="plain index")
             self._op.create_index(
-                spec["name"], name, _index_columns(spec["columns"]), postgresql_using=spec["using"]
+                spec["name"],
+                name,
+                _index_columns(spec["columns"]),
+                unique=spec.get("unique", False),
+                postgresql_using=spec["using"],
             )
 
     def drop_column(self, table: str, *columns: str) -> None:

@@ -180,8 +180,14 @@ class Request:
         return None
 
     async def input(self, key: str, default: Any = None) -> Any:
-        """A single value by key, looking in the JSON body first, then the query string."""
-        body = await self.json()
+        """A single value by key, looking in the JSON body first, then the query string.
+
+        A non-JSON body (form-encoded, etc.) raises when parsed as JSON — swallow that and fall
+        through to the query string rather than surface a decode error to the caller."""
+        try:
+            body = await self.json()
+        except Exception:
+            body = None
         if isinstance(body, dict) and key in body:
             return cast("dict[str, Any]", body)[key]
         return self.query(key, default)

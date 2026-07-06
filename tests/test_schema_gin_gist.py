@@ -73,7 +73,7 @@ def test_migrator_emits_create_index_for_gin() -> None:
     assert len(created) == 1
     _, args, kwargs = created[0]
     assert args == ("docs_data_gin", "docs", ["data"])
-    assert kwargs == {"postgresql_using": "gin"}
+    assert kwargs == {"unique": False, "postgresql_using": "gin"}
 
 
 def test_index_requires_a_column() -> None:

@@ -383,7 +383,7 @@ class Rule:
     instance goes straight into a field's rule list, e.g. ``{"code": [Uppercase()]}``. On
     failure ``message`` is recorded (``:attribute`` is replaced with the field name)."""
 
-    message: str = "The:attribute is invalid."
+    message: str = "The :attribute is invalid."
 
     def passes(self, attribute: str, value: Any) -> bool:
         raise NotImplementedError(f"{type(self).__name__} must implement passes()")
@@ -397,7 +397,7 @@ class Enum(Rule):
 
     def __init__(self, enum_cls: type[_PyEnum]) -> None:
         self._enum_cls = enum_cls
-        self.message = f"The:attribute is not a valid {enum_cls.__name__}."
+        self.message = f"The :attribute is not a valid {enum_cls.__name__}."
 
     def passes(self, attribute: str, value: Any) -> bool:
         try:

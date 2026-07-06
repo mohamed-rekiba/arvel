@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from arvel.database import ConnectionResolver
 from arvel.database.migrations import Migration, Migrator
 from arvel.features import DatabaseFeatureStore, FeatureManager, FeatureValue
@@ -39,6 +41,14 @@ async def test_shipped_migrations_create_working_tables() -> None:
         store = DatabaseFeatureStore()
         await store.put("beta", "user:1", True)
         assert await store.get("beta", "user:1") is True
+        # composite unique (name, scope): a second raw insert for the same pair is rejected
+        import sqlalchemy as sa
+        from sqlalchemy.exc import IntegrityError
+
+        features = sa.table("features", sa.column("name"), sa.column("scope"), sa.column("value"))
+        with pytest.raises(IntegrityError):
+            async with db.engine().begin() as conn:
+                await conn.execute(features.insert().values(name="beta", scope="user:1", value="x"))
     finally:
         await db.dispose()
 
