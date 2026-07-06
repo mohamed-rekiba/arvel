@@ -92,13 +92,21 @@ to a portable JSON column otherwise:
 t.vector("embedding", dimensions=1536)        # in a migration blueprint
 ```
 
-Nearest-neighbour search uses pgvector's distance operators (`<->` L2, `<=>` cosine). Compute the
-distance with `select_raw` and order by it:
+Similarity queries are first-class on the builder — pass the query embedding as a plain list of
+floats (arvel never generates embeddings; bring your own):
 
 ```python
-hits = await (Document.query()
-    .select_raw(f"*, embedding <=> '{q}' AS distance")   # q: the query embedding literal
-    .order_by("distance")
-    .limit(5)
+# five nearest documents, most similar first (cosine by default)
+hits = await Document.query().order_by_similarity("embedding", q).limit(5).get()
+
+# only close matches, composable with ordinary wheres
+close = await (Document.query()
+    .where("published", True)
+    .where_vector_similar("embedding", q, metric="l2", max_distance=0.5)
     .get())
 ```
+
+`metric` is one of `"cosine"`, `"l2"`, or `"inner"` (negative inner product — ascending is always
+most-similar-first). On a column without vector operators (the JSON fallback, or a non-vector
+column) both methods raise `UnsupportedDriverOperation` instead of emitting SQL that would compare
+strings.
