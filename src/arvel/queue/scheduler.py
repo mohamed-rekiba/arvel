@@ -300,9 +300,8 @@ class ScheduledEvent:
         finally:
             if ran:  # after-hooks fire only when the event actually ran, not on a skipped tick
                 await self._fire(self._after)
-            for (
-                lock
-            ) in release_locks:  # overlap lock only; the one-server claim expires with its TTL
+            # overlap lock only; the one-server claim is left to expire with its TTL
+            for lock in release_locks:
                 await lock.release()
 
 
