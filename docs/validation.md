@@ -189,7 +189,7 @@ Validator(data, {"name": "requried"}, strict=True).passes() # raises UnknownVali
 `UnknownValidationRule` is a **programmer** error, not a user-input failure — it is *not* a
 `ValidationException` and does not render as 422. Turn it on in development to surface misspelled or
 unsupported rules early. (`unique` / `exists` and custom `Rule` objects are recognized and never
-flagged, even though they're validated on the async path.)
+flagged — the DB string rules run on the async path, custom `Rule` objects on both.)
 
 ## Custom messages
 
@@ -322,9 +322,10 @@ an empty dict) when annotations already say everything you need.
 - **Forgetting `nullable` before a type rule.** `"age": "integer|min:18"` rejects a missing value;
   `"age": "nullable|integer|min:18"` skips the rest when it's `None`. Order matters — `nullable`
   goes first.
-- **DB rules need the async path.** `unique` / `exists` and custom `Rule` objects run on
-  `passes_async` / `fails_async` / `validate_async`. The sync `passes()` / `validate()` only run the
-  string rules — call the async variants when a rule touches the database.
+- **DB rules need the async path.** Only the database string rules `unique` / `exists` require
+  `passes_async` / `fails_async` / `validate_async`; the sync `passes()` / `validate()` skip them.
+  Custom `Rule` objects are synchronous and run on both paths — call the async variants when a rule
+  touches the database.
 - **`min`/`max` mean different things by type.** On a number they compare the **value**; on a string
   or list they compare the **length**. `"name": "max:255"` caps length; `"age": "max:120"` caps the
   number.

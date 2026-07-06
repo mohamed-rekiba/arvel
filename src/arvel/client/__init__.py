@@ -519,8 +519,6 @@ class Client:
     def _shared_client(self) -> httpx.AsyncClient | None:
         if self._fake_state is not None:
             return None  # faking swaps the transport per call — no shared client
-        import asyncio
-
         try:
             loop_id = id(asyncio.get_running_loop())
         except RuntimeError:
