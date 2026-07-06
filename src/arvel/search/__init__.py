@@ -175,6 +175,19 @@ def _safe_field(field: str) -> str:
     return field
 
 
+def _filter_value(value: Any) -> str:
+    """Render a filter value as a Meilisearch literal. bool/None must be the engine's
+    ``true``/``false``/``null`` — Python's ``repr`` would emit ``True``/``None`` and silently
+    never match. bool is checked before int since ``bool`` subclasses ``int``."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return "null"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    return repr(str(value))  # quoted string literal
+
+
 class MeilisearchEngine:
     """Meilisearch-backed engine (optional ``[search]`` extra). Construction fails with
     ``MissingExtraError`` when the ``meilisearch`` client isn't installed.
@@ -233,7 +246,7 @@ class MeilisearchEngine:
             # filter-expression syntax. Field names are interpolated raw, so guard them: only a
             # bare identifier is allowed — never request-derived free text (filter-injection).
             options["filter"] = [
-                f"{_safe_field(field)} = {value!r}" for field, value in filters.items()
+                f"{_safe_field(field)} = {_filter_value(value)}" for field, value in filters.items()
             ]
         if sort:
             options["sort"] = list(sort)
