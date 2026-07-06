@@ -1,4 +1,4 @@
-"""arvel.features — Pennant-style feature flags.
+"""arvel.features — feature flags.
 
 ``Feature.define(name, resolver)`` registers a flag; ``resolver(scope) -> bool | str | value`` is
 evaluated **once per scope** — the resolved value is written straight to the configured store, so
@@ -10,7 +10,7 @@ serialized to a string key (``_scope_key``) before it ever reaches a store.
 Resolvers must be **side-effect-free / idempotent**: on the database and cache drivers the
 get→resolve→put window has an ``await`` I/O suspension, so two concurrent first-time calls for the
 same scope can both miss the store and run the resolver twice (best-effort memoization, exactly as
-Pennant). The stored *value* is unaffected (the put is idempotent); only a resolver with an
+the reference design). The stored *value* is unaffected (the put is idempotent); only a resolver with an
 observable side effect would notice. The array driver has no suspension point, so it is strictly
 once.
 
@@ -18,7 +18,7 @@ Storage drivers (the ``arvel.support.manager.Manager`` strategy base, config ``f
 ``array`` (in-memory, default/test), ``database`` (the ``features`` table, story 10), ``cache``
 (story 06 — tagged per flag name so :meth:`FeatureManager.purge` can clear every scope for a flag
 in one call). Not part of the original ch-08 port spec — added on request, following the
-Pennant design (a small, high-value addition needing no new infra beyond cache/db; DR-0029).
+reference design (a small, high-value addition needing no new infra beyond cache/db; DR-0029).
 """
 
 from __future__ import annotations
@@ -153,7 +153,7 @@ class CacheFeatureStore:
 
 
 class FeatureManager(Manager):
-    """Resolves the configured feature store + does per-scope resolution (Pennant's
+    """Resolves the configured feature store + does per-scope resolution (the reference's
     ``FeatureManager``): the store only remembers already-resolved values — this class owns the
     resolver registry and the "run once per scope" behavior."""
 

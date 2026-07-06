@@ -1,6 +1,6 @@
 """arvel.views — server templating on **Jinja2** (mandated engine; the ``[view]`` extra).
 
-``view("welcome", {...})`` builds a ``View`` (Blade-style dotted name → ``welcome.html``);
+``view("welcome", {...})`` builds a ``View`` (dotted name → ``welcome.html``);
 ``ViewFactory`` wraps an async Jinja2 ``Environment`` (autoescape on) with framework
 globals (``trans``/``trans_choice``). The frontend SPA toolchain is **decoupled** — Python
 owns server templates + (P7.2) the Inertia protocol + the Vite manifest reader, not the JS
@@ -123,7 +123,7 @@ class View:
 
 
 def view(name: str, data: dict[str, Any] | None = None) -> View:
-    """Build a view from a Blade-style dotted name (``pages.home`` → ``pages/home.html``)."""
+    """Build a view from a dotted name (``pages.home`` → ``pages/home.html``)."""
     return View(name.replace(".", "/") + ".html", data or {})
 
 

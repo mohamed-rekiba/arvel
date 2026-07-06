@@ -205,13 +205,13 @@ def test_response_assertion_matrix() -> None:
             http.get("/go", follow_redirects=False).assert_redirect("/nope")
 
 
-# -- console: artisan() --------------------------------------------------------------------------
+# -- console: cli() --------------------------------------------------------------------------
 
 
-def test_artisan_runs_a_command_class_with_seeded_prompt_and_captured_output() -> None:
+def test_cli_runs_a_command_class_with_seeded_prompt_and_captured_output() -> None:
     from arvel.console import Command
     from arvel.kernel import Application
-    from arvel.testing import artisan
+    from arvel.testing import cli
 
     class Greet(Command):
         signature = "greet {name} {--loud}"
@@ -223,14 +223,14 @@ def test_artisan_runs_a_command_class_with_seeded_prompt_and_captured_output() -
     app = Application()
     app.command_classes.append(Greet)
 
-    result = artisan(app, "greet Ada --loud", input=["Bob"])
+    result = cli(app, "greet Ada --loud", input=["Bob"])
     result.assert_exit_code(0).assert_output_contains("hello Bob (Ada, loud=True)")
 
 
-def test_artisan_runs_a_console_registered_closure() -> None:
+def test_cli_runs_a_console_registered_closure() -> None:
     from arvel.console.closure import ClosureCommand
     from arvel.kernel import Application
-    from arvel.testing import artisan
+    from arvel.testing import cli
 
     ran: list[str] = []
 
@@ -240,14 +240,14 @@ def test_artisan_runs_a_console_registered_closure() -> None:
     app = Application()
     app.console_commands["greet"] = ClosureCommand("greet {name}", greet)
 
-    artisan(app, "greet Ada").assert_exit_code(0)
+    cli(app, "greet Ada").assert_exit_code(0)
     assert ran == ["Ada"]
 
 
-def test_artisan_assert_exit_code_fails_with_a_readable_message() -> None:
+def test_cli_assert_exit_code_fails_with_a_readable_message() -> None:
     from arvel.console import Command
     from arvel.kernel import Application
-    from arvel.testing import artisan
+    from arvel.testing import cli
 
     class Boom(Command):
         signature = "boom"
@@ -260,25 +260,25 @@ def test_artisan_assert_exit_code_fails_with_a_readable_message() -> None:
     app = Application()
     app.command_classes.append(Boom)
 
-    result = artisan(app, "boom")
+    result = cli(app, "boom")
     result.assert_exit_code(1)
     with pytest.raises(AssertionError, match="expected exit code 0"):
         result.assert_exit_code(0)
 
 
-def test_artisan_unknown_command_raises() -> None:
+def test_cli_unknown_command_raises() -> None:
     from arvel.kernel import Application
-    from arvel.testing import artisan
+    from arvel.testing import cli
 
     with pytest.raises(ValueError, match="is not registered"):
-        artisan(Application(), "nope")
+        cli(Application(), "nope")
 
 
-def test_artisan_positional_default_is_applied_when_omitted() -> None:
+def test_cli_positional_default_is_applied_when_omitted() -> None:
     # review MEDIUM: an omitted {name=default} positional must bind its default, matching the CLI
     from arvel.console.closure import ClosureCommand
     from arvel.kernel import Application
-    from arvel.testing import artisan
+    from arvel.testing import cli
 
     got: list[str] = []
 
@@ -287,7 +287,7 @@ def test_artisan_positional_default_is_applied_when_omitted() -> None:
 
     app = Application()
     app.console_commands["hi"] = ClosureCommand("hi {name=World}", hi)
-    artisan(app, "hi").assert_exit_code(0)  # name omitted -> default "World"
+    cli(app, "hi").assert_exit_code(0)  # name omitted -> default "World"
     assert got == ["World"]
 
 

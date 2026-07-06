@@ -170,29 +170,29 @@ def test_terminate_runs_on_boot_failure(tmp_path: Path, monkeypatch: pytest.Monk
         set_application(None)
 
 
-# -- Artisan.call / call_silently (CLI-5) -------------------------------------------------------
+# -- Cli.call / call_silently (CLI-5) -------------------------------------------------------
 
 
-def test_artisan_call_runs_a_builtin_and_returns_its_exit_code() -> None:
-    from arvel.console.kernel import Artisan
+def test_cli_call_runs_a_builtin_and_returns_its_exit_code() -> None:
+    from arvel.console.kernel import Cli
 
-    assert Artisan.call("extras") == 0
+    assert Cli.call("extras") == 0
 
 
-def test_artisan_call_returns_the_command_s_typer_exit_code(
+def test_cli_call_returns_the_command_s_typer_exit_code(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from arvel.console.kernel import Artisan
+    from arvel.console.kernel import Cli
 
     monkeypatch.chdir(tmp_path)
     (tmp_path / "taken").mkdir()
-    assert Artisan.call("new", ["taken"]) == 1  # `new` exits 1 when the target already exists
+    assert Cli.call("new", ["taken"]) == 1  # `new` exits 1 when the target already exists
 
 
-def test_artisan_call_silently_suppresses_output(capsys: pytest.CaptureFixture[str]) -> None:
-    from arvel.console.kernel import Artisan
+def test_cli_call_silently_suppresses_output(capsys: pytest.CaptureFixture[str]) -> None:
+    from arvel.console.kernel import Cli
 
-    assert Artisan.call_silently("extras") == 0
+    assert Cli.call_silently("extras") == 0
     assert capsys.readouterr().out == ""
 
 
@@ -204,9 +204,9 @@ def app() -> Iterator[Application]:
     set_application(None)
 
 
-def test_artisan_call_dispatches_an_app_registered_closure(app: Application) -> None:
+def test_cli_call_dispatches_an_app_registered_closure(app: Application) -> None:
     from arvel import Console
-    from arvel.console.kernel import Artisan
+    from arvel.console.kernel import Cli
 
     ran: list[str] = []
 
@@ -214,13 +214,13 @@ def test_artisan_call_dispatches_an_app_registered_closure(app: Application) -> 
         ran.append(name)
 
     Console.command("greet {name}", greet)
-    assert Artisan.call("greet", {"name": "Ada"}) == 0
+    assert Cli.call("greet", {"name": "Ada"}) == 0
     assert ran == ["Ada"]
 
 
-def test_artisan_call_dispatches_an_app_registered_command_class(app: Application) -> None:
+def test_cli_call_dispatches_an_app_registered_command_class(app: Application) -> None:
     from arvel.console import Command
-    from arvel.console.kernel import Artisan
+    from arvel.console.kernel import Cli
 
     seen: dict[str, object] = {}
 
@@ -232,29 +232,29 @@ def test_artisan_call_dispatches_an_app_registered_command_class(app: Applicatio
             seen["force"] = self.option("force")
 
     app.command_classes.append(Notify)
-    assert Artisan.call("notify", {"user": "Ada", "--force": True}) == 0
+    assert Cli.call("notify", {"user": "Ada", "--force": True}) == 0
     assert seen == {"user": "Ada", "force": True}
 
 
-def test_artisan_call_without_an_active_app_errors_clearly() -> None:
-    from arvel.console.kernel import Artisan
+def test_cli_call_without_an_active_app_errors_clearly() -> None:
+    from arvel.console.kernel import Cli
 
     with pytest.raises(RuntimeError, match="no active application"):
-        Artisan.call("some:app-registered-command")
+        Cli.call("some:app-registered-command")
 
 
-def test_artisan_call_unknown_command_raises(app: Application) -> None:
-    from arvel.console.kernel import Artisan
+def test_cli_call_unknown_command_raises(app: Application) -> None:
+    from arvel.console.kernel import Cli
 
     with pytest.raises(ValueError, match="is not defined"):
-        Artisan.call("totally-unknown-command")
+        Cli.call("totally-unknown-command")
 
 
-async def test_artisan_call_works_from_inside_a_running_event_loop(app: Application) -> None:
-    # the production path: Artisan.call from a request/scheduled task (async) — the sync-body tests
+async def test_cli_call_works_from_inside_a_running_event_loop(app: Application) -> None:
+    # the production path: Cli.call from a request/scheduled task (async) — the sync-body tests
     # masked that the app-command path did asyncio.run() and crashed inside a running loop.
     from arvel import Console
-    from arvel.console.kernel import Artisan
+    from arvel.console.kernel import Cli
 
     ran: list[str] = []
 
@@ -262,8 +262,6 @@ async def test_artisan_call_works_from_inside_a_running_event_loop(app: Applicat
         ran.append(name)
 
     Console.command("greet2 {name}", greet)
-    exit_code = Artisan.call(
-        "greet2", {"name": "Grace"}
-    )  # called from an async test = running loop
+    exit_code = Cli.call("greet2", {"name": "Grace"})  # called from an async test = running loop
     assert exit_code == 0
     assert ran == ["Grace"]

@@ -1,4 +1,4 @@
-"""API token guard (Sanctum-parity): create + resolve + bearer guard."""
+"""API token guard: create + resolve + bearer guard."""
 
 from __future__ import annotations
 
@@ -73,7 +73,7 @@ async def test_token_guard_reads_bearer_header() -> None:
         await db.dispose()
 
 
-# --- abilities / scopes (Sanctum parity) --------------------------------------
+# --- abilities / scopes --------------------------------------
 
 
 async def test_token_abilities_scope() -> None:
@@ -245,7 +245,7 @@ async def test_resolve_token_stamps_last_used_at_once() -> None:
 async def test_last_used_at_write_is_throttled() -> None:
     db = await _setup()
     app = Application()
-    app.make("config").set("sanctum.last_used_throttle", 3600)  # 1h — won't elapse in this test
+    app.make("config").set("api_tokens.last_used_throttle", 3600)  # 1h — won't elapse in this test
     set_application(app)
     try:
         user = await Account.create(email="ada@example.com")
@@ -266,7 +266,7 @@ async def test_last_used_at_write_is_throttled() -> None:
 async def test_last_used_at_rewrites_once_throttle_elapses() -> None:
     db = await _setup()
     app = Application()
-    app.make("config").set("sanctum.last_used_throttle", 60)
+    app.make("config").set("api_tokens.last_used_throttle", 60)
     set_application(app)
     try:
         user = await Account.create(email="ada@example.com")
@@ -314,13 +314,13 @@ def test_token_can_false_with_no_active_token() -> None:
     assert token_can("anything") is False  # fail closed, contextvar default is None
 
 
-# --- global default expiration (config sanctum.expiration) --------------------
+# --- global default expiration (config api_tokens.expiration) --------------------
 
 
 async def test_create_token_applies_global_default_expiration() -> None:
     db = await _setup()
     app = Application()
-    app.make("config").set("sanctum.expiration", 60)  # minutes
+    app.make("config").set("api_tokens.expiration", 60)  # minutes
     set_application(app)
     try:
         user = await Account.create(email="ada@example.com")
@@ -335,7 +335,7 @@ async def test_create_token_applies_global_default_expiration() -> None:
 async def test_create_token_explicit_expires_in_overrides_config_default() -> None:
     db = await _setup()
     app = Application()
-    app.make("config").set("sanctum.expiration", 60)
+    app.make("config").set("api_tokens.expiration", 60)
     set_application(app)
     try:
         user = await Account.create(email="ada@example.com")

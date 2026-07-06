@@ -928,7 +928,7 @@ class Builder:
 
     async def get(self) -> Any:
         """Every matching row. A **hydrating** (model-bound) query returns an
-        :class:`~arvel.database.collection.EloquentCollection` (doc B3); a raw table builder (no
+        :class:`~arvel.database.collection.ModelCollection` (doc B3); a raw table builder (no
                 ``hydrate``) returns a plain ``list[dict]`` — the query builder returns a Collection
                 too, but arvel keeps raw rows as plain dicts (typed simplicity over exact parity)."""
         rows = await self._require_resolver().fetch_all(self.to_select())
@@ -938,9 +938,9 @@ class Builder:
         models = [await _maybe_await(self._hydrate(r)) for r in records]
         for spec in self._eager:
             await self._eager_load_path(models, spec.split("."), self._eager_constraints.get(spec))
-        from arvel.database.collection import EloquentCollection
+        from arvel.database.collection import ModelCollection
 
-        return EloquentCollection(models)
+        return ModelCollection(models)
 
     async def upsert(
         self, rows: list[dict[str, Any]], unique_by: list[str], update: list[str] | None = None
@@ -1010,7 +1010,7 @@ class Builder:
                 loaded = model._relations.get(name)
                 if isinstance(
                     loaded, (list, Collection)
-                ):  # a many-relation: list or EloquentCollection
+                ):  # a many-relation: list or ModelCollection
                     nested.extend(cast("list[Any]", loaded))
                 elif loaded is not None:
                     nested.append(loaded)

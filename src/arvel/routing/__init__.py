@@ -272,7 +272,7 @@ class Router:
         ``directory/index.html`` and lets that router (history-mode) decide what to render — the
         same trick as the own OPTIONAL catch-all ``Route::get('/{any}',...)->where('any',
         '.*')`` or Nginx's ``try_files $uri $uri/ /index.html``. It's optional in too — a
-        server-rendered (Blade/Inertia-SSR) or API-only app has no such route. Pass
+        server-rendered or API-only app has no such route. Pass
         ``spa_fallback=False`` for those: only real files under ``directory`` are ever served
         (favicon/robots/storage/...), and an unmatched path 404s normally rather than claiming
         ``/`` or any other path your app already owns.

@@ -2,7 +2,7 @@
 
 Feature flags let you ship code behind a switch — roll a change out to one user, one team, or
 everyone, without a deploy for every flip. arvel's feature-flag module follows
-[Pennant]: define a flag once with a **resolver**, then
+define a flag once with a **resolver**, then
 ask whether it's active for a given **scope** (a user, a team, or nothing at all for a global
 flag).
 

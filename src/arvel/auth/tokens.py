@@ -1,14 +1,14 @@
-"""arvel.auth.tokens — API tokens (Sanctum parity): scopes + expiry + last-used + abilities middleware.
+"""arvel.auth.tokens — personal API tokens: scopes + expiry + last-used + abilities middleware.
 
 A token is a high-entropy random string shown to the client **once**; only its SHA-256 hash is
 stored, so a database leak doesn't expose usable tokens. Each token carries **abilities** (scopes —
 ``["*"]`` grants everything) and an optional **expiry**; ``resolve_token`` rejects expired tokens and
 ``ApiToken.can(ability)`` checks the scope. ``TokenGuard`` authenticates a request from its
 ``Authorization: Bearer <token>`` header, and sets :func:`current_access_token` for the rest of the
-request (parity with Sanctum's ``$request->user()->currentAccessToken()``, request-scoped here
+request (the current-access-token accessor, request-scoped here
 instead of hung off the model instance). ``abilities()``/``ability()`` build route-middleware classes
 that authenticate the bearer token *and* enforce its scopes in one step — arvel's equivalent of
-Sanctum's named ``abilities:a,b``/``ability:a`` middleware, but built from explicit string args (like
+the named ``abilities:a,b``/``ability:a`` middleware pattern, but built from explicit string args (like
 ``Authorize()`` in ``arvel.auth.middleware``) rather than parsed from a colon-separated alias string.
 Parity glue over stdlib hashing — not a reimplementation of any crypto primitive. Grounded in
 knowledge/port/15.
@@ -91,8 +91,8 @@ async def create_token(
 
     ``abilities`` scopes the token (default ``["*"]`` = all). ``expires_in`` is a lifetime in
     **seconds**; omit (``None``) to fall back to the global default expiration, config
-    ``sanctum.expiration`` (**minutes**, Sanctum parity) — or a non-expiring token when that's unset
-    too (arvel/Sanctum's shared default: ``null``/``None``).
+    ``api_tokens.expiration`` (**minutes**) — or a non-expiring token when that's unset
+    too (the default: ``None``).
 
     Validated at mint (fail fast, never store a footgun token): a bare ``str`` ability is treated as a
     single ability (not split into characters); ``abilities`` must be a non-empty iterable of
@@ -114,7 +114,7 @@ async def create_token(
     if resolved_expires_in is None:
         from arvel.kernel.config import config_default
 
-        default_minutes = config_default("sanctum.expiration", None)
+        default_minutes = config_default("api_tokens.expiration", None)
         if default_minutes is not None:
             resolved_expires_in = int(default_minutes) * 60
 
@@ -161,14 +161,14 @@ async def resolve_token(plaintext: str) -> ApiToken | None:
 
 
 async def _touch_last_used(record: ApiToken) -> None:
-    """Stamp ``last_used_at`` — throttled to at most once per config ``sanctum.last_used_throttle``
+    """Stamp ``last_used_at`` — throttled to at most once per config ``api_tokens.last_used_throttle``
     seconds (default 60), so a hot endpoint doesn't take a write on every single request.
-    Sanctum updates ``last_used_at`` unconditionally each request; this throttle is an idiomatic,
+    The reference behavior stamps ``last_used_at`` unconditionally each request; this throttle is an idiomatic,
     documented divergence (see docs/auth/api-tokens.md)."""
     from arvel.dates import Date
     from arvel.kernel.config import config_default
 
-    throttle = int(config_default("sanctum.last_used_throttle", 60))
+    throttle = int(config_default("api_tokens.last_used_throttle", 60))
     last_used_at = getattr(record, "last_used_at", None)
     now = Date.now()
     if last_used_at is not None and (now.to_py() - last_used_at.to_py()).total_seconds() < throttle:
@@ -203,7 +203,7 @@ class TokenGuard:
 
 def current_access_token() -> ApiToken | None:
     """The ``ApiToken`` active for this request — set by :class:`TokenGuard` once it resolves a valid
-    bearer token; ``None`` outside a token-authenticated request (Sanctum's
+    bearer token; ``None`` outside a token-authenticated request (the
     ``$request->user()->currentAccessToken()``, request-scoped here instead of hung off the user)."""
     return cast("ApiToken | None", _current_token.get())
 
@@ -217,7 +217,7 @@ def token_can(ability: str) -> bool:
 
 def abilities(*required: str) -> type[Any]:
     """A route-middleware **class** requiring the active bearer token to hold **all** of
-    ``required`` (Sanctum's ``abilities:a,b``). Authenticates the bearer token itself (**401** if
+    ``required`` (the ``abilities:a,b`` form). Authenticates the bearer token itself (**401** if
     missing/invalid/expired) and enforces the scope (**403** if any ability is missing) — one
     middleware covers both steps. Returns a class, like ``Authorize()``:
     ``router.get(..., middleware=[abilities("posts.read", "posts.write")])``.
@@ -243,7 +243,7 @@ def abilities(*required: str) -> type[Any]:
 
 def ability(*any_of: str) -> type[Any]:
     """A route-middleware **class** requiring the active bearer token to hold **any** of ``any_of``
-    (Sanctum's ``ability:a``). Same 401/403 shape as :func:`abilities`, just OR'd instead of AND'd."""
+    (the ``ability:a`` form). Same 401/403 shape as :func:`abilities`, just OR'd instead of AND'd."""
 
     class _RequireAnyAbility(Middleware):
         required_abilities: ClassVar[tuple[str, ...]] = any_of

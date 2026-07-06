@@ -12,7 +12,7 @@ from typing import Any
 
 from arvel.database.attribute import Attribute
 from arvel.database.builder import Builder, UnsupportedDriverOperation
-from arvel.database.collection import EloquentCollection
+from arvel.database.collection import ModelCollection
 from arvel.database.connections import ConnectionResolver, QueryExecuted, WriteResult
 from arvel.database.factory import Factory, FactoryBatch
 from arvel.database.migrations import Migration, Migrator, Schema, discover_migrations
@@ -49,7 +49,6 @@ __all__ = [
     "Blueprint",
     "Builder",
     "ConnectionResolver",
-    "EloquentCollection",
     "Factory",
     "FactoryBatch",
     "HasUlids",
@@ -61,6 +60,7 @@ __all__ = [
     "Migration",
     "Migrator",
     "Model",
+    "ModelCollection",
     "Prunable",
     "QueryExecuted",
     "ReadOnlyModelError",

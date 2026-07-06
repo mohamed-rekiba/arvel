@@ -45,7 +45,7 @@ def load_project_app() -> Any | None:
 
 
 def _run_to_completion(coro: Any) -> None:
-    """Drive ``coro`` to completion whether or not a loop is already running. ``Artisan.call`` is a
+    """Drive ``coro`` to completion whether or not a loop is already running. ``Cli.call`` is a
     sync API documented as callable from a request/scheduled task (i.e. from inside a running loop),
     where ``asyncio.run`` raises; there we run it on a fresh loop in a worker thread (a fresh loop
     gets its own per-loop DB connections via the resolver, so there's no cross-loop affinity bug)."""
@@ -204,21 +204,21 @@ def run_command_class(cls: Any, **cli_kwargs: Any) -> None:
     run_app_command(handler)
 
 
-class Artisan:
+class Cli:
     """Programmatic command invocation — dispatches in
     process and returns the exit code.
 
     Built-in framework commands (``about``, ``migrate``, ``make:*``, …) dispatch through the same
     click command the CLI uses, so ``args`` is CLI-shaped (a ``dict`` of ``{"--flag": True, "name":
-    "value"}`` — see :func:`_artisan_argv` — or a raw ``list[str]`` of argv tokens). App-registered
+    "value"}`` — see :func:`_cli_argv` — or a raw ``list[str]`` of argv tokens). App-registered
     command classes/closures (``routes/console.py`` ``Console.command(...)``, or a provider's
-    ``commands()``) dispatch **directly against the already-active application** — call ``Artisan``
+    ``commands()``) dispatch **directly against the already-active application** — call ``Cli``
     from inside a booted app (a request, another command, a scheduled task, or a test that set one
     up via ``set_application``), not as a bare script; there's no project to (re)boot here."""
 
     @staticmethod
     def call(name: str, args: dict[str, Any] | list[str] | None = None) -> int:
-        return _artisan_dispatch(name, args)
+        return _cli_dispatch(name, args)
 
     @staticmethod
     def call_silently(name: str, args: dict[str, Any] | list[str] | None = None) -> int:
@@ -227,10 +227,10 @@ class Artisan:
         import io
 
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            return _artisan_dispatch(name, args)
+            return _cli_dispatch(name, args)
 
 
-def _artisan_argv(args: dict[str, Any] | list[str] | None) -> list[str]:
+def _cli_argv(args: dict[str, Any] | list[str] | None) -> list[str]:
     """CLI-shaped ``args`` → argv tokens for a built-in (click) command. A ``--opt`` key with a
     ``True``/``False`` value is a flag (present/absent); a ``list`` value repeats the option (``{--opt=*}``
     or a variadic positional); anything else is a single value."""
@@ -268,7 +268,7 @@ def _dispatch_builtin(name: str, args: dict[str, Any] | list[str] | None) -> int
     sub_app = getattr(importlib.import_module(module_name), attr)
     command = typer.main.get_command(sub_app)
     try:
-        result = command.main(args=_artisan_argv(args), prog_name=name, standalone_mode=False)
+        result = command.main(args=_cli_argv(args), prog_name=name, standalone_mode=False)
     except SystemExit as exc:
         return exc.code if isinstance(exc.code, int) else 1
     except Exception as exc:  # click UsageError/ClickException etc. carry `.exit_code`
@@ -289,7 +289,7 @@ def _run_and_capture_exit(fn: Any) -> int:
     return 0
 
 
-def _artisan_dispatch(name: str, args: dict[str, Any] | list[str] | None) -> int:
+def _cli_dispatch(name: str, args: dict[str, Any] | list[str] | None) -> int:
     from arvel.console.lazy import LazyGroup
 
     if name in LazyGroup.commands_manifest:
@@ -300,15 +300,13 @@ def _artisan_dispatch(name: str, args: dict[str, Any] | list[str] | None) -> int
 
     if not has_application():
         message = (
-            f"Artisan.call({name!r}): no active application — app-registered commands dispatch "
+            f"Cli.call({name!r}): no active application — app-registered commands dispatch "
             "against the currently booted app (call from inside a request, another command, or a "
             "test that set one up), not as a bare script"
         )
         raise RuntimeError(message)
     if args is not None and not isinstance(args, dict):
-        message = (
-            f"Artisan.call({name!r}): an app-registered command takes a dict of args, not a list"
-        )
+        message = f"Cli.call({name!r}): an app-registered command takes a dict of args, not a list"
         raise TypeError(message)
     # bare param/token names (``run_closure_command``/``bind_parsed`` key on those) — a leading
     # ``--`` is accepted and stripped.

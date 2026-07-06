@@ -13,10 +13,10 @@ users = await User.with_("posts").get() # eager — one batched WHERE IN, no N+1
 post = await Post.with_("author").first() # with_(...).first() eager-loads too
 ```
 
-## Eloquent Collection
+## Model Collection
 
 `Model.all()`, `Model.query().get()`, and every many-relation `get()` return an
-**`EloquentCollection`** (`arvel.database.collection.EloquentCollection`) — a model-aware
+**`ModelCollection`** (`arvel.database.collection.ModelCollection`) — a model-aware
 `Collection`, not a plain `list` (though list-style iteration/indexing/`len()` still work; it
 implements `collections.abc.Sequence`):
 
@@ -35,9 +35,9 @@ posts.to_dict() # [{...}, {...}] — every member's to_dict()
 posts.to_query() # a fresh Builder: WHERE pk IN (these members' keys)
 ```
 
-`EloquentCollection` also carries the full `arvel.support.Collection` surface (`map`/`filter`/
+`ModelCollection` also carries the full `arvel.support.Collection` surface (`map`/`filter`/
 `pluck`/`where`/…) — a transform that returns a new collection (`map`, `filter`, …) yields a
-plain `Collection`, not another `EloquentCollection`, since the callback's output isn't
+plain `Collection`, not another `ModelCollection`, since the callback's output isn't
 guaranteed to still be models. A **raw** (non-model) table builder's `get()` — no `Model` bound —
 still returns a plain `list[dict]` (typed simplicity; the query builder returns a
 Collection there too, this is an intentional arvel divergence).

@@ -1,4 +1,4 @@
-"""Integration (spec 20-pennant) — the ``database`` feature-flag driver against a real
+"""Integration (feature flags) — the ``database`` feature-flag driver against a real
 PostgreSQL, not SQLite: resolved values persist to the ``features`` table, and a brand-new
 ``FeatureManager``/``DatabaseFeatureStore`` (no in-process state at all) sees them — the store
 survives a fresh process, not just a fresh request."""

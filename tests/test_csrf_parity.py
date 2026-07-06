@@ -75,7 +75,7 @@ class _Resp:
 
 
 async def test_terminate_sets_readable_xsrf_cookie() -> None:
-    """Decoupled-SPA flow: the token is mirrored into a JS-readable XSRF-TOKEN cookie (Sanctum)."""
+    """Decoupled-SPA flow: the token is mirrored into a JS-readable XSRF-TOKEN cookie."""
     mw = ValidateCsrfToken()
     session: dict[str, Any] = {}
     await mw.handle(_Req("GET", session), _ran)  # seeds session["_token"]

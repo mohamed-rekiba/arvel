@@ -7,12 +7,12 @@ name = "arvel"
 dynamic = [
   "version",
 ] # V1: single-sourced from arvel.__version__ (release-please managed)
-description = "A Laravel-grade web framework for Python — async-first, type-safe, modular."
+description = "A batteries-included web framework for Python — async-first, type-safe, modular."
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 authors = [{ name = "arvel" }]
-keywords = ["framework", "web", "async", "laravel", "asgi"]
+keywords = ["framework", "web", "async", "fullstack", "asgi"]
 dependencies = [ # CORE — light, no heavy libs
   "msgspec>=0.21.1",
   "whenever>=0.10.0",

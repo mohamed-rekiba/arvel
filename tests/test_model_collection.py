@@ -1,4 +1,4 @@
-"""09 DB-QUERY B3 — EloquentCollection: Builder.get()/relation get() return a model-aware
+"""09 DB-QUERY B3 — ModelCollection: Builder.get()/relation get() return a model-aware
 Collection (load/load_missing/model_keys/find/contains/fresh/make_hidden/make_visible/
 to_dict/to_json/only/except_/to_query), while staying list-compatible (Sequence conformance)."""
 
@@ -9,7 +9,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from arvel.database import ConnectionResolver, Model
-from arvel.database.collection import EloquentCollection
+from arvel.database.collection import ModelCollection
 
 
 class Author(Model):
@@ -35,13 +35,13 @@ async def _setup() -> ConnectionResolver:
     return db
 
 
-async def test_all_and_get_return_an_eloquent_collection() -> None:
+async def test_all_and_get_return_a_model_collection() -> None:
     db = await _setup()
     try:
         await Author.create(name="ada")
         await Author.create(name="bob")
         result = await Author.all()
-        assert isinstance(result, EloquentCollection)
+        assert isinstance(result, ModelCollection)
         assert isinstance(result, Sequence)
         assert isinstance(result, list) is False  # divergence: a Collection, not a bare list
         assert len(result) == 2
@@ -127,7 +127,7 @@ async def test_load_and_load_missing_batch_eager_load() -> None:
 
         # load_missing is a no-op the second time (already loaded on every member)
         await authors.load_missing("articles")
-        assert isinstance(authors[0]._relations["articles"], EloquentCollection)
+        assert isinstance(authors[0]._relations["articles"], ModelCollection)
     finally:
         await db.dispose()
 
@@ -160,16 +160,16 @@ async def test_to_query_round_trips() -> None:
         await db.dispose()
 
 
-async def test_relation_get_returns_eloquent_collection() -> None:
+async def test_relation_get_returns_model_collection() -> None:
     db = await _setup()
     try:
         ada = await Author.create(name="ada")
         await Article.create(title="hi", author_id=ada.id)
         articles = await ada.articles().get()
-        assert isinstance(articles, EloquentCollection)
+        assert isinstance(articles, ModelCollection)
 
         empty = await (await Author.create(name="bob")).articles().get()
-        assert isinstance(empty, EloquentCollection)
+        assert isinstance(empty, ModelCollection)
         assert empty == []
     finally:
         await db.dispose()
