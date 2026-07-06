@@ -65,7 +65,11 @@ class ServiceProvider(Protocol):
     ``arvel.kernel``; this is the structural contract."""
 
     @property
-    def app(self) -> Container: ...  # read-only in the contract so a concrete provider may hold any Container subtype
+    def app(
+        self,
+    ) -> (
+        Container
+    ): ...  # read-only in the contract so a concrete provider may hold any Container subtype
 
     def register(self) -> None: ...
     def boot(self) -> Awaitable[None] | None: ...

@@ -1,4 +1,4 @@
-"""arvel.dates — ``Date`` over **whenever** (Carbon parity).
+"""arvel.dates — ``Date`` over **whenever** — reference-parity datetimes without stdlib footguns.
 
 The value behind a ``Date`` is a whenever ``ZonedDateTime`` — never stdlib
 ``datetime`` — so DST/naive-vs-aware footguns are gone (G4 stack fidelity).
@@ -9,7 +9,7 @@ knowledge/port/14-dates.md.
 from __future__ import annotations
 
 import contextvars
-from typing import Any
+from typing import Any, ClassVar, Literal
 
 from whenever import (
     FRIDAY,
@@ -63,8 +63,23 @@ def _app_timezone() -> str:
     return "UTC"
 
 
+class DateParseError(ValueError):
+    """Raised when :meth:`Date.parse` can't make sense of ``value`` (optionally against an
+    explicit ``format``)."""
+
+    def __init__(self, value: str, *, format: str | None = None) -> None:
+        detail = f" using format {format!r}" if format is not None else ""
+        super().__init__(f"could not parse {value!r} as a date{detail}")
+        self.value = value
+        self.format = format
+
+
 class Date:
     """An immutable, timezone-aware datetime backed by whenever."""
+
+    # date-only / space-separated datetime, tried (in order) once the full ISO parse below
+    # fails; explicit seconds are optional (parsing conveniences matching the reference).
+    _NAIVE_FORMATS = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d")
 
     def __init__(self, dt: ZonedDateTime) -> None:
         self._dt = dt
@@ -81,11 +96,46 @@ class Date:
         return cls.now(tz).start_of_day()
 
     @classmethod
-    def parse(cls, value: str | Date, tz: str | None = None) -> Date:
+    def parse(cls, value: str | Date, tz: str | None = None, format: str | None = None) -> Date:
+        """Parse ISO-8601 (as before), a bare ``YYYY-MM-DD`` date, a ``YYYY-MM-DD HH:MM[:SS]``
+        datetime, or — given ``format`` — an explicit strptime pattern. A naive result is assumed
+        to be in ``tz`` (the app timezone by default), matching :meth:`from_py`. Raises
+        :class:`DateParseError` (a ``ValueError``) on unparseable input."""
+        import datetime as _datetime
+
         if isinstance(value, Date):
             return value
-        dt = ZonedDateTime.parse_iso(str(value))
+        text = str(value)
+        zone = tz or _app_timezone()
+
+        if format is not None:
+            try:
+                naive = _datetime.datetime.strptime(text, format)
+            except ValueError:
+                raise DateParseError(text, format=format) from None
+            return cls(cls._zoned_from_stdlib(naive, zone))
+
+        try:
+            dt = ZonedDateTime.parse_iso(text)
+        except ValueError:
+            for fmt in cls._NAIVE_FORMATS:
+                try:
+                    naive = _datetime.datetime.strptime(text, fmt)
+                except ValueError:
+                    continue
+                return cls(cls._zoned_from_stdlib(naive, zone))
+            raise DateParseError(text) from None
         return cls(dt if tz is None else dt.to_tz(tz))
+
+    @staticmethod
+    def _zoned_from_stdlib(value: Any, zone: str) -> ZonedDateTime:
+        """A stdlib ``datetime`` (naive or aware) as a whenever ``ZonedDateTime`` in ``zone``:
+        naive is assumed to already be in ``zone``; aware is converted to it."""
+        if value.tzinfo is None:
+            from zoneinfo import ZoneInfo
+
+            value = value.replace(tzinfo=ZoneInfo(zone))
+        return Instant.from_timestamp(value.timestamp()).to_tz(zone)
 
     @classmethod
     def from_py(cls, value: Any, tz: str | None = None) -> Date:
@@ -99,11 +149,7 @@ class Date:
             return value
         zone = tz or _app_timezone()
         if isinstance(value, _datetime.datetime):
-            if value.tzinfo is None:
-                from zoneinfo import ZoneInfo
-
-                value = value.replace(tzinfo=ZoneInfo(zone))
-            return cls(Instant.from_timestamp(value.timestamp()).to_tz(zone))
+            return cls(cls._zoned_from_stdlib(value, zone))
         return cls.parse(value, tz)
 
     def add(self, **units: int) -> Date:
@@ -159,7 +205,7 @@ class Date:
 
     def is_weekend(self) -> bool:
         """Whether this date falls on a weekend — per ``config('app.weekend_days')`` (day names),
-        defaulting to Saturday/Sunday. Carbon parity (weekend days are region-specific)."""
+        defaulting to Saturday/Sunday. Reference parity (weekend days are region-specific)."""
         return self._dt.date().day_of_week() in _weekend_days()
 
     def is_weekday(self) -> bool:
@@ -204,8 +250,10 @@ class Date:
 
         return format_time(self.to_py(), format=fmt, locale=self._locale(locale))
 
-    # (unit, seconds) from largest to smallest — month≈30d, year≈365d (Carbon's approximations).
-    _HUMAN_UNITS = (
+    # (unit, seconds) from largest to smallest — month≈30d, year≈365d (calendar approximations).
+    _HUMAN_UNITS: ClassVar[
+        tuple[tuple[Literal["year", "month", "week", "day", "hour", "minute", "second"], int], ...]
+    ] = (
         ("year", 31_536_000),
         ("month", 2_592_000),
         ("week", 604_800),
@@ -215,9 +263,15 @@ class Date:
         ("second", 1),
     )
 
-    def diff_for_humans(self, other: Date | None = None) -> str:
+    def diff_for_humans(self, other: Date | None = None, locale: str | None = None) -> str:
         """A relative phrase vs ``other`` (or now): ``in 3 hours`` / ``2 days ago`` / ``just now``.
-        Covers seconds→years; pluralizes; ``in`` for the future, ``ago`` for the past."""
+        Covers seconds→years; locale-aware via Babel (``[i18n]``), ``locale`` defaulting to the
+        current request locale like :meth:`format`. ``just now`` (sub-second diffs) isn't
+        localized — ponytail: rare edge, not worth a translation table for one phrase."""
+        import datetime as _datetime
+
+        from babel.dates import format_timedelta
+
         reference = (other if other is not None else Date.now(self._dt.tz)).to_py()
         seconds = (self.to_py() - reference).total_seconds()
         future = seconds >= 0
@@ -225,8 +279,10 @@ class Date:
         for unit, size in self._HUMAN_UNITS:
             if seconds >= size:
                 amount = int(seconds // size)
-                phrase = f"{amount} {unit}{'s' if amount != 1 else ''}"
-                return f"in {phrase}" if future else f"{phrase} ago"
+                delta = _datetime.timedelta(seconds=amount * size * (1 if future else -1))
+                return format_timedelta(
+                    delta, granularity=unit, add_direction=True, locale=self._locale(locale)
+                )
         return "just now"
 
     def __eq__(self, other: object) -> bool:
@@ -278,4 +334,4 @@ def today(tz: str | None = None) -> Date:
     return Date.today(tz)
 
 
-__all__ = ["Date", "now", "today"]
+__all__ = ["Date", "DateParseError", "now", "today"]
