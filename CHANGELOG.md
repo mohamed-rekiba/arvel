@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.55.0](https://github.com/mohamed-rekiba/arvel/compare/v0.54.0...v0.55.0) (2026-07-06)
+
+
+### Features
+
+* **config,dates:** env() quote-stripping + common Date accessors ([14cfa31](https://github.com/mohamed-rekiba/arvel/commit/14cfa311318ca6439ba6ea47947798e114ba0623))
+* **features,activitylog:** ship migrations + purge-all/values ([03485ef](https://github.com/mohamed-rekiba/arvel/commit/03485ef75fabf55d9910070aea3da95c2a3b7af8))
+* **http:** rate-limit headers on default throttle + request input helpers ([52b717f](https://github.com/mohamed-rekiba/arvel/commit/52b717f3d98f7c8020eeb375e80dbd30a15c5af3))
+
+
+### Bug Fixes
+
+* address automated PR review findings ([392b2f0](https://github.com/mohamed-rekiba/arvel/commit/392b2f07858c84ffe656d39ce34e3ad67f23b6e8))
+* **auth,security:** offload blocking hashing and JWKS fetch off the event loop ([91fccab](https://github.com/mohamed-rekiba/arvel/commit/91fccabf59edefe5a8244536aa4b1daf3c662eb8))
+* **cache:** has() checks existence, not truthiness ([f50d0d6](https://github.com/mohamed-rekiba/arvel/commit/f50d0d67021b90682fcbace8df441ff4df7fadc1))
+* **client:** reuse a keep-alive connection across sequential calls ([200da9b](https://github.com/mohamed-rekiba/arvel/commit/200da9b68686d92d3c48097330b9913c1d5d4bf7))
+* **database:** retry only transient txns; count() via COUNT not full load ([dbdaccd](https://github.com/mohamed-rekiba/arvel/commit/dbdaccd9b62d8869c9eb7ffd08ea07f139dd45df))
+* **database:** support non-integer primary keys in relations and chunking ([c1e86ed](https://github.com/mohamed-rekiba/arvel/commit/c1e86edb42f576967072795912632217f92ffccf))
+* **http,database:** address review nits ([7dd6fc2](https://github.com/mohamed-rekiba/arvel/commit/7dd6fc2a180d176d63d9b99ab165a3b04f04b538))
+* **localization:** longest-first placeholder replace + choice selectors ([4649d40](https://github.com/mohamed-rekiba/arvel/commit/4649d40e920368fa27053be723d909150902c0ad))
+* **media,routing:** offload blocking I/O off the async request path ([b87ca4a](https://github.com/mohamed-rekiba/arvel/commit/b87ca4a59c8da5a4403eec3bada93acc8b69cced))
+* resolve formating issues ([5bdbb5b](https://github.com/mohamed-rekiba/arvel/commit/5bdbb5b8aaaaa1dea48a1b06b47f4ed971d31bb1))
+* **search:** encode bool/None filter values as engine literals ([ac56d08](https://github.com/mohamed-rekiba/arvel/commit/ac56d084bf8972da842726dd70a0b54296dc2ff9))
+* **validation:** run custom Rule/Enum objects on the sync path ([5ce3a64](https://github.com/mohamed-rekiba/arvel/commit/5ce3a647757b4e7f2c8355508c2ee57f4e8db88d))
+
+
+### Documentation
+
+* **broadcasting:** correct stale provider docstring ([d17ba93](https://github.com/mohamed-rekiba/arvel/commit/d17ba9361240ace5f00039177778955688e76a18))
+* cover this round's public-API changes ([ea32ef3](https://github.com/mohamed-rekiba/arvel/commit/ea32ef39ac371cba550285258409cec985e6dfbd))
+
 ## [0.54.0](https://github.com/mohamed-rekiba/arvel/compare/v0.53.0...v0.54.0) (2026-07-05)
 
 
