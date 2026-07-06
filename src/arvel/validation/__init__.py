@@ -304,6 +304,36 @@ def _is_number(value: str) -> bool:
     return True
 
 
+def _ascii_digits(s: str) -> bool:
+    # narrower than str.isdigit(), which also accepts superscripts/Arabic-Indic/etc.
+    return s.isascii() and s.isdigit()
+
+
+# implicit rules run even when the value is absent/None — `nullable` must NOT suppress them.
+_IMPLICIT_RULES = frozenset(
+    {
+        "required",
+        "required_if",
+        "required_unless",
+        "required_with",
+        "required_with_all",
+        "required_without",
+        "required_without_all",
+        "present",
+        "filled",
+        "accepted",
+        "accepted_if",
+        "declined",
+        "declined_if",
+        "missing",
+        "missing_if",
+        "missing_unless",
+        "missing_with",
+        "missing_with_all",
+    }
+)
+
+
 def _grow(lst: list[Any], idx: int) -> None:
     """Pad ``lst`` with ``None`` so index ``idx`` is assignable."""
     while len(lst) <= idx:
@@ -484,11 +514,14 @@ class Validator:
                 continue  # only validate when the field is present
             # data_get resolves dot-paths into nested dicts, not just flat keys
             value = data_get(self.data, field)
-            if value is None and "nullable" in rules:
-                continue
+            # `nullable` suppresses only NON-implicit rules on a null value; required-family and
+            # other implicit rules still run (and fail) so `required|nullable` isn't a no-op.
+            nullable_none = value is None and "nullable" in rules
             bail = "bail" in rules  # stop THIS field's rules at its first failure
             for rule in rules:
-                if isinstance(rule, Rule):  # custom rule object — sync predicate
+                if isinstance(rule, Rule):  # custom rule object — sync predicate (non-implicit)
+                    if nullable_none:
+                        continue
                     if not rule.passes(field, value):
                         self._errors.setdefault(field, []).append(
                             rule.message.replace(":attribute", field)
@@ -501,6 +534,8 @@ class Validator:
                 if rule in ("nullable", "sometimes", "bail"):
                     continue
                 name, _, arg = rule.partition(":")
+                if nullable_none and name not in _IMPLICIT_RULES:
+                    continue
                 if not self._check(name, value, arg, field):
                     self._errors.setdefault(field, []).append(self._message(field, name, arg))
                     if bail:
@@ -688,14 +723,14 @@ class Validator:
                 return isinstance(value, str)
             case "integer":
                 return (isinstance(value, int) and not isinstance(value, bool)) or (
-                    isinstance(value, str) and value.lstrip("-").isdigit()
+                    isinstance(value, str) and _ascii_digits(value.lstrip("-"))
                 )
             case "numeric":
                 return (isinstance(value, (int, float)) and not isinstance(value, bool)) or (
                     isinstance(value, str) and _is_number(value)
                 )
             case "boolean":
-                return value in (True, False, 0, 1, "0", "1", "true", "false")
+                return value in (True, False, 0, 1, "0", "1")
             case "email":
                 return _check_email(value)
             case "url":
@@ -720,11 +755,17 @@ class Validator:
             case "uuid":
                 return isinstance(value, str) and bool(_UUID.match(value))
             case "confirmed":
-                return bool(self.data.get(f"{field}_confirmation") == value)
+                from arvel.support.helpers import data_get
+
+                return bool(data_get(self.data, f"{field}_confirmation") == value)
             case "same":
-                return bool(self.data.get(arg) == value)
+                from arvel.support.helpers import data_get
+
+                return bool(data_get(self.data, arg) == value)
             case "different":
-                return bool(self.data.get(arg) != value)
+                from arvel.support.helpers import data_get
+
+                return bool(data_get(self.data, arg) != value)
             case "accepted":
                 return value in (True, "yes", "on", 1, "1", "true")
             case "regex":
@@ -745,11 +786,11 @@ class Validator:
                     rule, this <= other
                 )
             case "digits":
-                return str(value).isdigit() and len(str(value)) == int(arg)
+                return _ascii_digits(str(value)) and len(str(value)) == int(arg)
             case "digits_between":
                 low, _, high = arg.partition(",")
                 digits = str(value)
-                return digits.isdigit() and int(low) <= len(digits) <= int(high)
+                return _ascii_digits(digits) and int(low) <= len(digits) <= int(high)
             case "alpha_dash":
                 return isinstance(value, str) and bool(re.fullmatch(r"[A-Za-z0-9_-]+", value))
             case "json":
