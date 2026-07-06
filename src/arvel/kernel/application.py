@@ -25,11 +25,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
     from arvel.contracts import ServiceProvider
+    from arvel.kernel.service_provider import ServiceProvider as ProviderBase
 
-#: A provider given to the builder: an instance, or a class taking ``(app)``.
-#: Typed ``Any`` because the concrete ``ServiceProvider`` base (constructible with
-#: ``app``) lands in T1.4; here it may be a duck-typed instance or class.
-ProviderInput = Any
+#: A provider given to the builder: a ``ServiceProvider`` instance, or its class
+#: (constructed with ``(app)``).
+type ProviderInput = ProviderBase | type[ProviderBase]
 
 
 class Application(Container):
@@ -381,8 +381,7 @@ class ApplicationBuilder:
         for provider in self._providers:
             instance = provider(app) if isinstance(provider, type) else provider
             app.register(instance)
-            # provider is duck-typed Any (concrete base lands per-package); its class is a type.
-            app.app_provider_classes.append(cast("type[Any]", type(instance)))
+            app.app_provider_classes.append(type(instance))
         # consume the fluent builder config (C2 — was previously dropped on the floor)
         app.use_builder_config(self._routing, self._middlewares, self._exceptions)
         return app

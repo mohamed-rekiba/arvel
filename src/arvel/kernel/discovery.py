@@ -94,7 +94,7 @@ def discover_providers(app: Application, *, use_cache: bool = True) -> list[type
     entry_point_providers: list[type]
     if use_cache and _cache is not None:
         entry_point_providers = _cache
-    elif use_cache and (cached := _load_manifest()) is not None:  # persistent manifest → no scan
+    elif use_cache and (cached := _load_manifest(app.base_path)) is not None:  # persistent manifest → no scan
         entry_point_providers = cached
         _cache = cached
     else:

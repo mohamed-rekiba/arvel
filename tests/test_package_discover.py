@@ -85,7 +85,19 @@ def test_manifest_skips_stale_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 def test_package_discover_command_writes_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # the command requires a project root (bootstrap/app.py), like app-loading commands
+    (tmp_path / "bootstrap").mkdir()
+    (tmp_path / "bootstrap" / "app.py").write_text("def create_app():\n    return None\n")
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(build_cli(), ["package:discover"])
     assert result.exit_code == 0, result.output
     assert (tmp_path / "bootstrap" / "cache" / "packages.py").is_file()
+
+
+def test_package_discover_refuses_outside_a_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(build_cli(), ["package:discover"])
+    assert result.exit_code == 1
+    assert not (tmp_path / "bootstrap").exists()  # nothing written into a random cwd

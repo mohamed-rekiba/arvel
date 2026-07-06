@@ -1,7 +1,7 @@
 """arvel.kernel — the inner ring: container, lifecycle, providers, config, pipeline, hooks.
 
-Imports only ``arvel.contracts`` and ``arvel.support`` (+ stdlib); never a capability
-module (G1, enforced by import-linter). Grows across Phase 1 (T1.x).
+Imports only ``arvel.contracts`` (+ stdlib) — ``arvel.support`` sits *above* kernel in
+the layered DAG — and never a capability module (G1, enforced by import-linter).
 """
 
 from __future__ import annotations
