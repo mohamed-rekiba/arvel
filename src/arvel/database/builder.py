@@ -806,7 +806,9 @@ class Builder:
     def _group_targets(self) -> list[Any]:
         return [self._column_or_literal(name) for name in self._group_by]
 
-    def to_select(self) -> Any:
+    def _select_core(self) -> Any:
+        """The SELECT with FROM/joins/distinct/where/group/having but no ordering, paging or
+        locking — the shape a COUNT or EXISTS must wrap to stay faithful to joins/group/distinct."""
         import sqlalchemy as sa
 
         stmt = sa.select(*self._select_targets())
@@ -824,6 +826,10 @@ class Builder:
         having = self._having_expression()
         if having is not None:
             stmt = stmt.having(having)
+        return stmt
+
+    def to_select(self) -> Any:
+        stmt = self._select_core()
         for clause in self._order:
             stmt = stmt.order_by(clause)
         if self._limit is not None:
@@ -1003,6 +1009,15 @@ class Builder:
         return await self._require_resolver().execute(self.to_insert(values))
 
     async def update(self, values: dict[str, Any]) -> WriteResult:
+        if (
+            self._model is not None
+            and self._model.__timestamps__
+            and "updated_at" not in values
+            and "updated_at" in self._table.c
+        ):
+            from arvel.database.model_casts import now_utc
+
+            values = {**values, "updated_at": now_utc()}
         return await self._require_resolver().execute(self.to_update(values))
 
     async def delete(self) -> WriteResult:
@@ -1012,10 +1027,15 @@ class Builder:
     async def count(self) -> int:
         import sqlalchemy as sa
 
-        stmt = sa.select(sa.func.count()).select_from(self._table)
-        expr = self._where_expression()
-        if expr is not None:
-            stmt = stmt.where(expr)
+        if self._joins or self._group_by or self._havings or self._distinct:
+            # a plain count(*) over the base table would drop the join/group/distinct shaping and
+            # report a wrong total (esp. for paginate); count rows of the real result instead.
+            stmt = sa.select(sa.func.count()).select_from(self._select_core().subquery())
+        else:
+            stmt = sa.select(sa.func.count()).select_from(self._table)
+            expr = self._where_expression()
+            if expr is not None:
+                stmt = stmt.where(expr)
         return int(await self._require_resolver().scalar(stmt) or 0)
 
     async def _aggregate(self, fn: str, column: str) -> Any:
@@ -1040,7 +1060,11 @@ class Builder:
         return await self._aggregate("max", column)
 
     async def exists(self) -> bool:
-        return await self.first() is not None
+        import sqlalchemy as sa
+
+        # a scalar EXISTS — no row fetch, no model hydration, no `retrieved` event
+        stmt = sa.select(sa.exists(self._select_core()))
+        return bool(await self._require_resolver().scalar(stmt))
 
     async def paginate(self, per_page: int = 15, page: int | None = None) -> LengthAwarePaginator:
         """A length-aware paginator: runs a ``count`` for the grand total
