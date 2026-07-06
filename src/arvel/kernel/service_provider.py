@@ -98,8 +98,9 @@ class ServiceProvider:
         """Boot-time wiring. May be overridden as ``async def`` — the application awaits the result
         when it returns an awaitable (so the return type permits both sync and async overrides)."""
 
-    def provides(self) -> list[Any]:
-        """Contracts this provider supplies — non-empty marks it *deferred*."""
+    def provides(self) -> list[type[Any] | str]:
+        """Contracts this provider supplies (container ``Abstract`` keys) — non-empty marks
+        it *deferred*."""
         return []
 
     # --- integration verbs -------------------------------------------------

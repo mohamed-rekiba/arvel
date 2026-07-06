@@ -64,7 +64,8 @@ class ServiceProvider(Protocol):
     ``boot`` may be sync or async. The base class + integration verbs live in
     ``arvel.kernel``; this is the structural contract."""
 
-    app: Container
+    @property
+    def app(self) -> Container: ...  # read-only in the contract so a concrete provider may hold any Container subtype
 
     def register(self) -> None: ...
     def boot(self) -> Awaitable[None] | None: ...

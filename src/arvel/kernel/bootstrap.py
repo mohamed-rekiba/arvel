@@ -21,7 +21,7 @@ from arvel.kernel.discovery import bootstrap_providers
 from arvel.kernel.globals import set_application
 from arvel.kernel.logging import configure_logging
 from arvel.kernel.service_provider import load_config_directory
-from arvel.kernel.settings import load_dotenv
+from arvel.kernel.settings import load_environment
 
 
 def bootstrap_app(app: Application) -> None:
@@ -39,7 +39,7 @@ def bootstrap_app(app: Application) -> None:
     if app.bootstrapped:
         return
     set_application(app)
-    load_dotenv(Path(app.base_path) / ".env")  # .env → os.environ (no override)
+    load_environment(app.base_path)  # .env + .env.[APP_ENV] overlay → os.environ (env wins)
     load_config_directory(app, app.config_dir)  # config/*.py → repo (with_config_dir may override)
     configure_logging(json_logs=app.config("app.env", "local") == "production")
     bootstrap_providers(app)  # framework + installed-package + app providers

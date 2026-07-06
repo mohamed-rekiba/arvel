@@ -103,3 +103,24 @@ def load_dotenv(path: str | os.PathLike[str]) -> None:
     from dotenv import load_dotenv as _load_dotenv
 
     _load_dotenv(dotenv_path=os.fspath(path), override=False)
+
+
+def load_environment(base_path: str | os.PathLike[str]) -> None:
+    """Load ``base_path/.env`` plus the per-environment ``.env.[APP_ENV]`` overlay.
+
+    Precedence (highest first): real environment > ``.env.[APP_ENV]`` > ``.env`` —
+    the overlay is loaded *first* so override=False semantics give it the middle slot.
+    ``APP_ENV`` itself comes from the real environment, falling back to the ``.env``
+    file. A missing overlay (or ``.env``) is a no-op.
+    """
+    from pathlib import Path
+
+    base = Path(base_path)
+    app_env = os.environ.get("APP_ENV")
+    if not app_env:
+        from dotenv import dotenv_values
+
+        app_env = dotenv_values(os.fspath(base / ".env")).get("APP_ENV")
+    if app_env:
+        load_dotenv(base / f".env.{app_env}")
+    load_dotenv(base / ".env")
