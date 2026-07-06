@@ -24,12 +24,15 @@ class _Greet(Job):
         RAN.append(self.who)
 
 
-async def _setup() -> tuple[QueueManager, ConnectionResolver]:
+async def _setup(url: str | None = None) -> tuple[QueueManager, ConnectionResolver]:
     from taskiq import InMemoryBroker
 
     RAN.clear()
     app = Application()
-    db = ConnectionResolver()
+    # a file-backed url gives each concurrent task its own pooled connection (two real workers);
+    # the default in-memory StaticPool shares one connection, which SQLAlchemy can't drive from
+    # two tasks at once — fine for the single-threaded tests, not for the concurrent one.
+    db = ConnectionResolver({"default": {"url": url}}) if url else ConnectionResolver()
     app.instance("db", db)
     manager = QueueManager(app, broker=InMemoryBroker())
     app.instance("queue", manager)
@@ -56,8 +59,11 @@ async def test_release_skips_rows_already_reserved_by_another_worker() -> None:
         await db.dispose()
 
 
-async def test_concurrent_release_dispatches_each_job_exactly_once() -> None:
-    manager, db = await _setup()
+async def test_concurrent_release_dispatches_each_job_exactly_once(tmp_path: Any) -> None:
+    # a file db so the two concurrent passes are two real pooled connections racing over one row
+    # (in-memory sqlite shares a single connection, which two tasks can't safely drive at once)
+    db_file = tmp_path / "queue.db"
+    manager, db = await _setup(f"sqlite+aiosqlite:///{db_file}")
     try:
         now = int(time.time())
         await manager.dispatch_after(0, _Greet("once"))
