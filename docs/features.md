@@ -1,10 +1,9 @@
 # Feature Flags
 
 Feature flags let you ship code behind a switch — roll a change out to one user, one team, or
-everyone, without a deploy for every flip. arvel's feature-flag module follows
-define a flag once with a **resolver**, then
-ask whether it's active for a given **scope** (a user, a team, or nothing at all for a global
-flag).
+everyone, without a deploy for every flip. arvel's feature-flag module follows one simple
+model: define a flag once with a **resolver**, then ask whether it's active for a given
+**scope** (a user, a team, or nothing at all for a global flag).
 
 A resolver runs **at most once per scope** — the first `active()`/`value()` call for a scope
 resolves it and writes the result to the configured store; every call after that (for that same

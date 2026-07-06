@@ -204,7 +204,9 @@ class JsonApiResource[M](ResourceTransformer[M]):
         return {name: loaded[name] for name in self.relationships if name in loaded}
 
     def resource_object(self, request: Any | None) -> dict[str, Any]:
-        """The full resource object: identifier + (sparse) attributes + loaded linkage."""
+        """The full resource object: identifier + (sparse) attributes + loaded linkage. A
+        sparse fieldset constrains *fields* — attributes AND relationships — so a linkage
+        member renders only when its name survives ``?fields[<type>]=`` too."""
         fields = _requested_fields(request, self.resource_type)
         attributes = _strip_missing(self.attributes(request))
         if fields is not None:
@@ -212,6 +214,8 @@ class JsonApiResource[M](ResourceTransformer[M]):
         obj: dict[str, Any] = {**self.identifier(), "attributes": attributes}
         linkage: dict[str, Any] = {}
         for name, related in self._loaded_relations().items():
+            if fields is not None and name not in fields:
+                continue
             resource_cls = self.relationships[name]
             if isinstance(related, (list, tuple)):
                 many: list[Any] = list(cast("tuple[Any, ...]", related))
@@ -233,9 +237,14 @@ class JsonApiResource[M](ResourceTransformer[M]):
         if not raw:
             return []
         wanted = {name.strip() for name in raw.split(",") if name.strip()}
+        fields = _requested_fields(request, self.resource_type)
         included: list[dict[str, Any]] = []
         for name, related in self._loaded_relations().items():
             if name not in wanted:
+                continue
+            if fields is not None and name not in fields:
+                # a fieldset that omits the relationship hides it from the whole document —
+                # no linkage and no included members, even when ?include= asks
                 continue
             resource_cls = self.relationships[name]
             items: list[Any] = (

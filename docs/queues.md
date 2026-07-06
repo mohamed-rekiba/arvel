@@ -82,8 +82,9 @@ async with db.transaction():
 
 A deferred dispatch returns `None` (there is no broker task yet). The deferral rides the event
 dispatcher's [after-commit buffer](events.md) (the after-commit events section) — one seam
-for events and jobs. The flush is fail-fast: if a buffered enqueue raises, the remaining
-buffered work is not attempted and the error surfaces to the caller after the commit.
+for events and jobs. Every buffered callback runs at flush even if an earlier one raises —
+the data already committed, so one failing enqueue can't silently drop its siblings; the first
+error still surfaces to the caller after the commit, and none of the work is retried.
 
 ### Routing by class
 

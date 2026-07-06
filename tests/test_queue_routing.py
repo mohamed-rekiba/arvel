@@ -154,6 +154,7 @@ async def test_delayed_dispatch_persists_the_routed_queue() -> None:
         rows = await QueuedJob.all()
         assert [r.queue for r in rows] == ["reports"]
     finally:
+        QueuedJob.set_connection(None)  # a disposed resolver must not leak into later tests
         set_application(None)
         if manager._started:
             await manager.broker.shutdown()

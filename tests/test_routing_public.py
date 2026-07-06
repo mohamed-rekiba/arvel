@@ -149,3 +149,19 @@ def test_missing_index_html_is_a_clear_error_not_a_bare_crash(tmp_path: Path) ->
         resp = client.get("/anything")
         assert resp.status_code == 500
         assert "index.html" in resp.text
+
+
+def test_nested_asset_is_immutable_too(tmp_path: Path) -> None:
+    """Bundlers nest under the assets dir (assets/chunks/...); depth must not lose the cache."""
+    _build_public_dir(tmp_path)
+    nested = tmp_path / "assets" / "chunks"
+    nested.mkdir()
+    (nested / "app.def456.js").write_text("//chunk")
+    r = Router()
+    r.public(tmp_path)
+    kernel = HttpKernel()
+    r.apply_to(kernel)
+    with TestClient(app=kernel.build()) as client:
+        resp = client.get("/assets/chunks/app.def456.js")
+        assert resp.is_success
+        assert resp.headers["cache-control"] == "public, max-age=31536000, immutable"

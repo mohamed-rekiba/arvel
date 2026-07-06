@@ -117,6 +117,14 @@ def render_exception(request: Any, exc: Any, *, debug: bool = False) -> Any:
                     }
                     for detail in details
                 )
+        elif isinstance(errors, list):
+            # a plain list of messages has no field to point at, but the details survive
+            error_objects = [
+                {"status": str(status), "detail": str(detail)}
+                for detail in cast("list[Any]", errors)
+            ]
+        elif errors is not None:
+            error_objects = [{"status": str(status), "detail": str(errors)}]
         if not error_objects:
             error_objects = [{"status": str(status), "detail": message}]
         return litestar.Response(

@@ -156,3 +156,10 @@ async def test_origin_without_hostname_fails_closed() -> None:
     req = FakeRequest("POST", sent_token="tok", origin="https://")
     with pytest.raises(ValidationException):
         await csrf.handle(req, _ok)
+
+
+async def test_full_origin_trusted_entry_matches_case_insensitively() -> None:
+    csrf = ValidateCsrfToken()
+    csrf._trusted = ["https://Partner.Test:8443"]
+    req = FakeRequest("POST", sent_token="tok", origin="https://partner.test:8443")
+    assert await csrf.handle(req, _ok) == "ok"
