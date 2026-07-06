@@ -83,3 +83,15 @@ def test_when_empty_callback_result_wins_when_it_returns_a_collection() -> None:
 def test_when_empty_returns_self_when_not_empty() -> None:
     original = Collection([1, 2])
     assert original.when_empty(lambda c: Collection([9])) is original
+
+
+def test_chunk_non_positive_size_returns_empty() -> None:
+    # a zero/negative chunk size is a no-op, not a range-step crash
+    assert Collection([1, 2, 3]).chunk(0).all() == []
+    assert Collection([1, 2, 3]).chunk(-1).all() == []
+
+
+def test_slice_negative_length_stops_from_end() -> None:
+    # negative length = drop that many from the tail (array_slice semantics)
+    assert Collection([1, 2, 3, 4]).slice(1, -1).all() == [2, 3]
+    assert Collection([1, 2, 3, 4]).slice(0, -1).all() == [1, 2, 3]

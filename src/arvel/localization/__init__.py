@@ -163,22 +163,25 @@ class Translator:
         return line
 
     def _plural(self, line: str, n: int, locale: str) -> str:
-        # explicit selectors ({n} exact, [a,b]/[a,*]/[*,b] intervals) win; the rest
-        # are positional CLDR forms selected by plural category.
-        plain: list[str] = []
+        # explicit selectors ({n} exact, [a,b]/[a,*]/[*,b] intervals) win; when none match,
+        # every segment collapses to its condition-stripped text and CLDR picks positionally —
+        # so an all-selector line with n outside every range never leaks its raw markup.
+        forms: list[str] = []
         for segment in (s.strip() for s in line.split("|")):
             match = _SELECTOR.match(segment)
             if match is None:
-                plain.append(segment)
+                forms.append(segment)
             elif _selector_matches(match.group("open"), match.group("cond"), n):
                 return match.group("text").strip()
-        if len(plain) <= 1:
-            return plain[0] if plain else line
+            else:
+                forms.append(match.group("text").strip())
+        if len(forms) <= 1:
+            return forms[0] if forms else line
         category = plural_category(locale, n)
-        if len(plain) == 2:
-            return plain[0] if category == "one" else plain[1]
-        wanted = _CLDR_ORDER.index(category) if category in _CLDR_ORDER else len(plain) - 1
-        return plain[min(wanted, len(plain) - 1)]
+        if len(forms) == 2:
+            return forms[0] if category == "one" else forms[1]
+        wanted = _CLDR_ORDER.index(category) if category in _CLDR_ORDER else len(forms) - 1
+        return forms[min(wanted, len(forms) - 1)]
 
 
 _DEFAULT = Translator()
