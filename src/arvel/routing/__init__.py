@@ -286,26 +286,41 @@ class Router:
 
         root = _Path(directory).resolve()
 
-        def _real_file(rel: str) -> _Path | None:
+        def _locate(rel: str, fallback: bool) -> tuple[str, Any]:
+            """Resolve, traversal-guard, and read in ONE worker-thread hop — every stat and the
+            read stay off the event loop. Returns a tagged tuple: ``("ok", (bytes, name,
+            immutable))``, ``("not_found", rel)``, or ``("no_index", target)``."""
             requested = (root / rel.lstrip("/")).resolve()
-            return requested if requested.is_relative_to(root) and requested.is_file() else None
+            target = (
+                requested
+                if requested.is_relative_to(root) and requested.is_file()
+                else (root / "index.html" if fallback else None)
+            )
+            if target is None:
+                return ("not_found", rel)
+            if not target.is_file():
+                # spa_fallback's own index.html is missing (public/ not built) -> a clear error
+                # instead of a raw FileNotFoundError surfacing as an opaque 500
+                return ("no_index", target)
+            immutable = target.parent.name == assets_dirname
+            return ("ok", (target.read_bytes(), target.name, immutable))
 
-        async def _to_response(target: _Path) -> Any:
+        async def _serve(rel: str, fallback: bool) -> Any:
             from mimetypes import guess_type
+
+            from anyio.to_thread import run_sync
 
             from arvel.http.exceptions import abort
             from arvel.http.response import Response
 
-            if not target.is_file():
-                # spa_fallback's own index.html is missing (public/ not built) -> a clear error
-                # instead of a raw FileNotFoundError surfacing as an opaque 500
-                abort(500, f"public directory has no index.html — did you build it? ({target})")
-            immutable = target.parent.name == assets_dirname
-            content_type = guess_type(target.name)[0] or "application/octet-stream"
+            tag, value = await run_sync(_locate, rel, fallback)
+            if tag == "not_found":
+                abort(404, "Not found")
+            if tag == "no_index":
+                abort(500, f"public directory has no index.html — did you build it? ({value})")
+            content, name, immutable = value
+            content_type = guess_type(name)[0] or "application/octet-stream"
             cache = "public, max-age=31536000, immutable" if immutable else "no-cache"
-            from anyio.to_thread import run_sync
-
-            content = await run_sync(target.read_bytes)  # keep the file read off the event loop
             return Response(
                 content=content,
                 status=200,
@@ -317,10 +332,10 @@ class Router:
             # template has no `{path}` placeholder, so a shared `path` param would be wrongly
             # inferred as a documented query parameter on that route
             async def _serve_root(request: Any) -> Any:
-                return await _to_response(_real_file("") or root / "index.html")
+                return await _serve("", fallback=True)
 
             async def _serve_catchall(request: Any, path: str) -> Any:
-                return await _to_response(_real_file(path) or root / "index.html")
+                return await _serve(path, fallback=True)
 
             root_route = self.add(["GET"], path, _serve_root, "public.root")
             root_route.is_fallback = True
@@ -329,13 +344,9 @@ class Router:
             )
             catchall_route.is_fallback = True
         else:
-            from arvel.http.exceptions import abort
 
             async def _serve_static(request: Any, path: str) -> Any:
-                found = _real_file(path)
-                if found is None:
-                    abort(404, "Not found")
-                return await _to_response(found)
+                return await _serve(path, fallback=False)
 
             static_route = self.add(
                 ["GET"], path.rstrip("/") + "/{path:path}", _serve_static, "public"
