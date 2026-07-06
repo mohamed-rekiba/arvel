@@ -36,6 +36,11 @@ def _is_number(value: str) -> bool:
     return True
 
 
+def _ascii_digits(s: str) -> bool:
+    # narrower than str.isdigit(), which also accepts superscripts/Arabic-Indic/etc.
+    return s.isascii() and s.isdigit()
+
+
 def _filled(data: Any, path: str) -> bool:
     """``path`` is present in ``data`` (dot-aware) and its value isn't empty."""
     from arvel.support.helpers import Arr, data_get
@@ -173,9 +178,9 @@ def check(validator: Validator, rule: str, value: Any, arg: str, field: str) -> 
         case "multiple_of":
             return _check_multiple_of(value, arg)
         case "min_digits":
-            return str(value).isdigit() and len(str(value)) >= int(arg)
+            return _ascii_digits(str(value)) and len(str(value)) >= int(arg)
         case "max_digits":
-            return str(value).isdigit() and len(str(value)) <= int(arg)
+            return _ascii_digits(str(value)) and len(str(value)) <= int(arg)
 
         # -- types / formats ------------------------------------------------------------------
         case "timezone":
