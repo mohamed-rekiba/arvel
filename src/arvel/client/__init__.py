@@ -98,7 +98,7 @@ class ClientResponse:
         return self.raw.headers
 
     def ok(self) -> bool:
-        return self.successful()
+        return self.raw.status_code == 200  # exactly 200, distinct from successful() (any 2xx)
 
     def successful(self) -> bool:
         return 200 <= self.raw.status_code < 300

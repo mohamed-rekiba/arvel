@@ -24,6 +24,13 @@ def test_200_is_ok_and_successful_not_failed() -> None:
     assert response.json() == {"id": 1}
 
 
+def test_ok_means_exactly_200_not_the_whole_2xx_range() -> None:
+    for status in (201, 202, 204):
+        response = _response(status)
+        assert response.ok() is False  # ok() is 200 exactly
+        assert response.successful() is True  # successful() is any 2xx
+
+
 def test_content_returns_raw_bytes_not_decoded_text() -> None:
     """``content()`` is the raw bytes (for images/files); ``body()`` is the lossy text decode."""
     binary = b"\x89PNG\r\n\x1a\n\x00\xff\xfe raw"
