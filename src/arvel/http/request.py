@@ -172,6 +172,27 @@ class Request:
     def user(self) -> Any:
         return current_user.get()
 
+    def bearer_token(self) -> str | None:
+        """The token from an ``Authorization: Bearer <token>`` header, or None."""
+        header = self.header("authorization")
+        if header and header.lower().startswith("bearer "):
+            return header[7:].strip()
+        return None
+
+    async def input(self, key: str, default: Any = None) -> Any:
+        """A single value by key, looking in the JSON body first, then the query string."""
+        body = await self.json()
+        if isinstance(body, dict) and key in body:
+            return cast("dict[str, Any]", body)[key]
+        return self.query(key, default)
+
+    async def boolean(self, key: str, default: bool = False) -> bool:
+        """``input(key)`` coerced to bool — ``"1"/"true"/"on"/"yes"`` (any case) are True."""
+        value = await self.input(key)
+        if value is None:
+            return default
+        return str(value).strip().lower() in ("1", "true", "on", "yes")
+
     def is_(self, pattern: str) -> bool:
         from fnmatch import fnmatch
 
