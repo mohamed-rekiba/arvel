@@ -1,0 +1,18 @@
+"""Create the features table."""
+
+from arvel.database import Migration
+
+
+class CreateFeaturesTable(Migration):
+    def up(self, schema):
+        def define(t):
+            t.id()
+            t.string("name").index()  # looked up per flag; purge clears every scope for a name
+            t.string("scope")
+            t.json("value").nullable()
+            t.timestamps()
+
+        schema.create("features", define)
+
+    def down(self, schema):
+        schema.drop("features")

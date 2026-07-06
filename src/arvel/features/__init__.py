@@ -232,8 +232,15 @@ class FeatureManager(Manager):
         scope_key = _scope_key(scope, self._default_scope())
         await self.driver().forget(name, scope_key)
 
-    async def purge(self, name: str) -> None:
-        await self.driver().purge(name)
+    async def purge(self, name: str | None = None) -> None:
+        """Drop stored values for ``name``, or for every defined flag when ``name`` is None."""
+        store = self.driver()
+        for target in [name] if name is not None else self.defined():
+            await store.purge(target)
+
+    async def values(self, names: list[str] | None = None, scope: Any = None) -> dict[str, Any]:
+        """Resolve several flags for one scope at once — every defined flag when ``names`` is None."""
+        return {n: await self._resolve(n, scope) for n in (names if names is not None else self.defined())}
 
     def for_(self, scope: Any) -> ScopedFeatures:
         """A features view bound to ``scope``."""
@@ -323,8 +330,12 @@ class Feature:
         await Feature._manager().forget(name, scope)
 
     @staticmethod
-    async def purge(name: str) -> None:
+    async def purge(name: str | None = None) -> None:
         await Feature._manager().purge(name)
+
+    @staticmethod
+    async def values(names: list[str] | None = None, scope: Any = None) -> dict[str, Any]:
+        return await Feature._manager().values(names, scope)
 
     @staticmethod
     def for_(scope: Any) -> ScopedFeatures:
