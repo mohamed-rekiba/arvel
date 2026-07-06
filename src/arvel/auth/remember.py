@@ -108,9 +108,16 @@ async def recall_remember_token(cookie: str) -> tuple[int, str] | None:
             tokenable_id=row.tokenable_id,
         )
         return None
-    new_validator = secrets.token_hex(32)  # rotate: single-use validator
-    row.validator = _hash(new_validator)
-    await row.save()
+    # Rotate atomically: WHERE selector = ? AND validator = <current hash>. Of two concurrent
+    # requests presenting the same cookie exactly one flips the validator (rowcount == 1); the other
+    # matches zero rows and bows out, so a single valid successor is minted — no last-write-wins race
+    # that would strand one client with a stale cookie.
+    new_validator = secrets.token_hex(32)
+    claimed = await RememberToken.where(selector=selector, validator=str(row.validator)).update(
+        {"validator": _hash(new_validator)}
+    )
+    if getattr(claimed, "rowcount", 0) < 1:
+        return None  # a concurrent request already rotated this token
     return row.tokenable_id, f"{selector}:{new_validator}"
 
 

@@ -82,6 +82,22 @@ async def test_issue_recall_rotates_and_detects_reuse() -> None:
         await db.dispose()
 
 
+async def test_concurrent_recall_never_mints_two_successors() -> None:
+    import asyncio
+
+    db = await _db()
+    try:
+        cookie = await issue_remember_token(7)
+        a, b = await asyncio.gather(
+            recall_remember_token(cookie), recall_remember_token(cookie)
+        )
+        # atomic rotation: exactly one caller mints a successor, never two valid cookies from one
+        successors = [r[1] for r in (a, b) if r is not None]
+        assert len(successors) == 1
+    finally:
+        await db.dispose()
+
+
 async def test_unknown_and_malformed_cookies_rejected() -> None:
     db = await _db()
     try:

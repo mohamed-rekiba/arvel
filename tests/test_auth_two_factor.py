@@ -22,6 +22,15 @@ from arvel.auth.two_factor import (
 )
 
 
+def test_recovery_codes_are_high_entropy_and_unique() -> None:
+    codes = TwoFactor.recovery_codes()
+    assert len(codes) == len(set(codes)) == 8
+    for code in codes:
+        left, sep, right = code.partition("-")
+        assert sep == "-" and len(left) == len(right) == 10  # two 10-char halves (~119 bits)
+        assert (left + right).isalnum() and (left + right).isascii()
+
+
 def test_secret_then_verify_current_code() -> None:
     secret = TwoFactor.generate_secret()
     assert isinstance(secret, str) and len(secret) >= 16
