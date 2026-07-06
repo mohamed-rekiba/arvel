@@ -158,12 +158,15 @@ class Dispatcher:
         if isinstance(event, ShouldBroadcast):
             await self._broadcast(event)
         name, args = self._parse(event, payload)
+        key = name if isinstance(name, str) else getattr(name, "__name__", str(name))
         results: list[Any] = []
-        for listener in self._gather(name):
-            if await self._queue_if_needed(listener, args):
+        for listener, is_wildcard in self._gather(name):
+            # a wildcard listener handles many events, so it receives the event name first
+            call_args = (key, *args) if is_wildcard else args
+            if await self._queue_if_needed(listener, call_args):
                 continue
             handler = self._resolve(listener)
-            outcome = handler(*args)
+            outcome = handler(*call_args)
             if inspect.isawaitable(outcome):
                 outcome = await outcome
             if halt and outcome is not None:
@@ -179,12 +182,12 @@ class Dispatcher:
         event_type: Any = cast("Any", type(event))
         return event_type, (event, *payload)
 
-    def _gather(self, name: Any) -> list[Any]:
-        listeners = list(self._listeners.get(name, []))
+    def _gather(self, name: Any) -> list[tuple[Any, bool]]:
+        listeners: list[tuple[Any, bool]] = [(l, False) for l in self._listeners.get(name, [])]
         key = name if isinstance(name, str) else getattr(name, "__name__", str(name))
         for pattern, wildcard_listeners in self._wildcards.items():
             if fnmatch.fnmatch(key, pattern):
-                listeners.extend(wildcard_listeners)
+                listeners.extend((l, True) for l in wildcard_listeners)
         return listeners
 
     def _resolve(self, listener: Any) -> Any:

@@ -66,6 +66,15 @@ async def test_wildcard_listeners() -> None:
     assert got == ["wild"]
 
 
+async def test_wildcard_listener_receives_event_name_first() -> None:
+    d = Dispatcher()
+    seen: list[tuple[object, ...]] = []
+    d.listen("user.*", lambda *a: seen.append(a))
+    await d.dispatch("user.created", {"id": 7})
+    # a wildcard handler gets (event_name, *payload) so it can tell events apart
+    assert seen == [("user.created", {"id": 7})]
+
+
 async def test_class_listener_resolved_via_container() -> None:
     app = Application()
     d = Dispatcher(app)
