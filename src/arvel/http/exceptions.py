@@ -121,7 +121,9 @@ def render_exception(request: Any, exc: Any, *, debug: bool = False) -> Any:
         FlashBag(cast("dict[str, Any]", session)).flash_errors(errors)
     referer = headers.get("referer") or headers.get("referrer") or "/"
     location = same_origin_or_root(str(referer), str(headers.get("host") or ""))
-    return litestar.Response(None, status_code=302, headers={"Location": location})
+    return litestar.Response(
+        None, status_code=302, headers={"Location": location, **extra_headers}
+    )
 
 
 def same_origin_or_root(target: str, host: str) -> str:
