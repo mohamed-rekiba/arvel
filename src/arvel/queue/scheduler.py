@@ -14,24 +14,51 @@ import inspect
 from datetime import datetime
 from typing import Any, cast
 
-#: `on_one_server`'s lock TTL — a safety net only (the lock is always explicitly released once the
-#: event finishes); this just bounds how long a crashed holder can starve other instances.
+#: `on_one_server`'s claim TTL. The claim is minute-scoped and held (not released) so any later
+#: same-minute tick on another instance skips; the TTL just bounds how long a stale claim lingers
+#: (a different minute always uses a different key, so this never cross-blocks the next tick).
 _ONE_SERVER_LOCK_TTL = 3600
+
+
+_CRON_MONTHS = {
+    m: i
+    for i, m in enumerate(
+        ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1
+    )
+}
+_CRON_DOWS = {d: i for i, d in enumerate(("sun", "mon", "tue", "wed", "thu", "fri", "sat"), 0)}
+
+
+def _cron_int(token: str) -> int:
+    t = token.strip().lower()
+    if t in _CRON_MONTHS:
+        return _CRON_MONTHS[t]
+    if t in _CRON_DOWS:
+        return _CRON_DOWS[t]
+    return int(t)
 
 
 def _field_matches(field: str, value: int) -> bool:
     if field == "*":
         return True
     for part in field.split(","):
-        if part.startswith("*/"):
-            if value % int(part[2:]) == 0:
+        rng, _, step_str = part.partition("/")  # optional step: "range/step" or "*/step"
+        step = int(step_str) if step_str else 1
+        if rng == "*":
+            if value % step == 0:
                 return True
-        elif "-" in part:
-            low, high = (int(n) for n in part.split("-"))
-            if low <= value <= high:
+        elif "-" in rng:  # a range, possibly stepped: "1-30/10", "mon-fri"
+            low_str, _, high_str = rng.partition("-")
+            low, high = _cron_int(low_str), _cron_int(high_str)
+            if low <= value <= high and (value - low) % step == 0:
                 return True
-        elif part.isdigit() and int(part) == value:
-            return True
+        else:  # a single value or name, with an optional open-ended step ("5/2" → 5,7,9,…)
+            start = _cron_int(rng)
+            if step_str:
+                if value >= start and (value - start) % step == 0:
+                    return True
+            elif start == value:
+                return True
     return False
 
 
@@ -235,20 +262,25 @@ class ScheduledEvent:
             if inspect.isawaitable(outcome):
                 await outcome
 
-    async def run(self) -> Any:
-        locks: list[Any] = []
+    async def run(self, moment: datetime | None = None) -> Any:
+        release_locks: list[Any] = []  # freed in finally; the one-server claim is NOT (see below)
         ran = False  # set only once past the locks — so before/after/callback all skip a lost tick
         try:
             if self.one_server:
-                lock = self._lock(f"schedule:one_server:{self._identity()}", _ONE_SERVER_LOCK_TTL)
+                # scope the claim to this minute and DON'T release it: a staggered tick that starts
+                # after this one finishes must still find the minute claimed and skip. Releasing on
+                # completion (the old behavior) let a later same-minute tick re-acquire and re-run.
+                bucket = self._localized(moment or datetime.now()).strftime("%Y%m%d%H%M")
+                lock = self._lock(
+                    f"schedule:one_server:{self._identity()}:{bucket}", _ONE_SERVER_LOCK_TTL
+                )
                 if not await lock.acquire():
-                    return None  # another instance already owns this tick
-                locks.append(lock)
+                    return None  # another instance already ran (or is running) this minute's tick
             if self.overlap_expire is not None:
                 lock = self._lock(f"schedule:overlap:{self._identity()}", self.overlap_expire)
                 if not await lock.acquire():
                     return None  # a prior run of this event is still in flight
-                locks.append(lock)
+                release_locks.append(lock)
 
             ran = True
             await self._fire(self._before)
@@ -264,7 +296,7 @@ class ScheduledEvent:
         finally:
             if ran:  # after-hooks fire only when the event actually ran, not on a skipped tick
                 await self._fire(self._after)
-            for lock in locks:  # release is unconditional — a lost tick acquired no lock anyway
+            for lock in release_locks:  # overlap lock only; the one-server claim expires with its TTL
                 await lock.release()
 
 
@@ -309,7 +341,7 @@ class Schedule:
         starve the rest of the schedule (or kill the cron tick)."""
         for event in self.due_events(moment):
             try:
-                await event.run()
+                await event.run(moment)
             except Exception:
                 from arvel.kernel.logging import LogManager
 
