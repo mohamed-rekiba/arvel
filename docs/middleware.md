@@ -188,8 +188,15 @@ Group / opt-in:
   `errors` (see [Validation](validation.md)).
 - **`ValidateCsrfToken`** — seeds a per-session CSRF token, then requires state-changing requests
   to send a matching one — via the `_token` form field (`{{ csrf_field() }}` in a form) or an
-  `X-CSRF-TOKEN` / `X-XSRF-TOKEN` header (read `{{ csrf_token() }}` into a meta tag for JS). A
-  missing/mismatched token is a `419`; safe methods (GET/HEAD/OPTIONS) are exempt. See
+  `X-CSRF-TOKEN` / `X-XSRF-TOKEN` header (read `{{ csrf_token() }}` into a meta tag for JS). It
+  also verifies **provenance**: a request carrying an `Origin` header (or, failing that, a
+  `Referer`) must come from the request's own host or a `session.trusted_origins` entry — a
+  cross-site request is a `419` even if its token is somehow valid. Clients that send neither
+  header (curl, native apps) are judged by the token alone. A missing/mismatched token is a
+  `419`; safe methods (GET/HEAD/OPTIONS) are exempt. Trusted origins are bare hosts
+  (`partner.example`, any scheme/port) or full origins matched exactly as the browser sends
+  them — write `https://partner.example`, not `https://partner.example:443` or a trailing
+  slash, since browsers omit default ports. See
   [Views](views.md) for the template helpers.
 - **`RequestContext`**, **`Locale`**, **`Authenticate`** — bind a request id, set the locale
   from `Accept-Language`, and resolve the current user.
@@ -242,7 +249,7 @@ See [API tokens](auth/api-tokens.md) for issuing tokens.
 
 **Decoupled SPA using the session cookie (the `web` group) → the `XSRF-TOKEN` cookie flow.** The
 session-id cookie is `HttpOnly` (JS can't read it), so the web group also sets a **readable
-`XSRF-TOKEN` cookie** holding the token — exactly Sanctum. The SPA never needs a
+`XSRF-TOKEN` cookie** holding the token. The SPA never needs a
 server-rendered page:
 
 1. On startup, make a `GET` to any web-group route (add a no-op `Route.get("/csrf-cookie", …)` for

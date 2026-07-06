@@ -41,9 +41,9 @@ class MiddlewareProtocol(Protocol):
 
 
 class SessionSettings(Settings):
-    """Typed, validated view over the ``session`` config section (DR-0016) — matches 's
-    ``config/session.php`` and the scaffold's ``config/session.py`` (and the top-level-key pattern of
-    the other Settings: database/cache/mail).
+    """Typed, validated view over the ``session`` config section (DR-0016) — matches the
+    scaffold's ``config/session.py`` (and the top-level-key pattern of the other Settings:
+    database/cache/mail).
 
     ``lifetime`` is in **minutes**; the middleware
     converts it to seconds for the cookie ``max-age`` and the cache TTL. Default 120 min = 2h.
@@ -61,6 +61,10 @@ class SessionSettings(Settings):
 
     ``csrf_except`` — URI glob patterns (``request.is_()``-style, e.g. ``"webhooks/*"``) exempt from
     ``ValidateCsrfToken``, merged with any subclass-level override.
+
+    ``trusted_origins`` — origins (besides the request's own host) allowed to source
+    state-changing browser requests: bare hosts (``partner.example``, any scheme/port) or full
+    origins (``https://partner.example:8443``).
     """
 
     __config_key__ = "session"
@@ -69,6 +73,7 @@ class SessionSettings(Settings):
     secure: bool = True
     host_prefix: bool | None = None
     csrf_except: list[str] = msgspec.field(default_factory=_empty_str_list)
+    trusted_origins: list[str] = msgspec.field(default_factory=_empty_str_list)
 
 
 # Shared across the per-request middleware instances the kernel builds: name:client -> (count, window_start).
@@ -424,7 +429,15 @@ class StartSession(Middleware):
 class ValidateCsrfToken(Middleware):
     """Reject state-changing requests whose CSRF token doesn't match the session (web group).
 
-    Safe methods (GET/HEAD/OPTIONS) are exempt. The submitted token comes from the ``X-CSRF-TOKEN``
+    Safe methods (GET/HEAD/OPTIONS) are exempt. Two gates apply to the rest, and both must pass:
+
+    **Provenance.** A request carrying an ``Origin`` header (browsers send it on cross-origin and
+    most same-origin unsafe requests) must originate from the request's own host or a configured
+    ``session.trusted_origins`` entry; ``Referer`` is the fallback signal when ``Origin`` is
+    absent. A request with neither header (curl, native API clients) is judged by the token alone
+    — provenance can only be checked when the client asserts it.
+
+    **Token.** The submitted token comes from the ``X-CSRF-TOKEN``
     (or ``X-XSRF-TOKEN``) header, or the ``_token`` field of a form/JSON body; the expected
     token is the session's ``_token`` (seeded by this middleware on each web request, so the form can
     render + submit it). A mismatch (or a missing token) raises a 419 ``ValidationException`` ('s
@@ -453,6 +466,7 @@ class ValidateCsrfToken(Middleware):
         self._secure = settings.secure
         self._max_age = settings.lifetime * 60  # minutes -> seconds for max-age
         self._except = [*self.except_, *settings.csrf_except]
+        self._trusted = list(settings.trusted_origins)
 
     def _is_excepted(self, request: Any) -> bool:
         checker = getattr(request, "is_", None)
@@ -480,6 +494,43 @@ class ValidateCsrfToken(Middleware):
             return None
         return cast("dict[str, Any]", session).get("_token")
 
+    def _asserted_origin(self, request: Any) -> str | None:
+        """The origin the client asserts: the ``Origin`` header, else one derived from
+        ``Referer``. ``None`` when the client asserts nothing (token-only fallback)."""
+        origin = request.header("origin")
+        if origin:
+            return str(origin)
+        referer = request.header("referer")
+        if referer:
+            from urllib.parse import urlsplit
+
+            parts = urlsplit(str(referer))
+            if parts.scheme and parts.netloc:
+                return f"{parts.scheme}://{parts.netloc}"
+            return "null"  # an unparseable referer asserts provenance but proves none
+        return None
+
+    def _origin_ok(self, request: Any, origin: str) -> bool:
+        from urllib.parse import urlsplit
+
+        if origin == "null":  # sandboxed iframe / data: URL — provenance explicitly withheld
+            return False
+        parts = urlsplit(origin)
+        host = parts.hostname
+        if host is None:
+            return False
+        own = getattr(request, "host", None)
+        own_host = str(own() or "") if callable(own) else ""
+        if own_host.lower() == host:  # urlsplit lowercases hostname; Host header may not be
+            return True
+        for entry in self._trusted:
+            if "://" in entry:
+                if origin == entry:
+                    return True
+            elif entry.lower() == host:  # bare host: any scheme/port
+                return True
+        return False
+
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         import secrets
 
@@ -488,6 +539,12 @@ class ValidateCsrfToken(Middleware):
             cast("dict[str, Any]", session).setdefault("_token", secrets.token_hex(32))
         if request.method().upper() in self.SAFE_METHODS or self._is_excepted(request):
             return await call_next(request)
+        asserted = self._asserted_origin(request)
+        if asserted is not None and not self._origin_ok(request, asserted):
+            from arvel.localization import trans
+            from arvel.validation import ValidationException
+
+            raise ValidationException(trans("http.csrf"), status=419)
         expected = self._expected(request)
         submitted = await self._submitted(request)
         # constant-time compare (must not leak the secret via timing); bytes so a non-ASCII
@@ -506,7 +563,7 @@ class ValidateCsrfToken(Middleware):
 
     async def terminate(self, request: Any, response: Any) -> None:
         """Expose the session token as a readable ``XSRF-TOKEN`` cookie so a decoupled SPA (no
-        server-rendered meta tag) can read it and send it back as ``X-XSRF-TOKEN`` — Sanctum.
+        server-rendered meta tag) can read it and send it back as ``X-XSRF-TOKEN``.
         Not ``HttpOnly`` (JS must read it); inherits the session's Secure flag; ``SameSite=Lax``."""
         session = getattr(request, "session", None)
         token = cast("dict[str, Any]", session).get("_token") if isinstance(session, dict) else None
