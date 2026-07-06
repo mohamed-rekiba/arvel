@@ -19,4 +19,5 @@ class ClientServiceProvider(ServiceProvider):
         self.app.singleton("http", make_http)
 
     def boot(self) -> None:
-        """No-op."""
+        # close the client's pooled keep-alive connections on shutdown
+        self.app.terminating(self.app.make("http").aclose)

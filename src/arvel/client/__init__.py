@@ -506,14 +506,42 @@ class Client:
     def __init__(self, transport: Any = None) -> None:
         self._transport = transport
         self._fake_state: _FakeState | None = None
+        # one keep-alive client per event loop, so sequential Http.get/post reuse connections
+        # instead of building and tearing one down per call. Keyed by loop id because an
+        # AsyncClient is bound to the loop it runs on; closed on app shutdown (see the provider).
+        self._shared: dict[int, httpx.AsyncClient] = {}
 
     def _current_transport(self) -> Any:
         if self._fake_state is not None:
             return httpx.MockTransport(self._fake_state.handle)
         return self._transport
 
+    def _shared_client(self) -> httpx.AsyncClient | None:
+        if self._fake_state is not None:
+            return None  # faking swaps the transport per call — no shared client
+        import asyncio
+
+        try:
+            loop_id = id(asyncio.get_running_loop())
+        except RuntimeError:
+            return None  # no running loop → fall back to a per-call client
+        client = self._shared.get(loop_id)
+        if client is None or client.is_closed:
+            client = httpx.AsyncClient(transport=self._transport)
+            self._shared[loop_id] = client
+        return client
+
+    async def aclose(self) -> None:
+        """Close the pooled keep-alive clients — wired to app shutdown by the provider."""
+        for client in self._shared.values():
+            if not client.is_closed:
+                await client.aclose()
+        self._shared.clear()
+
     def _pending(self) -> PendingRequest:
-        return PendingRequest(transport=self._current_transport())
+        return PendingRequest(
+            transport=self._current_transport(), shared_client=self._shared_client()
+        )
 
     # -- builder passthroughs (mirror PendingRequest) --------------------------
 
