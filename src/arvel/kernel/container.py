@@ -145,6 +145,9 @@ class Container:
         self._tags: dict[str, list[Any]] = {}
         self._resolving_cbs: dict[Any, list[Callable[[Any, Container], None]]] = {}
         self._after_resolving_cbs: dict[Any, list[Callable[[Any, Container], None]]] = {}
+        self._global_resolving_cbs: list[Callable[[Any, Container], None]] = []
+        self._global_after_resolving_cbs: list[Callable[[Any, Container], None]] = []
+        self._rebinding_cbs: dict[Any, list[Callable[[Container], None]]] = {}
         self._method_bindings: dict[tuple[type, str], Callable[[Any, Container], Any]] = {}
         self._build_stack: list[Any] = []
         self._with: list[dict[str, Any]] = []
@@ -158,11 +161,21 @@ class Container:
         shared: bool = False,
         scoped: bool = False,
     ) -> None:
-        self._bindings[self._alias_of(abstract)] = {
+        key = self._alias_of(abstract)
+        was_bound = key in self._bindings or key in self._instances
+        self._bindings[key] = {
             "concrete": abstract if concrete is None else concrete,
             "shared": shared,
             "scoped": scoped,
         }
+        # a rebind must not keep serving the old object: drop the stale shared
+        # instance and any current-scope copy so the next make() rebuilds
+        self._instances.pop(key, None)
+        scope = _scope.get()
+        if scope is not None:
+            scope.pop(key, None)
+        if was_bound:
+            self._fire_rebinding(key)
 
     def singleton(self, abstract: Any, concrete: Any = None) -> None:
         self.bind(abstract, concrete, shared=True)
@@ -171,7 +184,11 @@ class Container:
         self.bind(abstract, concrete, scoped=True)
 
     def instance(self, abstract: Any, obj: Any) -> Any:
-        self._instances[self._alias_of(abstract)] = obj
+        key = self._alias_of(abstract)
+        was_bound = key in self._bindings or key in self._instances
+        self._instances[key] = obj
+        if was_bound:
+            self._fire_rebinding(key)
         return obj
 
     def alias(self, alias: str, abstract: Any) -> None:
@@ -194,13 +211,40 @@ class Container:
     def tagged(self, tag: str) -> list[Any]:
         return [self.make(a) for a in self._tags.get(tag, [])]
 
-    def resolving(self, abstract: Any, callback: Callable[[Any, Container], None]) -> None:
+    @overload
+    def resolving(self, abstract: Callable[[Any, Container], None], /) -> None: ...
+    @overload
+    def resolving(self, abstract: Any, callback: Callable[[Any, Container], None]) -> None: ...
+    def resolving(self, abstract: Any, callback: Callable[[Any, Container], None] | None = None) -> None:
+        """Register a resolution hook. One-arg form (``resolving(cb)``) fires for *every*
+        resolution; two-arg form fires only for ``abstract``. Global hooks fire first."""
+        if callback is None:
+            self._global_resolving_cbs.append(abstract)
+            return
         self._resolving_cbs.setdefault(self._alias_of(abstract), []).append(callback)
 
-    def after_resolving(self, abstract: Any, callback: Callable[[Any, Container], None]) -> None:
+    @overload
+    def after_resolving(self, abstract: Callable[[Any, Container], None], /) -> None: ...
+    @overload
+    def after_resolving(self, abstract: Any, callback: Callable[[Any, Container], None]) -> None: ...
+    def after_resolving(
+        self, abstract: Any, callback: Callable[[Any, Container], None] | None = None
+    ) -> None:
         """Register ``callback(instance, container)`` to fire on each resolve of ``abstract``,
-        *after* its ``resolving`` callbacks."""
+        *after* its ``resolving`` callbacks. One-arg form fires for every resolution."""
+        if callback is None:
+            self._global_after_resolving_cbs.append(abstract)
+            return
         self._after_resolving_cbs.setdefault(self._alias_of(abstract), []).append(callback)
+
+    def rebinding(self, abstract: Any, callback: Callable[[Container], None]) -> None:
+        """Register ``callback(container)`` to fire when ``abstract`` is bound *again* after
+        already being bound — the seam for refreshing consumers of a swapped service."""
+        self._rebinding_cbs.setdefault(self._alias_of(abstract), []).append(callback)
+
+    def _fire_rebinding(self, key: Any) -> None:
+        for cb in self._rebinding_cbs.get(key, []):
+            cb(self)
 
     def bind_method(self, target: Sequence[Any], callback: Callable[[Any, Container], Any]) -> None:
         """Override how a method is resolved by ``call``. ``target`` is
@@ -272,10 +316,13 @@ class Container:
         needs_ctx = bool(params) or ctx is not None
         binding = self._bindings.get(abstract)
 
-        if binding is not None and binding["scoped"]:
-            return self._resolve_scoped(abstract, binding["concrete"])
         if abstract in self._instances and not needs_ctx:
+            # instance() wins over any binding, scoped included — it re-points resolution
             return self._instances[abstract]
+        if binding is not None and binding["scoped"] and not needs_ctx:
+            # explicit params / contextual overrides bypass the scope cache the same
+            # way they bypass the shared-instance cache below: fresh build, not cached
+            return self._resolve_scoped(abstract, binding["concrete"])
 
         self._with.append(params)
         try:
@@ -365,6 +412,7 @@ class Container:
         when it has one, else raises a clear ``BindingResolutionError`` rather than leaking a raw
         ``TypeError``/``NameError`` (M1/C3)."""
         override = self._with[-1] if self._with else {}
+        ctx_map = self._contextual.get(owner)
         args: list[Any] = []
         kwargs: dict[str, Any] = {}
         empty = inspect.Parameter.empty
@@ -373,10 +421,18 @@ class Container:
                 continue
             if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
                 continue
+            annotation = hints.get(name, param.annotation)
             if name in override:
                 value = override[name]
+            elif ctx_map is not None and name in ctx_map:
+                # contextual binding on the *parameter name* — covers primitives the
+                # annotation path can't autowire (when(X).needs("name").give(v))
+                value = self._from_contextual(ctx_map[name])
+            elif ctx_map is not None and self._is_primitive(annotation) and annotation in ctx_map:
+                # contextual binding keyed on a primitive annotation; class-typed
+                # annotations keep flowing through make() → _contextual_concrete
+                value = self._from_contextual(ctx_map[annotation])
             else:
-                annotation = hints.get(name, param.annotation)
                 inner, nullable = self._unwrap_optional(annotation)
                 has_default = param.default is not empty
                 value = _UNSET
@@ -431,7 +487,11 @@ class Container:
         return _ScopeGuard()
 
     def _fire_resolution_callbacks(self, abstract: Any, obj: Any) -> None:
+        for cb in self._global_resolving_cbs:
+            cb(obj, self)
         for cb in self._resolving_cbs.get(abstract, []):
+            cb(obj, self)
+        for cb in self._global_after_resolving_cbs:
             cb(obj, self)
         for cb in self._after_resolving_cbs.get(abstract, []):
             cb(obj, self)
@@ -455,21 +515,37 @@ class Container:
             hints = typing.get_type_hints(func)
         except Exception:
             hints = {}  # unresolvable hints → inject only what we can introspect
+        args: list[Any] = []
         kwargs: dict[str, Any] = {}
         for name, param in sig.parameters.items():
             if name == "self":
                 continue
             if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
                 continue
+            value: Any = _UNSET
             if name in params:
-                kwargs[name] = params[name]
+                value = params[name]
+            else:
+                annotation = hints.get(name, param.annotation)
+                if self._is_injectable(annotation):
+                    value = self.make(annotation)
+                elif param.default is not inspect.Parameter.empty:
+                    value = param.default
+            if value is _UNSET:
+                if param.kind is inspect.Parameter.POSITIONAL_ONLY:
+                    # skipping a positional-only slot would silently shift later
+                    # positional args left — fail loudly instead
+                    raise BindingResolutionError(
+                        f"Unresolvable positional-only parameter [{name}] calling {func!r}"
+                    )
                 continue
-            annotation = hints.get(name, param.annotation)
-            if self._is_injectable(annotation):
-                kwargs[name] = self.make(annotation)
-            elif param.default is not inspect.Parameter.empty:
-                kwargs[name] = param.default
-        return func(**kwargs)  # a coroutine is returned untouched for async targets
+            if param.kind is inspect.Parameter.POSITIONAL_ONLY:
+                # positional-only params can't be passed by name — func(**kwargs) would
+                # TypeError on any `def f(dep, /)` signature
+                args.append(value)
+            else:
+                kwargs[name] = value
+        return func(*args, **kwargs)  # a coroutine is returned untouched for async targets
 
     # --- helpers -----------------------------------------------------------
     @staticmethod
