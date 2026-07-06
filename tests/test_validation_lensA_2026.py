@@ -3,7 +3,9 @@ dot-path cross-field references, ASCII-only digit rules, and nullable-vs-implici
 
 from __future__ import annotations
 
-from arvel.validation import ValidationException, Validator
+from typing import Any
+
+from arvel.validation import Rule, ValidationException, Validator
 
 
 def _passes(data: dict, rules: dict) -> bool:
@@ -12,6 +14,20 @@ def _passes(data: dict, rules: dict) -> bool:
     except ValidationException:
         return False
     return True
+
+
+class _AlwaysFails(Rule):
+    message = "nope"
+
+    def passes(self, attribute: str, value: Any) -> bool:
+        return False
+
+
+def test_nullable_suppresses_a_custom_rule_on_none() -> None:
+    # a custom Rule object is non-implicit, so nullable suppresses it on a null value
+    assert _passes({"x": None}, {"x": ["nullable", _AlwaysFails()]})
+    # but a present value still runs the custom rule (which fails here)
+    assert not _passes({"x": "v"}, {"x": ["nullable", _AlwaysFails()]})
 
 
 def test_boolean_rejects_the_strings_true_and_false() -> None:
