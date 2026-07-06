@@ -245,7 +245,9 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
 
     # --- connection / query --------------------------------------------------
     @classmethod
-    def set_connection(cls, resolver: ConnectionResolver) -> None:
+    def set_connection(cls, resolver: ConnectionResolver | None) -> None:
+        """Bind (or with ``None`` unbind) the resolver this model class queries through —
+        tests unbind in teardown so a disposed connection can't leak into later tests."""
         cls._resolver = resolver
 
     @classmethod

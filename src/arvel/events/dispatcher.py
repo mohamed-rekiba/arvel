@@ -168,10 +168,18 @@ class Dispatcher:
             raise
         else:
             self._ac_buffer.reset(token)
-            # flush is fail-fast: the first raising callback aborts the rest and surfaces to
-            # the caller (the commit itself already succeeded) — deferred work is not retried
+            # the data already committed, so every buffered callback gets its chance — one
+            # failing enqueue must not silently drop its siblings. The first failure still
+            # surfaces to the caller (post-commit); none of the work is retried.
+            first_failure: Exception | None = None
             for callback in buffer:
-                await callback()
+                try:
+                    await callback()
+                except Exception as exc:  # cancellation still propagates immediately
+                    if first_failure is None:
+                        first_failure = exc
+            if first_failure is not None:
+                raise first_failure
 
     async def until(self, event: Any, *payload: Any) -> Any:
         return await self._fire(event, payload, halt=True)

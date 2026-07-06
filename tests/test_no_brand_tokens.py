@@ -9,7 +9,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# fragments, not literals, so this file is not itself a hit
+# fragments, not literals, so this file is not itself a hit. Plain substring matching (no
+# word boundaries): a token buried in an identifier (a CamelCase class, a snake_case config
+# key) is exactly the regression this guard exists to catch.
 _TOKENS = [
     "lara" + "vel",
     "elo" + "quent",
@@ -20,7 +22,7 @@ _TOKENS = [
     "sanc" + "tum",
     "pen" + "nant",
 ]
-_BANNED = re.compile("|".join(rf"\b{t}\b" for t in _TOKENS), re.IGNORECASE)
+_BANNED = re.compile("|".join(_TOKENS), re.IGNORECASE)
 
 _SCAN_SUFFIXES = {".py", ".md", ".sh", ".pyi", ".html", ".toml", ".yaml", ".yml", ".tmpl"}
 

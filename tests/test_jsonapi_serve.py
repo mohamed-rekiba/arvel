@@ -91,3 +91,22 @@ def test_plain_json_clients_keep_the_existing_error_shape() -> None:
         "message": "Unprocessable Entity",
         "errors": {"name": ["required"]},
     }
+
+
+def test_non_dict_validation_errors_keep_their_detail() -> None:
+    from arvel.validation import ValidationException
+
+    def string_handler(request: Any) -> Any:
+        raise ValidationException("quota exhausted", status=422)
+
+    def list_handler(request: Any) -> Any:
+        raise ValidationException(["first problem", "second problem"], status=422)
+
+    router = Router()
+    router.get("/fail-str", string_handler)
+    router.get("/fail-list", list_handler)
+    with _client(router) as client:
+        as_str = client.get("/fail-str", headers={"accept": JSONAPI})
+        as_list = client.get("/fail-list", headers={"accept": JSONAPI})
+    assert as_str.json()["errors"] == [{"status": "422", "detail": "quota exhausted"}]
+    assert [e["detail"] for e in as_list.json()["errors"]] == ["first problem", "second problem"]

@@ -82,10 +82,27 @@ def test_unknown_include_name_is_ignored() -> None:
 def test_sparse_fieldsets_filter_attributes_and_ignore_unknown_names() -> None:
     author = FakeModel({"id": 3, "name": "Ada", "bio": "…"})
     doc = PostResource(_post(author=author)).to_payload(
-        FakeRequest({"include": "author", "fields[posts]": "title,ghost", "fields[authors]": "bio"})
+        FakeRequest(
+            {
+                "include": "author",
+                # a fieldset lists FIELDS — attributes and relationships alike, per the spec
+                "fields[posts]": "title,author,ghost",
+                "fields[authors]": "bio",
+            }
+        )
     )
     assert doc["data"]["attributes"] == {"title": "Hello"}  # ghost silently dropped
+    assert doc["data"]["relationships"]["author"]["data"] == {"type": "authors", "id": "3"}
     assert doc["included"][0]["attributes"] == {"bio": "…"}
+
+
+def test_fieldset_omitting_a_relationship_hides_linkage_and_included() -> None:
+    author = FakeModel({"id": 3, "name": "Ada"})
+    doc = PostResource(_post(author=author)).to_payload(
+        FakeRequest({"include": "author", "fields[posts]": "title"})
+    )
+    assert "relationships" not in doc["data"]  # the fieldset hides the relationship field
+    assert "included" not in doc  # …from the whole document, include= notwithstanding
 
 
 def test_to_many_relationship_linkage() -> None:

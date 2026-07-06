@@ -189,3 +189,20 @@ async def test_after_commit_callback_outside_transaction_runs_now(ctx: Any) -> N
 
     assert await events.after_commit(cb) == "now"  # no open buffer → immediate, result returned
     assert ran == ["now"]
+
+
+async def test_flush_runs_all_callbacks_and_surfaces_the_first_failure(ctx: Any) -> None:
+    _, events, db = ctx
+    ran: list[str] = []
+
+    async def bad() -> None:
+        raise RuntimeError("enqueue failed")
+
+    async def good() -> None:
+        ran.append("sibling")
+
+    with pytest.raises(RuntimeError, match="enqueue failed"):
+        async with db.transaction():
+            await events.after_commit(bad)
+            await events.after_commit(good)
+    assert ran == ["sibling"]  # the committed tx's sibling work still ran

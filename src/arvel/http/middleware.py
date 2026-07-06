@@ -525,7 +525,9 @@ class ValidateCsrfToken(Middleware):
             return True
         for entry in self._trusted:
             if "://" in entry:
-                if origin == entry:
+                # an Origin value is scheme://host[:port] — lowercasing the whole string is
+                # safe (no path/userinfo) and matches how urlsplit folds the hostname
+                if origin.lower() == entry.lower():
                     return True
             elif entry.lower() == host:  # bare host: any scheme/port
                 return True

@@ -302,7 +302,8 @@ class Router:
                 # spa_fallback's own index.html is missing (public/ not built) -> a clear error
                 # instead of a raw FileNotFoundError surfacing as an opaque 500
                 return ("no_index", target)
-            immutable = target.parent.name == assets_dirname
+            # anywhere under the assets dir counts — bundlers nest (assets/chunks/x-abc.js)
+            immutable = assets_dirname in target.relative_to(root).parts[:-1]
             return ("ok", (target.read_bytes(), target.name, immutable))
 
         async def _serve(rel: str, fallback: bool) -> Any:
