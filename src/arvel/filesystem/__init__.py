@@ -247,7 +247,15 @@ class Filesystem:
         return full_dst
 
     async def delete(self, path: str) -> bool:
-        await run_sync(self._fs.rm, self._full(path))
+        full = self._full(path)
+
+        def _delete() -> None:
+            try:
+                self._fs.rm(full)
+            except FileNotFoundError:
+                pass  # idempotent: a path that's already gone is a successful delete
+
+        await run_sync(_delete)
         return True
 
     # -- directory listing ----------------------------------------------------

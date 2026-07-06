@@ -21,6 +21,12 @@ async def test_local_disk_roundtrip(tmp_path: Path) -> None:
     assert not await disk.exists("uploads/a.txt")
 
 
+async def test_delete_missing_path_is_idempotent(tmp_path: Path) -> None:
+    disk = Filesystem(fsspec.filesystem("file"), root=str(tmp_path))
+    # deleting something that isn't there is a no-op success, not a FileNotFoundError
+    assert await disk.delete("nope.txt") is True
+
+
 async def test_put_bytes(tmp_path: Path) -> None:
     disk = Filesystem(fsspec.filesystem("file"), root=str(tmp_path))
     await disk.put("b.bin", b"\x00\x01\x02")
