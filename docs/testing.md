@@ -128,15 +128,15 @@ async def test_create_and_delete(db):
 
 ## Console commands
 
-`artisan(app, command, input=None)` runs an app-registered command (a `Command` class on
+`cli(app, command, input=None)` runs an app-registered command (a `Command` class on
 `app.command_classes`, or a `routes/console.py` `Console.command(...)` closure) against a booted
-app and captures its exit code + output — the `$this->artisan(...)`:
+app and captures its exit code + output — the `$this->cli(...)`:
 
 ```python
-from arvel.testing import artisan
+from arvel.testing import cli
 
 def test_greet_command(app):
-    result = artisan(app, "greet Ada --loud", input=["Bob"])   # input pre-seeds ask()/confirm()/...
+    result = cli(app, "greet Ada --loud", input=["Bob"])   # input pre-seeds ask()/confirm()/...
     result.assert_exit_code(0).assert_output_contains("hello Bob")
 ```
 
@@ -145,7 +145,7 @@ they're asked — an exhausted or empty seeded answer falls back to the prompt's
 a real `Prompter`.
 
 !!! note "Built-in framework commands aren't reachable this way"
-    `artisan()` only dispatches **your** commands (app/provider `Command` classes and
+    `cli()` only dispatches **your** commands (app/provider `Command` classes and
     `Console.command(...)` closures) — a built-in (`migrate`, `make:*`, `db:seed`, ...) isn't. Test
     those with Typer's own `CliRunner` directly:
 

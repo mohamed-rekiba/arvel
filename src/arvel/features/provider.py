@@ -1,4 +1,4 @@
-"""FeatureServiceProvider — binds ``features`` (the FeatureManager) for Pennant-style flags."""
+"""FeatureServiceProvider — binds ``features`` (the FeatureManager) for feature flags."""
 
 from __future__ import annotations
 

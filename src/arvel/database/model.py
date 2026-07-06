@@ -24,7 +24,7 @@ from arvel.database.model_serialization import SerializesModels
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from arvel.database.collection import EloquentCollection
+    from arvel.database.collection import ModelCollection
     from arvel.database.connections import ConnectionResolver
     from arvel.database.factory import Factory
 
@@ -395,8 +395,8 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return found
 
     @classmethod
-    async def all(cls) -> EloquentCollection[Self]:
-        rows: EloquentCollection[Self] = await cls.get()
+    async def all(cls) -> ModelCollection[Self]:
+        rows: ModelCollection[Self] = await cls.get()
         return rows
 
     @classmethod

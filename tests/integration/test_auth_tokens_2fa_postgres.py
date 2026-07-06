@@ -1,4 +1,4 @@
-"""15 AUTH-AUTHZ — Sanctum-parity tokens (last_used_at) + Fortify-parity 2FA, against a real
+"""15 AUTH-AUTHZ — API tokens (last_used_at) + 2FA, against a real
 PostgreSQL (not just SQLite — the encrypted/hashed casts + real DateTime column round-trip need a
 real dialect, not just the ORM's in-memory model logic)."""
 

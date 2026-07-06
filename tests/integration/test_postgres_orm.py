@@ -14,7 +14,7 @@ import pytest
 import sqlalchemy as sa
 
 from arvel.database import Builder, ConnectionResolver, Model
-from arvel.database.collection import EloquentCollection
+from arvel.database.collection import ModelCollection
 from arvel.database.relations import SyncResult
 from arvel.events import Dispatcher
 from arvel.kernel import Application, set_application
@@ -167,7 +167,7 @@ async def test_full_event_lifecycle_on_postgres(postgres_url: str) -> None:
         set_application(None)
 
 
-# --- 09 DB-QUERY: A4 upsert / A5 sync / EloquentCollection / QB breadth / cursor pagination ------
+# --- 09 DB-QUERY: A4 upsert / A5 sync / ModelCollection / QB breadth / cursor pagination ------
 
 
 class Sku(Model):
@@ -357,7 +357,7 @@ async def test_cursor_paginate_walks_25_rows_in_3_pages_on_postgres(postgres_url
         await db.dispose()
 
 
-async def test_all_and_relation_get_return_eloquent_collection_on_postgres(
+async def test_all_and_relation_get_return_model_collection_on_postgres(
     postgres_url: str,
 ) -> None:
     db = ConnectionResolver({"default": {"url": postgres_url}})
@@ -366,7 +366,7 @@ async def test_all_and_relation_get_return_eloquent_collection_on_postgres(
         await db.execute(sa.schema.CreateTable(Sku.__table__))
         await Sku.create(sku="X", price=1)
         result = await Sku.all()
-        assert isinstance(result, EloquentCollection)
+        assert isinstance(result, ModelCollection)
         assert isinstance(await Builder(Sku.__table__, db).where_null("sku").get(), list)
     finally:
         await db.execute(sa.schema.DropTable(Sku.__table__))

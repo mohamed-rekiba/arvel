@@ -580,19 +580,19 @@ def freeze_time(moment: Any = None) -> Generator[Any]:
 # --- console test helpers --------------------------------------------------------------
 #
 # ponytail: this section duck-types just enough of `arvel.console` (Command/Prompter/signature
-# parsing/Artisan dispatch) to run an app-registered command or closure, rather than importing it —
+# parsing/Cli dispatch) to run an app-registered command or closure, rather than importing it —
 # import-linter's G1 layers contract puts `arvel.console` *above* `arvel.testing` (console may
-# import testing; testing may not import console), so `Artisan.call`/`Command`/`Prompter` aren't
+# import testing; testing may not import console), so `Cli.call`/`Command`/`Prompter` aren't
 # reachable from here even via a lazy import (import-linter's static analysis catches those too).
 # Ceiling: only app-registered `Command` classes/`Console.command(...)` closures are reachable this
-# way (mirrors `arvel.console.kernel._artisan_dispatch`'s own split) — a *built-in* framework
+# way (mirrors `arvel.console.kernel._cli_dispatch`'s own split) — a *built-in* framework
 # command (`migrate`, `make:*`,...) isn't; drive those with Typer's own `CliRunner` directly
 # (``from typer.testing import CliRunner``). Upgrade path: if a shared parser/dispatcher ever moves
 # below the layer line, swap this out for the real thing.
 
 
 class ConsoleResult:
-    """The outcome of:func:`artisan` — exit code + captured stdout/stderr."""
+    """The outcome of:func:`cli` — exit code + captured stdout/stderr."""
 
     def __init__(self, exit_code: int, output: str) -> None:
         self.exit_code = exit_code
@@ -650,7 +650,7 @@ def _bind_command_line(signature: str, rest: Sequence[str]) -> dict[str, Any]:
 
     ponytail: value options must use ``--opt=value``, not space-separated ``--opt value`` — matching
     that would mean reimplementing typer's parser here (which testing can't import). Ceiling, not a
-    bug: use the ``=`` form in artisan() calls."""
+    bug: use the ``=`` form in cli() calls."""
     tokens = _parse_signature_tokens(signature)
     positionals = [(name, default) for name, is_option, default in tokens if not is_option]
     option_names = {name for name, is_option, _default in tokens if is_option}
@@ -755,7 +755,7 @@ def _run_capturing_exit(run: Callable[[], None]) -> int:
     return 0
 
 
-def artisan(app: Any, command: str, input: Sequence[str] | None = None) -> ConsoleResult:
+def cli(app: Any, command: str, input: Sequence[str] | None = None) -> ConsoleResult:
     """Run an app-registered console command (a ``Command`` class or a ``routes/console.pyConsole.command(...)`` closure) against a booted ``app`` and capture its exit code + output. ``input`` pre-seeds prompt answers in the order they're
     asked (``Command.ask``/``confirm``/``choice``/...). Only app-registered commands are reachable
     this way — see the module note above ``ConsoleResult`` for why, and the built-in-command
@@ -779,7 +779,7 @@ def artisan(app: Any, command: str, input: Sequence[str] | None = None) -> Conso
             (c for c in getattr(app, "command_classes", []) if _command_name(c) == name), None
         )
     if closure is None and cls is None:
-        raise ValueError(f"artisan(): {name!r} is not registered on this app")
+        raise ValueError(f"cli(): {name!r} is not registered on this app")
 
     previous = _active_app() if has_application() else None
     set_application(app)
@@ -825,10 +825,10 @@ __all__ = [
     "FakeNotifications",
     "FakeQueue",
     "TestResponse",
-    "artisan",
     "assert_database_has",
     "assert_database_missing",
     "assert_soft_deleted",
+    "cli",
     "client",
     "database_transaction",
     "fake",

@@ -62,7 +62,7 @@ token.is_expired()                                              # False now, Tru
 await resolve_token(expired_plaintext)                          # → None (rejected)
 ```
 
-Omit `expires_in` for a non-expiring token — unless config `sanctum.expiration` (minutes) is set, in
+Omit `expires_in` for a non-expiring token — unless config `api_tokens.expiration` (minutes) is set, in
 which case that's the default lifetime applied whenever a caller doesn't pass `expires_in` explicitly
 (an explicit `expires_in` always overrides it). `create_token` **validates at mint** — a positive
 `expires_in` (or `None`) and a non-empty set of non-empty ability strings — and raises `ValueError`
@@ -116,8 +116,8 @@ Tokens live in the `api_tokens` table — `name`, the hashed `token`, `tokenable
 ## Tracking last use
 
 `resolve_token` (and therefore anything that authenticates via it) stamps `last_used_at` — but
-**throttled**: at most once per config `sanctum.last_used_throttle` seconds (default 60), not on
-every single request. Sanctum writes `last_used_at` unconditionally each request; arvel's
+**throttled**: at most once per config `api_tokens.last_used_throttle` seconds (default 60), not on
+every single request. The reference behavior writes `last_used_at` unconditionally each request; arvel's
 throttle is a documented, idiomatic divergence that trades a little staleness for far fewer writes on
 a hot endpoint. Lower the throttle (or set it to `0`) if you need per-request precision.
 
@@ -138,7 +138,7 @@ async def delete_post(request, post_id):
 
 For route-level enforcement, `abilities()`/`ability()` build a middleware class that both
 authenticates the bearer token (**401** if missing/invalid/expired) and enforces its scope
-(**403** if it doesn't match) — Sanctum's `abilities:a,b` (require **all**) and `ability:a` (require
+(**403** if it doesn't match) — `abilities:a,b` (require **all**) and `ability:a` (require
 **any**), built from explicit string args like `Authorize()` rather than parsed from a
 colon-separated alias string:
 

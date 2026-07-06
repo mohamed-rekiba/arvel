@@ -1,26 +1,26 @@
-"""arvel.console.kernel — the CLI-shaping helper ``_artisan_argv`` (dict/list -> argv tokens) and
-the ``Artisan.call`` dispatch guards for app-registered commands."""
+"""arvel.console.kernel — the CLI-shaping helper ``_cli_argv`` (dict/list -> argv tokens) and
+the ``Cli.call`` dispatch guards for app-registered commands."""
 
 from __future__ import annotations
 
 import pytest
 
 from arvel.console.kernel import (
-    Artisan,
-    _artisan_argv,  # pyright: ignore[reportPrivateUsage]
+    Cli,
+    _cli_argv,  # pyright: ignore[reportPrivateUsage]
 )
 from arvel.kernel import set_application
 from arvel.kernel.application import Application
 
 
-def test_artisan_argv_none_and_list_passthrough() -> None:
-    assert _artisan_argv(None) == []
-    assert _artisan_argv(["a", "b"]) == ["a", "b"]
-    assert _artisan_argv([1, 2]) == ["1", "2"]  # coerced to str
+def test_cli_argv_none_and_list_passthrough() -> None:
+    assert _cli_argv(None) == []
+    assert _cli_argv(["a", "b"]) == ["a", "b"]
+    assert _cli_argv([1, 2]) == ["1", "2"]  # coerced to str
 
 
-def test_artisan_argv_dict_flag_option_and_positional_forms() -> None:
-    argv = _artisan_argv(
+def test_cli_argv_dict_flag_option_and_positional_forms() -> None:
+    argv = _cli_argv(
         {
             "--force": True,  # flag present
             "--dry": False,  # flag absent -> skipped
@@ -42,7 +42,7 @@ def test_artisan_argv_dict_flag_option_and_positional_forms() -> None:
 def test_call_unknown_command_without_application_raises() -> None:
     set_application(None)
     with pytest.raises(RuntimeError, match="no active application"):
-        Artisan.call("definitely-not-a-command")
+        Cli.call("definitely-not-a-command")
 
 
 def test_call_app_command_rejects_a_list_of_args() -> None:
@@ -50,6 +50,6 @@ def test_call_app_command_rejects_a_list_of_args() -> None:
     set_application(app)
     try:
         with pytest.raises(TypeError, match="takes a dict of args, not a list"):
-            Artisan.call("some-app-command", ["positional"])
+            Cli.call("some-app-command", ["positional"])
     finally:
         set_application(None)

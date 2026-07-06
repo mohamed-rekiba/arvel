@@ -320,23 +320,23 @@ below) share one grammar, parsed by `arvel.console.closure.parse_signature`:
 An optional/defaulted/variadic positional must come last (a required one after it is a signature
 error, raised at registration).
 
-### Invoking a command programmatically (`Artisan.call`)
+### Invoking a command programmatically (`Cli.call`)
 
-`arvel.console.kernel.Artisan.call(name, args=None) -> int` runs a command in-process and returns
+`arvel.console.kernel.Cli.call(name, args=None) -> int` runs a command in-process and returns
 its exit code (`call_silently` additionally swallows its stdout/stderr):
 
 ```python
-from arvel.console.kernel import Artisan
+from arvel.console.kernel import Cli
 
-code = Artisan.call("migrate")                              # a built-in — argv-shaped args
-code = Artisan.call("report:send", {"user": "ada", "--force": True})  # app-registered
-Artisan.call_silently("cache:clear")
+code = Cli.call("migrate")                              # a built-in — argv-shaped args
+code = Cli.call("report:send", {"user": "ada", "--force": True})  # app-registered
+Cli.call_silently("cache:clear")
 ```
 
 Built-in framework commands (`migrate`, `make:*`, …) dispatch through the same click command the
 CLI uses (`args` is a `dict` of CLI-shaped values or a raw `list[str]` of argv tokens). Commands
 registered by *your* app (a `routes/console.py` closure, or a provider's `commands()`) dispatch
-**directly against the currently active application** — call `Artisan` from inside a booted app (a
+**directly against the currently active application** — call `Cli` from inside a booted app (a
 request, another command, a scheduled task, or a test that set one up), not as a bare script;
 there's no project to boot here.
 

@@ -26,7 +26,7 @@ class ConsoleOutput:
     dependency. ``out``/``err`` are injectable sinks (any writable text stream) so tests capture
     output without touching real stdio; left ``None`` they resolve to the live ``sys.stdout``/
     ``sys.stderr`` at print time (not at construction — so ``contextlib.redirect_stdout`` around an
-    already-built ``ConsoleOutput`` still works, e.g. ``Artisan.call_silently``)."""
+    already-built ``ConsoleOutput`` still works, e.g. ``Cli.call_silently``)."""
 
     def __init__(self, out: TextIO | None = None, err: TextIO | None = None) -> None:
         self._out = out

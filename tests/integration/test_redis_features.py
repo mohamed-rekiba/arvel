@@ -1,4 +1,4 @@
-"""Integration (spec 20-pennant) — the ``cache`` feature-flag driver against a real Redis: a
+"""Integration (feature flags) — the ``cache`` feature-flag driver against a real Redis: a
 resolved value is stored in the (tagged) cache, so ``purge`` can clear every scope for one flag in
 a single ``TaggedCache.flush()`` without touching another flag's entries."""
 

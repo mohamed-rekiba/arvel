@@ -1,4 +1,4 @@
-"""Closure console commands — the ``routes/console.phpArtisan::command``.
+"""Closure console commands — the ``routes/console.py closure-command surface``.
 
 Define ad-hoc commands in ``routes/console.py`` with ``Console.command("greet {name}", handler)``; the
 console kernel discovers them into ``--help`` and dispatches them through the booted app, with container

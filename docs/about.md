@@ -19,11 +19,10 @@ libraries yourself.
 
 ## Inspiration & prior art
 
-arvel's developer experience is inspired by **[Laravel](https://laravel.com)**, the PHP
-framework whose elegant, productive application layer set the bar for what a full-stack
-framework can feel like. arvel is an independent project — it shares none of Laravel's code
-— but it owes its ergonomic sensibility to Laravel's design, and we gratefully acknowledge
-that lineage here.
+arvel's developer experience is inspired by a mature PHP framework whose elegant, productive
+application layer set the bar for what a full-stack framework can feel like. arvel is an
+independent project — it shares none of that framework's code — but it owes its ergonomic
+sensibility to that design lineage, and we gratefully acknowledge it here.
 
 ## Built on great open source
 

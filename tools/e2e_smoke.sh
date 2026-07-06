@@ -38,7 +38,7 @@ case "$routes_out" in
 esac
 
 # vendor:publish boots the app + reads app.published through the real CLI path. The framework ships
-# publishable default lang files (validation/pagination), so a fresh project publishes them — Laravel
+# publishable default lang files (validation/pagination), so a fresh project publishes them — reference
 # lang:publish equivalent (`vendor:publish --tag=lang`).
 publish_out="$(arvel vendor:publish)"
 case "$publish_out" in
@@ -102,7 +102,7 @@ case "$seed_out" in
 esac
 echo "   migrate: $mig_count migrations applied; db:seed: ran"
 
-# Laravel parity: the users table carries email_verified_at, and the user can be marked verified so the
+# Parity: the users table carries email_verified_at, and the user can be marked verified so the
 # `verified` route middleware works (it reads email_verified_at). Exercised on the real migrated DB.
 python - <<'PY'
 import asyncio, sys
@@ -255,7 +255,7 @@ with TestClient(app=asgi_app) as client:
 print(f"   OpenAPI: title={doc['info']['title']!r}, schemas={sorted(schemas)}; POST /api/echo typed body OK")
 PY
 
-echo "== 8c. pagination: paginate() serves the Laravel JSON shape + links() renders HTML (real serve path) =="
+echo "== 8c. pagination: paginate() serves the standard paginator JSON shape + links() renders HTML (real serve path) =="
 # add a JSON route returning a paginator (auto-serialized) and a web route rendering links()
 cat >> routes/api.py <<'PYEOF'
 
@@ -322,7 +322,7 @@ with TestClient(app=asgi_app) as client:
     # links() renders an HTML page-link bar via the shipped pagination view namespace
     html = client.get("/users").text
     assert "<nav" in html and 'href="/users?page=2"' in html and "results" in html, html[:300]
-print(f"   pagination: GET /api/users-page -> Laravel JSON (total={total}, last_page={d['last_page']}); date col serialized; ?page=2 prev/next correct; /users renders links() HTML")
+print(f"   pagination: GET /api/users-page -> paginator JSON (total={total}, last_page={d['last_page']}); date col serialized; ?page=2 prev/next correct; /users renders links() HTML")
 PY
 echo "   pagination JSON + links() proven through the real serve path"
 

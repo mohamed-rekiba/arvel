@@ -1,4 +1,4 @@
-"""arvel.database.relations — Eloquent-style relations on the Active-Record Model.
+"""arvel.database.relations — Active-Record relations on the Active-Record Model.
 
 ``has_one``/``has_many``/``belongs_to`` with lazy resolution (``await user.posts().get()``)
 and **eager loading** (``await User.with_("posts").get()`` → one batched ``WHERE IN``,
@@ -58,9 +58,9 @@ class Relation:
         return await self.query().first()
 
     def _match(self, items: list[Any]) -> Any:
-        from arvel.database.collection import EloquentCollection
+        from arvel.database.collection import ModelCollection
 
-        return EloquentCollection(items)
+        return ModelCollection(items)
 
     def _eager_query(self, keys: list[Any]) -> Any:
         """The batched query loading all children for ``keys`` (subclasses add extra filters)."""
@@ -212,11 +212,11 @@ class BelongsToMany(Relation):
         return models_query, by_related
 
     async def get(self) -> Any:
-        from arvel.database.collection import EloquentCollection
+        from arvel.database.collection import ModelCollection
 
         models_query, by_related = await self._attached_related()
         if models_query is None:
-            return EloquentCollection[Any]()
+            return ModelCollection[Any]()
         models = await models_query.get()
         if self._pivot_columns:  # attach the requested pivot data to each model
             for model in models:
@@ -366,14 +366,14 @@ class HasManyThrough(Relation):
         self.second_local_key = second_local_key
 
     async def get(self) -> Any:
-        from arvel.database.collection import EloquentCollection
+        from arvel.database.collection import ModelCollection
 
         intermediates = await self.through.where(
             self.first_key, "=", self.parent._attributes[self.local_key]
         ).get()
         keys = [row._attributes[self.second_local_key] for row in intermediates]
         if not keys:
-            return EloquentCollection[Any]()
+            return ModelCollection[Any]()
         return await self.related.where_in(self.second_key, keys).get()
 
 
@@ -511,9 +511,9 @@ class MorphToMany(Relation):
         )
         related_ids = [row[self.related_pivot_key] for row in rows]
         if not related_ids:
-            from arvel.database.collection import EloquentCollection
+            from arvel.database.collection import ModelCollection
 
-            return EloquentCollection[Any]()
+            return ModelCollection[Any]()
         return await self.related.where_in(self.related.__primary_key__, related_ids).get()
 
 
@@ -553,9 +553,9 @@ class MorphedByMany(Relation):
         )
         related_ids = [row[f"{self.morph_name}_id"] for row in rows]
         if not related_ids:
-            from arvel.database.collection import EloquentCollection
+            from arvel.database.collection import ModelCollection
 
-            return EloquentCollection[Any]()
+            return ModelCollection[Any]()
         return await self.related.where_in(self.related.__primary_key__, related_ids).get()
 
 
@@ -672,9 +672,9 @@ class RecursiveRelation:
         models = [await self.related._hydrate_and_fire(r) for r in rows]
         if self._as_tree:
             return self._nest(models)  # a nested list of dicts, not model instances
-        from arvel.database.collection import EloquentCollection
+        from arvel.database.collection import ModelCollection
 
-        return EloquentCollection(models)
+        return ModelCollection(models)
 
     async def eager_load(self, parents: list[Any], name: str, constrain: Any = None) -> None:
         """Batch the whole tree for many parents in **one** ``WITH RECURSIVE`` query (so
@@ -693,7 +693,7 @@ class RecursiveRelation:
         step = sa.select(t, cte.c["__root"], (cte.c[dk] + 1).label(dk)).join(cte, join_on)
         full = cte.union_all(step)
 
-        from arvel.database.collection import EloquentCollection
+        from arvel.database.collection import ModelCollection
 
         resolver = self.related._resolve()
         rows = [dict(r) for r in await resolver.fetch_all(sa.select(full).where(full.c[dk] > 0))]
@@ -702,9 +702,7 @@ class RecursiveRelation:
             root = row.pop("__root")  # discriminator, not a model column
             grouped.setdefault(root, []).append(await self.related._hydrate_and_fire(row))
         for parent in parents:
-            parent._relations[name] = EloquentCollection(
-                grouped.get(parent._attributes.get(lk), [])
-            )
+            parent._relations[name] = ModelCollection(grouped.get(parent._attributes.get(lk), []))
 
     def _nest(self, models: list[Any]) -> list[dict[str, Any]]:
         """Fold the flat, depth-tagged rows into nested ``{…, <key>: [...]}`` dicts. Descendants

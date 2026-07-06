@@ -1,4 +1,4 @@
-"""DB.table() — a schema-less query builder over a raw table/view (Laravel's ``DB::table``), plus
+"""DB.table() — a schema-less query builder over a raw table/view, plus
 the ``dialect()`` accessor. Unlike a model query it does not hydrate (rows are plain ``dict``); its
 columns resolve as strictly-validated identifiers, so joined ``table.column`` filters work while an
 injection payload is still rejected."""

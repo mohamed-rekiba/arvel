@@ -35,7 +35,7 @@ await Post.where(slug=s).first_or_fail()                    # same — no manual
 ```
 
 `Model.all()`, `Model.query().get()`, and every relation `get()` return an
-[**`EloquentCollection`**](relationships.md#eloquent-collection) — a model-aware, list-compatible
+[**`ModelCollection`**](relationships.md#model-collection) — a model-aware, list-compatible
 result set (`load`/`find`/`make_hidden`/`to_query`/…), not a plain `list`.
 
 
