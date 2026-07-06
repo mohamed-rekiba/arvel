@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.55.1](https://github.com/mohamed-rekiba/arvel/compare/v0.55.0...v0.55.1) (2026-07-06)
+
+
+### Bug Fixes
+
+* address automated PR review findings ([8c12266](https://github.com/mohamed-rekiba/arvel/commit/8c1226661c83cfc631fbcb4dfb2a594792a2bedb))
+* **auth:** high-entropy 2FA recovery codes; atomic remember-cookie rotation ([989e695](https://github.com/mohamed-rekiba/arvel/commit/989e69574701e4884bf2b43a92a977e8f9aafe8d))
+* **cache:** a non-positive TTL evicts and stores nothing, not forever ([264adb0](https://github.com/mohamed-rekiba/arvel/commit/264adb0f62032ee81ca390c0c8d312f46682b413))
+* **client:** ok() means exactly 200, not the whole 2xx range ([a43414c](https://github.com/mohamed-rekiba/arvel/commit/a43414ccd3c2190e34ef21e2fcc22be237d20958))
+* **database,scheduler:** fire update lifecycle on increment; guard cron step ([18e303f](https://github.com/mohamed-rekiba/arvel/commit/18e303f8738d9e7ebf547bce19e436207565714a))
+* **database:** correct morph_to eager-load, mass-update timestamps, count, increment, exists ([28875c5](https://github.com/mohamed-rekiba/arvel/commit/28875c53950ff764456fd1a1a8a94c9e8ee2e19e))
+* **events:** wildcard listeners receive the event name first ([75ba254](https://github.com/mohamed-rekiba/arvel/commit/75ba254150a7ea07e70cc1bf9713a1b3de18c90b))
+* **filesystem:** delete() of a missing path is an idempotent success ([5065e5a](https://github.com/mohamed-rekiba/arvel/commit/5065e5a2afedabcfb3e9681adbaadc1e047d7200))
+* **http,routing:** persist late session flash, honor route-key URLs, encode paths, close backslash redirect ([f6a0219](https://github.com/mohamed-rekiba/arvel/commit/f6a0219c234cc15a412f22ab681445ff3226a36f))
+* **scheduler:** hold the one-server claim for the whole minute; parse stepped/named cron ([016b881](https://github.com/mohamed-rekiba/arvel/commit/016b881a3640b600d53282a625781f918489f146))
+* **support,kernel,localization:** correct edge-case behavior on collection/container/plural paths ([f0b6c27](https://github.com/mohamed-rekiba/arvel/commit/f0b6c27428d1253351984152c32f9e81bcac150a))
+* **validation:** tighten boolean set, dot-path cross-field refs, ASCII digits, nullable ([f3a637d](https://github.com/mohamed-rekiba/arvel/commit/f3a637d2e731ef28b96ae87b77fccba554d171e9))
+
 ## [0.55.0](https://github.com/mohamed-rekiba/arvel/compare/v0.54.0...v0.55.0) (2026-07-06)
 
 
