@@ -285,13 +285,24 @@ class ConnectionResolver:
     # --- transactions -------------------------------------------------------
     @contextlib.asynccontextmanager
     async def transaction(self, name: str | None = None) -> AsyncGenerator[Any]:
-        """Atomic block; nesting inside an open transaction opens a SAVEPOINT."""
+        """Atomic block; nesting inside an open transaction opens a SAVEPOINT.
+
+        The outermost transaction also opens the event dispatcher's after-commit buffer
+        (soft-coupled through the container, like ``QueryExecuted``): the dispatcher context
+        sits *outside* ``engine.begin()`` so buffered work — after-commit events, deferred job
+        enqueues — runs strictly after the real COMMIT, and an exception unwinds both, dropping
+        the buffer. Savepoints never re-wrap; the outer buffer owns the flush."""
         existing = _active_conn.get()
         if existing is not None:
             async with existing.begin_nested():  # savepoint — inner rollback ≠ outer
                 yield existing
             return
-        async with self.engine(name).begin() as conn:
+        from arvel.kernel import app, has_application
+
+        async with contextlib.AsyncExitStack() as stack:
+            if has_application() and app().bound("events"):
+                await stack.enter_async_context(app().make("events").transaction())
+            conn = await stack.enter_async_context(self.engine(name).begin())
             token = _active_conn.set(conn)
             try:
                 yield conn

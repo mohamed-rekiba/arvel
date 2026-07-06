@@ -226,6 +226,9 @@ class Job:
     """Base job: subclass and implement ``handle()``."""
 
     queue: str = "default"
+    #: Defer enqueue until the surrounding DB transaction commits (dropped on rollback);
+    #: immediate when no transaction is open. Per-call form: :meth:`dispatch_after_commit`.
+    after_commit: bool = False
     tries: int = 3
     backoff: int | list[int] = 5
     timeout: int = 60
@@ -257,6 +260,18 @@ class Job:
             app().make("queue") if has_application() and app().bound("queue") else QueueManager()
         )
         return await manager.push(cls, args, kwargs)
+
+    @classmethod
+    async def dispatch_after_commit(cls, *args: Any, **kwargs: Any) -> Any:
+        """Like :meth:`dispatch`, but defers the enqueue to the surrounding transaction's
+        commit regardless of the class-level ``after_commit`` default. Returns ``None`` when
+        deferred (there is no broker task yet)."""
+        from arvel.kernel import app, has_application
+
+        manager = (
+            app().make("queue") if has_application() and app().bound("queue") else QueueManager()
+        )
+        return await manager.push(cls, args, kwargs, after_commit=True)
 
     @classmethod
     async def dispatch_after(cls, delay: float, *args: Any, **kwargs: Any) -> Any:
@@ -684,8 +699,15 @@ class QueueManager(Manager):
         kwargs: dict[str, Any],
         *,
         queue: str | None = None,
+        after_commit: bool | None = None,
     ) -> Any:
         from arvel.queue.middleware import ShouldBeUnique, unique_lock_for
+
+        wants_deferral = (
+            after_commit if after_commit is not None else getattr(job_cls, "after_commit", False)
+        )
+        if wants_deferral and await self._defer_to_commit(job_cls, args, kwargs, queue=queue):
+            return None  # no broker task yet — the enqueue happens at commit
 
         if issubclass(job_cls, ShouldBeUnique):
             # Only the original `Job.dispatch()` entry point is gated — chain/batch continuation
@@ -709,6 +731,32 @@ class QueueManager(Manager):
                 serialize(job_cls, args, kwargs)  # pyright: ignore[reportUnknownArgumentType]
             )
         )
+
+    async def _defer_to_commit(
+        self,
+        job_cls: type,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        *,
+        queue: str | None,
+    ) -> bool:
+        """Buffer the enqueue on the event dispatcher's after-commit seam when a transaction
+        is open. Returns False (caller enqueues immediately) outside a transaction or when no
+        dispatcher is bound — after-commit is a deferral request, not a hard requirement."""
+        from arvel.kernel import app, has_application
+
+        if not (has_application() and app().bound("events")):
+            return False
+        events = app().make("events")
+        if not events.in_transaction():
+            return False
+
+        async def _enqueue() -> Any:
+            # replayed after COMMIT, outside the buffer — after_commit=False so it can't re-defer
+            return await self.push(job_cls, args, kwargs, queue=queue, after_commit=False)
+
+        await events.after_commit(_enqueue)  # buffer is open (checked just above, no await between)
+        return True
 
     async def failed_jobs(self) -> list[Any]:
         """The failed-job records, newest first."""

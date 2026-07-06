@@ -62,6 +62,29 @@ for due rows and pushes them onto the broker when their time comes — so a dela
 restart. Delayed dispatch needs a configured database; without one it raises (dispatch immediately
 instead). You can also release due jobs yourself: `await app.make("queue").release_due_jobs()`.
 
+### After-commit dispatch
+
+A job dispatched inside `db.transaction()` is normally enqueued **immediately** — a fast worker can
+pick it up and look for a row the transaction hasn't committed yet. Opt into commit-anchored
+dispatch per class or per call; the enqueue is then buffered and happens only after the outermost
+commit (a rollback drops it, and outside a transaction it enqueues right away):
+
+```python
+class SendReceipt(Job):
+    after_commit = True          # every dispatch of this class waits for the commit
+
+
+async with db.transaction():
+    order = await Order.create(...)
+    await SendReceipt.dispatch(order.id)          # enqueued after COMMIT — worker sees the row
+    await Reindex.dispatch_after_commit(order.id) # per-call form for a normally-eager job
+```
+
+A deferred dispatch returns `None` (there is no broker task yet). The deferral rides the event
+dispatcher's [after-commit buffer](events.md) (the after-commit events section) — one seam
+for events and jobs. The flush is fail-fast: if a buffered enqueue raises, the remaining
+buffered work is not attempted and the error surfaces to the caller after the commit.
+
 ## Chaining & batching
 
 Run several jobs in order, or fire a group at once, with `Bus`:

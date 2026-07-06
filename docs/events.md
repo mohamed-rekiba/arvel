@@ -131,15 +131,20 @@ class SendWelcome(ShouldQueue):
 ```
 
 ### After-commit events — `ShouldDispatchAfterCommit`
-An event marked `ShouldDispatchAfterCommit` (or dispatched inside `dispatcher.transaction()`)
-is **buffered until the surrounding DB transaction commits**, and dropped if it rolls back — so
-you never email a user about a record that was rolled back:
+An event marked `ShouldDispatchAfterCommit` (or with `after_commit = True`) that is dispatched
+inside `db.transaction()` is **buffered until the transaction commits**, and dropped if it rolls
+back — so you never email a user about a record that was rolled back:
 
 ```python
-async with events.transaction():
+async with db.transaction():
     await repo.save(user)                       # if this commits …
     await events.dispatch(UserRegistered(user)) # … the event fires; if it rolls back, it doesn't
 ```
+
+`db.transaction()` opens the dispatcher's buffer automatically (savepoints reuse the outer one —
+only the outermost commit flushes). Other layers defer work through the same seam:
+`await events.after_commit(callback)` buffers any zero-arg async callable, and queued jobs use it
+for [after-commit dispatch](queues.md#after-commit-dispatch).
 
 ## Model observers
 
