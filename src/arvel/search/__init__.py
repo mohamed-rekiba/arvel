@@ -185,7 +185,9 @@ def _filter_value(value: Any) -> str:
         return "null"
     if isinstance(value, (int, float)):
         return repr(value)
-    return repr(str(value))  # quoted string literal
+    # json.dumps yields a correctly-escaped double-quoted string (control chars, quotes, backslashes)
+    # that the engine's filter grammar accepts — repr() would mis-encode "\n"/"\t" etc.
+    return json.dumps(str(value))
 
 
 class MeilisearchEngine:

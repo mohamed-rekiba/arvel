@@ -101,7 +101,7 @@ async def test_search_builds_filter_sort_limit_offset(engine: MeilisearchEngine)
     assert isinstance(result, SearchResult)
     assert result.total == 1
     _query, options = engine._client.store["last_search"]  # pyright: ignore[reportPrivateUsage]
-    assert options["filter"] == ["kind = 'post'"]
+    assert options["filter"] == ['kind = "post"']
     assert options["sort"] == ["n:asc"]
     assert options["limit"] == 5
     assert options["offset"] == 10

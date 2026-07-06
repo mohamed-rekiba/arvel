@@ -14,4 +14,5 @@ def test_bool_and_none_use_engine_literals() -> None:
 def test_numbers_and_strings() -> None:
     assert _filter_value(5) == "5"
     assert _filter_value(3.5) == "3.5"
-    assert _filter_value("active") == "'active'"  # quoted string literal
+    assert _filter_value("active") == '"active"'  # engine double-quoted string literal
+    assert _filter_value("a\tb") == '"a\\tb"'  # control chars escaped, not left as backslash+letter

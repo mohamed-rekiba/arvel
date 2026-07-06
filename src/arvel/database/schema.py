@@ -134,7 +134,9 @@ class Blueprint:
         return column
 
     # --- access-method indexes (btree / Postgres GIN / GiST) ---------------
-    def _index_using(self, using: str, columns: tuple[str, ...], name: str | None) -> None:
+    def _index_using(
+        self, using: str, columns: tuple[str, ...], name: str | None, *, unique: bool = False
+    ) -> None:
         if not columns:
             raise ValueError(f"{using}_index requires at least one column")
         # sanitize non-word chars so an expression column (e.g. "name->>'en'") yields a legal index name
@@ -144,8 +146,14 @@ class Blueprint:
                 "using": using,
                 "columns": tuple(columns),
                 "name": name or f"{self.name}_{slug}_{using}",
+                "unique": unique,
             }
         )
+
+    def unique_index(self, *columns: str, name: str | None = None) -> None:
+        """A composite **unique** B-tree index — enforces at most one row per column tuple
+        (e.g. ``t.unique_index("name", "scope")`` for one value per flag+scope)."""
+        self._index_using("btree", columns, name, unique=True)
 
     def btree_index(self, *columns: str, name: str | None = None) -> None:
         """A **B-tree** index — the default access method, for composite and **expression** indexes

@@ -40,6 +40,18 @@ async def test_input_prefers_body_then_query() -> None:
     assert await r.input("missing", "d") == "d"
 
 
+class _RaisingRaw(_Raw):
+    async def json(self) -> Any:  # a non-JSON (e.g. form) body raises when parsed as JSON
+        raise ValueError("not json")
+
+
+@pytest.mark.asyncio
+async def test_input_falls_back_to_query_when_body_is_not_json() -> None:
+    r = Request(_RaisingRaw({}, None, {"q": "x"}))
+    assert await r.input("q") == "x"  # no crash; query fallback
+    assert await r.boolean("flag", default=True) is True
+
+
 @pytest.mark.asyncio
 async def test_boolean_coercion() -> None:
     for truthy in ("1", "true", "TRUE", "on", "yes"):

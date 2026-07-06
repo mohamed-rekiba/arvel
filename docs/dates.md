@@ -51,6 +51,7 @@ d.is_past()                       # relative to now (honors frozen test time)
 d.is_future()
 d.is_today()
 
+a, b = Date.parse("2026-01-01T00:00:00+00:00[UTC]", "UTC"), Date.parse("2026-01-10T06:00:00+00:00[UTC]", "UTC")
 a.diff_in_days(b)                 # whole calendar days from a to b, signed (future -> positive)
 a.diff_in_hours(b)                # exact elapsed hours; also diff_in_minutes / diff_in_seconds
 ```

@@ -7,10 +7,11 @@ class CreateFeaturesTable(Migration):
     def up(self, schema):
         def define(t):
             t.id()
-            t.string("name").index()  # looked up per flag; purge clears every scope for a name
+            t.string("name")
             t.string("scope")
             t.json("value").nullable()
             t.timestamps()
+            t.unique_index("name", "scope")  # one stored value per flag+scope
 
         schema.create("features", define)
 
