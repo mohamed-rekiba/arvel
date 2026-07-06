@@ -36,6 +36,37 @@ def test_on_one_server_flag() -> None:
     assert event.one_server is True
 
 
+def test_cron_stepped_range_and_named_fields_do_not_crash() -> None:
+    from arvel.queue.scheduler import cron_matches
+
+    event = Schedule().call(_noop).cron("0-30/10 * * * *")
+    assert event.is_due(datetime(2026, 1, 1, 9, 0))
+    assert event.is_due(datetime(2026, 1, 1, 9, 10))
+    assert event.is_due(datetime(2026, 1, 1, 9, 30))
+    assert not event.is_due(datetime(2026, 1, 1, 9, 25))  # not on the /10 step
+    assert not event.is_due(datetime(2026, 1, 1, 9, 40))  # past the range
+    # named month + weekday range (2026-01-02 is a Friday)
+    assert cron_matches("0 0 * jan mon-fri", datetime(2026, 1, 2, 0, 0))
+    assert not cron_matches("0 0 * jan mon-fri", datetime(2026, 1, 3, 0, 0))  # Saturday
+
+
+async def test_on_one_server_skips_a_sequential_second_run_in_the_same_minute() -> None:
+    from arvel.cache import CacheManager
+
+    cache = CacheManager().driver("array")
+    ran: list[str] = []
+
+    async def _tick() -> None:
+        ran.append("ran")
+
+    moment = datetime(2026, 1, 1, 9, 10)
+    a = Schedule(cache=cache).call(_tick).every_minute().on_one_server().name("shared")
+    b = Schedule(cache=cache).call(_tick).every_minute().on_one_server().name("shared")
+    await a.run(moment)
+    await b.run(moment)  # claim held for the minute → second run skips (no artificial overlap)
+    assert ran == ["ran"]
+
+
 async def test_run_due_executes_only_due_events() -> None:
     schedule = Schedule()
     ran: list[str] = []
