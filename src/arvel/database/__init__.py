@@ -27,7 +27,12 @@ from arvel.database.model import (
     scope,
 )
 from arvel.database.relations import SyncResult
-from arvel.database.resources import JsonResource, ResourceCollection
+from arvel.database.resources import (
+    JsonApiCollection,
+    JsonApiResource,
+    JsonResource,
+    ResourceCollection,
+)
 from arvel.database.schema import Blueprint
 from arvel.database.seeder import Seeder, WithoutModelEvents
 
@@ -49,6 +54,8 @@ __all__ = [
     "FactoryBatch",
     "HasUlids",
     "HasUuids",
+    "JsonApiCollection",
+    "JsonApiResource",
     "JsonResource",
     "MassAssignmentException",
     "Migration",

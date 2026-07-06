@@ -827,8 +827,21 @@ class HttpKernel:
             return cast("Any", litestar.Response(result.to_dict()))
         # a route handler returning a JsonResource/ResourceCollection (DB-MODEL §4) "just works" —
         # database sits below http in the layered DAG, so this downward import is legal.
-        from arvel.database.resources import JsonResource, ResourceCollection
+        from arvel.database.resources import (
+            JsonApiCollection,
+            JsonApiResource,
+            JsonResource,
+            ResourceCollection,
+        )
 
+        if isinstance(result, (JsonApiResource, JsonApiCollection)):
+            # the JSON:API media type is part of that spec's conformance, not a plain json response
+            return cast(
+                "Any",
+                litestar.Response(
+                    result.to_payload(request), media_type="application/vnd.api+json"
+                ),
+            )
         if isinstance(result, (JsonResource, ResourceCollection)):
             return cast("Any", litestar.Response(result.to_payload(request)))
         # no explicit status_code, so the route's method-aware default still applies (e.g. POST -> 201)
