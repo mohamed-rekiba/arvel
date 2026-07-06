@@ -3,7 +3,7 @@
 A model's `to_dict()` is fine for a quick endpoint, but a public API usually needs to shape the
 output differently from the storage schema: hide internal columns, rename keys, conditionally
 include a relation only when it's eager-loaded, or add pagination metadata. `JsonResource` (
-`eloquent-resources` parity) is that transform layer — declare the shape once, reuse it everywhere
+the API-resources capability) is that transform layer — declare the shape once, reuse it everywhere
 the model is serialized.
 
 ## Defining a resource
@@ -111,3 +111,47 @@ PostResource.collection(page).to_payload()
   a queued job or a CLI command).
 - **A custom `wrap` clashing with `additional()` keys.** `additional({"data": ...})` would collide
   with the wrap key — pick a different top-level name for extra metadata.
+
+## JSON:API documents
+
+For an API that speaks the JSON:API media type, extend `JsonApiResource` instead. Declare the
+resource `type` and (optionally) its related resource classes; the document shape, relationship
+linkage, `?include=`, and `?fields[<type>]=` handling come with it:
+
+```python
+from arvel.database.resources import JsonApiResource
+
+
+class AuthorResource(JsonApiResource[Author]):
+    resource_type = "authors"
+
+
+class PostResource(JsonApiResource[Post]):
+    resource_type = "posts"
+    relationships = {"author": AuthorResource}
+```
+
+Return one from a handler and the response is a compliant document served as
+`application/vnd.api+json`:
+
+```python
+async def show(request, post_id: int):
+    post = await Post.query().with_("author").find_or_fail(post_id)
+    return PostResource(post)
+# GET /posts/7?include=author&fields[posts]=title
+# {
+#   "data": {"type": "posts", "id": "7",
+#            "attributes": {"title": "Hello"},
+#            "relationships": {"author": {"data": {"type": "authors", "id": "3"}}}},
+#   "included": [{"type": "authors", "id": "3", "attributes": {"name": "Ada"}}],
+# }
+```
+
+The rules mirror `when_loaded`: relationship linkage renders only for relations you actually
+eager-loaded (never a lazy fetch), `?include=` adds the full objects under `included`
+(first-level, deduplicated), and sparse fieldsets drop unknown names silently.
+`PostResource.collection(models_or_paginator)` builds the collection document — a paginator
+contributes JSON:API `links` and `meta`. Validation failures return the spec's error objects
+(`errors[].source.pointer` → `/data/attributes/<field>`) when the client's `Accept` asks for
+the JSON:API media type. Write-side document parsing (POST/PATCH request bodies) is not
+implemented — request validation stays the framework's normal typed/FormRequest path.

@@ -100,6 +100,31 @@ def render_exception(request: Any, exc: Any, *, debug: bool = False) -> Any:
     accept = headers.get("accept")
 
     extra_headers: dict[str, str] = getattr(exc, "response_headers", None) or {}
+    if accept and "application/vnd.api+json" in accept:
+        # a JSON:API client gets that spec's error shape; validation errors point at the
+        # offending attribute so client tooling can map them back to fields
+        error_objects: list[dict[str, Any]] = []
+        if isinstance(errors, dict):
+            for field, messages in cast("dict[str, Any]", errors).items():
+                details: list[Any] = (
+                    list(cast("list[Any]", messages)) if isinstance(messages, list) else [messages]
+                )
+                error_objects.extend(
+                    {
+                        "status": str(status),
+                        "detail": str(detail),
+                        "source": {"pointer": f"/data/attributes/{field}"},
+                    }
+                    for detail in details
+                )
+        if not error_objects:
+            error_objects = [{"status": str(status), "detail": message}]
+        return litestar.Response(
+            {"errors": error_objects},
+            status_code=status,
+            media_type="application/vnd.api+json",
+            headers=extra_headers or None,
+        )
     if wants_json(accept) or is_inertia(request):
         body: dict[str, Any] = {"message": message}
         if errors is not None:
