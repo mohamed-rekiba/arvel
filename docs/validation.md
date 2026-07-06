@@ -77,7 +77,7 @@ report). It's the same bag the redirect-back response writes — the session fla
 
 ## Custom rule objects
 
-For logic a string rule can't express, write a `Rule`: an async `passes(attribute, value)` plus a
+For logic a string rule can't express, write a `Rule`: a `passes(attribute, value)` predicate plus a
 `message`. Drop the instance straight into a field's rule list — it mixes with string rules:
 
 ```python
@@ -85,16 +85,18 @@ from arvel.validation import Rule
 
 class Uppercase(Rule):
     message = "The :attribute must be uppercase."
-    async def passes(self, attribute, value) -> bool:
+    def passes(self, attribute, value) -> bool:
         return isinstance(value, str) and value.isupper()
 
 v = Validator({"code": "abc"}, {"code": ["required", Uppercase()]})
-await v.fails_async()        # True
+v.fails()                    # True — runs on the sync path too
 v.errors()                   # {"code": ["The code must be uppercase."]}
 ```
 
-`:attribute` in the message is replaced with the field name. Custom rules run on the **async** path
-(`passes_async` / `validate_async`), alongside the DB rules `unique` / `exists`.
+`:attribute` in the message is replaced with the field name. Custom rules are synchronous predicates,
+so they run on **both** the sync path (`passes` / `fails` / `FormRequest.parse`) and the async path
+(`passes_async` / `validate_async`). For a check that needs the database, use the async string rules
+`unique` / `exists`.
 
 ## Available rules
 

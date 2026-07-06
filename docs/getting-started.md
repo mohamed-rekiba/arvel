@@ -115,6 +115,11 @@ clean = Validator(data, {
 Rules are just `|`-delimited strings. There's a lot more — custom rules, typed form objects,
 localized messages — in [Validation](validation.md).
 
+For ad-hoc reads without a schema, the request exposes convenience accessors: `await
+request.input("key")` (JSON body first, then query string), `await request.boolean("flag")` (coerces
+`"1"/"true"/"on"/"yes"`), and `request.bearer_token()` (the token from an `Authorization: Bearer`
+header) — alongside the raw `request.json()` / `request.query(...)` / `request.header(...)`.
+
 ## Rendering a view
 
 For server-rendered HTML, return a view. arvel renders it through Jinja2 and turns it into a

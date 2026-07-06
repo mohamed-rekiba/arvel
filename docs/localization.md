@@ -78,6 +78,9 @@ trans("welcome", name="Ada")            # "Welcome, Ada"
 __("messages.saved")                     # "Saved!"
 ```
 
+Case-follows-the-token: `:name` → `Ada`, `:Name` → `Ada` (ucfirst), `:NAME` → `ADA`. Replacement is
+longest-key-first, so `:name` never eats a longer `:name_full` token when both are supplied.
+
 In templates the same functions are globals:
 
 ```html
@@ -102,6 +105,18 @@ from arvel.localization import trans_choice
 trans_choice("apples", 1)     # "one apple"
 trans_choice("apples", 5)     # "5 apples"
 trans_choice("apples", 0)     # "0 apples"   (0 takes the "other" form)
+```
+
+For explicit control, prefix a segment with an exact count `{n}` or an interval `[low,high]`
+(`*` is open-ended). A matching selector wins; segments without one fall back to the plural category:
+
+```json
+{ "apples": "{0} no apples|{1} one apple|[2,*] :count apples" }
+```
+
+```python
+trans_choice("apples", 0)     # "no apples"
+trans_choice("apples", 7)     # "7 apples"      ([2,*] matched)
 ```
 
 The core pipe form covers the common one/other split. With `[i18n]` installed, Babel supplies

@@ -25,6 +25,16 @@ hashed = hasher.make("secret")
 hasher.check("secret", hashed)
 ```
 
+On an async request or worker, use `make_async`/`check_async` — same result, but the CPU-heavy
+argon2/bcrypt work runs in a worker thread so it doesn't block the event loop:
+
+```python
+hashed = await hasher.make_async("secret")
+await hasher.check_async("secret", hashed)   # True
+```
+
+The framework's own auth paths (login, password reset, 2FA) already use these.
+
 ## Choosing a driver
 
 `hashing.driver` in config selects `argon2id` (default) or `bcrypt`; `hashing.options` carries

@@ -21,8 +21,12 @@ from arvel.support import cache       # the global helper → the default driver
 await cache().put("answer", 42, ttl=600)   # store for 10 minutes
 await cache().get("answer")                # 42
 await cache().get("missing", default=0)    # 0
+await cache().has("answer")                # True — tests presence, so a stored None still counts
 await cache().forget("answer")             # delete
 ```
+
+`has()` reports whether the key exists, not whether its value is truthy: after `put("k", None)`,
+`has("k")` is `True`. Use it to tell a cached `None` apart from a miss (`get` with a default can't).
 
 `cache()` mirrors `config()` — it returns the default cache driver, so you never hand-build
 `CacheManager().driver()`. (It lives in `arvel.support`, not `arvel`, because the bare name

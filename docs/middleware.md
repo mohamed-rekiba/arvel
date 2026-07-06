@@ -94,8 +94,9 @@ kernel.alias({"auth": Authenticate, "throttle": ThrottleRequests})
 ## Rate limiting
 
 `ThrottleRequests` has two modes. The plain one (used by the `api` group's default) takes
-`max_attempts`/`decay_seconds` directly and raises a `429` over the limit — see the built-in
-middleware list below.
+`max_attempts`/`decay_seconds` directly and returns a `429` over the limit — carrying the same
+`Retry-After` + `X-RateLimit-Limit`/`Remaining`/`Reset` headers the named mode does (and setting the
+limit headers on allowed responses too). See the built-in middleware list below.
 
 The other is **named limiters**: define the rule once, reuse it from any route via
 `throttle:<name>`. Register a limiter on the app's `limiter` (the `RateLimiter` facade) — typically
@@ -130,8 +131,8 @@ with router.group(group="api", middleware=["throttle:uploads"]):
 ```
 
 A request over any of the limiter's `Limit`s gets a `429` with `Retry-After`,
-`X-RateLimit-Limit`, and `X-RateLimit-Remaining` headers; a request under the limit gets
-`X-RateLimit-Limit`/`X-RateLimit-Remaining` too. Build your own `429` instead of the default JSON
+`X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers; a request under the
+limit gets `X-RateLimit-Limit`/`X-RateLimit-Remaining` too. Build your own `429` instead of the default JSON
 one with `.response(...)`:
 
 ```python
