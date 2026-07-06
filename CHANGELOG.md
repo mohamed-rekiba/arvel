@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.56.0](https://github.com/mohamed-rekiba/arvel/compare/v0.55.2...v0.56.0) (2026-07-06)
+
+
+### Features
+
+* **database,http:** JSON:API resource documents ([b895414](https://github.com/mohamed-rekiba/arvel/commit/b895414074e7e5a22db113f36a98a09abe76e0c4))
+* **database:** vector-similarity clauses on the query builder ([07d7b00](https://github.com/mohamed-rekiba/arvel/commit/07d7b00b3fb515481e89ed6397a9b42d0710d375))
+* **http:** origin-aware request-forgery verification ([25008b1](https://github.com/mohamed-rekiba/arvel/commit/25008b1545ecfaabc4932a2e52422b2e23abf15b))
+* **queue,events,database:** one after-commit seam for events and jobs ([6f6e792](https://github.com/mohamed-rekiba/arvel/commit/6f6e79294e9a1f04d405348e6abc58e8cb8a8cbf))
+* **queue:** central per-class queue routing ([e1e7301](https://github.com/mohamed-rekiba/arvel/commit/e1e7301a065705ac434d30669e297743c90c324f))
+
+
+### Bug Fixes
+
+* address external review findings across the round's seams ([d03291e](https://github.com/mohamed-rekiba/arvel/commit/d03291e56911c33152725146bc4454e3cfb72add))
+* **client:** key the keep-alive registry weakly on the loop object ([f803ae5](https://github.com/mohamed-rekiba/arvel/commit/f803ae5090ea5d2661b368763d735d6cc8044665))
+* **routing:** keep public-root path probes off the event loop ([b980ca7](https://github.com/mohamed-rekiba/arvel/commit/b980ca701a3efd5c4c196132b6f50d3fbd1c9215))
+
+
+### Refactors
+
+* brand-free tree — neutral public names and generic prose ([5d9b36b](https://github.com/mohamed-rekiba/arvel/commit/5d9b36b11523d8429b20a25ba215ffb1f8a19f7c))
+
 ## [0.55.2](https://github.com/mohamed-rekiba/arvel/compare/v0.55.1...v0.55.2) (2026-07-06)
 
 
