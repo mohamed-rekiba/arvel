@@ -100,8 +100,8 @@ response.json("user.name") # dotted-key lookup into the parsed JSON
 response.header("ETag")    # str | None
 response.headers()         # httpx.Headers
 
-response.ok()               # alias for successful()
-response.successful()       # 2xx
+response.ok()               # exactly 200
+response.successful()       # any 2xx
 response.redirect()         # 3xx
 response.client_error()     # 4xx
 response.server_error()     # 5xx
