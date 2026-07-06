@@ -5,9 +5,30 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from litestar.testing import TestClient
 
+from arvel.http import HttpKernel, reset_rate_limiter
+from arvel.http.exceptions import HttpException
 from arvel.http.middleware import ThrottleRequests
-from arvel.validation import ValidationException
+from arvel.routing import Router
+
+
+def test_throttled_route_returns_429_with_rate_limit_headers() -> None:
+    # real HTTP stack: a route in a throttled group, driven past the limit through TestClient
+    reset_rate_limiter()
+    router = Router()
+    router.get("/ping", _ok).middleware(ThrottleRequests(max_attempts=2, decay_seconds=60, name="p"))
+    kernel = HttpKernel()
+    router.apply_to(kernel)
+    with TestClient(kernel.build()) as client:
+        assert client.get("/ping").status_code == 200
+        assert client.get("/ping").status_code == 200
+        blocked = client.get("/ping")
+        assert blocked.status_code == 429
+        assert int(blocked.headers["retry-after"]) > 0
+        assert blocked.headers["x-ratelimit-limit"] == "2"
+        assert blocked.headers["x-ratelimit-remaining"] == "0"
+        assert "x-ratelimit-reset" in blocked.headers
 
 
 class FakeRequest:
@@ -27,9 +48,11 @@ async def test_allows_up_to_limit_then_429() -> None:
     request = FakeRequest()
     assert await throttle.handle(request, _ok) == "ok"  # 1
     assert await throttle.handle(request, _ok) == "ok"  # 2
-    with pytest.raises(ValidationException) as exc:
+    with pytest.raises(HttpException) as exc:
         await throttle.handle(request, _ok)  # 3 → over the limit
     assert exc.value.status == 429
+    assert exc.value.response_headers["Retry-After"]
+    assert exc.value.response_headers["X-RateLimit-Remaining"] == "0"
 
 
 async def test_separate_clients_have_separate_buckets() -> None:
@@ -54,7 +77,7 @@ async def test_reset_rate_limiter_clears_state_for_test_isolation() -> None:
     throttle = ThrottleRequests(max_attempts=1, decay_seconds=60, name="t-reset-helper")
     request = FakeRequest("9.9.9.9")
     assert await throttle.handle(request, _ok) == "ok"  # 1 (at the limit)
-    with pytest.raises(ValidationException):
+    with pytest.raises(HttpException):
         await throttle.handle(request, _ok)  # 2 → 429
 
     reset_rate_limiter()

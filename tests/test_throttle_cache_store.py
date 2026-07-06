@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 
 from arvel.cache import CacheManager
+from arvel.http.exceptions import HttpException
 from arvel.http.middleware import ThrottleRequests
-from arvel.validation import ValidationException
 
 
 @dataclass
@@ -33,9 +33,12 @@ async def test_cache_backed_allows_then_blocks() -> None:
     mw = ThrottleRequests(max_attempts=3, decay_seconds=60, name="api", cache=cache)
     for _ in range(3):
         assert await mw.handle(Req(), _ok) == "ok"
-    with pytest.raises(ValidationException) as exc:
+    with pytest.raises(HttpException) as exc:
         await mw.handle(Req(), _ok)
     assert exc.value.status == 429
+    assert exc.value.response_headers["Retry-After"]
+    assert exc.value.response_headers["X-RateLimit-Remaining"] == "0"
+    assert "X-RateLimit-Reset" in exc.value.response_headers
 
 
 async def test_two_instances_share_the_cache_store() -> None:
@@ -45,8 +48,8 @@ async def test_two_instances_share_the_cache_store() -> None:
     b = ThrottleRequests(max_attempts=2, decay_seconds=60, name="api", cache=cache)
     assert await a.handle(Req(), _ok) == "ok"
     assert await b.handle(Req(), _ok) == "ok"
-    with pytest.raises(ValidationException):
-        await a.handle(Req(), _ok)  # 3rd hit across both instances → blocked
+    with pytest.raises(HttpException):  # 3rd hit across both instances → blocked
+        await a.handle(Req(), _ok)
 
 
 async def test_distinct_clients_independent() -> None:
@@ -54,5 +57,5 @@ async def test_distinct_clients_independent() -> None:
     mw = ThrottleRequests(max_attempts=1, decay_seconds=60, name="api", cache=cache)
     assert await mw.handle(Req("10.0.0.1"), _ok) == "ok"
     assert await mw.handle(Req("10.0.0.2"), _ok) == "ok"  # different client, own counter
-    with pytest.raises(ValidationException):
+    with pytest.raises(HttpException):
         await mw.handle(Req("10.0.0.1"), _ok)

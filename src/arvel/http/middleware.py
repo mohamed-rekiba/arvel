@@ -182,12 +182,45 @@ class ThrottleRequests(Middleware):
         if self._limiter_name is not None:
             return await self._handle_named(request, call_next)
         key = f"{self.name}:{self._client(request)}"
-        if await self._hit(key) > self.max_attempts:
-            from arvel.localization import trans
-            from arvel.validation import ValidationException
-
-            raise ValidationException(trans("http.too_many_requests"), status=429)
+        count = await self._hit(key)
+        if count > self.max_attempts:
+            await self._plain_over_limit(key)  # raises HttpException(429) with rate-limit headers
+        self._success_headers = {
+            "X-RateLimit-Limit": str(self.max_attempts),
+            "X-RateLimit-Remaining": str(max(self.max_attempts - count, 0)),
+        }
         return await call_next(request)
+
+    async def _retry_after(self, key: str) -> int:
+        """Seconds until this window resets. Exact for the in-process store; for the distributed
+        cache we bound it by the decay window (the key's TTL guarantees a reset within it)."""
+        if self._cache is not None:
+            return self.decay_seconds
+        import time
+
+        entry = _THROTTLE_HITS.get(key)
+        if entry is None:
+            return self.decay_seconds
+        _, start = entry
+        return max(int(start + self.decay_seconds - time.monotonic()), 0)
+
+    async def _plain_over_limit(self, key: str) -> Any:
+        import time
+
+        from arvel.http.exceptions import HttpException
+        from arvel.localization import trans
+
+        retry_after = await self._retry_after(key)
+        raise HttpException(
+            429,
+            trans("http.too_many_requests"),
+            headers={
+                "Retry-After": str(retry_after),
+                "X-RateLimit-Limit": str(self.max_attempts),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(int(time.time()) + retry_after),
+            },
+        )
 
     async def _handle_named(self, request: Any, call_next: Any) -> Any:
         from arvel.kernel import app, has_application
@@ -233,6 +266,8 @@ class ThrottleRequests(Middleware):
             if inspect.isawaitable(result):
                 result = await result
             return result
+        import time
+
         from arvel.http.response import Response
         from arvel.localization import trans
 
@@ -243,6 +278,7 @@ class ThrottleRequests(Middleware):
                 "Retry-After": str(retry_after),
                 "X-RateLimit-Limit": str(limit.max_attempts),
                 "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(int(time.time()) + retry_after),
             },
         )
 

@@ -46,8 +46,11 @@ class HttpException(Exception):
     """An HTTP error carrying a status code (rendered by ``render_exception``). Raised by the
     ``abort()`` helper; the message, when given, overrides the default status text."""
 
-    def __init__(self, status: int, message: str | None = None) -> None:
+    def __init__(
+        self, status: int, message: str | None = None, *, headers: dict[str, str] | None = None
+    ) -> None:
         self.status = status
+        self.response_headers = headers or {}
         super().__init__(message or _status_text(status))
 
 
@@ -96,11 +99,17 @@ def render_exception(request: Any, exc: Any, *, debug: bool = False) -> Any:
     headers = _headers(request)
     accept = headers.get("accept")
 
+    extra_headers: dict[str, str] = getattr(exc, "response_headers", None) or {}
     if wants_json(accept) or is_inertia(request):
         body: dict[str, Any] = {"message": message}
         if errors is not None:
             body["errors"] = errors
-        return litestar.Response(body, status_code=status, media_type="application/json")
+        return litestar.Response(
+            body,
+            status_code=status,
+            media_type="application/json",
+            headers=extra_headers or None,
+        )
 
     try:  # request.session is a property that raises without session middleware configured
         session: Any = getattr(request, "session", None)
