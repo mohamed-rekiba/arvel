@@ -56,6 +56,17 @@ def test_cron_stepped_range_and_named_fields_do_not_crash() -> None:
     assert not cron_matches("1/10 * * * *", datetime(2026, 1, 1, 9, 2))
 
 
+def test_cron_aliases_are_field_scoped() -> None:
+    from arvel.queue.scheduler import cron_matches
+
+    monday_in_jan = datetime(2026, 1, 5, 0, 0)  # Monday, January
+    assert cron_matches("0 0 * jan mon", monday_in_jan)  # names valid in their own fields
+    # a weekday name in the month field (or a month name in the dow field) must not be read as a
+    # number — the schedule simply fails to match instead of firing at the wrong time or crashing.
+    assert not cron_matches("0 0 * mon *", monday_in_jan)
+    assert not cron_matches("0 0 * * jan", monday_in_jan)
+
+
 async def test_on_one_server_skips_a_sequential_second_run_in_the_same_minute() -> None:
     from arvel.cache import CacheManager
 

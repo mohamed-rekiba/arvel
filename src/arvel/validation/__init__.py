@@ -325,11 +325,6 @@ _IMPLICIT_RULES = frozenset(
         "accepted_if",
         "declined",
         "declined_if",
-        "missing",
-        "missing_if",
-        "missing_unless",
-        "missing_with",
-        "missing_with_all",
     }
 )
 
@@ -723,14 +718,21 @@ class Validator:
                 return isinstance(value, str)
             case "integer":
                 return (isinstance(value, int) and not isinstance(value, bool)) or (
-                    isinstance(value, str) and _ascii_digits(value.lstrip("-"))
+                    # at most one leading minus, then ASCII digits ("--1" must not pass)
+                    isinstance(value, str)
+                    and _ascii_digits(value[1:] if value[:1] == "-" else value)
                 )
             case "numeric":
                 return (isinstance(value, (int, float)) and not isinstance(value, bool)) or (
                     isinstance(value, str) and _is_number(value)
                 )
             case "boolean":
-                return value in (True, False, 0, 1, "0", "1")
+                # type-checked so a float that merely equals 0/1 (0.0, 1.0) doesn't slip through
+                return (
+                    isinstance(value, bool)
+                    or (isinstance(value, int) and value in (0, 1))
+                    or value in ("0", "1")
+                )
             case "email":
                 return _check_email(value)
             case "url":

@@ -308,7 +308,14 @@ class HttpKernel:
         record = getattr(getattr(request, "state", None), "arvel_session", None)
         if record is not None:
             middleware, arvel_request = record
-            await middleware.persist(arvel_request)
+            try:
+                await middleware.persist(arvel_request)
+            except Exception as exc:
+                # runs after the response is sent — a transient store failure must be logged,
+                # not raised into the ASGI teardown where it can't reach the client.
+                from arvel.kernel.logging import LogManager
+
+                LogManager().channel("http").error("session_persist_failed", error=repr(exc))
 
     def _openapi_config(self) -> Any:
         """The OpenAPI document config — a typed view over the ``openapi`` config section
