@@ -51,6 +51,9 @@ def test_cron_stepped_range_and_named_fields_do_not_crash() -> None:
     # dow 7 is Sunday (2026-01-04 is a Sunday); a zero step matches nothing but doesn't crash
     assert cron_matches("0 0 * * 7", datetime(2026, 1, 4, 0, 0))
     assert not cron_matches("*/0 * * * *", datetime(2026, 1, 1, 9, 0))
+    # a single value with an open-ended step ("1/10" → 1, 11, 21, …)
+    assert cron_matches("1/10 * * * *", datetime(2026, 1, 1, 9, 11))
+    assert not cron_matches("1/10 * * * *", datetime(2026, 1, 1, 9, 2))
 
 
 async def test_on_one_server_skips_a_sequential_second_run_in_the_same_minute() -> None:

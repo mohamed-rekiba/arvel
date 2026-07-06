@@ -106,6 +106,58 @@ async def test_increment_fires_update_lifecycle_events() -> None:
         set_application(None)
 
 
+class NoTsCounter(Model):
+    __fields__: ClassVar = {"name": str, "hits": int}
+    __fillable__: ClassVar = ["name", "hits"]
+    __timestamps__ = False
+
+
+async def test_increment_on_model_without_timestamps() -> None:
+    db = ConnectionResolver()
+    app = Application()
+    app.instance("events", Dispatcher())
+    app.instance("db", db)
+    set_application(app)
+    NoTsCounter.set_connection(db)
+    try:
+        await db.execute(sa.schema.CreateTable(NoTsCounter.__table__))
+        c = await NoTsCounter.create(name="a", hits=1)
+        await c.increment("hits", 4)  # no updated_at column to stamp
+        assert c.hits == 5
+        assert (await NoTsCounter.find(c.id)).hits == 5
+    finally:
+        await db.dispose()
+        set_application(None)
+
+
+class VetoCounter(Model):
+    __fields__: ClassVar = {"name": str, "hits": int}
+    __fillable__: ClassVar = ["name", "hits"]
+    __timestamps__ = True
+
+
+async def test_increment_cancelled_by_updating_observer() -> None:
+    class Veto:
+        async def updating(self, m: Any) -> bool:
+            return False
+
+    db = ConnectionResolver()
+    app = Application()
+    app.instance("events", Dispatcher())
+    app.instance("db", db)
+    set_application(app)
+    VetoCounter.set_connection(db)
+    try:
+        await db.execute(sa.schema.CreateTable(VetoCounter.__table__))
+        c = await VetoCounter.create(name="a", hits=1)
+        VetoCounter.observe(Veto())
+        await c.increment("hits", 5)  # updating observer cancels → no write
+        assert (await VetoCounter.find(c.id)).hits == 1
+    finally:
+        await db.dispose()
+        set_application(None)
+
+
 async def test_exists_does_not_fire_retrieved() -> None:
     seen: list[str] = []
 
