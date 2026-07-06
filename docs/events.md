@@ -103,6 +103,9 @@ Subscribe to a family of string events with `*`:
 Event.listen("order.*", log_order_activity)   # order.placed, order.shipped, order.refunded …
 ```
 
+A wildcard listener receives the concrete event name first, then the payload —
+`log_order_activity(name, *payload)` — so one listener can tell the members of the family apart.
+
 ### Checking & deferring
 Ask whether anyone is listening (honors wildcards; accepts a class, string, or instance), and
 **defer** events to fire later in a batch:
