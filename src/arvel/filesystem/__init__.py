@@ -8,6 +8,7 @@ to keep arvel async-first. fsspec is imported lazily. Grounded in knowledge/port
 
 from __future__ import annotations
 
+import contextlib
 import mimetypes
 from collections.abc import AsyncIterable, AsyncIterator
 from datetime import UTC, datetime, timedelta
@@ -250,10 +251,8 @@ class Filesystem:
         full = self._full(path)
 
         def _delete() -> None:
-            try:
+            with contextlib.suppress(FileNotFoundError):  # idempotent: already-gone is success
                 self._fs.rm(full)
-            except FileNotFoundError:
-                pass  # idempotent: a path that's already gone is a successful delete
 
         await run_sync(_delete)
         return True

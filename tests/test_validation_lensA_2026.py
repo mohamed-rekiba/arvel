@@ -31,10 +31,14 @@ def test_same_and_different_resolve_dot_paths() -> None:
 
 
 def test_digit_rules_reject_non_ascii_digits() -> None:
+    # build the non-ASCII digits by codepoint so no ambiguous glyphs sit in the source
+    arabic_555 = chr(0x0665) * 3  # Arabic-Indic five
+    superscript_2 = chr(0x00B2)  # also crashes a downstream int()
+    persian_12 = chr(0x06F1) + chr(0x06F2)  # Extended Arabic-Indic one, two
     assert _passes({"x": "555"}, {"x": "digits:3"})
-    assert not _passes({"x": "٥٥٥"}, {"x": "digits:3"})  # Arabic-Indic
-    assert not _passes({"x": "²"}, {"x": "integer"})  # superscript — also crashed downstream int()
-    assert not _passes({"x": "۱۲"}, {"x": "digits_between:1,3"})
+    assert not _passes({"x": arabic_555}, {"x": "digits:3"})
+    assert not _passes({"x": superscript_2}, {"x": "integer"})
+    assert not _passes({"x": persian_12}, {"x": "digits_between:1,3"})
 
 
 def test_nullable_does_not_suppress_implicit_rules() -> None:

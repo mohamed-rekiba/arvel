@@ -183,11 +183,11 @@ class Dispatcher:
         return event_type, (event, *payload)
 
     def _gather(self, name: Any) -> list[tuple[Any, bool]]:
-        listeners: list[tuple[Any, bool]] = [(l, False) for l in self._listeners.get(name, [])]
+        listeners: list[tuple[Any, bool]] = [(fn, False) for fn in self._listeners.get(name, [])]
         key = name if isinstance(name, str) else getattr(name, "__name__", str(name))
         for pattern, wildcard_listeners in self._wildcards.items():
             if fnmatch.fnmatch(key, pattern):
-                listeners.extend((l, True) for l in wildcard_listeners)
+                listeners.extend((fn, True) for fn in wildcard_listeners)
         return listeners
 
     def _resolve(self, listener: Any) -> Any:
