@@ -171,10 +171,15 @@ async def test_progress_and_cancel_handle() -> None:
         await db.dispose()
 
 
-async def test_concurrent_completions_do_not_lose_a_decrement() -> None:
+async def test_concurrent_completions_do_not_lose_a_decrement(tmp_path: Any) -> None:
     """The correctness point: two (here, five) jobs settling at the same moment via
-    `asyncio.gather` must land on `pending_jobs == 0`, not a stale/lost decrement."""
-    db = ConnectionResolver()
+    `asyncio.gather` must land on `pending_jobs == 0`, not a stale/lost decrement.
+
+    Uses a file-backed db so the five gathered tasks are five real pooled connections with row
+    locking — in-memory sqlite shares one connection, which two tasks can't safely drive at once,
+    so the finish transition (re-read `pending <= 0`) races nondeterministically.
+    """
+    db = ConnectionResolver({"default": {"url": f"sqlite+aiosqlite:///{tmp_path / 'batch.db'}"}})
     JobBatch.set_connection(db)
     await db.execute(sa.schema.CreateTable(JobBatch.__table__))
     try:
