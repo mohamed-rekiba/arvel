@@ -163,6 +163,8 @@ class Collection[T]:
         return Collection(seen)
 
     def chunk(self, size: int) -> Collection[list[T]]:
+        if size <= 0:
+            return Collection([])
         return Collection([self._items[i : i + size] for i in range(0, len(self._items), size)])
 
     def flatten(self) -> Collection[Any]:
@@ -259,7 +261,12 @@ class Collection[T]:
         return Collection(self._items[count:])
 
     def slice(self, offset: int, length: int | None = None) -> Collection[T]:
-        end = None if length is None else offset + length
+        if length is None:
+            end: int | None = None
+        elif length < 0:
+            end = length  # negative length = stop that many from the end
+        else:
+            end = offset + length
         return Collection(self._items[offset:end])
 
     def nth(self, step: int, offset: int = 0) -> Collection[T]:

@@ -324,6 +324,13 @@ class Container:
             )
         if inspect.isabstract(concrete):
             raise BindingResolutionError(f"Target [{concrete!r}] is abstract; bind a concrete.")
+        if getattr(concrete, "_is_protocol", False):
+            # a Protocol has no runtime constructor; isabstract() misses it (its methods rarely
+            # carry @abstractmethod). Raise the resolution error so an optional param still falls
+            # back to its default rather than leaking TypeError("Protocols cannot be instantiated").
+            raise BindingResolutionError(
+                f"Target [{concrete!r}] is a Protocol; bind a concrete implementation."
+            )
 
         self._build_stack.append(concrete)
         try:

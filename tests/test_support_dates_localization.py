@@ -116,6 +116,15 @@ def test_translator_choice() -> None:
     assert t.choice("apples", 5, locale="en") == "many apples"
 
 
+def test_choice_no_matching_selector_never_leaks_raw_line() -> None:
+    # every segment is an explicit interval; n=0 matches none. Fall back to a clean
+    # condition-stripped positional form, not the raw "[1,19] a few|[20,*] a lot".
+    t = Translator({"en": {"k": "[1,19] a few|[20,*] a lot"}})
+    out = t.choice("k", 0, locale="en")
+    assert "[" not in out and "|" not in out
+    assert out in {"a few", "a lot"}
+
+
 def test_locale_contextvar() -> None:
     t = Translator()
     token = current_locale.set("en")

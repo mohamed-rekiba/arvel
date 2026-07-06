@@ -131,3 +131,29 @@ def test_default_middleware_autowire_via_container() -> None:
     app = Application()
     assert isinstance(app.make(StartSession), StartSession)
     assert isinstance(app.make(ThrottleRequests), ThrottleRequests)
+
+
+def test_unbound_protocol_param_falls_back_to_default() -> None:
+    from typing import Protocol
+
+    class Repo(Protocol):
+        def all(self) -> list[str]: ...
+
+    class Service:
+        def __init__(self, repo: Repo | None = None) -> None:
+            self.repo = repo
+
+    c = Container()
+    # an unbound Protocol dep is not instantiable; the optional param takes its default
+    assert c.make(Service).repo is None
+
+
+def test_make_unbound_protocol_raises_resolution_error_not_typeerror() -> None:
+    from typing import Protocol
+
+    class Port(Protocol):
+        def go(self) -> None: ...
+
+    c = Container()
+    with pytest.raises(BindingResolutionError):
+        c.make(Port)
