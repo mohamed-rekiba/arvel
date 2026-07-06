@@ -3,22 +3,22 @@
 Custom-by-design (DR-0002 mandates no external engine here). Supports class- and
 string-named events, wildcard listeners, container-resolved class listeners,
 halting (``until``), stop-propagation (a listener returning ``False``), and the
-``ShouldQueue`` / ``ShouldBroadcast`` markers. ``after_commit`` events defer until
-the DB transaction commits (wired when transactions land in Phase 5).
-
-Grounded in knowledge/port/11-events.md.
+``ShouldQueue`` / ``ShouldBroadcast`` markers. ``after_commit`` events (and any work other
+layers buffer via :meth:`Dispatcher.after_commit`) defer until the DB transaction commits —
+``ConnectionResolver.transaction()`` opens the buffer on its outermost transaction.
 """
 
 from __future__ import annotations
 
 import contextlib
 import fnmatch
+import functools
 import inspect
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Awaitable, Callable
 
     from arvel.contracts import Container
 
@@ -41,8 +41,10 @@ class Dispatcher:
         self._listeners: dict[Any, list[Any]] = {}
         self._wildcards: dict[str, list[Any]] = {}
         self._pushed: dict[Any, list[tuple[Any, ...]]] = {}  # deferred events, fired on flush()
-        # Per-instance buffer of after-commit events while a transaction is open.
-        self._ac_buffer: ContextVar[list[Any] | None] = ContextVar(
+        # Per-instance buffer of after-commit work (zero-arg async callables) while a
+        # transaction is open — after-commit events and any other layer's deferred work
+        # (queued-job dispatch) ride the same buffer.
+        self._ac_buffer: ContextVar[list[Callable[[], Awaitable[Any]]] | None] = ContextVar(
             f"arvel_ac_{id(self)}", default=None
         )
 
@@ -117,11 +119,28 @@ class Dispatcher:
         if self._defers_to_commit(event):
             buffer = self._ac_buffer.get()
             if buffer is not None:  # a transaction is open → defer
-                buffer.append((event, payload))
+                buffer.append(functools.partial(self._fire_deferred, event, payload))
                 return []
         # halt=False always falls through to `_fire`'s `return results` (a list).
         result: Any = await self._fire(event, payload, halt=False)
         return cast("list[Any]", result)
+
+    async def _fire_deferred(self, event: Any, payload: tuple[Any, ...]) -> list[Any]:
+        return await self.dispatch(event, *payload)
+
+    async def after_commit(self, callback: Callable[[], Awaitable[Any]]) -> Any:
+        """Defer ``callback`` until the surrounding transaction commits; run it immediately
+        when no transaction is open. The generic seam other layers use (the queue defers job
+        enqueues through it), so rollback drops their work exactly like buffered events."""
+        buffer = self._ac_buffer.get()
+        if buffer is not None:
+            buffer.append(callback)
+            return None
+        return await callback()
+
+    def in_transaction(self) -> bool:
+        """Whether an after-commit buffer is currently open."""
+        return self._ac_buffer.get() is not None
 
     @staticmethod
     def _defers_to_commit(event: Any) -> bool:
@@ -133,23 +152,26 @@ class Dispatcher:
     async def transaction(self) -> AsyncGenerator[Dispatcher]:
         """Buffer after-commit events; flush them on success, discard on exception.
 
-        The DB layer wraps a real transaction in this so ``after_commit`` events fire
-        only once the data is durably committed. Nested calls reuse the outer buffer.
+        ``ConnectionResolver.transaction()`` wraps its outermost real transaction in this, so
+        ``after_commit`` work runs only once the data is durably committed. Nested calls reuse
+        the outer buffer (a savepoint release is not a commit).
         """
         if self._ac_buffer.get() is not None:
             yield self  # nested in an outer transaction — it owns the flush
             return
-        buffer: list[Any] = []
+        buffer: list[Callable[[], Awaitable[Any]]] = []
         token = self._ac_buffer.set(buffer)
         try:
             yield self
         except BaseException:
-            self._ac_buffer.reset(token)  # rolled back → drop the buffered events
+            self._ac_buffer.reset(token)  # rolled back → drop the buffered work
             raise
         else:
             self._ac_buffer.reset(token)
-            for event, payload in buffer:
-                await self.dispatch(event, *payload)
+            # flush is fail-fast: the first raising callback aborts the rest and surfaces to
+            # the caller (the commit itself already succeeded) — deferred work is not retried
+            for callback in buffer:
+                await callback()
 
     async def until(self, event: Any, *payload: Any) -> Any:
         return await self._fire(event, payload, halt=True)
