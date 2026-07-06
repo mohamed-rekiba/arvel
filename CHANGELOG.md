@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.55.2](https://github.com/mohamed-rekiba/arvel/compare/v0.55.1...v0.55.2) (2026-07-06)
+
+
+### Documentation
+
+* correct ok() semantics and document wildcard listener signature ([f8bae2c](https://github.com/mohamed-rekiba/arvel/commit/f8bae2c9ac30b02cd6c6008c4301c47b3f6787ff))
+
 ## [0.55.1](https://github.com/mohamed-rekiba/arvel/compare/v0.55.0...v0.55.1) (2026-07-06)
 
 
