@@ -58,7 +58,7 @@ class LocalGuard:
         hashed = await self._lookup(identifier)
         if not hashed:
             return None
-        if not self._hash().check(password, hashed):
+        if not await self._hash().check_async(password, hashed):
             return None
         from arvel.auth.identity import Principal
 

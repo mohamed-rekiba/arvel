@@ -127,9 +127,8 @@ class PasswordBroker:
         from arvel.dates import Date
 
         token = secrets.token_urlsafe(32)
-        await PasswordResetToken.create(
-            email=email, token_hash=self._hash().make(token), created_at=Date.now()
-        )
+        token_hash = await self._hash().make_async(token)
+        await PasswordResetToken.create(email=email, token_hash=token_hash, created_at=Date.now())
         await self._dispatch(PasswordResetRequested(email=email, token=token))
         return PasswordResetStatus.RESET_SUCCESS
 
@@ -155,7 +154,7 @@ class PasswordBroker:
             await record.delete()  # expired — clean up so it can never be replayed later
             return PasswordResetStatus.EXPIRED
 
-        if not self._hash().check(token, record.token_hash):
+        if not await self._hash().check_async(token, record.token_hash):
             return PasswordResetStatus.INVALID_TOKEN
 
         await record.delete()  # single-use: consumed now, regardless of what the callback does
