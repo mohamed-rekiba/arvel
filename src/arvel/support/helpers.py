@@ -6,11 +6,15 @@ Grounded in knowledge/port/06-facades.md §helpers.
 
 from __future__ import annotations
 
+import functools
+import inspect
 import time
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Sequence, Sized
+    from collections.abc import Callable, Generator, Iterable, Sequence, Sized
+    from contextlib import AbstractContextManager
 
 _MISSING: Any = object()
 
@@ -139,24 +143,146 @@ def optional(value: Any) -> Any:
     return _Optional(value)
 
 
-def rescue(callback: Callable[[], Any], default: Any = None) -> Any:
+class Sleep:
+    """The sleep seam flow helpers go through — fakeable so retry/backoff tests run instantly.
+
+    ``Sleep.fake()`` captures requested durations instead of sleeping; production code calls
+    ``Sleep.sleep``/``Sleep.asleep`` and never blocks under a fake.
+    """
+
+    _fake: list[float] | None = None
+
+    @classmethod
+    def sleep(cls, seconds: float) -> None:
+        if cls._fake is not None:
+            cls._fake.append(seconds)
+            return
+        time.sleep(seconds)
+
+    @classmethod
+    async def asleep(cls, seconds: float) -> None:
+        if cls._fake is not None:
+            cls._fake.append(seconds)
+            return
+        import asyncio
+
+        await asyncio.sleep(seconds)
+
+    @classmethod
+    def fake(cls) -> AbstractContextManager[list[float]]:
+        @contextmanager
+        def _cm() -> Generator[list[float]]:
+            prev: list[float] | None = cls._fake
+            recorded: list[float] = []
+            cls._fake = recorded
+            try:
+                yield recorded
+            finally:
+                cls._fake = prev
+
+        return _cm()
+
+
+def once(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Memoize ``fn``'s first result per argument tuple (per instance for methods) — the
+    stdlib cache with the flow-helper name. On methods the cache strong-refs ``self``, so
+    decorated instances live as long as the process — use on services, not per-request objects."""
+    return functools.cache(fn)
+
+
+def _report_to_handler(exc: BaseException) -> None:
+    """Best-effort report to the app's bound ExceptionHandler; never raises, no-op without one."""
+    from arvel.kernel.globals import has_application
+
+    if not has_application():
+        return
+    from arvel.contracts import ExceptionHandler
+    from arvel.kernel.globals import app as _app
+
+    try:
+        handler = _app(ExceptionHandler)
+        if handler.should_report(exc):
+            handler.report(exc)
+    except Exception:
+        # a broken handler must not turn a rescued error into a thrown one
+        return
+
+
+def rescue(callback: Callable[[], Any], default: Any = None, *, report: bool = True) -> Any:
+    """Run ``callback`` swallowing exceptions into ``default`` — reporting the swallowed
+    exception to the bound ExceptionHandler unless ``report=False``. An async *function*
+    (incl. a partial of one) returns an awaitable with the same semantics; an object whose
+    ``__call__`` is async is not detected — pass the function itself."""
+    if inspect.iscoroutinefunction(callback):
+
+        async def _arescue() -> Any:
+            try:
+                return await callback()
+            except Exception as exc:
+                if report:
+                    _report_to_handler(exc)
+                return value(default)
+
+        return _arescue()
     try:
         return callback()
-    except Exception:
+    except Exception as exc:
+        if report:
+            _report_to_handler(exc)
         return value(default)
 
 
-def retry(times: int, callback: Callable[[], Any], sleep: float = 0.0) -> Any:
+def _retry_delay(
+    attempt: int, sleep: float, backoff: Sequence[float] | Callable[[int], float] | None
+) -> float:
+    if backoff is None:
+        return sleep
+    if callable(backoff):
+        return backoff(attempt)
+    if not backoff:
+        return sleep
+    return backoff[min(attempt, len(backoff)) - 1]  # last entry repeats on deeper attempts
+
+
+def retry(
+    times: int,
+    callback: Callable[[], Any],
+    sleep: float = 0.0,
+    *,
+    backoff: Sequence[float] | Callable[[int], float] | None = None,
+    when: Callable[[Exception], bool] | None = None,
+) -> Any:
+    """Call ``callback`` up to ``times`` times. ``backoff`` (a per-attempt sequence — last
+    entry repeats — or ``attempt -> seconds`` callable) overrides ``sleep``; ``when`` limits
+    which exceptions retry (others re-raise immediately). An async callback returns an
+    awaitable and sleeps without blocking the loop; exhaustion re-raises the last error."""
+    if inspect.iscoroutinefunction(callback):
+
+        async def _aretry() -> Any:
+            attempts = 0
+            while True:
+                attempts += 1
+                try:
+                    return await callback()
+                except Exception as exc:
+                    if attempts >= times or (when is not None and not when(exc)):
+                        raise
+                    delay = _retry_delay(attempts, sleep, backoff)
+                    if delay:
+                        await Sleep.asleep(delay)
+
+        return _aretry()
     attempts = 0
     while True:
         attempts += 1
         try:
             return callback()
-        except Exception:
-            if attempts >= times:
+        except Exception as exc:
+            if attempts >= times or (when is not None and not when(exc)):
                 raise
-            if sleep:
-                time.sleep(sleep)
+            delay = _retry_delay(attempts, sleep, backoff)
+            if delay:
+                Sleep.sleep(delay)
 
 
 class Arr:
