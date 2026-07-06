@@ -287,6 +287,11 @@ class CacheRepository:
 
     async def put(self, key: str, value: Any, ttl: int | None = None) -> bool:
         with span("cache put", kind="client", attributes={"cache.operation": "put"}):
+            if ttl is not None and ttl <= 0:
+                # a non-positive TTL means "already expired" — evict any existing value, store
+                # nothing (cashews reads expire=0 as no-expiry, which would persist it forever).
+                await self._client.delete(key)
+                return False
             await self._client.set(key, value, expire=ttl)
             return True
 
@@ -309,6 +314,8 @@ class CacheRepository:
         """Set-if-absent — a single atomic SET NX on redis (cashews
         ``set(..., exist=False)``); ``True`` only when this call actually stored the value."""
         with span("cache add", kind="client", attributes={"cache.operation": "add"}) as sp:
+            if ttl is not None and ttl <= 0:
+                return False  # already-expired → never stored
             stored = bool(await self._client.set(key, value, expire=ttl, exist=False))
             if sp is not None:
                 sp.set_attribute("cache.stored", stored)
