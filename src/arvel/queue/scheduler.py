@@ -44,6 +44,8 @@ def _field_matches(field: str, value: int) -> bool:
     for part in field.split(","):
         rng, _, step_str = part.partition("/")  # optional step: "range/step" or "*/step"
         step = int(step_str) if step_str else 1
+        if step <= 0:
+            continue  # a zero/negative step matches nothing rather than dividing by zero
         if rng == "*":
             if value % step == 0:
                 return True
@@ -66,12 +68,14 @@ def cron_matches(expression: str, moment: datetime) -> bool:
     """Does a standard 5-field cron expression (min hour dom month dow) fire at ``moment``?"""
     minute, hour, dom, month, dow = expression.split()
     cron_dow = (moment.weekday() + 1) % 7  # python Mon=0 -> cron Sun=0
+    # cron also accepts 7 for Sunday, so match Sunday against either 0 or 7
+    dow_ok = _field_matches(dow, cron_dow) or (cron_dow == 0 and _field_matches(dow, 7))
     return (
         _field_matches(minute, moment.minute)
         and _field_matches(hour, moment.hour)
         and _field_matches(dom, moment.day)
         and _field_matches(month, moment.month)
-        and _field_matches(dow, cron_dow)
+        and dow_ok
     )
 
 

@@ -48,6 +48,9 @@ def test_cron_stepped_range_and_named_fields_do_not_crash() -> None:
     # named month + weekday range (2026-01-02 is a Friday)
     assert cron_matches("0 0 * jan mon-fri", datetime(2026, 1, 2, 0, 0))
     assert not cron_matches("0 0 * jan mon-fri", datetime(2026, 1, 3, 0, 0))  # Saturday
+    # dow 7 is Sunday (2026-01-04 is a Sunday); a zero step matches nothing but doesn't crash
+    assert cron_matches("0 0 * * 7", datetime(2026, 1, 4, 0, 0))
+    assert not cron_matches("*/0 * * * *", datetime(2026, 1, 1, 9, 0))
 
 
 async def test_on_one_server_skips_a_sequential_second_run_in_the_same_minute() -> None:

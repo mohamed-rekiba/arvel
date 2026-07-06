@@ -658,8 +658,11 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
 
     async def increment(self, column: str, amount: int = 1) -> Self:
         # atomic SET col = col + amount so concurrent increments compose instead of racing a
-        # read-modify-write; the in-memory value is bumped optimistically to match.
+        # read-modify-write; still fires the update lifecycle so observers (audit/cache-bust/
+        # reindex) run and an `updating` observer can cancel.
         self._guard_writable()
+        if await self._fire("updating") is False:
+            return self
         import sqlalchemy as sa
 
         # COALESCE so a NULL column increments from 0 rather than staying NULL (NULL + n = NULL)
@@ -671,6 +674,9 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
             updates["updated_at"] = now
             self._attributes["updated_at"] = now
         await self._key_query().update(updates)
+        object.__setattr__(self, "_original", dict(self._attributes))
+        await self._fire("updated")
+        await self._fire("saved")
         return self
 
     async def decrement(self, column: str, amount: int = 1) -> Self:
