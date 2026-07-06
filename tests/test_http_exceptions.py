@@ -74,3 +74,16 @@ def test_failed_authorize_renders_403() -> None:
     with _client() as client:
         response = client.post("/guarded", json={"value": 1})
     assert response.status_code == 403
+
+
+def test_same_origin_or_root_blocks_backslash_open_redirect() -> None:
+    from arvel.http.exceptions import same_origin_or_root
+
+    # browsers normalize a leading backslash to "/", turning these into off-host
+    # protocol-relative redirects — the guard must treat them as external.
+    assert same_origin_or_root("/\\evil.com", "app.test") == "/"
+    assert same_origin_or_root("\\/evil.com", "app.test") == "/"
+    assert same_origin_or_root("//evil.com", "app.test") == "/"
+    # genuinely same-origin / relative targets still pass through
+    assert same_origin_or_root("/dashboard", "app.test") == "/dashboard"
+    assert same_origin_or_root("https://app.test/x", "app.test") == "https://app.test/x"

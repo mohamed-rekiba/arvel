@@ -51,6 +51,22 @@ def test_route_is_absolute_by_default_and_path_only_when_opted_out() -> None:
     assert route("items.show", item_id=7, absolute=False) == "/items/7"
 
 
+def test_route_fills_a_route_key_bound_param() -> None:
+    # the inline {post:slug} route-key form must be substituted, not left in the path with the
+    # value dumped into the query string.
+    router = Router()
+    router.get("/posts/{post:slug}", lambda request, post: {"post": post}, name="posts.show")
+    _app_with_router(router)
+    assert route("posts.show", post="my-slug", absolute=False) == "/posts/my-slug"
+
+
+def test_route_percent_encodes_path_segment_values() -> None:
+    router = Router()
+    router.get("/users/{id}", lambda request, id: {"id": id}, name="users.show")
+    _app_with_router(router)
+    assert route("users.show", id="a b/c", absolute=False) == "/users/a%20b%2Fc"
+
+
 def test_to_route_is_redirect_dot_route_sugar() -> None:
     router = Router()
     router.get("/thanks", lambda request: {"ok": True}, name="thanks")

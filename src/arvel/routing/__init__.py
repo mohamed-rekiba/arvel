@@ -435,19 +435,20 @@ class Router:
         URL-encoded query string. Raises ``ValueError`` if a required path param is
         missing, ``KeyError`` if no route has that name."""
         import re
-        from urllib.parse import urlencode
+        from urllib.parse import quote, urlencode
 
         for route in self._routes:
             if route.name == name:
                 path = route.path
                 query: dict[str, Any] = {}
                 for key, value in params.items():
-                    placeholder = "{" + key + "}"
-                    if placeholder in path:
-                        path = path.replace(placeholder, str(value))
+                    # match {key} or the route-key form {key:field}; encode the path segment
+                    placeholder = re.compile(r"\{" + re.escape(key) + r"(?::[^}]*)?\}")
+                    if placeholder.search(path):
+                        path = placeholder.sub(quote(str(value), safe=""), path)
                     else:
                         query[key] = value
-                unfilled = re.findall(r"\{(\w+)\}", path)
+                unfilled = re.findall(r"\{([^}]+)\}", path)
                 if unfilled:
                     raise ValueError(
                         f"Missing route parameter(s) {unfilled} generating URL for {name!r}"

@@ -295,9 +295,20 @@ class HttpKernel:
                 # every other uncaught exception is reported then rendered, not left to Litestar's 500
                 Exception: self._handle_uncaught,
             },
+            after_response=self._persist_session,
             lifespan=[lifespan] if lifespan is not None else [],
         )
         return litestar_app
+
+    @staticmethod
+    async def _persist_session(request: Any) -> None:
+        """Re-persist the session after the response (incl. flash/errors/old-input written by the
+        redirect/exception paths, which run after the session middleware's pipeline pass). A no-op
+        off the web group or on a serializer-less store where the earlier save already aliased."""
+        record = getattr(getattr(request, "state", None), "arvel_session", None)
+        if record is not None:
+            middleware, arvel_request = record
+            await middleware.persist(arvel_request)
 
     def _openapi_config(self) -> Any:
         """The OpenAPI document config — a typed view over the ``openapi`` config section

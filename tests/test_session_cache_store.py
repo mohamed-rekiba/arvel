@@ -49,6 +49,23 @@ async def test_two_instances_share_session_store() -> None:
     assert r.session["count"] == 2  # second worker sees the first's write
 
 
+async def test_late_flash_survives_second_persist() -> None:
+    # a serializing store snapshots on save; flash written AFTER handle (as the kernel's redirect/
+    # exception path does) is captured by the after_response re-persist, not lost.
+    async def _noop(_req: Any) -> str:
+        return "ok"
+
+    cache = _array_cache()
+    mw = StartSession(cache=cache)
+    r1 = Req("sid-flash")
+    await mw.handle(r1, _bump)  # persisted in the pipeline finally, no flash yet
+    r1.session["errors"] = {"email": ["required"]}  # kernel writes flash post-pipeline
+    await mw.persist(r1)  # after_response re-persist
+    r2 = Req("sid-flash")
+    await mw.handle(r2, _noop)
+    assert r2.session.get("errors") == {"email": ["required"]}
+
+
 async def test_distinct_sessions_isolated() -> None:
     cache = _array_cache()
     mw = StartSession(cache=cache)
