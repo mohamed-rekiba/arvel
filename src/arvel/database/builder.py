@@ -420,7 +420,9 @@ class Builder:
 
         key = column or (self._model.__primary_key__ if self._model is not None else "id")
         base_wheres = list(self._wheres)
-        last: Any = None  # no lower bound on the first page — works for string/uuid PKs, not just int
+        last: Any = (
+            None  # no lower bound on the first page — works for string/uuid PKs, not just int
+        )
         while True:
             bound = [("and", self._table.c[key] > last)] if last is not None else []
             self._wheres = [*base_wheres, *bound]

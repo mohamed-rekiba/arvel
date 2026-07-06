@@ -21,7 +21,7 @@ def _pk_type(model: Any, key: str) -> Any:
 
     try:
         return model.__table__.c[key].type
-    except (AttributeError, KeyError):
+    except AttributeError, KeyError:
         return sa.Integer()
 
 
@@ -507,7 +507,9 @@ class MorphedByMany(Relation):
             self.pivot,
             sa.MetaData(),
             sa.Column(self.parent_pivot_key, _pk_type(self.parent, self.parent.__primary_key__)),
-            sa.Column(f"{self.morph_name}_id", _pk_type(self.related, self.related.__primary_key__)),
+            sa.Column(
+                f"{self.morph_name}_id", _pk_type(self.related, self.related.__primary_key__)
+            ),
             sa.Column(f"{self.morph_name}_type", sa.String),
         )
         return Builder(table, self.related._resolve())
