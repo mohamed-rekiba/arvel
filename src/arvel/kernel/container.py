@@ -215,7 +215,9 @@ class Container:
     def resolving(self, abstract: Callable[[Any, Container], None], /) -> None: ...
     @overload
     def resolving(self, abstract: Any, callback: Callable[[Any, Container], None]) -> None: ...
-    def resolving(self, abstract: Any, callback: Callable[[Any, Container], None] | None = None) -> None:
+    def resolving(
+        self, abstract: Any, callback: Callable[[Any, Container], None] | None = None
+    ) -> None:
         """Register a resolution hook. One-arg form (``resolving(cb)``) fires for *every*
         resolution; two-arg form fires only for ``abstract``. Global hooks fire first."""
         if callback is None:
@@ -226,7 +228,9 @@ class Container:
     @overload
     def after_resolving(self, abstract: Callable[[Any, Container], None], /) -> None: ...
     @overload
-    def after_resolving(self, abstract: Any, callback: Callable[[Any, Container], None]) -> None: ...
+    def after_resolving(
+        self, abstract: Any, callback: Callable[[Any, Container], None]
+    ) -> None: ...
     def after_resolving(
         self, abstract: Any, callback: Callable[[Any, Container], None] | None = None
     ) -> None:
