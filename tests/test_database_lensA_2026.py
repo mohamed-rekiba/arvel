@@ -79,6 +79,33 @@ async def test_increment_is_atomic_and_bumps_timestamp() -> None:
         set_application(None)
 
 
+async def test_increment_fires_update_lifecycle_events() -> None:
+    seen: list[str] = []
+
+    class Watch:
+        async def updating(self, m: Any) -> None:
+            seen.append("updating")
+
+        async def updated(self, m: Any) -> None:
+            seen.append("updated")
+
+        async def saved(self, m: Any) -> None:
+            seen.append("saved")
+
+    db = ConnectionResolver()
+    _app(db)
+    try:
+        await db.execute(sa.schema.CreateTable(Counter.__table__))
+        c = await Counter.create(name="a", hits=1)
+        Counter.observe(Watch())
+        await c.increment("hits")
+        # atomic increment still runs the update lifecycle (observers must not silently stop)
+        assert seen == ["updating", "updated", "saved"]
+    finally:
+        await db.dispose()
+        set_application(None)
+
+
 async def test_exists_does_not_fire_retrieved() -> None:
     seen: list[str] = []
 
