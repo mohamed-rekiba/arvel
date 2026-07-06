@@ -15,6 +15,7 @@ import json
 totals = json.load(open(".coverage.json"))["totals"]
 line = 100 * totals["covered_lines"] / totals["num_statements"]
 combined = totals["percent_covered"]  # branch-inclusive (branch=true)
-print(f"line: {line:.2f}%  ·  branch-inclusive: {combined:.2f}%  (gate: combined >= 95%)")
+# 4 decimals: at 2 the boundary lies (94.9995 displays as 95.00 yet fails the >= 95 gate)
+print(f"line: {line:.2f}%  ·  branch-inclusive: {combined:.4f}%  (gate: combined >= 95%)")
 raise SystemExit(0 if combined >= 95 else 1)
 PY

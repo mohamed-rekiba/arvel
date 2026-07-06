@@ -103,3 +103,8 @@ async def test_faking_bypasses_the_shared_client() -> None:
         assert r.status() == 200
     finally:
         http.restore()
+
+
+def test_no_running_loop_means_no_shared_client() -> None:
+    http = Client(transport=httpx.MockTransport(_echo))
+    assert http._shared_client() is None  # sync context → per-call client path

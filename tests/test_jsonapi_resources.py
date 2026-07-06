@@ -136,3 +136,41 @@ def test_collection_over_empty_paginator() -> None:
     doc = PostResource.collection(paginator).to_payload(FakeRequest())
     assert doc["data"] == []
     assert doc["links"]["next"] is None
+
+
+def test_to_array_falls_back_to_mapping_for_plain_dicts() -> None:
+    doc = PostResource({"id": 5, "title": "raw"}).to_payload(FakeRequest())  # type: ignore[arg-type]
+    assert doc["data"] == {"type": "posts", "id": "5", "attributes": {"title": "raw"}}
+
+
+def test_when_loaded_callback_and_non_dict_relations() -> None:
+    from arvel.database.resources import MISSING
+
+    author = FakeModel({"id": 3, "name": "Ada"})
+    post = _post(author=author)
+    resource = PostResource(post)
+    assert resource.when_loaded("author", lambda a: a.to_dict()["name"]) == "Ada"
+
+    class Bare:  # no _relations mapping at all
+        def to_dict(self) -> dict[str, Any]:
+            return {"id": 9}
+
+    assert PostResource(Bare()).when_loaded("author") is MISSING  # type: ignore[arg-type]
+
+
+def test_document_renders_without_a_request() -> None:
+    # queued serialization / CLI contexts pass no request: params simply read as absent
+    doc = PostResource(_post()).to_payload(None)
+    assert doc["data"]["attributes"] == {"title": "Hello", "body": "world"}
+
+
+def test_null_to_one_relation_renders_null_linkage() -> None:
+    doc = PostResource(_post(author=None)).to_payload(FakeRequest())
+    assert doc["data"]["relationships"]["author"] == {"data": None}
+
+
+def test_additional_meta_on_resource_and_collection() -> None:
+    doc = PostResource(_post()).additional({"meta": {"trace": "t1"}}).to_payload(FakeRequest())
+    assert doc["meta"] == {"trace": "t1"}
+    coll = PostResource.collection([_post()]).additional({"meta": {"page": 1}})
+    assert coll.to_payload(FakeRequest())["meta"] == {"page": 1}
