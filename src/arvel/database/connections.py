@@ -315,10 +315,13 @@ class ConnectionResolver:
         """Run ``callback(conn)`` in a transaction; retry only on a *transient* failure
         (deadlock / serialization failure) up to ``attempts`` times. A permanent error
         (constraint violation, bad SQL) raises immediately without burning retries (doc 08)."""
+        import asyncio
+
         from sqlalchemy.exc import DBAPIError
 
+        total = max(1, attempts)
         last: Exception | None = None
-        for _ in range(max(1, attempts)):
+        for attempt in range(total):
             try:
                 async with self.transaction(name) as conn:
                     return await callback(conn)
@@ -326,6 +329,8 @@ class ConnectionResolver:
                 if not _is_transient(exc):
                     raise  # permanent (integrity/programming/data) — don't retry
                 last = exc
+                if attempt + 1 < total:
+                    await asyncio.sleep(min(0.05 * 2**attempt, 1.0))  # capped exponential backoff
         raise last if last is not None else RuntimeError("transaction failed")
 
     async def select(self, sql: str, params: Any = None, name: str | None = None) -> list[Any]:

@@ -9,6 +9,7 @@ chain of responsibility. Grounded in knowledge/port/04-http-kernel-middleware.md
 from __future__ import annotations
 
 import inspect
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol, cast
 
 import msgspec
@@ -72,6 +73,12 @@ class SessionSettings(Settings):
 
 # Shared across the per-request middleware instances the kernel builds: name:client -> (count, window_start).
 _THROTTLE_HITS: dict[str, tuple[int, float]] = {}
+
+# per-request rate-limit headers to attach to an allowed response — a ContextVar (not instance
+# state) because a throttle middleware instance is shared across concurrent requests.
+_RATE_LIMIT_HEADERS: ContextVar[dict[str, str] | None] = ContextVar(
+    "arvel_rate_limit_headers", default=None
+)
 # Default in-process session store (session id -> data). Apps swap in a cache-backed store.
 _SESSIONS: dict[str, dict[str, Any]] = {}
 
@@ -153,8 +160,6 @@ class ThrottleRequests(Middleware):
         self.name = name
         self._cache = cache  # CacheRepository for distributed limiting; None → in-process
         self._limiter_name = limiter_name
-        # set in handle() for the named-limiter mode; applied to the response in terminate()
-        self._success_headers: dict[str, str] | None = None
 
     def _client(self, request: Any) -> str:
         getter = getattr(request, "ip", None)
@@ -185,10 +190,12 @@ class ThrottleRequests(Middleware):
         count = await self._hit(key)
         if count > self.max_attempts:
             await self._plain_over_limit(key)  # raises HttpException(429) with rate-limit headers
-        self._success_headers = {
-            "X-RateLimit-Limit": str(self.max_attempts),
-            "X-RateLimit-Remaining": str(max(self.max_attempts - count, 0)),
-        }
+        _RATE_LIMIT_HEADERS.set(
+            {
+                "X-RateLimit-Limit": str(self.max_attempts),
+                "X-RateLimit-Remaining": str(max(self.max_attempts - count, 0)),
+            }
+        )
         return await call_next(request)
 
     async def _retry_after(self, key: str) -> int:
@@ -253,10 +260,12 @@ class ThrottleRequests(Middleware):
             await limiter.hit(key, limit.decay_seconds)
             remaining = max(limit.max_attempts - attempts_before - 1, 0)
 
-        self._success_headers = {
-            "X-RateLimit-Limit": str(limits[-1].max_attempts),
-            "X-RateLimit-Remaining": str(max(remaining, 0)),
-        }
+        _RATE_LIMIT_HEADERS.set(
+            {
+                "X-RateLimit-Limit": str(limits[-1].max_attempts),
+                "X-RateLimit-Remaining": str(max(remaining, 0)),
+            }
+        )
         return await call_next(request)
 
     @staticmethod
@@ -283,11 +292,12 @@ class ThrottleRequests(Middleware):
         )
 
     async def terminate(self, request: Any, response: Any) -> None:
-        if self._success_headers is None:
+        success_headers = _RATE_LIMIT_HEADERS.get()
+        if success_headers is None:
             return
         headers: dict[str, str] | None = getattr(response, "headers", None)
         if isinstance(headers, dict):
-            headers.update(self._success_headers)
+            headers.update(success_headers)
 
 
 class StartSession(Middleware):

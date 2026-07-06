@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import sqlalchemy as sa
 
 from arvel.database import ConnectionResolver, Model
@@ -60,8 +62,8 @@ async def test_chunk_by_id_with_string_pk() -> None:
             await Book.create(id=f"b-{i}", title=f"t{i}")
         seen: list[str] = []
 
-        async def collect(rows: object) -> None:
-            for r in rows:  # type: ignore[attr-defined]
+        async def collect(rows: Any) -> None:
+            for r in rows:
                 seen.append(r.id)
 
         await Book.query().chunk_by_id(2, collect)
