@@ -178,11 +178,24 @@ class HashManager:
     def make(self, plain: str) -> str:
         return self._configured.make(plain)
 
+    async def make_async(self, plain: str) -> str:
+        """``make`` off the event loop — argon2/bcrypt are CPU-bound; run them in a worker thread
+        so hashing on an async request/worker path doesn't block the loop."""
+        from anyio.to_thread import run_sync
+
+        return await run_sync(self.make, plain)
+
     def check(self, plain: str, hashed: str) -> bool:
         name = self._detect_name(hashed)
         if name is None:
             return False
         return self._by_name[name].check(plain, hashed)
+
+    async def check_async(self, plain: str, hashed: str) -> bool:
+        """``check`` off the event loop (see :meth:`make_async`)."""
+        from anyio.to_thread import run_sync
+
+        return await run_sync(self.check, plain, hashed)
 
     def needs_rehash(self, hashed: str) -> bool:
         if self._detect_name(hashed) != self._driver_name:

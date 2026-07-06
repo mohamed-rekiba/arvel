@@ -171,8 +171,8 @@ class AuthManager:
         from arvel.security import resolve_hasher
 
         hasher = resolve_hasher()
-        if hasher.needs_rehash(stored):
-            user.set_auth_password(hasher.make(password))
+        if hasher.needs_rehash(stored):  # cheap param-inspection, no offload needed
+            user.set_auth_password(await hasher.make_async(password))
             await user.save()
 
 

@@ -87,8 +87,11 @@ def jwks_verifier(
     client = PyJWKClient(jwks_uri)  # built once; caches signing keys (no per-request fetch)
 
     async def _verify(token: str) -> Mapping[str, Any] | None:
+        from anyio.to_thread import run_sync
+
         try:
-            signing_key = client.get_signing_key_from_jwt(token)
+            # JWKS fetch is a blocking network call on a cache miss — keep it off the event loop
+            signing_key = await run_sync(client.get_signing_key_from_jwt, token)
             decoded: dict[str, Any] = jwt.decode(
                 token,
                 signing_key.key,

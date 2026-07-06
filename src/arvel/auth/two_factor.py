@@ -111,7 +111,7 @@ async def enable_two_factor(
     name = account_name or getattr(user, "email", None) or str(getattr(user, "id", ""))
 
     user.two_factor_secret = secret
-    user.two_factor_recovery_codes = [hsh.make(code) for code in codes]
+    user.two_factor_recovery_codes = [await hsh.make_async(code) for code in codes]
     user.two_factor_confirmed_at = None  # explicit: enabling never auto-confirms
     await user.save()
 
@@ -152,7 +152,7 @@ async def verify_two_factor(user: Any, code: str, *, hasher: Any = None) -> bool
 async def _consume_recovery_code(user: Any, code: str, *, hasher: Any) -> bool:
     hashed_codes = list(getattr(user, "two_factor_recovery_codes", None) or [])
     for stored in hashed_codes:
-        if hasher.check(code, stored):
+        if await hasher.check_async(code, stored):
             user.two_factor_recovery_codes = [h for h in hashed_codes if h != stored]
             await user.save()
             return True
@@ -164,7 +164,7 @@ async def regenerate_recovery_codes(user: Any, *, count: int = 8, hasher: Any = 
     ``save`` overwrites the stored set). Returns the new codes in plaintext, once."""
     hsh = _hasher(hasher)
     codes = TwoFactor.recovery_codes(count)
-    user.two_factor_recovery_codes = [hsh.make(code) for code in codes]
+    user.two_factor_recovery_codes = [await hsh.make_async(code) for code in codes]
     await user.save()
     return codes
 
