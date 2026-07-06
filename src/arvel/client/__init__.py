@@ -13,6 +13,7 @@ import asyncio
 import copy
 import fnmatch
 import json as _json
+import weakref
 from collections.abc import Callable, Mapping
 from typing import Any, cast
 
@@ -507,9 +508,13 @@ class Client:
         self._transport = transport
         self._fake_state: _FakeState | None = None
         # one keep-alive client per event loop, so sequential Http.get/post reuse connections
-        # instead of building and tearing one down per call. Keyed by loop id because an
-        # AsyncClient is bound to the loop it runs on; closed on app shutdown (see the provider).
-        self._shared: dict[int, httpx.AsyncClient] = {}
+        # instead of building and tearing one down per call. Weak-keyed on the loop object:
+        # an AsyncClient is bound to the loop it runs on, and a dead loop's entry must die
+        # with it — an id()-keyed dict could hand a recycled loop address a client bound to
+        # a collected loop. Closed on app shutdown (see the provider).
+        self._shared: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, httpx.AsyncClient] = (
+            weakref.WeakKeyDictionary()
+        )
 
     def _current_transport(self) -> Any:
         if self._fake_state is not None:
@@ -520,18 +525,23 @@ class Client:
         if self._fake_state is not None:
             return None  # faking swaps the transport per call — no shared client
         try:
-            loop_id = id(asyncio.get_running_loop())
+            loop = asyncio.get_running_loop()
         except RuntimeError:
             return None  # no running loop → fall back to a per-call client
-        client = self._shared.get(loop_id)
-        if client is None or client.is_closed:
-            client = httpx.AsyncClient(transport=self._transport)
-            self._shared[loop_id] = client
+        try:
+            client = self._shared.get(loop)
+            if client is None or client.is_closed:
+                client = httpx.AsyncClient(transport=self._transport)
+                self._shared[loop] = client
+        except TypeError:
+            # a host-installed loop type without weakref support can't be a key;
+            # per-call behavior (same as the no-loop branch) beats failing the request
+            return None
         return client
 
     async def aclose(self) -> None:
         """Close the pooled keep-alive clients — wired to app shutdown by the provider."""
-        for client in self._shared.values():
+        for client in list(self._shared.values()):  # snapshot: GC may prune during iteration
             if not client.is_closed:
                 await client.aclose()
         self._shared.clear()
