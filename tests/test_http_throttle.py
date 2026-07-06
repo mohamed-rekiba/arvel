@@ -17,7 +17,9 @@ def test_throttled_route_returns_429_with_rate_limit_headers() -> None:
     # real HTTP stack: a route in a throttled group, driven past the limit through TestClient
     reset_rate_limiter()
     router = Router()
-    router.get("/ping", _ok).middleware(ThrottleRequests(max_attempts=2, decay_seconds=60, name="p"))
+    router.get("/ping", _ok).middleware(
+        ThrottleRequests(max_attempts=2, decay_seconds=60, name="p")
+    )
     kernel = HttpKernel()
     router.apply_to(kernel)
     with TestClient(kernel.build()) as client:

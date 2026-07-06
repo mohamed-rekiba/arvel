@@ -43,6 +43,7 @@ def _is_transient(exc: Any) -> bool:
     args: Any = getattr(orig, "args", None)
     return bool(args) and args[0] in _TRANSIENT_MYSQL_CODES
 
+
 # the innermost open transaction's connection, so nested transaction() calls become SAVEPOINTs
 _active_conn: ContextVar[Any] = ContextVar("arvel_db_active_conn", default=None)
 

@@ -240,7 +240,10 @@ class FeatureManager(Manager):
 
     async def values(self, names: list[str] | None = None, scope: Any = None) -> dict[str, Any]:
         """Resolve several flags for one scope at once — every defined flag when ``names`` is None."""
-        return {n: await self._resolve(n, scope) for n in (names if names is not None else self.defined())}
+        return {
+            n: await self._resolve(n, scope)
+            for n in (names if names is not None else self.defined())
+        }
 
     def for_(self, scope: Any) -> ScopedFeatures:
         """A features view bound to ``scope``."""

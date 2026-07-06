@@ -19,7 +19,9 @@ class _Raw:
         return self._body
 
 
-def _req(headers: dict[str, str] | None = None, body: Any = None, query: dict[str, str] | None = None) -> Request:
+def _req(
+    headers: dict[str, str] | None = None, body: Any = None, query: dict[str, str] | None = None
+) -> Request:
     return Request(_Raw(headers or {}, body if body is not None else {}, query or {}))
 
 
