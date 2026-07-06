@@ -38,6 +38,26 @@ Because the underlying engine is DST-aware, `add(days=1)` across a spring-forwar
 gives you the same wall-clock time the next day — not "24 hours later." That correctness is the
 reason `Date` exists instead of raw `datetime`.
 
+## Period starts and differences
+
+```python
+d = Date.parse("2026-07-08T13:45:00+00:00[UTC]", "UTC")   # a Wednesday
+d.start_of_day()                  # 2026-07-08 00:00
+d.start_of_week()                 # 2026-07-06 00:00 (Monday)
+d.start_of_month()                # 2026-07-01 00:00
+d.start_of_year()                 # 2026-01-01 00:00
+
+d.is_past()                       # relative to now (honors frozen test time)
+d.is_future()
+d.is_today()
+
+a.diff_in_days(b)                 # whole calendar days from a to b, signed (future -> positive)
+a.diff_in_hours(b)                # exact elapsed hours; also diff_in_minutes / diff_in_seconds
+```
+
+`diff_in_days` counts **calendar** days (a `.date()` difference), so it stays correct across DST;
+the hour/minute/second diffs are exact elapsed time. `start_of_week` is Monday-based.
+
 ## Comparing and formatting
 
 ```python

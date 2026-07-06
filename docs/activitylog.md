@@ -84,10 +84,10 @@ await Activity.where(causer_id=user.id).get()                         # everythi
 Each row stores `subject_type`/`subject_id` and `causer_type`/`causer_id` so you can trace an
 activity back to the record it touched and the user who caused it.
 
-!!! note "Create the table"
-    Add an `activity_log` table in a migration (`Activity.__table__` describes its columns):
-    a `log_name`, `description`, polymorphic `subject_*`/`causer_*`, an `event`, and a JSON
-    `properties` column.
+!!! note "The table ships with the app"
+    A new app includes the `activity_log` migration, so `arvel migrate` creates the table out of the
+    box — a `log_name`, `description`, polymorphic `subject_*`/`causer_*`, an `event`, and a JSON
+    `properties` column (`Activity.__table__` describes it).
 
 ## Common mistakes & gotchas
 

@@ -72,7 +72,11 @@ Python values rather than strings:
 | `false`, `(false)` | `False` |
 | `null`, `(null)` | `None` |
 | `empty`, `(empty)` | `""` (empty string) |
+| `"quoted"` or `'quoted'` | the inner text, **verbatim** — quotes are stripped and no coercion runs |
 | anything else | the raw string, unchanged |
+
+Wrapping quotes make a value literal: `KEY="true"` returns the string `"true"`, not `True` — quote a
+value when you need it to survive coercion (or to keep leading/trailing spaces).
 
 !!! warning "Coercion can surprise you"
     Coercion is **case-insensitive** and matches the *whole* value, so a variable whose literal value

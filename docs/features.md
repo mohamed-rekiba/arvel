@@ -86,7 +86,15 @@ await Feature.activate("checkout-variant", user, value="purple") # force a rich 
 
 ```python
 await Feature.forget("new-dashboard", user) # this user only
-await Feature.purge("new-dashboard") # every scope, everywhere
+await Feature.purge("new-dashboard")         # every scope, everywhere
+await Feature.purge()                        # every defined flag — a clean slate
+```
+
+Resolve several flags for one scope in a single call with `values`:
+
+```python
+await Feature.values(scope=user)                 # {name: value} for every defined flag
+await Feature.values(["beta", "gamma"], user)    # just these two
 ```
 
 ## CLI
@@ -105,3 +113,6 @@ config = {
     "default_scope": "__global__",
 }
 ```
+
+The `database` driver stores resolved values in a `features` table; a new app ships the migration
+for it, so `arvel migrate` creates it out of the box — no hand-written schema needed.
