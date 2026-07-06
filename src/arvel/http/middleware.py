@@ -383,15 +383,27 @@ class StartSession(Middleware):
         drop: set[str] = set()  # old ids to forget (regenerate/invalidate add to this same set)
         request._session_drop = drop  # pyright: ignore[reportPrivateUsage]
         request._session_set_cookie = cookie_sid is None  # pyright: ignore[reportPrivateUsage]
+        # stash for the kernel's after_response persist: flash/errors/old-input are written to
+        # request.session AFTER this pipeline unwinds (redirect + exception-render both run later),
+        # and a serializing store snapshots on save — so the finally-save below would miss them.
+        state = getattr(getattr(request, "raw", None), "state", None)
+        if state is not None:
+            state.arvel_session = (self, request)
         try:
             return await call_next(request)
         finally:
-            for old in drop:
-                await self._forget(old)
-            await self._save(
-                request._session_id,  # pyright: ignore[reportPrivateUsage]
-                request.session,
-            )
+            await self.persist(request)
+
+    async def persist(self, request: Any) -> None:
+        """Persist request.session to its store and forget any dropped ids. Idempotent — the
+        pipeline calls it on the way out, and the kernel calls it again after the response is
+        built so late-written flash on a serializing (cache) store isn't lost."""
+        for old in getattr(request, "_session_drop", ()) or ():
+            await self._forget(old)
+        request._session_drop = set()  # pyright: ignore[reportPrivateUsage]
+        sid = getattr(request, "_session_id", None)
+        if sid is not None:
+            await self._save(sid, request.session)
 
     async def terminate(self, request: Any, response: Any) -> None:
         if not getattr(request, "_session_set_cookie", False):

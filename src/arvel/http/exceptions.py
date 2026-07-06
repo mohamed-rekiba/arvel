@@ -132,9 +132,12 @@ def same_origin_or_root(target: str, host: str) -> str:
     """
     from urllib.parse import urlsplit
 
-    parts = urlsplit(target)
+    # browsers treat backslashes as forward slashes, so "/\evil.com" would redirect off-host;
+    # normalize before deciding so a protocol-relative "//host" is recognized, not read as relative.
+    candidate = target.replace("\\", "/")
+    parts = urlsplit(candidate)
     if not parts.scheme and not parts.netloc:
-        return target or "/"
+        return candidate or "/"
     if host and parts.netloc == host:
-        return target
+        return candidate
     return "/"
