@@ -177,3 +177,15 @@ async def test_after_commit_events_drop_on_db_rollback(ctx: Any) -> None:
             await events.dispatch(Shipped(2))
             raise Boom
     assert fired == []
+
+
+async def test_after_commit_callback_outside_transaction_runs_now(ctx: Any) -> None:
+    _, events, _ = ctx
+    ran: list[str] = []
+
+    async def cb() -> str:
+        ran.append("now")
+        return "now"
+
+    assert await events.after_commit(cb) == "now"  # no open buffer → immediate, result returned
+    assert ran == ["now"]

@@ -188,6 +188,12 @@ class JsonApiResource[M](ResourceTransformer[M]):
             to_dict = getattr(self.resource, "to_dict", None)
             if callable(to_dict):
                 raw = cast("dict[str, Any]", to_dict()).get(self._primary_key())
+            else:
+                # the to_array fallback accepts plain mappings; the id must come from the
+                # same place
+                getter = getattr(self.resource, "get", None)
+                if callable(getter):
+                    raw = getter(self._primary_key())
         return {"type": self.resource_type, "id": str(raw)}
 
     def _loaded_relations(self) -> dict[str, Any]:

@@ -149,3 +149,10 @@ async def test_unparseable_referer_fails_closed() -> None:
     garbage = FakeRequest("POST", sent_token="tok", referer=":not a url")
     with pytest.raises(ValidationException):
         await csrf.handle(garbage, _ok)
+
+
+async def test_origin_without_hostname_fails_closed() -> None:
+    csrf = ValidateCsrfToken()
+    req = FakeRequest("POST", sent_token="tok", origin="https://")
+    with pytest.raises(ValidationException):
+        await csrf.handle(req, _ok)
