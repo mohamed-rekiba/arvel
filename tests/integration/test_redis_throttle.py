@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 
 from arvel.cache import CacheManager
+from arvel.http.exceptions import HttpException
 from arvel.http.middleware import ThrottleRequests
-from arvel.validation import ValidationException
 
 pytestmark = pytest.mark.integration
 
@@ -35,7 +35,7 @@ async def test_distributed_throttle_over_redis(redis_url: str, configure_app: An
 
     assert await a.handle(Req(), _ok) == "ok"
     assert await b.handle(Req(), _ok) == "ok"  # shared Redis counter now at 2
-    with pytest.raises(ValidationException) as exc:
+    with pytest.raises(HttpException) as exc:
         await a.handle(Req(), _ok)  # 3rd across instances → 429
     assert exc.value.status == 429
 
