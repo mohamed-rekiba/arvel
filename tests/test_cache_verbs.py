@@ -56,3 +56,24 @@ async def test_add_race_only_one_winner() -> None:
     results = await asyncio.gather(*(cache.add("race", i) for i in range(20)))
     assert results.count(True) == 1
     assert results.count(False) == 19
+
+
+async def test_put_with_non_positive_ttl_stores_nothing() -> None:
+    cache = _cache()
+    assert await cache.put("k", "v", ttl=0) is False
+    assert await cache.has("k") is False
+    assert await cache.put("k2", "v", ttl=-5) is False
+    assert await cache.has("k2") is False
+
+
+async def test_put_non_positive_ttl_evicts_an_existing_value() -> None:
+    cache = _cache()
+    await cache.put("k", "v")
+    assert await cache.put("k", "v2", ttl=0) is False
+    assert await cache.has("k") is False
+
+
+async def test_add_with_non_positive_ttl_stores_nothing() -> None:
+    cache = _cache()
+    assert await cache.add("k", "v", ttl=0) is False
+    assert await cache.has("k") is False
