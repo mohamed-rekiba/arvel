@@ -1,0 +1,24 @@
+"""Create the activity_log table."""
+
+from arvel.database import Migration
+
+
+class CreateActivityLogTable(Migration):
+    def up(self, schema):
+        def define(t):
+            t.id()
+            t.string("log_name").index()
+            t.text("description")
+            t.string("subject_type").nullable()  # polymorphic — null for a subjectless entry
+            t.big_integer("subject_id").nullable()
+            t.string("causer_type").nullable()
+            t.big_integer("causer_id").nullable()
+            t.string("event").nullable()
+            t.json("properties").nullable()
+            t.uuid("batch_uuid").nullable()
+            t.timestamps()
+
+        schema.create("activity_log", define)
+
+    def down(self, schema):
+        schema.drop("activity_log")
