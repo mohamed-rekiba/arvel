@@ -442,10 +442,13 @@ class Router:
                 path = route.path
                 query: dict[str, Any] = {}
                 for key, value in params.items():
-                    # match {key} or the route-key form {key:field}; encode the path segment
-                    placeholder = re.compile(r"\{" + re.escape(key) + r"(?::[^}]*)?\}")
-                    if placeholder.search(path):
-                        path = placeholder.sub(quote(str(value), safe=""), path)
+                    # match {key} or the route-key/converter form {key:conv}; encode the segment
+                    placeholder = re.compile(r"\{" + re.escape(key) + r"(?::(?P<conv>[^}]*))?\}")
+                    match = placeholder.search(path)
+                    if match:
+                        # a :path converter spans multiple segments, so keep its slashes
+                        safe = "/" if match.group("conv") == "path" else ""
+                        path = placeholder.sub(quote(str(value), safe=safe), path)
                     else:
                         query[key] = value
                 unfilled = re.findall(r"\{([^}]+)\}", path)

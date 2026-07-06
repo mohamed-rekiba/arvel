@@ -67,6 +67,14 @@ def test_route_percent_encodes_path_segment_values() -> None:
     assert route("users.show", id="a b/c", absolute=False) == "/users/a%20b%2Fc"
 
 
+def test_route_preserves_slashes_for_a_path_converter() -> None:
+    # a {name:path} catch-all spans multiple segments, so its slashes must survive url()
+    router = Router()
+    router.get("/{file:path}", lambda request, file: {"file": file}, name="assets")
+    _app_with_router(router)
+    assert route("assets", file="js/app.js", absolute=False) == "/js/app.js"
+
+
 def test_to_route_is_redirect_dot_route_sugar() -> None:
     router = Router()
     router.get("/thanks", lambda request: {"ok": True}, name="thanks")

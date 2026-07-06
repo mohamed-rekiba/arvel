@@ -29,16 +29,14 @@ _CRON_MONTHS = {
 _CRON_DOWS = {d: i for i, d in enumerate(("sun", "mon", "tue", "wed", "thu", "fri", "sat"), 0)}
 
 
-def _cron_int(token: str) -> int:
+def _cron_int(token: str, names: dict[str, int] | None = None) -> int:
     t = token.strip().lower()
-    if t in _CRON_MONTHS:
-        return _CRON_MONTHS[t]
-    if t in _CRON_DOWS:
-        return _CRON_DOWS[t]
+    if names is not None and t in names:  # names are field-scoped: months only in the month field
+        return names[t]
     return int(t)
 
 
-def _field_matches(field: str, value: int) -> bool:
+def _field_matches(field: str, value: int, names: dict[str, int] | None = None) -> bool:
     if field == "*":
         return True
     for part in field.split(","):
@@ -51,11 +49,11 @@ def _field_matches(field: str, value: int) -> bool:
                 return True
         elif "-" in rng:  # a range, possibly stepped: "1-30/10", "mon-fri"
             low_str, _, high_str = rng.partition("-")
-            low, high = _cron_int(low_str), _cron_int(high_str)
+            low, high = _cron_int(low_str, names), _cron_int(high_str, names)
             if low <= value <= high and (value - low) % step == 0:
                 return True
         else:  # a single value or name, with an optional open-ended step ("5/2" → 5,7,9,…)
-            start = _cron_int(rng)
+            start = _cron_int(rng, names)
             if step_str:
                 if value >= start and (value - start) % step == 0:
                     return True
@@ -65,18 +63,27 @@ def _field_matches(field: str, value: int) -> bool:
 
 
 def cron_matches(expression: str, moment: datetime) -> bool:
-    """Does a standard 5-field cron expression (min hour dom month dow) fire at ``moment``?"""
-    minute, hour, dom, month, dow = expression.split()
-    cron_dow = (moment.weekday() + 1) % 7  # python Mon=0 -> cron Sun=0
-    # cron also accepts 7 for Sunday, so match Sunday against either 0 or 7
-    dow_ok = _field_matches(dow, cron_dow) or (cron_dow == 0 and _field_matches(dow, 7))
-    return (
-        _field_matches(minute, moment.minute)
-        and _field_matches(hour, moment.hour)
-        and _field_matches(dom, moment.day)
-        and _field_matches(month, moment.month)
-        and dow_ok
-    )
+    """Does a standard 5-field cron expression (min hour dom month dow) fire at ``moment``?
+
+    A malformed field (bad number, or an alias in the wrong field like a weekday name where a
+    month belongs) makes the expression not match rather than raising — so one bad schedule can
+    never fire at the wrong time nor abort the whole tick."""
+    try:
+        minute, hour, dom, month, dow = expression.split()
+        cron_dow = (moment.weekday() + 1) % 7  # python Mon=0 -> cron Sun=0
+        # cron also accepts 7 for Sunday, so match Sunday against either 0 or 7
+        dow_ok = _field_matches(dow, cron_dow, _CRON_DOWS) or (
+            cron_dow == 0 and _field_matches(dow, 7, _CRON_DOWS)
+        )
+        return (
+            _field_matches(minute, moment.minute)
+            and _field_matches(hour, moment.hour)
+            and _field_matches(dom, moment.day)
+            and _field_matches(month, moment.month, _CRON_MONTHS)
+            and dow_ok
+        )
+    except ValueError:
+        return False
 
 
 class ScheduledEvent:

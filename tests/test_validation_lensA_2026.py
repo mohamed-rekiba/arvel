@@ -57,6 +57,25 @@ def test_digit_rules_reject_non_ascii_digits() -> None:
     assert not _passes({"x": persian_12}, {"x": "digits_between:1,3"})
 
 
+def test_integer_rejects_multiple_leading_minus() -> None:
+    assert _passes({"x": "-5"}, {"x": "integer"})
+    assert not _passes({"x": "--1"}, {"x": "integer"})
+    assert not _passes({"x": "-"}, {"x": "integer"})
+
+
+def test_boolean_rejects_floats_equal_to_0_or_1() -> None:
+    assert _passes({"x": 1}, {"x": "boolean"})
+    assert _passes({"x": True}, {"x": "boolean"})
+    assert not _passes({"x": 0.0}, {"x": "boolean"})  # a float that == 0 must not slip through
+    assert not _passes({"x": 1.0}, {"x": "boolean"})
+
+
+def test_nullable_skips_an_unimplemented_rule_even_in_strict_mode() -> None:
+    # `missing` isn't in the dispatcher and is no longer treated as implicit, so nullable+null
+    # skips it instead of forcing it through to a strict-mode UnknownValidationRule.
+    Validator({"x": None}, {"x": "nullable|missing"}, strict=True).validate()
+
+
 def test_nullable_does_not_suppress_implicit_rules() -> None:
     # nullable suppresses type rules on None but required-family still runs and fails
     assert _passes({"x": None}, {"x": "nullable|integer"})
