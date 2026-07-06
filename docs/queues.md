@@ -85,6 +85,29 @@ dispatcher's [after-commit buffer](events.md) (the after-commit events section) 
 for events and jobs. The flush is fail-fast: if a buffered enqueue raises, the remaining
 buffered work is not attempted and the error surfaces to the caller after the commit.
 
+### Routing by class
+
+Declare which queue a job class lands on **centrally** — in a provider — instead of on every
+class. Useful when the classes come from a package you don't own, or when queue topology is an
+app decision, not a job decision:
+
+```python
+class AppServiceProvider(ServiceProvider):
+    def boot(self) -> None:
+        queue = self.app.make("queue")
+        queue.route(SendReport, queue="reports")
+        queue.route(RebuildIndex, queue="maintenance")
+```
+
+Precedence, most specific wins: an explicit `queue=` at dispatch > a `queue` attribute declared
+on the job class **or any of its own ancestors below `Job`** (a subclass inherits its parent's
+declared queue; only classes that never declared one fall through) > the route registry >
+`"default"`. Registry lookups are exact-class — routing a base class does not route its
+subclasses. Re-registering a class replaces its route. Every enqueue path resolves the same way:
+immediate dispatch, delayed `dispatch_after`, retry-release, chains, and batches. arvel routes
+the **queue label** only — the broker is one config-selected connection by design, so there is
+no per-class connection routing.
+
 ## Chaining & batching
 
 Run several jobs in order, or fire a group at once, with `Bus`:

@@ -313,10 +313,21 @@ def _job_span(job: Job) -> Any:
     with cm as span:
         span.set_attribute("messaging.system", "arvel.queue")
         span.set_attribute("messaging.operation", "process")
-        span.set_attribute("messaging.destination.name", str(getattr(job, "queue", "default")))
+        span.set_attribute("messaging.destination.name", _resolved_label(job))
         span.set_attribute("code.namespace", type(job).__module__)
         span.set_attribute("code.function", name)
         yield span
+
+
+def _resolved_label(job: Job) -> str:
+    """The queue label a job class resolves to — through the bound manager's registry when an
+    app is up (so spans and failure records show the routed queue), else the class attribute."""
+    from arvel.kernel import app, has_application
+
+    if has_application() and app().bound("queue"):
+        label: str = app().make("queue")._queue_label(type(job), None)
+        return label
+    return str(getattr(job, "queue", "default"))
 
 
 def _backoff_for(backoff: int | list[int] | tuple[int, ...], attempt: int) -> float:
@@ -457,7 +468,7 @@ async def _record_failed_job(job: Job, exc: BaseException) -> None:
     from arvel.queue.failed import FailedJob
 
     await FailedJob.create(
-        queue=getattr(job, "queue", "default"),
+        queue=_resolved_label(job),
         payload=serialize_instance(job),
         exception=f"{type(exc).__name__}: {exc}",
         failed_at=Date.now(),
@@ -511,10 +522,31 @@ class QueueManager(Manager):
     def __init__(self, app: Any = None, broker: Any = None) -> None:
         super().__init__(app)
         self._broker = broker  # an explicit broker passed in wins over the config-selected one
+        self._routes: dict[type, str] = {}  # central per-class queue routing (last write wins)
         self._task: Any = None
         self._started = False
         self._worker_options: _WorkerOptions | None = None  # set only while work() is running
         self._worker_stop: Any = None  # the active work() run's stop/finish event
+
+    def route(self, job_cls: type, *, queue: str) -> None:
+        """Route ``job_cls`` to ``queue`` by default — declared once (a provider), not on the
+        class. Precedence: an explicit ``queue=`` at dispatch > a ``queue`` attribute declared
+        on the class itself > this registry > ``"default"``. Re-registering replaces."""
+        self._routes[job_cls] = queue
+
+    def _queue_label(self, job_cls: type, explicit: str | None) -> str:
+        if explicit:
+            return explicit
+        for klass in job_cls.__mro__:
+            if klass is Job:
+                break  # Job.queue = "default" is the fallback, not a declaration
+            declared = klass.__dict__.get("queue")
+            if isinstance(declared, str):
+                return declared
+        routed = self._routes.get(job_cls)
+        if routed is not None:
+            return routed
+        return "default"
 
     def default_driver(self) -> str:
         driver: str = self._settings(QueueSettings).default
@@ -565,9 +597,9 @@ class QueueManager(Manager):
         ``attempt`` rides along on the job instance so the next pass (via ``release_due_jobs``)
         resumes counting from where this one left off."""
         job.__arvel_attempts__ = attempt  # type: ignore[attr-defined]
-        await self.dispatch_after(
-            delay, job, queue=getattr(job, "queue", "default"), attempts=attempt
-        )
+        # queue=None → dispatch_after resolves through _queue_label, so a route()d class
+        # retries on its routed queue, not "default"
+        await self.dispatch_after(delay, job, attempts=attempt)
 
     async def _dispatch_next_link(self, job: Job) -> None:
         """A1: on success, dispatch the next link of ``job``'s chain (if any) — the remaining
@@ -673,7 +705,7 @@ class QueueManager(Manager):
         :class:`~arvel.queue.middleware.JobShouldBeReleased`) — durable (the `jobs` table) when a
         DB is bound, mirroring B1's retry-release; otherwise an inline sleep-then-repush."""
         if self._is_durable():
-            await self.dispatch_after(delay, job, queue=getattr(job, "queue", "default"))
+            await self.dispatch_after(delay, job)  # queue resolved by _queue_label inside
             return
         import asyncio
 
@@ -723,7 +755,7 @@ class QueueManager(Manager):
         # pyright's `issubclass(job_cls, ShouldBeUnique)` narrowing above leaves `job_cls` typed as
         # a union including `type[Unknown]` for the rest of the function (a known narrowing quirk
         # on a bare `type` parameter) — both calls below are exactly as they were before that check.
-        label = queue or getattr(job_cls, "queue", "default")  # pyright: ignore[reportUnknownArgumentType]
+        label = self._queue_label(job_cls, queue)  # pyright: ignore[reportUnknownArgumentType]
         return (
             await task.kicker()
             .with_labels(queue=label)
@@ -909,7 +941,7 @@ class QueueManager(Manager):
         if not self._started:
             await self.broker.startup()
             self._started = True
-        label = queue or getattr(job, "queue", "default")
+        label = self._queue_label(type(job), queue)
         return await task.kicker().with_labels(queue=label).kiq(serialize_instance(job))
 
     async def dispatch_after(
@@ -933,7 +965,7 @@ class QueueManager(Manager):
 
         now = int(time.time())
         return await QueuedJob.create(
-            queue=queue or getattr(job, "queue", "default"),
+            queue=self._queue_label(type(job), queue),
             payload=serialize_instance(job),
             attempts=attempts,
             available_at=now + int(delay),
