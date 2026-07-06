@@ -5,11 +5,11 @@ Parity glue only: pyotp owns the TOTP algorithm; arvel wraps secret generation, 
 small clock-skew window), and one-time recovery codes. pyotp is imported lazily (the ``[2fa]``
 extra), so ``import arvel`` stays light. Grounded in knowledge/port/15-auth-authorization.md.
 
-The Fortify-parity lifecycle below (``enable_two_factor``/``confirm_two_factor``/
+The 2FA-scaffolding lifecycle below (``enable_two_factor``/``confirm_two_factor``/
 ``verify_two_factor``/``disable_two_factor``/``regenerate_recovery_codes``) stores three plain
 attributes on the ``user`` you pass in: ``two_factor_secret``, ``two_factor_recovery_codes``
 (a list of *hashed* codes), and ``two_factor_confirmed_at``. arvel does not encrypt these for you —
-exactly like Fortify, your user model owns that by declaring the model casts:
+your user model owns that by declaring the model casts:
 
     class User(Model, Authenticatable):
         __casts__ = {
@@ -33,6 +33,7 @@ finish the *real* login e.g. ``SessionGuard.login``) is app-side; arvel ships th
 from __future__ import annotations
 
 import secrets
+import string
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -71,8 +72,15 @@ class TwoFactor:
 
     @staticmethod
     def recovery_codes(count: int = 8) -> list[str]:
-        """Single-use recovery codes to store (hashed) alongside the secret."""
-        return [secrets.token_hex(5) for _ in range(count)]
+        """Single-use recovery codes to store (hashed) alongside the secret. Two 10-char
+        alphanumeric halves (~119 bits) — comparable to a full random password, not the 40-bit
+        token_hex(5) that came before."""
+        alphabet = string.ascii_letters + string.digits
+
+        def _half() -> str:
+            return "".join(secrets.choice(alphabet) for _ in range(10))
+
+        return [f"{_half()}-{_half()}" for _ in range(count)]
 
 
 def _hasher(explicit: Any = None) -> Any:
@@ -169,7 +177,7 @@ async def regenerate_recovery_codes(user: Any, *, count: int = 8, hasher: Any = 
     return codes
 
 
-# --- login-challenge state machine (Fortify's "confirm the second factor" step) -----------------
+# --- login-challenge state machine (the "confirm the second factor" step) -----------------
 
 #: session key holding the pending user id — read/write by begin/pending/complete below.
 SESSION_PENDING_KEY = "auth.2fa.pending"
