@@ -71,6 +71,24 @@ async def test_polymorphic_type_collision_resolves_correct_parent() -> None:
         await db.dispose()
 
 
+async def test_morph_to_eager_load_batches_by_type() -> None:
+    # with_("commentable") on the inverse side must batch by *_type (one query per type),
+    # not crash on the base relation's where_in against a None related model.
+    db = await _setup()
+    try:
+        post = await MePost.create(title="P")
+        video = await MeVideo.create(title="V")
+        await MeComment.create(body="a", commentable_type="MePost", commentable_id=post.id)
+        await MeComment.create(body="b", commentable_type="MeVideo", commentable_id=video.id)
+
+        comments = await MeComment.with_("commentable").get()
+        by_body = {c.body: c.relation("commentable") for c in comments}
+        assert isinstance(by_body["a"], MePost) and by_body["a"].title == "P"
+        assert isinstance(by_body["b"], MeVideo) and by_body["b"].title == "V"
+    finally:
+        await db.dispose()
+
+
 async def test_morph_to_with_null_target_returns_none() -> None:
     db = await _setup()
     try:

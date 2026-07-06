@@ -657,8 +657,20 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return self._attributes.get("deleted_at") is not None
 
     async def increment(self, column: str, amount: int = 1) -> Self:
+        # atomic SET col = col + amount so concurrent increments compose instead of racing a
+        # read-modify-write; the in-memory value is bumped optimistically to match.
+        self._guard_writable()
+        import sqlalchemy as sa
+
+        # COALESCE so a NULL column increments from 0 rather than staying NULL (NULL + n = NULL)
+        col = self.__table__.c[column]
+        updates: dict[str, Any] = {column: sa.func.coalesce(col, 0) + amount}
         self._attributes[column] = (self._attributes.get(column) or 0) + amount
-        await self.save()
+        if self.__timestamps__ and "updated_at" in self.__table__.c:
+            now = now_utc()
+            updates["updated_at"] = now
+            self._attributes["updated_at"] = now
+        await self._key_query().update(updates)
         return self
 
     async def decrement(self, column: str, amount: int = 1) -> Self:

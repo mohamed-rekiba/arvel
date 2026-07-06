@@ -424,6 +424,36 @@ class MorphTo(Relation):
         model: Any = resolve_model(type_name)
         return await model.find(key) if model is not None else None
 
+    async def eager_load(self, parents: list[Any], name: str, constrain: Any = None) -> None:
+        # the inverse side has no single related model, so the base where_in query doesn't apply:
+        # group parents by their {name}_type, then one batched query per distinct type.
+        from arvel.database.model import resolve_model
+
+        by_type: dict[str, list[Any]] = {}
+        for parent in parents:
+            type_name = parent._attributes.get(f"{self.morph_name}_type")
+            key = parent._attributes.get(f"{self.morph_name}_id")
+            if type_name is not None and key is not None:
+                by_type.setdefault(type_name, []).append(parent)
+
+        resolved: dict[tuple[str, Any], Any] = {}
+        for type_name, group in by_type.items():
+            model: Any = resolve_model(type_name)
+            if model is None:
+                continue
+            pk = model.__primary_key__
+            ids = list({p._attributes.get(f"{self.morph_name}_id") for p in group})
+            query = model.where_in(pk, ids)
+            if constrain is not None:
+                constrain(query)
+            for row in await query.get():
+                resolved[(type_name, row._attributes.get(pk))] = row
+
+        for parent in parents:
+            type_name = parent._attributes.get(f"{self.morph_name}_type")
+            key = parent._attributes.get(f"{self.morph_name}_id")
+            parent._relations[name] = resolved.get((type_name, key))
+
 
 class MorphOne(MorphMany):
     """Polymorphic one-to-one (the single child for ``{name}_type``/``{name}_id``)."""
