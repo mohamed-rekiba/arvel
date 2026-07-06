@@ -10,7 +10,7 @@ reimplement* (doc 00 §5b). Grounded in knowledge/port/07-orm-active-record.md.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Literal, Self, cast
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Sequence
@@ -25,6 +25,18 @@ class UnsupportedDriverOperation(Exception):
     """Raised when an operation has no correct implementation for the connection's dialect —
     e.g. ``upsert()`` on a dialect that's neither ``postgresql``/``sqlite`` (``ON CONFLICT``) nor
     ``mysql``/``mariadb`` (``ON DUPLICATE KEY UPDATE``). Never silently emit the wrong SQL (A4)."""
+
+
+#: Distance semantics for the vector-similarity clauses. ``inner`` is the negative inner
+#: product (larger dot-product ⇒ smaller distance), so ascending order is always
+#: "most similar first" for every metric.
+VectorMetric = Literal["cosine", "l2", "inner"]
+
+_VECTOR_COMPARATORS: dict[str, str] = {
+    "cosine": "cosine_distance",
+    "l2": "l2_distance",
+    "inner": "max_inner_product",
+}
 
 
 async def _maybe_await(value: Any) -> Any:
@@ -345,6 +357,47 @@ class Builder:
 
         vector = sa.func.to_tsvector(language, self._table.c[column])
         self._add(vector.op("@@")(sa.func.plainto_tsquery(language, query)), connector)
+        return self
+
+    def _vector_distance(self, column: str, embedding: Sequence[float], metric: str) -> Any:
+        """The distance expression for a vector column, or a clear failure. The comparator
+        methods only exist when the column's type comes from the ``[vector]`` extra — the
+        portable JSON fallback (and any non-vector column) must fail loudly, never emit SQL
+        that compares strings."""
+        comparator = _VECTOR_COMPARATORS.get(metric)
+        if comparator is None:
+            raise UnsupportedDriverOperation(
+                f"unknown vector metric {metric!r} — one of: {', '.join(_VECTOR_COMPARATORS)}"
+            )
+        col = self._where_column(column)
+        method = getattr(col, comparator, None)
+        if method is None:
+            raise UnsupportedDriverOperation(
+                f"column {column!r} has no vector operators — declare it with schema vector() "
+                "and install the [vector] extra (server extension: CREATE EXTENSION vector)"
+            )
+        return method(list(embedding))
+
+    def where_vector_similar(
+        self,
+        column: str,
+        embedding: Sequence[float],
+        *,
+        metric: VectorMetric = "cosine",
+        max_distance: float,
+        connector: str = "and",
+    ) -> Self:
+        """Keep rows whose ``column`` embedding is within ``max_distance`` of ``embedding``
+        under ``metric``. Takes an explicit vector — arvel never generates embeddings."""
+        self._add(self._vector_distance(column, embedding, metric) <= max_distance, connector)
+        return self
+
+    def order_by_similarity(
+        self, column: str, embedding: Sequence[float], *, metric: VectorMetric = "cosine"
+    ) -> Self:
+        """Nearest-first ranking by ``metric`` distance to ``embedding``. Not part of
+        ``cursor_paginate``'s keyset ordering (same caveat as ``order_by_raw``)."""
+        self._order.append(self._vector_distance(column, embedding, metric).asc())
         return self
 
     # --- relationship existence (doc 07) -----------------------------------
