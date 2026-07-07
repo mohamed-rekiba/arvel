@@ -9,9 +9,9 @@ from typing import Any
 
 import pytest
 
+from arvel.http.exceptions import HttpException
 from arvel.http.middleware import ValidateCsrfToken
 from arvel.http.request import current_request
-from arvel.validation import ValidationException
 from arvel.views import ViewFactory, _csrf_field, _csrf_token
 
 _FORM_CT = {"content-type": "application/x-www-form-urlencoded"}
@@ -91,10 +91,10 @@ async def test_post_rejects_missing_or_wrong_token() -> None:
     mw = ValidateCsrfToken()
     session: dict[str, Any] = {}
     await mw.handle(_Req("GET", session), _ran)
-    with pytest.raises(ValidationException) as a:
+    with pytest.raises(HttpException) as a:
         await mw.handle(_Req("POST", session, _FORM_CT, {}), _ran)
     assert a.value.status == 419
-    with pytest.raises(ValidationException) as b:
+    with pytest.raises(HttpException) as b:
         await mw.handle(_Req("POST", session, _FORM_CT, {"_token": "wrong"}), _ran)
     assert b.value.status == 419
 

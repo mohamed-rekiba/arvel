@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
+from arvel.http.exceptions import HttpException
 from arvel.http.middleware import ValidateCsrfToken
-from arvel.validation import ValidationException
 
 
 class FakeRequest:
@@ -62,14 +62,14 @@ async def test_matching_token_passes() -> None:
 
 async def test_missing_token_rejected_419() -> None:
     csrf = ValidateCsrfToken()
-    with pytest.raises(ValidationException) as exc:
+    with pytest.raises(HttpException) as exc:
         await csrf.handle(FakeRequest("POST", sent_token=None), _ok)
     assert exc.value.status == 419
 
 
 async def test_mismatched_token_rejected_419() -> None:
     csrf = ValidateCsrfToken()
-    with pytest.raises(ValidationException) as exc:
+    with pytest.raises(HttpException) as exc:
         await csrf.handle(FakeRequest("POST", sent_token="wrong", session_token="tok"), _ok)
     assert exc.value.status == 419
 
@@ -86,7 +86,7 @@ async def test_same_origin_with_token_passes() -> None:
 async def test_cross_origin_rejected_even_with_valid_token() -> None:
     csrf = ValidateCsrfToken()
     req = FakeRequest("POST", sent_token="tok", origin="https://evil.test")
-    with pytest.raises(ValidationException) as exc:
+    with pytest.raises(HttpException) as exc:
         await csrf.handle(req, _ok)
     assert exc.value.status == 419
 
@@ -94,7 +94,7 @@ async def test_cross_origin_rejected_even_with_valid_token() -> None:
 async def test_null_origin_rejected() -> None:
     csrf = ValidateCsrfToken()
     req = FakeRequest("POST", sent_token="tok", origin="null")
-    with pytest.raises(ValidationException) as exc:
+    with pytest.raises(HttpException) as exc:
         await csrf.handle(req, _ok)
     assert exc.value.status == 419
 
@@ -102,7 +102,7 @@ async def test_null_origin_rejected() -> None:
 async def test_no_origin_falls_back_to_referer() -> None:
     csrf = ValidateCsrfToken()
     cross = FakeRequest("POST", sent_token="tok", referer="https://evil.test/form")
-    with pytest.raises(ValidationException):
+    with pytest.raises(HttpException):
         await csrf.handle(cross, _ok)
     same = FakeRequest("POST", sent_token="tok", referer="https://app.test/form")
     assert await csrf.handle(same, _ok) == "ok"
@@ -122,7 +122,7 @@ async def test_trusted_origins_full_and_bare_host() -> None:
     bare = FakeRequest("POST", sent_token="tok", origin="http://cdn.test:9000")
     assert await csrf.handle(bare, _ok) == "ok"
     other_port = FakeRequest("POST", sent_token="tok", origin="https://partner.test:9999")
-    with pytest.raises(ValidationException):
+    with pytest.raises(HttpException):
         await csrf.handle(other_port, _ok)
 
 
@@ -144,17 +144,17 @@ async def test_unparseable_referer_fails_closed() -> None:
     # a client that asserts provenance it can't prove is rejected, not waved through
     csrf = ValidateCsrfToken()
     scheme_relative = FakeRequest("POST", sent_token="tok", referer="//evil.test/form")
-    with pytest.raises(ValidationException):
+    with pytest.raises(HttpException):
         await csrf.handle(scheme_relative, _ok)
     garbage = FakeRequest("POST", sent_token="tok", referer=":not a url")
-    with pytest.raises(ValidationException):
+    with pytest.raises(HttpException):
         await csrf.handle(garbage, _ok)
 
 
 async def test_origin_without_hostname_fails_closed() -> None:
     csrf = ValidateCsrfToken()
     req = FakeRequest("POST", sent_token="tok", origin="https://")
-    with pytest.raises(ValidationException):
+    with pytest.raises(HttpException):
         await csrf.handle(req, _ok)
 
 

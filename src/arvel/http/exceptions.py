@@ -144,17 +144,33 @@ def render_exception(request: Any, exc: Any, *, debug: bool = False) -> Any:
             headers=extra_headers or None,
         )
 
-    try:  # request.session is a property that raises without session middleware configured
-        session: Any = getattr(request, "session", None)
-    except Exception:
-        session = None
-    if isinstance(session, dict) and errors is not None:
-        from arvel.http.flash import FlashBag
+    if status in (419, 422):
+        # "return to the form" semantics: flash the errors and bounce back — only for
+        # validation/CSRF failures; a 404 or 5xx must render as its real status
+        try:  # request.session is a property that raises without session middleware configured
+            session: Any = getattr(request, "session", None)
+        except Exception:
+            session = None
+        if isinstance(session, dict) and errors is not None:
+            from arvel.http.flash import FlashBag
 
-        FlashBag(cast("dict[str, Any]", session)).flash_errors(errors)
-    referer = headers.get("referer") or headers.get("referrer") or "/"
-    location = same_origin_or_root(str(referer), str(headers.get("host") or ""))
-    return litestar.Response(None, status_code=302, headers={"Location": location, **extra_headers})
+            FlashBag(cast("dict[str, Any]", session)).flash_errors(errors)
+        referer = headers.get("referer") or headers.get("referrer") or "/"
+        location = same_origin_or_root(str(referer), str(headers.get("host") or ""))
+        return litestar.Response(
+            None, status_code=302, headers={"Location": location, **extra_headers}
+        )
+    # HTML-accepting client, non-form failure: a minimal error page with the real status
+    import html as _html
+
+    detail = f"<p>{_html.escape(message)}</p>" if (debug or status < 500) else ""
+    page = (
+        f"<!doctype html><html><head><title>{status} — {_status_text(status)}</title></head>"
+        f"<body><h1>{status} — {_status_text(status)}</h1>{detail}</body></html>"
+    )
+    return litestar.Response(
+        page, status_code=status, media_type="text/html", headers=extra_headers or None
+    )
 
 
 def same_origin_or_root(target: str, host: str) -> str:
