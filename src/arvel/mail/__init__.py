@@ -116,6 +116,17 @@ def _global_from() -> str:
     return f"{name} <{address}>" if name else str(address)
 
 
+class _StorageRef:
+    """A deferred attachment read from a storage disk — loaded off the loop in
+    ``resolve_attachments`` (the disk's ``get`` is async), never in the sync ``render``."""
+
+    __slots__ = ("disk", "path")
+
+    def __init__(self, disk: Any, path: str) -> None:
+        self.disk = disk
+        self.path = path
+
+
 class Mailable:
     """Base mail message: subclass and override ``build()``."""
 
@@ -131,13 +142,26 @@ class Mailable:
         self._attachments: list[tuple[bytes, str, str]] = []  # (data, filename, content-type)
 
     @property
-    def _attachment_list(self) -> list[tuple[bytes | Path, str, str]]:
+    def _attachment_list(self) -> list[tuple[bytes | Path | _StorageRef, str, str]]:
         """The attachment list, lazily created — robust when ``__init__`` was bypassed/overridden."""
-        attachments: list[tuple[bytes | Path, str, str]] | None = self.__dict__.get("_attachments")
+        attachments: list[tuple[bytes | Path | _StorageRef, str, str]] | None = self.__dict__.get(
+            "_attachments"
+        )
         if attachments is None:
             attachments = []
             self.__dict__["_attachments"] = attachments
         return attachments
+
+    @property
+    def _inline_list(self) -> list[tuple[bytes | Path | _StorageRef, str, str]]:
+        """Inline (``cid:``) images, lazily created — ``(data, content-id, content-type)``."""
+        inline: list[tuple[bytes | Path | _StorageRef, str, str]] | None = self.__dict__.get(
+            "_inline"
+        )
+        if inline is None:
+            inline = []
+            self.__dict__["_inline"] = inline
+        return inline
 
     def subject(self, subject: str) -> Mailable:
         self._subject = subject
@@ -191,19 +215,63 @@ class Mailable:
         self._attachment_list.append((Path(path), filename, ctype))
         return self
 
+    def attach_from_storage(
+        self, disk: Any, path: str, *, name: str | None = None, mime: str | None = None
+    ) -> Mailable:
+        """Attach a file living on a storage ``disk`` (``Storage.disk("s3")`` etc.). The disk read
+        is deferred to the async send path (off the event loop), like :meth:`attach`."""
+        import mimetypes
+
+        filename = name or path.rsplit("/", 1)[-1]
+        ctype = mime or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        self._attachment_list.append((_StorageRef(disk, path), filename, ctype))
+        return self
+
+    def embed(self, path: str, *, mime: str | None = None) -> str:
+        """Embed a local image inline and return its ``cid:`` reference for the HTML body, e.g.
+        ``html(f'<img src="{mail.embed("logo.png")}">')``. The read is deferred to the send path."""
+        import mimetypes
+        from pathlib import Path
+
+        cid = self._new_cid()
+        ctype = mime or mimetypes.guess_type(path)[0] or "application/octet-stream"
+        self._inline_list.append((Path(path), cid, ctype))
+        return f"cid:{cid}"
+
+    def embed_data(self, data: bytes, *, mime: str) -> str:
+        """Embed raw image bytes inline; returns the ``cid:`` reference for the HTML body."""
+        cid = self._new_cid()
+        self._inline_list.append((data, cid, mime))
+        return f"cid:{cid}"
+
+    @staticmethod
+    def _new_cid() -> str:
+        import uuid
+
+        return f"{uuid.uuid4().hex}@arvel"
+
     async def resolve_attachments(self) -> None:
-        """Load any path-deferred attachments into memory via a worker thread — called by
-        the send path before ``render()``; idempotent."""
+        """Load any deferred attachments/inline images into memory off the event loop — a local
+        path via a worker thread, a storage ref via the disk's async ``get``. Called by the send
+        path before ``render()``; idempotent."""
+        self._attachment_list[:] = [
+            (await self._load(data), name, ctype) for data, name, ctype in self._attachment_list
+        ]
+        self._inline_list[:] = [
+            (await self._load(data), cid, ctype) for data, cid, ctype in self._inline_list
+        ]
+
+    @staticmethod
+    async def _load(data: bytes | Path | _StorageRef) -> bytes:
         from pathlib import Path
 
         from anyio.to_thread import run_sync
 
-        resolved: list[tuple[bytes | Path, str, str]] = []
-        for data, filename, ctype in self._attachment_list:
-            if isinstance(data, Path):
-                data = await run_sync(data.read_bytes)
-            resolved.append((data, filename, ctype))
-        self._attachment_list[:] = resolved
+        if isinstance(data, _StorageRef):
+            return cast("bytes", await data.disk.get(data.path))
+        if isinstance(data, Path):
+            return await run_sync(data.read_bytes)
+        return data
 
     def attach_data(
         self, data: bytes, name: str, *, mime: str = "application/octet-stream"
@@ -229,16 +297,41 @@ class Mailable:
         # both are supported, while a text-only client (or a spam filter) still gets real content.
         message.set_content(self._text or _strip_tags(self._html), subtype="plain")
         message.add_alternative(self._html, subtype="html")
-        from pathlib import Path
+
+        # Inline images ride on the HTML alternative as multipart/related parts, keyed by Content-ID
+        # so the body's `cid:...` refs resolve. Must attach before the regular attachments below.
+        if self._inline_list:
+            html_part = cast("EmailMessage", message.get_body(preferencelist=("html",)))
+            for data, cid, ctype in self._inline_list:
+                maintype, _, subtype = ctype.partition("/")
+                html_part.add_related(
+                    self._render_bytes(data),
+                    maintype=maintype,
+                    subtype=subtype or "octet-stream",
+                    cid=f"<{cid}>",
+                )
 
         for data, filename, ctype in self._attachment_list:
-            if isinstance(data, Path):  # direct sync render() (tests) — send paths pre-resolve
-                data = data.read_bytes()
             maintype, _, subtype = ctype.partition("/")
             message.add_attachment(
-                data, maintype=maintype, subtype=subtype or "octet-stream", filename=filename
+                self._render_bytes(data),
+                maintype=maintype,
+                subtype=subtype or "octet-stream",
+                filename=filename,
             )
         return message
+
+    @staticmethod
+    def _render_bytes(data: bytes | Path | _StorageRef) -> bytes:
+        from pathlib import Path
+
+        if isinstance(data, Path):  # direct sync render() (tests) — send paths pre-resolve
+            return data.read_bytes()
+        if isinstance(data, _StorageRef):
+            raise RuntimeError(
+                "a storage attachment needs the async send path; call resolve_attachments() first"
+            )
+        return data
 
 
 class LogTransport:

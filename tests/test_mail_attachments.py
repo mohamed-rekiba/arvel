@@ -49,3 +49,40 @@ def test_no_attachments_still_renders() -> None:
     message = Doc().render()
     assert _attachments(message) == []
     assert message["Subject"] == "Invoice"
+
+
+async def test_attach_from_storage_reads_a_real_disk(tmp_path: Path) -> None:
+    import fsspec
+
+    from arvel.filesystem import Filesystem
+
+    disk = Filesystem(fsspec.filesystem("file"), root=str(tmp_path))
+    await disk.put("invoices/1.pdf", b"%PDF from storage")
+
+    mailable = Doc().attach_from_storage(disk, "invoices/1.pdf", mime="application/pdf")
+    await mailable.resolve_attachments()  # the disk read happens here, off the render path
+    parts = _attachments(mailable.render())
+    assert len(parts) == 1
+    assert parts[0].get_filename() == "1.pdf"
+    assert parts[0].get_payload(decode=True) == b"%PDF from storage"
+
+
+def test_embed_data_renders_an_inline_image_with_matching_cid() -> None:
+    class Card(Mailable):
+        cid: str = ""
+
+        def build(self) -> Mailable:
+            self.cid = self.embed_data(b"\x89PNG-fake", mime="image/png")
+            return self.subject("Hi").html(f'<p><img src="{self.cid}"></p>')
+
+    card = Card()
+    message = card.render()
+    ref = card.cid.removeprefix("cid:")
+
+    images = [p for p in message.walk() if p.get_content_type() == "image/png"]
+    assert len(images) == 1
+    assert images[0]["Content-ID"] == f"<{ref}>"
+    assert images[0].get_payload(decode=True) == b"\x89PNG-fake"
+
+    html = message.get_body(preferencelist=("html",))
+    assert html is not None and f"cid:{ref}" in html.get_content()
