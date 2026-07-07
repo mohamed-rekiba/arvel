@@ -28,12 +28,35 @@ class Jwt:
 
     @staticmethod
     def decode(
-        token: str, secret: str, *, algorithms: tuple[str, ...] = ("HS256",)
+        token: str,
+        secret: str,
+        *,
+        algorithms: tuple[str, ...] = ("HS256",),
+        issuer: str | None = None,
+        audience: str | list[str] | None = None,
+        leeway: float = 0,
     ) -> dict[str, Any] | None:
         import jwt
 
+        # exp is always required — a token with no expiry is never valid (fail closed). When an
+        # issuer/audience is configured it is both enforced and required to be present.
+        require = ["exp"]
+        options: dict[str, Any] = {}
+        if issuer is not None:
+            options["issuer"] = issuer
+            require.append("iss")
+        if audience is not None:
+            options["audience"] = audience
+            require.append("aud")
         try:
-            decoded: dict[str, Any] = jwt.decode(token, secret, algorithms=list(algorithms))
+            decoded: dict[str, Any] = jwt.decode(
+                token,
+                secret,
+                algorithms=list(algorithms),
+                leeway=leeway,
+                options={"require": require},
+                **options,
+            )
         except jwt.PyJWTError:
             return None
         return decoded
