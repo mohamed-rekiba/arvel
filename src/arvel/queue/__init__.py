@@ -236,8 +236,9 @@ class Job:
     #: Visibility-timeout override (seconds) for this job's class; ``None`` -> the
     #: ``queue.retry_after`` config default (see `QueueManager._reclaim_stuck_jobs`).
     retry_after: int | None = None
-    #: An extra cap on attempts, alongside `tries` (ponytail: a simple shared ceiling, not
-    #: the full manual-release-vs-exception distinction — add that nuance if a job needs it).
+    #: Cap on *thrown* exceptions before the job is failed — a tighter ceiling than `tries`. A
+    #: `JobShouldBeReleased` (a middleware or handler putting the job back on the queue) is not an
+    #: exception: it never counts toward this or `tries`.
     max_exceptions: int | None = None
     #: Stop retrying past this moment regardless of `tries` left.
     retry_until: datetime | None = None
@@ -361,8 +362,9 @@ def _backoff_for(backoff: int | list[int] | tuple[int, ...], attempt: int) -> fl
 
 def _retry_should_stop(job: Job, attempt: int, tries: int) -> bool:
     """Whether to give up after this failed ``attempt`` rather than retry again: ``tries``
-    exhausted, ``max_exceptions`` capped (ponytail: a simple shared ceiling — see the attribute's
-    docstring), or past ``retry_until``."""
+    exhausted, ``max_exceptions`` reached, or past ``retry_until``. ``attempt`` only advances on a
+    thrown exception (a ``JobShouldBeReleased`` propagates past the retry loop and doesn't count),
+    so the ``max_exceptions`` check is a genuine exception ceiling, not just an attempt one."""
     max_exceptions = getattr(job, "max_exceptions", None)
     if max_exceptions is not None and attempt >= max_exceptions:
         return True

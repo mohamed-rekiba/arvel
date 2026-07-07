@@ -94,6 +94,35 @@ async def test_max_exceptions_caps_attempts_below_tries() -> None:
     assert job.attempts == 2  # capped by max_exceptions, well under tries=10
 
 
+async def test_a_release_is_not_a_counted_exception() -> None:
+    """max_exceptions counts *thrown* exceptions only. A JobShouldBeReleased (a middleware or
+    handler asking for the job back on the queue) is a BaseException that propagates past the
+    retry loop — it never counts toward max_exceptions and never calls failed(), even at
+    max_exceptions=1."""
+    import pytest
+
+    from arvel.queue.middleware import JobShouldBeReleased
+
+    class ReleasesItself(Job):
+        tries = 10
+        max_exceptions = 1  # would trip immediately if a release were counted as an exception
+        backoff = 0
+
+        def __init__(self) -> None:
+            self.failed_with: BaseException | None = None
+
+        async def handle(self) -> None:
+            raise JobShouldBeReleased(0)
+
+        async def failed(self, exc: BaseException) -> None:
+            self.failed_with = exc
+
+    job = ReleasesItself()
+    with pytest.raises(JobShouldBeReleased):
+        await run_job_with_retries(job, sleep=lambda d: _no_sleep(d, []))
+    assert job.failed_with is None  # a release is not a failure — max_exceptions=1 did not trip
+
+
 class RetryUntilAlreadyPast(Job):
     tries = 10
     backoff = 0
