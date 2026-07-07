@@ -347,8 +347,9 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
 
     @classmethod
     async def prune(cls) -> Any:
-        """Delete every row matching ``prunable()`` (Prunable mixin)."""
-        return await cls.prunable().delete()
+        """Permanently remove every row matching ``prunable()`` (Prunable mixin) — a hard delete
+        even for a soft-delete model, since pruning reclaims storage rather than trashing."""
+        return await cls.prunable().force_delete()
 
     @classmethod
     def _global_scopes(cls) -> dict[str, Any]:

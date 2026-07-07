@@ -1266,6 +1266,19 @@ class Builder[M = dict[str, Any]]:
         return await self._require_resolver().execute(self.to_update(values))
 
     async def delete(self) -> WriteResult:
+        model = self._model
+        if model is not None and cast("Any", model)._uses_soft_deletes():
+            # bulk delete on a soft-delete model stamps deleted_at instead of removing rows —
+            # same semantics as the instance path. The soft-delete scope is already on the where,
+            # so only live rows are stamped; update() carries the updated_at auto-stamp.
+            from arvel.database.model_casts import now_utc
+
+            return await self.update({"deleted_at": now_utc()})
+        return await self._require_resolver().execute(self.to_delete())
+
+    async def force_delete(self) -> WriteResult:
+        """Bulk hard-delete — removes rows even for a soft-delete model. On a plain model this
+        is identical to :meth:`delete`."""
         return await self._require_resolver().execute(self.to_delete())
 
     # --- aggregates --------------------------------------------------------
