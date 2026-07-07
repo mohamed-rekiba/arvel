@@ -53,6 +53,23 @@ class AuthorizationException(Exception):
         super().__init__(message)
 
 
+def _field_errors(exc: msgspec.ValidationError) -> dict[str, list[str]]:
+    """The structural engine's error as the same field-keyed ``{field: [messages]}`` shape
+    the rules engine produces — one 422 contract regardless of which engine rejected.
+    The structural engine reports the first failure only (documented divergence from the
+    rules engine's aggregate reporting)."""
+    message = str(exc)
+    at = re.search(r"\s+-\s+at\s+`\$\.(.+?)`$", message)
+    if at:
+        # `$.items[0].name` → items.0.name (the rules engine's nested-path syntax)
+        path = at.group(1).replace("[", ".").replace("]", "")
+        return {path: [message[: at.start()].strip()]}
+    missing = re.search(r"missing required field `(.+?)`", message)
+    if missing:
+        return {missing.group(1): [message]}
+    return {"_body": [message]}  # payload-level failure (wrong type at the root, etc.)
+
+
 def validate[T: msgspec.Struct](
     data: Mapping[str, Any], schema: type[T], *, strict: bool = False
 ) -> T:
@@ -60,7 +77,7 @@ def validate[T: msgspec.Struct](
     try:
         return msgspec.convert(dict(data), schema, strict=strict)
     except msgspec.ValidationError as exc:
-        raise ValidationException(str(exc)) from exc
+        raise ValidationException(_field_errors(exc)) from exc
 
 
 def json_schema(schema: type[msgspec.Struct]) -> dict[str, Any]:
