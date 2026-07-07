@@ -291,10 +291,14 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return issubclass(cls, SoftDeletes)
 
     @classmethod
-    def _base_query(cls, *, skip_scopes: tuple[str, ...] = ()) -> Builder:
+    def _base_query(cls, *, skip_scopes: tuple[str, ...] = (), trashed: str = "exclude") -> Builder:
         builder = Builder(cls.__table__, cls._resolve(), hydrate=cls._hydrate_and_fire, model=cls)
-        if cls._uses_soft_deletes():  # default scope: exclude trashed rows
-            builder = builder.where_null("deleted_at")
+        if cls._uses_soft_deletes():
+            if trashed == "exclude":  # default scope: hide trashed rows
+                builder = builder.where_null("deleted_at")
+            elif trashed == "only":
+                builder = builder.where_not_null("deleted_at")
+            # "include" adds no constraint — trashed and live rows both match
         for name, scope in cls._global_scopes().items():
             if name not in skip_scopes:
                 scope(builder)  # mutates the builder (adds wheres etc.)
@@ -370,15 +374,18 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
 
     @classmethod
     def with_trashed(cls) -> Builder:
-        """Query including soft-deleted rows (no default scope)."""
-        return Builder(cls.__table__, cls._resolve(), hydrate=cls._hydrate_and_fire)
+        """The normal model query with the soft-delete scope removed — local scopes,
+        relation constraints, aggregates, and other global scopes all still work."""
+        return cls._base_query(trashed="include")
 
     @classmethod
     def only_trashed(cls) -> Builder:
-        """Query only the soft-deleted rows."""
-        return Builder(cls.__table__, cls._resolve(), hydrate=cls._hydrate_and_fire).where_not_null(
-            "deleted_at"
-        )
+        """The normal model query constrained to soft-deleted rows only."""
+        if not cls._uses_soft_deletes():
+            raise TypeError(
+                f"{cls.__name__} does not use SoftDeletes — only_trashed() has no meaning."
+            )
+        return cls._base_query(trashed="only")
 
     # --- finders -------------------------------------------------------------
     @classmethod
