@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.57.0](https://github.com/mohamed-rekiba/arvel/compare/v0.56.0...v0.57.0) (2026-07-07)
+
+
+### Features
+
+* **console:** exit codes from handle(), fail(), missing-input prompting ([ceaae8a](https://github.com/mohamed-rekiba/arvel/commit/ceaae8a715d4a268c3bbf0ea7c764ad4f85c1a06))
+* **database:** generically typed ORM read surface ([8434c37](https://github.com/mohamed-rekiba/arvel/commit/8434c3740485b33cbb2f9d4355cdb91db3842741))
+* **database:** query-builder parity verbs and factory fills ([4f6487a](https://github.com/mohamed-rekiba/arvel/commit/4f6487adb116b63b739b4a44d9bffee4d7762a4d))
+* **dates:** multi-format parse with typed error, localized diff_for_humans ([e820794](https://github.com/mohamed-rekiba/arvel/commit/e820794643a0fc17840df56ecd36f0db8822169c))
+* **http,routing,client,views:** atomic throttling, routing fills, client retry surface ([42a7503](https://github.com/mohamed-rekiba/arvel/commit/42a75035cbba9b7262a35059770c2d896a3e06b5))
+* **mail,notifications:** transactional queued rails, failover transports, house idioms ([4cf2908](https://github.com/mohamed-rekiba/arvel/commit/4cf2908b88cfbb962c547abca5369e7847921736))
+* **queue,events,console:** worker queue filtering, queued broadcasts, non-blocking scheduler ([53a0e14](https://github.com/mohamed-rekiba/arvel/commit/53a0e14dd0e3d688c4f0a3e09590e981ac3e2ee6))
+* **search,features,filesystem,media,localization,testing:** ecosystem parity pass ([37e5678](https://github.com/mohamed-rekiba/arvel/commit/37e5678c8a0238a344b383a2fc35e95b43f592c4))
+* **security:** wire previous app keys into the encrypter ring ([9ec627b](https://github.com/mohamed-rekiba/arvel/commit/9ec627beff6cbdc77cfa40047247449f8afba858))
+* **support:** async-aware retry/rescue with reporting, once(), fakeable Sleep ([4a63594](https://github.com/mohamed-rekiba/arvel/commit/4a63594ff5e9d9e27016cfc74897d13f245c79b7))
+* **support:** close Str/Collection/Context/Concurrency parity gaps ([04b44e4](https://github.com/mohamed-rekiba/arvel/commit/04b44e47902588cc9a89d32e79bb079c776a4924))
+
+
+### Bug Fixes
+
+* address the PR-246 automated review findings ([0cb6a22](https://github.com/mohamed-rekiba/arvel/commit/0cb6a2232c464ae90fff8b524adeb57b1e7bab7f))
+* **auth,security:** conformance pass — async confirm, typed signer errors, PK-agnostic flows ([92bb56a](https://github.com/mohamed-rekiba/arvel/commit/92bb56a128391deab35c627542e85647e866f1f5))
+* **auth:** equalize attempt() timing for unknown identifiers ([f2a869b](https://github.com/mohamed-rekiba/arvel/commit/f2a869b43342eea55978b348aaf2f5b8878a0b14))
+* **cache:** stored None is a hit; events, batch verbs, lock conveniences ([1b48d4f](https://github.com/mohamed-rekiba/arvel/commit/1b48d4fbba9a7b54ecf433ef6ec2b98bdbfabe3a))
+* **console,auth:** resolve the reset sweep through the container, restoring G2 ([a2c0c9b](https://github.com/mohamed-rekiba/arvel/commit/a2c0c9b6dcb5cb6a21b39378091a9599a107e5e0))
+* **database:** dirty-only saves and the instance CRUD surface ([84da396](https://github.com/mohamed-rekiba/arvel/commit/84da3965ed2d951c2088513e66e2bb6e3a8daa81))
+* **database:** raw select/statement/stream join the active transaction ([22cf003](https://github.com/mohamed-rekiba/arvel/commit/22cf003161060e5eaae0f909b2400c7555bbe583))
+* **database:** shape-correct relation eager loads, correlations, morph map ([3c50948](https://github.com/mohamed-rekiba/arvel/commit/3c5094844ab38ec68b9481071321b226f87d9a2d))
+* **database:** trashed queries are full-fidelity model queries ([aac0a77](https://github.com/mohamed-rekiba/arvel/commit/aac0a77fb1c1120dd1d5767b1a423d4de98c5dd8))
+* **http:** render errors at their real status; one HTTP-error vocabulary ([0fbecbe](https://github.com/mohamed-rekiba/arvel/commit/0fbecbe720c69ebf38e2bc4d28777e4480bae557))
+* **kernel:** base_path-anchored discovery, .env.[APP_ENV] overlay, typed ProviderInput ([aa16c25](https://github.com/mohamed-rekiba/arvel/commit/aa16c25219b513dc1a842ae85f35661e57dbc22c))
+* **kernel:** container rebind, hooks, positional-only call, contextual primitives ([ef448f1](https://github.com/mohamed-rekiba/arvel/commit/ef448f112f8cec077ab39cbea8e454f419b217da))
+* **mail:** attachment reads leave the event loop ([dbf7fc5](https://github.com/mohamed-rekiba/arvel/commit/dbf7fc52964411c6687489727e7502112097b632))
+* **queue:** a filtered broker delivery is parked durably, never dropped ([d357a82](https://github.com/mohamed-rekiba/arvel/commit/d357a82a83cb4773d28bbda68b175eb33ed52788))
+* **validation:** one 422 error contract for both engines ([47e45f5](https://github.com/mohamed-rekiba/arvel/commit/47e45f5e501a5a49b91dd9e25b626be4c323c96d))
+
+
+### Refactors
+
+* **contracts:** one typed model-host contract replaces the mixin ignore clusters ([e5fed29](https://github.com/mohamed-rekiba/arvel/commit/e5fed29f367244dec4ced6c4897b5ba37e4522e4))
+
 ## [0.56.0](https://github.com/mohamed-rekiba/arvel/compare/v0.55.2...v0.56.0) (2026-07-06)
 
 
