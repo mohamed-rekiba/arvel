@@ -172,6 +172,17 @@ class PasswordBroker:
         return PasswordResetStatus.RESET_SUCCESS
 
 
+async def clear_expired_tokens(ttl_seconds: int = DEFAULT_TTL_SECONDS) -> int:
+    """Delete reset rows older than ``ttl_seconds`` and return the count — the sweep behind
+    the ``auth:clear-resets`` command (rows are otherwise only removed when their owner
+    retries). Resolved from the container by the console, keeping the console import-light."""
+    from arvel.dates import Date
+
+    cutoff = Date.now().subtract(seconds=ttl_seconds)
+    result = await PasswordResetToken.where("created_at", "<", cutoff).delete()
+    return int(result.rowcount)
+
+
 __all__ = [
     "DEFAULT_THROTTLE_SECONDS",
     "DEFAULT_TTL_SECONDS",
@@ -180,4 +191,5 @@ __all__ = [
     "PasswordResetRequested",
     "PasswordResetStatus",
     "PasswordResetToken",
+    "clear_expired_tokens",
 ]
