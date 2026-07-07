@@ -1,4 +1,4 @@
-"""arvel.activitylog — an activity log / audit trail, modelled on the Spatie-style activitylog.
+"""arvel.activitylog — an activity log / audit trail.
 
 Two ways in:
 - ``activity()`` — a fluent logger for *any* event: ``await activity().caused_by(user)
@@ -7,16 +7,47 @@ Two ways in:
   the changed attributes (``{old, attributes}``) in the activity's ``properties``. That auto-log
   *is* the audit trail; ``activity()`` is the broader event stream around it.
 
-Activities are rows in the ``activity_log`` table (the:class:`Activity` model). Not part of the
-original ch-08 port spec — added on request, following the Spatie design.
+Group related entries with :func:`activity_batch` (a shared ``batch_uuid``); silence logging for a
+bulk operation with :func:`without_activity_logging`. Activities are rows in the ``activity_log``
+table (the :class:`Activity` model).
 """
 
 from __future__ import annotations
 
+import contextlib
+import uuid
+from collections.abc import Generator
+from contextvars import ContextVar
 from typing import Any, ClassVar, cast
 
 from arvel.contracts import ModelHost
 from arvel.database import Model
+
+_batch_uuid: ContextVar[str | None] = ContextVar("arvel_activity_batch", default=None)
+_disabled: ContextVar[bool] = ContextVar("arvel_activity_disabled", default=False)
+
+
+@contextlib.contextmanager
+def activity_batch() -> Generator[str]:
+    """Every activity logged inside the block shares one ``batch_uuid``, so a single logical
+    operation's audit entries can be retrieved together. Yields the batch id."""
+    batch = str(uuid.uuid4())
+    token = _batch_uuid.set(batch)
+    try:
+        yield batch
+    finally:
+        _batch_uuid.reset(token)
+
+
+@contextlib.contextmanager
+def without_activity_logging() -> Generator[None]:
+    """Suppress all activity logging — manual and model auto-log — within the block; logging
+    resumes on exit."""
+    token = _disabled.set(True)
+    try:
+        yield
+    finally:
+        _disabled.reset(token)
 
 
 class Activity(Model):
@@ -70,14 +101,14 @@ class ActivityLogger:
         return self
 
     def performed_on(self, subject: Any) -> ActivityLogger:
-        """The subject the activity is *about* (Spatie ``performedOn`` / ``on``)."""
+        """The subject the activity is *about* (``performed_on`` / ``on``)."""
         self._subject = subject
         return self
 
     on = performed_on
 
     def caused_by(self, causer: Any) -> ActivityLogger:
-        """Who caused the activity (Spatie ``causedBy`` / ``by``). Defaults to the auth user."""
+        """Who caused the activity (``caused_by`` / ``by``). Defaults to the auth user."""
         self._causer = causer
         return self
 
@@ -102,8 +133,11 @@ class ActivityLogger:
 
         return current_user.get()
 
-    async def log(self, description: str) -> Activity:
-        """Persist and return the:class:`Activity`."""
+    async def log(self, description: str) -> Activity | None:
+        """Persist and return the :class:`Activity` — or ``None`` when logging is disabled
+        (see :func:`without_activity_logging`)."""
+        if _disabled.get():
+            return None
         subject_type, subject_id = _identify(self._subject)
         causer_type, causer_id = _identify(self._resolve_causer())
         return await Activity.create(
@@ -115,11 +149,12 @@ class ActivityLogger:
             causer_id=causer_id,
             event=self._event,
             properties=self._properties,
+            batch_uuid=_batch_uuid.get(),
         )
 
 
 def activity(log_name: str = "default") -> ActivityLogger:
-    """Start a fluent activity log entry (Spatie ``activity()``)."""
+    """Start a fluent activity log entry."""
     return ActivityLogger(log_name)
 
 
@@ -173,4 +208,11 @@ class LogsActivity(ModelHost):
         return result
 
 
-__all__ = ["Activity", "ActivityLogger", "LogsActivity", "activity"]
+__all__ = [
+    "Activity",
+    "ActivityLogger",
+    "LogsActivity",
+    "activity",
+    "activity_batch",
+    "without_activity_logging",
+]
