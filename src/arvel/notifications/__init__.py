@@ -55,6 +55,16 @@ class NotificationSent:
     response: Any
 
 
+@dataclass
+class AppriseMessage:
+    """A title/body message for the push channels (Slack/Discord/Telegram/…). ``notify_type`` is
+    one of ``info``/``success``/``warning``/``failure`` (drives the target's colour/icon)."""
+
+    body: str
+    title: str = ""
+    notify_type: str = "info"
+
+
 class Notification:
     """Base notification: override ``via`` + the per-channel ``to_*`` builders."""
 
@@ -74,6 +84,18 @@ class Notification:
 
     def apprise_urls(self, notifiable: Any) -> list[str]:
         return []
+
+    def to_apprise(self, notifiable: Any) -> AppriseMessage:
+        """The message for the push channels — override for a real title/body. The default derives
+        them from ``to_array()``: a ``subject``/``title`` key becomes the title, a
+        ``body``/``message``/``greeting`` key the body, otherwise the payload renders as
+        ``key: value`` lines instead of a raw stringified dict."""
+        data = self.to_array(notifiable)
+        title = str(data.get("subject") or data.get("title") or type(self).__name__)
+        body = data.get("body") or data.get("message") or data.get("greeting")
+        if body is None:
+            body = "\n".join(f"{key}: {value}" for key, value in data.items())
+        return AppriseMessage(body=str(body) or type(self).__name__, title=title)
 
     def should_send(self, notifiable: Any, channel: str) -> bool:
         """Consulted before EACH channel send; ``False`` skips that channel silently (no error, no
@@ -179,8 +201,10 @@ class NotificationManager(Manager):
             urls = self._route(notifiable, channel, None) or notification.apprise_urls(notifiable)
             for url in urls:
                 client.add(url)
-            body = str(notification.to_array(notifiable) or type(notification).__name__)
-            return await client.async_notify(body=body)
+            message = notification.to_apprise(notifiable)
+            return await client.async_notify(
+                body=message.body, title=message.title, notify_type=message.notify_type
+            )
 
         return _Channel(_send)
 
@@ -404,6 +428,7 @@ def __getattr__(name: str) -> Any:
 
 __all__ = [
     "AnonymousNotifiable",
+    "AppriseMessage",
     "BroadcastNotification",
     "DatabaseNotification",
     "Notifiable",
