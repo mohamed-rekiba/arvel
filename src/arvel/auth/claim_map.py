@@ -52,3 +52,6 @@ def roles_for_claims(
         else:
             roles.update(mapped)
     return roles
+
+
+__all__ = ["roles_for_claims"]

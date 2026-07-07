@@ -59,3 +59,6 @@ async def logout_everywhere(user: Any) -> None:
     audit("auth.logout_everywhere", tokenable_id=tokenable_id, failures=len(errors))
     if errors:
         raise ExceptionGroup("logout_everywhere: some credentials were not revoked", errors)
+
+
+__all__ = ["logout_everywhere"]

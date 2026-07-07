@@ -27,3 +27,6 @@ def audit(event: str, *, level: str = "info", **fields: Any) -> None:
         from arvel.support.facades import Log
 
         getattr(Log.channel("security"), level)(event, **fields)
+
+
+__all__ = ["audit"]

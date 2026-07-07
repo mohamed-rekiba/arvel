@@ -25,3 +25,4 @@ htmlcov/
 .coverage.json
 .claude/
 .aios/
+.repowise/

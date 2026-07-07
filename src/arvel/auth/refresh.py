@@ -77,3 +77,11 @@ async def rotate_refresh_token(plaintext: str) -> tuple[str, int] | None:
         return None
     new_plaintext = await issue_refresh_token(record.tokenable_id)
     return new_plaintext, record.tokenable_id
+
+
+__all__ = [
+    "RefreshToken",
+    "issue_refresh_token",
+    "revoke_all_refresh_tokens",
+    "rotate_refresh_token",
+]

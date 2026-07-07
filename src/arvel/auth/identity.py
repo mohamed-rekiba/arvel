@@ -168,3 +168,13 @@ class DbIdentityStore:
         record = await AuthIdentity.where(provider=provider, subject=subject).first()
         if record is not None and record.user_id == user.id:
             await record.delete()
+
+
+__all__ = [
+    "AuthIdentity",
+    "DbIdentityStore",
+    "IdentityStore",
+    "LastCredentialError",
+    "Principal",
+    "UserProvider",
+]
