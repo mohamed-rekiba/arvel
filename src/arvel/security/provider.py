@@ -22,6 +22,18 @@ def _require_key() -> str:
     return str(key)
 
 
+def _previous_keys() -> list[str]:
+    """Retired app keys (config ``app.previous_keys`` — APP_PREVIOUS_KEYS, comma-separated).
+    Decryption falls back across them, so rotating APP_KEY doesn't break existing
+    ciphertext; encryption always uses the current key."""
+    raw = config("app.previous_keys", None)
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        return [part.strip() for part in raw.split(",") if part.strip()]
+    return [str(part) for part in raw]
+
+
 class SecurityServiceProvider(ServiceProvider):
     def register(self) -> None:
         def make_hasher(_app: Container) -> Hasher:
@@ -30,7 +42,7 @@ class SecurityServiceProvider(ServiceProvider):
             return Hasher(driver, **options)
 
         def make_encrypter(_app: Container) -> Encrypter:
-            return Encrypter(_require_key())
+            return Encrypter(_require_key(), *_previous_keys())
 
         def make_signer(_app: Container) -> Signer:
             return Signer(_require_key())
