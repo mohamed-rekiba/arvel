@@ -73,3 +73,41 @@ def test_registered_in_command_manifest() -> None:
     assert (
         LazyGroup.commands_manifest["vendor:publish"] == "arvel.console.publish:vendor_publish_app"
     )
+
+
+def test_publish_reports_nothing_to_publish_when_no_provider_registered_anything(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _publish(Application(), None, False)  # no provider ran: app.published is empty
+    assert "nothing to publish" in capsys.readouterr().out
+
+
+def test_publish_warns_on_a_missing_source_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    app = _app_publishing({str(tmp_path / "does-not-exist.txt"): str(tmp_path / "out.txt")})
+    _publish(app, None, False)
+    out = capsys.readouterr().out
+    assert "WARNING" in out and "source not found" in out
+    assert not (tmp_path / "out.txt").exists()
+
+
+def test_vendor_publish_command_runs_the_handler_via_run_app_command(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import asyncio
+
+    import arvel.console.kernel as kernel_module
+    from arvel.console.publish import vendor_publish
+
+    src = tmp_path / "src.txt"
+    src.write_text("hi")
+    dest = tmp_path / "out.txt"
+    app = _app_publishing({str(src): str(dest)})
+
+    def fake_run_app_command(handler: object) -> None:
+        asyncio.run(handler(app))  # type: ignore[operator]
+
+    monkeypatch.setattr(kernel_module, "run_app_command", fake_run_app_command)
+    vendor_publish(tag=None, force=False)
+    assert dest.read_text() == "hi"
