@@ -103,6 +103,7 @@ class Builder:
         self._eager_constraints: dict[str, Any] = {}  # per-relation constrained eager load (D2)
         self._lock: str | None = None
         self._aggregates: list[Any] = []  # labeled scalar subqueries (with_count/with_sum)
+        self._unions: list[tuple[str, Any]] = []  # ("union" | "union_all", other's SELECT core)
 
     def __getattr__(self, name: str) -> Any:
         # local scopes: a model method `scope_<name>` becomes callable as `.<name>(...)`
@@ -217,18 +218,81 @@ class Builder:
         elif len(args) == 3:
             self._add(self._comparison(args[0], args[1], args[2]), connector)
 
+    def _grouped_clause(self, callback: Callable[[Builder], Any]) -> Any:
+        """Run ``callback`` against a fresh sub-builder over this same table, then fold its
+        accumulated conditions into one clause — parenthesized when compiled, since ``and_()``/
+        ``or_()`` always emit their own parens. Powers the nested-closure where-group idiom:
+        ``where(lambda q: q.where(...).or_where(...))``."""
+        nested = Builder(self._table, self._resolver, self._hydrate, self._model)
+        callback(nested)
+        return nested.combined_where()
+
     def where(self, *args: Any, **kwargs: Any) -> Self:
+        if len(args) == 1 and not kwargs and callable(args[0]):
+            clause = self._grouped_clause(args[0])
+            if clause is not None:
+                self._add(clause, "and")
+            return self
         self._apply_conditions(args, kwargs, "and")
         return self
 
     def or_where(self, *args: Any, **kwargs: Any) -> Self:
+        if len(args) == 1 and not kwargs and callable(args[0]):
+            clause = self._grouped_clause(args[0])
+            if clause is not None:
+                self._add(clause, "or")
+            return self
         self._apply_conditions(args, kwargs, "or")
+        return self
+
+    def where_not(self, *args: Any, connector: str = "and") -> Self:
+        """Negate a closure group (``where_not(lambda q: q.where(...).or_where(...))``) or a
+        plain column condition — 2-arg ``where_not("status", "active")`` (implies ``=``) or
+        3-arg ``where_not("price", ">", 100)``."""
+        import sqlalchemy as sa
+
+        if len(args) == 1 and callable(args[0]):
+            clause = self._grouped_clause(args[0])
+        elif len(args) == 2:
+            clause = self._where_column(args[0]) == self._bind(args[1])
+        elif len(args) == 3:
+            clause = self._comparison(args[0], args[1], args[2])
+        else:
+            raise TypeError(
+                "where_not() expects a closure, or (column, value) / (column, operator, value)"
+            )
+        if clause is not None:
+            self._add(sa.not_(clause), connector)
+        return self
+
+    def where_any(
+        self, columns: Sequence[str], operator: str, value: Any, *, connector: str = "and"
+    ) -> Self:
+        """``col1 op value OR col2 op value OR ...`` as one group — e.g.
+        ``where_any(["title", "body"], "like", "%needle%")`` (search across columns)."""
+        import sqlalchemy as sa
+
+        self._add(sa.or_(*(self._comparison(c, operator, value) for c in columns)), connector)
+        return self
+
+    def where_all(
+        self, columns: Sequence[str], operator: str, value: Any, *, connector: str = "and"
+    ) -> Self:
+        """``col1 op value AND col2 op value AND ...`` as one group."""
+        import sqlalchemy as sa
+
+        self._add(sa.and_(*(self._comparison(c, operator, value) for c in columns)), connector)
         return self
 
     def where_in(self, column: str, values: Sequence[Any] | Select[Any]) -> Self:
         """``WHERE col IN (...)``. ``values`` is a list **or a subquery** ``Select`` (``whereIn('id', $subquery)``) — pass ``sa.select(other.c.id)`` to filter DB-side without
         materializing the id list in the app (e.g. ``where_in('id', select(retrievable.c.id))``)."""
-        self._add(self._where_column(column).in_(values))
+        import sqlalchemy as sa
+
+        # same value adaptation as the 3-arg where() path (e.g. Date -> UTC stdlib datetime) —
+        # a bare list binds each value; a Select subquery passes through untouched.
+        bound = values if isinstance(values, sa.Select) else [self._bind(v) for v in values]
+        self._add(self._where_column(column).in_(bound))
         return self
 
     def where_not_in(self, column: str, values: Sequence[Any] | Select[Any]) -> Self:
@@ -464,26 +528,31 @@ class Builder:
 
         key = column or (self._model.__primary_key__ if self._model is not None else "id")
         base_wheres = list(self._wheres)
+        base_order, base_limit = list(self._order), self._limit
         last: Any = (
             None  # no lower bound on the first page — works for string/uuid PKs, not just int
         )
-        while True:
-            bound = [("and", self._table.c[key] > last)] if last is not None else []
-            self._wheres = [*base_wheres, *bound]
-            self._order = [self._table.c[key].asc()]
-            self._limit = size
-            rows = await self.get()
-            if not rows:
-                return
-            outcome = callback(rows)
-            if inspect.isawaitable(outcome):
-                outcome = await outcome
-            if outcome is False:  # parity: the callback can stop the chunk walk early
-                return
-            tail = rows[-1]
-            last = tail._attributes[key] if hasattr(tail, "_attributes") else tail[key]
-            if len(rows) < size:
-                return
+        try:
+            while True:
+                bound = [("and", self._table.c[key] > last)] if last is not None else []
+                self._wheres = [*base_wheres, *bound]
+                self._order = [self._table.c[key].asc()]
+                self._limit = size
+                rows = await self.get()
+                if not rows:
+                    return
+                outcome = callback(rows)
+                if inspect.isawaitable(outcome):
+                    outcome = await outcome
+                if outcome is False:  # parity: the callback can stop the chunk walk early
+                    return
+                tail = rows[-1]
+                last = tail._attributes[key] if hasattr(tail, "_attributes") else tail[key]
+                if len(rows) < size:
+                    return
+        finally:
+            # parity with chunk(): don't leave the builder mutated for the caller's next use
+            self._wheres, self._order, self._limit = base_wheres, base_order, base_limit
 
     async def chunk(self, size: int, callback: Any) -> None:
         """Page through results in fixed-size **offset** batches, calling ``callback`` per chunk
@@ -769,6 +838,24 @@ class Builder:
         self._order_specs.append((column, direction))
         return self
 
+    def in_random_order(self) -> Self:
+        """Randomize row order (``ORDER BY random()`` — SQLAlchemy renders it as ``RAND()`` on
+        MySQL). Replaces any previously accumulated ordering, same as :meth:`reorder`."""
+        import sqlalchemy as sa
+
+        self._order = [sa.func.random()]
+        self._order_specs = []
+        return self
+
+    def reorder(self, column: str | None = None, direction: str = "asc") -> Self:
+        """Drop any accumulated ``ORDER BY`` (including :meth:`in_random_order`); with ``column``,
+        immediately set a fresh one (``order_by(column, direction)``)."""
+        self._order = []
+        self._order_specs = []
+        if column is not None:
+            self.order_by(column, direction)
+        return self
+
     def order_by_raw(self, sql: str) -> Self:
         """A raw ``ORDER BY`` expression, e.g. a ``CASE``/``FIELD()``
         custom ordering the structural ``order_by`` can't express. Not tracked in
@@ -819,6 +906,21 @@ class Builder:
     def from_cte(self, cte: Any) -> Self:
         """Re-source this builder onto a CTE/selectable (so ``.get()`` reads from it). D6."""
         self._table = cte
+        return self
+
+    # --- combining queries (SQL UNION) ---------------------------------------
+    def union(self, other: Builder) -> Self:
+        """Combine with ``other``'s rows, de-duplicated (SQL ``UNION``). ``order_by`` applies to
+        the *combined* result set (each dialect's own UNION-ordering rules apply — SQLite/Postgres/
+        MySQL all accept a plain column name). Not supported by ``cursor_paginate``: keyset seeking
+        needs one underlying table's ordering, which a union no longer has."""
+        self._unions.append(("union", other._select_core()))
+        return self
+
+    def union_all(self, other: Builder) -> Self:
+        """Like :meth:`union` but keeps duplicate rows — no dedup pass, so it's cheaper when the
+        two sides are already known to be disjoint."""
+        self._unions.append(("union_all", other._select_core()))
         return self
 
     # --- Core construct builders (G4: real statement objects, not strings) ---
@@ -874,6 +976,15 @@ class Builder:
 
     def to_select(self) -> Any:
         stmt = self._select_core()
+        if self._unions:
+            import sqlalchemy as sa
+
+            for kind, other_select in self._unions:
+                stmt = (
+                    sa.union_all(stmt, other_select)
+                    if kind == "union_all"
+                    else sa.union(stmt, other_select)
+                )
         for clause in self._order:
             stmt = stmt.order_by(clause)
         if self._limit is not None:
@@ -943,6 +1054,11 @@ class Builder:
         , which ignores ``$uniqueBy`` on MySQL too). An unrecognized dialect raises
         :class:`UnsupportedDriverOperation` rather than silently emitting the wrong SQL (A4)."""
         import importlib
+
+        from arvel.database.connections import WriteResult
+
+        if not rows:  # nothing to write — was an IndexError below on `rows[0]`
+            return WriteResult(rowcount=0)
 
         resolver = self._require_resolver()
         dialect = resolver.engine().dialect.name
@@ -1064,6 +1180,68 @@ class Builder:
 
     async def insert(self, values: dict[str, Any]) -> WriteResult:
         return await self._require_resolver().execute(self.to_insert(values))
+
+    async def insert_get_id(self, values: dict[str, Any]) -> Any:
+        """Insert one row and return its generated primary key."""
+        return (await self.insert(values)).primary_key
+
+    async def insert_or_ignore(self, rows: list[dict[str, Any]]) -> WriteResult:
+        """Insert ``rows``, silently skipping any that violate a unique/PK constraint —
+        dialect-aware like :meth:`upsert`: Postgres/SQLite emit ``ON CONFLICT DO NOTHING``,
+        MySQL/MariaDB emit ``INSERT IGNORE``. An unrecognized dialect raises
+        :class:`UnsupportedDriverOperation` rather than silently emitting the wrong SQL (A4)."""
+        import importlib
+
+        if not rows:
+            return WriteResult(rowcount=0)
+
+        resolver = self._require_resolver()
+        dialect = resolver.engine().dialect.name
+        if dialect in ("postgresql", "sqlite"):
+            dialect_dml: Any = importlib.import_module(f"sqlalchemy.dialects.{dialect}")
+            statement = dialect_dml.insert(self._table).values(rows).on_conflict_do_nothing()
+        elif dialect in ("mysql", "mariadb"):
+            from sqlalchemy.dialects.mysql import insert as mysql_insert
+
+            statement = mysql_insert(self._table).values(rows).prefix_with("IGNORE")
+        else:
+            raise UnsupportedDriverOperation(
+                f"insert_or_ignore() has no ON CONFLICT DO NOTHING/INSERT IGNORE implementation "
+                f"for the {dialect!r} dialect."
+            )
+        return await resolver.execute(statement)
+
+    async def increment(
+        self, column: str, amount: int = 1, extra: dict[str, Any] | None = None
+    ) -> WriteResult:
+        """Bulk ``UPDATE ... SET col = col + amount`` (plus any ``extra`` column writes) over
+        every row matching this query — one statement, no read-modify-write race."""
+        import sqlalchemy as sa
+
+        col = self._table.c[column]
+        # COALESCE so a NULL column increments from 0 rather than staying NULL (NULL + n = NULL)
+        values = {column: sa.func.coalesce(col, 0) + amount, **(extra or {})}
+        return await self.update(values)
+
+    async def decrement(
+        self, column: str, amount: int = 1, extra: dict[str, Any] | None = None
+    ) -> WriteResult:
+        return await self.increment(column, -amount, extra)
+
+    async def truncate(self) -> None:
+        """Empty the table. Postgres/MySQL run ``TRUNCATE TABLE`` (also resets any identity/
+        auto-increment counter); SQLite has no ``TRUNCATE``, so this falls back to an
+        unconditional ``DELETE FROM`` — the ``sqlite_sequence`` autoincrement counter is
+        **not** reset by that fallback (identity reset differs by dialect)."""
+        import sqlalchemy as sa
+
+        resolver = self._require_resolver()
+        engine = resolver.engine()
+        if engine.dialect.name == "sqlite":
+            await resolver.execute(sa.delete(self._table))
+            return
+        quoted = engine.dialect.identifier_preparer.quote(self._table.name)
+        await resolver.execute(sa.text(f"TRUNCATE TABLE {quoted}"))
 
     async def update(self, values: dict[str, Any]) -> WriteResult:
         if (
