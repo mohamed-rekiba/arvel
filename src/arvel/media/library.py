@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
-from arvel.database import Model
+from arvel.database import Model, morph_type_of
 
 if TYPE_CHECKING:
     from arvel.media import Image
@@ -140,7 +140,7 @@ class MediaAdder:
         media_model: type[Media] = model.__media_model__
         existing = await model.get_media(collection)
         media = await media_model.create(
-            model_type=type(model).__name__,
+            model_type=morph_type_of(type(model)),
             model_id=model.id,
             collection_name=collection,
             name=self._name,
@@ -209,7 +209,7 @@ class HasMedia:
             in_collection.sort(key=lambda m: m.order_column)
             return in_collection
         rows = await (
-            self.__media_model__.where(model_type=type(self).__name__)
+            self.__media_model__.where(model_type=morph_type_of(type(self)))
             .where(model_id=self.id)  # type: ignore[attr-defined]
             .where(collection_name=collection)
             .order_by("order_column")
@@ -237,7 +237,7 @@ class HasMedia:
         media = await media_model.find(media_id)
         if (
             media is None
-            or media.model_type != type(self).__name__
+            or media.model_type != morph_type_of(type(self))
             or media.model_id != getattr(self, "id", None)
         ):
             return False

@@ -48,7 +48,9 @@ def _identify(thing: Any) -> tuple[str | None, Any]:
     if thing is None:
         return None, None
     pk_name = cast("str", getattr(thing, "__primary_key__", "id"))
-    return type(thing).__name__, getattr(thing, pk_name, None)
+    from arvel.database import morph_type_of
+
+    return morph_type_of(type(thing)), getattr(thing, pk_name, None)
 
 
 class ActivityLogger:

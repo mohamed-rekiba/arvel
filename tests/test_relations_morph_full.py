@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from arvel.database import ConnectionResolver, Model
+from arvel.database import ConnectionResolver, Model, morph_map
 
 
 class Tag(Model):
@@ -35,6 +35,8 @@ class Account(Model):
     def image(self) -> object:
         return self.morph_one(Image, "imageable")
 
+
+morph_map({"Post": Post, "Account": Account})
 
 _md = sa.MetaData()
 taggables = sa.Table(
