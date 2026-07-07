@@ -101,6 +101,33 @@ class Video:
     def streams_info(self) -> list[dict[str, Any]]:
         return [{"type": stream.type} for stream in self._container.streams]
 
+    def frame_at(self, seconds: float = 0.0) -> Image:
+        """Decode a single frame at ~``seconds`` into the video as an :class:`Image` — a poster or
+        thumbnail. Seeks to the nearest preceding keyframe, so the frame is at or just before
+        ``seconds``. CPU-bound (decode): offload it off the event loop on a request path."""
+        stream = self._container.streams.video[0]
+        if seconds > 0:
+            self._container.seek(int(seconds / stream.time_base), backward=True, stream=stream)
+        for frame in self._container.decode(stream):
+            return Image(frame.to_image())
+        raise ValueError("no decodable video frame")
+
+    def transcode(self, output_path: str, *, codec: str = "mpeg4", rate: int | None = None) -> None:
+        """Re-encode the video stream to ``output_path`` (container chosen by its extension) using
+        ``codec``. CPU-bound (a full decode/encode pass): offload it off the event loop."""
+        source = self._container.streams.video[0]
+        output = _av().open(output_path, mode="w")
+        try:
+            out_stream = output.add_stream(codec, rate=rate or source.average_rate or 25)
+            out_stream.width = source.width
+            out_stream.height = source.height
+            out_stream.pix_fmt = "yuv420p"
+            for frame in self._container.decode(source):
+                output.mux(out_stream.encode(frame))
+            output.mux(out_stream.encode())  # flush the encoder
+        finally:
+            output.close()
+
     def close(self) -> None:
         self._container.close()
 
