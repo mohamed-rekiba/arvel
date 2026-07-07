@@ -332,3 +332,118 @@ async def test_after_hook_does_not_fire_on_a_lost_one_server_tick() -> None:
     await asyncio.gather(a.run(), b.run())
     assert ran == ["ran"]  # exactly one ran
     assert after == ["after"]  # ...and after fired exactly once, not on the lost tick
+
+
+# --- 6.2c: maintenance-mode gating ----------------------------------------------------------
+
+
+async def test_maintenance_mode_skips_a_task_that_did_not_opt_in() -> None:
+    from arvel.cache.provider import CacheServiceProvider
+    from arvel.http.maintenance import down, up
+    from arvel.kernel import Application, set_application
+
+    app = Application()
+    CacheServiceProvider(app).register()
+    set_application(app)
+    try:
+        ran: list[str] = []
+        event = Schedule().call(lambda: ran.append("ran")).every_minute()
+        await down()
+        try:
+            assert await event.run() is None
+        finally:
+            await up()
+        assert ran == []
+    finally:
+        set_application(None)
+
+
+async def test_even_in_maintenance_mode_still_runs() -> None:
+    from arvel.cache.provider import CacheServiceProvider
+    from arvel.http.maintenance import down, up
+    from arvel.kernel import Application, set_application
+
+    app = Application()
+    CacheServiceProvider(app).register()
+    set_application(app)
+    try:
+        ran: list[str] = []
+        event = Schedule().call(lambda: ran.append("ran")).every_minute().even_in_maintenance_mode()
+        await down()
+        try:
+            await event.run()
+        finally:
+            await up()
+        assert ran == ["ran"]
+    finally:
+        set_application(None)
+
+
+async def test_maintenance_mode_is_a_noop_check_without_an_active_app() -> None:
+    # no app bound at all -> nothing to consult -> runs normally, never crashes
+    ran: list[str] = []
+    event = Schedule().call(lambda: ran.append("ran")).every_minute()
+    await event.run()
+    assert ran == ["ran"]
+
+
+# --- 6.2a: same-tick tasks run concurrently, a slow one doesn't delay a sibling --------------
+
+
+async def test_run_due_runs_same_tick_events_concurrently() -> None:
+    import asyncio
+    import time
+
+    schedule = Schedule()
+    started: list[float] = []
+
+    async def _slow() -> None:
+        started.append(time.monotonic())
+        await asyncio.sleep(0.1)
+
+    async def _fast() -> None:
+        started.append(time.monotonic())
+
+    schedule.call(_slow).every_minute()
+    schedule.call(_fast).every_minute()
+
+    await schedule.run_due(datetime(2026, 1, 1, 0, 0))
+    assert len(started) == 2
+    assert max(started) - min(started) < 0.05  # both started at ~the same moment — not serialized
+
+
+async def test_a_slow_scheduled_command_does_not_delay_a_same_tick_sibling() -> None:
+    """6.2a's actual regression: `Schedule.command()` used to block the scheduler's own event
+    loop for the command's full duration — a sibling `Schedule.call()` due in the same tick would
+    have to wait behind it. Not anymore: the sibling starts near-immediately."""
+    import asyncio
+    import time
+
+    from arvel.console import Command
+    from arvel.kernel import Application, set_application
+
+    class SlowCommand(Command):
+        signature = "slow:cmd"
+
+        async def handle(self) -> None:
+            await asyncio.sleep(0.15)
+
+    app = Application()
+    app.command_classes.append(SlowCommand)
+    set_application(app)
+    try:
+        started: list[float] = []
+
+        async def _fast() -> None:
+            started.append(time.monotonic())
+
+        schedule = Schedule()
+        schedule.command("slow:cmd").every_minute()
+        schedule.call(_fast).every_minute()
+
+        before = time.monotonic()
+        await schedule.run_due(datetime(2026, 1, 1, 0, 0))
+        assert started[0] - before < 0.05  # the fast sibling ran near-immediately, not queued
+        # behind the slow command — a generous margin against the 0.15s the command takes
+    finally:
+        set_application(None)

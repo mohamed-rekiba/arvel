@@ -2,7 +2,8 @@
 
 Also wires the events ``ShouldQueue`` rail (A2): ``queue_dispatcher`` is the contract seam
 ``events.Dispatcher`` calls to enqueue a ``ShouldQueue`` listener — events sits below queue in the
-module DAG and must not import it directly, so the queue side of the rail is bound here.
+module DAG and must not import it directly, so the queue side of the rail is bound here. Same
+story for ``broadcast_dispatcher`` (5.7): a ``ShouldBroadcast`` event's default queued delivery.
 """
 
 from __future__ import annotations
@@ -51,6 +52,17 @@ class QueueServiceProvider(ServiceProvider):
             return dispatch_listener
 
         self.app.singleton("queue_dispatcher", make_queue_dispatcher)
+
+        def make_broadcast_dispatcher(app: Container) -> Callable[[Any], Awaitable[Any]]:
+            async def dispatch_broadcast(event: Any) -> Any:
+                from arvel.queue.broadcast import CallQueuedBroadcast
+
+                job = CallQueuedBroadcast.for_event(event)
+                return await app.make("queue").push_instance(job)
+
+            return dispatch_broadcast
+
+        self.app.singleton("broadcast_dispatcher", make_broadcast_dispatcher)
 
     def boot(self) -> None:
         """No-op."""

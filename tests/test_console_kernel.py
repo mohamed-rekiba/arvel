@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -265,3 +266,61 @@ async def test_cli_call_works_from_inside_a_running_event_loop(app: Application)
     exit_code = Cli.call("greet2", {"name": "Grace"})  # called from an async test = running loop
     assert exit_code == 0
     assert ran == ["Grace"]
+
+
+# --- 6.2a: run_app_command_async / run_command_class_async ------------------------------------
+
+
+async def test_run_app_command_async_awaits_directly_no_thread_bridge(app: Application) -> None:
+    from arvel.console.kernel import run_app_command_async
+
+    seen: list[Any] = []
+
+    async def handler(booted: Any) -> None:
+        seen.append(booted)
+
+    await run_app_command_async(handler)
+    assert seen == [app]
+
+
+async def test_run_app_command_async_without_an_active_app_raises() -> None:
+    from arvel.console.kernel import run_app_command_async
+
+    async def handler(_app: Any) -> None: ...
+
+    with pytest.raises(RuntimeError, match="already-active application"):
+        await run_app_command_async(handler)
+
+
+async def test_run_app_command_still_bridges_through_a_thread_when_called_synchronously(
+    app: Application,
+) -> None:
+    # run_app_command itself is unchanged for its existing (sync) callers — it now delegates to
+    # run_app_command_async internally, but still via `_run_to_completion`'s thread bridge.
+    from arvel.console.kernel import run_app_command
+
+    seen: list[Any] = []
+
+    async def handler(booted: Any) -> None:
+        seen.append(booted)
+
+    run_app_command(handler)
+    assert seen == [app]
+
+
+async def test_run_command_class_async_dispatches_via_run_app_command_async(
+    app: Application,
+) -> None:
+    from arvel.console import Command
+    from arvel.console.kernel import run_command_class_async
+
+    seen: dict[str, object] = {}
+
+    class Ping(Command):
+        signature = "ping {--force}"
+
+        async def handle(self) -> None:
+            seen["force"] = self.option("force")
+
+    await run_command_class_async(Ping, force=True)
+    assert seen == {"force": True}

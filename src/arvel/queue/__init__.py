@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib
+from collections.abc import Iterable
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
@@ -491,12 +492,29 @@ class _WorkerOptions:
     detection). ``None`` on the manager outside an active ``work()`` call, so dispatch paths that
     reuse ``_invoke`` (e.g. release-due, a same-process ``dispatch``) are unaffected."""
 
-    __slots__ = ("last_tick_processed", "max_jobs", "processed", "rest", "stop_when_empty")
+    __slots__ = (
+        "last_tick_processed",
+        "max_jobs",
+        "processed",
+        "queues",
+        "rest",
+        "stop_when_empty",
+    )
 
-    def __init__(self, *, max_jobs: int | None, rest: float, stop_when_empty: bool) -> None:
+    def __init__(
+        self,
+        *,
+        max_jobs: int | None,
+        rest: float,
+        stop_when_empty: bool,
+        queues: list[str] | None = None,
+    ) -> None:
         self.max_jobs = max_jobs
         self.rest = rest
         self.stop_when_empty = stop_when_empty
+        #: `work(queues=[...])` — the named queues this run consumes, in priority order
+        #: (`None` = every queue). See `QueueManager._invoke`/`release_due_jobs`.
+        self.queues = queues
         self.processed = 0
         self.last_tick_processed = 0
 
@@ -651,10 +669,25 @@ class QueueManager(Manager):
             self._worker_stop.set()
         return options.rest
 
-    async def _invoke(self, job: Job) -> Any:
+    async def _invoke(self, job: Job, *, queue_label: str | None = None) -> Any:
         import asyncio
 
         from arvel.queue.middleware import JobShouldBeReleased, ShouldBeUnique, unique_lock_for
+
+        options = self._worker_options
+        if options is not None and options.queues is not None:
+            # the *actual* routed queue (from the broker message's own labels, passed by
+            # `_runner`'s task) when known — a per-dispatch `queue=` override (e.g.
+            # `dispatch_after(..., queue=...)`) isn't visible on `type(job)` alone, only on the
+            # message that carried it; falls back to the class-based resolution for a direct
+            # `_invoke` call with no message context (e.g. a test, or `_release_for_retry`'s
+            # inline retry path).
+            label = queue_label if queue_label is not None else self._queue_label(type(job), None)
+            if label not in options.queues:
+                # this worker's `work(queues=[...])` doesn't consume `label` — never run it (a
+                # clean empty poll), the receive-time safety net for any broker that can't filter
+                # at the network level itself (see `release_due_jobs`/`work`'s docstring).
+                return None
 
         batch_id = getattr(job, "__arvel_batch__", None)
         if batch_id is not None:
@@ -726,11 +759,24 @@ class QueueManager(Manager):
 
     def _runner(self) -> Any:
         if self._task is None:
+            from taskiq import Context, TaskiqDepends
+
             manager = self
+            # `dependency=Context` explicitly (rather than an annotation taskiq would have to
+            # resolve) — this module's own `from __future__ import annotations` turns the
+            # parameter annotation into a string, and `Context` is only ever imported lazily
+            # here, never at module scope, so taskiq couldn't look it up by name. Built once,
+            # outside the `def` (not a call in the default itself), so ruff's B008 doesn't flag it.
+            context_dependency = TaskiqDepends(Context)
 
             @self.broker.task  # type: ignore[untyped-decorator]  # broker is Any (lazy taskiq)
-            async def _run_job(payload: str) -> Any:
-                return await manager._invoke(await deserialize_any(payload))
+            async def _run_job(payload: str, context: Any = context_dependency) -> Any:
+                # `context.message.labels["queue"]` is the *actual* queue this message was routed
+                # to (set by `.with_labels(queue=label)` at push time) — `work(queues=[...])`'s
+                # filter (`_invoke`) needs this, not a class-level re-derivation, since a
+                # per-dispatch `queue=` override only ever lives on the message, never on the job.
+                label = context.message.labels.get("queue")
+                return await manager._invoke(await deserialize_any(payload), queue_label=label)
 
             self._task = _run_job
         return self._task
@@ -837,6 +883,19 @@ class QueueManager(Manager):
         Backs ``arvel queue:work``. For production scale, run taskiq's own worker process
         against the broker; this is the convenient in-process equivalent.
 
+        ``queues`` restricts this run to those named queues, consumed in the given priority
+        order — a due row in the durable ``jobs`` table (delayed dispatch, B1 retry-release) is
+        released queue-by-queue in that order (all of ``queues[0]``'s due rows before any of
+        ``queues[1]``'s); a queue not named is left completely alone (another worker may be
+        listening to it). Any job that still reaches this worker for a queue it isn't consuming
+        (in-process/direct dispatch, or a broker whose network-level routing can't filter by
+        queue — e.g. the ``memory`` broker, which runs a job inline at dispatch time rather than
+        through a receive loop) is dropped without running (``_invoke``'s own check) — a clean
+        empty poll, never a crash. **Broker-native queue routing** (e.g. AMQP's per-queue
+        consumers) isn't wired up in this pass — the ``jobs``-table release order above is what
+        actually delivers "priority order" today, for every driver alike; ``None`` (the default)
+        consumes every queue, as before.
+
         Worker flags: ``max_jobs`` stops after N jobs processed;
         ``max_time`` stops after S seconds; ``stop_when_empty`` stops once idle (no job has run and
         nothing was due across a release tick, checked after at least one job has run);
@@ -865,7 +924,7 @@ class QueueManager(Manager):
 
         finish = asyncio.Event()  # the single stop signal: flags, signals, and taskiq's Receiver
         self._worker_options = _WorkerOptions(
-            max_jobs=max_jobs, rest=rest, stop_when_empty=stop_when_empty
+            max_jobs=max_jobs, rest=rest, stop_when_empty=stop_when_empty, queues=queues
         )
         self._worker_stop = finish
 
@@ -943,7 +1002,8 @@ class QueueManager(Manager):
             released = 0
             if has_application() and app().bound("db"):
                 try:
-                    released = await self.release_due_jobs()
+                    queues = self._worker_options.queues if self._worker_options else None
+                    released = await self.release_due_jobs(queues=queues)
                 except Exception:
                     # a transient DB hiccup must not kill the worker — but a permanently
                     # broken DB silently stalling delayed/retry jobs must be visible
@@ -1017,17 +1077,32 @@ class QueueManager(Manager):
                     .update({"reserved_at": None})
                 )
 
-    async def release_due_jobs(self, now: int | None = None) -> int:
+    async def release_due_jobs(
+        self, now: int | None = None, *, queues: list[str] | None = None
+    ) -> int:
         """Reclaim any visibility-timed-out reservations, then push every stored job whose
         ``available_at`` has passed onto the broker and delete its row. Returns how many were
-        released. A worker (``queue:work``) / scheduler calls this periodically."""
+        released. A worker (``queue:work``) / scheduler calls this periodically.
+
+        ``queues`` (from an active ``work(queues=[...])`` run) restricts + orders release to
+        those queues: a due row on a queue not named is left untouched (another worker may
+        consume it), and the rest are released **queue-by-queue in the given order** — every due
+        row for ``queues[0]`` before any of ``queues[1]``'s — the priority cadence for the
+        durable jobs table (see ``work``'s docstring)."""
         import time
 
         from arvel.queue.jobs import QueuedJob
 
         moment = now if now is not None else int(time.time())
         await self._reclaim_stuck_jobs(moment)
-        due = await QueuedJob.where("available_at", "<=", moment).where_null("reserved_at").get()
+        due: Iterable[Any] = (
+            await QueuedJob.where("available_at", "<=", moment).where_null("reserved_at").get()
+        )
+        if queues is not None:
+            priority = {name: index for index, name in enumerate(queues)}
+            due = sorted(
+                (row for row in due if row.queue in priority), key=lambda r: priority[r.queue]
+            )
         released = 0
         for row in due:
             # Atomic claim: rowcount == 1 means this worker won the row; 0 means another worker

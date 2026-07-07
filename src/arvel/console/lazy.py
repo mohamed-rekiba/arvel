@@ -68,6 +68,7 @@ class LazyGroup(TyperGroup):
         "route:list": "arvel.console.routes:route_list_app",
         "openapi:export": "arvel.console.openapi:openapi_export_app",
         "schedule:run": "arvel.console.schedule:schedule_app",
+        "schedule:work": "arvel.console.schedule:work_app",
         "auth:clear-resets": "arvel.console.auth_maintenance:auth_maintenance_app",
         "shell": "arvel.console.shell:shell_app",
         "tinker": "arvel.console.shell:shell_app",  # alias for shell, Tinker style
