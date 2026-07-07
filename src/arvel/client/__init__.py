@@ -12,13 +12,15 @@ from __future__ import annotations
 import asyncio
 import copy
 import fnmatch
+import inspect
 import json as _json
 import weakref
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, cast
 
 import httpx
 
+from arvel.support import Sleep
 from arvel.telemetry import span
 
 # --- exceptions -----------------------------------------------------------------
@@ -36,6 +38,11 @@ class RequestFailed(Exception):
 class StrayRequest(Exception):
     """Raised when ``Http.fake(...)`` has ``prevent_stray_requests()`` set and a request is made
     to a URL that matches none of the faked patterns."""
+
+
+class FakeSequenceExhausted(Exception):
+    """Raised when a URL faked with a **sequence** of responses (``Http.fake({url: [r1, r2]})``)
+    is called more times than the sequence has entries."""
 
 
 # --- dotted-key json access -------------------------------------------------------
@@ -123,6 +130,15 @@ class ClientResponse:
             raise RequestFailed(self)
         return self
 
+    def throw_if(self, condition: bool | Callable[[ClientResponse], bool]) -> ClientResponse:
+        """Raise ``RequestFailed`` when ``condition`` is (or resolves to) truthy — a plain bool,
+        or a predicate over this response — regardless of status; ``.throw()`` is the
+        ``failed()``-only shortcut. Returns ``self`` (chainable) when it doesn't raise."""
+        truthy = condition(self) if callable(condition) else condition
+        if truthy:
+            raise RequestFailed(self)
+        return self
+
 
 # --- retry policy -------------------------------------------------------------------
 
@@ -156,6 +172,9 @@ class PendingRequest:
         self._retry_times: int = 0
         self._retry_sleep_ms: int = 0
         self._retry_when: Callable[[Exception | ClientResponse], bool] | None = None
+        self._retry_backoff: Sequence[float] | Callable[[int], float] | None = None
+        self._retry_throw: bool = True
+        self._on_error: Callable[[Exception | ClientResponse], Any] | None = None
         self._send_mode: str | None = None  # None | "form" | "multipart"
         self._files: list[tuple[str, Any]] = []
         self._auth: httpx.Auth | None = None
@@ -217,20 +236,42 @@ class PendingRequest:
         sleep_ms: int = 0,
         *,
         when: Callable[[Exception | ClientResponse], bool] | None = None,
+        backoff: Sequence[float] | Callable[[int], float] | None = None,
+        throw: bool = True,
     ) -> PendingRequest:
-        """Attempt the request up to ``times`` times total, sleeping ``sleep_ms`` between
-        attempts. Retries connect errors and 5xx responses by default; ``when(exc_or_response)``
-        overrides that policy. Raises when every attempt is retry-worthy (the last exception, or
-        ``RequestFailed`` for a persistent bad-status response).
+        """Attempt the request up to ``times`` times total, sleeping between attempts. Retries
+        connect errors and 5xx responses by default; ``when(exc_or_response)`` overrides that
+        policy.
+
+        ``backoff`` (seconds) overrides the flat ``sleep_ms`` wait: a sequence gives an explicit
+        per-attempt delay (``[0.1, 0.5]`` — the last entry repeats if there are more retries than
+        entries); a callable ``backoff(attempt)`` (1-based) computes it, e.g. exponential
+        (``lambda attempt: 0.1 * 2**attempt``).
+
+        ``throw=False`` returns the last response once every attempt is exhausted instead of
+        raising ``RequestFailed`` — a connect/timeout exception still raises either way (there's
+        no response to return). Default (``throw=True``): raises when every attempt is
+        retry-worthy (the last exception, or ``RequestFailed`` for a persistent bad-status
+        response).
 
         Note: a custom ``when`` that stays truthy on a *successful* response (e.g. content-based
-        polling) still raises ``RequestFailed`` once ``times`` is exhausted, even though the final
-        response is 2xx — exhaustion-with-``when`` always raises. Inspect the returned response
-        instead if you want to poll without an exception."""
+        polling) still raises/returns-as-exhausted once ``times`` is exhausted, even though the
+        final response is 2xx — exhaustion-with-``when`` is always treated as exhausted. Inspect
+        the returned response instead if you want to poll without an exception."""
         clone = self._clone()
         clone._retry_times = times
         clone._retry_sleep_ms = sleep_ms
         clone._retry_when = when
+        clone._retry_backoff = backoff
+        clone._retry_throw = throw
+        return clone
+
+    def on_error(self, hook: Callable[[Exception | ClientResponse], Any]) -> PendingRequest:
+        """Register ``hook(exc_or_response)``, called on every retry-worthy attempt (before the
+        sleep, including the final exhausted one) — logging/telemetry per attempt, not just the
+        overall outcome. ``hook`` may be sync or async."""
+        clone = self._clone()
+        clone._on_error = hook
         return clone
 
     def as_form(self) -> PendingRequest:
@@ -314,6 +355,16 @@ class PendingRequest:
         ) as client:
             return await client.request(method, url, **send_kwargs)
 
+    def _backoff_seconds(self, attempt: int) -> float:
+        """Seconds to sleep after the just-completed (1-based) ``attempt``, before the next one."""
+        if self._retry_backoff is not None:
+            if callable(self._retry_backoff):
+                return float(self._retry_backoff(attempt))
+            sequence = self._retry_backoff
+            index = min(attempt - 1, len(sequence) - 1)
+            return float(sequence[index])
+        return self._retry_sleep_ms / 1000
+
     async def _send_with_retry(
         self, method: str, url: str, kwargs: dict[str, Any]
     ) -> httpx.Response:
@@ -332,15 +383,27 @@ class PendingRequest:
                 last_exc = exc
                 last_response = None
                 retry_worthy = should_retry(exc)
+            if retry_worthy and self._on_error is not None:
+                outcome: Exception | ClientResponse = (
+                    last_exc if last_exc is not None else ClientResponse(cast("Any", last_response))
+                )
+                hook_result = self._on_error(outcome)
+                if inspect.isawaitable(hook_result):
+                    await hook_result
             if attempt == times or not retry_worthy:
                 break
-            if self._retry_sleep_ms:
-                await asyncio.sleep(self._retry_sleep_ms / 1000)
+            seconds = self._backoff_seconds(attempt)
+            if seconds:
+                await Sleep.asleep(seconds)
         if last_exc is not None:
             raise last_exc
         if last_response is None:  # invariant: the loop always ends with an exception or a response
             raise RuntimeError("retry loop produced neither a response nor an exception")
-        if self._retry_times > 0 and should_retry(ClientResponse(last_response)):
+        if (
+            self._retry_times > 0
+            and self._retry_throw
+            and should_retry(ClientResponse(last_response))
+        ):
             raise RequestFailed(ClientResponse(last_response))
         return last_response
 
@@ -445,23 +508,41 @@ class RecordedRequest:
 
 
 FakeHandler = Callable[[RecordedRequest], FakeResponse]
+FakeStub = FakeResponse | FakeHandler
 
 
 class _FakeState:
     """Per-``fake()`` state: the url-pattern → stub mapping, recorded requests, and the
-    ``prevent_stray_requests`` flag."""
+    ``prevent_stray_requests`` flag. A mapping value may also be a **sequence** of stubs
+    (``{url: [Http.response(...), Http.response(...)]}``): consecutive matching calls pop
+    successive entries; a call past the end raises :class:`FakeSequenceExhausted`."""
 
-    def __init__(self, mapping: Mapping[str, FakeResponse | FakeHandler] | None) -> None:
+    def __init__(self, mapping: Mapping[str, FakeStub | Sequence[FakeStub]] | None) -> None:
         self.mapping = mapping
         self.prevent_stray = False
         self.recorded: list[RecordedRequest] = []
+        # own mutable queues for the sequence-form patterns, so popping never mutates the
+        # caller's original list (a fake() can be re-entered with the same mapping object).
+        self._sequences: dict[str, list[FakeStub]] = {
+            pattern: list(cast("Sequence[FakeStub]", stub))
+            for pattern, stub in (mapping or {}).items()
+            if isinstance(stub, (list, tuple))
+        }
 
-    def _match(self, url: str) -> FakeResponse | FakeHandler | None:
+    def _match(self, url: str) -> FakeStub | None:
         if not self.mapping:
             return None
         for pattern, stub in self.mapping.items():
-            if fnmatch.fnmatch(url, pattern):
-                return stub
+            if not fnmatch.fnmatch(url, pattern):
+                continue
+            if pattern in self._sequences:
+                queue = self._sequences[pattern]
+                if not queue:
+                    raise FakeSequenceExhausted(
+                        f"Http.fake: the faked response sequence for {pattern!r} is exhausted."
+                    )
+                return queue.pop(0)
+            return cast("FakeStub", stub)
         return None
 
     async def handle(self, request: httpx.Request) -> httpx.Response:
@@ -583,8 +664,13 @@ class Client:
         sleep_ms: int = 0,
         *,
         when: Callable[[Exception | ClientResponse], bool] | None = None,
+        backoff: Sequence[float] | Callable[[int], float] | None = None,
+        throw: bool = True,
     ) -> PendingRequest:
-        return self._pending().retry(times, sleep_ms, when=when)
+        return self._pending().retry(times, sleep_ms, when=when, backoff=backoff, throw=throw)
+
+    def on_error(self, hook: Callable[[Exception | ClientResponse], Any]) -> PendingRequest:
+        return self._pending().on_error(hook)
 
     def as_form(self) -> PendingRequest:
         return self._pending().as_form()
@@ -626,22 +712,35 @@ class Client:
 
     # -- pool ---------------------------------------------------------------------
 
-    async def pool(self, callback: Callable[[PoolBuilder], list[Any]]) -> list[Any]:
+    async def pool(
+        self, callback: Callable[[PoolBuilder], list[Any]], *, max_concurrency: int | None = None
+    ) -> list[Any]:
         """Run the ``PendingRequest`` calls the callback queues concurrently on one shared
         connection; returns ordered results — a failed slot holds the exception, it isn't
-        raised."""
+        raised. ``max_concurrency`` caps how many of them are ever in flight at once (a
+        semaphore) — the rest wait their turn on the same shared connection."""
         async with httpx.AsyncClient(transport=self._current_transport()) as shared:
             builder = PoolBuilder(shared_client=shared)
             awaitables = callback(builder)
+            if max_concurrency is not None:
+                semaphore = asyncio.Semaphore(max_concurrency)
+
+                async def _bounded(coro: Any) -> Any:
+                    async with semaphore:
+                        return await coro
+
+                awaitables = [_bounded(coro) for coro in awaitables]
             return await asyncio.gather(*awaitables, return_exceptions=True)
 
     # -- fake + assertions ----------------------------------------------------------
 
-    def fake(self, mapping: Mapping[str, FakeResponse | FakeHandler] | None = None) -> _Fake:
+    def fake(self, mapping: Mapping[str, FakeStub | Sequence[FakeStub]] | None = None) -> _Fake:
         """Swap in a ``MockTransport`` (context manager + plain call; ``restore()`` undoes it).
-        ``mapping`` is ``{url_pattern: Http.response(...) | callable}`` with ``fnmatch`` wildcards
-        against the full URL; ``None`` fakes every request with a generic 200. Unmatched URLs pass
-        through to the real network unless ``prevent_stray_requests()`` is set."""
+        ``mapping`` is ``{url_pattern: Http.response(...) | callable | [stub, stub, ...]}`` with
+        ``fnmatch`` wildcards against the full URL; a list/tuple value is the **sequence form** —
+        consecutive matching calls pop successive entries, and a call past the end raises
+        :class:`FakeSequenceExhausted`. ``None`` fakes every request with a generic 200. Unmatched
+        URLs pass through to the real network unless ``prevent_stray_requests()`` is set."""
         self._fake_state = _FakeState(mapping)
         return _Fake(self)
 
@@ -698,6 +797,7 @@ __all__ = [
     "Client",
     "ClientResponse",
     "FakeResponse",
+    "FakeSequenceExhausted",
     "PendingRequest",
     "PoolBuilder",
     "RecordedRequest",

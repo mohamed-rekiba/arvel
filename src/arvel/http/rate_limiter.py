@@ -95,6 +95,13 @@ class RateLimiter:
             await self._cache.expire(key, decay_seconds)
         return int(count)
 
+    async def hit_with_ttl(self, key: str, decay_seconds: int = 60) -> int:
+        """Atomic ``hit``: increment-and-arm-the-window in one call via
+        :meth:`~arvel.cache.CacheRepository.increment_with_ttl`, so a caller that must decide
+        "over limit?" from the returned count (rather than a separate ``attempts`` read first)
+        never races a concurrent hit between the check and the increment."""
+        return int(await self._cache.increment_with_ttl(key, 1, decay_seconds))
+
     async def too_many_attempts(self, key: str, max_attempts: int) -> bool:
         """Whether ``key`` has already reached ``max_attempts`` within its current window."""
         return await self.attempts(key) >= max_attempts

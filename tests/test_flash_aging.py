@@ -78,6 +78,63 @@ def test_age_is_a_noop_on_an_empty_session() -> None:
     assert FlashBag(session).errors() == {}
 
 
+def test_reflash_extends_all_current_flash_data_one_more_request() -> None:
+    session: dict[str, Any] = {}
+    bag = FlashBag(session)
+    bag.flash("status", "ok")
+    bag.flash_errors({"email": ["Bad."]})
+    bag.age()  # start of "request 2": both are fresh → kept
+
+    assert bag.get("status") == "ok"
+    assert bag.errors() == {"email": ["Bad."]}
+    bag.reflash()  # extend everything for one more hop
+
+    bag.age()  # start of "request 3": reflashed → still kept
+    assert bag.get("status") == "ok"
+    assert bag.errors() == {"email": ["Bad."]}
+
+    bag.age()  # start of "request 4": not reflashed again → aged out
+    assert bag.get("status") is None
+    assert bag.errors() == {}
+
+
+def test_keep_extends_only_the_named_key() -> None:
+    session: dict[str, Any] = {}
+    bag = FlashBag(session)
+    bag.flash("a", "keep-me")
+    bag.flash("b", "let-me-go")
+    bag.age()  # request 2: both fresh → kept
+
+    bag.keep("a")  # only "a" survives past the next age()
+
+    bag.age()  # request 3
+    assert bag.get("a") == "keep-me"
+    assert bag.get("b") is None  # "b" wasn't kept — aged out on schedule
+
+
+def test_keep_accepts_a_list_of_keys() -> None:
+    session: dict[str, Any] = {}
+    bag = FlashBag(session)
+    bag.flash("a", "1")
+    bag.flash("b", "2")
+    bag.flash("c", "3")
+    bag.age()
+
+    bag.keep(["a", "b"])
+
+    bag.age()
+    assert bag.get("a") == "1"
+    assert bag.get("b") == "2"
+    assert bag.get("c") is None
+
+
+def test_keep_on_a_key_not_in_the_bag_is_a_harmless_no_op() -> None:
+    session: dict[str, Any] = {}
+    bag = FlashBag(session)
+    bag.keep("nothing-here")  # must not raise or create spurious session state
+    assert bag.all() == {}
+
+
 def test_reads_after_aging_leave_no_session_residue() -> None:
     """A read (get/has/all) must not re-create an empty ``_flash`` after the bag was aged empty —
     callers that snapshot the session (regeneration, exact-equality tests) must see only real data."""

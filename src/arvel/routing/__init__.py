@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Sequence
+    from collections.abc import Callable, Generator, Sequence
     from pathlib import Path
 
     from arvel.http.kernel import HttpKernel
@@ -115,6 +115,10 @@ class RouteDefinition:
         default_factory=list[str]
     )  # OpenAPI security schemes this route requires (e.g. "bearer")
     status_code: int | None = None  # explicit response status (else Litestar's per-method default)
+    wheres: dict[str, str] = field(default_factory=dict[str, str])  # param -> regex constraint
+    # custom response when a bound param fails to resolve
+    missing_callback: Callable[[Any], Any] | None = None
+    excluded_middleware: list[Any] = field(default_factory=list[Any])  # `.without_middleware()`
 
     def status(self, code: int) -> RouteDefinition:
         """Pin this route's success response status. Lets a
@@ -127,6 +131,25 @@ class RouteDefinition:
         """Attach per-route middleware.
         Runs after global + group middleware (global → group → route)."""
         self.middlewares.extend(mw)
+        return self
+
+    def without_middleware(self, *mw: Any) -> RouteDefinition:
+        """Exclude ``mw`` (a class, instance, or alias string) from the global/group/route stack
+        that would otherwise run for this route — e.g. a public route inside an otherwise
+        CSRF-protected ``web`` group."""
+        self.excluded_middleware.extend(mw)
+        return self
+
+    def where(self, param: str, pattern: str) -> RouteDefinition:
+        """Constrain ``{param}`` to match the regex ``pattern``; a request whose captured segment
+        doesn't match renders 404 instead of reaching the handler."""
+        self.wheres[param] = pattern
+        return self
+
+    def missing(self, callback: Callable[[Any], Any]) -> RouteDefinition:
+        """``callback(request)`` builds the response when this route's model binding (explicit or
+        implicit) fails to resolve, instead of the default 404."""
+        self.missing_callback = callback
         return self
 
     def secure(self, *schemes: str) -> RouteDefinition:
@@ -541,6 +564,9 @@ class Router:
                 name=route.name,
                 security=route.security,
                 status_code=route.status_code,
+                wheres=route.wheres,
+                missing=route.missing_callback,
+                without_middleware=route.excluded_middleware,
             )
         kernel.bindings.update(self._bindings)
 

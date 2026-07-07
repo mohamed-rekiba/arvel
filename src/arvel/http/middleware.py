@@ -258,12 +258,14 @@ class ThrottleRequests(Middleware):
         remaining = 0
         for limit in limits:
             key = f"{self._limiter_name}:{limit.decay_seconds}:{limit.key or _default_segment(request)}"
-            attempts_before = await limiter.attempts(key)
-            if attempts_before >= limit.max_attempts:
+            # atomic increment-then-compare (not attempts()-then-hit()): two concurrent requests
+            # both reading "under limit" before either increments would let more than
+            # max_attempts through — increment_with_ttl folds the check into the same atomic op.
+            count = await limiter.hit_with_ttl(key, limit.decay_seconds)
+            if count > limit.max_attempts:
                 retry_after = await limiter.available_in(key)
                 return await self._too_many_attempts_response(request, limit, retry_after)
-            await limiter.hit(key, limit.decay_seconds)
-            remaining = max(limit.max_attempts - attempts_before - 1, 0)
+            remaining = max(limit.max_attempts - count, 0)
 
         _RATE_LIMIT_HEADERS.set(
             {
@@ -658,6 +660,17 @@ class LocaleMiddleware(Middleware):
         return str(header).split(",")[0].split("-")[0].strip()
 
 
+def _configured_max_request_size(default: int = 10 * 1024 * 1024) -> int:
+    """``config('app.max_request_size')`` in bytes, falling back to ``default`` when unset/unbound
+    — the one source ``ValidatePostSize`` and ``MethodOverride`` both enforce, so the two never
+    disagree on the limit."""
+    from arvel.kernel import app, has_application
+
+    if has_application() and app().bound("config"):
+        return int(app("config").get("app.max_request_size", default))
+    return default
+
+
 class ValidatePostSize(Middleware):
     """Reject an over-large request body with **413** before the handler runs (``ValidatePostSize``). The limit is ``config('app.max_request_size')`` bytes (default 10 MiB);
     pass ``max_bytes`` to override. A missing/invalid ``Content-Length`` is not enforced here
@@ -671,11 +684,7 @@ class ValidatePostSize(Middleware):
     def _limit(self) -> int:
         if self.max_bytes is not None:
             return self.max_bytes
-        from arvel.kernel import app, has_application
-
-        if has_application() and app().bound("config"):
-            return int(app("config").get("app.max_request_size", self.DEFAULT_MAX))
-        return self.DEFAULT_MAX
+        return _configured_max_request_size(self.DEFAULT_MAX)
 
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         length = request.header("content-length")
@@ -782,6 +791,23 @@ def _form_method_override(ctype: str, body: bytes) -> str:
     return ""
 
 
+async def _send_413(send: Any) -> None:
+    """A bare ASGI 413 response — ``MethodOverride`` runs ahead of Litestar's own middleware
+    stack (where ``ValidatePostSize`` builds its ``Response``), so it must speak raw ASGI here."""
+    body = b'{"message": "Payload too large."}'
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 413,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode("latin-1")),
+            ],
+        }
+    )
+    await send({"type": "http.response.body", "body": body})
+
+
 class MethodOverride:
     """ASGI middleware for HTML form method-spoofing: a POST whose form body
     carries ``_method=PUT|PATCH|DELETE`` is **routed as that method**.
@@ -807,6 +833,19 @@ class MethodOverride:
         if not ctype.startswith(self._FORM_TYPES):
             await self.app(scope, receive, send)
             return
+
+        # check Content-Length against ValidatePostSize's own limit BEFORE buffering — otherwise
+        # an oversized body would be fully read into memory here, ahead of (and defeating) the
+        # 413 gate that's supposed to refuse it first.
+        length = headers.get(b"content-length")
+        if length is not None:
+            try:
+                too_large = int(length) > _configured_max_request_size(ValidatePostSize.DEFAULT_MAX)
+            except ValueError:
+                too_large = False
+            if too_large:
+                await _send_413(send)
+                return
 
         # buffer the request body so we can read _method, then replay it untouched downstream
         buffered: list[Any] = []

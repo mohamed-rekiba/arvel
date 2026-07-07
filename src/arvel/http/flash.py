@@ -81,6 +81,24 @@ class FlashBag:
             return dict(data)
         return data.get(key, default)
 
+    def keep(self, keys: str | list[str]) -> FlashBag:
+        """Re-flash only the named key(s) for one more request — ``.reflash()`` narrowed to
+        specific keys. Marks each fresh again (the same bookkeeping :meth:`flash` uses), so the
+        next :meth:`age` doesn't expire it; a name not currently in the bag is harmless (nothing to
+        keep)."""
+        for name in [keys] if isinstance(keys, str) else keys:
+            self._mark_fresh(name)
+        return self
+
+    def reflash(self) -> FlashBag:
+        """Re-flash ALL current flash data (and validation errors, if flashed) for exactly one
+        more request — call it during a request whose flashed data should survive past the next
+        :meth:`age` instead of expiring after this one."""
+        self.keep(list(self._read_bag()))
+        if self.ERRORS_KEY in self._session:
+            self.keep(self.ERRORS_KEY)
+        return self
+
     def age(self) -> None:
         """Drop flashes that are no longer fresh (shown last request), demoting the rest to stale.
 
