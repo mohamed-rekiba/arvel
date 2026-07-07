@@ -93,7 +93,7 @@ async def test_search_builds_filter_sort_limit_offset(engine: MeilisearchEngine)
     result = await engine.search(
         "articles",
         "python",
-        filters={"kind": "post"},
+        filters=[("kind", "=", "post")],
         sort=["n:asc"],
         limit=5,
         offset=10,
@@ -109,7 +109,7 @@ async def test_search_builds_filter_sort_limit_offset(engine: MeilisearchEngine)
 
 async def test_search_rejects_injection_in_filter_field(engine: MeilisearchEngine) -> None:
     with pytest.raises(ValueError, match="unsafe search filter field"):
-        await engine.search("articles", "x", filters={"kind OR 1=1": "post"})
+        await engine.search("articles", "x", filters=[("kind OR 1=1", "=", "post")])
 
 
 async def test_configure_declares_attributes(engine: MeilisearchEngine) -> None:

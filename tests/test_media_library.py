@@ -3,7 +3,10 @@ conversions (thumbnails)."""
 
 from __future__ import annotations
 
+from typing import Any
+
 import fsspec
+import pytest
 import sqlalchemy as sa
 
 from arvel import Attribute
@@ -239,6 +242,89 @@ async def test_custom_media_model_with_user_accessors() -> None:
         [loaded] = await gallery.get_media("images")
         assert isinstance(loaded, PostMedia)  # ...and on read
         assert loaded.thumb is not None
+    finally:
+        await db.dispose()
+
+
+class _FailingDisk:
+    """Wraps a real ``Filesystem``, raising on its ``put``'s ``fail_after``'th call — a
+    fault-injection stub for the write-then-row cleanup path. Records every successful ``put``
+    and ``delete`` so a test can assert the cleanup path deleted exactly what it wrote, without
+    depending on fsspec's process-wide "memory" filesystem being otherwise empty."""
+
+    def __init__(self, fs: Filesystem, *, fail_after: int) -> None:
+        self._fs = fs
+        self._fail_after = fail_after
+        self.put_calls = 0
+        self.written: list[str] = []
+        self.deleted: list[str] = []
+
+    async def put(self, path: str, contents: bytes) -> str:
+        self.put_calls += 1
+        if self.put_calls > self._fail_after:
+            raise OSError("disk full (fault injection)")
+        result = await self._fs.put(path, contents)
+        self.written.append(path)
+        return result
+
+    async def delete(self, path: str) -> bool:
+        self.deleted.append(path)
+        return await self._fs.delete(path)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._fs, name)
+
+
+class _FailingDisks:
+    def __init__(self, disk: _FailingDisk) -> None:
+        self._disk = disk
+
+    def disk(self, name: str | None = None) -> _FailingDisk:
+        return self._disk
+
+
+async def test_a_failed_original_write_leaves_no_orphan_row_or_file() -> None:
+    app = Application.configure().create()
+    fs = Filesystem(fsspec.filesystem("memory"))
+    failing = _FailingDisk(fs, fail_after=0)  # the very first put() (the original) raises
+    app.instance("filesystem", _FailingDisks(failing))
+    db = ConnectionResolver()
+    Media.set_connection(db)
+    Album.set_connection(db)
+    await db.execute(sa.schema.CreateTable(Media.__table__))
+    await db.execute(sa.schema.CreateTable(Album.__table__))
+    try:
+        album = await Album.create(title="trip")
+        with pytest.raises(OSError, match="disk full"):
+            await album.add_media(_png(), file_name="a.png").to_media_collection("images")
+
+        assert await album.get_media("images") == []  # no orphan row
+        assert failing.written == []  # the very first put failed before writing anything
+        assert failing.deleted == []  # nothing to clean up either
+    finally:
+        await db.dispose()
+
+
+async def test_a_failed_conversion_write_cleans_up_the_original_file_and_the_row() -> None:
+    app = Application.configure().create()
+    fs = Filesystem(fsspec.filesystem("memory"))
+    failing = _FailingDisk(fs, fail_after=1)  # the original succeeds; the conversion raises
+    app.instance("filesystem", _FailingDisks(failing))
+    db = ConnectionResolver()
+    Media.set_connection(db)
+    Album.set_connection(db)  # Album registers a "thumb" conversion
+    await db.execute(sa.schema.CreateTable(Media.__table__))
+    await db.execute(sa.schema.CreateTable(Album.__table__))
+    try:
+        album = await Album.create(title="trip")
+        with pytest.raises(OSError, match="disk full"):
+            await album.add_media(_png(), file_name="a.png").to_media_collection("images")
+
+        assert await album.get_media("images") == []  # no orphan row
+        # the original write (put #1) succeeded before the conversion write (put #2) raised —
+        # the cleanup path must have deleted it, not just left the row alone
+        assert failing.written == ["images/1/a.png"]
+        assert failing.deleted == ["images/1/a.png"]
     finally:
         await db.dispose()
 

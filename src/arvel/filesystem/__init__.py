@@ -9,6 +9,8 @@ to keep arvel async-first. fsspec is imported lazily. Grounded in knowledge/port
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import json
 import mimetypes
 from collections.abc import AsyncIterable, AsyncIterator
 from datetime import UTC, datetime, timedelta
@@ -166,6 +168,22 @@ class Filesystem:
         content = data.encode() if isinstance(data, str) else data
         existing = await self.get(path) if await self.exists(path) else b""
         return await self.put(path, content + existing)
+
+    async def json(self, path: str) -> Any:
+        """Read ``path`` and JSON-decode it."""
+        return json.loads(await self.get(path))
+
+    async def put_json(self, path: str, data: Any) -> str:
+        """JSON-encode ``data`` and store it at ``path``; returns the stored path."""
+        return await self.put(path, json.dumps(data))
+
+    async def checksum(self, path: str, algo: str = "sha256") -> str:
+        """Hex digest of ``path``'s content (``algo``: any name ``hashlib.new`` accepts) — streamed
+        in chunks so a large file isn't loaded into memory all at once."""
+        digest = hashlib.new(algo)
+        async for chunk in self.read_stream(path):
+            digest.update(chunk)
+        return digest.hexdigest()
 
     async def put_file(self, directory: str, file: Any, name: str | None = None) -> str:
         """Store an ``UploadedFile``-like object (or raw ``bytes``/``str``) under ``directory``;

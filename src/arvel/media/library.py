@@ -133,8 +133,14 @@ class MediaAdder:
     async def to_media_collection(
         self, collection: str = "default", *, disk: str = "default"
     ) -> Media:
-        """Store the file (and its conversions) on ``disk`` and record a:class:`Media` row."""
+        """Store the file (and its conversions) on ``disk`` and record a:class:`Media` row.
+
+        The row is created first (its id names the storage path — ``{collection}/{id}/...``), but
+        it's a reservation, not a commit: if any store write below fails, every file written so
+        far is cleaned up and the row itself is deleted, so a disk error never leaves an orphan
+        row (with no file) or an orphan file (with no row)."""
         from arvel.kernel import app
+        from arvel.telemetry import span
 
         model = self._model
         media_model: type[Media] = model.__media_model__
@@ -154,24 +160,36 @@ class MediaAdder:
         )
         filesystem = app("filesystem").disk(disk)
         base_dir = f"{collection}/{media.id}"
-        await filesystem.put(f"{base_dir}/{self._file_name}", self._contents)
+        written: list[str] = []
+        try:
+            original_path = f"{base_dir}/{self._file_name}"
+            with span("media store", kind="client", attributes={"media.op": "store"}):
+                await filesystem.put(original_path, self._contents)
+            written.append(original_path)
 
-        # Conversions are image transforms (PIL); non-image files are stored as-is, untouched.
-        conversions = model.register_media_conversions()
-        if conversions and self._is_image():
-            from anyio.to_thread import run_sync
+            # Conversions are image transforms (PIL); non-image files are stored as-is, untouched.
+            conversions = model.register_media_conversions()
+            if conversions and self._is_image():
+                from anyio.to_thread import run_sync
 
-            from arvel.media import Image
+                from arvel.media import Image
 
-            # PIL decode/transform is CPU-bound — keep it off the event loop
-            source = await run_sync(Image.open, self._contents)
-            generated: dict[str, str] = {}
-            for conversion in conversions:
-                path = f"{base_dir}/conversions/{conversion.name}.{conversion.fmt.lower()}"
-                await filesystem.put(path, await run_sync(conversion.apply, source))
-                generated[conversion.name] = path
-            media.generated_conversions = generated
-            await media.save()
+                # PIL decode/transform is CPU-bound — keep it off the event loop
+                source = await run_sync(Image.open, self._contents)
+                generated: dict[str, str] = {}
+                for conversion in conversions:
+                    path = f"{base_dir}/conversions/{conversion.name}.{conversion.fmt.lower()}"
+                    with span("media store", kind="client", attributes={"media.op": "store"}):
+                        await filesystem.put(path, await run_sync(conversion.apply, source))
+                    written.append(path)
+                    generated[conversion.name] = path
+                media.generated_conversions = generated
+                await media.save()
+        except Exception:
+            for path in written:
+                await filesystem.delete(path)
+            await media.delete()
+            raise
         return media
 
 
@@ -232,6 +250,7 @@ class HasMedia:
         conversions; Spatie ``deleteMedia`` parity). Returns ``False`` when the id isn't attached
         to THIS model, so a caller can never remove another model's media through it."""
         from arvel.kernel import app
+        from arvel.telemetry import span
 
         media_model = getattr(type(self), "__media_model__", Media)
         media = await media_model.find(media_id)
@@ -243,20 +262,21 @@ class HasMedia:
             return False
         disk = app("filesystem").disk(media.disk)
         for path in media.stored_paths():
-            if await disk.exists(path):
-                await disk.delete(path)
+            with span("media delete", kind="client", attributes={"media.op": "delete"}):
+                await disk.delete(path)  # already idempotent — no exists() round-trip needed
         await media.delete()
         return True
 
     async def clear_media_collection(self, collection: str = "default") -> None:
         """Delete every media item in ``collection`` (rows + stored files)."""
         from arvel.kernel import app
+        from arvel.telemetry import span
 
         for media in await self.get_media(collection):
             disk = app("filesystem").disk(media.disk)
             for path in media.stored_paths():
-                if await disk.exists(path):
-                    await disk.delete(path)
+                with span("media delete", kind="client", attributes={"media.op": "delete"}):
+                    await disk.delete(path)  # already idempotent
             await media.delete()
 
 

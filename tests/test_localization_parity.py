@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from arvel.localization import Translator
+import pytest
+
+from arvel.localization import TranslationMissingError, Translator
 
 
 def _t(line: str) -> Translator:
@@ -37,6 +39,31 @@ def test_choice_bounded_interval_selector() -> None:
     assert t.choice("k", 10) == "some"
     assert t.choice("k", 19) == "some"
     assert t.choice("k", 20) == "lots"
+
+
+# --- has() / get_or_fail() ----------------------------------------------------
+def test_has_is_true_for_a_present_key_and_false_for_a_miss() -> None:
+    t = _t("hello")
+    assert t.has("k") is True
+    assert t.has("missing") is False
+
+
+def test_has_checks_the_fallback_locale_too() -> None:
+    t = Translator({"en": {"k": "hello"}}, fallback="en")
+    assert t.has("k", locale="fr") is True  # absent in fr, present in the fallback
+    assert t.has("nope", locale="fr") is False
+
+
+def test_get_or_fail_returns_the_line_when_present() -> None:
+    t = _t("hi :name")
+    assert t.get_or_fail("k", {"name": "Bob"}) == "hi Bob"
+
+
+def test_get_or_fail_raises_on_a_real_miss_unlike_get() -> None:
+    t = _t("hello")
+    assert t.get("missing") == "missing"  # get() silently falls back to the key itself
+    with pytest.raises(TranslationMissingError, match="missing"):
+        t.get_or_fail("missing")
 
 
 def test_choice_low_star_and_star_high() -> None:

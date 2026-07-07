@@ -35,6 +35,19 @@ async def test_fake_mailer_assertions() -> None:
         mailer.assert_nothing_sent()
 
 
+async def test_fake_mailer_records_cc_bcc_and_assert_sent_predicate() -> None:
+    mailer = FakeMailer()
+    await mailer.to("a@x.com").cc("c@x.com").bcc("b@x.com").send(_MailA())
+    assert mailer.recipients == [{"to": ["a@x.com"], "cc": ["c@x.com"], "bcc": ["b@x.com"]}]
+
+    mailer.assert_sent(_MailA, lambda _m, r: "c@x.com" in r["cc"])
+    mailer.assert_sent(_MailA, count=1)
+    with pytest.raises(AssertionError):
+        mailer.assert_sent(_MailA, lambda _m, r: "nope@x.com" in r["cc"])
+    with pytest.raises(AssertionError):
+        mailer.assert_sent(_MailA, count=2)
+
+
 class _JobA: ...
 
 
@@ -56,6 +69,35 @@ async def test_fake_queue_push_and_dispatch_assertions() -> None:
         queue.assert_not_dispatched(_JobA)
 
 
+async def test_fake_queue_assert_pushed_with_fn_count_and_queue() -> None:
+    queue = FakeQueue()
+    await queue.push(_JobA, (1,), {"k": "v"}, queue="high")
+    await queue.push(_JobA, (2,), {"k": "w"}, queue="low")
+
+    queue.assert_pushed(_JobA, lambda n, k: n == 1, queue="high")
+    queue.assert_pushed(_JobA, count=2)
+    with pytest.raises(AssertionError):
+        queue.assert_pushed(_JobA, lambda n, k: n == 1, queue="low")  # wrong queue
+    with pytest.raises(AssertionError):
+        queue.assert_pushed(_JobA, count=1)  # actually 2
+
+
+def test_fake_queue_push_signature_pinned_against_the_real_push() -> None:
+    """A signature-drift contract test: FakeQueue.push must keep the same parameter names/kinds
+    as QueueManager.push, so a future real-push signature change can't silently drift the fake out
+    of sync (defaults are allowed to differ — the fake's are convenience-only)."""
+    import inspect
+
+    from arvel.queue import QueueManager
+
+    fake_params = list(inspect.signature(FakeQueue.push).parameters.values())[1:]  # drop self
+    real_params = list(inspect.signature(QueueManager.push).parameters.values())[1:]
+
+    fake_shape = [(p.name, p.kind) for p in fake_params]
+    real_shape = [(p.name, p.kind) for p in real_params]
+    assert fake_shape == real_shape
+
+
 class _EventA: ...
 
 
@@ -70,6 +112,17 @@ async def test_fake_events_dispatch_until_and_assert() -> None:
     events.assert_dispatched(_EventA)
     with pytest.raises(AssertionError):
         events.assert_dispatched(type("Missing", (), {}))
+
+
+async def test_fake_events_not_dispatched_and_nothing_dispatched() -> None:
+    events = FakeEvents()
+    events.assert_not_dispatched(_EventA)
+    events.assert_nothing_dispatched()
+    await events.dispatch(_EventA())
+    with pytest.raises(AssertionError):
+        events.assert_not_dispatched(_EventA)
+    with pytest.raises(AssertionError):
+        events.assert_nothing_dispatched()
 
 
 class _Notification:

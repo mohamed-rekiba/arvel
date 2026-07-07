@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from typer.testing import CliRunner
 
 from arvel.console import build_cli
-from arvel.database import ConnectionResolver, Model
+from arvel.database import ConnectionResolver, Model, SoftDeletes
 from arvel.search import MeilisearchEngine, Searchable, SearchManager
 
 pytestmark = pytest.mark.integration
@@ -99,6 +99,55 @@ async def test_save_updates_the_index_and_delete_removes_it(
 
         await article.delete()
         assert await MeiliArticle.search("async").get() == []
+    finally:
+        await db.dispose()
+
+
+class MeiliNote(Searchable, Model, SoftDeletes):
+    __table_name__ = "meili_notes"
+    __fields__: ClassVar = {"title": str}
+    __fillable__: ClassVar = ["title"]
+
+    @classmethod
+    def searchable_filterable(cls) -> list[str]:
+        return ["__soft_deleted"]
+
+
+async def test_soft_delete_model_keeps_trashed_docs_reachable_via_with_trashed(
+    configure_app: Any, meilisearch_url: dict[str, str]
+) -> None:
+    """search.soft_delete=True against a real Meilisearch server: a soft-deleted row stays
+    indexed (flagged), excluded by default, reachable via with_trashed()/only_trashed()."""
+    app = configure_app(
+        search={
+            "driver": "meilisearch",
+            "soft_delete": True,
+            "meilisearch": {"url": meilisearch_url["url"], "key": meilisearch_url["key"]},
+        }
+    )
+    app.singleton("search", lambda a: SearchManager(a))
+    db = ConnectionResolver()
+    MeiliNote.set_connection(db)
+    await db.execute(sa.schema.CreateTable(MeiliNote.__table__))
+    with contextlib.suppress(Exception):
+        await app.make("search").flush(MeiliNote.searchable_as())
+    await app.make("search").configure(
+        MeiliNote.searchable_as(), filterable=MeiliNote.searchable_filterable(), sortable=[]
+    )
+    try:
+        note = await MeiliNote.create(title="secret note")
+        await note.delete()  # soft — kept indexed, flagged
+
+        assert await MeiliNote.search("secret").get() == []
+        assert [n.title for n in await MeiliNote.search("secret").with_trashed().get()] == [
+            "secret note"
+        ]
+        assert [n.title for n in await MeiliNote.search("secret").only_trashed().get()] == [
+            "secret note"
+        ]
+
+        await note.restore()
+        assert [n.title for n in await MeiliNote.search("secret").get()] == ["secret note"]
     finally:
         await db.dispose()
 

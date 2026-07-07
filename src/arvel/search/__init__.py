@@ -6,18 +6,29 @@ goes through the configured engine (``config('search.driver')``, default ``array
 optional driver behind the ``[search]`` extra. Engines are resolved by ``SearchManager`` (the
 ``arvel.support.manager.Manager`` strategy base).
 
-``Model.search(query)`` returns a fluent:class:`SearchBuilder` (``where``/``order_by``/``take``/
-``get``/``first``/``paginate``/``keys``/``raw``) — Scout parity. Index writes normally happen
-inline on save/delete; setting ``search.queue = True`` instead emits a:class:`ModelIndexRequested`
-event through the events dispatcher (see ``arvel.search.listeners`` for the provided listener) so
-the write moves off the ``Searchable`` call path — the queue-seam story (no ``arvel.queue`` import
-here; that back-edge is forbidden by the G1 layer contract).
+``Model.search(query)`` returns a fluent:class:`SearchBuilder` (``where``/``where_in``/
+``where_not_in``/``order_by``/``take``/``get``/``first``/``paginate``/``simple_paginate``/
+``keys``/``raw``) — Scout parity. Index writes normally happen inline on save/delete; setting
+``search.queue = True`` instead emits a:class:`ModelIndexRequested` event through the events
+dispatcher (see ``arvel.search.listeners`` for the provided listener) so the write moves off the
+``Searchable`` call path — the queue-seam story (no ``arvel.queue`` import here; that back-edge is
+forbidden by the G1 layer contract).
+
+Soft-delete model (``search.soft_delete = True``): a soft-deleted record stays indexed with a
+``__soft_deleted`` flag instead of being removed — ``SearchBuilder`` filters it out by default,
+``with_trashed()`` includes it, ``only_trashed()`` filters to it alone. A force-delete (or a
+soft-delete with the flag off) still removes the record from the index entirely. Override
+``should_be_searchable()`` to skip indexing on save (returning ``False`` also removes an
+already-indexed record); wrap writes in ``Model.without_syncing()`` to suspend index sync for a
+block.
 
 Not part of the original ch-08 port spec — added on request as a first-party search module.
 """
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import enum
 import json
 import re
@@ -30,13 +41,26 @@ from arvel.kernel import Settings
 from arvel.support.manager import Manager, MissingExtraError
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Generator, Mapping, Sequence
 
-    from arvel.pagination import LengthAwarePaginator
+    from arvel.pagination import LengthAwarePaginator, Paginator
 
 #: The field a hit's index key is carried under in every engine's search payload (both
 #: ``ArrayEngine`` and ``MeilisearchEngine`` inject it) — the builder reads it back to hydrate.
 _KEY_FIELD = "_key"
+
+#: The flag field a soft-deleted record's index entry carries when ``search.soft_delete`` is on.
+_SOFT_DELETED_FIELD = "__soft_deleted"
+
+#: Sentinel for ``SearchBuilder.where``'s optional 3rd positional arg — distinguishes the
+#: two-arg equality form (``where(field, value)``) from the three-arg operator form
+#: (``where(field, operator, value)``), since ``None`` is itself a legitimate filter value.
+_NO_VALUE: Any = object()
+
+#: A search filter clause: ``(field, operator, value)``. ``"in"``/``"not in"`` take a sequence
+#: for ``value``; every other operator takes a scalar.
+type FilterOp = Literal["=", "!=", ">", ">=", "<", "<=", "in", "not in"]
+SearchFilter = tuple[str, FilterOp, Any]
 
 
 class _JSONEncoder(json.JSONEncoder):
@@ -60,6 +84,7 @@ class SearchSettings(Settings):
     __config_key__ = "search"
     driver: str = "array"  # engine name (open registry → str)
     queue: bool = False  # True: save/delete emit ModelIndexRequested instead of an inline write
+    soft_delete: bool = False  # True: a soft-deleted record stays indexed, flagged, not removed
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,7 +106,7 @@ class SearchEngine(Protocol):
         index: str,
         query: str,
         *,
-        filters: Mapping[str, Any] | None = None,
+        filters: Sequence[SearchFilter] | None = None,
         sort: Sequence[str] | None = None,
         limit: int | None = None,
         offset: int | None = None,
@@ -93,6 +118,33 @@ class SearchEngine(Protocol):
 
 
 _Hit = tuple[Any, dict[str, Any]]
+
+
+def _matches_filter(record: dict[str, Any], clause: SearchFilter) -> bool:
+    """Whether ``record`` satisfies one filter clause — a missing field reads as ``None``, so
+    ``!=``/``not in`` naturally include records that never had the field (used by the soft-delete
+    default scope: ``__soft_deleted != True`` matches both ``False`` and absent)."""
+    field, op, value = clause
+    actual = record.get(field)
+    if op == "=":
+        return bool(actual == value)
+    if op == "!=":
+        return bool(actual != value)
+    if op == "in":
+        return actual in cast("Sequence[Any]", value)
+    if op == "not in":
+        return actual not in cast("Sequence[Any]", value)
+    if actual is None:  # ordering ops on an absent/None field never match
+        return False
+    if op == ">":
+        return bool(actual > value)
+    if op == ">=":
+        return bool(actual >= value)
+    if op == "<":
+        return bool(actual < value)
+    if op == "<=":
+        return bool(actual <= value)
+    raise ValueError(f"unsupported search filter operator: {op!r}")
 
 
 def _sorted(hits: list[_Hit], sort: Sequence[str]) -> list[_Hit]:
@@ -129,7 +181,7 @@ class ArrayEngine:
         index: str,
         query: str,
         *,
-        filters: Mapping[str, Any] | None = None,
+        filters: Sequence[SearchFilter] | None = None,
         sort: Sequence[str] | None = None,
         limit: int | None = None,
         offset: int | None = None,
@@ -144,7 +196,7 @@ class ArrayEngine:
             matched = [
                 (key, record)
                 for key, record in matched
-                if all(record.get(field) == value for field, value in filters.items())
+                if all(_matches_filter(record, clause) for clause in filters)
             ]
         if sort:
             matched = _sorted(matched, sort)
@@ -189,6 +241,22 @@ def _filter_value(value: Any) -> str:
     # json.dumps yields a correctly-escaped double-quoted string (control chars, quotes, backslashes)
     # that the engine's filter grammar accepts — repr() would mis-encode "\n"/"\t" etc.
     return json.dumps(str(value))
+
+
+_OP_RENDER = {"=": "=", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<="}
+
+
+def _render_filter(clause: SearchFilter) -> str:
+    """One ``SearchFilter`` clause as a Meilisearch filter-expression fragment."""
+    field, op, value = clause
+    fld = _safe_field(field)
+    if op == "in":
+        values = ", ".join(_filter_value(v) for v in cast("Sequence[Any]", value))
+        return f"{fld} IN [{values}]"
+    if op == "not in":
+        values = ", ".join(_filter_value(v) for v in cast("Sequence[Any]", value))
+        return f"NOT {fld} IN [{values}]"
+    return f"{fld} {_OP_RENDER[op]} {_filter_value(value)}"
 
 
 class MeilisearchEngine:
@@ -236,7 +304,7 @@ class MeilisearchEngine:
         index: str,
         query: str,
         *,
-        filters: Mapping[str, Any] | None = None,
+        filters: Sequence[SearchFilter] | None = None,
         sort: Sequence[str] | None = None,
         limit: int | None = None,
         offset: int | None = None,
@@ -245,12 +313,10 @@ class MeilisearchEngine:
 
         options: dict[str, Any] = {}
         if filters:
-            # equality filters only (scope of this story); values are repr()'d into Meilisearch's
-            # filter-expression syntax. Field names are interpolated raw, so guard them: only a
-            # bare identifier is allowed — never request-derived free text (filter-injection).
-            options["filter"] = [
-                f"{_safe_field(field)} = {_filter_value(value)}" for field, value in filters.items()
-            ]
+            # values are repr()'d into Meilisearch's filter-expression syntax. Field names are
+            # interpolated raw, so guard them: only a bare identifier is allowed — never
+            # request-derived free text (filter-injection).
+            options["filter"] = [_render_filter(clause) for clause in filters]
         if sort:
             options["sort"] = list(sort)
         if limit is not None:
@@ -305,7 +371,7 @@ class SearchManager(Manager):
     ``array``. Forwards unknown attributes to the default driver (``Manager`` base)."""
 
     def default_driver(self) -> str:
-        return SearchSettings().driver  # auto-loads + validates config("search")
+        return self._settings(SearchSettings).driver  # auto-loads + validates config("search")
 
     def create_array_driver(self) -> ArrayEngine:
         return ArrayEngine()
@@ -331,6 +397,13 @@ class ModelIndexRequested:
     model_class: type[Any]
     key: Any
     record: dict[str, Any] | None
+
+
+#: Suspends index sync for the duration of a ``Searchable.without_syncing()`` block — a plain
+#: ContextVar (not per-model) since the reference ``withoutSyncingToSearch`` suspends every model.
+_syncing_suspended: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "arvel_search_syncing_suspended", default=False
+)
 
 
 class Searchable(ModelHost):
@@ -363,6 +436,22 @@ class Searchable(ModelHost):
         """The index document key — the model's primary key by default."""
         return getattr(self, type(self).__primary_key__)
 
+    def should_be_searchable(self) -> bool:
+        """Whether this record should be in the index at all (default: always). Returning
+        ``False`` on save skips indexing it — and removes it, if it was already indexed."""
+        return True
+
+    @classmethod
+    @contextlib.contextmanager
+    def without_syncing(cls) -> Generator[None]:
+        """``with Model.without_syncing(): ...`` — suspend index sync (save/delete/restore) for
+        every ``Searchable`` model for the duration of the block."""
+        token = _syncing_suspended.set(True)
+        try:
+            yield
+        finally:
+            _syncing_suspended.reset(token)
+
     @staticmethod
     def _search_engine() -> Any:
         from arvel.kernel import app, has_application
@@ -377,7 +466,10 @@ class Searchable(ModelHost):
 
     async def _sync_to_index(self, record: dict[str, Any] | None) -> None:
         """Write ``record`` (``None`` = delete) to the index — inline by default, or via a
-        :class:`ModelIndexRequested` event when ``search.queue`` is enabled."""
+        :class:`ModelIndexRequested` event when ``search.queue`` is enabled. A no-op entirely
+        inside :meth:`without_syncing`."""
+        if _syncing_suspended.get():
+            return
         if SearchSettings().queue:
             dispatcher = self._events_dispatcher()
             if dispatcher is None:
@@ -399,12 +491,23 @@ class Searchable(ModelHost):
             await engine.index(self.searchable_as(), self.get_search_key(), record)
 
     async def searchable(self) -> None:
-        """Index (or re-index) this record now (respects ``search.queue``)."""
-        await self._sync_to_index(self.to_searchable_array())
+        """Index (or re-index) this record now (respects ``search.queue``). Stamps the
+        ``__soft_deleted`` flag (cleared) when ``search.soft_delete`` is enabled, so the flag is
+        always present and the builder's default equality filter matches consistently."""
+        record = self.to_searchable_array()
+        if SearchSettings().soft_delete:
+            record = {**record, _SOFT_DELETED_FIELD: False}
+        await self._sync_to_index(record)
 
     async def unsearchable(self) -> None:
         """Remove this record from the index now (respects ``search.queue``)."""
         await self._sync_to_index(None)
+
+    async def _mark_trashed_in_index(self) -> None:
+        """Re-index this record flagged ``__soft_deleted`` (kept, not removed) — the
+        ``search.soft_delete`` model's soft-delete write."""
+        record = {**self.to_searchable_array(), _SOFT_DELETED_FIELD: True}
+        await self._sync_to_index(record)
 
     @classmethod
     async def make_all_searchable(cls) -> int:
@@ -431,9 +534,20 @@ class Searchable(ModelHost):
 
     async def _fire(self, hook: str) -> Any:
         result: Any = await super()._fire(hook)
+        # "trashed"/"force_deleted" fire alongside (not instead of) the generic "deleted" hook —
+        # see ``Model.delete``/``force_delete`` — so those two, not "deleted", are what tell a soft
+        # delete (keep flagged, per search.soft_delete) apart from an actual removal.
         if hook == "saved":
-            await self.searchable()
-        elif hook == "deleted":
+            if self.should_be_searchable():
+                await self.searchable()
+            else:  # no longer wanted in the index — drop it if it was already there
+                await self.unsearchable()
+        elif hook == "trashed":
+            if SearchSettings().soft_delete:
+                await self._mark_trashed_in_index()
+            else:
+                await self.unsearchable()
+        elif hook == "force_deleted":
             await self.unsearchable()
         elif hook == "restored":
             # restoring a soft-deleted model makes it searchable again (reference parity)
@@ -444,22 +558,44 @@ class Searchable(ModelHost):
 class SearchBuilder[M: Searchable]:
     """Fluent search-query builder returned by ``Model.search(query)``.
 
-    ``where``/``order_by``/``take`` build up the query; ``get``/``first``/``paginate`` run it and
-    hydrate hits back into models (by primary key, preserving the engine's result order — a
-    ``whereIn(pk, keys)`` fetch, mirroring); ``keys``/``raw`` skip hydration for the raw
-    engine keys/payload. Soft-deleted models are excluded unless ``with_trashed()`` was called."""
+    ``where``/``where_in``/``where_not_in``/``order_by``/``take`` build up the query;
+    ``get``/``first``/``paginate``/``simple_paginate`` run it and hydrate hits back into models (by
+    primary key, preserving the engine's result order — a ``whereIn(pk, keys)`` fetch, mirroring);
+    ``keys``/``raw`` skip hydration for the raw engine keys/payload. When ``search.soft_delete`` is
+    on, soft-deleted models are excluded by default — ``with_trashed()`` includes them,
+    ``only_trashed()`` selects only them."""
 
     def __init__(self, model_cls: type[M], query: str) -> None:
         self._model_cls = model_cls
         self._query = query
-        self._filters: dict[str, Any] = {}
+        self._filters: list[SearchFilter] = []
         self._sort: list[str] = []
         self._limit: int | None = None
         self._with_trashed = False
+        self._only_trashed = False
 
-    def where(self, field: str, value: Any) -> SearchBuilder[M]:
-        """Add an equality filter (Meilisearch: ``field`` must be declared filterable)."""
-        self._filters[field] = value
+    def where(self, field: str, operator_or_value: Any, value: Any = _NO_VALUE) -> SearchBuilder[M]:
+        """Add a filter clause. Two-arg form is equality (``where("kind", "post")``); three-arg
+        form takes an explicit comparison operator (``where("views", ">", 10)``) — one of
+        ``=``/``!=``/``>``/``>=``/``<``/``<=`` (Meilisearch: ``field`` must be declared
+        filterable)."""
+        if value is _NO_VALUE:
+            op: FilterOp = "="
+            val = operator_or_value
+        else:
+            op = cast("FilterOp", operator_or_value)
+            val = value
+        self._filters.append((field, op, val))
+        return self
+
+    def where_in(self, field: str, values: Sequence[Any]) -> SearchBuilder[M]:
+        """Filter to hits whose ``field`` is one of ``values``."""
+        self._filters.append((field, "in", list(values)))
+        return self
+
+    def where_not_in(self, field: str, values: Sequence[Any]) -> SearchBuilder[M]:
+        """Filter out hits whose ``field`` is one of ``values``."""
+        self._filters.append((field, "not in", list(values)))
         return self
 
     def order_by(self, field: str, direction: Literal["asc", "desc"] = "asc") -> SearchBuilder[M]:
@@ -477,6 +613,20 @@ class SearchBuilder[M: Searchable]:
         self._with_trashed = True
         return self
 
+    def only_trashed(self) -> SearchBuilder[M]:
+        """Only soft-deleted models (requires ``search.soft_delete``)."""
+        self._only_trashed = True
+        return self
+
+    def _effective_filters(self) -> list[SearchFilter]:
+        filters = list(self._filters)
+        if SearchSettings().soft_delete:
+            if self._only_trashed:
+                filters.append((_SOFT_DELETED_FIELD, "=", True))
+            elif not self._with_trashed:
+                filters.append((_SOFT_DELETED_FIELD, "!=", True))
+        return filters
+
     async def _search(self, *, limit: int | None, offset: int | None) -> SearchResult:
         engine = cast("Any", self._model_cls)._search_engine()
         if engine is None:
@@ -487,7 +637,7 @@ class SearchBuilder[M: Searchable]:
             await engine.search(
                 index,
                 self._query,
-                filters=self._filters or None,
+                filters=self._effective_filters() or None,
                 sort=self._sort or None,
                 limit=limit,
                 offset=offset,
@@ -508,7 +658,12 @@ class SearchBuilder[M: Searchable]:
             return []
         keys = [hit[_KEY_FIELD] for hit in hits]
         model_cls = cast("Any", self._model_cls)
-        query = model_cls.with_trashed() if self._with_trashed else model_cls.query()
+        if self._only_trashed:
+            query = model_cls.only_trashed()
+        elif self._with_trashed:
+            query = model_cls.with_trashed()
+        else:
+            query = model_cls.query()
         rows = await query.where_in(model_cls.__primary_key__, keys).get()
         by_key = {getattr(row, model_cls.__primary_key__): row for row in rows}
         # preserve the engine's hit order; a row missing from the DB (e.g. a stale index entry)
@@ -538,13 +693,27 @@ class SearchBuilder[M: Searchable]:
         items = await self._hydrate(result.hits)
         return LengthAwarePaginator(items, result.total, per_page, page)
 
+    async def simple_paginate(self, per_page: int = 15, page: int | None = None) -> Paginator:
+        """A lean prev/next paginator over the hydrated matches — no grand total query (fetches
+        one extra hit to infer ``has_more``, like the plain paginator)."""
+        from arvel.pagination import Paginator, resolve_current_page
+
+        per_page = max(1, per_page)
+        if page is None:
+            page = resolve_current_page()
+        result = await self._search(limit=per_page + 1, offset=(page - 1) * per_page)
+        items = await self._hydrate(result.hits)
+        return Paginator(items, per_page, page)
+
 
 __all__ = [
     "ArrayEngine",
+    "FilterOp",
     "MeilisearchEngine",
     "ModelIndexRequested",
     "SearchBuilder",
     "SearchEngine",
+    "SearchFilter",
     "SearchManager",
     "SearchResult",
     "SearchSettings",

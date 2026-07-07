@@ -127,6 +127,60 @@ async def test_bus_fake_is_the_queue_fake() -> None:
         bus.assert_not_dispatched(WelcomeMail)
 
 
+async def test_fake_bus_intercepts_bus_chain_and_asserts_the_order(booted_app: Any) -> None:
+    """Bus.chain(...).dispatch() resolves the container's `queue` binding directly, bypassing the
+    Queue facade — fake_bus() must bind the fake into the container too, not just swap the facade."""
+    from arvel.queue import Bus, Job
+    from arvel.testing import fake_bus
+
+    class First(Job):
+        async def handle(self) -> None:
+            pass
+
+    class Second(Job):
+        async def handle(self) -> None:
+            pass
+
+    bus = fake_bus()
+    assert booted_app.make("queue") is bus  # the container binding itself, not just the facade
+
+    await Bus.chain([First(), Second()]).dispatch()
+
+    bus.assert_chained([First, Second])
+    with pytest.raises(AssertionError):
+        bus.assert_chained([Second, First])
+
+
+async def test_fake_bus_intercepts_bus_batch_and_asserts_the_group(booted_app: Any) -> None:
+    import sqlalchemy as sa
+
+    from arvel.database import ConnectionResolver
+    from arvel.queue import Bus, Job
+    from arvel.queue.batch import JobBatch
+    from arvel.testing import fake_bus
+
+    class Alpha(Job):
+        async def handle(self) -> None:
+            pass
+
+    class Beta(Job):
+        async def handle(self) -> None:
+            pass
+
+    db = ConnectionResolver()
+    JobBatch.set_connection(db)
+    await db.execute(sa.schema.CreateTable(JobBatch.__table__))
+    try:
+        bus = fake_bus()
+        await Bus.batch([Alpha(), Beta()]).dispatch()
+
+        bus.assert_batched(lambda jobs: {type(j) for j in jobs} == {Alpha, Beta})
+        with pytest.raises(AssertionError):
+            bus.assert_batched(lambda jobs: len(jobs) == 5)
+    finally:
+        await db.dispose()
+
+
 # -- fake_http (re-exports Http.fake so arvel.testing is the one surface) -----------------------
 
 

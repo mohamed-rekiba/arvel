@@ -19,10 +19,10 @@ class _Evt: ...
 
 
 # --- testing fakes ------------------------------------------------------------
-def test_fake_mailer_assertions() -> None:
+async def test_fake_mailer_assertions() -> None:
     mailer = FakeMailer()
     FakeMailer().assert_nothing_sent()  # empty -> passes
-    mailer.sent.append(_Msg())
+    await mailer.to("a@b.com").send(_Msg())
     mailer.assert_sent(_Msg)  # success path
     with pytest.raises(AssertionError):
         FakeMailer().assert_sent(_Msg)  # nothing sent
@@ -30,10 +30,10 @@ def test_fake_mailer_assertions() -> None:
         mailer.assert_nothing_sent()  # something sent
 
 
-def test_fake_queue_assertions() -> None:
+async def test_fake_queue_assertions() -> None:
     queue = FakeQueue()
     FakeQueue().assert_nothing_pushed()
-    queue.pushed.append((_Job, (), {}))
+    await queue.push(_Job)
     queue.assert_pushed(_Job)
     with pytest.raises(AssertionError):
         FakeQueue().assert_pushed(_Job)
