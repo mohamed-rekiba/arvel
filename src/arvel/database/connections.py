@@ -345,26 +345,41 @@ class ConnectionResolver:
         raise last if last is not None else RuntimeError("transaction failed")
 
     async def select(self, sql: str, params: Any = None, name: str | None = None) -> list[Any]:
-        """Run a raw SQL SELECT (parameterized) and return mapped rows."""
+        """Run a raw SQL SELECT (parameterized) and return mapped rows. Inside a transaction
+        it runs on the transaction's connection, so uncommitted writes are visible."""
         import sqlalchemy as sa
 
         statement = sa.text(sql)
-        async with self.engine(name).connect() as conn:
-            start = time.perf_counter()
-            result = await conn.execute(statement, params or {})
-            rows = list(result.mappings().all())
+        start = time.perf_counter()
+        active = _active_conn.get()
+        if active is not None:
+            rows = list((await active.execute(statement, params or {})).mappings().all())
+        else:
+            async with self.engine(name).connect() as conn:
+                rows = list((await conn.execute(statement, params or {})).mappings().all())
         await self._record(statement, (time.perf_counter() - start) * 1000, name)
         return rows
 
     async def statement(self, sql: str, params: Any = None, name: str | None = None) -> Any:
-        """Run a raw SQL statement (INSERT/UPDATE/DDL) in a transaction."""
+        """Run a raw SQL statement (INSERT/UPDATE/DDL). Inside a transaction it joins the
+        transaction (and rolls back with it); standalone it commits its own."""
         import sqlalchemy as sa
 
+        active = _active_conn.get()
+        if active is not None:
+            return await active.execute(sa.text(sql), params or {})
         async with self.engine(name).begin() as conn:
             return await conn.execute(sa.text(sql), params or {})
 
     async def stream(self, statement: Any, name: str | None = None) -> AsyncGenerator[Any]:
-        """Stream mapped rows one at a time (server-side cursor) for low-memory reads."""
+        """Stream mapped rows one at a time (server-side cursor) for low-memory reads.
+        Inside a transaction it streams from the transaction's connection."""
+        active = _active_conn.get()
+        if active is not None:
+            result = await active.stream(statement)
+            async for row in result.mappings():
+                yield dict(row)
+            return
         async with self.engine(name).connect() as conn:
             result = await conn.stream(statement)
             async for row in result.mappings():
