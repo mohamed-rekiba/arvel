@@ -27,28 +27,67 @@ class Concurrency:
     """Static namespace for running a batch of zero-arg callables concurrently."""
 
     @staticmethod
-    async def run(callables: Sequence[Callable[[], Any]], driver: Driver = "async") -> list[Any]:
+    async def run(
+        callables: Sequence[Callable[[], Any]] | dict[str, Callable[[], Any]],
+        driver: Driver = "async",
+        timeout: float | None = None,
+    ) -> list[Any] | dict[str, Any]:
+        """Run every callable concurrently under ``driver``, in call order. A ``dict``
+        input returns a same-keyed ``dict`` of results (a ``list`` input stays a
+        ``list``). ``timeout`` (seconds), if given, bounds each task individually —
+        raises ``TimeoutError`` the moment any one task overruns it. Siblings are not
+        cancelled on that first failure (and thread/process work can't be) — they run
+        to completion in the background; their results are discarded."""
+        if isinstance(callables, dict):
+            keys: list[str] | None = list(callables.keys())
+            jobs: Sequence[Callable[[], Any]] = list(callables.values())
+        else:
+            keys = None
+            jobs = callables
         if driver == "async":
-            return await Concurrency._run_async(callables)
-        if driver == "thread":
-            return list(await asyncio.gather(*(asyncio.to_thread(fn) for fn in callables)))
-        if driver == "process":
-            return await Concurrency._run_process(callables)
-        raise ValueError(f"unknown concurrency driver: {driver!r}")
+            results = await Concurrency._run_async(jobs, timeout)
+        elif driver == "thread":
+            results = list(
+                await asyncio.gather(
+                    *(Concurrency._bounded(asyncio.to_thread(fn), timeout) for fn in jobs)
+                )
+            )
+        elif driver == "process":
+            results = await Concurrency._run_process(jobs, timeout)
+        else:
+            raise ValueError(f"unknown concurrency driver: {driver!r}")
+        return dict(zip(keys, results, strict=True)) if keys is not None else results
 
     @staticmethod
-    async def _run_async(callables: Sequence[Callable[[], Any]]) -> list[Any]:
+    async def _bounded(awaitable: Any, timeout: float | None) -> Any:
+        """Await ``awaitable``, bounded by ``timeout`` seconds if given."""
+        if timeout is None:
+            return await awaitable
+        return await asyncio.wait_for(awaitable, timeout)
+
+    @staticmethod
+    async def _run_async(
+        callables: Sequence[Callable[[], Any]], timeout: float | None = None
+    ) -> list[Any]:
         async def call_one(fn: Callable[[], Any]) -> Any:
-            if inspect.iscoroutinefunction(fn):
-                return await fn()
-            return await asyncio.to_thread(fn)
+            coro = fn() if inspect.iscoroutinefunction(fn) else asyncio.to_thread(fn)
+            return await Concurrency._bounded(coro, timeout)
 
         return list(await asyncio.gather(*(call_one(fn) for fn in callables)))
 
     @staticmethod
-    async def _run_process(callables: Sequence[Callable[[], Any]]) -> list[Any]:
+    async def _run_process(
+        callables: Sequence[Callable[[], Any]], timeout: float | None = None
+    ) -> list[Any]:
         loop = asyncio.get_running_loop()
         # a fresh pool per call keeps lifecycle simple; worker-spawn cost is acceptable for
         # coarse CPU jobs — share an executor at the call site if invoked hot
         with ProcessPoolExecutor() as pool:
-            return list(await asyncio.gather(*(loop.run_in_executor(pool, fn) for fn in callables)))
+            return list(
+                await asyncio.gather(
+                    *(
+                        Concurrency._bounded(loop.run_in_executor(pool, fn), timeout)
+                        for fn in callables
+                    )
+                )
+            )

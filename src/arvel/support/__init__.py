@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextvars
 import functools
 import itertools
+import operator
 import re
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import Any, cast
@@ -64,6 +65,40 @@ _UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
 _ULID_RE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$", re.IGNORECASE)
+#: sentinel distinguishing "not passed" from ``None`` in ``Collection.first_where``'s
+#: 1/2/3-arg overloads.
+_UNSET: Any = object()
+
+_FIRST_WHERE_OPS: dict[str, Callable[[Any, Any], bool]] = {
+    "=": operator.eq,
+    "==": operator.eq,
+    "===": operator.eq,
+    "!=": operator.ne,
+    "<>": operator.ne,
+    ">": operator.gt,
+    ">=": operator.ge,
+    "<": operator.lt,
+    "<=": operator.le,
+}
+
+
+def _first_where_matches(cmp: Callable[[Any, Any], bool], actual: Any, expected: Any) -> bool:
+    """``cmp(actual, expected)``, tolerating incomparable types (e.g. ``None`` vs an
+    ``int``) as a non-match instead of raising — loose-comparison parity."""
+    try:
+        return cmp(actual, expected)
+    except TypeError:
+        return False
+
+
+class ItemNotFoundException(RuntimeError):
+    """``Collection.sole()`` matched nothing — parity with the reference's
+    ``ItemNotFoundException``."""
+
+
+class MultipleItemsFoundException(RuntimeError):
+    """``Collection.sole()`` matched more than one item — parity with the reference's
+    ``MultipleItemsFoundException``."""
 
 
 class Collection[T]:
@@ -137,7 +172,19 @@ class Collection[T]:
         """The first ``count`` items, or the last ``|count|`` when negative."""
         return Collection(self._items[count:] if count < 0 else self._items[:count])
 
-    def contains(self, item: T) -> bool:
+    def diff(self, other: Iterable[T]) -> Collection[T]:
+        """Items in this collection not present in ``other`` — ``diff``."""
+        excluded = list(other)
+        return Collection(x for x in self._items if x not in excluded)
+
+    def intersect(self, other: Iterable[T]) -> Collection[T]:
+        """Items in this collection also present in ``other`` — ``intersect``."""
+        allowed = list(other)
+        return Collection(x for x in self._items if x in allowed)
+
+    def contains(self, item: T | Callable[[T], bool]) -> bool:
+        if callable(item):
+            return any(item(x) for x in self._items)
         return item in self._items
 
     def is_empty(self) -> bool:
@@ -226,6 +273,34 @@ class Collection[T]:
                 seen.add(marker)
         return result
 
+    def _values_for(self, key: str | Callable[[T], Any] | None) -> list[Any]:
+        if key is None:
+            return list(self._items)
+        return [key(item) if callable(key) else self._get(item, key) for item in self._items]
+
+    def median(self, key: str | Callable[[T], Any] | None = None) -> Any:
+        values = sorted(self._values_for(key))
+        if not values:
+            return None
+        mid = len(values) // 2
+        if len(values) % 2:
+            return values[mid]
+        return (values[mid - 1] + values[mid]) / 2
+
+    def mode(self, key: str | Callable[[T], Any] | None = None) -> list[Any]:
+        """The most frequent value(s) (by ``key``, or the item itself) — ``mode``. Ties
+        are all returned, in first-seen order."""
+        counts: dict[Any, int] = {}
+        order: list[Any] = []
+        for marker in self._values_for(key):
+            if marker not in counts:
+                order.append(marker)
+            counts[marker] = counts.get(marker, 0) + 1
+        if not counts:
+            return []
+        peak = max(counts.values())
+        return [marker for marker in order if counts[marker] == peak]
+
     # --- filtering / selection ---------------------------------------------
     def reject(self, fn: Callable[[T], bool]) -> Collection[T]:
         return Collection(x for x in self._items if not fn(x))
@@ -248,6 +323,31 @@ class Collection[T]:
 
     def value(self, key: str, default: Any = None) -> Any:
         return self._get(self._items[0], key) if self._items else default
+
+    def first_where(self, key: str, op: Any = _UNSET, value: Any = _UNSET) -> T | None:
+        """The first item matching a key/value pair — ``firstWhere``. One arg tests
+        ``key``'s value for truthiness; two args test equality; three args apply a
+        comparison operator (``=``/``!=``/``>``/``>=``/``<``/``<=``) between them."""
+        if op is _UNSET:
+            return next((x for x in self._items if self._get(x, key)), None)
+        if value is _UNSET:
+            return next((x for x in self._items if self._get(x, key) == op), None)
+        cmp = _FIRST_WHERE_OPS.get(op)
+        if cmp is None:
+            raise ValueError(f"first_where(): unknown operator {op!r}")
+        return next(
+            (x for x in self._items if _first_where_matches(cmp, self._get(x, key), value)), None
+        )
+
+    def sole(self, predicate: Callable[[T], bool] | None = None) -> T:
+        """The single item matching ``predicate`` (or the collection's single item when
+        omitted) — ``sole``. Raises unless exactly one item qualifies."""
+        matches = self._items if predicate is None else [x for x in self._items if predicate(x)]
+        if not matches:
+            raise ItemNotFoundException("sole(): no item matched")
+        if len(matches) > 1:
+            raise MultipleItemsFoundException(f"sole(): {len(matches)} items matched")
+        return matches[0]
 
     # --- ordering / slicing ------------------------------------------------
     def reverse(self) -> Collection[T]:
@@ -273,6 +373,53 @@ class Collection[T]:
 
     def nth(self, step: int, offset: int = 0) -> Collection[T]:
         return Collection(self._items[offset::step])
+
+    def random(self, n: int | None = None) -> T | Collection[T]:
+        """A single random item (``n`` omitted), or a ``Collection`` of ``n`` distinct
+        random items — ``random``. Uses ``secrets`` for selection."""
+        import secrets
+
+        if n is None:
+            if not self._items:
+                raise ValueError("random(): the collection is empty")
+            return secrets.choice(self._items)
+        if n > len(self._items):
+            raise ValueError(f"requested {n} items but only {len(self._items)} available")
+        pool = list(self._items)
+        return Collection(pool.pop(secrets.randbelow(len(pool))) for _ in range(n))
+
+    def shuffle(self) -> Collection[T]:
+        """A new collection with items in random order — ``shuffle`` (Fisher-Yates,
+        ``secrets``-backed)."""
+        import secrets
+
+        shuffled = list(self._items)
+        for i in range(len(shuffled) - 1, 0, -1):
+            j = secrets.randbelow(i + 1)
+            shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+        return Collection(shuffled)
+
+    def pad(self, size: int, value: T) -> Collection[T]:
+        """Pad to ``|size|`` items with ``value`` — ``pad``. A negative ``size`` pads on
+        the left; no-op if the collection already meets the target length."""
+        missing = abs(size) - len(self._items)
+        if missing <= 0:
+            return Collection(self._items)
+        padding = [value] * missing
+        return Collection([*self._items, *padding] if size >= 0 else [*padding, *self._items])
+
+    def splice(
+        self, offset: int, length: int | None = None, replacement: Iterable[T] | None = None
+    ) -> Collection[T]:
+        """Remove and return the ``[offset:offset+length]`` slice (negative ``length``
+        stops that many from the end, matching ``slice``'s convention), optionally
+        splicing ``replacement`` in its place — ``splice``. Unlike this class's other
+        (non-mutating) methods, splice mutates ``self`` in place — that's the operation's
+        whole point in the reference too."""
+        end = len(self._items) if length is None else (offset + length if length >= 0 else length)
+        removed = self._items[offset:end]
+        self._items[offset:end] = list(replacement) if replacement is not None else []
+        return Collection(removed)
 
     # --- combining ---------------------------------------------------------
     def merge(self, other: Iterable[T]) -> Collection[T]:
@@ -687,6 +834,166 @@ class Str:
 
         return str(_uuid.uuid4())
 
+    @staticmethod
+    def uuid7() -> str:
+        """A time-ordered (v7) UUID string — sorts chronologically, index-friendly."""
+        import uuid as _uuid
+
+        return str(_uuid.uuid7())
+
+    # --- regex ---------------------------------------------------------------
+    @staticmethod
+    def match(pattern: str, subject: str) -> str:
+        """The first capturing group of the first match, else the whole match, else
+        ``''`` — ``Str::match``."""
+        found = re.search(pattern, subject)
+        if found is None:
+            return ""
+        return found.group(1) if found.lastindex else found.group(0)
+
+    @staticmethod
+    def match_all(pattern: str, subject: str) -> Collection[str]:
+        """Every match (or, with one capturing group, every first-group capture) —
+        ``Str::matchAll``. Empty ``Collection`` when nothing matches."""
+        found = re.findall(pattern, subject)
+        return Collection(cast("str", m[0] if isinstance(m, tuple) else m) for m in found)
+
+    @staticmethod
+    def is_match(pattern: str, subject: str) -> bool:
+        return re.search(pattern, subject) is not None
+
+    @staticmethod
+    def replace_matches(pattern: str, replace: str | Callable[[str], str], subject: str) -> str:
+        """Replace every match of ``pattern`` — a plain string, or a callable receiving
+        each matched substring and returning its replacement — ``Str::replaceMatches``."""
+        if callable(replace):
+            return re.sub(pattern, lambda m: replace(m.group(0)), subject)
+        return re.sub(pattern, replace, subject)
+
+    # --- transliteration / excerpting ------------------------------------------
+    @staticmethod
+    def ascii_(value: str) -> str:
+        """Transliterate to the closest ASCII representation — ``Str::ascii``. Reuses
+        python-slugify's own transliteration engine (an already-installed dependency,
+        resolved dynamically the same way slugify itself does, so no stub-less static
+        import is needed)."""
+        import importlib
+        import unicodedata
+
+        try:
+            engine: Any = importlib.import_module("unidecode")
+        except ImportError:
+            engine = importlib.import_module("text_unidecode")
+        return cast("str", engine.unidecode(unicodedata.normalize("NFKD", value)))
+
+    @staticmethod
+    def excerpt(text: str, phrase: str, radius: int = 100, omission: str = "...") -> str:
+        """``radius`` characters either side of the first ``phrase`` match, bracketed by
+        ``omission`` where the excerpt was truncated — ``Str::excerpt``. ``''`` if
+        ``phrase`` isn't found."""
+        if not phrase:
+            return text
+        index = text.find(phrase)
+        if index < 0:
+            return ""
+        start = max(0, index - radius)
+        end = min(len(text), index + len(phrase) + radius)
+        result = text[start:end]
+        if start > 0:
+            result = omission + result
+        if end < len(text):
+            result = result + omission
+        return result
+
+    @staticmethod
+    def word_wrap(text: str, characters: int = 76, break_str: str = "\n") -> str:
+        """Break ``text`` into lines of at most ``characters`` (splitting only at spaces;
+        an overlong single word is never cut) joined by ``break_str`` — ``Str::wordWrap``."""
+        lines: list[str] = []
+        current = ""
+        for word in text.split(" "):
+            candidate = word if not current else f"{current} {word}"
+            if not current or len(candidate) <= characters:
+                current = candidate
+            else:
+                lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return break_str.join(lines)
+
+    # --- generators ------------------------------------------------------------
+    @staticmethod
+    def password(
+        length: int = 32,
+        *,
+        letters: bool = True,
+        numbers: bool = True,
+        symbols: bool = True,
+        spaces: bool = False,
+    ) -> str:
+        """A cryptographically-random password containing at least one character from
+        every enabled class (matching the reference's guarantee), the rest drawn from
+        the combined pool — ``Str::password``."""
+        import secrets
+
+        classes: list[str] = []
+        if letters:
+            classes.append("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        if numbers:
+            classes.append("0123456789")
+        if symbols:
+            classes.append("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~")
+        if spaces:
+            classes.append(" ")
+        if not classes:
+            raise ValueError("password() needs at least one character class enabled")
+        pool = "".join(classes)
+        # one guaranteed char per class (when length allows), remainder from the pool
+        chars = [secrets.choice(cls) for cls in classes[: max(length, 0)]]
+        chars += [secrets.choice(pool) for _ in range(max(length - len(chars), 0))]
+        shuffled: list[str] = []
+        while chars:
+            shuffled.append(chars.pop(secrets.randbelow(len(chars))))
+        return "".join(shuffled)
+
+    # --- substr / dedup / base64 ------------------------------------------------
+    @staticmethod
+    def substr_count(haystack: str, needle: str) -> int:
+        return haystack.count(needle)
+
+    @staticmethod
+    def substr_replace(subject: str, replace: str, start: int, length: int | None = None) -> str:
+        """Replace the ``[start:start+length]`` slice with ``replace`` — ``Str::substrReplace``.
+        ``length=0`` inserts without removing; a negative ``start``/``length`` counts from
+        the end, mirroring PHP's ``substr_replace``."""
+        size = len(subject)
+        start = max(size + start, 0) if start < 0 else min(start, size)
+        if length is None:
+            end = size
+        elif length < 0:
+            end = max(size + length, start)
+        else:
+            end = min(start + length, size)
+        return subject[:start] + replace + subject[end:]
+
+    @staticmethod
+    def deduplicate(value: str, character: str = " ") -> str:
+        """Collapse consecutive runs of ``character`` to a single instance — ``Str::deduplicate``."""
+        return re.sub(f"{re.escape(character)}+", character, value)
+
+    @staticmethod
+    def to_base64(value: str) -> str:
+        import base64
+
+        return base64.b64encode(value.encode()).decode()
+
+    @staticmethod
+    def from_base64(value: str) -> str:
+        import base64
+
+        return base64.b64decode(value).decode()
+
 
 __all__ = [
     "Arr",
@@ -695,8 +1002,10 @@ __all__ = [
     "Context",
     "Currency",
     "InvokedProcess",
+    "ItemNotFoundException",
     "LazyCollection",
     "Money",
+    "MultipleItemsFoundException",
     "Number",
     "Pipeline",
     "Process",
