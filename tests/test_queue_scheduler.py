@@ -415,35 +415,37 @@ async def test_run_due_runs_same_tick_events_concurrently() -> None:
 async def test_a_slow_scheduled_command_does_not_delay_a_same_tick_sibling() -> None:
     """6.2a's actual regression: `Schedule.command()` used to block the scheduler's own event
     loop for the command's full duration — a sibling `Schedule.call()` due in the same tick would
-    have to wait behind it. Not anymore: the sibling starts near-immediately."""
+    have to wait behind it. Not anymore: the sibling runs concurrently, before the slow command
+    finishes. Asserted by ordering (not wall-clock) so it can't flake under load."""
     import asyncio
-    import time
 
     from arvel.console import Command
     from arvel.kernel import Application, set_application
+
+    slow_finished = asyncio.Event()
 
     class SlowCommand(Command):
         signature = "slow:cmd"
 
         async def handle(self) -> None:
             await asyncio.sleep(0.15)
+            slow_finished.set()
 
     app = Application()
     app.command_classes.append(SlowCommand)
     set_application(app)
     try:
-        started: list[float] = []
+        fast_ran_before_slow_finished: list[bool] = []
 
         async def _fast() -> None:
-            started.append(time.monotonic())
+            # queued behind the slow command -> it would already be finished; concurrent -> not
+            fast_ran_before_slow_finished.append(not slow_finished.is_set())
 
         schedule = Schedule()
         schedule.command("slow:cmd").every_minute()
         schedule.call(_fast).every_minute()
 
-        before = time.monotonic()
         await schedule.run_due(datetime(2026, 1, 1, 0, 0))
-        assert started[0] - before < 0.05  # the fast sibling ran near-immediately, not queued
-        # behind the slow command — a generous margin against the 0.15s the command takes
+        assert fast_ran_before_slow_finished == [True]  # ran concurrently, not queued behind
     finally:
         set_application(None)
