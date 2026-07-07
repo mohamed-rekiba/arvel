@@ -41,6 +41,12 @@ class AuthServiceProvider(ServiceProvider):
                 DbIdentityStore(user_model), trusted_email_providers=trusted, jit=jit
             )
 
+        def make_reset_sweeper(_app: Any) -> Any:
+            from arvel.auth.password_reset import clear_expired_tokens
+
+            return clear_expired_tokens
+
+        self.app.singleton("auth.reset_sweeper", make_reset_sweeper)
         self.app.singleton("auth", make_auth)
         self.app.singleton("gate", make_gate)
         self.app.singleton("guard", make_guard)

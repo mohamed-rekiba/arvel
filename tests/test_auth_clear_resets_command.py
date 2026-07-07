@@ -58,7 +58,11 @@ def test_auth_clear_resets_deletes_only_expired_rows() -> None:
 
     asyncio.run(_seed())
 
-    set_application(Application())
+    from arvel.auth.provider import AuthServiceProvider
+
+    app = Application()
+    AuthServiceProvider(app).register()  # binds auth.reset_sweeper, like a booted app
+    set_application(app)
     try:
         result = runner.invoke(build_cli(), ["auth:clear-resets"])
     finally:
