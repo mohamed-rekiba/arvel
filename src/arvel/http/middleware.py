@@ -543,10 +543,10 @@ class ValidateCsrfToken(Middleware):
             return await call_next(request)
         asserted = self._asserted_origin(request)
         if asserted is not None and not self._origin_ok(request, asserted):
+            from arvel.http.exceptions import HttpException
             from arvel.localization import trans
-            from arvel.validation import ValidationException
 
-            raise ValidationException(trans("http.csrf"), status=419)
+            raise HttpException(419, trans("http.csrf"))
         expected = self._expected(request)
         submitted = await self._submitted(request)
         # constant-time compare (must not leak the secret via timing); bytes so a non-ASCII
@@ -557,10 +557,10 @@ class ValidateCsrfToken(Middleware):
             or not isinstance(submitted, str)
             or not secrets.compare_digest(submitted.encode(), expected.encode())
         ):
+            from arvel.http.exceptions import HttpException
             from arvel.localization import trans
-            from arvel.validation import ValidationException
 
-            raise ValidationException(trans("http.csrf"), status=419)
+            raise HttpException(419, trans("http.csrf"))
         return await call_next(request)
 
     async def terminate(self, request: Any, response: Any) -> None:

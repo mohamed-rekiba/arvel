@@ -9,9 +9,9 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from arvel.http.exceptions import HttpException
 from arvel.http.middleware import ValidateCsrfToken
 from arvel.routing import Router
-from arvel.validation import ValidationException
 
 KEY = "test-secret-key"
 
@@ -88,7 +88,7 @@ async def test_csrf_matching_token_passes() -> None:
 async def test_csrf_non_ascii_token_is_rejected_cleanly() -> None:
     """A hostile non-ASCII header must yield a 419, not a 500 — secrets.compare_digest rejects non-ASCII str, so the impl must compare as bytes."""
     csrf = ValidateCsrfToken()
-    with pytest.raises(ValidationException) as exc:
+    with pytest.raises(HttpException) as exc:
         await csrf.handle(_Req("POST", "tökén", "tok"), _ok)
     assert exc.value.status == 419
 
@@ -101,5 +101,5 @@ async def test_csrf_only_exact_match_passes(sent: str, expected: str) -> None:
     if sent == expected:
         assert await csrf.handle(req, _ok) == "ok"
     else:
-        with pytest.raises(ValidationException):
+        with pytest.raises(HttpException):
             await csrf.handle(req, _ok)

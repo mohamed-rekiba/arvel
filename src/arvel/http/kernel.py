@@ -763,10 +763,10 @@ class HttpKernel:
 
     @staticmethod
     def _not_found() -> None:
+        from arvel.http.exceptions import HttpException
         from arvel.localization import trans
-        from arvel.validation import ValidationException
 
-        raise ValidationException(trans("http.not_found"), status=404)
+        raise HttpException(404, trans("http.not_found"))
 
     def _make(self, middleware_cls: Any) -> Any:
         # an already-built instance is used as-is; Container.make() expects a class/string abstract
