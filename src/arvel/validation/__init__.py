@@ -420,6 +420,12 @@ class Rule:
     def passes(self, attribute: str, value: Any) -> bool:
         raise NotImplementedError(f"{type(self).__name__} must implement passes()")
 
+    async def passes_async(self, attribute: str, value: Any) -> bool:
+        """Async counterpart to :meth:`passes` — override for a rule that needs I/O (a lookup, an
+        API call). Defaults to the sync check, so a plain ``Rule`` runs unchanged on the async
+        validation path (``validate``/``Validator.passes_async``)."""
+        return self.passes(attribute, value)
+
 
 class Enum(Rule):
     """Rule object: value-in-enum membership. No string
@@ -500,7 +506,10 @@ class Validator:
         failure it discovered (a cross-field/business check no single rule expresses)."""
         self._errors.setdefault(field, []).append(message)
 
-    def passes(self) -> bool:
+    def passes(self, *, defer_custom: bool = False) -> bool:
+        # defer_custom: skip non-wildcard custom Rule objects so passes_async can run them awaited
+        # (a custom rule may need I/O). Wildcard custom rules still run here — the async loop can't
+        # resolve a ``a.*.b`` path, so they stay on the sync path.
         from arvel.support.helpers import data_get
 
         self._errors = {}
@@ -522,6 +531,8 @@ class Validator:
             bail = "bail" in rules  # stop THIS field's rules at its first failure
             for rule in rules:
                 if isinstance(rule, Rule):  # custom rule object — sync predicate (non-implicit)
+                    if defer_custom:
+                        continue  # runs awaited in passes_async instead
                     if nullable_none:
                         continue
                     if not rule.passes(field, value):
@@ -599,7 +610,9 @@ class Validator:
         rules (``unique``/``exists``) that can't run on the sync path."""
         from arvel.support.helpers import data_get
 
-        self.passes()  # sync rules, custom Rule objects included — not re-run below
+        # sync rules run here (wildcard custom rules included); non-wildcard custom rules are
+        # deferred so they can be awaited below, alongside the async DB rules (unique/exists).
+        self.passes(defer_custom=True)
         for field, ruleset in self.rules.items():
             rules = self._parse_rules(ruleset)
             if "sometimes" in rules and field not in self.data:
@@ -609,6 +622,16 @@ class Validator:
                 continue
             bail = "bail" in rules
             for rule in rules:
+                if isinstance(rule, Rule):
+                    if "*" in field:
+                        continue  # wildcard custom rules already ran sync in _validate_wildcard
+                    if not await rule.passes_async(field, value):
+                        self._errors.setdefault(field, []).append(
+                            rule.message.replace(":attribute", field)
+                        )
+                        if bail:
+                            break
+                    continue
                 if not isinstance(rule, str):
                     continue
                 name, _, arg = rule.partition(":")
