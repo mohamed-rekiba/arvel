@@ -174,14 +174,27 @@ class Translator:
         return node if isinstance(node, str) else None
 
     def _replace(self, line: str, replace: Mapping[str, Any]) -> str:
-        # longest key first so :name never consumes the :name_full token when both are given
-        for k, v in sorted(replace.items(), key=lambda kv: len(kv[0]), reverse=True):
-            val = str(v)
-            line = line.replace("{" + k + "}", val)
-            line = line.replace(":" + k.upper(), val.upper())
-            line = line.replace(":" + _ucfirst(k), _ucfirst(val))
-            line = line.replace(":" + k, val)
-        return line
+        # Match whole :key / {key} tokens, not substrings — otherwise a short key (:n) eats a
+        # longer placeholder that starts with it (:nick). :KEY upper-cases the value, :Key
+        # capitalizes it; an unknown placeholder is left untouched.
+        values = {k: str(v) for k, v in replace.items()}
+
+        def colon(match: re.Match[str]) -> str:
+            token = match.group(1)
+            if token in values:  # exact key wins (covers keys that are themselves cased)
+                return values[token]
+            lowered = token.lower()
+            if lowered not in values:
+                return match.group(0)
+            val = values[lowered]
+            if token.isupper():
+                return val.upper()
+            if token[0].isupper():
+                return _ucfirst(val)
+            return val
+
+        line = re.sub(r"\{(\w+)\}", lambda m: values.get(m.group(1), m.group(0)), line)
+        return re.sub(r":(\w+)", colon, line)
 
     def _plural(self, line: str, n: int, locale: str) -> str:
         # explicit selectors ({n} exact, [a,b]/[a,*]/[*,b] intervals) win; when none match,

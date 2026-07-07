@@ -26,6 +26,16 @@ def test_brace_form_still_replaced() -> None:
     assert _t("hi {name}").get("k", {"name": "Bob"}) == "hi Bob"
 
 
+def test_choice_does_not_corrupt_a_prefix_colliding_placeholder() -> None:
+    # choice() injects :n / :count — neither may bleed into an unrelated :nick token
+    t = _t("Hi :nick, you have :count messages")
+    assert t.choice("k", 3, {"nick": "Bob"}) == "Hi Bob, you have 3 messages"
+
+
+def test_unknown_placeholder_is_left_untouched() -> None:
+    assert _t("ping :missing here").get("k", {"name": "x"}) == "ping :missing here"
+
+
 def test_choice_exact_count_selector() -> None:
     t = _t("{0} none|{1} one|[2,*] many")
     assert t.choice("k", 0) == "none"
