@@ -746,6 +746,12 @@ class CacheManager(Manager):
         # or cache-dependent correctness (locks, throttles) degrades silently.
         return self._build(self._settings(CacheSettings).url, driver="redis", suppress=False)
 
+    async def close(self) -> None:
+        """Close every resolved driver's dedicated lock connection — the app's terminating hook
+        calls this so the redis lock client is drained on shutdown, not left to the GC."""
+        for repo in self._drivers.values():
+            await repo.close()
+
 
 _CACHE_MISS: Any = object()
 

@@ -32,5 +32,7 @@ class CacheServiceProvider(ServiceProvider):
         async def close_redis() -> None:
             if app.bound("redis"):
                 await app.make("redis").close_all()
+            if app.bound("cache"):
+                await app.make("cache").close()  # drain the cache lock client(s)
 
         app.terminating(close_redis)

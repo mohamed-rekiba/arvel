@@ -136,3 +136,12 @@ async def test_redis_lock_path_requires_a_configured_url() -> None:
     repo = CacheRepository(object(), driver="redis", redis_url=None)
     with pytest.raises(RuntimeError, match="redis url"):
         await repo._redis_raw_client()  # pyright: ignore[reportPrivateUsage]
+
+
+async def test_manager_close_drains_resolved_drivers() -> None:
+    # CacheManager.close() closes each resolved driver's lock client (array driver: safe no-op)
+    from arvel.cache import CacheManager
+
+    manager = CacheManager()
+    await manager.driver().lock("y").acquire()  # resolve the array driver
+    await manager.close()  # closes resolved drivers without error
