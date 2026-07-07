@@ -42,3 +42,21 @@ def test_manager_defaults_to_local_disk() -> None:
 def test_missing_disk_driver_raises() -> None:
     with pytest.raises(MissingExtraError):
         FilesystemManager().disk("dropbox")
+
+
+async def test_put_json_and_json_round_trip(tmp_path: Path) -> None:
+    disk = Filesystem(fsspec.filesystem("file"), root=str(tmp_path))
+    await disk.put_json("config.json", {"a": 1, "b": [1, 2, 3]})
+    assert await disk.json("config.json") == {"a": 1, "b": [1, 2, 3]}
+
+
+async def test_checksum_matches_hashlib_and_defaults_to_sha256(tmp_path: Path) -> None:
+    import hashlib
+
+    disk = Filesystem(fsspec.filesystem("file"), root=str(tmp_path))
+    await disk.put("a.txt", b"hello world")
+    assert await disk.checksum("a.txt") == hashlib.sha256(b"hello world").hexdigest()
+    assert (
+        await disk.checksum("a.txt", algo="md5")
+        == hashlib.md5(b"hello world", usedforsecurity=False).hexdigest()
+    )

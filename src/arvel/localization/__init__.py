@@ -47,6 +47,11 @@ _CLDR_ORDER = ("zero", "one", "two", "few", "many", "other")
 _SELECTOR = re.compile(r"^(?P<open>[\[{])\s*(?P<cond>[^\]}]*?)\s*[\]}]\s*(?P<text>.*)$", re.DOTALL)
 
 
+class TranslationMissingError(LookupError):
+    """Raised by :meth:`Translator.get_or_fail` when ``key`` has no line in ``locale`` or the
+    fallback locale — a miss that ``get()`` silently papers over by returning ``key`` itself."""
+
+
 def _ucfirst(value: str) -> str:
     return value[:1].upper() + value[1:]
 
@@ -122,6 +127,22 @@ class Translator:
         line = self._lookup(key, loc) or self._lookup(key, self.fallback) or key
         segment = self._plural(line, n, loc)
         return self._replace(segment, {"count": n, "n": n, **(replace or {})})
+
+    def has(self, key: str, locale: str | None = None) -> bool:
+        """Whether ``key`` has a translation in ``locale`` (or the fallback) — distinguishes a
+        real miss from ``get()``'s "return the key itself" fallback."""
+        loc = locale or current_locale.get()
+        return self._lookup(key, loc) is not None or self._lookup(key, self.fallback) is not None
+
+    def get_or_fail(
+        self, key: str, replace: Mapping[str, Any] | None = None, locale: str | None = None
+    ) -> str:
+        """Like :meth:`get`, but raises :class:`TranslationMissingError` instead of silently
+        falling back to ``key`` itself."""
+        loc = locale or current_locale.get()
+        if not self.has(key, loc):
+            raise TranslationMissingError(f"no translation for {key!r} in locale {loc!r}")
+        return self.get(key, replace, locale)
 
     def get_locale(self) -> str:
         return current_locale.get()
@@ -210,6 +231,7 @@ def trans_choice(key: str, n: int, **replace: Any) -> str:
 __all__ = [
     "HasTranslations",
     "Translatable",
+    "TranslationMissingError",
     "Translator",
     "__",
     "current_locale",

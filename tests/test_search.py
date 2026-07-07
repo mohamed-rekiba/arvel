@@ -51,15 +51,42 @@ async def test_array_engine_filters_sorts_and_slices() -> None:
     await engine.index("articles", 3, {"kind": "post", "n": 2})
     await engine.index("articles", 4, {"kind": "page", "n": 9})
 
-    result = await engine.search("articles", "", filters={"kind": "post"}, sort=["n:asc"])
+    result = await engine.search("articles", "", filters=[("kind", "=", "post")], sort=["n:asc"])
     assert [h["_key"] for h in result.hits] == [2, 3, 1]
     assert result.total == 3  # total is the filtered count, before any limit/offset slice
 
     page = await engine.search(
-        "articles", "", filters={"kind": "post"}, sort=["n:asc"], limit=1, offset=1
+        "articles", "", filters=[("kind", "=", "post")], sort=["n:asc"], limit=1, offset=1
     )
     assert [h["_key"] for h in page.hits] == [3]
     assert page.total == 3
+
+
+async def test_array_engine_filter_operators() -> None:
+    engine = ArrayEngine()
+    await engine.index("articles", 1, {"n": 1})
+    await engine.index("articles", 2, {"n": 2})
+    await engine.index("articles", 3, {"n": 3})
+
+    gt = await engine.search("articles", "", filters=[("n", ">", 1)])
+    assert {h["_key"] for h in gt.hits} == {2, 3}
+
+    ne = await engine.search("articles", "", filters=[("n", "!=", 2)])
+    assert {h["_key"] for h in ne.hits} == {1, 3}
+
+    in_ = await engine.search("articles", "", filters=[("n", "in", [1, 3])])
+    assert {h["_key"] for h in in_.hits} == {1, 3}
+
+    not_in = await engine.search("articles", "", filters=[("n", "not in", [1, 3])])
+    assert {h["_key"] for h in not_in.hits} == {2}
+
+    # a field absent from the record reads as None: an ordering op never matches it, but `!=`
+    # (used by the soft-delete default scope) naturally does.
+    await engine.index("articles", 4, {"other": "x"})
+    absent_ne = await engine.search("articles", "", filters=[("n", "!=", True)])
+    assert 4 in {h["_key"] for h in absent_ne.hits}
+    absent_gt = await engine.search("articles", "", filters=[("n", ">", 0)])
+    assert 4 not in {h["_key"] for h in absent_gt.hits}
 
 
 async def test_array_engine_configure_is_a_no_op() -> None:
@@ -251,28 +278,174 @@ async def test_builder_hydration_preserves_engine_order() -> None:
         await db.dispose()
 
 
-async def test_builder_excludes_soft_deleted_unless_with_trashed() -> None:
+async def test_builder_excludes_soft_deleted_unless_trashed_flag_off() -> None:
+    """Without ``search.soft_delete``, a soft delete still removes the record from the index
+    entirely (legacy/default behavior) — ``with_trashed()`` finds nothing to include."""
+
     class Note(Searchable, Model, SoftDeletes):
         __fields__ = {"title": str}
         __fillable__ = ["title"]
 
-    app, db = await _app_with_search()
+    db = (await _app_with_search())[1]
     try:
         Note.set_connection(db)
         await db.execute(sa.schema.CreateTable(Note.__table__))
         note = await Note.create(title="secret note")
-        await note.delete()  # soft-delete; the `deleted` hook already ran unsearchable()
-
-        # simulate a still-present (e.g. stale) index entry for the trashed row, to prove it's the
-        # *hydration* query's default scope excluding it — not just the index having been cleared:
-        engine = app.make("search")
-        await engine.index(Note.searchable_as(), note.id, note.to_searchable_array())
+        await note.delete()  # soft-delete; `trashed` hook fires -> unsearchable() (flag off)
 
         assert await Note.search("secret").get() == []
-        trashed = await Note.search("secret").with_trashed().get()
-        assert [t.title for t in trashed] == ["secret note"]
+        assert await Note.search("secret").with_trashed().get() == []
     finally:
         Note.set_connection(None)
+        await db.dispose()
+
+
+async def _app_with_soft_delete_search() -> tuple[Application, ConnectionResolver]:
+    app = (
+        Application.configure()
+        .with_config({"search": {"driver": "array", "soft_delete": True}})
+        .create()
+    )
+    app.singleton("search", lambda a: SearchManager(a))
+    db = ConnectionResolver()
+    return app, db
+
+
+class Note(Searchable, Model, SoftDeletes):
+    __fields__ = {"title": str}
+    __fillable__ = ["title"]
+
+
+async def test_soft_delete_model_keeps_the_record_indexed_flagged() -> None:
+    """search.soft_delete=True: a soft delete keeps the doc indexed with __soft_deleted, excluded
+    by default, reachable via with_trashed()/only_trashed(); force_delete removes it entirely."""
+    app, db = await _app_with_soft_delete_search()
+    try:
+        Note.set_connection(db)
+        await db.execute(sa.schema.CreateTable(Note.__table__))
+        note = await Note.create(title="secret note")
+        await note.delete()  # soft — `trashed` hook re-indexes it, flagged
+
+        driver = app.make("search").driver()  # the ArrayEngine, for direct store introspection
+        stored = driver._store[Note.searchable_as()][note.id]
+        assert stored["__soft_deleted"] is True
+
+        assert await Note.search("secret").get() == []  # default scope excludes it
+        assert [t.title for t in await Note.search("secret").with_trashed().get()] == [
+            "secret note"
+        ]
+        assert [t.title for t in await Note.search("secret").only_trashed().get()] == [
+            "secret note"
+        ]
+
+        await note.restore()  # `restored` hook clears the flag
+        restored_stored = driver._store[Note.searchable_as()][note.id]
+        assert restored_stored["__soft_deleted"] is False
+        assert [t.title for t in await Note.search("secret").get()] == ["secret note"]
+        assert await Note.search("secret").only_trashed().get() == []
+
+        await note.force_delete()  # a real removal, flag or not
+        assert await Note.search("secret").with_trashed().get() == []
+    finally:
+        Note.set_connection(None)
+        await db.dispose()
+
+
+async def test_regular_saves_carry_the_cleared_flag_when_soft_delete_is_on() -> None:
+    """Every indexed record carries __soft_deleted (cleared) once the config is on — so the
+    builder's default equality-ish filter matches consistently, not just on delete/restore."""
+    _app, db = await _app_with_soft_delete_search()
+    try:
+        Note.set_connection(db)
+        await db.execute(sa.schema.CreateTable(Note.__table__))
+        await Note.create(title="alpha")
+        hits = await Note.search("alpha").get()
+        assert [h.title for h in hits] == ["alpha"]
+    finally:
+        Note.set_connection(None)
+        await db.dispose()
+
+
+async def test_should_be_searchable_skips_and_removes_from_the_index() -> None:
+    class Draft(Searchable, Model):
+        __fields__: Any = {"title": str, "published": bool}
+        __fillable__ = ["title", "published"]
+
+        def should_be_searchable(self) -> bool:
+            return bool(self.published)
+
+    _app, db = await _app_with_search()
+    try:
+        Draft.set_connection(db)
+        await db.execute(sa.schema.CreateTable(Draft.__table__))
+        draft = await Draft.create(title="unfinished", published=False)
+        assert await Draft.search("unfinished").get() == []  # never indexed
+
+        draft.published = True
+        await draft.save()
+        assert [d.title for d in await Draft.search("unfinished").get()] == ["unfinished"]
+
+        draft.published = False
+        await draft.save()  # should_be_searchable() now False -> removed
+        assert await Draft.search("unfinished").get() == []
+    finally:
+        Draft.set_connection(None)
+        await db.dispose()
+
+
+async def test_without_syncing_suspends_index_writes() -> None:
+    _app, db = await _app_with_search()
+    try:
+        with Article.without_syncing():
+            await Article.create(title="hidden", body="x", views=1)
+        assert await Article.search("hidden").get() == []
+
+        # normal writes resume outside the block
+        await Article.create(title="visible", body="x", views=1)
+        assert [a.title for a in await Article.search("visible").get()] == ["visible"]
+    finally:
+        await db.dispose()
+
+
+async def test_builder_where_operators_and_where_in() -> None:
+    _app, db = await _app_with_search()
+    try:
+        await Article.create(title="python", body="x", views=1)
+        await Article.create(title="python", body="x", views=2)
+        await Article.create(title="python", body="x", views=3)
+
+        gt = await Article.search("python").where("views", ">", 1).get()
+        assert {a.views for a in gt} == {2, 3}
+
+        in_ = await Article.search("python").where_in("views", [1, 3]).get()
+        assert {a.views for a in in_} == {1, 3}
+
+        not_in = await Article.search("python").where_not_in("views", [1, 3]).get()
+        assert {a.views for a in not_in} == {2}
+    finally:
+        await db.dispose()
+
+
+async def test_builder_simple_paginate_has_more_without_a_grand_total() -> None:
+    from arvel.pagination import Paginator
+
+    _app, db = await _app_with_search()
+    try:
+        for n in range(3):
+            await Article.create(title="python", body=f"b{n}", views=n)
+        page = await Article.search("python").order_by("views", "asc").simple_paginate(per_page=2)
+        assert isinstance(page, Paginator)
+        assert [a.views for a in page.items()] == [0, 1]
+        assert page.has_more_pages() is True
+
+        page2 = (
+            await Article.search("python")
+            .order_by("views", "asc")
+            .simple_paginate(per_page=2, page=2)
+        )
+        assert [a.views for a in page2.items()] == [2]
+        assert page2.has_more_pages() is False
+    finally:
         await db.dispose()
 
 

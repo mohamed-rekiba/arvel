@@ -15,20 +15,34 @@ from typing import Any, cast
 
 class FakeMailer:
     """Records sent mailables instead of delivering them. ``sent[i]`` is the mailable and
-    ``recipients[i]`` the recipient list of the same send (assertSent-with-callback
-    parity: tests can assert WHO a mail went to, not just that it went)."""
+    ``recipients[i]`` is that same send's ``{"to": [...], "cc": [...], "bcc": [...]}`` (assertSent-
+    with-callback parity: tests can assert WHO a mail went to — including cc/bcc — not just that
+    it went)."""
 
     def __init__(self) -> None:
         self.sent: list[Any] = []
-        self.recipients: list[list[str]] = []
+        self.recipients: list[dict[str, list[str]]] = []
 
     def to(self, *recipients: Any) -> _PendingFake:
-        return _PendingFake(self, [str(r) for r in recipients])
+        return _PendingFake(self, to=[str(r) for r in recipients])
 
-    def assert_sent(self, mailable_cls: type) -> None:
-        if not any(isinstance(m, mailable_cls) for m in self.sent):
+    def assert_sent(
+        self, mailable_cls: type, fn: Callable[..., bool] | None = None, *, count: int | None = None
+    ) -> None:
+        """``fn(mailable, recipients)``, if given, must also return true — ``recipients`` is the
+        ``{"to", "cc", "bcc"}`` dict of that send, so a test can assert e.g. a cc'd address."""
+        matches = [
+            (m, r)
+            for m, r in zip(self.sent, self.recipients, strict=True)
+            if isinstance(m, mailable_cls) and (fn is None or fn(m, r))
+        ]
+        if not matches:
             raise AssertionError(
                 f"expected a {mailable_cls.__name__} to be sent; sent={self.sent!r}"
+            )
+        if count is not None and len(matches) != count:
+            raise AssertionError(
+                f"expected {count} {mailable_cls.__name__} sent; got {len(matches)}"
             )
 
     def assert_nothing_sent(self) -> None:
@@ -37,41 +51,88 @@ class FakeMailer:
 
 
 class _PendingFake:
-    def __init__(self, mailer: FakeMailer, recipients: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        mailer: FakeMailer,
+        *,
+        to: list[str] | None = None,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+    ) -> None:
         self._mailer = mailer
-        self._recipients = recipients or []
+        self._to = to or []
+        self._cc = cc or []
+        self._bcc = bcc or []
 
     def cc(self, *recipients: Any) -> _PendingFake:
+        self._cc = [*self._cc, *(str(r) for r in recipients)]
         return self
 
     def bcc(self, *recipients: Any) -> _PendingFake:
+        self._bcc = [*self._bcc, *(str(r) for r in recipients)]
         return self
 
     async def send(self, mailable: Any) -> bool:
         self._mailer.sent.append(mailable)
-        self._mailer.recipients.append(self._recipients)
+        self._mailer.recipients.append({"to": self._to, "cc": self._cc, "bcc": self._bcc})
         return True
 
 
+def _job_name(value: Any) -> str:
+    """A job's fully-qualified name — either already a string (a serialized chain link's ``job``
+    field) or a class (compute it, mirroring ``arvel.queue._qualified_name``)."""
+    return value if isinstance(value, str) else f"{value.__module__}:{value.__qualname__}"
+
+
 class FakeQueue:
-    """Records pushed jobs instead of enqueuing them."""
+    """Records pushed jobs instead of enqueuing them. ``push`` is the ``Queue``/``Job.dispatch``
+    rail (class + constructor args/kwargs); ``push_instance`` is the ``Bus.chain``/``Bus.batch``
+    rail (an already-built job instance — see :func:`fake_bus`, which binds this fake into the
+    container so those resolve it too, not just the ``Queue`` facade)."""
 
     def __init__(self) -> None:
-        self.pushed: list[tuple[type, tuple[Any, ...], dict[str, Any]]] = []
+        self.pushed: list[tuple[type, tuple[Any, ...], dict[str, Any], str | None]] = []
+        self.pushed_instances: list[Any] = []
 
     async def push(
         self,
         job_cls: type,
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
-        **_: Any,
+        *,
+        queue: str | None = None,
+        after_commit: bool | None = None,
     ) -> None:
-        self.pushed.append((job_cls, tuple(args), dict(kwargs or {})))
+        self.pushed.append((job_cls, tuple(args), dict(kwargs or {}), queue))
 
-    def assert_pushed(self, job_cls: type) -> None:
-        if not any(job is job_cls for job, _, _ in self.pushed):
-            pushed = [job.__name__ for job, _, _ in self.pushed]
+    async def push_instance(self, job: Any, *, queue: str | None = None) -> None:
+        job_cls = cast("type[Any]", type(job))
+        self.pushed.append((job_cls, (), {}, queue))
+        self.pushed_instances.append(job)
+
+    def assert_pushed(
+        self,
+        job_cls: type,
+        fn: Callable[..., bool] | None = None,
+        *,
+        count: int | None = None,
+        queue: str | None = None,
+    ) -> None:
+        """``fn(*args, **kwargs)``, if given, must also return true (the args/kwargs a matching
+        ``Job.dispatch(*args, **kwargs)``/``Queue.push`` call carried); ``queue``, if given,
+        restricts to that named queue."""
+        matches = [
+            (cls, args, kwargs, q)
+            for cls, args, kwargs, q in self.pushed
+            if cls is job_cls
+            and (queue is None or q == queue)
+            and (fn is None or fn(*args, **kwargs))
+        ]
+        if not matches:
+            pushed = [cls.__name__ for cls, _, _, _ in self.pushed]
             raise AssertionError(f"expected {job_cls.__name__} to be pushed; pushed={pushed}")
+        if count is not None and len(matches) != count:
+            raise AssertionError(f"expected {job_cls.__name__} pushed {count}x; got {len(matches)}")
 
     def assert_nothing_pushed(self) -> None:
         if self.pushed:
@@ -85,8 +146,38 @@ class FakeQueue:
 
     def assert_not_dispatched(self, job_cls: type) -> None:
         """Alias of the inverse of:meth:`assert_pushed` — ``Bus::assertNotDispatched``."""
-        if any(job is job_cls for job, _, _ in self.pushed):
+        if any(cls is job_cls for cls, _, _, _ in self.pushed):
             raise AssertionError(f"expected {job_cls.__name__} NOT to be pushed")
+
+    def assert_chained(self, job_classes: Sequence[Any]) -> None:
+        """A ``Bus.chain([...]).dispatch()`` pushes only the head job (via ``push_instance``),
+        serializing the rest onto it as ``__arvel_chain__`` — verify a recorded chain matches
+        ``job_classes`` (types or qualified-name strings), in order, head first.
+
+        ponytail: parses each serialized link's ``job`` field with stdlib ``json`` rather than
+        importing ``arvel.queue.deserialize_instance`` — ``arvel.queue`` sits above
+        ``arvel.testing`` in the G1 layers DAG, so it can't be imported from here even lazily."""
+        import json
+
+        wanted = [_job_name(cls) for cls in job_classes]
+        for job in self.pushed_instances:
+            links = cast("list[str]", getattr(job, "__arvel_chain__", None) or [])
+            names = [_job_name(type(job)), *(str(json.loads(link)["job"]) for link in links)]
+            if names == wanted:
+                return
+        raise AssertionError(f"expected a chain {wanted}; no recorded chain matched")
+
+    def assert_batched(self, fn: Callable[[Sequence[Any]], bool]) -> None:
+        """A ``Bus.batch([...]).dispatch()`` pushes every job (via ``push_instance``), each
+        stamped with the same ``__arvel_batch__`` id — ``fn(jobs)`` must return true for at least
+        one recorded batch's job instances (in dispatch order)."""
+        groups: dict[Any, list[Any]] = {}
+        for job in self.pushed_instances:
+            batch_id = getattr(job, "__arvel_batch__", None)
+            if batch_id is not None:
+                groups.setdefault(batch_id, []).append(job)
+        if not any(fn(jobs) for jobs in groups.values()):
+            raise AssertionError(f"expected a batch matching the predicate; recorded: {groups!r}")
 
 
 class FakeEvents:
@@ -109,6 +200,14 @@ class FakeEvents:
     def assert_dispatched(self, event_type: type) -> None:
         if not any(isinstance(e, event_type) for e in self.dispatched):
             raise AssertionError(f"expected a {event_type.__name__} to be dispatched")
+
+    def assert_not_dispatched(self, event_type: type) -> None:
+        if any(isinstance(e, event_type) for e in self.dispatched):
+            raise AssertionError(f"expected no {event_type.__name__} to be dispatched")
+
+    def assert_nothing_dispatched(self) -> None:
+        if self.dispatched:
+            raise AssertionError(f"expected nothing dispatched; dispatched={self.dispatched!r}")
 
 
 class FakeNotifications:
@@ -181,14 +280,42 @@ def fake(facade: Any) -> Any:
     return fake_obj
 
 
+_bus_faked = False
+
+
 def fake_bus() -> FakeQueue:
-    """Fake job dispatch — an alias of ``fake(Queue)``: arvel already
-        models ``Bus``/``Queue`` dispatch as the one push path, so this returns the same
-    :class:`FakeQueue` rather than a second, duplicate double. Extend with
-        ``assert_dispatched_chain``/``assert_batched`` once batching (story 18) lands."""
+    """Fake job dispatch — an alias of ``fake(Queue)``: arvel already models ``Bus``/``Queue``
+    dispatch as the one push path, so this returns the same :class:`FakeQueue` rather than a
+    second, duplicate double.
+
+    ``Bus.chain(...)``/``Bus.batch(...)`` resolve the container's ``queue`` binding directly
+    (``app().make("queue")``), bypassing the ``Queue`` facade entirely — so faking *just* the
+    facade (as before) never caught them. This also binds the same fake into the container
+    (``app().instance("queue", ...)``, like:func:`fake_notifications`), so ``assert_chained``/
+    ``assert_batched`` see those dispatches too;:func:`restore_bus` (or ``reset_fakes``) undoes it."""
     from arvel.support.facades import Queue
 
-    return cast("FakeQueue", fake(Queue))
+    global _bus_faked
+    fake_obj = cast("FakeQueue", fake(Queue))
+    from arvel.kernel.globals import app, has_application
+
+    if has_application():
+        app().instance("queue", fake_obj)
+        _bus_faked = True
+    return fake_obj
+
+
+def restore_bus() -> None:
+    """Restore the real ``queue`` container binding after:func:`fake_bus`. A no-op if nothing was
+    faked (or the app that held the swap is already gone — best-effort, like:func:`restore_storage`)."""
+    global _bus_faked
+    if not _bus_faked:
+        return
+    from arvel.kernel.globals import app, has_application
+
+    if has_application():
+        app().forget("queue")
+    _bus_faked = False
 
 
 _faked_notifications = False
@@ -331,14 +458,15 @@ def restore_http() -> None:
 
 
 def reset_fakes() -> None:
-    """Clear all swapped facade roots and restore any faked storage disks/HTTP transport/notification
-    binding (call in test teardown)."""
+    """Clear all swapped facade roots and restore any faked storage disks/HTTP transport/
+    notification/queue-container binding (call in test teardown)."""
     from arvel.support.facades import Facade
 
     Facade.clear_swapped()
     restore_storage()
     restore_http()
     restore_notifications()
+    restore_bus()
 
 
 def _dotted_get(data: Any, key: str, default: Any) -> Any:
@@ -504,20 +632,24 @@ def client(asgi: Any) -> Any:
 
 
 async def _matching_count(
-    connection: Any, table: str, conditions: dict[str, Any], *, soft_deleted: bool = False
+    connection: Any, table: str, conditions: dict[str, Any], *, soft_deleted: bool | None = None
 ) -> int:
+    """``soft_deleted``: ``None`` doesn't touch ``deleted_at`` at all; ``True`` requires it set,
+    ``False`` requires it null."""
     import sqlalchemy as sa
 
     from arvel.database import Builder
 
-    names = {*conditions} | ({"deleted_at"} if soft_deleted else set[str]())
+    names = {*conditions} | ({"deleted_at"} if soft_deleted is not None else set[str]())
     columns = [cast("Any", sa.Column(name)) for name in names] or [cast("Any", sa.Column("id"))]
     ad_hoc = sa.Table(table, sa.MetaData(), *columns)
     query = Builder(ad_hoc, connection)
     for column, expected in conditions.items():
         query = query.where(column, "=", expected)
-    if soft_deleted:
+    if soft_deleted is True:
         query = query.where_not_null("deleted_at")
+    elif soft_deleted is False:
+        query = query.where_null("deleted_at")
     count: int = await query.count()
     return count
 
@@ -534,10 +666,49 @@ async def assert_database_missing(connection: Any, table: str, **conditions: Any
         raise AssertionError(f"expected NO row in {table!r} matching {conditions}")
 
 
+async def assert_database_count(connection: Any, table: str, n: int, **conditions: Any) -> None:
+    """Assert exactly ``n`` rows in ``table`` match ``conditions`` (``{}`` -> the whole table)."""
+    found = await _matching_count(connection, table, conditions)
+    if found != n:
+        raise AssertionError(f"expected {n} row(s) in {table!r} matching {conditions}; got {found}")
+
+
+async def assert_database_empty(connection: Any, table: str) -> None:
+    """Assert ``table`` has no rows at all."""
+    await assert_database_count(connection, table, 0)
+
+
 async def assert_soft_deleted(connection: Any, table: str, **conditions: Any) -> None:
     """Assert a matching row exists and is soft-deleted (``deleted_at`` set)."""
     if await _matching_count(connection, table, conditions, soft_deleted=True) == 0:
         raise AssertionError(f"expected a soft-deleted row in {table!r} matching {conditions}")
+
+
+async def assert_not_soft_deleted(connection: Any, table: str, **conditions: Any) -> None:
+    """Assert a matching row exists and is NOT soft-deleted (``deleted_at`` null)."""
+    if await _matching_count(connection, table, conditions, soft_deleted=False) == 0:
+        raise AssertionError(f"expected a non-soft-deleted row in {table!r} matching {conditions}")
+
+
+async def assert_model_exists(model: Any) -> None:
+    """Assert ``model``'s row still exists — re-queried fresh by primary key (default scope, so
+    a soft-deleted row reads as missing, same as the rest of the app sees it)."""
+    model_cls = cast("Any", type(model))
+    pk = getattr(model, model_cls.__primary_key__)
+    if not await model_cls.where(model_cls.__primary_key__, "=", pk).exists():
+        raise AssertionError(
+            f"expected a {model_cls.__name__} row with {model_cls.__primary_key__}={pk!r} to exist"
+        )
+
+
+async def assert_model_missing(model: Any) -> None:
+    """Assert ``model``'s row is gone (or soft-deleted, past the default scope)."""
+    model_cls = cast("Any", type(model))
+    pk = getattr(model, model_cls.__primary_key__)
+    if await model_cls.where(model_cls.__primary_key__, "=", pk).exists():
+        raise AssertionError(
+            f"expected no {model_cls.__name__} row with {model_cls.__primary_key__}={pk!r}"
+        )
 
 
 def database_transaction(connection: Any, name: str | None = None) -> Any:
@@ -559,6 +730,18 @@ def travel_back() -> None:
     from arvel.dates import Date
 
     Date.set_test_now(None)
+
+
+def travel(seconds: int = 0, *, minutes: int = 0, hours: int = 0, days: int = 0) -> None:
+    """Move the clock forward by the given offset, relative to the already-frozen ``test_now()``
+    (or the real now, if the clock isn't frozen yet) — builds on:func:`travel_to`. The positional
+    arg is seconds; combine with the ``minutes=``/``hours=``/``days=`` keywords freely
+    (``travel(30, minutes=5)`` == 5 minutes 30 seconds forward)."""
+    from arvel.dates import Date
+    from arvel.dates import now as _now
+
+    base = Date.test_now() or _now()
+    travel_to(base.add(seconds=seconds, minutes=minutes, hours=hours, days=days))
 
 
 @contextlib.contextmanager
@@ -825,8 +1008,13 @@ __all__ = [
     "FakeNotifications",
     "FakeQueue",
     "TestResponse",
+    "assert_database_count",
+    "assert_database_empty",
     "assert_database_has",
     "assert_database_missing",
+    "assert_model_exists",
+    "assert_model_missing",
+    "assert_not_soft_deleted",
     "assert_soft_deleted",
     "cli",
     "client",
@@ -838,9 +1026,11 @@ __all__ = [
     "fake_storage",
     "freeze_time",
     "reset_fakes",
+    "restore_bus",
     "restore_http",
     "restore_notifications",
     "restore_storage",
+    "travel",
     "travel_back",
     "travel_to",
 ]

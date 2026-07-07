@@ -309,6 +309,129 @@ def test_feature_purge_clears_stored_values() -> None:
         set_application(None)
 
 
+# --- purge(None): store-level purge-all reaches undefined flags too ---------
+async def test_array_store_purge_all_clears_every_row_defined_or_not() -> None:
+    manager = FeatureManager()
+    manager.define("defined", lambda scope: True)
+    await manager.activate("defined", "u1")
+    # an undefined flag can still have a stored row (e.g. activated once, then un-defined)
+    await manager.driver().put("undefined", "u1", True)
+
+    await manager.purge(None)
+
+    assert await manager.driver().get("defined", "u1") is _MISSING
+    assert await manager.driver().get("undefined", "u1") is _MISSING
+
+
+async def test_database_store_purge_all_clears_every_row_defined_or_not() -> None:
+    db = await _sqlite_db()
+    try:
+        manager = _database_backed_manager()
+        manager.define("defined", lambda scope: True)
+        await manager.activate("defined", "u1")
+        await manager.driver().put("undefined", "u1", True)
+
+        await manager.purge(None)
+
+        assert await manager.driver().get("defined", "u1") is _MISSING
+        assert await manager.driver().get("undefined", "u1") is _MISSING
+    finally:
+        await db.dispose()
+
+
+# --- request/task-scoped memoization -----------------------------------------
+async def test_memo_is_dropped_by_forget_and_purge_not_just_activate() -> None:
+    manager = FeatureManager()
+    calls = {"n": 0}
+
+    def resolver(_scope: Any) -> int:
+        calls["n"] += 1
+        return calls["n"]
+
+    manager.define("counter", resolver)
+    assert await manager.value("counter", "u1") == 1
+    assert await manager.value("counter", "u1") == 1  # memoized, no re-resolve
+    await manager.purge("counter")
+    assert await manager.value("counter", "u1") == 2  # purge invalidated the memo too
+
+
+async def test_flush_cache_forces_a_fresh_read_of_an_unchanged_store() -> None:
+    """flush_cache() drops the memo, but not the persisted store — a mutation made directly on
+    the store (bypassing activate/forget) is only picked up once the memo is flushed."""
+    manager = FeatureManager()
+    manager.define("flag", lambda scope: False)
+    assert await manager.active("flag", "u1") is False  # resolves + memoizes False
+
+    await manager.driver().put("flag", "u1", True)  # store mutated directly — memo unaware
+    assert await manager.active("flag", "u1") is False  # still serving the memo
+
+    manager.flush_cache()
+    assert await manager.active("flag", "u1") is True  # re-reads the store now
+
+
+async def test_database_driver_hits_the_store_once_per_scope_per_request() -> None:
+    """The persisted store is queried once per (flag, scope) per request — the memo layer serves
+    every repeat read after that."""
+    db = await _sqlite_db()
+    try:
+        manager = _database_backed_manager()
+        manager.define("beta", lambda scope: True)
+        await manager.active("beta", "u1")  # first read: resolves + persists + memoizes
+
+        db.enable_query_log()
+        assert await manager.active("beta", "u1") is True
+        assert await manager.active("beta", "u1") is True
+        assert db.get_query_log() == []  # served entirely from the memo, no store query
+    finally:
+        await db.dispose()
+
+
+# --- activate_for_everyone / deactivate_for_everyone precedence -------------
+async def test_activate_for_everyone_is_the_fallback_below_an_explicit_scope_value() -> None:
+    manager = FeatureManager()
+    manager.define("beta", lambda scope: False)
+
+    await manager.activate_for_everyone("beta")
+    assert await manager.active("beta", "u1") is True  # no explicit value -> everyone wins
+    assert await manager.active("beta", "u2") is True
+
+    await manager.activate("beta", "u1", value=False)  # an explicit scope value beats everyone
+    assert await manager.active("beta", "u1") is False
+    assert await manager.active("beta", "u2") is True  # u2 still sees the everyone value
+
+    # a scope that hasn't been read yet this request sees a later activate_for_everyone change
+    # immediately; u2 already memoized this request keeps its memoized read until flush_cache()
+    await manager.deactivate_for_everyone("beta")
+    assert await manager.active("beta", "u3") is False
+    manager.flush_cache()
+    assert await manager.active("beta", "u2") is False
+
+
+async def test_activate_for_everyone_is_below_an_already_resolved_scope_value() -> None:
+    """The definition default is the last resort: a scope that already resolved (and persisted)
+    its own value keeps it even after activate_for_everyone runs."""
+    manager = FeatureManager()
+    manager.define("beta", lambda scope: False)
+    assert await manager.active("beta", "u1") is False  # resolves + persists False for u1
+
+    await manager.activate_for_everyone("beta", value=True)
+    assert await manager.active("beta", "u1") is False  # u1's own persisted value still wins
+    assert await manager.active("beta", "u2") is True  # a fresh scope sees the everyone value
+
+
+# --- all_are_active / some_are_active bulk checks ----------------------------
+async def test_all_are_active_and_some_are_active() -> None:
+    manager = FeatureManager()
+    manager.define("a", lambda scope: True)
+    manager.define("b", lambda scope: False)
+    manager.define("c", lambda scope: True)
+
+    assert await manager.all_are_active(["a", "c"], "u1") is True
+    assert await manager.all_are_active(["a", "b"], "u1") is False
+    assert await manager.some_are_active(["a", "b"], "u1") is True
+    assert await manager.some_are_active(["b"], "u1") is False
+
+
 async def test_a_cached_falsy_value_is_not_re_resolved() -> None:
     # review nit: the _MISSING sentinel must distinguish "unstored" from a stored falsy value —
     # a resolver returning False must run exactly ONCE, not re-run because the value is falsy
