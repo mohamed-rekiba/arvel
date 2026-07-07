@@ -10,7 +10,7 @@ the command body. Grounded in knowledge/port/13-console.md.
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Sequence
-from typing import TYPE_CHECKING, Any, TextIO
+from typing import TYPE_CHECKING, Any, NoReturn, TextIO
 
 if TYPE_CHECKING:
     import typer
@@ -90,6 +90,10 @@ class ConsoleOutput:
         click.echo(click.style(message, fg=fg) if fg else message, file=stream)
 
 
+class CommandFailed(Exception):
+    """Raised by :meth:`Command.fail` — the kernel renders the message and exits 1."""
+
+
 class Command:
     """Base class for app/ecosystem commands (Typer-wrapped at registration)."""
 
@@ -159,12 +163,26 @@ class Command:
     def bind_parsed(self, values: dict[str, Any]) -> None:
         """Split ``values`` into arguments/options per this command's ``signature`` grammar (the
         kernel calls this right before ``handle`` — see ``console.kernel.run_command_class`` — so
-        ``argument()``/``option()`` resolve)."""
+        ``argument()``/``option()`` resolve). A required argument that wasn't supplied is asked
+        for interactively (via the command's Prompter); without a TTY it fails with a usage error."""
+        import sys
+
         from arvel.console.closure import parse_signature
 
         tokens = parse_signature(self.signature)
         self._arguments = {t.name: values.get(t.name) for t in tokens if not t.is_option}
         self._options = {t.name: values.get(t.name) for t in tokens if t.is_option}
+        for token in tokens:
+            if token.is_option or token.optional or self._arguments.get(token.name) is not None:
+                continue
+            if sys.stdin is not None and sys.stdin.isatty():
+                self._arguments[token.name] = self.ask(f"{token.name}")
+            else:
+                self.fail(f"missing required argument: {token.name}")
+
+    def fail(self, message: str) -> NoReturn:
+        """Abort the command with ``message`` and exit code 1."""
+        raise CommandFailed(message)
 
     def argument(self, name: str) -> Any:
         return self._arguments.get(name)
@@ -206,3 +224,12 @@ def main() -> None:
         print_banner(__version__)
         return
     build_cli()()
+
+
+__all__ = [
+    "Command",
+    "CommandFailed",
+    "ConsoleOutput",
+    "build_cli",
+    "main",
+]

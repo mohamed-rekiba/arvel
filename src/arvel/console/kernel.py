@@ -195,11 +195,16 @@ def run_command_class(cls: Any, **cli_kwargs: Any) -> None:
     import inspect
 
     async def handler(app: Any) -> None:
+        import typer
+
         instance = cls()
         instance.bind_parsed(cli_kwargs)
         result = app.call((instance, "handle"))
         if inspect.isawaitable(result):
-            await result
+            result = await result
+        # a returned int is the exit code, like a process's return status
+        if isinstance(result, int) and result != 0:
+            raise typer.Exit(code=result)
 
     run_app_command(handler)
 
