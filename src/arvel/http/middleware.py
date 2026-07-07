@@ -166,11 +166,6 @@ class ThrottleRequests(Middleware):
         self._cache = cache  # CacheRepository for distributed limiting; None → in-process
         self._limiter_name = limiter_name
 
-    def _client(self, request: Any) -> str:
-        getter = getattr(request, "ip", None)
-        client: Any = getter() if callable(getter) else None
-        return str(client) if client else "global"
-
     async def _hit(self, key: str) -> int:
         """Increment the window counter for ``key`` and return the new count."""
         if self._cache is not None:  # distributed: atomic incr in the cache, TTL on first hit
@@ -191,7 +186,9 @@ class ThrottleRequests(Middleware):
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         if self._limiter_name is not None:
             return await self._handle_named(request, call_next)
-        key = f"{self.name}:{self._client(request)}"
+        # user-then-IP (the same segmentation named limiters use) so authenticated users behind a
+        # shared IP get independent buckets, not one shared with every user on that IP.
+        key = f"{self.name}:{_default_segment(request)}"
         count = await self._hit(key)
         if count > self.max_attempts:
             await self._plain_over_limit(key)  # raises HttpException(429) with rate-limit headers

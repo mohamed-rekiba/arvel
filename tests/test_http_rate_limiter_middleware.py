@@ -212,3 +212,38 @@ def test_named_limiter_end_to_end_headers_and_429() -> None:
             assert third.headers["X-RateLimit-Remaining"] == "0"
     finally:
         set_application(None)
+
+
+async def test_plain_mode_throttles_per_user_not_just_per_ip() -> None:
+    """Plain-mode (no named limiter) must segment by user-then-IP, so two authenticated users
+    behind a shared IP get independent buckets rather than sharing one."""
+    from dataclasses import dataclass as _dc
+
+    from arvel.http.exceptions import HttpException
+    from arvel.http.middleware import reset_rate_limiter
+    from arvel.support import current_user
+
+    @_dc
+    class User:
+        id: int
+
+    reset_rate_limiter()
+    try:
+        mw = ThrottleRequests(max_attempts=1, name="g16")
+        shared_ip = FakeRequest("10.0.0.1")
+
+        token = current_user.set(User(id=1))
+        try:
+            assert await mw.handle(shared_ip, _ok) == "ok"
+            with pytest.raises(HttpException):  # user 1's 2nd hit is over the limit
+                await mw.handle(shared_ip, _ok)
+        finally:
+            current_user.reset(token)
+
+        token = current_user.set(User(id=2))  # different user, SAME ip
+        try:
+            assert await mw.handle(shared_ip, _ok) == "ok"  # own bucket, not user 1's
+        finally:
+            current_user.reset(token)
+    finally:
+        reset_rate_limiter()
