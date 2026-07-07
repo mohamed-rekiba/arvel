@@ -10,6 +10,7 @@ Not part of the original ch-08 port spec — added on request, following the Spa
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from arvel.database import Model, morph_type_of
@@ -186,15 +187,19 @@ class MediaAdder:
                 media.generated_conversions = generated
                 await media.save()
         except Exception:
+            # best-effort cleanup: a secondary failure (permissions, network) must not stop
+            # the remaining paths or the row removal — the ORIGINAL error is what propagates
             for path in written:
-                await filesystem.delete(path)
-            await media.delete()
+                with contextlib.suppress(Exception):
+                    await filesystem.delete(path)
+            with contextlib.suppress(Exception):
+                await media.delete()
             raise
         return media
 
 
 class HasMedia:
-    """Mixin: attach files to a model via named media collections (Spatie ``InteractsWithMedia``).
+    """Mixin: attach files to a model via named media collections (the familiar media-collections mixin).
 
     Override:meth:`register_media_conversions` to declare derived versions generated on upload.
     Override ``__media_model__`` to store media as a custom:class:`Media` subclass (e.g. one that

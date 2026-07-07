@@ -362,14 +362,21 @@ class ConnectionResolver:
 
     async def statement(self, sql: str, params: Any = None, name: str | None = None) -> Any:
         """Run a raw SQL statement (INSERT/UPDATE/DDL). Inside a transaction it joins the
-        transaction (and rolls back with it); standalone it commits its own."""
+        transaction (and rolls back with it); standalone it commits its own. Writes mark the
+        connection sticky and hit the query log, exactly like execute()."""
         import sqlalchemy as sa
 
+        statement = sa.text(sql)
+        start = time.perf_counter()
         active = _active_conn.get()
         if active is not None:
-            return await active.execute(sa.text(sql), params or {})
-        async with self.engine(name).begin() as conn:
-            return await conn.execute(sa.text(sql), params or {})
+            result = await active.execute(statement, params or {})
+        else:
+            async with self.engine(name).begin() as conn:
+                result = await conn.execute(statement, params or {})
+        self._mark_sticky(name)
+        await self._record(statement, (time.perf_counter() - start) * 1000, name)
+        return result
 
     async def stream(self, statement: Any, name: str | None = None) -> AsyncGenerator[Any]:
         """Stream mapped rows one at a time (server-side cursor) for low-memory reads.
