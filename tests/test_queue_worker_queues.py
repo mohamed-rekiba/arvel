@@ -103,3 +103,24 @@ async def test_work_without_queues_still_consumes_everything() -> None:
     finally:
         set_application(None)
         await db.dispose()
+
+
+async def test_filtered_broker_delivery_is_parked_not_lost() -> None:
+    """A queue-filtering worker receiving a job for a queue it doesn't consume must park
+    it durably (jobs table) for another worker — the broker acks the delivery either way."""
+    from arvel.queue import _WorkerOptions  # pyright: ignore[reportPrivateUsage]
+
+    manager, db = await _setup()
+    try:
+        manager._worker_options = _WorkerOptions(
+            max_jobs=None, rest=0.0, stop_when_empty=False, queues=["emails"]
+        )
+        result = await manager._invoke(Tick("stray"), queue_label="reports")
+        assert result is None
+        assert PROCESSED == []  # not executed by this worker
+        parked = await QueuedJob.get()
+        assert len(parked) == 1 and parked[0].queue == "reports"  # durable, not lost
+    finally:
+        manager._worker_options = None
+        set_application(None)
+        await db.dispose()
