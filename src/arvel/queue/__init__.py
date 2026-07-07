@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
@@ -234,7 +234,7 @@ class Job:
     backoff: int | list[int] = 5
     timeout: int = 60
     #: Visibility-timeout override (seconds) for this job's class; ``None`` -> the
-    #: ``queue.retry_after`` config default (see `QueueManager._reclaim_stuck_jobs`).
+    #: ``queue.retry_after`` config default (see `DurableJobs._reclaim_stuck`).
     retry_after: int | None = None
     #: Cap on *thrown* exceptions before the job is failed — a tighter ceiling than `tries`. A
     #: `JobShouldBeReleased` (a middleware or handler putting the job back on the queue) is not an
@@ -581,6 +581,107 @@ class JobRouter:
         return routed if routed is not None else "default"
 
 
+class DurableJobs:
+    """The durable jobs-table store, split out of the coordinator: delayed / retry-release rows
+    persisted to the ``jobs`` table, reserved with a visibility timeout, and released onto the
+    broker when due. Depends only on routing, a push callable, and the retry-after setting — no
+    back-reference to the manager.
+    """
+
+    def __init__(
+        self,
+        router: JobRouter,
+        push: Callable[..., Awaitable[Any]],
+        retry_after: Callable[[], int],
+    ) -> None:
+        self._router = router
+        self._push = push  # the broker-push (QueueManager.push_instance) — a plain callable
+        self._retry_after = retry_after
+
+    async def store(
+        self, delay: float, job: Job, *, queue: str | None = None, attempts: int = 0
+    ) -> Any:
+        """Persist a job to the ``jobs`` table with ``available_at = now + delay`` — the durable
+        delayed/retry rail. ``attempts`` carries the real attempt count across a retry-release."""
+        import time
+
+        from arvel.kernel import app, has_application
+
+        if not (has_application() and app().bound("db")):
+            raise RuntimeError(
+                "delayed dispatch needs a configured database (the jobs table); "
+                "dispatch without a delay to enqueue immediately"
+            )
+        from arvel.queue.jobs import QueuedJob
+
+        now = int(time.time())
+        return await QueuedJob.create(
+            queue=self._router.label(type(job), queue),
+            payload=serialize_instance(job),
+            attempts=attempts,
+            available_at=now + int(delay),
+            created_at=now,
+        )
+
+    async def _reclaim_stuck(self, moment: int) -> None:
+        """Visibility timeout: a row whose ``reserved_at`` predates its ``retry_after`` window
+        means the worker that claimed it died mid-flight — free it so another worker retakes it."""
+        from arvel.queue.jobs import QueuedJob
+
+        default_retry_after = self._retry_after()
+        stuck = await QueuedJob.where_not_null("reserved_at").get()
+        for row in stuck:
+            reserved_at = row.reserved_at
+            if reserved_at is None:
+                continue
+            retry_after = default_retry_after
+            with contextlib.suppress(Exception):  # an undeserializable row falls back to default
+                job = await deserialize_instance(row.payload)
+                override = getattr(job, "retry_after", None)
+                if override is not None:
+                    retry_after = override
+            if moment - int(reserved_at) >= retry_after:
+                await (
+                    QueuedJob.where("id", "=", row.id)
+                    .where("reserved_at", "=", reserved_at)
+                    .update({"reserved_at": None})
+                )
+
+    async def release_due(self, now: int | None = None, *, queues: list[str] | None = None) -> int:
+        """Reclaim timed-out reservations, then push every due row onto the broker and delete it.
+        ``queues`` restricts + orders release queue-by-queue in the given priority order."""
+        import time
+
+        from arvel.queue.jobs import QueuedJob
+
+        moment = now if now is not None else int(time.time())
+        await self._reclaim_stuck(moment)
+        due: Iterable[Any] = (
+            await QueuedJob.where("available_at", "<=", moment).where_null("reserved_at").get()
+        )
+        if queues is not None:
+            priority = {name: index for index, name in enumerate(queues)}
+            due = sorted(
+                (row for row in due if row.queue in priority), key=lambda r: priority[r.queue]
+            )
+        released = 0
+        for row in due:
+            # Atomic claim: rowcount == 1 means this worker won the row; 0 means another already
+            # took it — skip to avoid a double-dispatch.
+            claim = (
+                await QueuedJob.where("id", "=", row.id)
+                .where_null("reserved_at")
+                .update({"reserved_at": moment})
+            )
+            if claim.rowcount != 1:
+                continue
+            job = await deserialize_instance(row.payload)
+            await self._push(job, queue=row.queue)
+            await row.delete()
+            released += 1
+        return released
+
+
 class QueueManager(Manager):
     """Pushes jobs onto a config-selected taskiq broker (the Manager 'driver': ``memory``/``redis``/
     ``amqp``) and runs them via a single wrapper task."""
@@ -589,6 +690,11 @@ class QueueManager(Manager):
         super().__init__(app)
         self._broker = broker  # an explicit broker passed in wins over the config-selected one
         self._router = JobRouter()  # per-class queue routing, split out of this coordinator
+        self._durable = DurableJobs(  # the jobs-table store, also split out
+            self._router,
+            self.push_instance,
+            lambda: self._settings(QueueSettings).retry_after,
+        )
         self._task: Any = None
         self._started = False
         self._worker_options: _WorkerOptions | None = None  # set only while work() is running
@@ -1058,102 +1164,21 @@ class QueueManager(Manager):
     async def dispatch_after(
         self, delay: float, job: Job, *, queue: str | None = None, attempts: int = 0
     ) -> Any:
-        """Delay a job: persist it to the ``jobs`` table with
-        ``available_at = now + delay`` instead of enqueuing now. A worker/scheduler calls
-        :meth:`release_due_jobs` to push the due ones. Durable (survives restart); needs a DB.
-        ``attempts`` records how many times the job has already run — B1's retry-release reuses
-        this same mechanism, so a released-for-retry row shows its real attempt count."""
-        import time
-
-        from arvel.kernel import app, has_application
-
-        if not (has_application() and app().bound("db")):
-            raise RuntimeError(
-                "delayed dispatch needs a configured database (the jobs table); "
-                "dispatch without a delay to enqueue immediately"
-            )
-        from arvel.queue.jobs import QueuedJob
-
-        now = int(time.time())
-        return await QueuedJob.create(
-            queue=self._queue_label(type(job), queue),
-            payload=serialize_instance(job),
-            attempts=attempts,
-            available_at=now + int(delay),
-            created_at=now,
-        )
-
-    async def _reclaim_stuck_jobs(self, moment: int) -> None:
-        """Visibility timeout: a row whose ``reserved_at`` predates its ``retry_after`` window
-        means the worker that claimed it died before finishing (a crash between the atomic claim
-        and the delete in :meth:`release_due_jobs`) — free it (clear ``reserved_at``) so another
-        worker can pick it up. ``retry_after`` is the job's own class attribute if set, else the
-        ``queue.retry_after`` config default."""
-        from arvel.queue.jobs import QueuedJob
-
-        default_retry_after = self._settings(QueueSettings).retry_after
-        stuck = await QueuedJob.where_not_null("reserved_at").get()
-        for row in stuck:
-            reserved_at = row.reserved_at
-            if reserved_at is None:
-                continue
-            retry_after = default_retry_after
-            with contextlib.suppress(
-                Exception
-            ):  # an undeserializable row falls back to the default
-                job = await deserialize_instance(row.payload)
-                override = getattr(job, "retry_after", None)
-                if override is not None:
-                    retry_after = override
-            if moment - int(reserved_at) >= retry_after:
-                await (
-                    QueuedJob.where("id", "=", row.id)
-                    .where("reserved_at", "=", reserved_at)
-                    .update({"reserved_at": None})
-                )
+        """Delay a job: persist it to the ``jobs`` table with ``available_at = now + delay``
+        instead of enqueuing now. A worker/scheduler calls :meth:`release_due_jobs` to push the due
+        ones. Durable (survives restart); needs a DB. ``attempts`` carries the real attempt count
+        across a retry-release."""
+        return await self._durable.store(delay, job, queue=queue, attempts=attempts)
 
     async def release_due_jobs(
         self, now: int | None = None, *, queues: list[str] | None = None
     ) -> int:
         """Reclaim any visibility-timed-out reservations, then push every stored job whose
         ``available_at`` has passed onto the broker and delete its row. Returns how many were
-        released. A worker (``queue:work``) / scheduler calls this periodically.
-
-        ``queues`` (from an active ``work(queues=[...])`` run) restricts + orders release to
-        those queues: a due row on a queue not named is left untouched (another worker may
-        consume it), and the rest are released **queue-by-queue in the given order** — every due
-        row for ``queues[0]`` before any of ``queues[1]``'s — the priority cadence for the
-        durable jobs table (see ``work``'s docstring)."""
-        import time
-
-        from arvel.queue.jobs import QueuedJob
-
-        moment = now if now is not None else int(time.time())
-        await self._reclaim_stuck_jobs(moment)
-        due: Iterable[Any] = (
-            await QueuedJob.where("available_at", "<=", moment).where_null("reserved_at").get()
-        )
-        if queues is not None:
-            priority = {name: index for index, name in enumerate(queues)}
-            due = sorted(
-                (row for row in due if row.queue in priority), key=lambda r: priority[r.queue]
-            )
-        released = 0
-        for row in due:
-            # Atomic claim: rowcount == 1 means this worker won the row; 0 means another worker
-            # already took it — skip it to avoid a double-dispatch.
-            claim = (
-                await QueuedJob.where("id", "=", row.id)
-                .where_null("reserved_at")
-                .update({"reserved_at": moment})
-            )
-            if claim.rowcount != 1:
-                continue
-            job = await deserialize_instance(row.payload)
-            await self.push_instance(job, queue=row.queue)
-            await row.delete()
-            released += 1
-        return released
+        released. A worker (``queue:work``) / scheduler calls this periodically. ``queues`` (from an
+        active ``work(queues=[...])`` run) restricts + orders release queue-by-queue in that
+        priority order."""
+        return await self._durable.release_due(now, queues=queues)
 
 
 def _queue_manager() -> Any:
