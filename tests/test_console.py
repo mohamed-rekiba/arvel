@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import runpy
 import subprocess
 import sys
+
+import pytest
 
 
 def _run(*args: str, cwd: str | None = None) -> subprocess.CompletedProcess[str]:
@@ -55,6 +58,27 @@ def test_new_command_surface(tmp_path: object) -> None:
     proc = _run("new", "demo", "--package", cwd=str(tmp_path))  # tmp cwd: scaffolding writes files
     assert proc.returncode == 0, proc.stderr
     assert "demo" in proc.stdout
+
+
+def test_dunder_main_module_is_a_noop_import_when_not_run_as_main() -> None:
+    sys.modules.pop("arvel.console.__main__", None)  # force a fresh, real import
+    import arvel.console.__main__ as dunder_main  # __name__ != "__main__": no CLI invocation
+
+    assert hasattr(dunder_main, "main")
+
+
+def test_dunder_main_runs_the_cli_and_exits_zero_on_help(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # exercises the real `python -m arvel.console` entry point (the `__main__.py` guard) —
+    # run in-process via runpy so it's the actual production code path, not a subprocess
+    # coverage can't see.
+    monkeypatch.setattr(sys, "argv", ["arvel.console", "--help"])
+    sys.modules.pop("arvel.console.__main__", None)  # force a fresh run, not a cached module
+    with pytest.raises(SystemExit) as exc:
+        runpy.run_module("arvel.console.__main__", run_name="__main__")
+    assert exc.value.code == 0
+    assert "Usage" in capsys.readouterr().out
 
 
 def test_lazygroup_lists_builtins_without_importing_them() -> None:

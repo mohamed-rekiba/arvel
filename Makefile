@@ -75,5 +75,5 @@ pre-commit:  ## Run pre-commit checks (lint, format, typecheck, imports, securit
 	$(RUN) pre-commit run --all-files
 
 clean:  ## Remove build/test artifacts
-	rm -rf .site .cache .pytest_cache .mypy_cache .ruff_cache .hypothesis .import_linter_cache .coverage.json dist build
+	rm -rf .site .cache .pytest_cache .mypy_cache .ruff_cache .hypothesis .import_linter_cache .coverage .coverage.json dist build
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

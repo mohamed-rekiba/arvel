@@ -94,3 +94,38 @@ def test_create_oidc_driver_fails_loud_on_missing_config() -> None:
 
     with pytest.raises(ValueError, match="jwks_uri"):
         GuardManager(_App()).guard("oidc")
+
+
+def test_create_oidc_driver_with_no_app_treats_config_as_missing() -> None:
+    from arvel.auth.guards import GuardManager
+
+    with pytest.raises(ValueError, match="jwks_uri"):
+        GuardManager().guard("oidc")  # no app bound at all: skips the config lookup entirely
+
+
+def test_create_oidc_driver_treats_a_non_dict_config_as_missing() -> None:
+    from arvel.auth.guards import GuardManager
+
+    class _App:
+        def config(self, key: str, default: Any = None) -> Any:
+            return None  # no auth.oidc section configured at all
+
+    with pytest.raises(ValueError, match="jwks_uri"):
+        GuardManager(_App()).guard("oidc")
+
+
+def test_create_oidc_driver_builds_a_working_guard_from_full_config() -> None:
+    from arvel.auth.guards import GuardManager
+
+    class _App:
+        def config(self, key: str, default: Any = None) -> Any:
+            return {
+                "jwks_uri": "https://idp.test/jwks",
+                "issuer": "https://idp.test",
+                "audience": "arvel",
+                "provider": "keycloak",
+            }
+
+    guard = GuardManager(_App()).guard("oidc")
+    assert isinstance(guard, OidcGuard)
+    assert guard._provider == "keycloak"

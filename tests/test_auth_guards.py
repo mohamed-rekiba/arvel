@@ -176,6 +176,36 @@ async def test_session_guard_user_id_reads_back_a_later_request() -> None:
 
 
 @pytest.mark.asyncio
+async def test_session_guard_login_without_a_dict_session_still_sets_current_user(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # a request with no `.session` attribute (or a non-dict one): login skips persisting the
+    # user id but still sets current_user for the rest of this request.
+    import arvel.http.session as session_module
+
+    monkeypatch.setattr(session_module, "regenerate_session", lambda _r: None)
+
+    class _NoSessionRequest:
+        pass
+
+    req = _NoSessionRequest()
+    token = current_user.set(None)
+    try:
+        await SessionGuard().login(_User(3), req)
+        assert isinstance(current_user.get(), _User)
+    finally:
+        current_user.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_session_guard_user_id_without_a_dict_session_is_none() -> None:
+    class _NoSessionRequest:
+        pass
+
+    assert await SessionGuard().user_id(_NoSessionRequest()) is None
+
+
+@pytest.mark.asyncio
 async def test_session_guard_login_with_remember_issues_a_cookie() -> None:
     import sqlalchemy as sa
 
@@ -269,6 +299,37 @@ def test_guard_manager_extend() -> None:
     mgr = GuardManager()
     mgr.extend("custom", lambda _app: sentinel)
     assert mgr.guard("custom") is sentinel
+
+
+def test_guard_manager_default_driver_reads_app_config() -> None:
+    class _App:
+        def config(self, key: str, default: Any = None) -> Any:
+            assert key == "auth.default_guard"
+            return "local"
+
+    mgr = GuardManager(_App())
+    assert mgr.default_driver() == "local"
+
+
+@pytest.mark.asyncio
+async def test_local_guard_from_the_manager_uses_the_db_credential_lookup() -> None:
+    import sqlalchemy as sa
+
+    from arvel.auth.identity import AuthIdentity
+    from arvel.database import ConnectionResolver
+
+    db = ConnectionResolver()
+    AuthIdentity.set_connection(db)
+    await db.execute(sa.schema.CreateTable(AuthIdentity.__table__))
+    try:
+        hashed = Hasher().make("s3cret")
+        await AuthIdentity.create(provider="local", subject="ada", user_id=1, credential=hashed)
+        guard = GuardManager().guard("local")
+        assert isinstance(guard, LocalGuard)
+        assert await guard.attempt("ada", "s3cret") is not None
+        assert await guard.attempt("nobody", "whatever") is None  # the unknown-id branch too
+    finally:
+        await db.dispose()
 
 
 # --- AuthManager.attempt (recast through LocalGuard) ---------------------------
