@@ -7,7 +7,7 @@ from typing import ClassVar
 
 import sqlalchemy as sa
 
-from arvel.database import ConnectionResolver, Model
+from arvel.database import ConnectionResolver, Model, morph_map
 
 
 class MePost(Model):
@@ -21,6 +21,9 @@ class MeVideo(Model):
 
     def comments(self) -> object:
         return self.morph_many(MeComment, "commentable")
+
+
+morph_map({"MePost": MePost, "MeVideo": MeVideo})
 
 
 class MeComment(Model):

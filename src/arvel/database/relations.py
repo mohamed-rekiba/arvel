@@ -14,6 +14,13 @@ from dataclasses import dataclass, field
 from typing import Any, cast
 
 
+def _morph_type(model: Any) -> str:
+    """The stored ``{name}_type`` discriminator for ``model`` (alias or qualified path)."""
+    from arvel.database.model import morph_type_of
+
+    return morph_type_of(model)
+
+
 def _pk_type(model: Any, key: str) -> Any:
     """The SQLAlchemy column type of ``model``'s ``key`` column, so a synthetic pivot column
     matches the real PK type (int / uuid / string) rather than assuming Integer."""
@@ -67,7 +74,11 @@ class Relation:
         return self.related.where_in(self.foreign_key, keys)
 
     async def eager_load(self, parents: list[Any], name: str, constrain: Any = None) -> None:
-        keys = [p._attributes.get(self.local_key) for p in parents]
+        keys = [k for p in parents if (k := p._attributes.get(self.local_key)) is not None]
+        if not keys:
+            for parent in parents:
+                parent._relations[name] = self._match([])
+            return
         query = self._eager_query(keys)
         if constrain is not None:  # constrained eager load (with_where_has, D2)
             constrain(query)
@@ -79,6 +90,43 @@ class Relation:
             parent._relations[name] = self._match(
                 grouped.get(parent._attributes.get(self.local_key), [])
             )
+
+    # --- correlation seams (Builder delegates here) --------------------------
+    # Each relation shape knows how its rows correlate to a parent row; Builder's
+    # where_has / doesnt_have / with_count-and-friends must not assume a shape.
+
+    def _constrained_where(self, callback: Any) -> Any:
+        """The extra WHERE from a user callback, built against the related model's table."""
+        from arvel.database.builder import Builder
+
+        constrained = Builder(self.related.__table__, model=self.related)
+        callback(constrained)
+        return constrained.combined_where()
+
+    def exists_clause(self, parent_table: Any, callback: Any = None) -> Any:
+        """EXISTS(1) correlating this relation's rows to ``parent_table`` (has-many shape)."""
+        import sqlalchemy as sa
+
+        related_table = self.related.__table__
+        subquery = sa.select(sa.literal(1)).where(
+            related_table.c[self.foreign_key] == parent_table.c[self.local_key]
+        )
+        if callback is not None:
+            extra = self._constrained_where(callback)
+            if extra is not None:
+                subquery = subquery.where(extra)
+        return sa.exists(subquery)
+
+    def aggregate_clause(self, parent_table: Any, aggregate: Any) -> Any:
+        """A correlated scalar subquery of ``aggregate`` over this relation's rows."""
+        import sqlalchemy as sa
+
+        related_table = self.related.__table__
+        return (
+            sa.select(aggregate)
+            .where(related_table.c[self.foreign_key] == parent_table.c[self.local_key])
+            .scalar_subquery()
+        )
 
 
 class HasOneOrMany(Relation):
@@ -226,6 +274,110 @@ class BelongsToMany(Relation):
                         col: pivot_row[col] for col in self._pivot_columns
                     }
         return models
+
+    async def eager_load(self, parents: list[Any], name: str, constrain: Any = None) -> None:
+        from arvel.database.collection import ModelCollection
+
+        parent_ids = [k for p in parents if (k := p._attributes.get(self.parent_key)) is not None]
+        if not parent_ids:
+            for parent in parents:
+                parent._relations[name] = ModelCollection[Any]()
+            return
+        pivot_query = self._pivot_query().where_in(self.foreign_pivot_key, parent_ids)
+        for column, value in self._pivot_wheres:
+            pivot_query = pivot_query.where(column, "=", value)
+        pivot_rows = await pivot_query.get()
+        related_ids_by_parent: dict[Any, list[Any]] = {}
+        pivot_by_pair: dict[tuple[Any, Any], Any] = {}
+        for row in pivot_rows:
+            pid, rid = row[self.foreign_pivot_key], row[self.related_pivot_key]
+            related_ids_by_parent.setdefault(pid, []).append(rid)
+            pivot_by_pair[(pid, rid)] = row
+
+        all_related_ids = list({rid for rids in related_ids_by_parent.values() for rid in rids})
+        by_related_id: dict[Any, Any] = {}
+        if all_related_ids:
+            models_query = self.related.where_in(self.related_key, all_related_ids)
+            for related_constrain in self._related_constraints:
+                related_constrain(models_query)
+            if constrain is not None:
+                constrain(models_query)
+            for model in await models_query.get():
+                by_related_id[model._attributes[self.related_key]] = model
+
+        for parent in parents:
+            pid = parent._attributes.get(self.parent_key)
+            matched: list[Any] = []
+            for rid in related_ids_by_parent.get(pid, []):
+                model = by_related_id.get(rid)
+                if model is None:
+                    continue
+                # without pivot columns, parents share one hydrated instance — read-path
+                # aliasing, same tradeoff the reference makes
+                if self._pivot_columns:
+                    # each parent gets its own hydrated copy so pivot data can't cross parents
+                    model = self.related(**dict(model._attributes))
+                    pivot_row = pivot_by_pair[(pid, rid)]
+                    model._attributes[self._pivot_accessor] = {
+                        col: pivot_row[col] for col in self._pivot_columns
+                    }
+                    model._exists = True
+                matched.append(model)
+            parent._relations[name] = ModelCollection(matched)
+
+    def _related_where(self, callback: Any = None) -> Any:
+        """The combined related-table WHERE from the relation's chained ``where()`` constraints
+        plus an optional extra callback — so where_has/with_count filter exactly like a fetch."""
+        if callback is None and not self._related_constraints:
+            return None
+        from arvel.database.builder import Builder
+
+        constrained = Builder(self.related.__table__, model=self.related)
+        for related_constrain in self._related_constraints:
+            related_constrain(constrained)
+        if callback is not None:
+            callback(constrained)
+        return constrained.combined_where()
+
+    def exists_clause(self, parent_table: Any, callback: Any = None) -> Any:
+        import sqlalchemy as sa
+
+        pivot = self._pivot_table()
+        related_table = self.related.__table__
+        subquery = sa.select(sa.literal(1)).where(
+            pivot.c[self.foreign_pivot_key] == parent_table.c[self.parent_key]
+        )
+        for column, value in self._pivot_wheres:
+            subquery = subquery.where(pivot.c[column] == value)
+        extra = self._related_where(callback)
+        if extra is not None:
+            inner = sa.select(sa.literal(1)).where(
+                related_table.c[self.related_key] == pivot.c[self.related_pivot_key]
+            )
+            inner = inner.where(extra)
+            subquery = subquery.where(sa.exists(inner))
+        return sa.exists(subquery)
+
+    def aggregate_clause(self, parent_table: Any, aggregate: Any) -> Any:
+        import sqlalchemy as sa
+
+        pivot = self._pivot_table()
+        clause = (
+            sa.select(aggregate)
+            .select_from(
+                pivot.join(
+                    self.related.__table__,
+                    self.related.__table__.c[self.related_key] == pivot.c[self.related_pivot_key],
+                )
+            )
+            .where(pivot.c[self.foreign_pivot_key] == parent_table.c[self.parent_key])
+        )
+        for column, value in self._pivot_wheres:
+            clause = clause.where(pivot.c[column] == value)
+        extra = self._related_where()
+        if extra is not None:
+            clause = clause.where(extra)
+        return clause.scalar_subquery()
 
     async def attach(self, related_id: Any, **pivot: Any) -> None:
         """Insert a pivot row linking the parent to ``related_id``, with optional extra pivot columns."""
@@ -376,10 +528,76 @@ class HasManyThrough(Relation):
             return ModelCollection[Any]()
         return await self.related.where_in(self.second_key, keys).get()
 
+    async def eager_load(self, parents: list[Any], name: str, constrain: Any = None) -> None:
+        parent_keys = [k for p in parents if (k := p._attributes.get(self.local_key)) is not None]
+        if not parent_keys:
+            for parent in parents:
+                parent._relations[name] = self._match([])
+            return
+        intermediates = await self.through.where_in(self.first_key, parent_keys).get()
+        # intermediate link value → owning parent key (the far rows join on second_local_key).
+        # ponytail: assumes second_local_key is unique (it defaults to the through PK); a
+        # non-unique custom key would need multi-parent attribution here.
+        parent_key_by_link: dict[Any, Any] = {
+            row._attributes[self.second_local_key]: row._attributes[self.first_key]
+            for row in intermediates
+        }
+        grouped: dict[Any, list[Any]] = {}
+        if parent_key_by_link:
+            query = self.related.where_in(self.second_key, list(parent_key_by_link))
+            if constrain is not None:
+                constrain(query)
+            for child in await query.get():
+                owner = parent_key_by_link.get(child._attributes.get(self.second_key))
+                grouped.setdefault(owner, []).append(child)
+        for parent in parents:
+            parent._relations[name] = self._match(
+                grouped.get(parent._attributes.get(self.local_key), [])
+            )
+
+    def exists_clause(self, parent_table: Any, callback: Any = None) -> Any:
+        import sqlalchemy as sa
+
+        through_table = self.through.__table__
+        related_table = self.related.__table__
+        inner = sa.select(sa.literal(1)).where(
+            related_table.c[self.second_key] == through_table.c[self.second_local_key]
+        )
+        if callback is not None:
+            extra = self._constrained_where(callback)
+            if extra is not None:
+                inner = inner.where(extra)
+        subquery = (
+            sa.select(sa.literal(1))
+            .where(through_table.c[self.first_key] == parent_table.c[self.local_key])
+            .where(sa.exists(inner))
+        )
+        return sa.exists(subquery)
+
+    def aggregate_clause(self, parent_table: Any, aggregate: Any) -> Any:
+        import sqlalchemy as sa
+
+        through_table = self.through.__table__
+        related_table = self.related.__table__
+        return (
+            sa.select(aggregate)
+            .select_from(
+                through_table.join(
+                    related_table,
+                    related_table.c[self.second_key] == through_table.c[self.second_local_key],
+                )
+            )
+            .where(through_table.c[self.first_key] == parent_table.c[self.local_key])
+            .scalar_subquery()
+        )
+
 
 class HasOneThrough(HasManyThrough):
     """Far relation through an intermediate, resolving a single row (or None) — the
     one-row sibling of ``HasManyThrough`` (e.g. Country → User → first Post). D1."""
+
+    def _match(self, items: list[Any]) -> Any:
+        return items[0] if items else None
 
     async def get(self) -> Any:
         rows = await super().get()
@@ -395,7 +613,7 @@ class MorphMany(Relation):
 
     async def get(self) -> Any:
         return await (
-            self.related.where(f"{self.morph_name}_type", "=", type(self.parent).__name__)
+            self.related.where(f"{self.morph_name}_type", "=", _morph_type(type(self.parent)))
             .where(f"{self.morph_name}_id", "=", self.parent._attributes[self.local_key])
             .get()
         )
@@ -403,7 +621,7 @@ class MorphMany(Relation):
     def _eager_query(self, keys: list[Any]) -> Any:
         # also filter by parent type, so children of a different model sharing an id aren't mis-attached
         return self.related.where(
-            f"{self.morph_name}_type", "=", type(self.parent).__name__
+            f"{self.morph_name}_type", "=", _morph_type(type(self.parent))
         ).where_in(self.foreign_key, keys)
 
 
@@ -458,6 +676,10 @@ class MorphTo(Relation):
 class MorphOne(MorphMany):
     """Polymorphic one-to-one (the single child for ``{name}_type``/``{name}_id``)."""
 
+    def _match(self, items: list[Any]) -> Any:
+        # eager loads hydrate a single model (or None), like HasOne
+        return items[0] if items else None
+
     async def get(self) -> Any:
         results = await super().get()
         return results[0] if results else None
@@ -497,7 +719,7 @@ class MorphToMany(Relation):
         await self._pivot_query().insert(
             {
                 f"{self.morph_name}_id": self._parent_id(),
-                f"{self.morph_name}_type": type(self.parent).__name__,
+                f"{self.morph_name}_type": _morph_type(type(self.parent)),
                 self.related_pivot_key: related_id,
             }
         )
@@ -506,7 +728,7 @@ class MorphToMany(Relation):
         rows = await (
             self._pivot_query()
             .where(f"{self.morph_name}_id", "=", self._parent_id())
-            .where(f"{self.morph_name}_type", "=", type(self.parent).__name__)
+            .where(f"{self.morph_name}_type", "=", _morph_type(type(self.parent)))
             .get()
         )
         related_ids = [row[self.related_pivot_key] for row in rows]
@@ -548,7 +770,7 @@ class MorphedByMany(Relation):
         rows = await (
             self._pivot_query()
             .where(self.parent_pivot_key, "=", self.parent._attributes[self.parent.__primary_key__])
-            .where(f"{self.morph_name}_type", "=", self.related.__name__)
+            .where(f"{self.morph_name}_type", "=", _morph_type(self.related))
             .get()
         )
         related_ids = [row[f"{self.morph_name}_id"] for row in rows]
@@ -594,7 +816,11 @@ class BelongsTo(Relation):
         return self.parent
 
     async def eager_load(self, parents: list[Any], name: str, constrain: Any = None) -> None:
-        keys = [p._attributes.get(self.foreign_key) for p in parents]
+        keys = [k for p in parents if (k := p._attributes.get(self.foreign_key)) is not None]
+        if not keys:
+            for parent in parents:
+                parent._relations[name] = None
+            return
         query = self.related.where_in(self.owner_key, keys)
         if constrain is not None:
             constrain(query)
@@ -602,6 +828,30 @@ class BelongsTo(Relation):
         by_key = {o._attributes.get(self.owner_key): o for o in owners}
         for parent in parents:
             parent._relations[name] = by_key.get(parent._attributes.get(self.foreign_key))
+
+    def exists_clause(self, parent_table: Any, callback: Any = None) -> Any:
+        # inverse shape: the CHILD (query table) carries the foreign key
+        import sqlalchemy as sa
+
+        related_table = self.related.__table__
+        subquery = sa.select(sa.literal(1)).where(
+            related_table.c[self.owner_key] == parent_table.c[self.foreign_key]
+        )
+        if callback is not None:
+            extra = self._constrained_where(callback)
+            if extra is not None:
+                subquery = subquery.where(extra)
+        return sa.exists(subquery)
+
+    def aggregate_clause(self, parent_table: Any, aggregate: Any) -> Any:
+        import sqlalchemy as sa
+
+        related_table = self.related.__table__
+        return (
+            sa.select(aggregate)
+            .where(related_table.c[self.owner_key] == parent_table.c[self.foreign_key])
+            .scalar_subquery()
+        )
 
 
 class RecursiveRelation:

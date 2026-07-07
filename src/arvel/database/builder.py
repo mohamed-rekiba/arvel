@@ -401,8 +401,10 @@ class Builder:
         return self
 
     # --- relationship existence (doc 07) -----------------------------------
-    def _combined_where(self) -> Any:
-        """Fold this builder's accumulated conditions into one SQLAlchemy clause (or None)."""
+    def combined_where(self) -> Any:
+        """Fold this builder's accumulated conditions into one SQLAlchemy clause (or None) —
+        the seam relation classes use to embed a user callback's constraints in their
+        correlation subqueries."""
         import sqlalchemy as sa
 
         clause: Any = None
@@ -421,20 +423,8 @@ class Builder:
         return getattr(self._model(), name)()  # bare instance: relation keys are class-level
 
     def _has_subquery(self, name: str, callback: Any) -> Any:
-        import sqlalchemy as sa
-
-        relation = self._relation(name)
-        related_table = relation.related.__table__
-        subquery = sa.select(sa.literal(1)).where(
-            related_table.c[relation.foreign_key] == self._table.c[relation.local_key]
-        )
-        if callback is not None:
-            constrained = Builder(related_table, model=relation.related)
-            callback(constrained)
-            extra = constrained._combined_where()
-            if extra is not None:
-                subquery = subquery.where(extra)
-        return sa.exists(subquery)
+        # the relation knows its own shape (pivot / through / inverse / has-many)
+        return self._relation(name).exists_clause(self._table, callback)
 
     def where_has(self, relation: str, callback: Any = None, *, connector: str = "and") -> Self:
         """Constrain to parents that have ≥1 matching related row (optional callback)."""
@@ -456,15 +446,8 @@ class Builder:
         return self
 
     def _correlated_aggregate(self, name: str, aggregate: Any) -> Any:
-        import sqlalchemy as sa
-
-        relation = self._relation(name)
-        related_table = relation.related.__table__
-        return (
-            sa.select(aggregate)
-            .where(related_table.c[relation.foreign_key] == self._table.c[relation.local_key])
-            .scalar_subquery()
-        )
+        # shape-aware: pivot/through relations correlate through their intermediates
+        return self._relation(name).aggregate_clause(self._table, aggregate)
 
     async def chunk_by_id(self, size: int, callback: Any, *, column: str | None = None) -> None:
         """Page through results in id-ordered batches of ``size``, calling ``callback`` per

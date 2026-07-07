@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from arvel.database import ConnectionResolver, Model
+from arvel.database import ConnectionResolver, Model, morph_map
 
 
 class Country(Model):
@@ -39,6 +39,9 @@ class Video(Model):
 
     def comments(self) -> object:
         return self.morph_many(Comment, "commentable")
+
+
+morph_map({"Post": Post, "Video": Video})
 
 
 async def _setup() -> ConnectionResolver:

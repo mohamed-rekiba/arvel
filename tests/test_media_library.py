@@ -78,7 +78,9 @@ async def test_add_media_stores_file_and_row() -> None:
             _png(), file_name="a.png", mime_type="image/png"
         ).to_media_collection("images")
         assert media.collection_name == "images"
-        assert media.model_type == "Album"
+        from arvel.database import morph_type_of
+
+        assert media.model_type == morph_type_of(Album)
         assert media.model_id == album.id
         assert media.size > 0
         assert await fs.exists(media.get_path())

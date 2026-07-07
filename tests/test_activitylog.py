@@ -42,7 +42,9 @@ async def test_activity_logger_subject_causer_properties() -> None:
             activity("audit").performed_on(post).with_properties({"ip": "1.2.3.4"}).log("viewed")
         )
         assert logged.log_name == "audit"
-        assert logged.subject_type == "Post"
+        from arvel.database import morph_type_of
+
+        assert logged.subject_type == morph_type_of(Post)
         assert logged.subject_id == post.id
         assert logged.properties == {"ip": "1.2.3.4"}
     finally:

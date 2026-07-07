@@ -24,6 +24,8 @@ from arvel.database.model import (
     Prunable,
     ReadOnlyModelError,
     SoftDeletes,
+    morph_map,
+    morph_type_of,
     scope,
 )
 from arvel.database.relations import SyncResult
@@ -73,6 +75,8 @@ __all__ = [
     "WithoutModelEvents",
     "WriteResult",
     "discover_migrations",
+    "morph_map",
+    "morph_type_of",
     "raw",
     "scope",
 ]

@@ -51,12 +51,37 @@ def _sa_type(sa: Any, field_type: Any) -> Any:
     return getattr(sa, _PY_TO_SA.get(field_type, "String"))()
 
 
+#: Concrete models keyed by their qualified name (``module.Class``) — bare class
+#: names collide across modules, which silently corrupts polymorphic resolution.
 _MODEL_REGISTRY: dict[str, type] = {}
+#: Explicit morph aliases (``morph_map``): alias → class, plus the reverse.
+_MORPH_ALIASES: dict[str, type[Any]] = {}
+_ALIAS_BY_CLASS: dict[type[Any], str] = {}
+
+
+def _qualified_name(model: Any) -> str:
+    return f"{model.__module__}.{model.__name__}"
+
+
+def morph_map(mapping: dict[str, type[Any]]) -> None:
+    """Register stable morph aliases: ``{'post': Post}`` stores ``'post'`` in ``{name}_type``
+    columns instead of the qualified class path, so a class rename/move can't orphan rows."""
+    for alias, model in mapping.items():
+        _MORPH_ALIASES[alias] = model
+        _ALIAS_BY_CLASS[model] = alias
+
+
+def morph_type_of(model: Any) -> str:
+    """The value written to ``{name}_type`` columns: the registered alias, else the
+    qualified class path."""
+    return _ALIAS_BY_CLASS.get(model, _qualified_name(model))
 
 
 def resolve_model(name: str) -> type | None:
-    """Resolve a model class by its name (for polymorphic ``morph_to``)."""
-    return _MODEL_REGISTRY.get(name)
+    """Resolve a stored morph type (for polymorphic ``morph_to``): an explicit alias first,
+    then the qualified-name registry. Unknown names resolve to ``None`` — the reading side
+    treats them as a missing owner rather than crashing."""
+    return _MORPH_ALIASES.get(name) or _MODEL_REGISTRY.get(name)
 
 
 def scope[F: "Any"](method: F) -> F:
@@ -204,7 +229,7 @@ class ModelMeta(type):
         cls.__local_scopes__ = scopes
         if bases and getattr(cls, "__fields__", None):  # concrete model → build its table
             cls.__table__ = _build_table(cls)
-            _MODEL_REGISTRY[name] = cls  # for polymorphic morph_to resolution
+            _MODEL_REGISTRY[_qualified_name(cls)] = cls  # for polymorphic morph_to resolution
         return cls
 
     def __getattr__(cls, item: str) -> Any:
