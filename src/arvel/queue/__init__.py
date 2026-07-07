@@ -684,9 +684,20 @@ class QueueManager(Manager):
             # inline retry path).
             label = queue_label if queue_label is not None else self._queue_label(type(job), None)
             if label not in options.queues:
-                # this worker's `work(queues=[...])` doesn't consume `label` — never run it (a
-                # clean empty poll), the receive-time safety net for any broker that can't filter
-                # at the network level itself (see `release_due_jobs`/`work`'s docstring).
+                # this worker's `work(queues=[...])` doesn't consume `label` — the receive-time
+                # net for brokers without network-level filtering. The broker acks this delivery
+                # regardless, so park the job durably (jobs table, due now) instead of dropping
+                # it — another worker's release_due_jobs re-dispatches it on its own queue.
+                from arvel.kernel import app, has_application
+
+                if has_application() and app().bound("db"):
+                    await self.dispatch_after(0, job, queue=label)
+                else:
+                    from arvel.kernel.logging import LogManager
+
+                    LogManager().channel("queue").warning(
+                        "filtered_job_dropped_no_db", queue=label, job=type(job).__name__
+                    )
                 return None
 
         batch_id = getattr(job, "__arvel_batch__", None)
