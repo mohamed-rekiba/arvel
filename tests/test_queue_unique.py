@@ -75,6 +75,34 @@ async def test_a_new_dispatch_enqueues_again_once_unique_for_elapses() -> None:
         UniqueJob.unique_for = 3600
 
 
+async def test_delayed_dispatch_of_a_unique_job_is_not_double_enqueued() -> None:
+    """A delayed (DB-backed) dispatch acquires the same uniqueness lock as an immediate one, so a
+    second delayed dispatch in the window doesn't write a duplicate jobs-table row."""
+    import sqlalchemy as sa
+
+    from arvel.database import ConnectionResolver
+    from arvel.queue import QueuedJob
+
+    app = Application()
+    CacheServiceProvider(app).register()
+    db = ConnectionResolver()
+    app.instance("db", db)
+    manager = QueueManager(app, broker=InMemoryBroker(await_inplace=False))
+    app.instance("queue", manager)
+    set_application(app)
+    QueuedJob.set_connection(db)
+    await db.execute(sa.schema.CreateTable(QueuedJob.__table__))
+    try:
+        first = await UniqueJob.dispatch_after(60, 1)
+        second = await UniqueJob.dispatch_after(60, 1)  # same slot, lock still held
+        assert first is not None
+        assert second is None
+        assert len(await QueuedJob.get()) == 1  # one durable row — no duplicate
+    finally:
+        set_application(None)
+        await db.dispose()
+
+
 async def test_lock_releases_once_the_worker_finishes_processing() -> None:
     """Proves the lock is freed on completion — not just via its (here, long) TTL."""
     RUN.clear()

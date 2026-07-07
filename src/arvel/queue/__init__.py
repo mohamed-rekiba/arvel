@@ -294,7 +294,16 @@ class Job:
         manager = (
             app().make("queue") if has_application() and app().bound("queue") else QueueManager()
         )
-        return await manager.dispatch_after(delay, cls(*args, **kwargs))
+        job = cls(*args, **kwargs)
+        # A unique job acquires its lock at the user dispatch entry (as `push` does for immediate
+        # dispatch) so a delayed dispatch can't double-enqueue. Internal re-dispatch through
+        # `QueueManager.dispatch_after` (filtered-park, retry-release) stays lock-free, reusing the
+        # lock the job already holds — mirroring the `push`/`push_instance` split.
+        from arvel.queue.middleware import ShouldBeUnique, unique_lock_for
+
+        if isinstance(job, ShouldBeUnique) and not await unique_lock_for(job).acquire():
+            return None  # already queued/running — don't double-enqueue
+        return await manager.dispatch_after(delay, job)
 
 
 @contextlib.contextmanager
