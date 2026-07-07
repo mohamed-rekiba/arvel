@@ -52,6 +52,17 @@ _KEY_FIELD = "_key"
 #: The flag field a soft-deleted record's index entry carries when ``search.soft_delete`` is on.
 _SOFT_DELETED_FIELD = "__soft_deleted"
 
+
+def effective_filterable(model_cls: Any) -> list[str]:
+    """The model's declared filterable fields, plus the soft-delete flag when
+    ``search.soft_delete`` is on — the engine must have the flag declared or the
+    default not-trashed scope would make it reject every search."""
+    fields = list(model_cls.searchable_filterable())
+    if SearchSettings().soft_delete and _SOFT_DELETED_FIELD not in fields:
+        fields.append(_SOFT_DELETED_FIELD)
+    return fields
+
+
 #: Sentinel for ``SearchBuilder.where``'s optional 3rd positional arg — distinguishes the
 #: two-arg equality form (``where(field, value)``) from the three-arg operator form
 #: (``where(field, operator, value)``), since ``None`` is itself a legitimate filter value.
@@ -718,4 +729,5 @@ __all__ = [
     "SearchResult",
     "SearchSettings",
     "Searchable",
+    "effective_filterable",
 ]

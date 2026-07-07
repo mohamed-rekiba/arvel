@@ -53,8 +53,10 @@ def scout_import(
         cls = _resolve_model(app, model)
         engine = await _require_engine(cls)
         index = cls.searchable_as()
+        from arvel.search import effective_filterable
+
         await engine.configure(
-            index, filterable=cls.searchable_filterable(), sortable=cls.searchable_sortable()
+            index, filterable=effective_filterable(cls), sortable=cls.searchable_sortable()
         )
 
         count = 0

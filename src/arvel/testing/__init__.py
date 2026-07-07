@@ -36,13 +36,15 @@ class FakeMailer:
             for m, r in zip(self.sent, self.recipients, strict=True)
             if isinstance(m, mailable_cls) and (fn is None or fn(m, r))
         ]
+        if count is not None:
+            if len(matches) != count:
+                raise AssertionError(
+                    f"expected {count} {mailable_cls.__name__} sent; got {len(matches)}"
+                )
+            return  # an explicit count owns the assertion — count=0 means "none sent"
         if not matches:
             raise AssertionError(
                 f"expected a {mailable_cls.__name__} to be sent; sent={self.sent!r}"
-            )
-        if count is not None and len(matches) != count:
-            raise AssertionError(
-                f"expected {count} {mailable_cls.__name__} sent; got {len(matches)}"
             )
 
     def assert_nothing_sent(self) -> None:
@@ -91,7 +93,9 @@ class FakeQueue:
     container so those resolve it too, not just the ``Queue`` facade)."""
 
     def __init__(self) -> None:
-        self.pushed: list[tuple[type, tuple[Any, ...], dict[str, Any], str | None]] = []
+        self.pushed: list[
+            tuple[type, tuple[Any, ...], dict[str, Any], str | None, bool | None]
+        ] = []
         self.pushed_instances: list[Any] = []
 
     async def push(
@@ -103,11 +107,11 @@ class FakeQueue:
         queue: str | None = None,
         after_commit: bool | None = None,
     ) -> None:
-        self.pushed.append((job_cls, tuple(args), dict(kwargs or {}), queue))
+        self.pushed.append((job_cls, tuple(args), dict(kwargs or {}), queue, after_commit))
 
     async def push_instance(self, job: Any, *, queue: str | None = None) -> None:
         job_cls = cast("type[Any]", type(job))
-        self.pushed.append((job_cls, (), {}, queue))
+        self.pushed.append((job_cls, (), {}, queue, None))
         self.pushed_instances.append(job)
 
     def assert_pushed(
@@ -123,16 +127,20 @@ class FakeQueue:
         restricts to that named queue."""
         matches = [
             (cls, args, kwargs, q)
-            for cls, args, kwargs, q in self.pushed
+            for cls, args, kwargs, q, _ac in self.pushed
             if cls is job_cls
             and (queue is None or q == queue)
             and (fn is None or fn(*args, **kwargs))
         ]
+        if count is not None:
+            if len(matches) != count:
+                raise AssertionError(
+                    f"expected {job_cls.__name__} pushed {count}x; got {len(matches)}"
+                )
+            return  # an explicit count owns the assertion — count=0 means "never pushed"
         if not matches:
-            pushed = [cls.__name__ for cls, _, _, _ in self.pushed]
+            pushed = [cls.__name__ for cls, _, _, _, _ in self.pushed]
             raise AssertionError(f"expected {job_cls.__name__} to be pushed; pushed={pushed}")
-        if count is not None and len(matches) != count:
-            raise AssertionError(f"expected {job_cls.__name__} pushed {count}x; got {len(matches)}")
 
     def assert_nothing_pushed(self) -> None:
         if self.pushed:
@@ -146,7 +154,7 @@ class FakeQueue:
 
     def assert_not_dispatched(self, job_cls: type) -> None:
         """Alias of the inverse of:meth:`assert_pushed` — ``Bus::assertNotDispatched``."""
-        if any(cls is job_cls for cls, _, _, _ in self.pushed):
+        if any(cls is job_cls for cls, _, _, _, _ in self.pushed):
             raise AssertionError(f"expected {job_cls.__name__} NOT to be pushed")
 
     def assert_chained(self, job_classes: Sequence[Any]) -> None:

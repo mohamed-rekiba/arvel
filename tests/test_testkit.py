@@ -178,6 +178,7 @@ async def test_fake_bus_intercepts_bus_batch_and_asserts_the_group(booted_app: A
         with pytest.raises(AssertionError):
             bus.assert_batched(lambda jobs: len(jobs) == 5)
     finally:
+        JobBatch.set_connection(None)  # unbind the class-level resolver
         await db.dispose()
 
 

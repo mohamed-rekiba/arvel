@@ -27,6 +27,7 @@ reference design (a small, high-value addition needing no new infra beyond cache
 
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import inspect
 from collections.abc import Callable
@@ -189,6 +190,7 @@ class CacheFeatureStore:
 
     def __init__(self, cache_manager: Any) -> None:
         self._cache_manager = cache_manager
+        self._names_lock: asyncio.Lock | None = None  # created lazily on the running loop
 
     def _tagged(self, name: str) -> Any:
         return self._cache_manager.driver().tags(f"feature:{name}")
@@ -197,9 +199,16 @@ class CacheFeatureStore:
         return self._cache_manager.driver().tags(_CACHE_KNOWN_NAMES_TAG)
 
     async def _remember_name(self, name: str) -> None:
-        names: list[str] = await self._known_names().get(_CACHE_KNOWN_NAMES_KEY, [])
-        if name not in names:
-            await self._known_names().forever(_CACHE_KNOWN_NAMES_KEY, [*names, name])
+        # serialized read-modify-write: two concurrent put()s for different new names must
+        # not overwrite each other's registry update, or purge_all() would miss a flag.
+        # ponytail: an in-process lock; a multi-process registry needs an atomic append
+        # on the backing store.
+        if self._names_lock is None:
+            self._names_lock = asyncio.Lock()
+        async with self._names_lock:
+            names: list[str] = await self._known_names().get(_CACHE_KNOWN_NAMES_KEY, [])
+            if name not in names:
+                await self._known_names().forever(_CACHE_KNOWN_NAMES_KEY, [*names, name])
 
     async def get(self, name: str, scope_key: str) -> Any:
         return await self._tagged(name).get(scope_key, _MISSING)

@@ -68,6 +68,9 @@ def test_auth_clear_resets_deletes_only_expired_rows() -> None:
     finally:
         set_application(None)
 
-    assert result.exit_code == 0, result.output
-    assert "deleted 1 expired password reset token" in result.output
-    assert asyncio.run(_remaining_emails()) == {"live@x.test"}
+    try:
+        assert result.exit_code == 0, result.output
+        assert "deleted 1 expired password reset token" in result.output
+        assert asyncio.run(_remaining_emails()) == {"live@x.test"}
+    finally:
+        PasswordResetToken.set_connection(None)  # unbind the class-level resolver

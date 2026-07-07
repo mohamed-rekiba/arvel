@@ -321,6 +321,8 @@ class RoundRobinTransport:
         self._next = 0
 
     async def send(self, message: EmailMessage) -> bool:
+        if not self._transports:
+            raise RuntimeError("mail.round_robin: no mailers configured")
         transport = self._transports[self._next % len(self._transports)]
         self._next += 1
         result: bool = await transport.send(message)

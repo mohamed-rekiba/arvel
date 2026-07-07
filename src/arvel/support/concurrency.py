@@ -81,9 +81,12 @@ class Concurrency:
     ) -> list[Any]:
         loop = asyncio.get_running_loop()
         # a fresh pool per call keeps lifecycle simple; worker-spawn cost is acceptable for
-        # coarse CPU jobs — share an executor at the call site if invoked hot
-        with ProcessPoolExecutor() as pool:
-            return list(
+        # coarse CPU jobs — share an executor at the call site if invoked hot. Managed
+        # explicitly (not `with`) so a timeout returns immediately: the context manager's
+        # shutdown(wait=True) would block the raising caller until the stuck worker finished.
+        pool = ProcessPoolExecutor()
+        try:
+            results = list(
                 await asyncio.gather(
                     *(
                         Concurrency._bounded(loop.run_in_executor(pool, fn), timeout)
@@ -91,3 +94,6 @@ class Concurrency:
                     )
                 )
             )
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+        return results

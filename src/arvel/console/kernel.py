@@ -225,7 +225,7 @@ def run_command_class(cls: Any, **cli_kwargs: Any) -> None:
         if inspect.isawaitable(result):
             result = await result
         # a returned int is the exit code, like a process's return status
-        if isinstance(result, int) and result != 0:
+        if isinstance(result, int) and not isinstance(result, bool) and result != 0:
             raise typer.Exit(code=result)
 
     run_app_command(handler)
@@ -246,7 +246,7 @@ async def run_command_class_async(cls: Any, **cli_kwargs: Any) -> None:
         result = app.call((instance, "handle"))
         if inspect.isawaitable(result):
             result = await result
-        if isinstance(result, int) and result != 0:
+        if isinstance(result, int) and not isinstance(result, bool) and result != 0:
             raise typer.Exit(code=result)
 
     await run_app_command_async(handler)

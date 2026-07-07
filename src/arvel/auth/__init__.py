@@ -42,7 +42,13 @@ async def _dispatch_auth_event(event: Any) -> None:
     from arvel.kernel import app, has_application
 
     if has_application() and app().bound("events"):
-        await app().make("events").dispatch(event)
+        try:
+            await app().make("events").dispatch(event)
+        except Exception:
+            # best-effort means a broken listener can't fail the operation that fired it
+            from arvel.kernel.logging import LogManager
+
+            LogManager().channel("auth").warning("event_listener_failed", exc_info=True)
 
 
 class Authenticatable:
