@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
+from arvel.contracts import ModelHost
 from arvel.kernel import Settings
 from arvel.support.manager import Manager, MissingExtraError
 
@@ -332,8 +333,8 @@ class ModelIndexRequested:
     record: dict[str, Any] | None
 
 
-class Searchable:
-    """Mixin that makes a model searchable (Scout-style): it is indexed on save and removed on
+class Searchable(ModelHost):
+    """Mixin that makes a model searchable: it is indexed on save and removed on
     delete, and ``Model.search(query)`` returns a fluent:class:`SearchBuilder`. Override
     ``to_searchable_array`` to control what gets indexed, ``searchable_as`` to name the index, and
     ``searchable_filterable``/``searchable_sortable`` to declare the fields ``where``/``order_by``
@@ -341,13 +342,12 @@ class Searchable:
 
     def to_searchable_array(self) -> dict[str, Any]:
         """The record to index — the model's serialized form by default."""
-        data = cast("dict[str, Any]", self.to_dict())  # type: ignore[attr-defined]
-        return data
+        return self.to_dict()
 
     @classmethod
     def searchable_as(cls) -> str:
         """The index name — the model's table name by default."""
-        return str(cls.__table__.name)  # type: ignore[attr-defined]
+        return str(cls.__table__.name)
 
     @classmethod
     def searchable_filterable(cls) -> list[str]:
@@ -361,7 +361,7 @@ class Searchable:
 
     def get_search_key(self) -> Any:
         """The index document key — the model's primary key by default."""
-        return getattr(self, type(self).__primary_key__)  # type: ignore[attr-defined]
+        return getattr(self, type(self).__primary_key__)
 
     @staticmethod
     def _search_engine() -> Any:
@@ -408,17 +408,17 @@ class Searchable:
 
     @classmethod
     async def make_all_searchable(cls) -> int:
-        """Index every row of this model (Scout's ``makeAllSearchable``). Returns the number of
+        """Index every row of this model (reference ``makeAllSearchable`` semantics). Returns the number of
         records indexed. Use it to (re)build the index after a bulk load / seed. ``scout:import``
         (the CLI command) chunks instead, for large tables."""
-        records = cast("list[Any]", await cls.all())  # type: ignore[attr-defined]
+        records = cast("list[Any]", await cls.all())
         for record in records:
             await record.searchable()
         return len(records)
 
     @classmethod
     async def remove_all_from_search(cls) -> None:
-        """Remove every row of this model from the index (Scout's ``scout:flush``)."""
+        """Remove every row of this model from the index (``scout:flush`` semantics)."""
         engine = cls._search_engine()
         if engine is not None:
             await engine.flush(cls.searchable_as())
@@ -430,13 +430,13 @@ class Searchable:
         return SearchBuilder(cls, query)
 
     async def _fire(self, hook: str) -> Any:
-        result = cast("Any", await super()._fire(hook))  # type: ignore[misc]
+        result: Any = await super()._fire(hook)
         if hook == "saved":
             await self.searchable()
         elif hook == "deleted":
             await self.unsearchable()
         elif hook == "restored":
-            # Scout parity: restoring a soft-deleted model makes it searchable again
+            # restoring a soft-deleted model makes it searchable again (reference parity)
             await self.searchable()
         return result
 
