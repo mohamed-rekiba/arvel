@@ -290,23 +290,25 @@ class Builder[M = dict[str, Any]]:
         self._add(sa.and_(*(self._comparison(c, operator, value) for c in columns)), connector)
         return self
 
+    def _in_values(self, values: Sequence[Any] | Select[Any]) -> Any:
+        # same value adaptation as the 3-arg where() path (e.g. Date -> UTC stdlib datetime) —
+        # a bare list binds each value; a Select subquery passes through untouched.
+        import sqlalchemy as sa
+
+        return values if isinstance(values, sa.Select) else [self._bind(v) for v in values]
+
     def where_in(self, column: str, values: Sequence[Any] | Select[Any]) -> Self:
         """``WHERE col IN (...)``. ``values`` is a list **or a subquery** ``Select`` (``whereIn('id', $subquery)``) — pass ``sa.select(other.c.id)`` to filter DB-side without
         materializing the id list in the app (e.g. ``where_in('id', select(retrievable.c.id))``)."""
-        import sqlalchemy as sa
-
-        # same value adaptation as the 3-arg where() path (e.g. Date -> UTC stdlib datetime) —
-        # a bare list binds each value; a Select subquery passes through untouched.
-        bound = values if isinstance(values, sa.Select) else [self._bind(v) for v in values]
-        self._add(self._where_column(column).in_(bound))
+        self._add(self._where_column(column).in_(self._in_values(values)))
         return self
 
     def where_not_in(self, column: str, values: Sequence[Any] | Select[Any]) -> Self:
-        self._add(self._where_column(column).not_in(values))
+        self._add(self._where_column(column).not_in(self._in_values(values)))
         return self
 
-    def or_where_in(self, column: str, values: Sequence[Any]) -> Self:
-        self._add(self._where_column(column).in_(values), "or")
+    def or_where_in(self, column: str, values: Sequence[Any] | Select[Any]) -> Self:
+        self._add(self._where_column(column).in_(self._in_values(values)), "or")
         return self
 
     def where_between(self, column: str, values: Sequence[Any]) -> Self:

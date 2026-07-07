@@ -282,6 +282,36 @@ async def test_where_in_adapts_date_values_like_the_3_arg_where() -> None:
         await db.dispose()
 
 
+async def test_where_not_in_adapts_date_values_like_where_in() -> None:
+    db = ConnectionResolver()
+    Event.set_connection(db)
+    await db.execute(sa.schema.CreateTable(Event.__table__))
+    try:
+        await Event.create(name="first", posted_at=_at("2024-01-01 10:00:00"))
+        await Event.create(name="second", posted_at=_at("2024-02-01 10:00:00"))
+        rows = await Event.where_not_in("posted_at", [Date.parse("2024-01-01 10:00:00")]).get()
+        assert [r.name for r in rows] == ["second"]  # Date adapted, so "first" is excluded
+    finally:
+        await db.dispose()
+
+
+async def test_or_where_in_adapts_date_values_like_where_in() -> None:
+    db = ConnectionResolver()
+    Event.set_connection(db)
+    await db.execute(sa.schema.CreateTable(Event.__table__))
+    try:
+        await Event.create(name="first", posted_at=_at("2024-01-01 10:00:00"))
+        await Event.create(name="second", posted_at=_at("2024-02-01 10:00:00"))
+        rows = (
+            await Event.where("name", "=", "nobody")
+            .or_where_in("posted_at", [Date.parse("2024-02-01 10:00:00")])
+            .get()
+        )
+        assert [r.name for r in rows] == ["second"]
+    finally:
+        await db.dispose()
+
+
 # --- chunk_by_id() must leave the builder reusable ---------------------------
 async def test_chunk_by_id_reused_builder_gives_identical_results_twice() -> None:
     db = await _seed()
