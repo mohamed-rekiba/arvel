@@ -152,12 +152,12 @@ class ModelCollection[M](Collection[M], _Sequence[M]):
         blocked = list(keys)
         return ModelCollection([m for m in self._items if self._pk(m) not in blocked])
 
-    def to_query(self) -> Builder:
+    def to_query(self) -> Builder[M]:
         """A fresh ``Builder`` constrained to ``WHERE pk IN (these members' keys)toQuery()``. Requires a non-empty collection to resolve the model class."""
         if not self._items:
             raise RuntimeError("to_query() requires a non-empty ModelCollection.")
         model_cls = self._model_cls()
-        result: Builder = model_cls.where_in(model_cls.__primary_key__, self.model_keys())
+        result: Builder[M] = model_cls.where_in(model_cls.__primary_key__, self.model_keys())
         return result
 
 

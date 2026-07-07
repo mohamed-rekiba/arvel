@@ -9,7 +9,7 @@ a declared layered edge, doc 17). Grounded in knowledge/port/15-auth-authorizati
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any, ClassVar
 
 from arvel.database import Model
@@ -48,8 +48,8 @@ class Role(Model):
         pivot = _pivot("role_has_permissions", "role_id", "permission_id")
         rows = await Builder(pivot, type(self)._resolve()).where("role_id", "=", self.id).get()
         ids = [row["permission_id"] for row in rows]
-        result: list[Any] = await Permission.where_in("id", ids).get() if ids else []
-        return result
+        result: Sequence[Any] = await Permission.where_in("id", ids).get() if ids else []
+        return list(result)
 
 
 class Permission(Model):
@@ -145,8 +145,8 @@ class HasRoles:
         role_ids = [row["role_id"] for row in rows]
         if not role_ids:
             return []
-        result: list[Any] = await Role.where_in("id", role_ids).get()
-        return result
+        result: Sequence[Any] = await Role.where_in("id", role_ids).get()
+        return list(result)
 
     async def has_role(self, name: str, team: Any = None) -> bool:
         if name in self._carried_idp_roles():
@@ -203,7 +203,7 @@ class HasRoles:
             names: set[str] = cached
             return names
         ids = await self._effective_permission_ids()
-        perms: list[Any] = await Permission.where_in("id", list(ids)).get() if ids else []
+        perms: Sequence[Any] = await Permission.where_in("id", list(ids)).get() if ids else []
         resolved = {p.name for p in perms}
         # union in permissions granted via ephemeral IdP-derived roles (never persisted)
         idp_roles = self._carried_idp_roles()
@@ -225,7 +225,9 @@ class HasRoles:
             .get()
         )
         perm_ids = {row["permission_id"] for row in via}
-        perms: list[Any] = await Permission.where_in("id", list(perm_ids)).get() if perm_ids else []
+        perms: Sequence[Any] = (
+            await Permission.where_in("id", list(perm_ids)).get() if perm_ids else []
+        )
         return {perm.name for perm in perms}
 
     @staticmethod
