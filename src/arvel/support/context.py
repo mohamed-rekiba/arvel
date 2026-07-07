@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import contextvars
 import copy
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterable
 from contextlib import contextmanager
 from typing import Any, TypedDict
 
@@ -72,6 +72,49 @@ class Context:
     @staticmethod
     def has(key: str) -> bool:
         return key in _visible_get()
+
+    @staticmethod
+    def missing(key: str) -> bool:
+        return not Context.has(key)
+
+    @staticmethod
+    def only(keys: Iterable[str]) -> dict[str, Any]:
+        keyset = set(keys)
+        return {k: v for k, v in _visible_get().items() if k in keyset}
+
+    @staticmethod
+    def except_(keys: Iterable[str]) -> dict[str, Any]:
+        keyset = set(keys)
+        return {k: v for k, v in _visible_get().items() if k not in keyset}
+
+    @staticmethod
+    def pull(key: str, default: Any = None) -> Any:
+        """Read ``key`` then remove it — ``pull``."""
+        found = Context.get(key, default)
+        Context.forget(key)
+        return found
+
+    @staticmethod
+    def remember(key: str, factory: Callable[[], Any]) -> Any:
+        """``get(key)`` if present, else store + return ``factory()`` — ``remember``.
+        ``factory`` must be sync; an async callable would store the coroutine itself."""
+        if Context.has(key):
+            return Context.get(key)
+        resolved = factory()
+        Context.add(key, resolved)
+        return resolved
+
+    @staticmethod
+    def when(
+        condition: Any,
+        then: Callable[[type[Context]], Any],
+        otherwise: Callable[[type[Context]], Any] | None = None,
+    ) -> None:
+        """Invoke ``then(Context)`` if ``condition``, else ``otherwise(Context)`` (if given)."""
+        if condition:
+            then(Context)
+        elif otherwise is not None:
+            otherwise(Context)
 
     # --- stacks ----------------------------------------------------------------
     @staticmethod

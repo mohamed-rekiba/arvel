@@ -127,6 +127,24 @@ class Stringable:
     def mask(self, char: str = "*", index: int = 0, length: int | None = None) -> Stringable:
         return Stringable(_str().mask(self._value, char, index, length))
 
+    def replace_matches(self, pattern: str, replace: str | Callable[[str], str]) -> Stringable:
+        return Stringable(_str().replace_matches(pattern, replace, self._value))
+
+    def substr_replace(self, replace: str, start: int, length: int | None = None) -> Stringable:
+        return Stringable(_str().substr_replace(self._value, replace, start, length))
+
+    def deduplicate(self, character: str = " ") -> Stringable:
+        return Stringable(_str().deduplicate(self._value, character))
+
+    def ascii_(self) -> Stringable:
+        return Stringable(_str().ascii_(self._value))
+
+    def to_base64(self) -> Stringable:
+        return Stringable(_str().to_base64(self._value))
+
+    def from_base64(self) -> Stringable:
+        return Stringable(_str().from_base64(self._value))
+
     # --- slicing / shaping -------------------------------------------------
     def after(self, search: str) -> Stringable:
         return Stringable(self._value.split(search, 1)[1] if search in self._value else self._value)
@@ -149,6 +167,12 @@ class Stringable:
 
     def words(self, words: int = 100, end: str = "...") -> Stringable:
         return Stringable(_str().words(self._value, words, end))
+
+    def excerpt(self, phrase: str, radius: int = 100, omission: str = "...") -> Stringable:
+        return Stringable(_str().excerpt(self._value, phrase, radius, omission))
+
+    def word_wrap(self, characters: int = 76, break_str: str = "\n") -> Stringable:
+        return Stringable(_str().word_wrap(self._value, characters, break_str))
 
     def reverse(self) -> Stringable:
         return Stringable(self._value[::-1])
@@ -239,6 +263,18 @@ class Stringable:
 
     def is_ulid(self) -> bool:
         return _str().is_ulid(self._value)
+
+    def match(self, pattern: str) -> str:
+        return _str().match(pattern, self._value)
+
+    def match_all(self, pattern: str) -> Collection[str]:
+        return _str().match_all(pattern, self._value)
+
+    def is_match(self, pattern: str) -> bool:
+        return _str().is_match(pattern, self._value)
+
+    def substr_count(self, needle: str) -> int:
+        return _str().substr_count(self._value, needle)
 
     def explode(self, delimiter: str, limit: int = -1) -> Collection[str]:
         """Split into a ``Collection``. ``limit`` is Python
