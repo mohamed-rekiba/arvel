@@ -770,16 +770,15 @@ def freeze_time(moment: Any = None) -> Generator[Any]:
 
 # --- console test helpers --------------------------------------------------------------
 #
-# ponytail: this section duck-types just enough of `arvel.console` (Command/Prompter/signature
-# parsing/Cli dispatch) to run an app-registered command or closure, rather than importing it —
-# import-linter's G1 layers contract puts `arvel.console` *above* `arvel.testing` (console may
-# import testing; testing may not import console), so `Cli.call`/`Command`/`Prompter` aren't
-# reachable from here even via a lazy import (import-linter's static analysis catches those too).
-# Ceiling: only app-registered `Command` classes/`Console.command(...)` closures are reachable this
-# way (mirrors `arvel.console.kernel._cli_dispatch`'s own split) — a *built-in* framework
-# command (`migrate`, `make:*`,...) isn't; drive those with Typer's own `CliRunner` directly
-# (``from typer.testing import CliRunner``). Upgrade path: if a shared parser/dispatcher ever moves
-# below the layer line, swap this out for the real thing.
+# Signature parsing now uses the REAL shared grammar (`arvel.support.command_signature`, moved below
+# the layer line) so cli() binds args exactly as the production CLI does — variadics and shortcuts
+# included, no drift-prone copy. The remaining stand-ins (Prompter/output/exit-capture, and calling
+# the command's handle() directly) are inherent to a programmatic test runner: `arvel.console` sits
+# *above* `arvel.testing` in the G1 layers contract, so the typer dispatcher itself isn't reachable.
+# Ceilings, not bugs: (1) only app-registered `Command`/`Console.command(...)` closures run this way
+# — a *built-in* framework command (`migrate`, `make:*`,...) is driven with Typer's own `CliRunner`
+# (`from typer.testing import CliRunner`); (2) value options take the `--opt=value` form, not
+# space-separated (typer's own tokenizer).
 
 
 class ConsoleResult:
@@ -812,54 +811,52 @@ def _command_name(cls: type) -> str:
     return Str.snake(cls.__name__)
 
 
-def _parse_signature_tokens(signature: str) -> list[tuple[str, bool, str | None]]:
-    """``(name, is_option, default)`` per ``{...}`` token — the common forms only (``{name}``/
-    ``{name?}``/``{name=default}``/``{--flag}``/``{--opt=}``); no variadics (``{arg*}``) or shortcuts
-    (``{--S|flag}``). ``default`` is the positional's ``=value`` when present, else ``None``. Mirrors
-    ``arvel.console.closure.parse_signature`` (can't import it — console is above testing in the DAG)."""
-    import re
-
-    tokens: list[tuple[str, bool, str | None]] = []
-    for raw in re.findall(r"\{([^{}]+)\}", signature):
-        if raw.startswith("--"):
-            body = raw[2:]
-            tokens.append((body[:-1] if body.endswith("=") else body, True, None))
-        elif "=" in raw:
-            name, default = raw.split("=", 1)
-            tokens.append((name, False, default))
-        elif raw.endswith("?"):
-            tokens.append((raw[:-1], False, None))
-        else:
-            tokens.append((raw, False, None))
-    return tokens
-
-
 def _bind_command_line(signature: str, rest: Sequence[str]) -> dict[str, Any]:
-    """Raw CLI tokens (post command-name) -> ``{token_name: value}``, per ``signature``'s grammar —
-    positionals assigned in order (an omitted ``{name=default}`` positional gets its default), value
-    options as ``--name=value`` (a bare ``--flag`` becomes ``True``).
+    """Raw CLI tokens (post command-name) -> ``{token_name: value}``, per ``signature``'s grammar,
+    using the *real* shared parser (``arvel.support.command_signature``) — so variadics (``{arg*}``,
+    ``{--opt=*}``) and shortcuts (``{--Q|queue}`` → ``-Q``) bind exactly as the production CLI reads
+    them, not a copy that could drift.
 
-    ponytail: value options must use ``--opt=value``, not space-separated ``--opt value`` — matching
-    that would mean reimplementing typer's parser here (which testing can't import). Ceiling, not a
-    bug: use the ``=`` form in cli() calls."""
-    tokens = _parse_signature_tokens(signature)
-    positionals = [(name, default) for name, is_option, default in tokens if not is_option]
-    option_names = {name for name, is_option, _default in tokens if is_option}
+    ponytail: value options must use ``--opt=value`` / ``-Q=value``, not space-separated
+    ``--opt value`` — that spacing is typer's own tokenizer, which the test runner doesn't embed.
+    Ceiling, not a bug: use the ``=`` form in cli() calls."""
+    from arvel.support.command_signature import parse_signature
+
+    tokens = parse_signature(signature)
+    positionals = [t for t in tokens if not t.is_option]
+    options = {t.name: t for t in tokens if t.is_option}
+    shortcuts = {t.shortcut: t for t in tokens if t.is_option and t.shortcut}
     values: dict[str, Any] = {}
     pos_i = 0
+
+    def _set_option(spec: Any, sep: str, val: str) -> None:
+        if spec.variadic:
+            values.setdefault(spec.name, []).append(val)
+        else:
+            values[spec.name] = val if sep else True
+
     for tok in rest:
         if tok.startswith("--"):
             key, sep, val = tok[2:].partition("=")
-            if key in option_names:
-                values[key] = val if sep else True
+            if key in options:
+                _set_option(options[key], sep, val)
+            continue
+        if tok.startswith("-") and len(tok) > 1:
+            key, sep, val = tok[1:].partition("=")
+            if key in shortcuts:
+                _set_option(shortcuts[key], sep, val)
             continue
         if pos_i < len(positionals):
-            values[positionals[pos_i][0]] = tok
-            pos_i += 1
+            spec = positionals[pos_i]
+            if spec.variadic:  # a variadic positional consumes the remaining tokens
+                values.setdefault(spec.name, []).append(tok)
+            else:
+                values[spec.name] = tok
+                pos_i += 1
     # fill omitted positionals that declared a default (parity with the real CLI's {name=default})
-    for name, default in positionals[pos_i:]:
-        if default is not None:
-            values[name] = default
+    for spec in positionals[pos_i:]:
+        if spec.default is not None:
+            values[spec.name] = spec.default
     return values
 
 

@@ -282,6 +282,25 @@ def test_cli_runs_a_command_class_with_seeded_prompt_and_captured_output() -> No
     result.assert_exit_code(0).assert_output_contains("hello Bob (Ada, loud=True)")
 
 
+def test_cli_binds_variadics_and_shortcuts_via_the_shared_parser() -> None:
+    # the grammar the old duck-typed copy dropped — now cli() uses the real shared parser
+    from arvel.console import Command
+    from arvel.kernel import Application
+    from arvel.testing import cli
+
+    class Tag(Command):
+        signature = "tag {items*} {--Q|queue=}"
+
+        async def handle(self) -> None:
+            self.info(f"items={self.argument('items')} queue={self.option('queue')}")
+
+    app = Application()
+    app.command_classes.append(Tag)
+
+    result = cli(app, "tag a b c -Q=high")
+    result.assert_exit_code(0).assert_output_contains("items=['a', 'b', 'c'] queue=high")
+
+
 def test_cli_runs_a_console_registered_closure() -> None:
     from arvel.console.closure import ClosureCommand
     from arvel.kernel import Application
