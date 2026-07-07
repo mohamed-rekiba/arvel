@@ -143,3 +143,14 @@ class EnsureSessionCurrent(Middleware):
                 for key in (self._user_key, GEN_KEY, "_impersonator_id"):
                     store.pop(key, None)
         return await call_next(request)
+
+
+__all__ = [
+    "GEN_KEY",
+    "EnsureSessionCurrent",
+    "current_generation",
+    "invalidate_all_sessions",
+    "logout_other_sessions",
+    "session_is_current",
+    "stamp_session",
+]

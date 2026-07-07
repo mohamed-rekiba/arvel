@@ -215,3 +215,6 @@ class GuardManager(Manager):
             audience=str(config["audience"]),
         )
         return OidcGuard(verifier, provider=str(config.get("provider", "oidc")))
+
+
+__all__ = ["GuardDriver", "GuardManager", "LocalGuard", "SessionGuard"]

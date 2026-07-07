@@ -37,3 +37,6 @@ class Jwt:
         except jwt.PyJWTError:
             return None
         return decoded
+
+
+__all__ = ["Jwt"]

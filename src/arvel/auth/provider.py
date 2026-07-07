@@ -48,3 +48,6 @@ class AuthServiceProvider(ServiceProvider):
 
     def boot(self) -> None:
         """No-op (apps define abilities/policies in their own AuthServiceProvider)."""
+
+
+__all__ = ["AuthServiceProvider"]

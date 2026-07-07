@@ -261,3 +261,17 @@ def ability(*any_of: str) -> type[Any]:
     _RequireAnyAbility.__name__ = f"ability({', '.join(any_of)!r})"
     _RequireAnyAbility.__qualname__ = _RequireAnyAbility.__name__
     return _RequireAnyAbility
+
+
+__all__ = [
+    "ApiToken",
+    "TokenGuard",
+    "abilities",
+    "ability",
+    "create_token",
+    "current_access_token",
+    "prune_expired_tokens",
+    "resolve_token",
+    "revoke_all_tokens",
+    "token_can",
+]

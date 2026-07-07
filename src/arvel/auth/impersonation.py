@@ -121,3 +121,13 @@ async def stop_impersonating(request: Any) -> bool:
     current_user.set(None)  # cleared; the next request resolves the original user from the session
     audit("auth.impersonation.stopped", impersonator_id=original)
     return True
+
+
+__all__ = [
+    "IMPERSONATOR_KEY",
+    "USER_KEY",
+    "impersonate",
+    "impersonator_id",
+    "is_impersonating",
+    "stop_impersonating",
+]

@@ -247,3 +247,20 @@ async def complete_two_factor_challenge(
     if isinstance(session, dict):
         cast("dict[str, Any]", session).pop(SESSION_PENDING_KEY, None)
     return True
+
+
+__all__ = [
+    "SESSION_PENDING_KEY",
+    "TwoFactor",
+    "TwoFactorEnrollment",
+    "TwoFactorRequired",
+    "begin_two_factor_challenge",
+    "complete_two_factor_challenge",
+    "confirm_two_factor",
+    "disable_two_factor",
+    "enable_two_factor",
+    "pending_two_factor_user_id",
+    "regenerate_recovery_codes",
+    "requires_two_factor_challenge",
+    "verify_two_factor",
+]
