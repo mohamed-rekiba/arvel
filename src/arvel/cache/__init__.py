@@ -293,9 +293,9 @@ class TaggedCache:
     them. ``flush()`` deletes every entry ever written under **any** of these tags, even via a
     different combination, mirroring the cross-combination tag invalidation.
 
-    Note: TTL-expired entries are not proactively pruned from their tag sets (has the
-    same limitation); a tag set reclaims its members only on ``flush()``. Long-lived tags with
-    high churn of short-TTL keys should be flushed periodically.
+    ``forget()`` removes an entry's tag membership as it deletes it; :meth:`prune` reclaims the
+    members of entries that expired or were evicted (TTL churn), so a long-lived tag's member set
+    stays bounded without a full ``flush()``.
     """
 
     def __init__(self, repository: CacheRepository, names: tuple[str, ...]) -> None:
@@ -325,7 +325,37 @@ class TaggedCache:
         return await self._repository.has(self._scoped_key(key))
 
     async def forget(self, key: str) -> bool:
-        return await self._repository.forget(self._scoped_key(key))
+        scoped = self._scoped_key(key)
+        client = self._repository.client
+        for name in self._names:
+            await client.set_remove(self._tagset_key(name), scoped)  # don't leak a dead member
+        return await self._repository.forget(scoped)
+
+    async def prune(self) -> int:
+        """Drop tag-set members whose entry has expired or been evicted, so a long-lived tag that
+        churns short-TTL keys doesn't grow its member set unbounded between flushes. Returns the
+        number of dead members reclaimed.
+
+        ponytail: drains then re-adds survivors (cashews has no non-destructive set read), so a
+        write racing the prune could be dropped and re-registered on its next access — self-healing.
+        """
+        client = self._repository.client
+        removed = 0
+        for name in self._names:
+            set_key = self._tagset_key(name)
+            survivors: list[str] = []
+            while True:
+                members = list(await client.set_pop(set_key, 1000))
+                if not members:
+                    break
+                for member in members:
+                    if await self._repository.has(member):
+                        survivors.append(member)
+                    else:
+                        removed += 1
+            if survivors:
+                await client.set_add(set_key, *survivors)
+        return removed
 
     async def add(self, key: str, value: Any, ttl: int | None = None) -> bool:
         stored = await self._repository.add(self._scoped_key(key), value, ttl)
