@@ -67,7 +67,7 @@ class Factory[M: Model]:
 
     def __init__(self) -> None:
         self._states: list[dict[str, Any] | Callable[[dict[str, Any]], dict[str, Any]]] = []
-        self._sequence: list[dict[str, Any]] = []
+        self._sequence: list[dict[str, Any] | Callable[[int], dict[str, Any]]] = []
         self._after_making: list[Callable[[M], Any]] = []
         self._after_creating: list[Callable[[M], Any]] = []
         self._for: list[tuple[Factory[Any] | Model, str, str | None]] = []
@@ -98,8 +98,10 @@ class Factory[M: Model]:
         clone._states = [*self._states, overrides]
         return clone
 
-    def sequence(self, *items: dict[str, Any]) -> Factory[M]:
-        """A copy of this factory that cycles ``items`` across a batch."""
+    def sequence(self, *items: dict[str, Any] | Callable[[int], dict[str, Any]]) -> Factory[M]:
+        """A copy of this factory that cycles ``items`` across a batch. An item may be a plain
+        dict (cycled as-is) or a ``callable(index) -> dict`` receiving the 0-based iteration
+        index — e.g. ``sequence(lambda i: {"rank": i})`` numbers every instance in the batch."""
         clone = copy.copy(self)
         clone._sequence = list(items)
         return clone
@@ -155,6 +157,30 @@ class Factory[M: Model]:
         clone._has = [*self._has, (factory, relation, resolved_count, foreign_key)]
         return clone
 
+    def trashed(self) -> Factory[M]:
+        """A copy of this factory whose instances are built already soft-deleted — stamps
+        ``deleted_at`` to now, for a model using ``SoftDeletes``. Raises ``TypeError`` for a
+        model that doesn't (no ``deleted_at`` column for the state to mean anything).
+
+        Stamped via ``after_making`` straight onto ``_attributes``, not a ``state()`` dict —
+        ``deleted_at`` is framework-managed, not normally ``__fillable__``, so routing it through
+        ``fill()`` (like ``create()`` does for every other attribute) would just get it silently
+        discarded (same reason ``Model.delete()`` itself writes ``_attributes`` directly)."""
+        from arvel.database.model import SoftDeletes
+        from arvel.database.model_casts import now_utc
+
+        if not issubclass(self.model, SoftDeletes):
+            raise TypeError(
+                f"{self.model.__name__} does not use SoftDeletes — trashed() has no meaning."
+            )
+
+        def _stamp_trashed(instance: Any) -> None:
+            # `Any`, not `M`: same cross-class, same-package internal access as `_resolve_for`'s
+            # `parent._attributes` above — writes straight past `fill()`'s fillable guard.
+            instance._attributes["deleted_at"] = now_utc()
+
+        return self.after_making(_stamp_trashed)
+
     def recycle(self, instances: Model | Sequence[Model]) -> Factory[M]:
         """A copy of this factory that reuses ``instances`` for any :meth:`for_` needing that model
         class, instead of creating a new parent each time."""
@@ -176,7 +202,8 @@ class Factory[M: Model]:
             extra = state(attrs) if callable(state) else state
             attrs = {**attrs, **extra}
         if self._sequence:
-            attrs = {**attrs, **self._sequence[index % len(self._sequence)]}
+            item = self._sequence[index % len(self._sequence)]
+            attrs = {**attrs, **(item(index) if callable(item) else item)}
         return {**attrs, **overrides}
 
     def raw(self, **overrides: Any) -> dict[str, Any]:
