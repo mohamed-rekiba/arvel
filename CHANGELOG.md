@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.58.0](https://github.com/mohamed-rekiba/arvel/compare/v0.57.0...v0.58.0) (2026-07-07)
+
+
+### Features
+
+* **activitylog:** batch grouping and a logging on/off switch ([574d04e](https://github.com/mohamed-rekiba/arvel/commit/574d04e6ec209578deaf85c4d4d91709aef4fd71))
+* **cache:** prune tag members so tag sets stay bounded ([be2aca5](https://github.com/mohamed-rekiba/arvel/commit/be2aca5e4b357fb2bbd9c8a0788403bcbe3ab063))
+* **inertia:** partial reloads and a real asset version ([70eeed2](https://github.com/mohamed-rekiba/arvel/commit/70eeed2d9cefad309d00096bd7fb014d25a8edd9))
+* **mail:** attach from a storage disk and embed inline images ([a3c16e9](https://github.com/mohamed-rekiba/arvel/commit/a3c16e9fd671d8afbd9a70d35899b56e9a1df3ab))
+* **media:** video frame extraction and transcode ([c74f4b9](https://github.com/mohamed-rekiba/arvel/commit/c74f4b9fb01e0aa141340c37dbf5146346b3362d))
+* **notifications:** structured title/body for push channels ([c29149b](https://github.com/mohamed-rekiba/arvel/commit/c29149bc9e4ad7f341f9bd86b4a97cd433481c52))
+* **storage:** signed temporary URLs for gcs and azure ([47d5444](https://github.com/mohamed-rekiba/arvel/commit/47d5444e6119465b14aba0d78a9b13bd3f78e0cd))
+
+
+### Bug Fixes
+
+* **auth:** equalize login timing for an unknown user ([b440a4e](https://github.com/mohamed-rekiba/arvel/commit/b440a4e8c8b91c9d05edc5205e9c871b8f9b01bb))
+* **auth:** token decode requires exp and enforces iss/aud ([30f9056](https://github.com/mohamed-rekiba/arvel/commit/30f9056cf176926a0f12793be477faaa4339abf7))
+* **broadcasting:** a metadata-less presence member is authorized ([d6daa81](https://github.com/mohamed-rekiba/arvel/commit/d6daa81f4693319adab7beea7b209069ae8152bc))
+* **broadcasting:** evaluate broadcast_when at dispatch for queued events ([c4399f9](https://github.com/mohamed-rekiba/arvel/commit/c4399f94d0af2130995b9990a03a5e5717c36608))
+* **http:** default throttle segments by user then IP ([95a8d5d](https://github.com/mohamed-rekiba/arvel/commit/95a8d5d840d8d533cdd4f8c3f4328aa597079e47))
+* **http:** Request.validate runs the full FormRequest lifecycle ([b0e558c](https://github.com/mohamed-rekiba/arvel/commit/b0e558c178a61e3d7209141cdd7d27e6ad627efe))
+* **i18n:** replace placeholders as whole tokens ([95378e0](https://github.com/mohamed-rekiba/arvel/commit/95378e0879778e93061399fb3b744e863be7637f))
+* **inertia:** hash the manifest with sha256, not sha1 ([20768e1](https://github.com/mohamed-rekiba/arvel/commit/20768e13f0b1c95cfc54033c0736396789a87708))
+* **orm:** bulk delete respects soft-deletes ([f8e63b5](https://github.com/mohamed-rekiba/arvel/commit/f8e63b55ead5d758009ceca6d2245b4657df4363))
+* **orm:** coerce non-temporal cursor values back to the column type ([817d563](https://github.com/mohamed-rekiba/arvel/commit/817d563b04865e570b8f2bf16a0e6f2633585b8d))
+* **orm:** where_not_in/or_where_in adapt values like where_in ([409cc19](https://github.com/mohamed-rekiba/arvel/commit/409cc19a8fc508a373bbc016e2ba61e11b7f60ee))
+* **queue:** a unique job's delayed dispatch can't double-enqueue ([239e768](https://github.com/mohamed-rekiba/arvel/commit/239e768583acdab656af823ce5c71bcf16332d60))
+* **queue:** run a filtered job when there's no durable store ([c35ee6b](https://github.com/mohamed-rekiba/arvel/commit/c35ee6b8704c2cb568df4dab3a255de0aa235bc1))
+* **validation:** await custom async rules on the async path ([86e06bf](https://github.com/mohamed-rekiba/arvel/commit/86e06bf283119ac6c48a1eea25feb9d59c6aa386))
+
 ## [0.57.0](https://github.com/mohamed-rekiba/arvel/compare/v0.56.0...v0.57.0) (2026-07-07)
 
 
