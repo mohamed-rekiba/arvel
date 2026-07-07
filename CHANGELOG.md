@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.58.1](https://github.com/mohamed-rekiba/arvel/compare/v0.58.0...v0.58.1) (2026-07-07)
+
+
+### Bug Fixes
+
+* **cache:** drain the owned lock client on app shutdown ([19c8ea4](https://github.com/mohamed-rekiba/arvel/commit/19c8ea47cfd808cc2934bd292644cfc6be23b088))
+
+
+### Refactors
+
+* **cache:** own the redis lock client instead of cashews internals ([37eaf20](https://github.com/mohamed-rekiba/arvel/commit/37eaf20d1697c8a322df23865667b2f32d67b778))
+* **console:** share the signature parser across the layer line ([1acba0e](https://github.com/mohamed-rekiba/arvel/commit/1acba0edf817d802f8dbbe0700de1384bc699323))
+* **queue:** extract DurableJobs from the QueueManager coordinator ([bb5ee7e](https://github.com/mohamed-rekiba/arvel/commit/bb5ee7e0f539f18d638272c98d28125ded088bd1))
+* **queue:** extract JobRouter from the QueueManager coordinator ([b6ddde8](https://github.com/mohamed-rekiba/arvel/commit/b6ddde8c8b098e9935e1e4173c0d6f958451ce97))
+
 ## [0.58.0](https://github.com/mohamed-rekiba/arvel/compare/v0.57.0...v0.58.0) (2026-07-07)
 
 
