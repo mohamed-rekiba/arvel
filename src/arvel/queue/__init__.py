@@ -555,26 +555,20 @@ async def _stop_on_memory(stop: Any, limit_mb: float, interval: float) -> None:
             return
 
 
-class QueueManager(Manager):
-    """Pushes jobs onto a config-selected taskiq broker (the Manager 'driver': ``memory``/``redis``/
-    ``amqp``) and runs them via a single wrapper task."""
+class JobRouter:
+    """Resolves a job class to its queue name — the routing concern, split out of the coordinator.
 
-    def __init__(self, app: Any = None, broker: Any = None) -> None:
-        super().__init__(app)
-        self._broker = broker  # an explicit broker passed in wins over the config-selected one
-        self._routes: dict[type, str] = {}  # central per-class queue routing (last write wins)
-        self._task: Any = None
-        self._started = False
-        self._worker_options: _WorkerOptions | None = None  # set only while work() is running
-        self._worker_stop: Any = None  # the active work() run's stop/finish event
+    Precedence: an explicit ``queue=`` at dispatch > a ``queue`` attribute on the class > this
+    registry > ``"default"``. Holds no broker/store/worker state, so it's a pure, testable unit.
+    """
 
-    def route(self, job_cls: type, *, queue: str) -> None:
-        """Route ``job_cls`` to ``queue`` by default — declared once (a provider), not on the
-        class. Precedence: an explicit ``queue=`` at dispatch > a ``queue`` attribute declared
-        on the class itself > this registry > ``"default"``. Re-registering replaces."""
+    def __init__(self) -> None:
+        self._routes: dict[type, str] = {}  # per-class routing (last write wins)
+
+    def route(self, job_cls: type, queue: str) -> None:
         self._routes[job_cls] = queue
 
-    def _queue_label(self, job_cls: type, explicit: str | None) -> str:
+    def label(self, job_cls: type, explicit: str | None) -> str:
         if explicit:
             return explicit
         for klass in job_cls.__mro__:
@@ -584,9 +578,30 @@ class QueueManager(Manager):
             if isinstance(declared, str):
                 return declared
         routed = self._routes.get(job_cls)
-        if routed is not None:
-            return routed
-        return "default"
+        return routed if routed is not None else "default"
+
+
+class QueueManager(Manager):
+    """Pushes jobs onto a config-selected taskiq broker (the Manager 'driver': ``memory``/``redis``/
+    ``amqp``) and runs them via a single wrapper task."""
+
+    def __init__(self, app: Any = None, broker: Any = None) -> None:
+        super().__init__(app)
+        self._broker = broker  # an explicit broker passed in wins over the config-selected one
+        self._router = JobRouter()  # per-class queue routing, split out of this coordinator
+        self._task: Any = None
+        self._started = False
+        self._worker_options: _WorkerOptions | None = None  # set only while work() is running
+        self._worker_stop: Any = None  # the active work() run's stop/finish event
+
+    def route(self, job_cls: type, *, queue: str) -> None:
+        """Route ``job_cls`` to ``queue`` by default — declared once (a provider), not on the
+        class. Precedence: an explicit ``queue=`` at dispatch > a ``queue`` attribute declared
+        on the class itself > this registry > ``"default"``. Re-registering replaces."""
+        self._router.route(job_cls, queue)
+
+    def _queue_label(self, job_cls: type, explicit: str | None) -> str:
+        return self._router.label(job_cls, explicit)
 
     def default_driver(self) -> str:
         driver: str = self._settings(QueueSettings).default
