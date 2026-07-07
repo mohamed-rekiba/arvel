@@ -9,15 +9,50 @@ Grounded in knowledge/port/16-managers.md.
 
 from __future__ import annotations
 
+import functools
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 from arvel.broadcasting import PrivateChannel
 from arvel.events import ShouldBroadcast
+from arvel.kernel import Settings
 from arvel.queue import Job
+from arvel.support.manager import Manager
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from arvel.mail import Mailable
     from arvel.notifications.database import DatabaseNotification as DatabaseNotification
+
+
+class NotificationSettings(Settings):
+    """Typed view over the ``notifications`` config section — the channel used when the manager's
+    ``driver()`` is resolved with no explicit name (channels are otherwise always named via
+    ``via()``, so this rarely matters in practice)."""
+
+    __config_key__ = "notifications"
+    default: str = "mail"
+
+
+@dataclass(frozen=True)
+class NotificationSending:
+    """Fired before a channel's send; a listener returning ``False`` vetoes that channel (the
+    notification's own ``should_send`` still runs first)."""
+
+    notifiable: Any
+    notification: Notification
+    channel: str
+
+
+@dataclass(frozen=True)
+class NotificationSent:
+    """Fired after a channel's send completes, carrying its result."""
+
+    notifiable: Any
+    notification: Notification
+    channel: str
+    response: Any
 
 
 class Notification:
@@ -97,11 +132,57 @@ class SendQueuedNotification(Job):
         return await manager.send_now(self.notifiable, notification, channels=self.channels)
 
 
-class NotificationManager:
-    """Fans a notification out across its channels."""
+class _Channel:
+    """A single named channel driver: wraps the async ``send(channel, notifiable, notification)``
+    closure a ``create_<name>_driver`` builds — the closure (not a manager back-reference) is what
+    lets it reach the manager's own ``_route``/``_mailer``/etc. helpers without a cross-class
+    private-attribute reach-around."""
 
-    def __init__(self, app: Any = None) -> None:
-        self.app = app
+    def __init__(self, send: Callable[[str, Any, Notification], Awaitable[Any]]) -> None:
+        self._send = send
+
+    async def send(self, channel: str, notifiable: Any, notification: Notification) -> Any:
+        return await self._send(channel, notifiable, notification)
+
+
+class NotificationManager(Manager):
+    """Fans a notification out across its channels — one ``support.Manager`` driver per channel
+    (``mail``/``database``/``broadcast``, else the ``apprise`` catch-all), so a custom channel is
+    just ``extend(name, creator)`` like any other manager."""
+
+    def default_driver(self) -> str:
+        return self._settings(NotificationSettings).default
+
+    def create_mail_driver(self) -> _Channel:
+        async def _send(channel: str, notifiable: Any, notification: Notification) -> Any:
+            recipient = self._route(notifiable, "mail", notifiable)
+            return await self._mailer().to(recipient).send(notification.to_mail(notifiable))
+
+        return _Channel(_send)
+
+    def create_database_driver(self) -> _Channel:
+        async def _send(channel: str, notifiable: Any, notification: Notification) -> Any:
+            return await self._store_database(notifiable, notification)
+
+        return _Channel(_send)
+
+    def create_broadcast_driver(self) -> _Channel:
+        async def _send(channel: str, notifiable: Any, notification: Notification) -> Any:
+            await self._broadcaster().broadcast(BroadcastNotification(notifiable, notification))
+            return True
+
+        return _Channel(_send)
+
+    def create_apprise_driver(self) -> _Channel:
+        async def _send(channel: str, notifiable: Any, notification: Notification) -> Any:
+            client = self.apprise()
+            urls = self._route(notifiable, channel, None) or notification.apprise_urls(notifiable)
+            for url in urls:
+                client.add(url)
+            body = str(notification.to_array(notifiable) or type(notification).__name__)
+            return await client.async_notify(body=body)
+
+        return _Channel(_send)
 
     def apprise(self) -> Any:
         import apprise
@@ -115,9 +196,26 @@ class NotificationManager:
 
         return MailManager(self.app)
 
+    def _events(self) -> Any:
+        """The bound event dispatcher, else ``None`` (soft-coupled — no-op without an app)."""
+        app = self.app
+        if app is not None and hasattr(app, "bound") and app.bound("events"):
+            return app.make("events")
+        return None
+
+    async def _after_commit(self, callback: Callable[[], Awaitable[Any]]) -> Any:
+        """Route ``callback`` through the events after-commit buffer — the SAME seam
+        ``QueueManager._defer_to_commit``/mail's ``PendingMail`` use: buffered while a transaction
+        is open (dropped on rollback), run immediately outside one/without an events dispatcher."""
+        events = self._events()
+        if events is not None:
+            return await events.after_commit(callback)
+        return await callback()
+
     async def send(self, notifiable: Any, notification: Notification) -> dict[str, Any]:
         """Send ``notification`` — inline, or onto the queue when it's ``ShouldQueue`` and a
-        queue is bound (mirrors the mail/events ShouldQueue rail)."""
+        queue is bound (mirrors the mail/events ShouldQueue rail). Each channel's enqueue rides
+        the after-commit seam, same as a queued job."""
         from arvel.events import ShouldQueue
 
         app = self.app
@@ -129,11 +227,25 @@ class NotificationManager:
         ):
             queue = app.make("queue")
             for channel in notification.via(notifiable):
-                await queue.push_instance(
-                    SendQueuedNotification(notifiable, notification, channels=[channel])
-                )
+                job = SendQueuedNotification(notifiable, notification, channels=[channel])
+                await self._after_commit(functools.partial(queue.push_instance, job))
             return {"queued": True}
         return await self.send_now(notifiable, notification)
+
+    async def later(
+        self, delay: float, notifiable: Any, notification: Notification
+    ) -> dict[str, Any]:
+        """Queue ``notification`` to send after ``delay`` seconds via the queue's durable
+        delayed-dispatch path (``dispatch_after``) — regardless of ``ShouldQueue``, one job per
+        channel like :meth:`send`. Falls back to an immediate send when no queue is bound."""
+        app = self.app
+        if not (app is not None and hasattr(app, "bound") and app.bound("queue")):
+            return await self.send_now(notifiable, notification)
+        queue = app.make("queue")
+        for channel in notification.via(notifiable):
+            job = SendQueuedNotification(notifiable, notification, channels=[channel])
+            await self._after_commit(functools.partial(queue.dispatch_after, delay, job))
+        return {"queued": True}
 
     async def send_now(
         self,
@@ -144,12 +256,22 @@ class NotificationManager:
         """Fan out immediately, bypassing the queue rail — across all of ``via()``, or only the
         given ``channels`` slice (the per-channel worker path). ``should_send(notifiable, channel)``
         is consulted first; ``False`` skips that channel silently — no result entry, no error — while
-        the rest of the channels still send."""
+        the rest of the channels still send. When an events dispatcher is bound, each channel also
+        fires ``NotificationSending`` first (a listener returning ``False`` vetoes just that channel,
+        same silent skip) and ``NotificationSent`` after a successful send."""
+        events = self._events()
         results: dict[str, Any] = {}
         for channel in channels if channels is not None else notification.via(notifiable):
             if not notification.should_send(notifiable, channel):
                 continue
-            results[channel] = await self._dispatch(channel, notifiable, notification)
+            if events is not None:
+                veto = await events.until(NotificationSending(notifiable, notification, channel))
+                if veto is False:
+                    continue
+            result = await self._dispatch(channel, notifiable, notification)
+            results[channel] = result
+            if events is not None:
+                await events.dispatch(NotificationSent(notifiable, notification, channel, result))
         return results
 
     async def _store_database(self, notifiable: Any, notification: Notification) -> Any:
@@ -193,20 +315,15 @@ class NotificationManager:
         return BroadcastManager(self.app)
 
     async def _dispatch(self, channel: str, notifiable: Any, notification: Notification) -> Any:
-        if channel == "mail":
-            recipient = self._route(notifiable, "mail", notifiable)
-            return await self._mailer().to(recipient).send(notification.to_mail(notifiable))
-        if channel == "database":
-            return await self._store_database(notifiable, notification)
-        if channel == "broadcast":
-            await self._broadcaster().broadcast(BroadcastNotification(notifiable, notification))
-            return True
-        client = self.apprise()
-        urls = self._route(notifiable, channel, None) or notification.apprise_urls(notifiable)
-        for url in urls:
-            client.add(url)
-        body = str(notification.to_array(notifiable) or type(notification).__name__)
-        return await client.async_notify(body=body)
+        """Resolve ``channel`` to a driver — the three built-ins or an ``extend()``-ed custom
+        channel dispatch by their own name; anything else falls through to the ``apprise``
+        catch-all — and run its ``send()``."""
+        driver_name = (
+            channel
+            if channel in ("mail", "database", "broadcast") or channel in self._creators
+            else "apprise"
+        )
+        return await self.driver(driver_name).send(channel, notifiable, notification)
 
 
 def _resolve_manager() -> NotificationManager:
@@ -247,9 +364,11 @@ class Notifiable:
         return rows
 
     async def mark_all_notifications_as_read(self) -> None:
-        """Stamp every unread notification as read."""
-        for note in await self.unread_notifications():
-            await note.mark_as_read()
+        """Stamp every unread notification as read in ONE mass ``UPDATE`` — not a per-row
+        fetch-then-save loop."""
+        from arvel.dates import Date
+
+        await self._notification_query().where_null("read_at").update({"read_at": Date.now()})
 
 
 class AnonymousNotifiable:
@@ -290,5 +409,8 @@ __all__ = [
     "Notifiable",
     "Notification",
     "NotificationManager",
+    "NotificationSending",
+    "NotificationSent",
+    "NotificationSettings",
     "SendQueuedNotification",
 ]

@@ -11,13 +11,16 @@ from __future__ import annotations
 import re
 from email.message import EmailMessage
 from html.parser import HTMLParser
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import msgspec
 
 from arvel.kernel import Settings
 from arvel.queue import Job
 from arvel.support.manager import Manager
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 type Encryption = Literal["", "tls", "ssl"]  # "tls" = STARTTLS, "ssl" = implicit TLS, "" = none
 
@@ -33,6 +36,14 @@ class SmtpSettings(msgspec.Struct):
     timeout: int = 30
 
 
+class MailerListSettings(msgspec.Struct):
+    """Typed view over a composed mailer's ``mailers`` list — the child driver names
+    ``failover``/``round_robin`` resolve through this SAME registry (``mail.failover.mailers``,
+    ``mail.round_robin.mailers``), so their config is reused rather than duplicated."""
+
+    mailers: list[str] = msgspec.field(default_factory=list[str])
+
+
 class MailSettings(Settings):
     """Typed, validated view over the ``mail`` config section (DR-0016).
 
@@ -43,6 +54,8 @@ class MailSettings(Settings):
     __config_key__ = "mail"
     default: str = "log"
     smtp: SmtpSettings = msgspec.field(default_factory=SmtpSettings)
+    failover: MailerListSettings = msgspec.field(default_factory=MailerListSettings)
+    round_robin: MailerListSettings = msgspec.field(default_factory=MailerListSettings)
 
 
 def _address(recipient: Any) -> str:
@@ -254,6 +267,43 @@ class SmtpTransport:
         return True
 
 
+class FailoverTransport:
+    """Tries child transports in order, moving to the next on a connect/send error; all down
+    → re-raises the last error. Children are resolved driver instances (``mail.failover.mailers``),
+    so this composes existing transports rather than knowing about SMTP/log itself."""
+
+    def __init__(self, transports: list[Any]) -> None:
+        self._transports = transports
+
+    async def send(self, message: EmailMessage) -> bool:
+        last_error: Exception | None = None
+        for transport in self._transports:
+            try:
+                result: bool = await transport.send(message)
+            except Exception as exc:  # a down mailer must not stop the failover walk
+                last_error = exc
+                continue
+            return result
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("mail.failover: no mailers configured")
+
+
+class RoundRobinTransport:
+    """Rotates across child transports, one per send — spreads load, no failure fallback (pair
+    with ``failover`` for that). Children are resolved driver instances (``mail.round_robin.mailers``)."""
+
+    def __init__(self, transports: list[Any]) -> None:
+        self._transports = transports
+        self._next = 0
+
+    async def send(self, message: EmailMessage) -> bool:
+        transport = self._transports[self._next % len(self._transports)]
+        self._next += 1
+        result: bool = await transport.send(message)
+        return result
+
+
 class SendQueuedMailable(Job):
     """Worker job that delivers a mailable enqueued via the ShouldQueue rail.
 
@@ -311,7 +361,9 @@ class PendingMail:
 
     async def send(self, mailable: Mailable) -> bool:
         """Deliver ``mailable`` — inline, or onto the queue when it's ``ShouldQueue`` and a
-        queue is bound (the mail equivalent of the events ShouldQueue rail)."""
+        queue is bound (the mail equivalent of the events ShouldQueue rail). The enqueue itself
+        rides the same after-commit seam as a queued job: buffered while a transaction is open
+        (dropped on rollback), immediate outside one."""
         from arvel.events import ShouldQueue
 
         app = self._mailer.app
@@ -322,9 +374,33 @@ class PendingMail:
             and app.bound("queue")
         ):
             job = SendQueuedMailable(self._recipients, mailable, self._cc, self._bcc)
-            await app.make("queue").push_instance(job)
+            queue = app.make("queue")
+            await self._after_commit(lambda: queue.push_instance(job))
             return True
         return await self.send_now(mailable)
+
+    async def later(self, delay: float, mailable: Mailable) -> bool:
+        """Queue ``mailable`` to send after ``delay`` seconds via the queue's durable delayed-dispatch
+        path (``dispatch_after``) — regardless of ``ShouldQueue``. Same after-commit semantics as
+        :meth:`send`. Falls back to an immediate send when no queue is bound (there's nothing to
+        delay against)."""
+        app = self._mailer.app
+        if not (app is not None and hasattr(app, "bound") and app.bound("queue")):
+            return await self.send_now(mailable)
+        job = SendQueuedMailable(self._recipients, mailable, self._cc, self._bcc)
+        queue = app.make("queue")
+        await self._after_commit(lambda: queue.dispatch_after(delay, job))
+        return True
+
+    async def _after_commit(self, callback: Callable[[], Awaitable[Any]]) -> Any:
+        """Route ``callback`` through the events after-commit buffer — the SAME seam
+        ``QueueManager._defer_to_commit`` uses for a plain ``Job.dispatch()``: buffered while a
+        transaction is open (dropped on rollback), run immediately outside one/without an events
+        dispatcher bound."""
+        app = self._mailer.app
+        if app is not None and hasattr(app, "bound") and app.bound("events"):
+            return await app.make("events").after_commit(callback)
+        return await callback()
 
     async def send_now(self, mailable: Mailable) -> bool:
         """Deliver immediately, bypassing the queue rail (used by the worker job)."""
@@ -357,13 +433,24 @@ class MailManager(Manager):
     def create_smtp_driver(self) -> SmtpTransport:
         return SmtpTransport(self._settings(MailSettings).smtp)
 
+    def create_failover_driver(self) -> FailoverTransport:
+        names = self._settings(MailSettings).failover.mailers
+        return FailoverTransport([self.transport(name) for name in names])
+
+    def create_round_robin_driver(self) -> RoundRobinTransport:
+        names = self._settings(MailSettings).round_robin.mailers
+        return RoundRobinTransport([self.transport(name) for name in names])
+
 
 __all__ = [
+    "FailoverTransport",
     "LogTransport",
     "MailManager",
     "MailSettings",
     "Mailable",
+    "MailerListSettings",
     "PendingMail",
+    "RoundRobinTransport",
     "SendQueuedMailable",
     "SmtpSettings",
     "SmtpTransport",
