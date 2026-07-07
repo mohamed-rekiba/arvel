@@ -442,18 +442,20 @@ class Filesystem:
         return full
 
     async def temporary_url(self, path: str, expires_in: timedelta) -> str:
-        """A time-boxed signed URL for ``path`` (``s3`` only, via s3fs presigning). Other drivers
-        raise:class:`UnsupportedDriverOperation` (parity: ``temporaryUrl`` throws when
-        the driver doesn't support it)."""
-        if not self._is("s3", "s3a"):
-            raise UnsupportedDriverOperation(
-                f"temporary_url is not supported by the {self._protocol()!r} driver"
-            )
+        """A time-boxed signed URL for ``path``: ``s3`` via presigning, ``gcs``/``azure`` via the
+        backend's ``sign`` (a signed URL / SAS token). Other drivers (e.g. ``local``) raise
+        :class:`UnsupportedDriverOperation`."""
         full = self._full(path)
         seconds = int(expires_in.total_seconds())
 
         def _sign() -> str:
-            return str(self._fs.url(full, expires=seconds))
+            if self._is("s3", "s3a"):
+                return str(self._fs.url(full, expires=seconds))
+            if self._is("gcs", "gs", "az", "abfs", "abfss"):
+                return str(self._fs.sign(full, expiration=seconds))
+            raise UnsupportedDriverOperation(
+                f"temporary_url is not supported by the {self._protocol()!r} driver"
+            )
 
         return await run_sync(_sign)
 
