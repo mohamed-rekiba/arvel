@@ -13,6 +13,9 @@ from email.message import EmailMessage
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 import msgspec
 
 from arvel.kernel import Settings
@@ -128,9 +131,9 @@ class Mailable:
         self._attachments: list[tuple[bytes, str, str]] = []  # (data, filename, content-type)
 
     @property
-    def _attachment_list(self) -> list[tuple[bytes, str, str]]:
+    def _attachment_list(self) -> list[tuple[bytes | Path, str, str]]:
         """The attachment list, lazily created — robust when ``__init__`` was bypassed/overridden."""
-        attachments: list[tuple[bytes, str, str]] | None = self.__dict__.get("_attachments")
+        attachments: list[tuple[bytes | Path, str, str]] | None = self.__dict__.get("_attachments")
         if attachments is None:
             attachments = []
             self.__dict__["_attachments"] = attachments
@@ -177,14 +180,30 @@ class Mailable:
         return self
 
     def attach(self, path: str, *, name: str | None = None, mime: str | None = None) -> Mailable:
-        """Attach a file from disk; MIME is guessed from the name if omitted."""
+        """Attach a file from disk; MIME is guessed from the name if omitted. The read is
+        deferred: the async send path loads it off the event loop, so building a mailable
+        in a request handler never blocks on disk I/O."""
         import mimetypes
         from pathlib import Path
 
         filename = name or Path(path).name
         ctype = mime or mimetypes.guess_type(filename)[0] or "application/octet-stream"
-        self._attachment_list.append((Path(path).read_bytes(), filename, ctype))
+        self._attachment_list.append((Path(path), filename, ctype))
         return self
+
+    async def resolve_attachments(self) -> None:
+        """Load any path-deferred attachments into memory via a worker thread — called by
+        the send path before ``render()``; idempotent."""
+        from pathlib import Path
+
+        from anyio.to_thread import run_sync
+
+        resolved: list[tuple[bytes | Path, str, str]] = []
+        for data, filename, ctype in self._attachment_list:
+            if isinstance(data, Path):
+                data = await run_sync(data.read_bytes)
+            resolved.append((data, filename, ctype))
+        self._attachment_list[:] = resolved
 
     def attach_data(
         self, data: bytes, name: str, *, mime: str = "application/octet-stream"
@@ -210,7 +229,11 @@ class Mailable:
         # both are supported, while a text-only client (or a spam filter) still gets real content.
         message.set_content(self._text or _strip_tags(self._html), subtype="plain")
         message.add_alternative(self._html, subtype="html")
+        from pathlib import Path
+
         for data, filename, ctype in self._attachment_list:
+            if isinstance(data, Path):  # direct sync render() (tests) — send paths pre-resolve
+                data = data.read_bytes()
             maintype, _, subtype = ctype.partition("/")
             message.add_attachment(
                 data, maintype=maintype, subtype=subtype or "octet-stream", filename=filename
@@ -404,6 +427,7 @@ class PendingMail:
 
     async def send_now(self, mailable: Mailable) -> bool:
         """Deliver immediately, bypassing the queue rail (used by the worker job)."""
+        await mailable.resolve_attachments()  # disk reads happen off the loop, not in render()
         message = mailable.render()
         message["To"] = ", ".join(self._recipients)
         if self._cc:
