@@ -120,3 +120,19 @@ async def test_lock_expires_after_seconds() -> None:
     # a lock with an effectively-zero TTL should not block a new acquirer for long
     await asyncio.sleep(0.01)
     assert await cache.lock("L").acquire() is True
+
+
+async def test_close_is_a_noop_when_no_redis_lock_client_was_built() -> None:
+    # array-driver repository never builds a redis lock client; close() must be safe
+    cache = _cache()
+    await cache.lock("x").acquire()  # array path — no redis client involved
+    await cache.close()  # no-op, no error
+
+
+async def test_redis_lock_path_requires_a_configured_url() -> None:
+    # a repository with the redis driver but no url can't own a lock client — fail loudly
+    from arvel.cache import CacheRepository
+
+    repo = CacheRepository(object(), driver="redis", redis_url=None)
+    with pytest.raises(RuntimeError, match="redis url"):
+        await repo._redis_raw_client()  # pyright: ignore[reportPrivateUsage]

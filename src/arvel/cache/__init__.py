@@ -408,9 +408,11 @@ class TaggedCache:
 class CacheRepository:
     """cache API over a configured ``cashews.Cache`` client."""
 
-    def __init__(self, client: Any, *, driver: str = "array") -> None:
+    def __init__(self, client: Any, *, driver: str = "array", redis_url: str | None = None) -> None:
         self._client = client
         self._driver = driver
+        self._redis_url = redis_url  # for the redis driver's own atomic-lock client
+        self._lock_client: Any = None  # lazily built redis.asyncio client, dedicated to locks
         self._array_lock_store: _ArrayLockStore | None = None
         # Kept alive so `flexible()`'s fire-and-forget revalidation isn't garbage-collected
         # mid-flight (asyncio only guarantees a task runs while something holds a reference).
@@ -656,29 +658,26 @@ class CacheRepository:
         a different process/instance than the one that acquired the lock release it."""
         return CacheLock(self, name, owner=owner)
 
-    async def _redis_raw_client(self, key: str) -> Any:
-        """Reach the cashews-managed redis backend's raw ``redis.asyncio`` client.
+    async def _redis_raw_client(self) -> Any:
+        """A ``redis.asyncio`` client dedicated to the atomic locks (SET NX PX + Lua owner-release).
 
-        cashews exposes no public accessor for it, so this pulls it off the backend directly
-        (the same backend cashews already created and pools — never a second connection). Mirrors
-        cashews' own lazy-init middleware: initializes the backend on first use if needed.
-
-        The ONE place that reaches into cashews' private shape (``Cache._get_backend``,
-        ``Backend.is_init``/``.init()``/``._client`` — pinned as of cashews' current wrapper/
-        backend layout). If a cashews upgrade renames or removes any of these, this raises loudly
-        instead of the lock code silently breaking.
+        cashews exposes no public accessor for its pooled client, so rather than reach into its
+        private backend shape, the lock path owns its own connection from the same configured URL.
+        Lazily built and reused; closed in :meth:`close`.
         """
-        try:
-            backend = self._client._get_backend(key)
-            if not backend.is_init:
-                await backend.init()
-            return backend._client
-        except AttributeError as exc:
-            raise RuntimeError(
-                "cashews' redis backend internals changed shape (expected "
-                "Cache._get_backend()/.is_init/.init()/._client) — pin the cashews version or "
-                "update CacheRepository._redis_raw_client to match the new shape"
-            ) from exc
+        if self._lock_client is None:
+            import redis.asyncio as redis_asyncio
+
+            if self._redis_url is None:
+                raise RuntimeError("the redis lock path requires a configured redis url")
+            self._lock_client = redis_asyncio.from_url(self._redis_url)
+        return self._lock_client
+
+    async def close(self) -> None:
+        """Close the dedicated lock connection (if the redis lock path was ever used)."""
+        if self._lock_client is not None:
+            await self._lock_client.aclose()
+            self._lock_client = None
 
     def _array_locks(self) -> _ArrayLockStore:
         if self._array_lock_store is None:
@@ -687,7 +686,7 @@ class CacheRepository:
 
     async def _lock_acquire(self, name: str, owner: str, seconds: int | None) -> bool:
         if self._driver == "redis":
-            client = await self._redis_raw_client(name)
+            client = await self._redis_raw_client()
             # redis rejects px=0 ("invalid expire time"); seconds=0 means expire-immediately,
             # so the lock is never actually held — match the array path's behaviour, don't 500
             if seconds == 0:
@@ -698,14 +697,14 @@ class CacheRepository:
 
     async def _lock_release(self, name: str, owner: str) -> bool:
         if self._driver == "redis":
-            client = await self._redis_raw_client(name)
+            client = await self._redis_raw_client()
             result = await client.eval(_LOCK_RELEASE_SCRIPT, 1, name, owner)
             return bool(result)
         return self._array_locks().release(name, owner)
 
     async def _lock_refresh(self, name: str, owner: str, seconds: int) -> bool:
         if self._driver == "redis":
-            client = await self._redis_raw_client(name)
+            client = await self._redis_raw_client()
             px = int(seconds * 1000)
             result = await client.eval(_LOCK_REFRESH_SCRIPT, 1, name, owner, px)
             return bool(result)
@@ -713,7 +712,7 @@ class CacheRepository:
 
     async def _lock_force_release(self, name: str) -> None:
         if self._driver == "redis":
-            client = await self._redis_raw_client(name)
+            client = await self._redis_raw_client()
             await client.delete(name)
             return
         self._array_locks().force_release(name)
@@ -737,7 +736,7 @@ class CacheManager(Manager):
 
         client = Cache()
         client.setup(url, **backend_options)
-        return CacheRepository(client, driver=driver)
+        return CacheRepository(client, driver=driver, redis_url=url if driver == "redis" else None)
 
     def create_array_driver(self) -> CacheRepository:
         return self._build("mem://", driver="array")
