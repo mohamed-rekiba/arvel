@@ -255,7 +255,11 @@ class BroadcastManager(Manager):
             outcome = callback(user, *match.groups())
             if inspect.isawaitable(outcome):
                 outcome = await outcome
-            return outcome if outcome else False
+            # a dict (even empty) or True authorizes; only False/None denies. Truthiness would
+            # collapse a valid metadata-less presence member ({}) into a denial.
+            if outcome is None or outcome is False:
+                return False
+            return cast("bool | dict[str, Any]", outcome)
         return False
 
 

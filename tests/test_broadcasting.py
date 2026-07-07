@@ -101,6 +101,19 @@ async def test_no_matching_pattern_denies() -> None:
     assert await manager.authorize("private-unregistered.1", "someone") is False
 
 
+async def test_presence_member_with_no_metadata_is_authorized() -> None:
+    # a presence callback returning {} is a valid member with no metadata, not a denial
+    manager = BroadcastManager()
+    manager.channel("room.{id}", lambda user, room_id: {})
+    assert await manager.authorize("presence-room.9", "user-1") == {}
+
+
+async def test_presence_callback_returning_none_denies() -> None:
+    manager = BroadcastManager()
+    manager.channel("room.{id}", lambda user, room_id: None)
+    assert await manager.authorize("presence-room.9", "user-1") is False
+
+
 async def test_presence_channel_returns_member_data() -> None:
     manager = BroadcastManager()
 
