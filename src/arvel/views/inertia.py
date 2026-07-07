@@ -26,7 +26,7 @@ def _hash_manifest(manifest_path: str) -> str:
     from pathlib import Path
 
     try:
-        digest = hashlib.sha1(Path(manifest_path).read_bytes()).hexdigest()
+        digest = hashlib.sha256(Path(manifest_path).read_bytes()).hexdigest()
     except OSError:
         return "dev"  # no build yet (dev server) — a stable placeholder version
     return digest[:12]
