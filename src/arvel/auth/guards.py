@@ -46,6 +46,7 @@ class LocalGuard:
     ) -> None:
         self._lookup = lookup
         self._hasher = hasher
+        self._dummy_hash: str | None = None
 
     def _hash(self) -> Any:
         if self._hasher is None:
@@ -54,9 +55,21 @@ class LocalGuard:
             self._hasher = resolve_hasher()
         return self._hasher
 
+    async def _dummy(self) -> str:
+        # computed once per guard; must go through the same driver as real digests so
+        # the unknown-identifier path costs one verification, like the known path
+        dummy = self._dummy_hash
+        if dummy is None:
+            dummy = str(await self._hash().make_async("arvel-timing-equalization"))
+            self._dummy_hash = dummy
+        return dummy
+
     async def attempt(self, identifier: str, password: str) -> Principal | None:
         hashed = await self._lookup(identifier)
         if not hashed:
+            # unknown identifier: burn a full verification against a dummy digest so
+            # response time can't be used to enumerate valid usernames
+            await self._hash().check_async(password, await self._dummy())
             return None
         if not await self._hash().check_async(password, hashed):
             return None
