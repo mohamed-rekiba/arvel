@@ -28,7 +28,9 @@ def _errors(fn: object) -> dict[str, list[str]]:
 
 
 def test_wrong_type_is_keyed_by_field() -> None:
-    errors = _errors(lambda: validate({"email": "e", "items": [{"name": "x", "qty": "NaN"}]}, Order, strict=True))
+    errors = _errors(
+        lambda: validate({"email": "e", "items": [{"name": "x", "qty": "NaN"}]}, Order, strict=True)
+    )
     assert list(errors.keys()) == ["items.0.qty"]
     assert isinstance(errors["items.0.qty"], list) and errors["items.0.qty"]
 
