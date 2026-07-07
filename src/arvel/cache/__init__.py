@@ -15,8 +15,9 @@ import asyncio
 import inspect
 import secrets
 import time
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
+from typing import Any, cast
 
 from arvel.kernel import Settings
 from arvel.support.manager import Manager
@@ -33,6 +34,72 @@ else
     return 0
 end
 """
+
+# Same compare-then-act shape as the release script above, but extends the TTL instead of
+# deleting — still only when this holder's owner token still holds it.
+_LOCK_REFRESH_SCRIPT = """
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("PEXPIRE", KEYS[1], ARGV[2])
+else
+    return 0
+end
+"""
+
+
+@dataclass(frozen=True)
+class CacheHit:
+    """Dispatched when a read finds a stored value (a stored ``None`` counts as a hit)."""
+
+    key: str
+    value: Any
+
+
+@dataclass(frozen=True)
+class CacheMissed:
+    """Dispatched when a read finds nothing stored for ``key``."""
+
+    key: str
+
+
+@dataclass(frozen=True)
+class KeyWritten:
+    """Dispatched after a value is stored."""
+
+    key: str
+    value: Any
+    ttl: int | None = None
+
+
+@dataclass(frozen=True)
+class KeyForgotten:
+    """Dispatched after a key is deleted."""
+
+    key: str
+
+
+async def _dispatch_cache_event(event: Any) -> None:
+    """Best-effort dispatch through the app's event bus; a no-op without one (mirrors
+    ``arvel.auth._dispatch_auth_event`` / database's ``QueryExecuted`` dispatch)."""
+    from arvel.kernel import app, has_application
+
+    if has_application() and app().bound("events"):
+        await app().make("events").dispatch(event)
+
+
+def _wrap(value: Any) -> tuple[Any]:
+    """arvel's own envelope for a stored value — a 1-tuple, so a cached ``None`` is stored as
+    ``(None,)`` and is never confused with "nothing stored" (a bare ``None`` from the client)."""
+    return (value,)
+
+
+def _unwrap(raw: Any) -> Any:
+    """Inverse of :func:`_wrap`. A value written by another (non-arvel) client is passed through
+    unchanged, best-effort — this only recognizes this exact 1-tuple shape as arvel's envelope."""
+    if isinstance(raw, tuple):
+        envelope: tuple[Any, ...] = cast("tuple[Any, ...]", raw)
+        if len(envelope) == 1:
+            return envelope[0]
+    return cast("Any", raw)
 
 
 class CacheSettings(Settings):
@@ -98,6 +165,13 @@ class _ArrayLockStore:
         del self._locks[name]
         return True
 
+    def refresh(self, name: str, owner: str, seconds: int) -> bool:
+        current = self._live(name)
+        if current is None or current[0] != owner:
+            return False
+        self._locks[name] = (owner, time.monotonic() + seconds)
+        return True
+
     def force_release(self, name: str) -> None:
         self._locks.pop(name, None)
 
@@ -134,19 +208,51 @@ class CacheLock:
                 self._name, self._owner, self._seconds
             )
 
-    async def block(self, wait_seconds: float, sleep: float = 0.25) -> None:
-        """Retry until acquired, or raise :class:`LockTimeout` once ``wait_seconds`` elapses."""
+    async def block(
+        self, wait_seconds: float, sleep: float = 0.25, callback: Callable[[], Any] | None = None
+    ) -> Any:
+        """Retry until acquired, or raise :class:`LockTimeout` once ``wait_seconds`` elapses.
+
+        With ``callback``, once acquired it runs (sync or async) and the lock is released
+        afterward — always, even on exception (mirrors :meth:`get`) — and its result is returned.
+        Without one, returns ``None`` once acquired and leaves release to the caller (the
+        original behaviour)."""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + wait_seconds
         while True:
             if await self.acquire():
-                return
+                return await self._run_and_release(callback) if callback is not None else None
             remaining = deadline - loop.time()
             if remaining <= 0:
                 raise LockTimeout(
                     f"Timed out after {wait_seconds}s waiting for lock {self._name!r}"
                 )
             await asyncio.sleep(min(sleep, remaining))
+
+    async def get(self, callback: Callable[[], Any]) -> Any:
+        """Acquire (single try), run ``callback`` (sync or async), always release — even on
+        exception. Raises :class:`LockAcquireFailed` if the lock is already held."""
+        if not await self.acquire():
+            raise LockAcquireFailed(f"Lock {self._name!r} is already held")
+        return await self._run_and_release(callback)
+
+    async def _run_and_release(self, callback: Callable[[], Any]) -> Any:
+        try:
+            result = callback()
+            if inspect.isawaitable(result):
+                result = await result
+            return result
+        finally:
+            await self.release()
+
+    async def refresh(self, ttl: int) -> bool:
+        """Extend this lock's expiry to ``ttl`` seconds from now — atomic, and only if this
+        handle's owner token still holds it (mirrors :meth:`release`'s compare-and-act)."""
+        attrs = {"cache.operation": "lock.refresh", "cache.lock": self._name}
+        with span("cache lock refresh", kind="client", attributes=attrs):
+            return await self._repository._lock_refresh(  # pyright: ignore[reportPrivateUsage]
+                self._name, self._owner, ttl
+            )
 
     async def release(self) -> bool:
         """Delete the lock only if this handle's owner token still holds it."""
@@ -279,11 +385,20 @@ class CacheRepository:
         return self._client
 
     async def get(self, key: str, default: Any = None) -> Any:
+        """A stored ``None`` is a hit — returned as ``None``, not ``default`` (values are kept
+        in arvel's own envelope, see :func:`_wrap`, so a stored ``None`` is distinguishable from
+        nothing-stored)."""
         with span("cache get", kind="client", attributes={"cache.operation": "get"}) as sp:
-            value = await self._client.get(key)
+            raw = await self._client.get(key)
+            hit = raw is not None
             if sp is not None:
-                sp.set_attribute("cache.hit", value is not None)
-            return default if value is None else value
+                sp.set_attribute("cache.hit", hit)
+            if not hit:
+                await _dispatch_cache_event(CacheMissed(key))
+                return default
+            value = _unwrap(raw)
+            await _dispatch_cache_event(CacheHit(key, value))
+            return value
 
     async def put(self, key: str, value: Any, ttl: int | None = None) -> bool:
         with span("cache put", kind="client", attributes={"cache.operation": "put"}):
@@ -291,8 +406,10 @@ class CacheRepository:
                 # a non-positive TTL means "already expired" — evict any existing value, store
                 # nothing (cashews reads expire=0 as no-expiry, which would persist it forever).
                 await self._client.delete(key)
+                await _dispatch_cache_event(KeyForgotten(key))
                 return False
-            await self._client.set(key, value, expire=ttl)
+            await self._client.set(key, _wrap(value), expire=ttl)
+            await _dispatch_cache_event(KeyWritten(key, value, ttl))
             return True
 
     async def has(self, key: str) -> bool:
@@ -302,6 +419,7 @@ class CacheRepository:
     async def forget(self, key: str) -> bool:
         with span("cache forget", kind="client", attributes={"cache.operation": "forget"}):
             await self._client.delete(key)
+            await _dispatch_cache_event(KeyForgotten(key))
             return True
 
     async def flush(self) -> bool:
@@ -316,20 +434,27 @@ class CacheRepository:
         with span("cache add", kind="client", attributes={"cache.operation": "add"}) as sp:
             if ttl is not None and ttl <= 0:
                 return False  # already-expired → never stored
-            stored = bool(await self._client.set(key, value, expire=ttl, exist=False))
+            stored = bool(await self._client.set(key, _wrap(value), expire=ttl, exist=False))
             if sp is not None:
                 sp.set_attribute("cache.stored", stored)
+            if stored:
+                await _dispatch_cache_event(KeyWritten(key, value, ttl))
             return stored
 
     async def pull(self, key: str, default: Any = None) -> Any:
-        """Get then delete in one call."""
+        """Get then delete in one call. A stored ``None`` is pulled (and deleted) like any other
+        value, not treated as a miss."""
         with span("cache pull", kind="client", attributes={"cache.operation": "pull"}) as sp:
-            value = await self._client.get(key)
-            if value is None:
+            raw = await self._client.get(key)
+            if raw is None:
+                await _dispatch_cache_event(CacheMissed(key))
                 return default
+            value = _unwrap(raw)
             await self._client.delete(key)
             if sp is not None:
                 sp.set_attribute("cache.hit", True)
+            await _dispatch_cache_event(CacheHit(key, value))
+            await _dispatch_cache_event(KeyForgotten(key))
             return value
 
     async def forever(self, key: str, value: Any) -> bool:
@@ -351,23 +476,61 @@ class CacheRepository:
         with span("cache decrement", kind="client", attributes={"cache.operation": "decrement"}):
             return int(await self._client.incr(key, -by))
 
+    async def increment_with_ttl(self, key: str, amount: int = 1, ttl: int | None = None) -> int:
+        """Atomically bump a counter and arm its TTL on the hit that creates it (fixed-window
+        counting — e.g. rate limiting — needs "create with decay" to not race between the two
+        calls it'd otherwise take). Safe under concurrent callers: cashews folds this into one
+        INCR+EXPIRE Lua script on redis, and the array driver has no `await` between its read and
+        write (see `_ArrayLockStore`) — so a decay only arms once, on the count-1 creation."""
+        with span(
+            "cache increment_with_ttl",
+            kind="client",
+            attributes={"cache.operation": "increment_with_ttl"},
+        ):
+            return int(await self._client.incr(key, amount, expire=ttl))
+
     async def expire(self, key: str, ttl: int) -> bool:
         """Set/refresh a key's time-to-live in seconds."""
         await self._client.expire(key, ttl)
         return True
 
     async def remember(self, key: str, ttl: int | None, callback: Any) -> Any:
-        value = await self._client.get(key)
-        if value is not None:
+        """Serve the cached value if present — a cached ``None`` counts, and is served without
+        recomputing — else compute, store, and return it."""
+        raw = await self._client.get(key)
+        if raw is not None:
+            value = _unwrap(raw)
+            await _dispatch_cache_event(CacheHit(key, value))
             return value
+        await _dispatch_cache_event(CacheMissed(key))
         computed = callback()
         if inspect.isawaitable(computed):
             computed = await computed
-        await self._client.set(key, computed, expire=ttl)
+        await self._client.set(key, _wrap(computed), expire=ttl)
+        await _dispatch_cache_event(KeyWritten(key, computed, ttl))
         return computed
 
     async def remember_forever(self, key: str, callback: Any) -> Any:
         return await self.remember(key, None, callback)
+
+    async def many(self, keys: Iterable[str], default: Any = None) -> dict[str, Any]:
+        """Batch :meth:`get` — one round trip per backend via cashews' native multi-get."""
+        keys = list(keys)
+        raws = await self._client.get_many(*keys)
+        return {
+            key: (default if raw is None else _unwrap(raw))
+            for key, raw in zip(keys, raws, strict=True)
+        }
+
+    async def put_many(self, mapping: Mapping[str, Any], ttl: int | None = None) -> bool:
+        """Batch :meth:`put` — one round trip per backend via cashews' native multi-set."""
+        if ttl is not None and ttl <= 0:
+            for key in mapping:
+                await self._client.delete(key)
+            return False
+        wrapped = {key: _wrap(value) for key, value in mapping.items()}
+        await self._client.set_many(wrapped, expire=ttl)
+        return True
 
     async def flexible(
         self,
@@ -463,11 +626,23 @@ class CacheRepository:
         cashews exposes no public accessor for it, so this pulls it off the backend directly
         (the same backend cashews already created and pools — never a second connection). Mirrors
         cashews' own lazy-init middleware: initializes the backend on first use if needed.
+
+        The ONE place that reaches into cashews' private shape (``Cache._get_backend``,
+        ``Backend.is_init``/``.init()``/``._client`` — pinned as of cashews' current wrapper/
+        backend layout). If a cashews upgrade renames or removes any of these, this raises loudly
+        instead of the lock code silently breaking.
         """
-        backend = self._client._get_backend(key)
-        if not backend.is_init:
-            await backend.init()
-        return backend._client
+        try:
+            backend = self._client._get_backend(key)
+            if not backend.is_init:
+                await backend.init()
+            return backend._client
+        except AttributeError as exc:
+            raise RuntimeError(
+                "cashews' redis backend internals changed shape (expected "
+                "Cache._get_backend()/.is_init/.init()/._client) — pin the cashews version or "
+                "update CacheRepository._redis_raw_client to match the new shape"
+            ) from exc
 
     def _array_locks(self) -> _ArrayLockStore:
         if self._array_lock_store is None:
@@ -491,6 +666,14 @@ class CacheRepository:
             result = await client.eval(_LOCK_RELEASE_SCRIPT, 1, name, owner)
             return bool(result)
         return self._array_locks().release(name, owner)
+
+    async def _lock_refresh(self, name: str, owner: str, seconds: int) -> bool:
+        if self._driver == "redis":
+            client = await self._redis_raw_client(name)
+            px = int(seconds * 1000)
+            result = await client.eval(_LOCK_REFRESH_SCRIPT, 1, name, owner, px)
+            return bool(result)
+        return self._array_locks().refresh(name, owner, seconds)
 
     async def _lock_force_release(self, name: str) -> None:
         if self._driver == "redis":
@@ -551,22 +734,27 @@ def cached(fn: Any = None, *, ttl: int | None = None, key: str | None = None) ->
 
         cache_key = key or f"{fn.__module__}.{fn.__qualname__}:{args!r}:{sorted(kwargs.items())!r}"
         repo = cache()
-        # Wrap in a 1-tuple so a cached None is never confused with a miss.
+        # get() distinguishes a cached None from a miss on its own now (CacheRepository's own
+        # envelope, see `_wrap`/`_unwrap`) — no decorator-local workaround needed.
         hit = await repo.get(cache_key, _CACHE_MISS)
         if hit is not _CACHE_MISS:
-            return hit[0]
+            return hit
         result = await fn(*args, **kwargs)
-        await repo.put(cache_key, (result,), ttl=ttl)
+        await repo.put(cache_key, result, ttl=ttl)
         return result
 
     return wrapper
 
 
 __all__ = [
+    "CacheHit",
     "CacheLock",
     "CacheManager",
+    "CacheMissed",
     "CacheRepository",
     "CacheSettings",
+    "KeyForgotten",
+    "KeyWritten",
     "LockAcquireFailed",
     "LockTimeout",
     "TaggedCache",

@@ -20,9 +20,10 @@ def cache() -> CacheRepository:
 async def test_has_true_for_stored_none(cache: CacheRepository) -> None:
     await cache.put("k", None)
     assert await cache.has("k") is True
-    # has() is the disambiguator; get() keeps standard cache semantics (a default fills a None value)
+    # a stored None is itself a hit — get() returns it, the default never fills it in
+    # (root-fixed at the repository layer via an envelope, see `_wrap`/`_unwrap`)
     assert await cache.get("k") is None
-    assert await cache.get("k", "sentinel") == "sentinel"
+    assert await cache.get("k", "sentinel") is None
 
 
 @pytest.mark.asyncio
