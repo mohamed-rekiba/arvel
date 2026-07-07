@@ -64,8 +64,10 @@ class HasRoles:
         return self  # at runtime this *is* a Model; typed loosely for the mixin
 
     def _morph(self) -> tuple[str, Any]:
+        from arvel.database import morph_type_of
+
         model = self._as_model()
-        return type(model).__name__, model._attributes[model.__primary_key__]
+        return morph_type_of(type(model)), model._attributes[model.__primary_key__]
 
     def _connection(self) -> Any:
         # call Model's _resolve() method, not the same-named _resolver ClassVar (would shadow it)

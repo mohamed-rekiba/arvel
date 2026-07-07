@@ -145,6 +145,13 @@ def _b64d(data: str) -> bytes:
     return base64.b64decode(data, validate=True)
 
 
+class SignatureInvalid(Exception):
+    """A signed value failed verification — tampered, wrong key, or expired.
+
+    The module's own vocabulary (like :class:`DecryptionFailed`): callers never
+    have to catch the signing library's exception types."""
+
+
 class Signer:
     """Tamper-evident signing on itsdangerous."""
 
@@ -155,7 +162,18 @@ class Signer:
         return self._serializer.dumps(value)
 
     def unsign(self, signed: str, max_age: int | None = None) -> Any:
-        return self._serializer.loads(signed, max_age=max_age)
+        try:
+            return self._serializer.loads(signed, max_age=max_age)
+        except Exception as exc:
+            raise SignatureInvalid(str(exc)) from exc
 
 
-__all__ = ["DecryptionFailed", "Encrypter", "HashManager", "Hasher", "Signer", "resolve_hasher"]
+__all__ = [
+    "DecryptionFailed",
+    "Encrypter",
+    "HashManager",
+    "Hasher",
+    "SignatureInvalid",
+    "Signer",
+    "resolve_hasher",
+]

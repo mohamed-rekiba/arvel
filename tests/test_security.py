@@ -37,11 +37,11 @@ def test_signer_sign_unsign() -> None:
 
 
 def test_signer_expiry() -> None:
-    from itsdangerous import SignatureExpired
+    from arvel.security import SignatureInvalid
 
     s = Signer("secret-key")
     signed = s.sign("v")
-    with pytest.raises(SignatureExpired):
+    with pytest.raises(SignatureInvalid):  # expiry surfaces as the module's own error
         s.unsign(signed, max_age=-1)
 
 

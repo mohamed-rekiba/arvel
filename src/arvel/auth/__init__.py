@@ -9,6 +9,7 @@ Grounded in knowledge/port/15-auth-authorization.md.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from arvel.auth.gate import AuthorizationError, Gate, GateResponse
@@ -25,6 +26,23 @@ def _gate() -> Gate:
         gate: Gate = app().make("gate")
         return gate
     return Gate()
+
+
+@dataclass(frozen=True)
+class EmailVerified:
+    """Fired once when a user's email transitions to verified — the framework-level hook
+    for welcome flows, audit trails, and provisioning."""
+
+    user_id: Any
+    email: str | None
+
+
+async def _dispatch_auth_event(event: Any) -> None:
+    """Best-effort dispatch through the app's event bus; a no-op without one."""
+    from arvel.kernel import app, has_application
+
+    if has_application() and app().bound("events"):
+        await app().make("events").dispatch(event)
 
 
 class Authenticatable:
@@ -49,7 +67,9 @@ class Authenticatable:
     # --- email verification -----------------
     def has_verified_email(self) -> bool:
         """Whether the user's email is verified — the ``email_verified_at`` timestamp is set. Drives the ``verified`` route middleware."""
-        return getattr(self, "email_verified_at", None) is not None
+        # truthy, not is-not-None — a falsy-but-set value ("", 0) is NOT verified,
+        # matching the `verified` route middleware
+        return bool(getattr(self, "email_verified_at", None))
 
     async def mark_email_as_verified(self) -> bool:
         """Stamp the email verified **now** and persist. Returns
@@ -60,6 +80,9 @@ class Authenticatable:
 
         self.email_verified_at = now()
         await self.save()
+        await _dispatch_auth_event(
+            EmailVerified(user_id=self.get_auth_identifier(), email=getattr(self, "email", None))
+        )
         return True
 
     async def mark_email_as_unverified(self) -> None:
@@ -180,6 +203,7 @@ __all__ = [
     "AuthManager",
     "Authenticatable",
     "AuthorizationError",
+    "EmailVerified",
     "Gate",
     "GateResponse",
     "HasRoles",

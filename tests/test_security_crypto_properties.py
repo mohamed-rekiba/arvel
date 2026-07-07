@@ -9,9 +9,8 @@ from __future__ import annotations
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from itsdangerous import BadData
 
-from arvel.security import DecryptionFailed, Encrypter, Hasher, Signer
+from arvel.security import DecryptionFailed, Encrypter, Hasher, SignatureInvalid, Signer
 
 # A replacement-char pool for single-char mutation (doesn't need to match a token's own
 # alphabet exactly — any char differing from the original exercises the tamper-rejection path).
@@ -142,6 +141,6 @@ def test_signer_tamper_never_yields_different_value(value: str, index: int) -> N
         return
     try:
         result = s.unsign(tampered)
-    except BadData:
+    except SignatureInvalid:
         return
     assert result == value, f"tamper forged a different value: {result!r}"
