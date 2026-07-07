@@ -28,7 +28,15 @@ class ShouldQueue:
 
 
 class ShouldBroadcast:
-    """Marker base: an event that should be broadcast to clients."""
+    """Marker base: an event that should be broadcast to clients — **queued** by default (a small
+    internal job carries the broadcast to the worker; see ``Dispatcher._broadcast``), composed
+    with after-commit like a queued listener's own dispatch. Subclass :class:`ShouldBroadcastNow`
+    instead for the old inline-send behavior."""
+
+
+class ShouldBroadcastNow(ShouldBroadcast):
+    """Marker base: broadcast **inline**, during dispatch — never queued, never deferred to a
+    commit."""
 
 
 class ShouldDispatchAfterCommit:
@@ -248,5 +256,24 @@ class Dispatcher:
         return False
 
     async def _broadcast(self, event: ShouldBroadcast) -> None:
+        """Send ``event`` to the bound ``broadcast`` manager — **queued** by default (A2-style
+        seam: ``broadcast_dispatcher`` is bound by the queue provider, mirroring
+        ``queue_dispatcher``'s rail for a ``ShouldQueue`` listener, since events sits below queue
+        in the module DAG and must not import it). The enqueue itself rides ``after_commit``
+        (this dispatcher's own deferral buffer — the generic seam other queued work uses), so a
+        broadcast dispatched inside a transaction that rolls back is dropped, never sent.
+        ``ShouldBroadcastNow`` skips the queue and buffer entirely: sent inline, right now. No
+        ``broadcast_dispatcher`` bound (no queue provider registered) -> the same inline send,
+        documented fallback (mirrors ``ShouldQueue``'s own no-queue-provider fallback)."""
+        if isinstance(event, ShouldBroadcastNow):
+            await self._broadcast_now(event)
+            return
+        if self.container is not None and self.container.bound("broadcast_dispatcher"):
+            dispatch = self.container.make("broadcast_dispatcher")
+            await self.after_commit(functools.partial(dispatch, event))
+            return
+        await self._broadcast_now(event)
+
+    async def _broadcast_now(self, event: ShouldBroadcast) -> None:
         if self.container is not None and self.container.bound("broadcast"):
             await self.container.make("broadcast").broadcast(event)

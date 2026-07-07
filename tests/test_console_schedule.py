@@ -6,6 +6,7 @@ loading scheduled tasks from routes/console.py.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -96,6 +97,55 @@ def test_schedule_run_without_binding_errors() -> None:
     set_application(Application())  # active app, but no 'schedule' bound → binding-missing branch
     try:
         result = runner.invoke(build_cli(), ["schedule:run"])
+        assert result.exit_code == 1
+        assert "no schedule bound" in result.output
+    finally:
+        set_application(None)
+
+
+# --- 6.2b: schedule:work — a dev loop ticking schedule:run every minute ----------------------
+
+
+async def test_tick_loop_runs_due_tasks_repeatedly_until_stopped() -> None:
+    from arvel.console.schedule import tick_loop
+    from arvel.queue.scheduler import Schedule
+
+    ticks: list[str] = []
+    schedule = Schedule()
+    schedule.call(lambda: ticks.append("tick")).every_minute()
+
+    stop = asyncio.Event()
+
+    async def _stop_soon() -> None:
+        await asyncio.sleep(0.05)
+        stop.set()
+
+    stopper = asyncio.create_task(_stop_soon())
+    await asyncio.wait_for(tick_loop(schedule, interval=0.01, stop=stop), timeout=5)
+    await stopper
+    assert len(ticks) >= 2  # ticked more than once before stopping
+
+
+async def test_tick_loop_stops_immediately_when_already_stopped() -> None:
+    from arvel.console.schedule import tick_loop
+    from arvel.queue.scheduler import Schedule
+
+    ticks: list[str] = []
+    schedule = Schedule()
+    schedule.call(lambda: ticks.append("tick")).every_minute()
+
+    stop = asyncio.Event()
+    stop.set()
+    await asyncio.wait_for(tick_loop(schedule, interval=60.0, stop=stop), timeout=1)
+    assert ticks == []  # never ticked — already stopped before the first iteration
+
+
+def test_schedule_work_is_registered_as_a_cli_command_and_errors_without_a_binding() -> None:
+    from arvel.kernel import Application, set_application
+
+    set_application(Application())  # active app, but no 'schedule' bound
+    try:
+        result = runner.invoke(build_cli(), ["schedule:work"])
         assert result.exit_code == 1
         assert "no schedule bound" in result.output
     finally:

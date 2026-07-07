@@ -62,6 +62,29 @@ def _run_to_completion(coro: Any) -> None:
         pool.submit(asyncio.run, coro).result()
 
 
+async def run_app_command_async(handler: CommandHandler) -> None:
+    """Run ``handler`` against the **already-active** application, awaited directly on the
+    caller's own event loop — no thread bridge (contrast :func:`_run_to_completion`, which spins a
+    fresh loop in a worker thread because its callers are synchronous). For a caller that's
+    already async and already has an app up (e.g. a scheduler tick, which always runs inside the
+    booted app's own loop) — awaiting this directly means a slow command never blocks that loop
+    for its whole duration, unlike routing through the sync :func:`run_app_command`.
+
+    This is also ``run_app_command``'s own "already active" branch (extracted so both callers
+    share one implementation); raises if no application is active — there's no project to
+    (re)bootstrap here, unlike the CLI-process path in :func:`run_app_command`.
+    """
+    from arvel.kernel import app as active_app
+    from arvel.kernel import has_application
+
+    if not has_application():
+        raise RuntimeError(
+            "run_app_command_async requires an already-active application "
+            "(e.g. called from a scheduler tick or another already-booted context)"
+        )
+    await handler(active_app())
+
+
 def run_app_command(handler: CommandHandler) -> None:
     """Run an app-dependent console command inside the project app.
 
@@ -76,11 +99,10 @@ def run_app_command(handler: CommandHandler) -> None:
 
     import typer
 
-    from arvel.kernel import app as active_app
     from arvel.kernel import has_application
 
     if has_application():  # tests / embedding own the app's lifecycle — just run the command
-        _run_to_completion(handler(active_app()))
+        _run_to_completion(run_app_command_async(handler))
         return
     project = load_project_app()
     if project is None:
@@ -207,6 +229,27 @@ def run_command_class(cls: Any, **cli_kwargs: Any) -> None:
             raise typer.Exit(code=result)
 
     run_app_command(handler)
+
+
+async def run_command_class_async(cls: Any, **cli_kwargs: Any) -> None:
+    """Async twin of :func:`run_command_class` — for a caller already inside the app's own event
+    loop (e.g. a scheduler tick dispatching a zero-arg command) with no CLI argv to parse.
+    Dispatches straight through :func:`run_app_command_async` instead of bridging through a
+    thread."""
+    import inspect
+
+    async def handler(app: Any) -> None:
+        import typer
+
+        instance = cls()
+        instance.bind_parsed(cli_kwargs)
+        result = app.call((instance, "handle"))
+        if inspect.isawaitable(result):
+            result = await result
+        if isinstance(result, int) and result != 0:
+            raise typer.Exit(code=result)
+
+    await run_app_command_async(handler)
 
 
 class Cli:

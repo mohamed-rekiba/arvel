@@ -111,6 +111,7 @@ class ScheduledEvent:
         self._skip: Any = None
         self._environments: tuple[str, ...] | None = None
         self._between: tuple[str, str] | None = None
+        self._even_in_maintenance_mode = False
 
     # --- cadence -------------------------------------------------------------
     def cron(self, expression: str) -> ScheduledEvent:
@@ -187,6 +188,12 @@ class ScheduledEvent:
         """An explicit identity for the ``on_one_server``/``without_overlapping`` lock key —
         needed when the callback itself has no stable qualified name (e.g. a lambda/closure)."""
         self._event_name = name
+        return self
+
+    def even_in_maintenance_mode(self) -> ScheduledEvent:
+        """Opt this task out of the maintenance-mode skip (below) — it still runs while the app
+        is down (``arvel down``), unlike every other scheduled task."""
+        self._even_in_maintenance_mode = True
         return self
 
     # --- concurrency -------------------------------------------------------
@@ -267,6 +274,20 @@ class ScheduledEvent:
         return cache().lock(name, seconds=seconds)
 
     @staticmethod
+    async def _in_maintenance_mode() -> bool:
+        """Whether the app is currently down for maintenance (``arvel down``) — queue is a
+        higher layer than http in the module DAG (G1), so this lazy import is a permitted
+        forward reference, not a back-edge; the check is skipped (never blocks) with no app
+        bound (no maintenance state exists to check)."""
+        from arvel.kernel import has_application
+
+        if not has_application():
+            return False
+        from arvel.http.maintenance import is_down
+
+        return await is_down()
+
+    @staticmethod
     async def _fire(hooks: list[Any]) -> None:
         for hook in hooks:
             outcome = hook()
@@ -277,6 +298,8 @@ class ScheduledEvent:
         release_locks: list[Any] = []  # freed in finally; the one-server claim is NOT (see below)
         ran = False  # set only once past the locks — so before/after/callback all skip a lost tick
         try:
+            if not self._even_in_maintenance_mode and await self._in_maintenance_mode():
+                return None  # the app is down for maintenance and this task didn't opt in
             if self.one_server:
                 # scope the claim to this minute and DON'T release it: a staggered tick that starts
                 # after this one finishes must still find the minute claimed and skip. Releasing on
@@ -312,6 +335,58 @@ class ScheduledEvent:
                 await lock.release()
 
 
+async def _dispatch_scheduled_command(name: str, args: tuple[str, ...]) -> None:
+    """Dispatch a scheduled console command when due, without blocking the scheduler's own event
+    loop for its full duration (6.2a).
+
+    A **zero-arg** app-registered command — a ``routes/console.py`` closure or a provider
+    ``Command`` class, the common case for a scheduled task — runs directly on this loop via
+    :func:`arvel.console.kernel.run_app_command_async`: no thread, no CLI/click re-parsing (an
+    app is always active here — a scheduler tick only ever runs inside one). Anything else (a
+    built-in framework command, or one that takes args) still goes through the ordinary CLI
+    dispatch (``build_cli()``), moved onto a worker thread (``run_in_executor``) so a slow one
+    can't stall a same-tick sibling either.
+
+    ponytail: argv→kwargs re-parsing for an *args-taking* app command isn't reimplemented here
+    (that's click/Typer's own signature machinery — see ``console.lazy``); add the loop-native
+    path for it too if scheduling a slow command *with* arguments turns out to need it.
+    """
+    if not args:
+        from arvel.console.kernel import (
+            command_name,
+            run_app_command_async,
+            run_command_class_async,
+        )
+        from arvel.kernel import app as active_app
+        from arvel.kernel import has_application
+
+        if has_application():
+            application = active_app()
+            closure = application.console_commands.get(name)
+            if closure is not None:
+
+                async def _run_closure(app: Any) -> None:
+                    result = app.call(closure.handler)
+                    if inspect.isawaitable(result):
+                        await result
+
+                await run_app_command_async(_run_closure)
+                return
+            cls = next((c for c in application.command_classes if command_name(c) == name), None)
+            if cls is not None:
+                await run_command_class_async(cls)
+                return
+
+    import asyncio
+
+    def _dispatch() -> None:
+        from arvel.console import build_cli
+
+        build_cli()([name, *args], standalone_mode=False)
+
+    await asyncio.get_running_loop().run_in_executor(None, _dispatch)
+
+
 class Schedule:
     """Registry of scheduled events. ``run_due(now)`` executes the ones due at ``now``."""
 
@@ -336,12 +411,12 @@ class Schedule:
         return self.call(_dispatch)
 
     def command(self, name: str, *args: str) -> ScheduledEvent:
-        """Schedule a console command by name (run via the CLI when due)."""
+        """Schedule a console command by name (run via the CLI when due) — dispatched without
+        blocking the scheduler's own event loop for the command's duration; see
+        :func:`_dispatch_scheduled_command`."""
 
-        def _invoke() -> None:
-            from arvel.console import build_cli
-
-            build_cli()([name, *args], standalone_mode=False)
+        async def _invoke() -> None:
+            await _dispatch_scheduled_command(name, args)
 
         return self.call(_invoke)
 
@@ -349,16 +424,23 @@ class Schedule:
         return [event for event in self.events if event.is_due(moment)]
 
     async def run_due(self, moment: datetime) -> None:
-        """Run every due event. A failing event is LOGGED and skipped — one bad task must never
-        starve the rest of the schedule (or kill the cron tick)."""
-        for event in self.due_events(moment):
-            try:
-                await event.run(moment)
-            except Exception:
-                from arvel.kernel.logging import LogManager
+        """Run every due event **concurrently** (6.2a) — one tick's tasks no longer serialize
+        behind each other, so a slow one doesn't delay a sibling due in the same minute. A failing
+        event is LOGGED and skipped — one bad task must never starve the rest of the schedule (or
+        kill the cron tick)."""
+        import asyncio
 
-                LogManager().channel("schedule").error(
-                    "scheduled_task_failed",
-                    task=getattr(event.callback, "__name__", repr(event.callback)),
-                    exc_info=True,
-                )
+        await asyncio.gather(*(self._run_one(event, moment) for event in self.due_events(moment)))
+
+    @staticmethod
+    async def _run_one(event: ScheduledEvent, moment: datetime) -> None:
+        try:
+            await event.run(moment)
+        except Exception:
+            from arvel.kernel.logging import LogManager
+
+            LogManager().channel("schedule").error(
+                "scheduled_task_failed",
+                task=getattr(event.callback, "__name__", repr(event.callback)),
+                exc_info=True,
+            )

@@ -71,3 +71,28 @@ class CallQueuedListener(Job):
         if inspect.isawaitable(outcome):
             outcome = await outcome
         return outcome
+
+    async def failed(self, exc: BaseException) -> None:
+        """On retry exhaustion, delegate to the wrapped listener's own ``failed(exc)`` (if it
+        defines one) exactly once — mirrors a job's own ``failed()`` hook, for a queued listener.
+        Resolving the listener again, or the hook itself, raising is logged and swallowed: one
+        broken failure-hook must never crash the worker (``run_job_with_retries`` awaits this
+        directly from ``_give_up``, unguarded)."""
+        from arvel.kernel.logging import LogManager
+
+        try:
+            instance = await self._resolve_listener()
+        except Exception:
+            LogManager().channel("queue").warning(
+                "queued_listener_failed_hook_resolve_failed", exc_info=True
+            )
+            return
+        hook = getattr(instance, "failed", None)
+        if not callable(hook):
+            return
+        try:
+            outcome = hook(exc)
+            if inspect.isawaitable(outcome):
+                await outcome
+        except Exception:
+            LogManager().channel("queue").error("queued_listener_failed_hook_raised", exc_info=True)
