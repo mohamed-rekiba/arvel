@@ -165,3 +165,54 @@ def test_malformed_cursor_degrades_to_first_page_not_500() -> None:
     # untrusted query input (rule 20): garbage must not raise, it resolves to first-page
     for bad in ("not-base64!!", "YWJj", "", "eyJiYWQiOjF9"):
         assert decode_cursor(bad) == ({}, False)
+
+
+_typed = sa.Table(
+    "cp_typed",
+    sa.MetaData(),
+    sa.Column("id", sa.Integer, primary_key=True),
+    sa.Column("price", sa.Numeric(10, 2)),
+    sa.Column("ref", sa.Uuid(as_uuid=True), nullable=True),
+)
+
+
+def test_coerce_cursor_value_restores_a_columns_python_type() -> None:
+    import decimal
+    import uuid
+
+    b = Builder(_typed, None)  # only reads column types; no resolver needed
+    # a Decimal ordering column round-trips through the cursor as a str — bind it back as Decimal
+    coerced = b._coerce_cursor_value("price", "12.50")  # pyright: ignore[reportPrivateUsage]
+    assert coerced == decimal.Decimal("12.50") and isinstance(coerced, decimal.Decimal)
+    # a native-uuid column's stringified value comes back a UUID
+    u = uuid.uuid4()
+    assert b._coerce_cursor_value("ref", str(u)) == u  # pyright: ignore[reportPrivateUsage]
+    # a native JSON int arrives un-stringified and passes straight through
+    assert b._coerce_cursor_value("id", 7) == 7  # pyright: ignore[reportPrivateUsage]
+
+
+async def test_cursor_paginate_over_a_numeric_column_orders_numerically() -> None:
+    import decimal
+
+    db = ConnectionResolver()
+    await db.execute(sa.schema.CreateTable(_typed))
+    try:
+        prices = ["2.00", "10.00", "3.00", "25.00", "1.00"]
+        for p in prices:
+            await Builder(_typed, db).insert({"price": decimal.Decimal(p)})
+        seen: list[decimal.Decimal] = []
+        cursor = None
+        for _ in range(10):
+            page = (
+                await Builder(_typed, db)
+                .order_by("price")
+                .cursor_paginate(per_page=2, cursor=cursor)
+            )
+            seen.extend(r["price"] for r in page)
+            if not page.has_more_pages():
+                break
+            cursor = page.next_cursor()
+        # numeric order — "10.00" sorts before "2.00" lexically, so a str bind would drift
+        assert seen == sorted(decimal.Decimal(p) for p in prices)
+    finally:
+        await db.dispose()

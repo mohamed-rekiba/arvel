@@ -1352,8 +1352,11 @@ class Builder[M = dict[str, Any]]:
 
     # --- cursor (keyset) pagination -----------------------------------------------------------
     def _coerce_cursor_value(self, column: str, value: Any) -> Any:
-        """A decoded cursor value round-trips over JSON as a plain str/int/bool — parse a
-        datetime/date column's value back from its ISO string so binding stays type-correct."""
+        """A decoded cursor value round-trips over JSON as a plain str/int/bool. Anything the
+        cursor's ``default=str`` encoder stringified (a datetime/date, a Decimal, a native UUID)
+        comes back as a str — parse it back to the column's Python type so the seek binds
+        type-correctly (a stray str against a numeric/uuid column mis-seeks or errors on a strict
+        backend). Native JSON scalars (int/float/bool) arrive un-stringified and pass through."""
         import datetime as _dt
 
         import sqlalchemy as sa
@@ -1365,6 +1368,14 @@ class Builder[M = dict[str, Any]]:
             return _dt.datetime.fromisoformat(value)
         if isinstance(col_type, sa.Date):
             return _dt.date.fromisoformat(value)
+        if isinstance(col_type, sa.Numeric):  # Float arrives as a JSON float, never here
+            import decimal
+
+            return decimal.Decimal(value)
+        if isinstance(col_type, sa.Uuid) and col_type.as_uuid:
+            import uuid
+
+            return uuid.UUID(value)
         return value
 
     def _seek_predicate(self, specs: list[tuple[str, str]], position: dict[str, Any]) -> Any:
