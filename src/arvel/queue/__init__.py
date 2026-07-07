@@ -949,9 +949,7 @@ class QueueManager(Manager):
                     # broken DB silently stalling delayed/retry jobs must be visible
                     from arvel.kernel.logging import LogManager
 
-                    LogManager().channel("queue").warning(
-                        "release_due_jobs_failed", exc_info=True
-                    )
+                    LogManager().channel("queue").warning("release_due_jobs_failed", exc_info=True)
             self._on_release_tick(released)
 
     async def push_instance(self, job: Job, *, queue: str | None = None) -> Any:
