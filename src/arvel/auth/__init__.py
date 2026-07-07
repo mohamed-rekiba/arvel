@@ -160,17 +160,17 @@ class AuthManager:
             return False
 
         user = await provider(credentials)
-        ok = False
-        if user is not None:
-            from arvel.auth.guards import LocalGuard
+        from arvel.auth.guards import LocalGuard
 
-            async def _lookup(_identifier: str) -> Any:
-                return user.get_auth_password()
+        async def _lookup(_identifier: str) -> Any:
+            # None for an unknown user — LocalGuard then burns a dummy verification so an
+            # unknown identifier costs the same as a wrong password (no enumeration by timing).
+            return user.get_auth_password() if user is not None else None
 
-            principal = await LocalGuard(_lookup).attempt(
-                identifier, credentials.get("password", "")
-            )
-            ok = principal is not None
+        principal = await LocalGuard(_lookup).attempt(
+            identifier, credentials.get("password", "")
+        )
+        ok = principal is not None
 
         if not ok:
             if limiter is not None and identifier:
