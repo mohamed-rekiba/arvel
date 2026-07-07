@@ -125,11 +125,17 @@ class Request:
         FormRequest's ``authorize()`` returns False.
         """
         from arvel.localization import trans
-        from arvel.validation import ValidationException, validate
+        from arvel.validation import FormRequest, ValidationException, validate
 
         data = await self.json()
+        raw_schema: Any = schema  # an un-narrowed Any handle for the generic validate path
         try:
-            dto = validate(data, schema)
+            if isinstance(schema, type) and issubclass(schema, FormRequest):
+                # run the full lifecycle — prepare_for_validation, rules(), passed_validation —
+                # not just msgspec's structural pass, which silently skips the semantic hooks.
+                dto = cast("Any", schema.parse(data))
+            else:
+                dto = validate(data, raw_schema)
         except ValidationException:
             self._flash_old_input(data)  # repopulate the redirected-back form via old()
             raise
