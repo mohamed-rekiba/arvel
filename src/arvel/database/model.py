@@ -452,6 +452,25 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return cast("Factory[Self]", factory_for(cls))
 
     @classmethod
+    async def first_or_new(
+        cls, attributes: Mapping[str, Any], values: Mapping[str, Any] | None = None
+    ) -> Self:
+        """The first row matching ``attributes``, or an **unsaved** instance filled with
+        ``attributes`` + ``values`` (the caller decides when to persist)."""
+        existing: Self | None = await cls.where(**attributes).first()
+        if existing is not None:
+            return existing
+        instance = cls()
+        instance.fill({**attributes, **(values or {})})
+        return instance
+
+    @classmethod
+    async def find_many(cls, keys: Any) -> ModelCollection[Self]:
+        """The models whose primary keys are in ``keys`` (missing keys are simply absent)."""
+        result: ModelCollection[Self] = await cls.where_in(cls.__primary_key__, keys).get()
+        return result
+
+    @classmethod
     async def first_or_create(
         cls, attributes: Mapping[str, Any], values: Mapping[str, Any] | None = None
     ) -> Self:
@@ -589,7 +608,10 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         now = now_utc()
         if not self._exists:
             self._attributes.setdefault("created_at", now)
-        self._attributes["updated_at"] = now
+            self._attributes["updated_at"] = now
+        elif self.is_dirty():
+            # a clean save must stay a no-op — bump updated_at only when a write will happen
+            self._attributes["updated_at"] = now
 
     def _guard_writable(self) -> None:
         if type(self).__view__ is not None:
@@ -624,10 +646,16 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         elif self.is_dirty():
             if await self._fire("updating") is False:
                 return False
+            # write only the changed columns so concurrent writers can't clobber each
+            # other's untouched fields; locate the row by its ORIGINAL key so a
+            # primary-key change updates the right row
+            original_key = self._original.get(
+                self.__primary_key__, self._attributes[self.__primary_key__]
+            )
             await (
                 Builder(self.__table__, resolver)
-                .where(self.__primary_key__, "=", self._attributes[self.__primary_key__])
-                .update(dict(self._attributes))
+                .where(self.__primary_key__, "=", original_key)
+                .update(self.get_dirty())
             )
             performed = True
         object.__setattr__(self, "_original", dict(self._attributes))
@@ -635,6 +663,27 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
             await self._fire("created" if is_new else "updated")
         await self._fire("saved")
         await self._touch_owners()
+        return True
+
+    async def update(self, attributes: Mapping[str, Any]) -> bool:
+        """``fill`` + ``save`` in one call — the instance-level mass update."""
+        self.fill(attributes)
+        return await self.save()
+
+    async def push(self) -> bool:
+        """Save this model and every **loaded** relation (single models and collections).
+        Unloaded relations are untouched — push persists what's in memory, it doesn't fetch."""
+        if not await self.save():
+            return False
+        for related in self._relations.values():
+            if related is None:
+                continue
+            if hasattr(related, "push"):  # a single related model
+                await related.push()
+                continue
+            for child in related:  # a ModelCollection
+                if hasattr(child, "push"):
+                    await child.push()
         return True
 
     async def _touch_owners(self) -> None:

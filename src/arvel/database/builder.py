@@ -21,6 +21,14 @@ if TYPE_CHECKING:
     from arvel.pagination import CursorPaginator, LengthAwarePaginator, Paginator
 
 
+class MultipleRecordsFound(Exception):
+    """Raised by ``sole()`` when more than one row matches a query expected to match one."""
+
+    def __init__(self, count: int) -> None:
+        self.count = count
+        super().__init__(f"{count} records found where exactly one was expected.")
+
+
 class UnsupportedDriverOperation(Exception):
     """Raised when an operation has no correct implementation for the connection's dialect —
     e.g. ``upsert()`` on a dialect that's neither ``postgresql``/``sqlite`` (``ON CONFLICT``) nor
@@ -1021,6 +1029,19 @@ class Builder:
             name = self._model.__name__ if self._model is not None else self._table.name
             raise ModelNotFound(f"No query results for model [{name}].")
         return row
+
+    async def sole(self) -> Any:
+        """The single matching row — raises ``ModelNotFound`` on zero matches and
+        ``MultipleRecordsFound`` when the query matches more than one."""
+        rows = await self.limit(2).get()
+        if not rows:
+            from arvel.database.model import ModelNotFound
+
+            name = self._model.__name__ if self._model is not None else self._table.name
+            raise ModelNotFound(f"No query results for model [{name}].")
+        if len(rows) > 1:
+            raise MultipleRecordsFound(len(rows))
+        return rows[0]
 
     @staticmethod
     def _column_of(row: Any, column: str) -> Any:
