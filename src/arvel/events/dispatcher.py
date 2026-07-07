@@ -265,6 +265,14 @@ class Dispatcher:
         ``ShouldBroadcastNow`` skips the queue and buffer entirely: sent inline, right now. No
         ``broadcast_dispatcher`` bound (no queue provider registered) -> the same inline send,
         documented fallback (mirrors ``ShouldQueue``'s own no-queue-provider fallback)."""
+        # broadcast_when(): evaluate once here at dispatch — the condition reflects dispatch-time
+        # state, and a queued job can neither serialize nor meaningfully re-run the closure on the
+        # worker. Once consumed, drop it so it never rides the broker (encode would choke on it).
+        should = getattr(event, "should_broadcast", None)
+        if callable(should) and not should():
+            return
+        if getattr(event, "_when", None) is not None:
+            cast("Any", event)._when = None
         if isinstance(event, ShouldBroadcastNow):
             await self._broadcast_now(event)
             return

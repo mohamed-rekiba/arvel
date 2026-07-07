@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from arvel.broadcasting import LogBroadcaster
+from arvel.broadcasting import InteractsWithSockets, LogBroadcaster
 from arvel.broadcasting.provider import BroadcastServiceProvider
 from arvel.database.connections import ConnectionResolver
 from arvel.events import Dispatcher, ShouldBroadcast, ShouldBroadcastNow
@@ -32,8 +32,32 @@ class PingedNow(ShouldBroadcastNow):
         return "pinged-now"
 
 
+class PingedWhen(Pinged, InteractsWithSockets):
+    """A queued broadcast that carries a broadcast_when() condition."""
+
+
 class Boom(Exception):
     pass
+
+
+async def test_queued_broadcast_when_true_is_delivered_without_a_serialization_crash(
+    ctx: Any,
+) -> None:
+    app, events, manager, _ = ctx
+    driver = app.make("broadcast").driver()
+
+    await events.dispatch(PingedWhen().broadcast_when(lambda: True))
+    await manager.broker.wait_all()
+    assert len(driver.sent) == 1  # the callable was consumed at dispatch, not shipped to the worker
+
+
+async def test_queued_broadcast_when_false_is_never_enqueued(ctx: Any) -> None:
+    app, events, manager, _ = ctx
+    driver = app.make("broadcast").driver()
+
+    await events.dispatch(PingedWhen().broadcast_when(lambda: False))
+    await manager.broker.wait_all()
+    assert driver.sent == []  # condition false at dispatch -> nothing queued, nothing sent
 
 
 @pytest.fixture
