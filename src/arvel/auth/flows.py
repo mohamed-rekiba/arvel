@@ -39,17 +39,19 @@ def email_verification_token(user_id: int, email: str, secret: str) -> str:
 
 def verify_email_token(
     token: str, current_email: str, secret: str, *, max_age: int = DEFAULT_TTL_SECONDS
-) -> int | None:
-    """The user id if ``token`` is validly signed, unexpired, and its bound email hash matches
+) -> str | None:
+    """The user id (as issued — string form, so UUID/ULID keys work) if ``token`` is validly signed, unexpired, and its bound email hash matches
     ``current_email`` — else ``None``. Passing the user's *current* email (not the one at issuance)
     is what invalidates a link after an email change; default ``max_age`` is 60 minutes."""
+    from arvel.security import SignatureInvalid
+
     try:
         value = _signer(secret).unsign(token, max_age=max_age)
-    except Exception:
+    except SignatureInvalid:
         return None
     parts = str(value).split(":", 2)
-    if len(parts) != 3 or parts[0] != "verify" or not parts[1].isdigit():
+    if len(parts) != 3 or parts[0] != "verify" or not parts[1]:
         return None
     if parts[2] != _email_hash(current_email):
         return None
-    return int(parts[1])
+    return parts[1]

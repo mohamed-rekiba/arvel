@@ -166,7 +166,7 @@ class PasswordBroker:
         from arvel.auth.remember import clear_all_remember_tokens
 
         identifier = user.get_auth_identifier() if hasattr(user, "get_auth_identifier") else user.id
-        await clear_all_remember_tokens(int(identifier))
+        await clear_all_remember_tokens(identifier)  # PK-type-agnostic (int, uuid, ulid)
 
         await self._dispatch(PasswordReset(email=email))
         return PasswordResetStatus.RESET_SUCCESS

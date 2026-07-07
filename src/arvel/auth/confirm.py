@@ -56,7 +56,8 @@ async def confirm_password(
     if not (stored and password):
         return False
     try:
-        valid = resolve_hasher().check(password, stored)
+        # async offload — argon2/bcrypt must not block the event loop on the request path
+        valid = await resolve_hasher().check_async(password, stored)
     except Exception:  # malformed/legacy hash → fail closed, never 500 the confirm endpoint
         return False
     if not valid:

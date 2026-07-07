@@ -131,7 +131,7 @@ async def clear_remember_token(cookie: str) -> None:
         await row.delete()
 
 
-async def clear_all_remember_tokens(tokenable_id: int) -> None:
+async def clear_all_remember_tokens(tokenable_id: object) -> None:
     """Delete every remember token for a user (e.g. password change / log out everywhere)."""
     await RememberToken.where(tokenable_id=tokenable_id).delete()
 
@@ -245,3 +245,17 @@ class RememberMe(Middleware):
                     secure=self._secure,
                     samesite="lax",
                 )
+
+
+__all__ = [
+    "DEFAULT_TTL",
+    "REMEMBER_COOKIE",
+    "RememberMe",
+    "RememberToken",
+    "clear_all_remember_tokens",
+    "clear_remember_token",
+    "forget_remember",
+    "issue_remember_token",
+    "recall_remember_token",
+    "remember",
+]
