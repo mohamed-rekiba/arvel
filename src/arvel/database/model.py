@@ -291,7 +291,9 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return issubclass(cls, SoftDeletes)
 
     @classmethod
-    def _base_query(cls, *, skip_scopes: tuple[str, ...] = (), trashed: str = "exclude") -> Builder:
+    def _base_query(
+        cls, *, skip_scopes: tuple[str, ...] = (), trashed: str = "exclude"
+    ) -> Builder[Self]:
         builder = Builder(cls.__table__, cls._resolve(), hydrate=cls._hydrate_and_fire, model=cls)
         if cls._uses_soft_deletes():
             if trashed == "exclude":  # default scope: hide trashed rows
@@ -305,33 +307,33 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return builder
 
     @classmethod
-    def query(cls) -> Builder:
+    def query(cls) -> Builder[Self]:
         return cls._base_query()
 
     # Typed proxies: __getattr__ already forwards any builder method to query(), but untyped (Any),
     # which trips strict type-checking — these give the common ones a real Builder return type.
     @classmethod
-    def where(cls, *args: Any, **kwargs: Any) -> Builder:
+    def where(cls, *args: Any, **kwargs: Any) -> Builder[Self]:
         return cls.query().where(*args, **kwargs)
 
     @classmethod
-    def or_where(cls, *args: Any, **kwargs: Any) -> Builder:
+    def or_where(cls, *args: Any, **kwargs: Any) -> Builder[Self]:
         return cls.query().or_where(*args, **kwargs)
 
     @classmethod
-    def where_in(cls, column: str, values: Any) -> Builder:
+    def where_in(cls, column: str, values: Any) -> Builder[Self]:
         return cls.query().where_in(column, values)
 
     @classmethod
-    def where_not_in(cls, column: str, values: Any) -> Builder:
+    def where_not_in(cls, column: str, values: Any) -> Builder[Self]:
         return cls.query().where_not_in(column, values)
 
     @classmethod
-    def with_(cls, *names: str, **constrained: Any) -> Builder:
+    def with_(cls, *names: str, **constrained: Any) -> Builder[Self]:
         return cls.query().with_(*names, **constrained)
 
     @classmethod
-    def order_by(cls, column: str, direction: str = "asc") -> Builder:
+    def order_by(cls, column: str, direction: str = "asc") -> Builder[Self]:
         return cls.query().order_by(column, direction)
 
     @classmethod
@@ -339,7 +341,7 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return HasUuids in cls.__mro__ or HasUlids in cls.__mro__
 
     @classmethod
-    def prunable(cls) -> Builder:
+    def prunable(cls) -> Builder[Self]:
         """Override to scope which rows ``prune()`` removes (default: all)."""
         return cls.query()
 
@@ -363,23 +365,23 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         own[name] = callback
 
     @classmethod
-    def without_global_scope(cls, name: str) -> Builder:
+    def without_global_scope(cls, name: str) -> Builder[Self]:
         """A query with the named global scope skipped."""
         return cls._base_query(skip_scopes=(name,))
 
     @classmethod
-    def without_global_scopes(cls) -> Builder:
+    def without_global_scopes(cls) -> Builder[Self]:
         """A query with all global scopes skipped."""
         return cls._base_query(skip_scopes=tuple(cls._global_scopes().keys()))
 
     @classmethod
-    def with_trashed(cls) -> Builder:
+    def with_trashed(cls) -> Builder[Self]:
         """The normal model query with the soft-delete scope removed — local scopes,
         relation constraints, aggregates, and other global scopes all still work."""
         return cls._base_query(trashed="include")
 
     @classmethod
-    def only_trashed(cls) -> Builder:
+    def only_trashed(cls) -> Builder[Self]:
         """The normal model query constrained to soft-deleted rows only."""
         if not cls._uses_soft_deletes():
             raise TypeError(

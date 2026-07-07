@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Select
 
+    from arvel.database.collection import ModelCollection
     from arvel.database.connections import ConnectionResolver, WriteResult
     from arvel.pagination import CursorPaginator, LengthAwarePaginator, Paginator
 
@@ -72,15 +73,20 @@ _COMPARISONS = {
 _SAFE_COLUMN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")
 
 
-class Builder:
-    """Fluent query builder emitting SQLAlchemy Core statements."""
+class Builder[M = dict[str, Any]]:
+    """Fluent query builder emitting SQLAlchemy Core statements.
+
+    ``M`` is the hydrated row type: the model class for a model-bound query
+    (``User.query() -> Builder[User]``), defaulting to a plain dict row for
+    schema-less table queries — so ``await User.query().first()`` type-checks
+    as ``User | None`` while internals stay dynamic."""
 
     def __init__(
         self,
         table: Any,
         resolver: ConnectionResolver | None = None,
         hydrate: Callable[[dict[str, Any]], Any] | None = None,
-        model: Any = None,
+        model: type[M] | None = None,
     ) -> None:
         self._table = table
         self._resolver = resolver
@@ -124,9 +130,9 @@ class Builder:
         if scope is None:
             raise AttributeError(name)
 
-        def apply(*args: Any, **kwargs: Any) -> Builder:
+        def apply(*args: Any, **kwargs: Any) -> Builder[M]:
             result = scope(self, *args, **kwargs)
-            return result if isinstance(result, Builder) else self
+            return cast("Builder[M]", result) if isinstance(result, Builder) else self
 
         return apply
 
@@ -218,7 +224,7 @@ class Builder:
         elif len(args) == 3:
             self._add(self._comparison(args[0], args[1], args[2]), connector)
 
-    def _grouped_clause(self, callback: Callable[[Builder], Any]) -> Any:
+    def _grouped_clause(self, callback: Callable[[Builder[M]], Any]) -> Any:
         """Run ``callback`` against a fresh sub-builder over this same table, then fold its
         accumulated conditions into one clause — parenthesized when compiled, since ``and_()``/
         ``or_()`` always emit their own parens. Powers the nested-closure where-group idiom:
@@ -526,7 +532,9 @@ class Builder:
         chunk (sync or async). Keyset pagination on the primary key — stable under inserts."""
         import inspect
 
-        key = column or (self._model.__primary_key__ if self._model is not None else "id")
+        key = column or (
+            cast("Any", self._model).__primary_key__ if self._model is not None else "id"
+        )
         base_wheres = list(self._wheres)
         base_order, base_limit = list(self._order), self._limit
         last: Any = (
@@ -1028,7 +1036,7 @@ class Builder:
             raise RuntimeError("Builder has no connection resolver bound.")
         return self._resolver
 
-    async def get(self) -> Any:
+    async def get(self) -> ModelCollection[M]:
         """Every matching row. A **hydrating** (model-bound) query returns an
         :class:`~arvel.database.collection.ModelCollection` (doc B3); a raw table builder (no
                 ``hydrate``) returns a plain ``list[dict]`` — the query builder returns a Collection
@@ -1036,7 +1044,9 @@ class Builder:
         rows = await self._require_resolver().fetch_all(self.to_select())
         records = [dict(row) for row in rows]
         if self._hydrate is None:
-            return records
+            # schema-less queries return plain dict rows at runtime (M defaults to dict);
+            # cast once at this documented dynamic seam
+            return cast("ModelCollection[M]", records)
         models = [await _maybe_await(self._hydrate(r)) for r in records]
         for spec in self._eager:
             await self._eager_load_path(models, spec.split("."), self._eager_constraints.get(spec))
@@ -1085,7 +1095,7 @@ class Builder:
             )
         return await resolver.execute(statement)
 
-    async def cursor(self) -> AsyncIterator[Any]:
+    async def cursor(self) -> AsyncIterator[M]:
         """Stream results one model at a time (low memory; server-side cursor)."""
         rows: Any = self._require_resolver().stream(self.to_select())
         async for row in rows:
@@ -1123,20 +1133,20 @@ class Builder:
                     nested.append(loaded)
             await self._eager_load_path(nested, segments[1:])
 
-    async def first(self) -> Any:
+    async def first(self) -> M | None:
         row = await self._require_resolver().fetch_one(self.to_select())
         if row is None:
             return None
         record = dict(row)
         if self._hydrate is None:
-            return record
+            return cast("M", record)
         model = await _maybe_await(self._hydrate(record))
         # parity: ``with('rel')->first()`` eager-loads the relation, just like ``get()``.
         for spec in self._eager:
             await self._eager_load_path([model], spec.split("."), self._eager_constraints.get(spec))
-        return model
+        return cast("M", model)
 
-    async def first_or_fail(self) -> Any:
+    async def first_or_fail(self) -> M:
         """``first()`` or raise ``ModelNotFound``."""
         row = await self.first()
         if row is None:
@@ -1146,7 +1156,7 @@ class Builder:
             raise ModelNotFound(f"No query results for model [{name}].")
         return row
 
-    async def sole(self) -> Any:
+    async def sole(self) -> M:
         """The single matching row — raises ``ModelNotFound`` on zero matches and
         ``MultipleRecordsFound`` when the query matches more than one."""
         rows = await self.limit(2).get()
@@ -1157,7 +1167,7 @@ class Builder:
             raise ModelNotFound(f"No query results for model [{name}].")
         if len(rows) > 1:
             raise MultipleRecordsFound(len(rows))
-        return rows[0]
+        return cast("M", rows[0])
 
     @staticmethod
     def _column_of(row: Any, column: str) -> Any:
@@ -1246,7 +1256,7 @@ class Builder:
     async def update(self, values: dict[str, Any]) -> WriteResult:
         if (
             self._model is not None
-            and self._model.__timestamps__
+            and cast("Any", self._model).__timestamps__
             and "updated_at" not in values
             and "updated_at" in self._table.c
         ):
@@ -1378,7 +1388,7 @@ class Builder:
         from arvel.pagination import CursorPaginator, decode_cursor, encode_cursor
 
         per_page = max(1, per_page)
-        pk = self._model.__primary_key__ if self._model is not None else "id"
+        pk = cast("Any", self._model).__primary_key__ if self._model is not None else "id"
         if not self._order_specs:
             self.order_by(pk, "asc")
         if pk not in [c for c, _ in self._order_specs]:

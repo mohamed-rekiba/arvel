@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import base64
 import json as _json
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
@@ -119,7 +119,7 @@ class AbstractPaginator:
 
     def __init__(
         self,
-        items: list[Any],
+        items: Sequence[Any],
         per_page: int,
         current_page: int | None,
         *,
@@ -287,7 +287,7 @@ class LengthAwarePaginator(AbstractPaginator):
 
     def __init__(
         self,
-        items: list[Any],
+        items: Sequence[Any],
         total: int,
         per_page: int,
         current_page: int | None = None,
@@ -404,7 +404,7 @@ class Paginator(AbstractPaginator):
 
     def __init__(
         self,
-        items: list[Any],
+        items: Sequence[Any],
         per_page: int,
         current_page: int | None = None,
         *,
@@ -486,7 +486,7 @@ class CursorPaginator:
 
     def __init__(
         self,
-        items: list[Any],
+        items: Sequence[Any],
         per_page: int,
         *,
         next_cursor: str | None = None,
