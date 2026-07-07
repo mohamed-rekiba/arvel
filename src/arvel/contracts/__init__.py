@@ -18,7 +18,7 @@ Grounded in knowledge/port/02-container.md and 03-application-providers-bootstra
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
-from typing import Any, Protocol, TypeVar, overload, runtime_checkable
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, overload, runtime_checkable
 
 T = TypeVar("T")
 
@@ -164,6 +164,35 @@ class CommandOutput(Protocol):
     def with_progress_bar(self, iterable: Iterable[Any], *, label: str = "") -> Iterator[Any]: ...
 
 
+class ModelHost:
+    """Base for mixins hosted by a database model (search indexing, activity logging, …).
+
+    Declares — for the type checker only — the model surface a mixin may call
+    (``to_dict``, dirty tracking, the lifecycle-hook seam), replacing per-line ignores
+    with one typed contract (DR-0037). At runtime it contributes exactly one thing: a
+    cooperative ``_fire`` that forwards along the MRO, so a mixin placed *before* the
+    concrete model class (the required order for its hooks to win) still reaches the
+    model's event system through ``super()``.
+    """
+
+    if TYPE_CHECKING:  # provided by the concrete model the mixin is combined with
+        __primary_key__: ClassVar[str]
+        __table__: ClassVar[Any]
+        _attributes: dict[str, Any]
+        _exists: bool
+
+        def to_dict(self) -> dict[str, Any]: ...
+        def get_dirty(self) -> dict[str, Any]: ...
+        def get_original(self, key: str | None = None) -> Any: ...
+        async def save(self) -> bool: ...
+        @classmethod
+        async def all(cls) -> Any: ...
+
+    async def _fire(self, hook: str) -> Any:
+        nxt = getattr(super(), "_fire", None)
+        return await nxt(hook) if nxt is not None else None
+
+
 @runtime_checkable
 class EventDispatcher(Protocol):
     """Event dispatch (the contract the ORM, queue, etc. resolve — they never
@@ -186,6 +215,7 @@ __all__ = [
     "EventDispatcher",
     "ExceptionHandler",
     "Logger",
+    "ModelHost",
     "ServiceProvider",
     "Translator",
 ]

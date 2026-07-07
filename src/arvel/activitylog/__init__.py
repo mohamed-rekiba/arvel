@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import Any, ClassVar, cast
 
+from arvel.contracts import ModelHost
 from arvel.database import Model
 
 
@@ -122,7 +123,7 @@ def activity(log_name: str = "default") -> ActivityLogger:
     return ActivityLogger(log_name)
 
 
-class LogsActivity:
+class LogsActivity(ModelHost):
     """Mixin: auto-log a model's create/update/delete to the activity log (the audit trail).
 
     Mix in **before** ``Model`` so the lifecycle hooks run (Python MRO). Configure via class
@@ -138,7 +139,7 @@ class LogsActivity:
     _activity_snapshot: tuple[bool, dict[str, Any], dict[str, Any]] = (False, {}, {})
 
     def _activity_attributes(self) -> dict[str, Any]:
-        attrs: dict[str, Any] = dict(self._attributes)  # type: ignore[attr-defined]
+        attrs: dict[str, Any] = dict(self._attributes)
         if self.__log_attributes__ == ["*"]:
             return attrs
         return {k: attrs[k] for k in self.__log_attributes__ if k in attrs}
@@ -154,10 +155,10 @@ class LogsActivity:
 
     async def _fire(self, hook: str) -> Any:
         if hook == "saving":
-            dirty: dict[str, Any] = self.get_dirty()  # type: ignore[attr-defined]
-            originals: dict[str, Any] = {k: self.get_original(k) for k in dirty}  # type: ignore[attr-defined]
-            self._activity_snapshot = (not self._exists, dirty, originals)  # type: ignore[attr-defined]
-        result: Any = cast("Any", await super()._fire(hook))  # type: ignore[misc]
+            dirty: dict[str, Any] = self.get_dirty()
+            originals: dict[str, Any] = {k: self.get_original(k) for k in dirty}
+            self._activity_snapshot = (not self._exists, dirty, originals)
+        result: Any = await super()._fire(hook)
         if hook == "saved":
             created, dirty, old = self._activity_snapshot
             event = "created" if created else "updated"

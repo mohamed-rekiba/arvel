@@ -143,8 +143,8 @@ def serialize(job_cls: type, args: tuple[Any, ...], kwargs: dict[str, Any]) -> s
 def _apply_envelope(job: Job, data: dict[str, Any]) -> None:
     """Stamp the trace carrier + dehydrated Context captured at dispatch time onto ``job`` — the
     worker hydrates the Context from this before running `handle()` (see `QueueManager._invoke`)."""
-    job.__arvel_trace__ = data.get("_trace")  # type: ignore[attr-defined]  # parent trace for the job span
-    job.__arvel_context__ = data.get("_context")  # type: ignore[attr-defined]  # SUPPORT-FOUNDATION carry-over
+    job.__arvel_trace__ = data.get("_trace")  # parent trace for the job span
+    job.__arvel_context__ = data.get("_context")  # SUPPORT-FOUNDATION carry-over
 
 
 async def deserialize(payload: str) -> Job:
@@ -240,6 +240,17 @@ class Job:
     max_exceptions: int | None = None
     #: Stop retrying past this moment regardless of `tries` left.
     retry_until: datetime | None = None
+
+    # Queue envelope state, assigned per instance by the dispatcher/worker. Declared here
+    # (typed, defaulted) so assignments type-check; the arvel-prefixed names keep them out
+    # of app-job attribute space, and instance assignments still travel in the payload
+    # (vars()-based serialization is unchanged).
+    __arvel_trace__: Any = None
+    __arvel_context__: Any = None
+    __arvel_attempts__: int = 0
+    __arvel_chain__: list[str] | None = None
+    __arvel_chain_catch__: str | None = None
+    __arvel_batch__: Any = None
 
     async def handle(self) -> Any:
         raise NotImplementedError(f"{type(self).__name__} must implement handle()")
@@ -596,7 +607,7 @@ class QueueManager(Manager):
         instead of an inline ``asyncio.sleep`` — this worker keeps draining other jobs meanwhile.
         ``attempt`` rides along on the job instance so the next pass (via ``release_due_jobs``)
         resumes counting from where this one left off."""
-        job.__arvel_attempts__ = attempt  # type: ignore[attr-defined]
+        job.__arvel_attempts__ = attempt
         # queue=None → dispatch_after resolves through _queue_label, so a route()d class
         # retries on its routed queue, not "default"
         await self.dispatch_after(delay, job, attempts=attempt)
@@ -611,8 +622,8 @@ class QueueManager(Manager):
             return
         payload, *rest = chain
         next_job = await deserialize_instance(payload)
-        next_job.__arvel_chain__ = rest  # type: ignore[attr-defined]
-        next_job.__arvel_chain_catch__ = getattr(job, "__arvel_chain_catch__", None)  # type: ignore[attr-defined]
+        next_job.__arvel_chain__ = rest
+        next_job.__arvel_chain_catch__ = job.__arvel_chain_catch__
         await self.push_instance(next_job)
 
     async def _run_chain_catch(self, job: Job, exc: BaseException) -> None:
@@ -931,9 +942,16 @@ class QueueManager(Manager):
                 return
             released = 0
             if has_application() and app().bound("db"):
-                # a transient DB hiccup must not kill the worker; try again next tick
-                with contextlib.suppress(Exception):
+                try:
                     released = await self.release_due_jobs()
+                except Exception:
+                    # a transient DB hiccup must not kill the worker — but a permanently
+                    # broken DB silently stalling delayed/retry jobs must be visible
+                    from arvel.kernel.logging import LogManager
+
+                    LogManager().channel("queue").warning(
+                        "release_due_jobs_failed", exc_info=True
+                    )
             self._on_release_tick(released)
 
     async def push_instance(self, job: Job, *, queue: str | None = None) -> Any:
@@ -1064,8 +1082,8 @@ class PendingChain:
             return None
         mgr = manager or _queue_manager()
         head, *rest = self.jobs
-        head.__arvel_chain__ = [serialize_instance(j) for j in rest]  # type: ignore[attr-defined]
-        head.__arvel_chain_catch__ = self._catch  # type: ignore[attr-defined]
+        head.__arvel_chain__ = [serialize_instance(j) for j in rest]
+        head.__arvel_chain_catch__ = self._catch
         return await mgr.push_instance(head)
 
 
@@ -1145,7 +1163,7 @@ class PendingBatch:
             await finalize_empty_batch(row.id)
             return Batch(row.id)
         for job in self.jobs:
-            job.__arvel_batch__ = row.id  # type: ignore[attr-defined]
+            job.__arvel_batch__ = row.id
         for job in self.jobs:
             await mgr.push_instance(job)
         return Batch(row.id)
