@@ -15,64 +15,42 @@ from __future__ import annotations
 import inspect
 import re
 import typing
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, cast
 
-import msgspec
-
+from arvel.http import openapi
 from arvel.http.request import Request, current_request
 from arvel.http.response import Response
-from arvel.kernel.settings import Settings
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-# friendly `.secure("bearer")` names -> the OpenAPI security-scheme component key they reference.
-_SECURITY_SCHEME_KEYS = {"bearer": "bearerAuth", "api_key": "apiKeyAuth"}
+# one compiled route: (methods, path, handler, group, route_middleware, name, security,
+# status_code, wheres, missing_callback, without_middleware)
+_RouteEntry = tuple[
+    list[str],
+    str,
+    Any,
+    str | None,
+    list[Any],
+    str | None,
+    list[str],
+    int | None,
+    dict[str, str],
+    Any,
+    list[Any],
+]
 
-
-def _empty_dict_list() -> list[dict[str, Any]]:
-    return []
-
-
-def _empty_str_dict() -> dict[str, Any]:
-    return {}
-
-
-#: the 5 render plugins Litestar ships (``_render_plugin`` maps each to its ``OpenAPIRenderPlugin``).
-OpenApiUi = Literal["swagger", "redoc", "scalar", "rapidoc", "stoplight"]
-
-
-class OpenApiSettings(Settings, forbid_unknown_fields=True):
-    """Typed view over the ``openapi`` config section (DR-0016) — the full OpenAPI document config:
-    identity (title/version/description/summary/terms), the ``path`` the schema + UI are served at, the
-    ``ui`` renderer (swagger/redoc/scalar/rapidoc/stoplight — a closed set; an unknown name fails
-    config validation instead of silently falling back), contact/license/servers/tags/external
-    docs, whether handler docstrings feed operation descriptions, and ``security`` schemes (e.g. a
-    bearer/JWT scheme → the Swagger 'Authorize' button). Auto-loads + validates ``config('openapi')``;
-    defaults when unset."""
-
-    __config_key__ = "openapi"
-    title: str = "arvel"
-    version: str = "1.0.0"
-    description: str | None = None
-    summary: str | None = None
-    terms_of_service: str | None = None
-    path: str = "/schema"
-    ui: OpenApiUi = "swagger"
-    contact: dict[str, Any] | None = None
-    license: dict[str, Any] | None = None
-    servers: list[dict[str, Any]] = msgspec.field(default_factory=_empty_dict_list)
-    tags: list[dict[str, Any]] = msgspec.field(default_factory=_empty_dict_list)
-    external_docs: dict[str, Any] | None = None
-    use_handler_docstrings: bool = True
-    security: dict[str, Any] = msgspec.field(default_factory=_empty_str_dict)
-
-
-_PARAM = re.compile(r"\{(\w+)(?::(\w+))?\}")
+_PARAM = re.compile(r"\{(\w+)(?::(\w+))?(\?)?\}")
 # a `{name:<field>}` suffix outside this set is an arvel route-key field resolved by that column
 _LITESTAR_CONVERTERS = frozenset(
     {"str", "int", "float", "uuid", "decimal", "date", "datetime", "time", "timedelta", "path"}
 )
+
+
+class _BindingMissing(Exception):
+    """Internal control-flow signal: a route/model binding (explicit or implicit) didn't resolve.
+    Caught in ``HttpKernel._dispatch`` so a route's ``.missing(callback)`` hook (if any) can render
+    a custom response instead of the default 404."""
 
 
 class HttpKernel:
@@ -80,10 +58,9 @@ class HttpKernel:
 
     def __init__(self, app: Any = None) -> None:
         self.app = app
-        # (methods, path, handler, group, route_middleware, name, security, status_code)
-        self._routes: list[
-            tuple[list[str], str, Any, str | None, list[Any], str | None, list[str], int | None]
-        ] = []
+        # (methods, path, handler, group, route_middleware, name, security, status_code,
+        #  wheres, missing_callback, without_middleware)
+        self._routes: list[_RouteEntry] = []
         self.global_middleware: list[Any] = []
         self.groups: dict[str, list[Any]] = {"web": [], "api": []}
         self._aliases: dict[str, Any] = {}  # short name -> middleware class
@@ -112,8 +89,15 @@ class HttpKernel:
 
     def resolve_middleware(self, reference: Any) -> Any:
         """Resolve a middleware reference: an alias string -> its class; a ``throttle:<name>``
-        string -> a:class:`~arvel.http.middleware.ThrottleRequests` bound to that named limiter; else itself."""
+        string -> a:class:`~arvel.http.middleware.ThrottleRequests` bound to that named limiter;
+        a generic ``alias:arg1,arg2`` string -> the registered alias class constructed with those
+        (string) args, e.g. ``.alias({"cache.headers": CacheHeaders})`` + ``"cache.headers:60"`` ->
+        ``CacheHeaders("60")``; else itself."""
         if isinstance(reference, str):
+            name, sep, raw_args = reference.partition(":")
+            if sep and name in self._aliases:
+                target = self._aliases[name]
+                return target(*raw_args.split(",")) if isinstance(target, type) else target
             if reference in self._aliases:
                 return self._aliases[reference]
             if reference.startswith("throttle:"):
@@ -188,6 +172,9 @@ class HttpKernel:
         name: str | None = None,
         security: Sequence[str] | None = None,
         status_code: int | None = None,
+        wheres: dict[str, str] | None = None,
+        missing: Any | None = None,
+        without_middleware: Sequence[Any] | None = None,
     ) -> None:
         self._routes.append(
             (
@@ -199,6 +186,9 @@ class HttpKernel:
                 name,
                 list(security or []),
                 status_code,
+                dict(wheres or {}),
+                missing,
+                list(without_middleware or []),
             )
         )
 
@@ -217,21 +207,29 @@ class HttpKernel:
     def delete(self, path: str, handler: Any, group: str | None = None) -> None:
         self.add_route(["DELETE"], path, handler, group)
 
-    def routes(
-        self,
-    ) -> list[tuple[list[str], str, Any, str | None, list[Any], str | None, list[str], int | None]]:
+    def routes(self) -> list[_RouteEntry]:
         return list(self._routes)
 
     @staticmethod
-    def _compile_path(path: str) -> tuple[str, dict[str, str]]:
-        """Compile an arvel path to a Litestar path + a map of ``param -> route-key field``.
-        ``{id}`` → ``{id:str}``; ``{post:slug}`` → ``{post:str}`` plus ``{"post": "slug"}`` (so
-        implicit binding resolves Post by slug); a Litestar converter (``{x:path}``/``{x:int}``)
-        passes through unchanged and records no field."""
+    def _compile_path(path: str) -> tuple[list[str], dict[str, str]]:
+        """Compile an arvel path to one or more Litestar paths + a map of
+        ``param -> route-key field``. ``{id}`` → ``{id:str}``; ``{post:slug}`` → ``{post:str}``
+        plus ``{"post": "slug"}`` (so implicit binding resolves Post by slug); a Litestar converter
+        (``{x:path}``/``{x:int}``) passes through unchanged and records no field.
+
+        A trailing run of optional params (``{x?}``) compiles to MULTIPLE Litestar paths — one per
+        prefix length, via Litestar's own multi-path-per-handler support — so the route matches with
+        or without those segments. The handler's own Python default applies when a segment is
+        absent: Litestar simply never puts that name in ``path_params`` for the shorter path, so
+        ``_dispatch`` never overrides the default (matches the convention that optional params must
+        be the trailing run, same as the reference framework's ``{x?}``)."""
         fields: dict[str, str] = {}
+        optional: list[str] = []
 
         def repl(m: re.Match[str]) -> str:
-            name, suffix = m.group(1), m.group(2)
+            name, suffix, opt = m.group(1), m.group(2), m.group(3)
+            if opt:
+                optional.append(name)
             if suffix is None:
                 return "{" + name + ":str}"
             if suffix in _LITESTAR_CONVERTERS:
@@ -239,7 +237,15 @@ class HttpKernel:
             fields[name] = suffix
             return "{" + name + ":str}"
 
-        return _PARAM.sub(repl, path), fields
+        compiled = _PARAM.sub(repl, path)
+        if not optional:
+            return [compiled], fields
+        paths = [compiled]
+        shortened = compiled
+        for name in reversed(optional):
+            shortened = re.sub(r"/\{" + re.escape(name) + r":[^}]+\}", "", shortened)
+            paths.append(shortened)
+        return paths, fields
 
     def build(self, lifespan: Any = None) -> Any:
         """Compile the registered routes into a ``litestar.Litestar`` instance.
@@ -279,13 +285,28 @@ class HttpKernel:
                 security,
                 status_code,
                 HTTPRouteHandler,
+                wheres,
+                missing,
+                without_middleware,
             )
-            for methods, path, handler, group, middleware, name, security, status_code in self._routes
+            for (
+                methods,
+                path,
+                handler,
+                group,
+                middleware,
+                name,
+                security,
+                status_code,
+                wheres,
+                missing,
+                without_middleware,
+            ) in self._routes
         ]
         litestar_app = litestar.Litestar(
             route_handlers=handlers,
             cors_config=self._cors_config(),
-            openapi_config=self._openapi_config(),
+            openapi_config=openapi.openapi_config(),
             # serializes Date-typed model fields to ISO-8601 without a SerializationException
             type_encoders={Date: lambda value: value.to_iso(), **model_encoder},
             exception_handlers={
@@ -317,128 +338,36 @@ class HttpKernel:
 
                 LogManager().channel("http").error("session_persist_failed", error=repr(exc))
 
-    def _openapi_config(self) -> Any:
-        """The OpenAPI document config — a typed view over the ``openapi`` config section
-        (:class:`OpenApiSettings`, DR-0016): identity, the served ``path``, the ``ui`` renderer,
-        contact/license/servers/tags/external-docs, and ``security`` schemes (the Swagger 'Authorize'
-        button). Not Litestar's generic 'Litestar API' default. (Type-safe: msgspec-validated, not raw
-        dict access.)"""
-        from litestar.openapi import OpenAPIConfig
-        from litestar.openapi.spec import (
-            Components,
-            Contact,
-            ExternalDocumentation,
-            License,
-            Server,
-            Tag,
-        )
-
-        s = OpenApiSettings()
-        kwargs: dict[str, Any] = {
-            "title": s.title,
-            "version": s.version,
-            "description": s.description,
-            "summary": s.summary,
-            "terms_of_service": s.terms_of_service,
-            "path": s.path,
-            "use_handler_docstrings": s.use_handler_docstrings,
-        }
-        if s.contact:
-            kwargs["contact"] = Contact(**s.contact)
-        if s.license:
-            kwargs["license"] = License(**s.license)
-        if s.servers:
-            kwargs["servers"] = [Server(**srv) for srv in s.servers]
-        if s.tags:
-            kwargs["tags"] = [Tag(**tag) for tag in s.tags]
-        if s.external_docs:
-            kwargs["external_docs"] = ExternalDocumentation(**s.external_docs)
-        plugin = self._render_plugin(s.ui)
-        if plugin is not None:
-            kwargs["render_plugins"] = [plugin]
-        schemes, default_security = self._security_schemes(s.security)
-        if schemes:
-            kwargs["components"] = Components(security_schemes=schemes)
-            if default_security:  # require auth on every route unless one opts out
-                kwargs["security"] = default_security
-        return OpenAPIConfig(**kwargs)
-
-    @staticmethod
-    def _render_plugin(ui: str) -> Any:
-        """Map the configured ``ui`` to a Litestar render plugin (the API-docs UI served at ``path``).
-        Default Swagger; ``None`` for an unknown name (Litestar falls back to its built-in UI)."""
-        from litestar.openapi import plugins
-
-        mapping = {
-            "swagger": plugins.SwaggerRenderPlugin,
-            "redoc": plugins.RedocRenderPlugin,
-            "scalar": plugins.ScalarRenderPlugin,
-            "rapidoc": plugins.RapidocRenderPlugin,
-            "stoplight": plugins.StoplightRenderPlugin,
-        }
-        plugin = mapping.get(ui.lower())
-        return plugin() if plugin is not None else None
-
-    @staticmethod
-    def _security_schemes(security: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-        """Build OpenAPI security schemes from ``config('openapi').security`` — ``bearer`` (HTTP
-        bearer/JWT → the 'Authorize' button), ``api_key`` (header/query key), and ``oidc``
-        (OpenID Connect discovery → the IdP login, e.g. Keycloak). A truthy value defines the scheme;
-        a ``dict`` customizes it (``format``/``description`` for bearer; ``name``/``in`` for api_key;
-        ``openIdConnectUrl`` for oidc). ``default: true`` makes it required on every route (else routes
-        opt in via ``.secure(...)``). Returns ``(schemes, default_requirements)``."""
-        from litestar.openapi.spec import SecurityScheme
-
-        schemes: dict[str, Any] = {}
-        default_security: list[dict[str, Any]] = []
-        bearer = security.get("bearer")
-        if bearer:
-            opts = cast("dict[str, Any]", bearer) if isinstance(bearer, dict) else {}
-            schemes["bearerAuth"] = SecurityScheme(
-                type="http",
-                scheme="bearer",
-                bearer_format=opts.get("format", "JWT"),
-                description=opts.get("description"),
-            )
-            if opts.get("default"):
-                default_security.append({"bearerAuth": []})
-        api_key = security.get("api_key")
-        if api_key:
-            opts = cast("dict[str, Any]", api_key) if isinstance(api_key, dict) else {}
-            schemes["apiKeyAuth"] = SecurityScheme(
-                type="apiKey",
-                name=opts.get("name", "X-API-Key"),
-                security_scheme_in=opts.get("in", "header"),
-                description=opts.get("description"),
-            )
-            if opts.get("default"):
-                default_security.append({"apiKeyAuth": []})
-        oidc = security.get("oidc")
-        if oidc:
-            opts = cast("dict[str, Any]", oidc) if isinstance(oidc, dict) else {}
-            schemes["oidc"] = SecurityScheme(
-                type="openIdConnect",
-                open_id_connect_url=opts.get("openIdConnectUrl") or opts.get("url", ""),
-                description=opts.get("description"),
-            )
-            if opts.get("default"):
-                default_security.append({"oidc": []})
-        return schemes, default_security
-
     def _warn_undefined_security(self) -> None:
         """Warn (at build) when a route's ``.secure(...)`` names a scheme that isn't defined in
         ``config('openapi').security`` — that would emit a dangling ``securitySchemes`` reference (a
         technically-invalid OpenAPI document). Non-fatal: the doc still serves."""
-        secured = {scheme for *_, security, _status in self._routes for scheme in security}
+        secured = {
+            scheme
+            for *_, security, _status, _wheres, _missing, _without in self._routes
+            for scheme in security
+        }
         if not secured:
             return
-        defined, _ = self._security_schemes(OpenApiSettings().security)
+        defined, _ = openapi.security_schemes(openapi.OpenApiSettings().security)
         from arvel.kernel.logging import LogManager
 
         log = LogManager().channel("http")
-        for _methods, path, _handler, _group, _middleware, name, security, _status in self._routes:
+        for (
+            _methods,
+            path,
+            _handler,
+            _group,
+            _middleware,
+            name,
+            security,
+            _status,
+            _wheres,
+            _missing,
+            _without,
+        ) in self._routes:
             for scheme in security:
-                if _SECURITY_SCHEME_KEYS.get(scheme, scheme) not in defined:
+                if openapi.SECURITY_SCHEME_KEYS.get(scheme, scheme) not in defined:
                     log.warning(
                         "route_security_scheme_undefined", route=name or path, scheme=scheme
                     )
@@ -525,19 +454,31 @@ class HttpKernel:
         security: list[str],
         status_code: int | None,
         route_handler: Any,
+        wheres: dict[str, str],
+        missing: Any,
+        without_middleware: list[Any],
     ) -> Any:
         kernel = self
-        litestar_path, key_fields = self._compile_path(path)
+        litestar_paths, key_fields = self._compile_path(path)
         return_hint, body = self._handler_io(handler)
         body_name = body[0] if body is not None else None
-        query_params = self._query_params(handler, litestar_path, body_name)
+        query_params = self._query_params(handler, litestar_paths[0], body_name)
 
         # Litestar reads `__signature__` below to know what to inject and document; split the
         # body back out of the injected kwargs and forward the rest to the handler as query args.
         async def adapter(request: Any, **injected: Any) -> Any:
             body_arg = (body_name, injected.pop(body_name)) if body_name is not None else None
             return await kernel._dispatch(
-                handler, request, group, middleware, key_fields, body=body_arg, query=injected
+                handler,
+                request,
+                group,
+                middleware,
+                key_fields,
+                body=body_arg,
+                query=injected,
+                wheres=wheres,
+                missing=missing,
+                without_middleware=without_middleware,
             )
 
         sig_params = [inspect.Parameter("request", inspect.Parameter.POSITIONAL_OR_KEYWORD)]
@@ -571,8 +512,9 @@ class HttpKernel:
         if name:
             extra["operation_id"] = name
         if security:
-            extra["security"] = [{_SECURITY_SCHEME_KEYS.get(s, s): []} for s in security]
-        return route_handler(path=litestar_path, http_method=methods, **extra)(adapter)
+            extra["security"] = [{openapi.SECURITY_SCHEME_KEYS.get(s, s): []} for s in security]
+        route_path = litestar_paths[0] if len(litestar_paths) == 1 else litestar_paths
+        return route_handler(path=route_path, http_method=methods, **extra)(adapter)
 
     @staticmethod
     def _handler_io(handler: Any) -> tuple[Any, tuple[str, Any] | None]:
@@ -632,6 +574,9 @@ class HttpKernel:
         key_fields: dict[str, str] | None = None,
         body: tuple[str, Any] | None = None,
         query: dict[str, Any] | None = None,
+        wheres: dict[str, str] | None = None,
+        missing: Any = None,
+        without_middleware: Sequence[Any] | None = None,
     ) -> Any:
         import contextlib
 
@@ -648,18 +593,38 @@ class HttpKernel:
         try:
             async with scope:
                 params = dict(litestar_request.path_params)
-                await self._resolve_bindings(params)
-                await self._resolve_implicit_bindings(handler, params, key_fields or {})
+                self._apply_wheres(params, wheres or {})
+                try:
+                    await self._resolve_bindings(params)
+                    await self._resolve_implicit_bindings(handler, params, key_fields or {})
+                except _BindingMissing:
+                    if missing is None:
+                        self._not_found()
+                    result = missing(request)
+                    if inspect.isawaitable(result):
+                        result = await result
+                    return await self._to_response(result, request)
                 if body is not None:
                     params[body[0]] = body[1]
                 if query:
                     params.update(query)
 
-                return await self._handle(handler, request, params, group, route_middleware)
+                return await self._handle(
+                    handler, request, params, group, route_middleware, without_middleware
+                )
         finally:
             current_user.reset(user_token)
             access_token.reset(access_token_ctx)
             current_request.reset(token)
+
+    def _apply_wheres(self, params: dict[str, Any], wheres: dict[str, str]) -> None:
+        """``.where(param, pattern)`` constraints (routing 05): a captured segment that doesn't
+        fullmatch its regex 404s — before bindings run, so a mismatched param never even reaches
+        model resolution."""
+        for name, pattern in wheres.items():
+            value = params.get(name)
+            if value is not None and re.fullmatch(pattern, str(value)) is None:
+                self._not_found()
 
     async def _handle(
         self,
@@ -668,6 +633,7 @@ class HttpKernel:
         params: dict[str, Any],
         group: str | None,
         route_middleware: Sequence[Any] | None,
+        without_middleware: Sequence[Any] | None = None,
     ) -> Any:
         async def destination(req: Any) -> Any:
             target = handler
@@ -682,15 +648,16 @@ class HttpKernel:
                 result = await result
             return result
 
-        # instantiate once so a terminable middleware shares state between handle() and terminate()
-        instances = [
-            self._make(self.resolve_middleware(m))
-            for m in (
-                *self.global_middleware,
-                *self.groups.get(group or "", []),
-                *(route_middleware or []),
-            )
+        stack = [
+            *self.global_middleware,
+            *self.groups.get(group or "", []),
+            *(route_middleware or []),
         ]
+        if without_middleware:
+            excluded = list(without_middleware)
+            stack = [m for m in stack if not any(m == exc for exc in excluded)]
+        # instantiate once so a terminable middleware shares state between handle() and terminate()
+        instances = [self._make(self.resolve_middleware(m)) for m in stack]
         result = await self._run_pipeline(instances, request, destination)
         response = await self._to_response(result, request)
         await self._terminate(instances, request, response)
@@ -721,7 +688,8 @@ class HttpKernel:
 
     async def _resolve_bindings(self, params: dict[str, Any]) -> None:
         """Resolve *explicit* route-param bindings (``Route.model``/``bind_enum``) in
-        place; 404 on a miss."""
+        place; raises ``_BindingMissing`` on a miss (``_dispatch`` turns that into 404, or the
+        route's own ``.missing(callback)`` response)."""
         for name, resolver in self.bindings.items():
             if name not in params:
                 continue
@@ -729,7 +697,7 @@ class HttpKernel:
             if inspect.isawaitable(resolved):
                 resolved = await resolved
             if resolved is None:
-                self._not_found()
+                raise _BindingMissing(name)
             params[name] = resolved
 
     async def _resolve_implicit_bindings(
@@ -737,10 +705,10 @@ class HttpKernel:
     ) -> None:
         """Implicit route-model binding: a path param
         whose handler type hint is a model (duck-typed: has ``resolve_route_binding``)
-        is resolved to that model by its route key; 404 on a miss. An inline ``{post:slug}``
-        route-key field (from ``key_fields``) overrides the model's default route key. Params
-        already handled by an explicit binding are skipped. Duck-typing keeps the HTTP layer
-        from importing the database layer.
+        is resolved to that model by its route key; raises ``_BindingMissing`` on a miss (see
+        :meth:`_resolve_bindings`). An inline ``{post:slug}`` route-key field (from ``key_fields``)
+        overrides the model's default route key. Params already handled by an explicit binding are
+        skipped. Duck-typing keeps the HTTP layer from importing the database layer.
         """
         key_fields = key_fields or {}
         try:
@@ -758,11 +726,11 @@ class HttpKernel:
             if inspect.isawaitable(resolved):
                 resolved = await resolved
             if resolved is None:
-                self._not_found()
+                raise _BindingMissing(name)
             params[name] = resolved
 
     @staticmethod
-    def _not_found() -> None:
+    def _not_found() -> typing.NoReturn:
         from arvel.http.exceptions import HttpException
         from arvel.localization import trans
 

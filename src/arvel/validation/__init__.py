@@ -15,6 +15,9 @@ from typing import TYPE_CHECKING, Any, Self, cast
 
 import msgspec
 
+from arvel.validation.rules import ascii_digits as _ascii_digits
+from arvel.validation.rules import is_number as _is_number
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sized
 
@@ -311,19 +314,6 @@ _DEFAULT_MESSAGES = {
     # src/arvel/validation/, tests/, docs/validation.md only), so they fall back to the generic
     # "The {field} is invalid." below rather than drift the two out of sync.
 }
-
-
-def _is_number(value: str) -> bool:
-    try:
-        float(value)
-    except ValueError:
-        return False
-    return True
-
-
-def _ascii_digits(s: str) -> bool:
-    # narrower than str.isdigit(), which also accepts superscripts/Arabic-Indic/etc.
-    return s.isascii() and s.isdigit()
 
 
 # implicit rules run even when the value is absent/None — `nullable` must NOT suppress them.

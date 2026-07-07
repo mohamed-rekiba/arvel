@@ -26,9 +26,10 @@ _ULID = re.compile(r"^[0-7][0-9A-HJKMNP-TV-Z]{25}$", re.IGNORECASE)
 _MAC = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$")
 
 
-def _is_number(value: str) -> bool:
-    """Local copy of ``__init__.py``'s numeric-string check — kept private to each module
-    rather than exported across the split (pyright flags cross-module `_private` access)."""
+def is_number(value: str) -> bool:
+    """Numeric-string check shared with ``validation/__init__.py`` — the one module-level home
+    (was duplicated in both modules to dodge pyright's cross-module `_private`-access flag;
+    a proper, non-underscored export sidesteps that instead)."""
     try:
         float(value)
     except ValueError:
@@ -36,7 +37,11 @@ def _is_number(value: str) -> bool:
     return True
 
 
-def _ascii_digits(s: str) -> bool:
+# back-compat alias: existing direct-import test coverage reaches this by its old private name.
+_is_number = is_number
+
+
+def ascii_digits(s: str) -> bool:
     # narrower than str.isdigit(), which also accepts superscripts/Arabic-Indic/etc.
     return s.isascii() and s.isdigit()
 
@@ -71,7 +76,7 @@ def _check_decimal(value: Any, arg: str) -> bool:
     if isinstance(value, bool) or not isinstance(value, (str, int, float)):
         return False
     text = str(value)
-    if not _is_number(text):
+    if not is_number(text):
         return False
     places = len(text.split(".", 1)[1]) if "." in text else 0
     low, _, high = arg.partition(",")
@@ -84,7 +89,7 @@ def _check_multiple_of(value: Any, arg: str) -> bool:
     if (
         isinstance(value, bool)
         or not isinstance(value, (str, int, float))
-        or not _is_number(str(value))
+        or not is_number(str(value))
     ):
         return False
     divisor = float(arg)
@@ -178,9 +183,9 @@ def check(validator: Validator, rule: str, value: Any, arg: str, field: str) -> 
         case "multiple_of":
             return _check_multiple_of(value, arg)
         case "min_digits":
-            return _ascii_digits(str(value)) and len(str(value)) >= int(arg)
+            return ascii_digits(str(value)) and len(str(value)) >= int(arg)
         case "max_digits":
-            return _ascii_digits(str(value)) and len(str(value)) <= int(arg)
+            return ascii_digits(str(value)) and len(str(value)) <= int(arg)
 
         # -- types / formats ------------------------------------------------------------------
         case "timezone":

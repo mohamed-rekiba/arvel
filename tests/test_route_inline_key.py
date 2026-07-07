@@ -63,7 +63,8 @@ def test_litestar_path_converter_still_works() -> None:
 
 
 def test_compile_path_classifies_suffixes() -> None:
-    assert HttpKernel._compile_path("/u/{id}") == ("/u/{id:str}", {})
-    assert HttpKernel._compile_path("/p/{post:slug}") == ("/p/{post:str}", {"post": "slug"})
-    assert HttpKernel._compile_path("/f/{x:path}") == ("/f/{x:path}", {})
-    assert HttpKernel._compile_path("/n/{n:int}") == ("/n/{n:int}", {})
+    # `_compile_path` returns a LIST of Litestar paths (>1 only for trailing `{x?}` params).
+    assert HttpKernel._compile_path("/u/{id}") == (["/u/{id:str}"], {})
+    assert HttpKernel._compile_path("/p/{post:slug}") == (["/p/{post:str}"], {"post": "slug"})
+    assert HttpKernel._compile_path("/f/{x:path}") == (["/f/{x:path}"], {})
+    assert HttpKernel._compile_path("/n/{n:int}") == (["/n/{n:int}"], {})
