@@ -98,9 +98,7 @@ async def test_manager_attempt_unknown_user_still_verifies() -> None:
         async def provider(_credentials: dict[str, str]) -> None:
             return None  # unknown identifier
 
-        ok = await AuthManager().attempt(
-            {"email": "ghost@x", "password": "pw"}, provider
-        )
+        ok = await AuthManager().attempt({"email": "ghost@x", "password": "pw"}, provider)
         assert ok is False
         assert len(spy.checks) == 1  # dummy burn happened at the manager level, not skipped
     finally:
@@ -118,9 +116,7 @@ async def test_manager_attempt_known_wrong_password_verifies_once() -> None:
         async def provider(_credentials: dict[str, str]) -> _User:
             return _User("hashed::right")
 
-        ok = await AuthManager().attempt(
-            {"email": "known@x", "password": "wrong"}, provider
-        )
+        ok = await AuthManager().attempt({"email": "known@x", "password": "wrong"}, provider)
         assert ok is False
         assert len(spy.checks) == 1  # same single verification as the unknown path
     finally:

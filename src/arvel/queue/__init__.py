@@ -686,19 +686,17 @@ class QueueManager(Manager):
             if label not in options.queues:
                 # this worker's `work(queues=[...])` doesn't consume `label` — the receive-time
                 # net for brokers without network-level filtering. The broker acks this delivery
-                # regardless, so park the job durably (jobs table, due now) instead of dropping
-                # it — another worker's release_due_jobs re-dispatches it on its own queue.
+                # regardless, so it must not be lost.
                 from arvel.kernel import app, has_application
 
                 if has_application() and app().bound("db"):
+                    # durable park (jobs table, due now) — another worker's release_due_jobs
+                    # re-dispatches it on its own queue.
                     await self.dispatch_after(0, job, queue=label)
-                else:
-                    from arvel.kernel.logging import LogManager
-
-                    LogManager().channel("queue").warning(
-                        "filtered_job_dropped_no_db", queue=label, job=type(job).__name__
-                    )
-                return None
+                    return None
+                # No DB to park into and no other consumer: an inline broker is the sole executor,
+                # so running the job here is the only way an already-acked delivery isn't silently
+                # lost (DR-0036). Fall through to execute it.
 
         batch_id = getattr(job, "__arvel_batch__", None)
         if batch_id is not None:

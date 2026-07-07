@@ -167,9 +167,7 @@ class AuthManager:
             # unknown identifier costs the same as a wrong password (no enumeration by timing).
             return user.get_auth_password() if user is not None else None
 
-        principal = await LocalGuard(_lookup).attempt(
-            identifier, credentials.get("password", "")
-        )
+        principal = await LocalGuard(_lookup).attempt(identifier, credentials.get("password", ""))
         ok = principal is not None
 
         if not ok:

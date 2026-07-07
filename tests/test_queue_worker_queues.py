@@ -93,6 +93,27 @@ async def test_direct_invoke_drops_a_job_on_a_queue_this_worker_does_not_consume
         await db.dispose()
 
 
+async def test_filtered_delivery_without_a_db_runs_rather_than_drops() -> None:
+    """No durable store and no other consumer (the inline broker is the sole executor) — an
+    already-acked filtered delivery must run here, not vanish (DR-0036)."""
+    from arvel.queue import _WorkerOptions  # pyright: ignore[reportPrivateUsage]
+
+    PROCESSED.clear()
+    app = Application()  # deliberately no "db" binding
+    manager = QueueManager(app, broker=InMemoryBroker())
+    app.instance("queue", manager)
+    set_application(app)
+    manager._worker_options = _WorkerOptions(
+        max_jobs=None, rest=0.0, stop_when_empty=False, queues=["emails"]
+    )
+    try:
+        await manager._invoke(Tick("stray"), queue_label="reports")
+        assert PROCESSED == ["stray"]  # run, not dropped — nothing durable to park into
+    finally:
+        manager._worker_options = None
+        set_application(None)
+
+
 async def test_work_without_queues_still_consumes_everything() -> None:
     manager, db = await _setup()
     try:
