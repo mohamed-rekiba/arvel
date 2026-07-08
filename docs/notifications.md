@@ -8,9 +8,10 @@ Telegram, SMS, push, …).
 
 This page covers writing a notification, sending it, the available channels, and queueing delivery.
 
-!!! note "Channels and their extras"
-    The `database` channel is **core** (needs a configured database). The `mail` channel needs `arvel[mail]`; the
-    `apprise` channel (Slack/Discord/Telegram/SMS/push) needs `arvel[notifications]`.
+!!! note "Needs an extra per channel"
+    The `database` channel is **core** (needs a configured database). The `mail` channel needs
+    `uv add 'arvel[mail]'`; the `apprise` channel (Slack/Discord/Telegram/SMS/push) needs
+    `uv add 'arvel[notifications]'`.
 
 ## A notification
 

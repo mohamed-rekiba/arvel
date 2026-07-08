@@ -11,12 +11,8 @@ authentication (2FA) adds *something you have*: a rotating 6-digit code from an 
   batteries-included path this page mostly covers, following the standard enable → confirm →
   challenge flow.
 
-!!! note "Install the extra"
-    2FA uses pyotp, which ships in the `[2fa]` extra:
-
-    ```bash
-    uv add 'arvel[2fa]'
-    ```
+!!! note "Needs the `[2fa]` extra"
+    2FA uses pyotp — `uv add 'arvel[2fa]'`.
 
 ## Before you start: cast the columns
 

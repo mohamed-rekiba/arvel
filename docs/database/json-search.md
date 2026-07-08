@@ -3,7 +3,7 @@
 Query special column types in SQL — JSON/JSONB documents, Postgres full-text search, and
 pgvector embeddings — without pulling rows into Python first.
 
-!!! note "Vector search needs the `[vector]` extra"
+!!! note "Needs the `[vector]` extra for vector search"
     JSON and Postgres full-text queries ride your existing [database extra](index.md). Vector columns
     and similarity search additionally need pgvector: `uv add 'arvel[vector]'` (plus `CREATE EXTENSION
     vector` on the Postgres server).

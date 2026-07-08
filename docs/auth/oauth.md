@@ -7,12 +7,8 @@ for tokens. arvel's `OAuthProvider` is the client for that flow — it builds th
 performs the code exchange. This page covers configuring a provider, the redirect/callback dance, and
 turning the result into a logged-in [`User`](identities.md).
 
-!!! note "Install the extra"
-    OAuth uses httpx-oauth (and authlib), in the `[oauth]` extra:
-
-    ```bash
-    uv add 'arvel[oauth]'
-    ```
+!!! note "Needs the `[oauth]` extra"
+    OAuth uses httpx-oauth (and authlib) — `uv add 'arvel[oauth]'`.
 
 ## OAuth vs OIDC — which piece do I want?
 

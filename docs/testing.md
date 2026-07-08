@@ -9,9 +9,9 @@ of the behaviour, not a pile of mocks.
 
 This page covers the test client, fakes, database assertions, and freezing time.
 
-!!! note "Test tooling"
-    The helpers in `arvel.testing` come with the framework; the test client needs `arvel[http]`, and
-    the test runner + factories (pytest, pytest-asyncio, polyfactory, faker) come with `arvel[dev]`.
+!!! note "Needs the `[http]` and `[dev]` extras"
+    The helpers in `arvel.testing` are **core**. The test client needs `uv add 'arvel[http]'`, and the
+    test runner + factories (pytest, pytest-asyncio, polyfactory, faker) come with `'arvel[dev]'`.
 
 ## Feature tests with the test client
 

@@ -8,10 +8,10 @@ arvel's cache is an async store over [cashews](https://github.com/Krukov/cashews
 selectable by config. This page covers the basic get/put API, the `remember` compute-or-fetch
 helper, the `@cached` decorator, choosing a backend, and atomic locks.
 
-!!! note "Backends"
-    The in-process `array` driver is the default and needs nothing — great for one instance and for
-    tests. A cache that's **shared across instances and survives restarts** needs Redis:
-    `uv add 'arvel[redis]'`, then set `cache.default = "redis"`.
+!!! note "Needs the `[redis]` extra to share or persist"
+    The in-process `array` driver is **core** — the default, great for one instance and tests. A cache
+    **shared across instances and surviving restarts** needs Redis: `uv add 'arvel[redis]'`, then set
+    `cache.default = "redis"`.
 
 ## Basic usage
 

@@ -7,9 +7,10 @@ built on [fsspec](https://filesystem-spec.readthedocs.io): the same calls — `p
 
 This page covers the basic read/write API, configuring disks, and a worked upload example.
 
-!!! note "Local is core; cloud disks need an extra"
-    The `local` disk works out of the box. Cloud disks pull their fsspec driver: `arvel[s3]`
-    (s3fs — also covers S3-compatible endpoints), `arvel[gcs]` (gcsfs), or `arvel[azure]` (adlfs).
+!!! note "Needs an extra for cloud disks"
+    The `local` disk is **core** — nothing to install. Cloud disks pull their fsspec driver:
+    `uv add 'arvel[s3]'` (s3fs — also covers S3-compatible endpoints), `'arvel[gcs]'` (gcsfs), or
+    `'arvel[azure]'` (adlfs).
 
 ## The basics
 

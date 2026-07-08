@@ -10,7 +10,7 @@ plural rules for every language.
 This page covers organizing translation files, translating strings, pluralization, and setting the
 active locale per request.
 
-!!! note "Core, plus the `[i18n]` extra for CLDR plurals"
+!!! note "Needs the `[i18n]` extra for CLDR plurals"
     Key lookup, placeholder replacement, and a simple one/other plural split are **core** — nothing to
     install. Correct CLDR plural rules for every language (Polish's `few`/`many`, Arabic's six forms)
     need Babel: `uv add 'arvel[i18n]'`.

@@ -10,12 +10,8 @@ it feeds *both* halves of this section at once: the `sub` claim becomes the user
 This page covers configuring the guard for Keycloak, what it validates, and how a token becomes a
 logged-in, authorized user.
 
-!!! note "Install the extra"
-    The OIDC guard validates JWTs with pyjwt, which ships in the `[jwt]` extra:
-
-    ```bash
-    uv add 'arvel[jwt]'
-    ```
+!!! note "Needs the `[jwt]` extra"
+    The OIDC guard validates JWTs with pyjwt — `uv add 'arvel[jwt]'`.
 
 ## Two modes: obtaining a token vs validating one
 
