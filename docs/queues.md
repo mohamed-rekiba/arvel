@@ -211,7 +211,7 @@ class GenerateInvoice(Job, ShouldBeUnique):
         ...
 ```
 
-Before dispatch, `Job.dispatch()` acquires a story-06 `CacheLock` keyed by the job's class +
+Before dispatch, `Job.dispatch()` acquires a `CacheLock` keyed by the job's class +
 `unique_id()`; a second `dispatch()` for the same key while it's held returns `None` (nothing
 enqueued) instead of raising. The lock is released once the worker finishes processing the job —
 or after `unique_for` seconds, whichever comes first, so a crashed worker can't wedge it forever.

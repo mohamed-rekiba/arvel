@@ -102,8 +102,9 @@ Context.hydrate(payload)          # restores both visible and hidden state
 ```
 
 Values you put in `Context` must be serializable by whatever you dehydrate with (the contract is
-yours to keep — `msgspec`-encodable values are a safe default). This story only guarantees the
-round-trip contract; wiring dehydrate/hydrate into the actual queue push/pop is QUEUE-RELIABILITY.
+yours to keep — `msgspec`-encodable values are a safe default). This guarantees only the round-trip
+contract; automatically threading dehydrate/hydrate through the queue's push and pop is planned
+queue-integration work — until it lands, call them explicitly around an enqueue.
 
 ### Callbacks
 
@@ -119,7 +120,7 @@ Context.hydrated(lambda payload: configure_logger(payload["visible"].get("reques
 
 - **Expecting `Context` to survive across a queued job automatically.** It won't — a job runs in a
   different process/worker with its own empty context. Use `dehydrate()`/`hydrate()` explicitly
-  (or the queue integration once QUEUE-RELIABILITY wires it in).
+  (or the queue integration once it wires this in).
 - **Putting non-serializable values in context you intend to dehydrate.** `dehydrate()` doesn't
   validate that its values serialize — that surfaces later, at the point you actually try to
   serialize the payload.

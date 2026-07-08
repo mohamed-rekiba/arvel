@@ -130,12 +130,12 @@ from arvel.search.listeners import handle_index_request
 app.make("events").listen(ModelIndexRequested, handle_index_request)
 ```
 
-This story ships the event + the listener proof (a save no longer calls the engine inline — the
-listener does, when the event fires). Actually running that listener on a background worker
-(rather than inline in the same dispatch call) is `arvel.queue`'s own story
-(QUEUE-RELIABILITY) — `arvel.search` never imports `arvel.queue` (the G1 layer contract forbids
-that back-edge). Want the write to genuinely run later, off-process? Register your own
-`ShouldQueue` listener that pushes a job instead of writing directly.
+What this buys you is **decoupling**, not yet off-process execution: the save no longer calls the
+search engine directly — it fires an event, and the shipped listener performs the write when that
+event fires. But that listener still runs *inline*, in the same dispatch. To move the write onto a
+background worker, register your own `ShouldQueue` listener that pushes a job instead of indexing
+directly. `arvel.search` deliberately doesn't depend on `arvel.queue`, so whether and how to queue the
+write stays your decision, not something the search layer forces.
 
 ## Engines
 
