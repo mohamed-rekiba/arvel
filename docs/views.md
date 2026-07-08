@@ -24,6 +24,48 @@ Route.get("/", home, name="home")
 (`pages.home` → `resources/views/pages/home.html`). It returns a `View`; `await …​.to_response()`
 renders it (async) to an HTML response, or `await …​.render()` for the raw string.
 
+## Layouts & template inheritance
+
+You rarely want every page to repeat the same `<head>`, navigation, and footer. Jinja2's template
+inheritance lets you write that shell **once** as a layout and have each page fill in the parts that
+differ. Define a base template with `{% block %}` holes:
+
+```html
+{# resources/views/layouts/app.html #}
+<!doctype html>
+<html>
+  <head>
+    <title>{% block title %}{{ config('app.name', 'arvel') }}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+  </head>
+  <body>
+    <nav>{% if auth() %}Hi, {{ auth().name }}{% else %}<a href="{{ route('login') }}">Log in</a>{% endif %}</nav>
+    <main>{% block content %}{% endblock %}</main>
+  </body>
+</html>
+```
+
+Then each page `extends` the layout and overrides only the blocks it cares about — template paths
+inside `{% extends %}`/`{% include %}` are relative to `resources/views/`, the same root `view()`
+resolves against:
+
+```html
+{# resources/views/pages/home.html #}
+{% extends "layouts/app.html" %}
+
+{% block title %}Home · {{ config('app.name') }}{% endblock %}
+
+{% block content %}
+  <h1>Welcome</h1>
+  {% include "partials/feature-grid.html" %}   {# pull in a reusable fragment #}
+{% endblock %}
+```
+
+The handler renders the page exactly as before — `await view("pages.home", {...}).to_response()` — and
+Jinja assembles the layout, the page's blocks, and any included partials into one document. All the
+[template globals](#template-globals) below are available inside the layout and every page that
+extends it, so `route`, `auth`, and `asset` work everywhere without re-passing them.
+
 ## Template globals
 
 These helpers are available in every template with no imports — they resolve against the running
