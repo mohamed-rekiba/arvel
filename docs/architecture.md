@@ -1,29 +1,38 @@
 # Architecture Concepts
 
-arvel is built around *developer experience* first — but the kind that survives growth, not just a
-clean hello-world. Three principles keep the framework honest as it scales: it stays **light**, it
-leans on **best-in-class engines** rather than reinventing them, and it's **type-safe** with those
-guarantees enforced mechanically. This page walks through each, then the **application lifecycle**
-that ties them together, and what state to **share** once you run more than one instance.
+Before you build with arvel, it's worth ten minutes to understand how the pieces fit — not the
+internals, but the handful of ideas the whole framework is arranged around. Get these and the rest of
+the documentation reads as obvious; skip them and you'll keep meeting machinery that seems to appear
+from nowhere.
 
-## 1. Light by default
+arvel is built for *developer experience* — but the durable kind that holds up as an app grows past
+hello-world, not the kind that photographs well in a README. Three commitments keep it honest: it
+stays **light**, it leans on **best-in-class engines** instead of reinventing them, and it's
+**type-safe**, with all three enforced mechanically rather than left to discipline. This page walks
+through each, then the **lifecycle** that turns your code into a running app, and finally the shared
+state to think about once you run more than one instance.
 
-Importing `arvel` must pull in **zero** heavy third-party libraries. The public surface
-is resolved lazily through a module-level `__getattr__` (PEP 562):
+## Light by default
+
+Importing `arvel` pulls in **zero** heavy third-party libraries. The public surface resolves lazily
+through a module-level `__getattr__` (PEP 562), so you only pay for a subsystem when you reach for it:
 
 ```python
 import arvel            # imports nothing heavy — no Litestar, SQLAlchemy, taskiq, …
-from arvel import Model # imports arvel.database (and SQLAlchemy) only now
+from arvel import Model # NOW arvel.database (and SQLAlchemy) loads — because you asked for it
 ```
 
-Every capability module lazy-imports its engine *inside* the function that needs it, so
-the T0 CLI and cold-start stay instant. This is verified mechanically: a startup test
-spawns a fresh interpreter and asserts no heavy module is loaded after `import arvel`.
+Every capability module lazy-imports its engine *inside* the function that needs it, so cold starts
+and the CLI's fast paths stay instant. And this isn't a convention that quietly rots: a startup test
+spawns a fresh interpreter and asserts that nothing heavy is loaded after `import arvel`. The weight is
+opt-in, and the framework fails its own build if that ever stops being true. (The full mechanism —
+extras, the import-linter contracts — is in [Packaging & Extras](packaging.md).)
 
-## 2. Best-in-class engines, never reinvented
+## Best-in-class engines, never reinvented
 
-Each capability is backed by a **mandated** library — and a *stack-fidelity* test suite
-fails the build if a capability is ever quietly reimplemented in stdlib:
+arvel doesn't write its own ORM, HTTP server, or template engine. Each capability is backed by a
+**mandated** library, and a stack-fidelity test suite fails the build if a capability is ever quietly
+reimplemented in stdlib:
 
 | Capability | Engine | Capability | Engine |
 |---|---|---|---|
@@ -35,46 +44,59 @@ fails the build if a capability is ever quietly reimplemented in stdlib:
 | Localization | Babel | Queue | taskiq |
 | Hash / Crypt | pwdlib / cryptography | Images / Video | Pillow / av |
 
-*Lazy-import ≠ reimplement.* arvel adds the ergonomic seam; the engine does the work.
+What arvel adds is the *ergonomic seam* — a small, consistent, Pythonic surface over each engine — not
+a reimplementation of it. When you write `Model.where(...)`, SQLAlchemy Core does the SQL; arvel just
+gives you a nicer way to ask. The upshot: you get familiar, battle-tested behavior and can drop to the
+raw engine whenever you need to, without fighting an abstraction that pretends the engine isn't there.
 
-## 3. Type-safe & mechanically enforced
+## Type-safe, mechanically enforced
 
-- **Strict typing** under both `mypy` and `pyright`, PEP 695 generics throughout.
-- **Architecture rules** enforced by `import-linter`: the kernel stays isolated, and the
-  light core may never import a heavy library — even transitively.
-- **One DI container** wires it together; services resolve through contracts, and
-  **facades** (`Cache`, `Queue`, `Mail`, `Gate`, …) are static-looking proxies over them.
+- **Strict typing** under both `mypy` and `pyright`, with PEP 695 generics throughout.
+- **Architecture rules** enforced by `import-linter`: the kernel stays isolated, the light core may
+  never import a heavy library (even transitively), and the module dependency graph stays acyclic.
+- **One container** wires everything, services resolve through contracts, and **facades** are
+  static-looking proxies over them — with generated stubs so the dynamic proxying stays type-checked.
+
+The theme across all three commitments: the guarantees are *tested*, not trusted. That's what lets a
+one-person team move fast without the framework silently drifting out from under them.
 
 ## The application lifecycle
 
-**Serving.** Your ASGI entry point is just `Application().as_asgi()`. That call runs the
-**synchronous** bootstrap (load `.env` + `config/*.py`, configure logging, register providers — so
-the router and bindings exist) and compiles the routes onto Litestar, then attaches a **lifespan** so
-the **async** `boot()` runs on ASGI startup and `terminate()` on shutdown:
+Here's what actually happens when your app starts. Your ASGI entry point is a single call:
 
 ```python
 # asgi.py — what your server (granian/uvicorn) imports
 from arvel import Application
-asgi_app = Application().as_asgi()   # sync bootstrap now; boot()/terminate() on startup/shutdown
+asgi_app = Application().as_asgi()   # sync bootstrap now; boot()/terminate() on startup & shutdown
 ```
 
-The split exists because the ASGI app must be built **with its routes already in place** (synchronous
-provider `register`), while a provider's `boot()` may be `async` and belongs in the server's lifespan.
-If `boot()` fails, a partial boot is still `terminate()`d so half-opened resources are released.
+`as_asgi()` runs the **synchronous bootstrap** immediately — load `.env` and `config/*.py`, configure
+logging, run every provider's `register` so the container is populated, and compile the routes onto
+Litestar. Then it attaches a **lifespan** so the **async** work runs at the right time: each
+provider's `boot()` on ASGI startup, and `terminate()` on shutdown.
 
-For a worker or a one-shot (no ASGI server), drive the same sequence with the `lifespan` async context
-manager (`async with lifespan(app): ...`), or call `await app.boot()` / `await app.terminate()`
-yourself in tests.
+That split isn't arbitrary. The ASGI app has to be built *with its routes already in place* — which is
+synchronous provider `register` — while a provider's `boot()` may be `async` (opening a pool, warming a
+cache) and belongs in the server's lifespan. If `boot()` fails partway, the app still `terminate()`s
+what did come up, so half-opened resources are released rather than leaked.
 
-Service providers register bindings and boot in dependency order; the container
-autowires constructor dependencies; and a request flows through the two-tier middleware
-pipeline before reaching your handler.
+Outside an ASGI server — a worker, a one-shot script, a test — you drive the same sequence yourself
+with the `lifespan` async context manager (`async with lifespan(app): ...`) or by calling
+`await app.boot()` / `await app.terminate()` directly.
 
-## Running multiple instances (shared state)
+Three subsystems do the heavy lifting inside that lifecycle, and they each get their own page:
 
-A few subsystems keep state **in-process by default** — fine for one instance, but in-process
-state is lost on restart and **not shared** across replicas. Before you scale horizontally, point
-each of these at a shared backend (Redis is the usual one):
+- The **[service container](container.md)** constructs your objects and injects their dependencies.
+- **[Service providers](providers.md)** register and boot every feature, yours and the framework's.
+- **[Facades](facades.md)** give you terse, testable access to the services the container holds.
+
+Read those three next, in that order — they're the working parts of everything above.
+
+## Running multiple instances
+
+A few subsystems keep state **in-process by default**. That's exactly right for a single instance, but
+in-process state is lost on restart and isn't shared across replicas — so before you scale
+horizontally, point each of these at a shared backend (Redis is the usual choice):
 
 | Subsystem | Default (single instance) | Shared / persistent backend |
 |-----------|---------------------------|-----------------------------|
@@ -82,7 +104,7 @@ each of these at a shared backend (Redis is the usual one):
 | **Session** | in-process dict | cache-backed: `StartSession(cache=cache())` over Redis |
 | **Throttle** | in-process dict | cache-backed: `ThrottleRequests(cache=cache())` — one shared counter (Redis `INCR`) |
 | **Queue** | `InMemoryBroker` | taskiq **Redis** broker (`[queue]` pulls `taskiq-redis`); jobs survive restarts + fan out to workers |
-| **Maintenance flag** | stored in the **default cache** (so it follows `cache.default`) | use the `redis` cache so `arvel down` reaches every instance + survives restarts (with `array` it's per-process) |
+| **Maintenance flag** | stored in the **default cache** (follows `cache.default`) | use the `redis` cache so `arvel down` reaches every instance + survives restarts |
 
 ```python
 from arvel.support import cache
@@ -93,14 +115,14 @@ api.append_to_group("api", ThrottleRequests(max_attempts=60, cache=cache()))
 web.append_to_group("web", StartSession(cache=cache()))
 ```
 
-Not every "global" is a scaling risk: the **model registry** (class-name → model, for polymorphic
-relations) is *type metadata*, rebuilt deterministically on import — it's read-only and identical
-on every instance, so it needs no shared store.
+Not every process-global is a scaling hazard, though. The **model registry** (class-name → model, for
+polymorphic relations) is *type metadata* — rebuilt deterministically on import, read-only, and
+identical on every instance — so it needs no shared store. The rule of thumb: shared *data* needs a
+shared backend; shared *code-derived metadata* doesn't.
 
 ## See also
 
-- [Packaging & Extras](packaging.md) — how "light by default" is built and enforced.
-- [Service Container](container.md) · [Service Providers](providers.md) — the wiring and bootstrap
-  the lifecycle runs.
-- [Cache](cache.md) · [Queues & Jobs](queues.md) — the shared backends to configure before scaling
-  out.
+- [Service Container](container.md) · [Service Providers](providers.md) · [Facades](facades.md) — the
+  three working parts of the lifecycle above.
+- [Packaging & Extras](packaging.md) — how "light by default" is built and enforced in CI.
+- [Cache](cache.md) · [Queues & Jobs](queues.md) — the shared backends to configure before scaling out.
