@@ -155,3 +155,10 @@ contributes JSON:API `links` and `meta`. Validation failures return the spec's e
 (`errors[].source.pointer` → `/data/attributes/<field>`) when the client's `Accept` asks for
 the JSON:API media type. Write-side document parsing (POST/PATCH request bodies) is not
 implemented — request validation stays the framework's normal typed/FormRequest path.
+
+## See also
+
+- [Casts & Serialization](casts.md) — `to_dict()`, the plainer serialization a resource builds on.
+- [Relationships](relationships.md) — eager loading, which drives what a resource can include.
+- [Pagination](../pagination.md) — a paginator passed to `.collection()` contributes `links`/`meta`.
+- [Validation](../validation.md) — the request-side path resources deliberately leave alone.

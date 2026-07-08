@@ -116,3 +116,10 @@ base = Builder(t).where(id=root_id).to_select().cte("tree", recursive=True)
 full = base.union_all(sa.select(t).join(base, t.c.parent_id == base.c.id))
 rows = await Builder(t, db, hydrate=Category._hydrate, model=Category).from_cte(full).get()
 ```
+
+## See also
+
+- [Queries](queries.md) — the builder CTEs are sourced from and hydrated back into.
+- [Relationships](relationships.md) — the referential (self-referencing) relation, for the common tree case.
+- [SQL Views & Functions](sql-views.md) — persisting a complex query as a (materialized) view.
+- [Transactions & Streaming](transactions.md) — streaming a large recursive result without buffering it.

@@ -266,3 +266,10 @@ The framework's own modules ship typed settings built this exact way:
   read-only and use `set()` to change config (and only at boot — see the read-only warning above).
 - **Config holds secrets.** The repository's `repr()` redacts values for exactly this reason — don't
   log `config().all()` or individual secret values yourself.
+
+## See also
+
+- [Service Providers](providers.md) — `merge_config_from` for package config defaults, and boot-time setup.
+- [Service Container](container.md) — how the `config` repository itself is bound and resolved.
+- [Packaging & Extras](packaging.md) — how a capability's config is published into an app.
+- [Encryption](encryption.md) · [Hashing](hashing.md) — the `app.key` and secrets that config carries.

@@ -1,5 +1,10 @@
 # Relationships
 
+Rows in one table point at rows in another — a user *has many* posts, a post *belongs to* a user,
+posts and tags are *many-to-many*. arvel models those links as **methods** on the model. Each method
+declares the relation once; calling it gives you a query you can filter, and eager-loading it pulls
+the related rows in a single extra query — no hand-written joins, and no N+1.
+
 ```python
 class User(Model):
     def posts(self): return self.has_many(Post)
@@ -185,3 +190,21 @@ await user.roles().attach(role.id, assigned_at="2026-06-01")
 (await user.roles().get())[0].membership["assigned_at"]
 await user.roles().where_pivot("assigned_at", "2026-06-01").get()
 ```
+
+## Common mistakes & gotchas
+
+- **N+1 from a lazy relation in a loop.** `for u in users: await u.posts()` runs a query per user.
+  Eager-load with `User.with_("posts")` to batch it into one `WHERE IN`.
+- **Calling vs. awaiting a relation.** `user.posts()` returns a *query* (chain more onto it, then
+  `get()`); an eager-loaded relation is read as an attribute (`user.posts` after `with_("posts")`).
+- **Mismatched foreign-key names.** The conventions expect `<related>_id` (and `*_id`/`*_type` for
+  morphs via `t.morphs(...)`). Pass an explicit key when your columns don't follow the convention.
+- **Grouped aggregates as models.** A `select_raw(...).group_by(...)` returns computed rows, not
+  models — read them with `fetch_all`, not `get()`.
+
+## See also
+
+- [Queries](queries.md) — the builder relation queries extend.
+- [Migrations & Schema](migrations.md) — the foreign keys (`t.foreign_id`, `t.morphs`) relations rely on.
+- [API Resources](resources.md) — serializing a model with its loaded relations.
+- [CTEs & Recursive Queries](ctes.md) — self-referential trees (a category and its descendants).

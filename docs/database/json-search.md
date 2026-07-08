@@ -110,3 +110,21 @@ close = await (Document.query()
 most-similar-first). On a column without vector operators (the JSON fallback, or a non-vector
 column) both methods raise `UnsupportedDriverOperation` instead of emitting SQL that would compare
 strings.
+
+## Common mistakes & gotchas
+
+- **Expecting vectors off Postgres.** Similarity search needs pgvector — on a column without vector
+  operators it raises `UnsupportedDriverOperation` rather than silently doing something wrong.
+- **Generating embeddings inside arvel.** It doesn't — you bring your own vector (a plain list of
+  floats) from whatever model you use, and arvel only does the SQL-side nearest-neighbour query.
+- **Full-text on SQLite.** Postgres full-text operators are Postgres-only; check `db` dialect (or the
+  degradation warning) before relying on them in a cross-backend migration.
+- **JSON path typos.** A JSON path that doesn't match returns no rows rather than erroring — verify
+  the path against a sample document.
+
+## See also
+
+- [Queries](queries.md) — the builder these JSON/full-text/vector methods extend.
+- [SQL Views & Functions](sql-views.md) — the GIN/GiST indexes and extensions these queries want.
+- [Casts & Serialization](casts.md) — the `json`/`array` casts for reading JSON columns into Python.
+- [Search](../search.md) — application-level search indexing, distinct from in-database full-text.

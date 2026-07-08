@@ -181,3 +181,22 @@ await Post.published().authored_by(ada).get()   # identical call site
 
 Both styles are equivalent and may be mixed on the same model; `@scope` just frees the name from
 the prefix.
+
+## Common mistakes & gotchas
+
+- **`get()` when you meant `first()`.** `get()` always returns a list (empty if nothing matched);
+  `first()` returns one model or `None`, and `find(id)` looks up by primary key. Reaching for
+  `[0]` on a `get()` is a sign you wanted `first()`.
+- **A silent global scope.** A registered global scope filters *every* query on the model — if a
+  count looks wrong, check for one and use `without_global_scope(name)` when you need the raw set.
+- **N+1 in a loop.** Iterating models and touching a relation per row fires a query each time; batch
+  it with `with_(...)` — see [Relationships](relationships.md).
+- **`where("col", value)` vs `where("col", ">", value)`.** Two args is an equality check; an operator
+  needs the three-arg form.
+
+## See also
+
+- [Relationships](relationships.md) — relation queries, eager loading, and aggregates.
+- [Transactions & Streaming](transactions.md) — locking, and streaming large result sets.
+- [Pagination](../pagination.md) — `paginate()`/`simple_paginate()` on any query chain.
+- [Casts & Serialization](casts.md) — how the rows a query returns map to Python types.
