@@ -65,7 +65,7 @@ Money(1500, "JPY").format("ja_JP")          # "￥1,500"
 ```
 
 `format()` with no argument uses the **active locale**, so money honors i18n automatically. Pass a
-`locale` to override. (Babel, the `[i18n]` extra.)
+`locale` to override. (Formatting goes through Babel.)
 
 ### Internationalized amounts
 

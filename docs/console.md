@@ -80,9 +80,11 @@ absolute (or relative, or trailing-slash) path all work the same way:
 
 ## The REPL (`tinker`)
 
-`tinker` drops you into an interactive shell with the app booted. On **IPython** (shipped with
-`arvel[standard]`, or `uv add 'arvel[console]'`) you get **top-level `await`** and autocomplete; without
-it, it falls back to the stdlib REPL (no `await`). Inside a project it preloads:
+!!! note "Needs the `[console]` extra for top-level `await`"
+    `tinker` runs on the stdlib REPL out of the box. Installing IPython adds **top-level `await`** and
+    autocomplete: `uv add 'arvel[console]'` (also bundled in `arvel[standard]`).
+
+`tinker` drops you into an interactive shell with the app booted. Inside a project it preloads:
 
 - arvel's public surface (`Model`, `config`, `Collection`, …),
 - the running `app`,

@@ -16,6 +16,11 @@ arvel's media layer handles that for you, at two levels:
 Reach for the low level when you just need to transform some bytes; reach for `HasMedia` when a file
 *belongs* to something.
 
+!!! note "Needs the `[image]` and/or `[video]` extra"
+    Everything here is **opt-in** and imported lazily. Image transforms and model thumbnails need
+    Pillow (`uv add 'arvel[image]'`); video probing needs PyAV (`'arvel[video]'`). `HasMedia` also
+    uses a [storage disk](storage.md) and a [database](database/index.md) extra — full set below.
+
 ## Installation
 
 The media engines are **optional dependencies** — kept out of the core and imported only when you
