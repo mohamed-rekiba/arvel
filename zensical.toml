@@ -21,35 +21,38 @@ extra_javascript = ["assets/arvel-snake.js"]
 nav = [
   { "Home" = "index.md" },
   { "Getting Started" = "getting-started.md" },
-  { "The Basics" = [
-    { "Configuration" = "configuration.md" },
-    { "Routing" = "routing.md" },
-    { "Database & ORM" = [
-      { "Overview" = "database/index.md" },
-      { "Queries" = "database/queries.md" },
-      { "Relationships" = "database/relationships.md" },
-      { "Migrations & Schema" = "database/migrations.md" },
-      { "Casts & Serialization" = "database/casts.md" },
-      { "API Resources" = "database/resources.md" },
-      { "Factories" = "database/factories.md" },
-      { "Transactions & Streaming" = "database/transactions.md" },
-      { "CTEs & Recursive Queries" = "database/ctes.md" },
-      { "SQL Views & Functions" = "database/sql-views.md" },
-      { "JSON, Full-text & Vectors" = "database/json-search.md" },
-    ] },
-    { "Middleware" = "middleware.md" },
-    { "Validation" = "validation.md" },
-    { "Error Handling" = "errors.md" },
-    { "Pagination" = "pagination.md" },
-    { "Views" = "views.md" },
-  ] },
-  { "Architecture" = [
+  { "Architecture Concepts" = [
+    { "Overview" = "architecture.md" },
     { "Service Container" = "container.md" },
     { "Service Providers" = "providers.md" },
     { "Facades" = "facades.md" },
     { "Packaging & Extras" = "packaging.md" },
   ] },
-  { "Authentication & Authorization" = [
+  { "The Basics" = [
+    { "Configuration" = "configuration.md" },
+    { "Routing" = "routing.md" },
+    { "Middleware" = "middleware.md" },
+    { "Validation" = "validation.md" },
+    { "Error Handling" = "errors.md" },
+    { "Views" = "views.md" },
+  ] },
+  { "Database" = [
+    { "Overview" = "database/index.md" },
+    { "Queries" = "database/queries.md" },
+    { "Relationships" = "database/relationships.md" },
+    { "Migrations & Schema" = "database/migrations.md" },
+    { "Factories & Seeding" = "database/factories.md" },
+    { "Casts & Serialization" = "database/casts.md" },
+    { "API Resources" = "database/resources.md" },
+    { "Pagination" = "pagination.md" },
+    { "Transactions & Streaming" = "database/transactions.md" },
+    { "Advanced" = [
+      { "CTEs & Recursive Queries" = "database/ctes.md" },
+      { "SQL Views & Functions" = "database/sql-views.md" },
+      { "JSON, Full-text & Vectors" = "database/json-search.md" },
+    ] },
+  ] },
+  { "Security" = [
     { "Overview" = "auth/index.md" },
     { "Authentication" = "auth/authentication.md" },
     { "Guards & drivers" = "auth/guards.md" },
@@ -63,10 +66,10 @@ nav = [
     { "Routes & flows" = "auth/routes-and-flows.md" },
     { "Providers & middleware" = "auth/providers-and-middleware.md" },
     { "Configuration" = "auth/configuration.md" },
-  ] },
-  { "Digging Deeper" = [
     { "Hashing" = "hashing.md" },
     { "Encryption" = "encryption.md" },
+  ] },
+  { "Digging Deeper" = [
     { "HTTP Client" = "http-client.md" },
     { "Cache" = "cache.md" },
     { "Feature Flags" = "features.md" },
@@ -78,6 +81,7 @@ nav = [
     { "Notifications" = "notifications.md" },
     { "Telemetry" = "telemetry.md" },
     { "Console (CLI)" = "console.md" },
+    { "OpenAPI & API Docs" = "openapi.md" },
     { "Dates & Time" = "dates.md" },
     { "File Storage" = "storage.md" },
     { "Images & Video" = "media.md" },
@@ -88,12 +92,9 @@ nav = [
     { "Concurrency" = "concurrency.md" },
     { "Money" = "money.md" },
     { "Localization" = "localization.md" },
-    { "Testing" = "testing.md" },
   ] },
-  { "Prologue" = [
-    { "Architecture Concepts" = "architecture.md" },
-    { "About arvel" = "about.md" },
-  ] },
+  { "Testing" = "testing.md" },
+  { "About arvel" = "about.md" },
 ]
 
 [project.theme]
