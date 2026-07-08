@@ -83,6 +83,21 @@ Per request the middleware run **outermost-first** in three tiers: **global → 
 Nested `group(...)` blocks compose (outer middleware then inner), and everything is restored when
 the block exits, so sibling routes aren't affected.
 
+## Pinning relative order with `middleware_priority`
+
+Insertion order (global → group → route) is usually enough, but sometimes two middleware need a
+fixed relative order *regardless* of which tier put them on the stack — e.g. a session must always
+start before anything that reads it, even if a route attaches that "anything" directly. Set
+`kernel.middleware_priority` to a list of middleware **classes** in the order they must run:
+
+```python
+kernel.middleware_priority = [EncryptCookies, StartSession, ValidateCsrfToken]
+```
+
+Assembled for each request, the full stack is stably re-sorted: any middleware named in the list
+runs in that relative order no matter where it was inserted; everything else keeps its original
+relative position. Leave it empty (the default) for plain insertion order — no behavior change.
+
 ## Aliases
 
 Give a middleware a short name and reference it by that name in groups or routes:

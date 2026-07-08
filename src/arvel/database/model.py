@@ -418,17 +418,44 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return cls.__primary_key__
 
     @classmethod
-    async def resolve_route_binding(cls, value: Any, field: str | None = None) -> Self | None:
+    async def resolve_route_binding(
+        cls, value: Any, field: str | None = None, *, with_trashed: bool = False
+    ) -> Self | None:
         """Resolve a route param to a model.
 
         Used by the framework for **implicit** binding: a controller action typed
         ``async def show(self, post: Post)`` resolves ``{post}`` via this method
         (against:meth:`get_route_key_name`, or ``field`` for a custom key like
         ``{post:slug}``). Returns ``None`` on no match — the HTTP layer turns that
-        into a 404.
+        into a 404. ``with_trashed=True`` (set by a route's ``.with_trashed()``, H3) resolves
+        through :meth:`with_trashed` instead of the default soft-delete-excluding query, so a
+        soft-deleted row still binds.
         """
         column = field or cls.get_route_key_name()
-        found: Self | None = await cls.where(column, "=", value).first()
+        query = cls.with_trashed() if with_trashed else cls.query()
+        found: Self | None = await query.where(column, "=", value).first()
+        return found
+
+    @classmethod
+    async def resolve_child_route_binding(
+        cls, parent: Any, value: Any, field: str | None = None
+    ) -> Self | None:
+        """Resolve a route param scoped to ``parent`` (H2 — implicit binding + a route's
+        ``.scope_bindings()``): constrained through the parent's relation named for this model's
+        plural snake name (e.g. ``Post`` -> ``posts``), so a row that exists but belongs to a
+        different parent 404s instead of resolving globally. Falls back to the plain
+        (unscoped) lookup when ``parent`` doesn't expose that relation — the convention is
+        best-effort, not mandatory.
+        """
+        from arvel.support import Str
+
+        relation_name = Str.plural(Str.snake(cls.__name__))
+        relation_method: Any = getattr(parent, relation_name, None)
+        if relation_method is None or not callable(relation_method):
+            return await cls.resolve_route_binding(value, field)
+        column = field or cls.get_route_key_name()
+        relation: Any = relation_method()
+        found: Self | None = await relation.where(column, "=", value).first()
         return found
 
     @classmethod

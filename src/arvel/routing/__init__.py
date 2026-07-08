@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
     from arvel.http.kernel import HttpKernel
     from arvel.http.redirect import Redirect
+    from arvel.http.request import RouteMatch
 
 
 _RESOURCE_ACTIONS: list[tuple[str, list[str], str]] = [
@@ -119,6 +120,10 @@ class RouteDefinition:
     # custom response when a bound param fails to resolve
     missing_callback: Callable[[Any], Any] | None = None
     excluded_middleware: list[Any] = field(default_factory=list[Any])  # `.without_middleware()`
+    domain: str | None = None  # host pattern (H1) — may contain a `{param}` segment
+    scoped: bool = False  # `.scope_bindings()` — resolve implicit child bindings within the parent
+    trashed_all: bool = False  # `.with_trashed()` with no args — every bound param on this route
+    trashed_params: set[str] = field(default_factory=set[str])  # `.with_trashed(*params)`
 
     def status(self, code: int) -> RouteDefinition:
         """Pin this route's success response status. Lets a
@@ -152,6 +157,25 @@ class RouteDefinition:
         self.missing_callback = callback
         return self
 
+    def scope_bindings(self, enabled: bool = True) -> RouteDefinition:
+        """Opt this route's implicit bindings into parent-scoped resolution (H2): once a param
+        resolves to a model, a later param resolves through ``resolve_child_route_binding`` —
+        constrained to that parent's relation (named for the child's plural snake name, e.g.
+        ``Post`` -> ``posts``) instead of a global lookup, so
+        ``/users/{user}/posts/{post}`` 404s a real post id that belongs to someone else. A child
+        model with no matching relation just resolves globally, same as an unscoped route."""
+        self.scoped = enabled
+        return self
+
+    def with_trashed(self, *params: str) -> RouteDefinition:
+        """Opt bound param(s) into resolving soft-deleted rows too — the default binding lookup
+        404s them. No args opts in every bound param on this route; named args opt in only those."""
+        if params:
+            self.trashed_params.update(params)
+        else:
+            self.trashed_all = True
+        return self
+
     def secure(self, *schemes: str) -> RouteDefinition:
         """Mark this route as requiring an OpenAPI security scheme (default ``"bearer"``) — it shows
         the lock + 'Authorize' requirement in the API docs. Documents the contract; enforcement is
@@ -169,6 +193,7 @@ class Router:
         self._name_prefix = ""
         self._middleware: list[Any] = []  # middleware from the current group stack
         self._group: str | None = None  # named group from the current group stack
+        self._domain: str | None = None  # host pattern from the current group stack (H1)
         self._bindings: dict[str, Any] = {}
 
     def add(
@@ -181,6 +206,7 @@ class Router:
             name=(self._name_prefix + name) if name else None,
             group=self._group,
             middlewares=list(self._middleware),
+            domain=self._domain,
         )
         self._routes.append(route)
         return route
@@ -445,21 +471,32 @@ class Router:
         name: str = "",
         middleware: Sequence[Any] | None = None,
         group: str | None = None,
+        domain: str | None = None,
     ) -> Generator[Router]:
         """Open a route group. ``prefix``/``name`` extend the path and name prefixes;
         ``middleware`` adds middleware run for every route in the block; ``group`` assigns
-        a named kernel middleware group (e.g. ``"web"``/``"api"``). Nested groups compose
-        (outer + inner middleware both run) and restore on exit."""
-        previous = (self._prefix, self._name_prefix, self._middleware, self._group)
+        a named kernel middleware group (e.g. ``"web"``/``"api"``); ``domain`` (H1) constrains
+        every route in the block to a host pattern (may contain a ``{param}`` segment, e.g.
+        ``"{account}.example.com"`` — captured into the handler params like a path param).
+        Nested groups compose (outer + inner middleware both run) and restore on exit."""
+        previous = (self._prefix, self._name_prefix, self._middleware, self._group, self._domain)
         self._prefix += prefix
         self._name_prefix += name
         self._middleware = [*self._middleware, *(middleware or [])]
         if group is not None:
             self._group = group
+        if domain is not None:
+            self._domain = domain
         try:
             yield self
         finally:
-            self._prefix, self._name_prefix, self._middleware, self._group = previous
+            (
+                self._prefix,
+                self._name_prefix,
+                self._middleware,
+                self._group,
+                self._domain,
+            ) = previous
 
     def routes(self) -> list[RouteDefinition]:
         return list(self._routes)
@@ -567,8 +604,28 @@ class Router:
                 wheres=route.wheres,
                 missing=route.missing_callback,
                 without_middleware=route.excluded_middleware,
+                domain=route.domain,
+                scope_bindings=route.scoped,
+                trashed_all=route.trashed_all,
+                trashed_params=list(route.trashed_params),
             )
         kernel.bindings.update(self._bindings)
+
+    def current_route(self) -> RouteMatch | None:
+        """The matched route for the active request (H4) — its name + resolved params, or
+        ``None`` outside a request / before dispatch reaches binding resolution. Same object
+        ``url().current_route()`` returns; exposed here too so the ``Route`` facade reads it
+        directly (``Route.current_route()``)."""
+        from arvel.http.request import current_route_match
+
+        return current_route_match()
+
+    def current_route_named(self, pattern: str) -> bool:
+        """Whether the current route's name matches ``pattern`` (an ``fnmatch`` glob, e.g.
+        ``"admin.*"``). ``False`` outside a request or on an unnamed route."""
+        from arvel.http.request import current_route_match, route_matches_name
+
+        return route_matches_name(current_route_match(), pattern)
 
 
 def _absolute(path: str) -> str:
@@ -613,6 +670,22 @@ class _UrlGenerator:
             return _absolute(fallback)
         referer = request.header("referer") or request.header("referrer")
         return referer or _absolute(fallback)
+
+    def current_route(self) -> RouteMatch | None:
+        """The matched route for the active request (H4) — name + resolved params. Unlike
+        ``.current()``/``.full()`` this degrades to ``None`` outside a request instead of raising:
+        "no current route" (no active request, or a path the router never finished matching) is a
+        legitimate state, not a programming error."""
+        from arvel.http.request import current_route_match
+
+        return current_route_match()
+
+    def current_route_named(self, pattern: str) -> bool:
+        """Whether the current route's name matches ``pattern`` (an ``fnmatch`` glob). ``False``
+        outside a request or on an unnamed route."""
+        from arvel.http.request import current_route_match, route_matches_name
+
+        return route_matches_name(current_route_match(), pattern)
 
     def query(self, path: str, params: dict[str, Any]) -> str:
         """``path`` with ``params`` appended as a URL-encoded query string."""

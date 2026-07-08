@@ -287,6 +287,41 @@ router.bind_enum("status", Status)         # coerce {status} to an enum member (
 
 Explicit bindings take precedence over implicit ones for the same parameter.
 
+### Scoping a nested binding to its parent
+
+`/users/{user}/posts/{post}` resolves `{post}` on its own by default — a post id that belongs to
+someone else still 200s. Opt the route into **parent-scoped** resolution with `.scope_bindings()`:
+
+```python
+async def show(request, user: User, post: Post):
+    return PostResource(post)
+
+Route.get("/users/{user}/posts/{post}", show).scope_bindings()
+```
+
+Once `{user}` resolves, `{post}` resolves through `Post.resolve_child_route_binding`, which looks
+for a relation on `User` named for `Post`'s plural snake name (`Post` -> `posts()`):
+
+```python
+class User(Model):
+    def posts(self):
+        return self.has_many(Post)
+```
+
+A post that exists but isn't in `user.posts()` now 404s instead of resolving globally. A model
+with no matching relation just falls back to the plain lookup, so turning `.scope_bindings()` on
+for a route where it doesn't apply is harmless.
+
+### Binding a soft-deleted row
+
+Route-model binding excludes soft-deleted rows by default (same as any other query). Let a
+specific route's binding include them with `.with_trashed()`:
+
+```python
+Route.get("/posts/{post}", show).with_trashed()          # every bound param on this route
+Route.get("/posts/{post}/comments/{comment}", show).with_trashed("comment")   # just {comment}
+```
+
 ## Aborting a request
 
 When a handler needs to bail out with an HTTP error, call `abort()` — it raises an
@@ -336,6 +371,24 @@ with router.group(prefix="/api", group="api") as api:
         v1.get("/stats", stats, name="stats")   # /api/v1/stats, "v1.stats", throttled by "api"
 ```
 
+## Domain routing
+
+`group(domain=...)` constrains every route in the block to a `Host` header pattern — handy for a
+tenant subdomain or splitting an admin host from the public one:
+
+```python
+with router.group(domain="{account}.example.com"):
+    router.get("/dashboard", dashboard)   # only matches e.g. acme.example.com
+
+async def dashboard(request, account: str):    # {account} injected like a path param
+    ...
+```
+
+A request whose `Host` doesn't match renders a plain 404 — never a mis-bind onto the wrong tenant.
+A route with no `domain` matches any host, so most of your routes need nothing extra. Two routes
+*can* share the same path with different domains (dispatch picks the one whose pattern matches);
+declare the most specific domain first if you also register a domain-less catch-all at that path.
+
 ## Middleware & fallback
 
 Assign a route to a middleware [group](middleware.md), and register a catch-all:
@@ -345,6 +398,23 @@ Route.get("/dashboard", show, group="web")     # session + CSRF
 Route.get("/api/stats", stats, group="api")    # throttled
 Route.fallback(not_found)                        # matched when nothing else does
 ```
+
+## Current route
+
+Inside a handler (or anything it calls), read the matched route back — its name and resolved
+params (a model-bound param carries the resolved model, not the raw id):
+
+```python
+from arvel import url
+
+async def show(request, post):
+    match = url().current_route()          # RouteMatch(name=..., params={...}) | None
+    is_admin = url().current_route_named("admin.*")   # fnmatch glob on the name
+```
+
+`Route.current_route()`/`Route.current_route_named(...)` read the same thing. Both degrade instead
+of raising outside a request (`None`/`False`) — unlike `url().current()`, "no current route" is a
+legitimate state, not a programming error.
 
 ## Serving a public/ directory (SPA, static assets)
 
