@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.58.2](https://github.com/mohamed-rekiba/arvel/compare/v0.58.1...v0.58.2) (2026-07-08)
+
+
+### Documentation
+
+* 'the [redis] tier' -&gt; 'the [redis] extra' (cache.md) ([df7731b](https://github.com/mohamed-rekiba/arvel/commit/df7731b1babd81012fc2235c2cbb761f7f616875))
+* add consistent closing sections across Database + configuration ([42d8bc0](https://github.com/mohamed-rekiba/arvel/commit/42d8bc0d0d2feec913af328f9f4cc022f65350c3))
+* add extra callouts for the last inline-only cases (console, media) ([53776e1](https://github.com/mohamed-rekiba/arvel/commit/53776e10681820befe641760a1a908692b9093bb))
+* add highlighted [telemetry] extra callout for consistency ([0620fd9](https://github.com/mohamed-rekiba/arvel/commit/0620fd9bd48180bb43073e12465f5f8bd690963c))
+* add scoped [jwt] callout to guards for full consistency ([83a27e3](https://github.com/mohamed-rekiba/arvel/commit/83a27e3017fe3e8cdf8366e67cd93c312492d314))
+* add the Broadcasting module page ([95042b0](https://github.com/mohamed-rekiba/arvel/commit/95042b01f8f2f17a473f502bb5d58bf81f1d130e))
+* clear reference-framework leaks in auth + routing + relationships ([ecca401](https://github.com/mohamed-rekiba/arvel/commit/ecca40171bf99dc62b383551aa1329439f049987))
+* consistency sweep — core phrasing, db handle, json fences ([078d2e0](https://github.com/mohamed-rekiba/arvel/commit/078d2e086043aec8b5cc05142f1beb973f8eb7c9))
+* Digging Deeper consistency pass ([5aecff6](https://github.com/mohamed-rekiba/arvel/commit/5aecff6d6113155483864af26f06265c64ace241))
+* Digging Deeper rewrite — worked tutorials for money + concurrency ([3da8bc2](https://github.com/mohamed-rekiba/arvel/commit/3da8bc236e37bdd33a91c002536a8793baea557f))
+* drop leaked 'story 06' ids + fix garbled features gotcha ([4336b55](https://github.com/mohamed-rekiba/arvel/commit/4336b55106a2052ce6bcd7b55f44fb2b5550b2df))
+* final consistency sweep — clear last brand leaks + uniform sections ([4cd81c4](https://github.com/mohamed-rekiba/arvel/commit/4cd81c4e39c6ceb5a1743fa7ae88bf2f0b8b0bf3))
+* fix 'pre--9' version-scrub artifact in localization ([5e5f3bc](https://github.com/mohamed-rekiba/arvel/commit/5e5f3bc55cf7c92e99b7d2932176d3d9a3bfa2d3))
+* fix brand-scrub artifacts + internal-id leaks across Digging Deeper ([1d38c88](https://github.com/mohamed-rekiba/arvel/commit/1d38c8865d860a2f2576b695798e521fe7ce3cf3))
+* fix cross-reference link texts to match new Title Case titles ([be13e23](https://github.com/mohamed-rekiba/arvel/commit/be13e23e039b7af4fda186d9e5cc33ec0cd842ba))
+* fix leaked draft note (processes) + misplaced section (hashing) ([045115c](https://github.com/mohamed-rekiba/arvel/commit/045115cf776b69352a2ff1aa1eef70ba897f0296))
+* fix PHP-syntax leaks, dangling scrubs, section order ([2800487](https://github.com/mohamed-rekiba/arvel/commit/280048702da41b43cfbaf81a19019964b39924c6))
+* ground-up rewrite of the Architecture Concepts module ([c23200e](https://github.com/mohamed-rekiba/arvel/commit/c23200ecbc8fb758c5c042f290865a866c8ddde8))
+* highlight required extras consistently on the buried pages ([2facc48](https://github.com/mohamed-rekiba/arvel/commit/2facc48bcc0551d5c5132a68c8db2b24d2d55757))
+* lift error-handling page to the docs-quality bar ([78d66a2](https://github.com/mohamed-rekiba/arvel/commit/78d66a284f7004442cadbfc17235e15d10e94afa))
+* lift views/pagination to bar + clear brand-comparison artifacts ([21953a8](https://github.com/mohamed-rekiba/arvel/commit/21953a83a134de461acba7093c441b0f1a273409))
+* move encryption nonce-budget note out from after 'See also' ([c2b2da0](https://github.com/mohamed-rekiba/arvel/commit/c2b2da08b9b8fc7e7451c5b49b5bf4876e56c997))
+* normalize every 'required extra' callout to one template ([318d314](https://github.com/mohamed-rekiba/arvel/commit/318d3143f162ad7893417b00981ff742c4acda0a))
+* opinionated rewrite pass — queries + container ([82b44ca](https://github.com/mohamed-rekiba/arvel/commit/82b44ca3b16872d0861cb46579099a9ea297c95c))
+* refactor Database & ORM module to the docs-quality bar ([d304f95](https://github.com/mohamed-rekiba/arvel/commit/d304f95aa3ca91bc71235c81139dd052d9a09410))
+* restructure the site information architecture ([721f040](https://github.com/mohamed-rekiba/arvel/commit/721f04075a78fd1cadd5534386aff07e7d11b27b))
+* Security module consistency pass ([120b6e8](https://github.com/mohamed-rekiba/arvel/commit/120b6e8c40f23a91846c93ad0f000f4f97d786d7))
+* standardize all headings to Title Case (H1s + nav labels) ([88e8675](https://github.com/mohamed-rekiba/arvel/commit/88e8675b1ac7dd54bd7642ad20bcce9666488f76))
+* strip internal decision-record + audit-finding ids from user prose ([3868373](https://github.com/mohamed-rekiba/arvel/commit/3868373c7a18a8ad0572e0b2deaa957505a14771))
+* The Basics rewrite (1/2) — configuration + errors ([4efea66](https://github.com/mohamed-rekiba/arvel/commit/4efea666f38b7aa69057061438332f121a446dc1))
+* The Basics rewrite (2/2) — views layouts & inheritance ([4731505](https://github.com/mohamed-rekiba/arvel/commit/473150562db13d7495c64c4d50177fbb2b390039))
+
 ## [0.58.1](https://github.com/mohamed-rekiba/arvel/compare/v0.58.0...v0.58.1) (2026-07-07)
 
 
