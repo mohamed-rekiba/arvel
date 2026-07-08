@@ -114,6 +114,12 @@ def test_expiry():
         Date.set_test_now(None)            # always release the freeze
 ```
 
+## The Date facade
+
+`Date` is also registered as a [facade](facades.md) (accessor `"date"`), so `Date.now()`,
+`Date.today()`, and `Date.parse(...)` are reachable as a swappable container service — handy when
+a service should resolve "the clock" rather than call the class directly.
+
 ## Common mistakes & gotchas
 
 - **Reaching for stdlib `datetime`.** Mixing naive `datetime` with `Date` reintroduces the tz
@@ -130,12 +136,6 @@ def test_expiry():
 (returning the frozen value when set) before reading the real clock, which is what makes time
 travel isolated and deterministic. Arithmetic delegates to whenever, so DST and calendar rules
 are the library's — arvel just provides the ergonomic surface and the cast integration.
-
-## The Date facade
-
-`Date` is also registered as a [facade](facades.md) (accessor `"date"`), so `Date.now()`,
-`Date.today()`, and `Date.parse(...)` are reachable as a swappable container service — handy when
-a service should resolve "the clock" rather than call the class directly.
 
 ## See also
 

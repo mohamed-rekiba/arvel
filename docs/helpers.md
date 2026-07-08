@@ -27,7 +27,7 @@ Str.random(32)               # a cryptographically-random alphanumeric token
 (The casing transforms are pure and memoized, so repeated calls on the same input are free.
 `Str.random` is the exception — it returns a fresh value every time.)
 
-More transforms, mirroring the `Str`:
+More `Str` transforms:
 
 ```python
 Str.title("a nice title")        # "A Nice Title"
@@ -154,7 +154,7 @@ data_set(config, "cache.ttl", 600)             # nested write (creates intermedi
 `data_get` returns the default (`None`) instead of raising when any segment is missing — ideal
 for digging into untrusted JSON. The `*` wildcard collects across a list.
 
-More `Arr`, mirroring
+More `Arr` helpers:
 
 ```python
 Arr.except_({"a": 1, "b": 2}, ["b"])       # {"a": 1}     (alias: excluding)
@@ -247,13 +247,12 @@ Collection([1, 2, 3, 4, 5]).take(2)                     # [1, 2]  (take(-2) → 
 `merge`/`concat`/`flat_map`, `search`/`value`/`every`, and `tap` round out the set — all returning a
 new `Collection` (or a plain value for terminals).
 
-**No higher-order proxy.** the `$collection->map->name` (a magic proxy over `map`/`each`/…)
-is intentionally **not** ported here (DR-0031): a dynamic `__getattr__` proxy can't be typed —
-every call through it would collapse to `Any`, which conflicts with arvel's strict-typing mandate.
-The idiomatic Python replacement is a lambda, and it types end-to-end:
+**No higher-order proxy.** Some collection libraries offer a magic `collection.map.name` shorthand
+that implicitly maps over an attribute. arvel intentionally **doesn't**: a dynamic `__getattr__`
+proxy can't be typed — every call through it would collapse to `Any`, which conflicts with arvel's
+strict-typing mandate. The idiomatic Python replacement is a lambda, and it types end-to-end:
 
 ```python
-# $users->map->name
 Collection(users).map(lambda u: u.name)         # typed: Collection[str], not Any
 Collection(users).each(lambda u: u.activate())
 ```

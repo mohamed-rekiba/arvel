@@ -63,7 +63,7 @@ client — you write `validate()` once and the right response comes out:
 | Browser | `Accept: text/html` | **redirect back** (`302`) to the `Referer`, with the errors flashed to the session **error bag** |
 
 So an API gets machine-readable per-field errors, while a browser is sent back to the form with
-`$errors` available to the template on the next request:
+`errors` available to the template on the next request:
 
 ```python
 # in a Jinja template, after a redirect-back:

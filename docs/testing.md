@@ -130,7 +130,7 @@ async def test_create_and_delete(db):
 
 `cli(app, command, input=None)` runs an app-registered command (a `Command` class on
 `app.command_classes`, or a `routes/console.py` `Console.command(...)` closure) against a booted
-app and captures its exit code + output — the `$this->cli(...)`:
+app and captures its exit code + output:
 
 ```python
 from arvel.testing import cli

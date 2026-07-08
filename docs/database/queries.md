@@ -150,7 +150,7 @@ await Product.upsert(
 
 Dialect-correct: Postgres/SQLite compile `ON CONFLICT ... DO UPDATE`; MySQL/MariaDB compile
 `ON DUPLICATE KEY UPDATE` (`unique_by` is honored by documentation only there — MySQL has no
-`ON CONFLICT(cols)` targeting, matching, which ignores `$uniqueBy` on MySQL too). An
+`ON CONFLICT(cols)` targeting, so it ignores `unique_by` on MySQL too). An
 unrecognized dialect raises `UnsupportedDriverOperation` rather than silently emitting the wrong
 SQL.
 
