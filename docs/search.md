@@ -9,6 +9,10 @@ It's a model mixin plus a swappable **engine** (driver). The
 built-in `array` engine keeps the index in memory — perfect for tests and small apps — and a
 `meilisearch` engine (the `[search]` extra) backs production search.
 
+!!! note "Needs the `[search]` extra for production"
+    The in-memory `array` engine is **core** — great for tests and small apps. Production search runs
+    on Meilisearch: `uv add 'arvel[search]'`, then set `search.driver = "meilisearch"`.
+
 ## Making a model searchable
 
 Mix in `Searchable` — **before** `Model`, so its save/delete hooks take effect:

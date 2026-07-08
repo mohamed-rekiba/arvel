@@ -86,7 +86,7 @@ it, it falls back to the stdlib REPL (no `await`). Inside a project it preloads:
 
 - arvel's public surface (`Model`, `config`, `Collection`, …),
 - the running `app`,
-- **every model by its short name** (autoloaded from `app/models/`, -Tinker style).
+- **every model by its short name** (autoloaded from `app/models/`).
 
 ```python
 arvel tinker

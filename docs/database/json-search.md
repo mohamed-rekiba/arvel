@@ -3,6 +3,11 @@
 Query special column types in SQL — JSON/JSONB documents, Postgres full-text search, and
 pgvector embeddings — without pulling rows into Python first.
 
+!!! note "Vector search needs the `[vector]` extra"
+    JSON and Postgres full-text queries ride your existing [database extra](index.md). Vector columns
+    and similarity search additionally need pgvector: `uv add 'arvel[vector]'` (plus `CREATE EXTENSION
+    vector` on the Postgres server).
+
 ## Querying JSON columns
 
 A `json`/`jsonb` column holds structured data — settings, metadata, tags. You don't have to pull

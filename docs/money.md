@@ -1,9 +1,13 @@
 # Money
 
 Working with money as `float` loses pennies. `Money` is an **immutable, currency-aware value object**
-that stores the amount in **integer minor units** (cents) — a faithful port of
-[moneyphp/money](https://www.moneyphp.org/). Arithmetic across different currencies raises, and
-`allocate` splits an amount **without ever losing a unit**.
+that stores the amount in **integer minor units** (cents).
+Arithmetic across different currencies raises, and `allocate` splits an amount **without ever losing a unit**.
+
+!!! note "Needs the `[i18n]` extra to display"
+    Constructing `Money` and doing arithmetic, allocation, and comparison is **core**. Per-currency
+    precision and locale-aware formatting — `.format()`, and therefore `str(price)` — come from Babel:
+    `uv add 'arvel[i18n]'`.
 
 ```python
 from arvel.support import Money
