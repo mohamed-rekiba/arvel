@@ -54,6 +54,16 @@ app.scoped(RequestContext, RequestContext)                # fresh per request
 app.instance("config", loaded_config)                     # pre-built
 ```
 
+### Conditional binding
+
+`bind_if` / `singleton_if` / `scoped_if` register **only when the abstract is not already
+bound** — the tool for a package default an application may have overridden first:
+
+```python
+app.singleton_if(Clock, SystemClock)   # keeps the app's Clock if one is already bound
+app.bind_if("mailer", SmtpMailer)
+```
+
 ## Aliases
 
 Give a binding a short string name:
@@ -76,6 +86,36 @@ expresses that:
 (app.when(InvoiceController)
     .needs(Filesystem)
     .give(lambda c: c.make(FilesystemManager).disk("local")))
+```
+
+Two shorthands cover the common "give me a list of services" and "give me a config value"
+cases without writing a factory:
+
+```python
+app.tag([RateLimit, Csrf], "http.filters")
+
+(app.when(FilterChain).needs("filters").give_tagged("http.filters"))  # the tagged list
+(app.when(SearchClient).needs("api_key").give_config("services.search.key", default=None))
+```
+
+`give_tagged` injects everything under the tag in registration order (an unknown tag gives an
+empty list). `give_config` reads the bound config repository at resolve time.
+
+### Variadic dependencies
+
+A constructor's typed `*args` parameter resolves to **every binding of that type**, in
+registration order — or to a contextual `give([...])` list when one is set. Nothing bound
+means an empty tuple, not an error:
+
+```python
+class Pipeline:
+    def __init__(self, *filters: Filter): ...
+
+app.bind(RateLimit)   # each a Filter subclass
+app.bind(Csrf)
+app.make(Pipeline)    # Pipeline(RateLimit(), Csrf())
+
+(app.when(Pipeline).needs("filters").give([Csrf]))   # explicit set wins
 ```
 
 ## Extending a resolved service

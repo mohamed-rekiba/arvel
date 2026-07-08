@@ -14,7 +14,7 @@ import functools
 import inspect
 import typing
 from collections.abc import Callable, Sequence
-from typing import Any, TypedDict, TypeVar, cast, overload
+from typing import Any, NamedTuple, TypedDict, TypeVar, cast, overload
 
 T = TypeVar("T")
 
@@ -114,6 +114,19 @@ class _Binding(TypedDict):
     scoped: bool
 
 
+class _GiveTagged(NamedTuple):
+    """Contextual implementation marker: resolve to every binding tagged ``tag``."""
+
+    tag: str
+
+
+class _GiveConfig(NamedTuple):
+    """Contextual implementation marker: resolve to ``config.get(key, default)``."""
+
+    key: str
+    default: Any
+
+
 class ContextualBindingBuilder:
     """Fluent builder for ``container.when(A).needs(B).give(C)``."""
 
@@ -130,6 +143,14 @@ class ContextualBindingBuilder:
         self._container._add_contextual(  # pyright: ignore[reportPrivateUsage]
             self._concrete, self._needs, implementation
         )
+
+    def give_tagged(self, tag: str) -> None:
+        """Inject the full ``tagged(tag)`` list (registration order; empty tag → empty list)."""
+        self.give(_GiveTagged(tag))
+
+    def give_config(self, key: str, default: Any = None) -> None:
+        """Inject the value of the bound config repository at ``key``."""
+        self.give(_GiveConfig(key, default))
 
 
 class Container:
@@ -151,6 +172,9 @@ class Container:
         self._method_bindings: dict[tuple[type, str], Callable[[Any, Container], Any]] = {}
         self._build_stack: list[Any] = []
         self._with: list[dict[str, Any]] = []
+        # first-registration order across bind() AND instance() — the variadic type
+        # scan promises "registration order", which the two dicts alone can't give
+        self._registered: dict[Any, None] = {}
 
     # --- binding -----------------------------------------------------------
     def bind(
@@ -163,6 +187,7 @@ class Container:
     ) -> None:
         key = self._alias_of(abstract)
         was_bound = key in self._bindings or key in self._instances
+        self._registered.setdefault(key)
         self._bindings[key] = {
             "concrete": abstract if concrete is None else concrete,
             "shared": shared,
@@ -183,9 +208,30 @@ class Container:
     def scoped(self, abstract: Any, concrete: Any = None) -> None:
         self.bind(abstract, concrete, scoped=True)
 
+    def bind_if(
+        self,
+        abstract: Any,
+        concrete: Any = None,
+        *,
+        shared: bool = False,
+        scoped: bool = False,
+    ) -> None:
+        """``bind()`` only when ``abstract`` is not already bound (binding or instance)."""
+        if not self.bound(abstract):
+            self.bind(abstract, concrete, shared=shared, scoped=scoped)
+
+    def singleton_if(self, abstract: Any, concrete: Any = None) -> None:
+        if not self.bound(abstract):
+            self.singleton(abstract, concrete)
+
+    def scoped_if(self, abstract: Any, concrete: Any = None) -> None:
+        if not self.bound(abstract):
+            self.scoped(abstract, concrete)
+
     def instance(self, abstract: Any, obj: Any) -> Any:
         key = self._alias_of(abstract)
         was_bound = key in self._bindings or key in self._instances
+        self._registered.setdefault(key)
         self._instances[key] = obj
         if was_bound:
             self._fire_rebinding(key)
@@ -351,7 +397,24 @@ class Container:
     def _buildable(self, concrete: Any, abstract: Any) -> bool:
         return concrete is abstract or (callable(concrete) and not isinstance(concrete, str))
 
+    def _variadic_instances(self, annotation: Any) -> list[Any]:
+        """Every registered binding whose key is a subclass of ``annotation``, in
+        registration order — the resolution set for a typed ``*args`` parameter."""
+        if not (inspect.isclass(annotation) and not self._is_primitive(annotation)):
+            return []
+        return [
+            self.make(k)
+            for k in self._registered
+            if isinstance(k, type)
+            and issubclass(k, annotation)
+            and (k in self._bindings or k in self._instances)
+        ]
+
     def _from_contextual(self, implementation: Any) -> Any:
+        if isinstance(implementation, _GiveTagged):
+            return self.tagged(implementation.tag)
+        if isinstance(implementation, _GiveConfig):
+            return self.make("config").get(implementation.key, implementation.default)
         if inspect.isclass(implementation):
             return self.make(implementation)
         if callable(implementation):
@@ -423,7 +486,31 @@ class Container:
         for name, param in sig.parameters.items():
             if name == "self":
                 continue
-            if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
+            if param.kind is param.VAR_KEYWORD:
+                continue
+            if param.kind is param.VAR_POSITIONAL:
+                # typed *args: contextual give([...]) wins, else every binding of the
+                # annotated type in registration order; nothing bound → empty, not an error
+                if name in override:
+                    args.extend(override[name])
+                elif ctx_map is not None and name in ctx_map:
+                    impl: Any = ctx_map[name]
+                    # give([...]) resolves per item (classes → instances). The give_tagged/
+                    # give_config markers are NamedTuples — resolve them whole, never spread.
+                    if isinstance(impl, list | tuple) and not isinstance(
+                        impl, _GiveTagged | _GiveConfig
+                    ):
+                        items: list[Any] = list(cast("Sequence[Any]", impl))
+                        args.extend(self._from_contextual(item) for item in items)
+                    else:
+                        given: Any = self._from_contextual(impl)
+                        args.extend(
+                            cast("Sequence[Any]", given)
+                            if isinstance(given, list | tuple)
+                            else [given]
+                        )
+                else:
+                    args.extend(self._variadic_instances(hints.get(name, param.annotation)))
                 continue
             annotation = hints.get(name, param.annotation)
             if name in override:
