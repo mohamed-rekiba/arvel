@@ -92,6 +92,41 @@ handler.reportable(OrderError, lambda e: tracker.capture(e))     # log line stil
 handler.reportable(NoisyError, lambda e: False)                  # swallow the default log
 ```
 
+An exception can also own its reporting and rendering: a `report()` method replaces the
+default log line (return `False` from it to keep the default too), and a `render(request)`
+method is consulted before registered renderables (return `None` to fall through):
+
+```python
+class PaymentDeclined(Exception):
+    def report(self) -> None:
+        metrics.increment("payments.declined")
+
+    def render(self, request) -> dict[str, str]:
+        return {"error": "payment_declined"}
+```
+
+### Log levels
+
+Pin an exception type to a quieter level — everything else stays `error`:
+
+```python
+handler.level(StaleCacheError, "warning")
+```
+
+### Throttling
+
+High-volume failures (a dead upstream failing thousands of times a minute) can be
+rate-limited or sampled. `throttle(fn)` gets each exception and returns a `Limit`, a
+`Lottery`, or `None` for unthrottled:
+
+```python
+from arvel.kernel.exceptions import Limit, Lottery
+
+handler.throttle(lambda e: Limit(max_attempts=10, per_seconds=60)   # 10/min per type
+                 if isinstance(e, UpstreamTimeout) else None)
+handler.throttle(lambda e: Lottery(1, 100) if isinstance(e, NoisyError) else None)  # 1%
+```
+
 ### Exception context
 
 Give an exception a `context()` method and its keys are merged into the structured log
@@ -111,11 +146,28 @@ class AuditedError(Exception):
 ... [error] unhandled_exception error="AuditedError('order 42 failed')" kind=AuditedError order_id=42
 ```
 
+A `context(provider)` registration on the handler merges `provider()` into **every**
+report — app version, deployment id, tenant. Per-exception context wins on key clashes:
+
+```python
+handler.context(lambda: {"app_version": "1.4.0"})
+```
+
 ### Ignoring exceptions
 
 `dont_report(ExcType, ...)` suppresses both the log line and reportable callbacks for
 expected exceptions. Each exception **instance** is reported at most once, so a retry
 loop re-raising the same instance won't spam your log.
+
+Two more suppression forms, both render-preserving: `dont_report_when(predicate)` for
+value-dependent cases, and the `ShouldntReport` marker mixin for types that are never
+worth a log line:
+
+```python
+handler.dont_report_when(lambda e: isinstance(e, HttpTimeout) and e.retryable)
+
+class CartExpired(Exception, ShouldntReport): ...
+```
 
 ## A domain exception, end to end
 
