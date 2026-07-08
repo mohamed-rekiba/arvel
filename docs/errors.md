@@ -23,6 +23,42 @@ def create_app() -> Application:
     )
 ```
 
+## Raising an HTTP error
+
+Most of the time you don't define an exception class at all — you `abort()` with a status code, and
+the handler turns it into a proper HTTP response:
+
+```python
+from arvel import abort
+
+async def show(request, post):
+    if post.archived:
+        abort(404)                       # → 404 "Not Found"
+    if not request.user.owns(post):
+        abort(403, "That isn't yours.")  # → 403 with your message
+    return post
+```
+
+`abort(status, message=None)` raises an `HttpException` carrying the status. With no message it uses
+the standard status text (`404` → "Not Found"). It's typed `NoReturn`, so a type-checker narrows the
+value after an `abort` guard — the code below an `abort(404)` knows `post` is non-`None`. Validation
+failures raise their own `HttpException` (a `422` carrying the field errors); see
+[Validation](validation.md).
+
+### How a response is chosen
+
+The handler renders one exception *content-negotiated* — the same `abort(403)` becomes JSON for an API
+client and an HTML error page for a browser, decided by the request's `Accept` header:
+
+- **API-first default → JSON.** With no `Accept` (or an explicit `application/json`), you get
+  `{"message": "...", "errors": {...}}`. arvel only renders HTML when the client explicitly asks for
+  `text/html`.
+- **`application/vnd.api+json` → JSON:API.** Errors come back in the JSON:API shape, and validation
+  errors include a `source.pointer` at the offending field so client tooling can map them back.
+- **Inertia (`X-Inertia: true`) → the JSON 422 path**, so the front end handles validation inline.
+- **A `5xx` never leaks internals in production.** The message is the generic status text unless
+  `app.debug` is on — only then do you see the exception type and detail.
+
 ## Rendering exceptions
 
 `renderable(ExcType, callback)` registers a custom response for an exception type. The
@@ -80,3 +116,32 @@ class AuditedError(Exception):
 `dont_report(ExcType, ...)` suppresses both the log line and reportable callbacks for
 expected exceptions. Each exception **instance** is reported at most once, so a retry
 loop re-raising the same instance won't spam your log.
+
+## Common mistakes & gotchas
+
+- **Expecting HTML from an API client.** Rendering is API-first: with no `Accept` header you get JSON,
+  not an error page. Send `Accept: text/html` (a browser does) for the HTML render.
+- **Leaking detail from a `5xx`.** In production a `500` shows only generic status text — that's
+  deliberate. Turn on `app.debug` locally to see the exception; don't ship it on.
+- **A `renderable` that returns nothing.** Returning `None` falls through to the next match / the
+  default render. Return a `Response` (e.g. via `json(...)`) to actually handle the type.
+- **`reportable` that forgets to return `False`.** A reportable callback runs *in addition to* the
+  default log line; return `False` if you want your handler to replace it, not double it.
+- **Aborting for a not-found bind.** Route–model binding already raises a `404` on a miss — you rarely
+  need a manual `abort(404)` for that case (see [Routing](routing.md)).
+
+## How it works
+
+One `ExceptionHandler` sits at the top of every entry point — HTTP, console, queue, orphan tasks — so
+there's a single place errors are logged and rendered. On the HTTP path, `render_exception` reads the
+status off the exception (`HttpException.status`, or a framework exception's `status_code`), negotiates
+the media type from `Accept`, and builds the matching response; reporting runs the registered
+`reportable` callbacks and (unless suppressed) writes the structured `unhandled_exception` log line,
+merging in any `context()` the exception exposes.
+
+## See also
+
+- [Routing](routing.md) — `abort()` in handlers, and the automatic `404` from route–model binding.
+- [Validation](validation.md) — how a failed rule becomes a `422` with per-field `errors`.
+- [Telemetry](telemetry.md) — shipping reported errors to a tracker (e.g. Sentry).
+- [Providers](providers.md) — where `with_exceptions` fits in application bootstrap.
