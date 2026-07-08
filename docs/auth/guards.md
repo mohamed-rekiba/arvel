@@ -10,6 +10,10 @@ loading roles) is written once, no matter how the user proved themselves.
 This page covers the `Principal` contract, the built-in guards, selecting the default, and
 registering your own.
 
+!!! note "Needs the `[jwt]` extra for OIDC"
+    The `session` and password (`local`) guards are **core** — nothing to install. Only the
+    OIDC/Keycloak guard pulls pyjwt: `uv add 'arvel[jwt]'` (full setup on [Single sign-on](sso-oidc.md)).
+
 ## One contract: `Principal`
 
 Every guard returns a `Principal` (or `None` if the request carries no valid credentials for it):
