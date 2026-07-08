@@ -169,7 +169,7 @@ of as given.
 ### `on_one_server` and `without_overlapping` (real locks, not a no-op)
 
 Running `schedule:run` on more than one node? `on_one_server()` makes sure a task fires only
-**once** across all of them — arbitrated by a real `CacheLock` (story 06), not a per-process flag:
+**once** across all of them — arbitrated by a real `CacheLock`, not a per-process flag:
 
 ```python
 Schedule.command("reports:generate").daily().on_one_server()

@@ -12,8 +12,8 @@ scope) is served straight from the store, not re-computed.
 !!! note "Backends"
     The in-process `array` driver is the default and needs nothing — great for tests. `database`
     persists resolved values in a `features` table (survives a restart); `cache` stores them in
-    the [cache](cache.md) (story 06), tagged per flag so purging one flag never touches another's
-    stored values. Set `features.driver`.
+    the [cache](cache.md), tagged per flag so purging one flag never touches another's stored
+    values. Set `features.driver`.
 
 ## Defining a flag
 
@@ -122,7 +122,7 @@ for it, so `arvel migrate` creates it out of the box — no hand-written schema 
   Changing the resolver's logic doesn't retroactively re-evaluate stored scopes — `purge` the flag
   (or `forget` a scope) to force a re-resolve.
 - **Defining flags too late.** Register `Feature.define(...)` in a provider's `boot()`. Define it
-  after the code that checks it runs and the check resolves against an undefined flag.
+  *after* the code that checks it has already run, and that check resolves against an undefined flag.
 - **`activate`/`deactivate` are permanent overrides.** They write straight to the store and bypass
   the resolver — a forced value sticks until you `forget`/`purge` it, even if the resolver would now
   say otherwise.
