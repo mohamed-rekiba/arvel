@@ -1,4 +1,4 @@
-# OAuth2 social login
+# OAuth2 Social Login
 
 "Log in with Google." "Continue with GitHub." "Sign in with your company account." All of these are
 the OAuth2 **authorization-code flow**: instead of taking a password, you bounce the user to a

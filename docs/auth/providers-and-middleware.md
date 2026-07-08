@@ -1,4 +1,4 @@
-# Wiring it up: providers & middleware
+# Wiring It Up: Providers & Middleware
 
 The rest of this section gave you the *pieces* — guards, the user provider, gates, policies. This
 page is about **assembly**: the two questions every app has to answer.

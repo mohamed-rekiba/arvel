@@ -1,4 +1,4 @@
-# JSON, Full-text & Vectors
+# JSON, Full-Text & Vectors
 
 Query special column types in SQL — JSON/JSONB documents, Postgres full-text search, and
 pgvector embeddings — without pulling rows into Python first.

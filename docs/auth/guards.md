@@ -1,4 +1,4 @@
-# Guards & drivers
+# Guards & Drivers
 
 A real app rarely has just one way to log in. The browser uses a session; the mobile app sends a
 bearer token; the admin console goes through Keycloak SSO. Writing each of those as a bespoke

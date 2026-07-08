@@ -1,4 +1,4 @@
-# Activity Log (audit trail)
+# Activity Log (Audit Trail)
 
 Keep a log of what happened in your app — who did what, to which record, and what changed. It's
 your **audit trail** (every model create/update/delete, with the old and new values) *and* a

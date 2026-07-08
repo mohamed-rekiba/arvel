@@ -1,4 +1,4 @@
-# Single sign-on (OIDC)
+# Single Sign-On (OIDC)
 
 When your company runs Keycloak (or Auth0, Okta, Entra…), you don't want to store passwords at all —
 you want the identity provider to do the proving and just *tell* you who showed up. With OpenID

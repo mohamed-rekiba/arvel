@@ -1,4 +1,4 @@
-# OpenAPI & API docs
+# OpenAPI & API Docs
 
 Every arvel app ships an OpenAPI document and an interactive docs UI for free — generated from your
 routes by [Litestar](https://litestar.dev), not hand-written. Type a handler's request body and return

@@ -1,4 +1,4 @@
-# Two-factor authentication
+# Two-Factor Authentication
 
 A password proves *something you know* — and that's exactly what gets phished. Two-factor
 authentication (2FA) adds *something you have*: a rotating 6-digit code from an authenticator app

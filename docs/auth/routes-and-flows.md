@@ -1,4 +1,4 @@
-# Routes & flows
+# Routes & Flows
 
 The rest of this section gave you the building blocks — guards, the session, identities, roles, tokens.
 What it deliberately *didn't* give you is a set of ready-made `/login` and `/logout` routes. That's by

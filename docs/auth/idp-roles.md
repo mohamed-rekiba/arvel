@@ -1,4 +1,4 @@
-# Mapping IdP groups to roles
+# Mapping IdP Groups to Roles
 
 If you've used HashiCorp Vault with Keycloak, you already know this pattern. You don't re-create users
 in Vault — you create **external groups** that mirror the IdP's groups, attach policies to them, and at

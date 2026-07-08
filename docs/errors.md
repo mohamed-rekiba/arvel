@@ -1,4 +1,4 @@
-# Error handling
+# Error Handling
 
 Every uncaught exception — in HTTP handlers, console commands, queued jobs, or orphan
 tasks — flows through one global `ExceptionHandler`. Out of the box it logs the error

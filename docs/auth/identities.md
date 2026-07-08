@@ -1,4 +1,4 @@
-# Identities & account linking
+# Identities & Account Linking
 
 Ada signs up with a password. Six months later your company adopts Keycloak and she clicks "Log in
 with SSO." Is that a *new* account, or the same Ada? It had better be the same one — same profile,

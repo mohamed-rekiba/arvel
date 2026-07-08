@@ -1,4 +1,4 @@
-# API tokens
+# API Tokens
 
 Sessions are great for browsers, but a CLI, a mobile app, or another service can't "log in with a
 form." They need a credential they can put in a header on every request: a **bearer token**. arvel's
