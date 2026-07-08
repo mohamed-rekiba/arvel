@@ -1,8 +1,7 @@
 # HTTP Client
 
-A small, async, fluent client for calling other services — the `Http` facade (`Http`
-parity), built on [httpx](https://www.python-httpx.org). httpx is part of the core (no extra
-needed).
+A small, async, fluent client for calling other services — the `Http` facade, built on
+[httpx](https://www.python-httpx.org). httpx is part of the core (no extra needed).
 
 ```python
 from arvel import Http

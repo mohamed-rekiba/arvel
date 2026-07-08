@@ -1,7 +1,13 @@
 # Views
 
-Server-rendered HTML with **Jinja2**. A handler builds a view from a dotted template name and turns
-it into an HTML response — the `view('pages.home', [...])`.
+When you're rendering HTML on the server — a marketing page, an admin panel, an email-confirmation
+screen — you want templates, not string concatenation. arvel renders views with **Jinja2**: a handler
+names a template, hands it some data, and gets back an HTML response. (Building a JSON API or a
+SPA instead? Return models/resources from your handlers — see [API Resources](database/resources.md) —
+and reach for views only for the HTML your app still serves.)
+
+The entry point is `view(name, data)`: it maps a dotted template name to a file and gives you back a
+renderable `View`.
 
 ## Rendering a view
 
@@ -89,6 +95,29 @@ A package ships its own templates under a namespace, addressed as `namespace::te
 app.make("view").add_namespace("billing", "/path/to/billing/views")
 await view("billing::invoice", {"total": total}).to_response()
 ```
+
+## Common mistakes & gotchas
+
+- **A POST that 419s.** Web-group forms need a CSRF token — drop `{{ csrf_field() }}` inside every
+  `<form method="post">`. See [Middleware](middleware.md#csrf-from-a-spa-or-mobile-app).
+- **Flash gone after a refresh.** `errors`, `old()`, and `flash(...)` live for **exactly one
+  request** — they show once on the redirected-to page and then age out. Re-flash to keep them.
+- **A form that can't PUT/DELETE.** HTML forms only speak GET/POST; add `{{ method_field('PUT') }}`
+  to spoof the verb for a route bound to PUT/PATCH/DELETE.
+- **Expecting `old()` to refill a password.** Password fields are never flashed — the user re-types
+  them by design.
+- **Awaiting the wrong thing.** `view(...)` is synchronous (it builds the `View`); the render is
+  async — `await view(...).to_response()` (an HTML response) or `await view(...).render()` (the raw
+  string).
+
+## How it works
+
+`view(name, data)` resolves the dotted name to a file under `resources/views/` (namespaced templates
+resolve against their registered directory) and constructs a `View`. Rendering runs Jinja2 with the
+template globals injected into the environment, so `route`/`auth`/`csrf_token`/`trans` resolve against
+the running app at render time and degrade safely when there's no app or session. `to_response()`
+wraps the rendered string in an HTML `Response`; the web middleware group is what shares the `errors`
+bag and old input into the environment on a redirect-back.
 
 ## See also
 

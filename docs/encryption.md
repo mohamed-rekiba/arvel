@@ -29,7 +29,7 @@ enc.encrypt_string("x")
 
 Use `encrypt`/`decrypt` for any JSON-serializable value (dict, list, str, int, bool, `None`);
 use `encrypt_string`/`decrypt_string` when you know the value is already a string and don't want
-the JSON envelope (e.g. an `encrypted` model cast, or `encryptString` parity).
+the JSON envelope (e.g. behind an `encrypted` model cast, or when the payload is already serialized).
 
 !!! warning "JSON-serializable values only"
     `encrypt`/`decrypt` go through `json.dumps`/`json.loads`. A value that isn't JSON-serializable

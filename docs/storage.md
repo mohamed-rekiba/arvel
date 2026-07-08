@@ -193,8 +193,8 @@ await Storage.temporary_url("invoices/2026-06.pdf", timedelta(minutes=15))   # s
 `url()` resolution order: the disk's configured `url` (`disks.<name>.url`) always wins; otherwise
 `s3` builds an endpoint/bucket/key URL, and other drivers return the full disk path as a
 best-effort identifier. `temporary_url` presigns a time-boxed GET via s3fs and only works on the
-`s3` driver — every other driver raises `UnsupportedDriverOperation` (parity: `temporaryUrl`
-throws when the driver doesn't support it).
+`s3` driver — every other driver raises `UnsupportedDriverOperation` rather than hand back a URL it
+can't actually sign.
 
 ## Testing: `Storage.fake`
 

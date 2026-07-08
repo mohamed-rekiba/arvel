@@ -3,7 +3,7 @@
 When a query returns more rows than you want on one screen, **paginate** it. arvel's
 paginators split the results into pages, build the page URLs for you (reading the current
 page from the request's `?page=`), serialize straight to JSON for an API, and render a
-ready-made HTML page-link bar for a server-rendered view — the same surface as.
+ready-made HTML page-link bar for a server-rendered view — one surface that covers both.
 
 ## The quick version
 
@@ -191,7 +191,20 @@ from arvel import LengthAwarePaginator, Paginator
 paginator = LengthAwarePaginator(items, total=100, per_page=15, current_page=1, path="/things")
 ```
 
+## Common mistakes & gotchas
+
+- **Treating a paginator like a list.** `paginate()` returns a paginator, not the rows. Iterate it
+  directly, or call `.items()` for the `Collection` of this page's rows.
+- **`total()` on a simple paginator.** `simple_paginate()` never runs a `COUNT`, so it has no
+  `total()`/`last_page()` — only prev/next. Use `paginate()` when you need page numbers.
+- **A `COUNT` you didn't want.** On a huge, frequently-written table, the `COUNT` behind `paginate()`
+  is the expensive part. Prefer `simple_paginate()` when Previous/Next is enough.
+- **Losing filters across pages.** The generated URLs carry only `?page=`. Call `with_query_string()`
+  (or `append`/`appends`) so a page link keeps the current sort/search params.
+
 ## See also
 
 - [Queries](database/queries.md) — `paginate()` / `simple_paginate()` on the query builder.
+- [Transactions & Streaming](database/transactions.md) — `chunk_by_id`/`cursor` for processing (not
+  displaying) a large result set.
 - [Views](views.md) — rendering templates and registering view namespaces.
