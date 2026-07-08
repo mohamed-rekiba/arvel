@@ -69,7 +69,7 @@ cached `None` is remembered too, not recomputed). Pass `key="…"` to fix the ca
 ## Choosing a backend
 
 The active driver comes from `cache.default` in config (defaults to `array`, the in-memory
-store, which needs no extras). Redis is enabled by installing the `[redis]` tier and setting
+store, which needs no extras). Redis is enabled by installing the `[redis]` extra and setting
 `cache.url` to your Redis URL.
 
 ## More verbs: add, pull, forever, touch, decrement
