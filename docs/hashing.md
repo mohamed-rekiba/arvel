@@ -120,8 +120,3 @@ no facade or manager changes required.
 
 - [Encryption](encryption.md) — encrypt/decrypt arbitrary values (not passwords).
 - [Authentication](auth/authentication.md) — where rehash-on-login is wired in.
-
-!!! note "bcrypt's 72-byte limit"
-    bcrypt only reads the first 72 bytes of a password; arvel truncates longer input
-    explicitly instead of erroring. The default argon2id driver has
-    no such limit.

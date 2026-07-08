@@ -49,7 +49,7 @@ await Process.run(
     ["python", "-c", "print('hi')"],
     timeout=5.0,                       # seconds; None (default) means no timeout
     cwd="/srv/app",                    # working directory
-    env={"MY_VAR": "1"},               # merged... actually replaces the child's env entirely
+    env={"MY_VAR": "1"},               # replaces the child's env entirely (not merged — see gotchas)
     input="some stdin data",           # piped to the command's stdin
 )
 ```
