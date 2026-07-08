@@ -184,7 +184,7 @@ if await limiter.too_many_attempts(email):
 Without a `limiter`, `AuthManager` doesn't throttle — it's opt-in. The identifier is normalised
 (case/whitespace) so `Ada@x` and `ada@x` share one bucket, and on a **cache outage** the limiter
 **fails open** by default (logins still work, but throttling is off — alert on cache downtime); pass
-`fail_open=False` to fail closed instead (DR-0015).
+`fail_open=False` to fail closed instead.
 
 !!! tip "Layer in IP throttling"
     Identifier-only lockout lets someone lock a *known* email out for the window. Put the IP-keyed

@@ -179,7 +179,7 @@ For a token API you issue a **short-lived access token** plus a **refresh token*
 `/refresh` endpoint that trades a valid refresh token for a fresh pair. arvel's refresh tokens
 **rotate** — each exchange revokes the presented token and issues a new one, so a leaked refresh token
 is single-use — and **reuse is detected**: replaying an already-rotated token revokes that user's
-whole token family (theft response, DR-0014). Rotation is **atomic**: the revoke is a single
+whole token family (theft response). Rotation is **atomic**: the revoke is a single
 conditional `UPDATE … WHERE revoked = false`, so two concurrent requests presenting the same token can
 never both mint a successor — exactly one wins and the other trips reuse detection.
 
@@ -213,8 +213,9 @@ have). For minting the access token itself, see [SSO / OIDC](sso-oidc.md) (valid
 
 `PasswordBroker` (`arvel.auth.password_reset`) is a **stored**, single-use, per-email-throttled
 broker — the `PasswordBroker`, not a signed token. A used *or* expired token row is **deleted**,
-so a replay never succeeds even inside the original TTL (the old stateless-signed-token approach was
-replayable within its TTL — audit finding A6). The `password_reset_tokens` table is a **framework**
+so a replay never succeeds even inside the original TTL (a stateless signed token, by contrast, stays
+replayable until it expires — which is why these are stored, single-use rows). The
+`password_reset_tokens` table is a **framework**
 migration (`arvel new` ships it, like `users`/`api_tokens`/`failed_jobs`) — no table to author yourself:
 
 ```python

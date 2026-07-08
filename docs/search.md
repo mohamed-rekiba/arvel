@@ -40,7 +40,7 @@ page = await (
     Article.search("python")
     .where("published", True)          # equality filter
     .order_by("views", "desc")         # sort
-    .paginate(per_page=10, page=1)     # a LengthAwarePaginator (DR-0022 shape)
+    .paginate(per_page=10, page=1)     # a LengthAwarePaginator
 )
 
 first = await Article.search("python").first()      # one hydrated model, or None

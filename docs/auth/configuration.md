@@ -43,7 +43,7 @@ config = {
     "lockout": {
         "max_attempts":  5,              # failed logins before lockout
         "decay_seconds": 900,            # lockout window, seconds (default 15m)
-        "fail_open":     True,           # on a cache outage: True = allow (alert!), False = deny (DR-0015)
+        "fail_open":     True,           # on a cache outage: True = allow (alert!), False = deny
     },
 
     # --- remember-me (RememberMe / remember()) -------------------------------
@@ -68,7 +68,7 @@ config = {
   only set them `False` for local plain-HTTP development.
 - **`lockout.fail_open` is the one availability-over-security default** — on a cache outage logins are
   allowed (so an outage doesn't lock everyone out) but throttling is off, so **alert on cache
-  downtime** or set `fail_open = false` to fail closed (decision record DR-0015).
+  downtime** or set `fail_open = false` to fail closed.
 - **`oidc` keys are required when you use the OIDC guard** — a missing `jwks_uri`/`issuer`/`audience`
   raises at construction rather than silently rejecting every token.
 - These keys are read where the corresponding component is built; passing the argument explicitly at
@@ -96,7 +96,7 @@ Identifier-only, best-effort (a logging failure never breaks an auth decision):
 | `auth.login.failed` | warning | `identifier` |
 | `auth.login.blocked` | warning | `identifier`, `reason=locked_out` |
 | `auth.login.locked_out` | warning | `identifier` (the failure that trips the lockout) |
-| `auth.refresh.reused` | warning | `tokenable_id` (reuse → family revoked, DR-0014) |
+| `auth.refresh.reused` | warning | `tokenable_id` (reuse → family revoked) |
 | `auth.remember.theft_detected` | warning | `selector`, `tokenable_id` |
 | `auth.impersonation.started` | info | `impersonator_id`, `target_id`, `ability` |
 | `auth.impersonation.denied` | warning | `impersonator_id`, `target_id`, `reason` (+ `ability` when unauthorized) |

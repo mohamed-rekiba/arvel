@@ -203,7 +203,7 @@ with defaults, coercion, and IDE autocomplete — define a `Settings` subclass, 
 over `config()`, not a second config source**: the values come from the one pipeline (config files /
 `with_config` / env via config files), so a typed setting can never disagree with `config()`. It's
 built on [msgspec](https://jcristharif.com/msgspec/) (core, fast, no extra dependency; pydantic is
-intentionally not used — see DR-0005/DR-0016):
+intentionally not used):
 
 ```python
 from arvel.kernel import Settings

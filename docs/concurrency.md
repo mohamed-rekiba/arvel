@@ -106,8 +106,8 @@ DB query, a sync cache read, and an HTTP call in one batch without thinking abou
 - **Reaching for `"process"` for I/O-bound work.** Spawning OS processes has real overhead; use
   the default `"async"` driver for anything that's mostly waiting on I/O.
 - **Expecting cancellation to interrupt a running process-pool worker.** A hung CPU-bound task can
-  outlive the caller's own cancellation — a documented limitation of `ProcessPoolExecutor` (see
-  DR-0030). Keep process-pool callables bounded/well-behaved.
+  outlive the caller's own cancellation — a documented limitation of `ProcessPoolExecutor`.
+  Keep process-pool callables bounded/well-behaved.
 
 ## How it works
 
@@ -115,8 +115,8 @@ DB query, a sync cache read, and an HTTP call in one batch without thinking abou
 routes it through `asyncio.to_thread`, then `asyncio.gather`s the lot — `gather` is what preserves
 input order regardless of completion order. `"process"` does the same gather, but each callable
 goes through `loop.run_in_executor` against a fresh `ProcessPoolExecutor` — stdlib only, zero new
-dependency (chosen over `anyio.to_process` in DR-0030; revisit only if cancellation semantics
-matter for your use case).
+dependency (chosen over `anyio.to_process`; revisit only if cancellation semantics matter for your
+use case).
 
 ## See also
 
