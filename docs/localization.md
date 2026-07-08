@@ -25,7 +25,7 @@ Put translations under a `lang/` directory, one file per locale (JSON or grouped
 The app's `lang/` directory is loaded automatically at boot, so `lang/<code>.json` and
 `lang/<code>/<group>.json` files are available through `trans`/`__` with no wiring.
 
-Prefer a different location (e.g. `resources/lang`, the pre--9 convention)?
+Prefer a different location (e.g. `resources/lang`)?
 `with_lang_dir(...)` overrides the default:
 
 ```python
