@@ -10,6 +10,11 @@ enabled, so `import arvel` and the CLI stay light. Once on, HTTP requests, datab
 jobs are traced automatically, request metrics are recorded, and your `Log` output is exported and
 correlated to the trace it happened in.
 
+!!! note "Needs the `[telemetry]` extra"
+    Telemetry is **off by default** and imports nothing until enabled. Turn it on with
+    `uv add 'arvel[telemetry]'` (the OpenTelemetry SDK + OTLP/Prometheus exporters, plus `sentry-sdk`
+    for error reporting) and `enabled: true` in config.
+
 ## Contents
 
 - [Quick start](#quick-start)
