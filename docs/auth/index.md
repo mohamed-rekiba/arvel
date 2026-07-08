@@ -1,4 +1,8 @@
-# Authentication & Authorization
+# Security
+
+This section covers everything about *who can do what* in an arvel app — authentication,
+authorization, and the cryptographic primitives (password hashing, value encryption) underneath
+them. It starts with the model that ties the first two together.
 
 Almost every "auth bug" you've ever debugged comes from quietly conflating three different
 questions:
@@ -88,6 +92,9 @@ Start at the top and read down, or jump to what you need:
 | [Two-factor authentication](two-factor.md) | TOTP second factor + recovery codes |
 | [Routes & flows](routes-and-flows.md) | Wiring login/logout, refresh tokens, password reset, email verification |
 | [Wiring it up: providers & middleware](providers-and-middleware.md) | Registering auth services + protecting routes |
+| [Configuration](configuration.md) | Every auth config key, and the security audit-log channel |
+| [Hashing](../hashing.md) | Hashing passwords — argon2id/bcrypt, rehash-on-login |
+| [Encryption](../encryption.md) | Encrypting arbitrary values — AES-256-GCM, key rotation |
 
 ## See also
 

@@ -100,6 +100,20 @@ can evolve), a random 96-bit nonce, and the AES-256-GCM output (ciphertext with 
 tag appended, as `cryptography`'s `AESGCM` already does). The nonce is fresh per call to
 `encrypt`/`encrypt_string`, so encrypting the same value twice produces different tokens.
 
+## Common mistakes & gotchas
+
+- **Encrypting a password.** Passwords are *hashed*, never encrypted — encryption is reversible, and
+  a password should never be recoverable. Use `Hash.make` — see [Hashing](hashing.md).
+- **Losing `APP_KEY`.** The key *is* the data — lose it (and its `previous_keys`) and every ciphertext
+  is gone for good. Back it up like any other secret; never commit it.
+- **Encrypting a non-JSON value.** `encrypt` goes through `json.dumps`; a `datetime` or custom object
+  raises before the cipher. Serialize to a plain dict/string first (or use `encrypt_string`).
+- **Rotating a key too early.** When you rotate, keep the old key in `previous_keys` until you've
+  re-encrypted (`rotate`) every ciphertext under the new primary — drop it sooner and old data
+  becomes unreadable.
+- **Treating `DecryptionFailed` as corruption.** It's also what a *tampered* or malformed token
+  raises — by design, one exception type, so an attacker learns nothing from which error came back.
+
 ## How it works
 
 `Encrypter` wraps `cryptography.hazmat.primitives.ciphers.aead.AESGCM` directly (no Fernet, no

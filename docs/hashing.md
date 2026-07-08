@@ -1,8 +1,8 @@
 # Hashing
 
 Never store a password in plaintext, and never roll your own hash. arvel's `Hash` is a driver
-manager over battle-tested KDFs — **argon2id** (the default) and **bcrypt** (parity with
-the default, useful when migrating hashes from a PHP app) — with a plaintext-free
+manager over battle-tested KDFs — **argon2id** (the default) and **bcrypt** (useful when you're
+verifying or migrating existing bcrypt hashes) — with a plaintext-free
 `needs_rehash` so you can upgrade a stale hash without ever holding the password again.
 
 ## Basic usage
@@ -92,6 +92,20 @@ info = Hash.info(hashed)
 info.algorithm  # "argon2id"
 info.options    # {"memory_cost": 65536, "time_cost": 3, "parallelism": 4}
 ```
+
+## Common mistakes & gotchas
+
+- **Encrypting a password instead of hashing it.** A password must be *hashed* (one-way), never
+  encrypted (reversible). Use `Hash.make`, never `Crypt.encrypt` — see [Encryption](encryption.md).
+- **Blocking the event loop.** `make`/`check` are CPU-heavy by design. On a request or worker, use
+  `make_async`/`check_async` so the argon2/bcrypt work runs off the loop.
+- **`needs_rehash` without a plaintext to rehash with.** It tells you a hash is *stale*, but you can
+  only upgrade it right after you've verified a plaintext (a successful login) — you can't rehash a
+  hash you can't reproduce.
+- **Lowering cost params to speed things up.** The cost is the point. Tune `memory_cost`/`time_cost`
+  (argon2) or `rounds` (bcrypt) to your hardware's tolerable latency, not to the floor.
+- **A password over 72 bytes on bcrypt.** bcrypt reads only the first 72 bytes (arvel truncates
+  rather than erroring). argon2id has no such limit — another reason it's the default.
 
 ## How it works
 

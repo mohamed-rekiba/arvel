@@ -103,6 +103,23 @@ Identifier-only, best-effort (a logging failure never breaks an auth decision):
 | `auth.impersonation.stopped` | info | `impersonator_id` |
 | `auth.logout_everywhere` | info | `tokenable_id`, `failures` |
 
+## Common mistakes & gotchas
+
+- **Not routing the `security` channel anywhere durable.** The audit events above are emitted
+  best-effort on the `security` log channel — if you don't route that channel to persistent storage,
+  a login-lockout or refresh-token-reuse signal is logged and gone. Wire it up before you need it.
+- **Leaving the hash cost at the default in production.** Password verification resolves the
+  container's hasher, so an app-configured Argon2 cost *is* honoured — but only if you set one. Tune
+  it to your hardware (see [Hashing](../hashing.md)).
+- **Rotating `APP_KEY` without a plan.** Signed URLs and remember-me cookies are keyed off it; rotate
+  it and outstanding tokens stop verifying. Use the encrypter's `previous_keys` path (see
+  [Encryption](../encryption.md)) when a value must survive a rotation.
+- **Flipping `session.secure`/`remember.secure` off and forgetting.** They default to `True`
+  (fail-closed) for a reason — `False` is for local plain-HTTP only; shipping it sends session
+  cookies over the clear.
+- **Ignoring `lockout.fail_open`.** On a cache outage it lets logins through *with throttling off*
+  (availability over security). Alert on cache downtime, or set `fail_open = false` to fail closed.
+
 ## See also
 
 - [Authentication](authentication.md) · [Guards & drivers](guards.md) · [Routes & flows](routes-and-flows.md)
