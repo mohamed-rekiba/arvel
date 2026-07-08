@@ -39,8 +39,10 @@ def test_framework_validation_defaults_are_loaded(tmp_path: Path) -> None:
 
 def test_defaults_registered_publishable_under_lang_tag(tmp_path: Path) -> None:
     app = _provider_for(tmp_path)
-    assert "lang" in app.published  # vendor:publish --tag=lang has something to copy
-    dests = set(app.published["lang"].values())
+    assert "lang" in app.registry(
+        "console.published", dict
+    )  # vendor:publish --tag=lang has something to copy
+    dests = set(app.registry("console.published", dict)["lang"].values())
     # must be the app's actual configured lang dir, not "lang" relative to the CLI's CWD
     assert dests == {str(tmp_path / "lang")}
 
@@ -50,7 +52,7 @@ def test_defaults_publish_into_with_lang_dir_override(tmp_path: Path) -> None:
     app.lang_dir = str(tmp_path / "resources" / "lang")  # simulates with_lang_dir(...)
     provider = LocalizationServiceProvider(app)
     provider.register()
-    dests = set(app.published["lang"].values())
+    dests = set(app.registry("console.published", dict)["lang"].values())
     assert dests == {str(tmp_path / "resources" / "lang")}
 
 

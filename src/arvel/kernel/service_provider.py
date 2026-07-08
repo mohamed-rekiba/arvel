@@ -14,7 +14,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -88,6 +88,11 @@ def load_config_directory(app: Application, directory: str | None = None) -> Non
 class ServiceProvider:
     """Base class for framework, app, and ecosystem providers."""
 
+    #: Declarative registrations applied before ``register()`` runs — the shorthand for
+    #: providers that only map abstracts to concretes.
+    bindings: ClassVar[Mapping[Any, Any]] = {}
+    singletons: ClassVar[Mapping[Any, Any]] = {}
+
     def __init__(self, app: Application) -> None:
         self.app = app
 
@@ -115,19 +120,23 @@ class ServiceProvider:
         self.app.route_files.append(path)
 
     def load_migrations_from(self, path: str) -> None:
-        self.app.migration_paths.append(path)
+        self.app.registry("database.migration_paths", list).append(path)
 
     def load_views_from(self, path: str, namespace: str) -> None:
-        self.app.view_namespaces[namespace] = path
+        self.app.registry("views.namespaces", dict)[namespace] = path
+        if self.app.resolved("view"):  # factory already built — apply now, not just record
+            self.app.make("view").add_namespace(namespace, path)
 
     def load_translations_from(self, path: str, namespace: str) -> None:
-        self.app.translation_namespaces[namespace] = path
+        self.app.registry("localization.namespaces", dict)[namespace] = path
 
     def commands(self, *cmds: Any) -> None:
-        self.app.command_classes.extend(cmds)
+        self.app.registry("console.commands", list).extend(cmds)
 
     def publishes(self, mapping: Mapping[str, str], *, tag: str | None = None) -> None:
-        self.app.published.setdefault(tag or "default", {}).update(mapping)
+        published: dict[str, dict[str, str]] = self.app.registry("console.published", dict)
+        published.setdefault(tag or "default", {}).update(mapping)
 
     def publishes_migrations(self, paths: Mapping[str, str], *, tag: str = "migrations") -> None:
-        self.app.published.setdefault(tag, {}).update(paths)
+        published: dict[str, dict[str, str]] = self.app.registry("console.published", dict)
+        published.setdefault(tag, {}).update(paths)

@@ -30,6 +30,11 @@ class ViewServiceProvider(ServiceProvider):
 
             views_dir = Path(arvel.pagination.__file__).parent / "views"
             factory.add_namespace("pagination", str(views_dir))
+            # provider-registered namespaces (load_views_from) recorded before the
+            # factory materialized; later registrations apply directly via the verb
+            namespaces: dict[str, str] = self.app.registry("views.namespaces", dict)
+            for name, path in namespaces.items():
+                factory.add_namespace(name, path)
             return factory
 
         self.app.singleton("view", make_view)

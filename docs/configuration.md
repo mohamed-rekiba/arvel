@@ -27,12 +27,30 @@ config("nope.not.here")            # None
 config("nope.not.here", "x")       # "x"
 ```
 
+### Typed reads
+
+The permissive `get` never raises; the typed getters do the opposite — the value must be exactly
+the type you asked for (a `bool` is not an `integer`), or a `ConfigTypeError` names the key, the
+expected type, and what was actually there. Reach for these when a wrong type should fail loud at
+boot instead of surfacing as a confusing error later:
+
+```python
+config().string("app.name")           # "arvel"
+config().integer("session.lifetime")  # 120 — raises if it's "120"
+config().boolean("app.debug")
+config().float("throttle.rate")       # ints widen to float; nothing else does
+config().array("cors.origins")        # list (a tuple converts); raises on anything else
+config().string("missing.key", "x")   # defaults work; a wrong TYPE still raises
+```
+
 ### Writing at runtime
 
-You can set values too — useful in tests or at boot:
+You can set values too — useful in tests or at boot. Passing a mapping to `config()` sets each
+dotted key:
 
 ```python
 config().set("services.stripe.key", "sk_test_…")
+config({"services.stripe.key": "sk_test_…", "app.debug": True})   # same, in bulk
 config().has("services.stripe.key")   # True
 ```
 
@@ -50,6 +68,19 @@ config().has("services.stripe.key")   # True
     new section `{"b": 1}` — the old value is discarded (a debug line is logged on the
     `arvel.config` logger). This is convenient but lossy; don't `set()` *into* a key you also use as
     a leaf value.
+
+## Which environment am I in?
+
+`app().environment()` answers from `config("app.env")` — no args for the name, names (or
+`fnmatch` patterns) for a membership check; `is_local()` / `is_production()` cover the two
+everyday cases:
+
+```python
+app().environment()                      # "local"
+app().environment("staging", "production")   # False
+app().environment("*-testing")           # pattern match
+app().is_production()                    # False
+```
 
 ## Environment variables: `env()`
 

@@ -232,7 +232,7 @@ def test_cli_call_dispatches_an_app_registered_command_class(app: Application) -
             seen["user"] = self.argument("user")
             seen["force"] = self.option("force")
 
-    app.command_classes.append(Notify)
+    app.registry("console.commands", list).append(Notify)
     assert Cli.call("notify", {"user": "Ada", "--force": True}) == 0
     assert seen == {"user": "Ada", "force": True}
 

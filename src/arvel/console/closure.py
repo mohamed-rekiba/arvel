@@ -48,7 +48,7 @@ class _ConsoleRegistrar:
         from arvel.kernel import app
 
         command = ClosureCommand(signature, handler)
-        app().console_commands[command.name] = command
+        app().registry("console.closure_commands", dict)[command.name] = command
         return command
 
 
@@ -56,7 +56,7 @@ Console = _ConsoleRegistrar()
 
 
 def run_closure_command(name: str, cli_args: dict[str, Any]) -> None:
-    """Dispatch a closure command through the booted app: look it up in ``console_commands`` (the
+    """Dispatch a closure command through the booted app: look it up in the ``console.closure_commands`` registry (the
     console kernel loads ``routes/console.py`` during boot) and call its handler with DI + the parsed
     CLI tokens passed by name."""
     from arvel.console.kernel import run_app_command
@@ -64,7 +64,7 @@ def run_closure_command(name: str, cli_args: dict[str, Any]) -> None:
     async def handler(app: Any) -> None:
         import inspect
 
-        command = app.console_commands.get(name)
+        command = app.registry("console.closure_commands", dict).get(name)
         if (
             command is None
         ):  # pragma: no cover - defensive (discovery + dispatch use the same loader)

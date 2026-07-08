@@ -276,7 +276,7 @@ def test_cli_runs_a_command_class_with_seeded_prompt_and_captured_output() -> No
             self.info(f"hello {who} ({self.argument('name')}, loud={self.option('loud')})")
 
     app = Application()
-    app.command_classes.append(Greet)
+    app.registry("console.commands", list).append(Greet)
 
     result = cli(app, "greet Ada --loud", input=["Bob"])
     result.assert_exit_code(0).assert_output_contains("hello Bob (Ada, loud=True)")
@@ -295,7 +295,7 @@ def test_cli_binds_variadics_and_shortcuts_via_the_shared_parser() -> None:
             self.info(f"items={self.argument('items')} queue={self.option('queue')}")
 
     app = Application()
-    app.command_classes.append(Tag)
+    app.registry("console.commands", list).append(Tag)
 
     result = cli(app, "tag a b c -Q=high")
     result.assert_exit_code(0).assert_output_contains("items=['a', 'b', 'c'] queue=high")
@@ -312,7 +312,7 @@ def test_cli_runs_a_console_registered_closure() -> None:
         ran.append(name)
 
     app = Application()
-    app.console_commands["greet"] = ClosureCommand("greet {name}", greet)
+    app.registry("console.closure_commands", dict)["greet"] = ClosureCommand("greet {name}", greet)
 
     cli(app, "greet Ada").assert_exit_code(0)
     assert ran == ["Ada"]
@@ -332,7 +332,7 @@ def test_cli_assert_exit_code_fails_with_a_readable_message() -> None:
             raise typer.Exit(1)
 
     app = Application()
-    app.command_classes.append(Boom)
+    app.registry("console.commands", list).append(Boom)
 
     result = cli(app, "boom")
     result.assert_exit_code(1)
@@ -360,7 +360,7 @@ def test_cli_positional_default_is_applied_when_omitted() -> None:
         got.append(name)
 
     app = Application()
-    app.console_commands["hi"] = ClosureCommand("hi {name=World}", hi)
+    app.registry("console.closure_commands", dict)["hi"] = ClosureCommand("hi {name=World}", hi)
     cli(app, "hi").assert_exit_code(0)  # name omitted -> default "World"
     assert got == ["World"]
 

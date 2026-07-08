@@ -48,6 +48,17 @@ when it needs to do async setup:
 Keep that split and providers compose cleanly no matter what order they load in. Break it — resolve
 in `register` — and your app works only by the accident of load order, until it doesn't.
 
+### Declarative bindings
+
+A provider whose `register()` would only map abstracts to concretes can declare them as class
+attributes instead — they register before `register()` runs:
+
+```python
+class PaymentProvider(ServiceProvider):
+    bindings = {PaymentGateway: StripeGateway}
+    singletons = {"payments.ledger": Ledger}
+```
+
 ## Building a provider
 
 Here's the whole lifecycle of a feature, wired as one provider. Say you're adding a blog: it has its

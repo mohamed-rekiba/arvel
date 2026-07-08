@@ -432,7 +432,7 @@ async def test_a_slow_scheduled_command_does_not_delay_a_same_tick_sibling() -> 
             slow_finished.set()
 
     app = Application()
-    app.command_classes.append(SlowCommand)
+    app.registry("console.commands", list).append(SlowCommand)
     set_application(app)
     try:
         fast_ran_before_slow_finished: list[bool] = []

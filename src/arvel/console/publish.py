@@ -1,8 +1,8 @@
 """``vendor:publish`` — copy publishable resources into the app.
 
 Service providers register publishable files (config, assets, migrations) via ``self.publishes({src:
-dest}, tag=...)`` / ``publishes_migrations(...)``, which populate ``app.published`` (``{tag: {src:
-dest}}``). This command copies them into the app, optionally filtered by ``--tag`` and overwriting with
+dest}, tag=...)`` / ``publishes_migrations(...)``, recorded in the ``console.published``
+registry (``{tag: {src: dest}}``). This command copies them into the app, optionally filtered by ``--tag`` and overwriting with
 ``--force``. Imports stay light (typer only); the app is booted via the console kernel at runtime.
 Grounded in knowledge/port/13-console.md.
 """
@@ -35,8 +35,8 @@ def vendor_publish(
 
 
 def _publish(app: Any, tag: str | None, force: bool) -> None:
-    """Copy the resources in ``app.published`` (optionally a single ``tag``) into the app."""
-    published: dict[str, dict[str, str]] = app.published
+    """Copy the registered publishable resources (optionally a single ``tag``) into the app."""
+    published: dict[str, dict[str, str]] = app.registry("console.published", dict)
     if tag is not None:
         if tag not in published:
             typer.echo(f"[vendor:publish] no resources registered under tag {tag!r}")

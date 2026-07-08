@@ -362,7 +362,7 @@ async def _dispatch_scheduled_command(name: str, args: tuple[str, ...]) -> None:
 
         if has_application():
             application = active_app()
-            closure = application.console_commands.get(name)
+            closure = application.registry("console.closure_commands", dict).get(name)
             if closure is not None:
 
                 async def _run_closure(app: Any) -> None:
@@ -372,7 +372,14 @@ async def _dispatch_scheduled_command(name: str, args: tuple[str, ...]) -> None:
 
                 await run_app_command_async(_run_closure)
                 return
-            cls = next((c for c in application.command_classes if command_name(c) == name), None)
+            cls = next(
+                (
+                    c
+                    for c in application.registry("console.commands", list)
+                    if command_name(c) == name
+                ),
+                None,
+            )
             if cls is not None:
                 await run_command_class_async(cls)
                 return

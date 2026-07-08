@@ -44,7 +44,9 @@ def test_database_provider_binds_migrator_and_discovers_migrations(tmp_path: Pat
         "    def down(self, schema): schema.drop('things')\n"
     )
     app = Application(base_path=str(tmp_path))
-    app.migration_paths.append(".")  # as load_migrations_from("database/migrations") would
+    app.registry("database.migration_paths", list).append(
+        "."
+    )  # as load_migrations_from("database/migrations") would
     provider = DatabaseServiceProvider(app)
     provider.register()
     provider.boot()

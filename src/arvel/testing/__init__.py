@@ -960,11 +960,11 @@ def cli(app: Any, command: str, input: Sequence[str] | None = None) -> ConsoleRe
     buffer: list[str] = []
     prompter = _SeededPrompter(input)
 
-    closure = getattr(app, "console_commands", {}).get(name)
+    closure = app.registry("console.closure_commands", dict).get(name)
     cls = None
     if closure is None:
         cls = next(
-            (c for c in getattr(app, "command_classes", []) if _command_name(c) == name), None
+            (c for c in app.registry("console.commands", list) if _command_name(c) == name), None
         )
     if closure is None and cls is None:
         raise ValueError(f"cli(): {name!r} is not registered on this app")

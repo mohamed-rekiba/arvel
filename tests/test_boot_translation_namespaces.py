@@ -20,7 +20,7 @@ async def test_boot_registers_translation_namespaces(tmp_path: Path) -> None:
     app = Application()
     translator = Translator(fallback="en")
     app.instance("translator", translator)
-    app.translation_namespaces["billing"] = str(
+    app.registry("localization.namespaces", dict)["billing"] = str(
         _pkg_lang(tmp_path)
     )  # as load_translations_from does
 
@@ -31,6 +31,6 @@ async def test_boot_registers_translation_namespaces(tmp_path: Path) -> None:
 
 async def test_boot_without_translator_is_noop(tmp_path: Path) -> None:
     app = Application()
-    app.translation_namespaces["billing"] = str(_pkg_lang(tmp_path))
+    app.registry("localization.namespaces", dict)["billing"] = str(_pkg_lang(tmp_path))
     await app.boot()  # no translator bound -> must not raise
     assert app.booted

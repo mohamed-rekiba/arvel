@@ -313,6 +313,11 @@ class Container:
         a = self._alias_of(abstract)
         return a in self._bindings or a in self._instances
 
+    def resolved(self, abstract: Any) -> bool:
+        """Whether ``abstract`` has a *materialized* instance (``instance()`` or an
+        already-built shared binding) — bound-but-never-made is False."""
+        return self._alias_of(abstract) in self._instances
+
     def forget(self, abstract: Any) -> None:
         """Drop ``abstract``'s cached shared instance + any current-scope instance so the next
         ``make`` rebuilds it. The *binding* is kept."""

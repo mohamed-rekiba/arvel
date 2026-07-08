@@ -19,7 +19,9 @@ def _app_publishing(mapping: dict[str, str], *, tag: str | None = None) -> Appli
         def register(self) -> None:
             self.publishes(mapping, tag=tag)
 
-    PublishingProvider(app).register()  # populates app.published (the production path)
+    PublishingProvider(
+        app
+    ).register()  # populates app.registry("console.published", dict) (the production path)
     return app
 
 
@@ -78,7 +80,9 @@ def test_registered_in_command_manifest() -> None:
 def test_publish_reports_nothing_to_publish_when_no_provider_registered_anything(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    _publish(Application(), None, False)  # no provider ran: app.published is empty
+    _publish(
+        Application(), None, False
+    )  # no provider ran: app.registry("console.published", dict) is empty
     assert "nothing to publish" in capsys.readouterr().out
 
 

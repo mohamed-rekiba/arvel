@@ -39,7 +39,7 @@ def test_console_command_registers_on_the_app(app: Application) -> None:
     async def greet(name: str) -> None: ...
 
     returned = Console.command("greet {name}", greet)
-    assert app.console_commands["greet"] is returned
+    assert app.registry("console.closure_commands", dict)["greet"] is returned
     assert isinstance(returned, ClosureCommand)
 
 
@@ -109,7 +109,9 @@ def test_optional_positional_argument_omitted_or_given(app: Application) -> None
         seen.append(name)
 
     Console.command("ping {name?}", ping)
-    command = LazyGroup._closure_command("ping", app.console_commands["ping"])
+    command = LazyGroup._closure_command(
+        "ping", app.registry("console.closure_commands", dict)["ping"]
+    )
     # {name?} is an optional POSITIONAL: a value is accepted positionally, omitting it uses the default
     assert CliRunner().invoke(command, ["Bob"]).exit_code == 0
     assert seen == ["Bob"]

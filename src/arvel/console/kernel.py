@@ -180,7 +180,7 @@ _command_table: dict[str, Any] | None = None
 def discover_app_commands() -> dict[str, Any]:
     """Collect the project's registered command classes as ``{name: cls}`` (CLI-3).
 
-    Provider/app ``commands()`` populate ``app.command_classes`` during the synchronous bootstrap, so
+    Provider/app ``commands()`` populate ``app.registry("console.commands", list)`` during the synchronous bootstrap, so
     we load a throwaway project app, run ``bootstrap_app`` (register only — no async boot), read the
     table, then **clear** the global application so a subsequent dispatch boots a clean app through the
     normal lifecycle. Cached per process; best-effort (a broken project app yields no dynamic commands
@@ -200,10 +200,12 @@ def discover_app_commands() -> dict[str, Any]:
             app = load_project_app()
             if app is not None:
                 bootstrap_app(app)
-                table = {command_name(cls): cls for cls in app.command_classes}
+                table = {command_name(cls): cls for cls in app.registry("console.commands", list)}
                 # so routes/console.py's Console.command(...) closures also appear in --help
                 load_console_routes(app)
-                table.update(app.console_commands)  # name -> ClosureCommand
+                table.update(
+                    app.registry("console.closure_commands", dict)
+                )  # name -> ClosureCommand
     finally:
         set_application(None)  # never leak the discovery app — dispatch boots its own clean app
     _command_table = table
@@ -361,12 +363,14 @@ def _cli_dispatch(name: str, args: dict[str, Any] | list[str] | None) -> int:
     values: dict[str, Any] = {k.removeprefix("--"): v for k, v in (args or {}).items()}
 
     application = active_app()
-    closure = application.console_commands.get(name)
+    closure = application.registry("console.closure_commands", dict).get(name)
     if closure is not None:
         from arvel.console.closure import run_closure_command
 
         return _run_and_capture_exit(lambda: run_closure_command(name, values))
-    cls = next((c for c in application.command_classes if command_name(c) == name), None)
+    cls = next(
+        (c for c in application.registry("console.commands", list) if command_name(c) == name), None
+    )
     if cls is not None:
         return _run_and_capture_exit(lambda: run_command_class(cls, **values))
     raise ValueError(f"command {name!r} is not defined")

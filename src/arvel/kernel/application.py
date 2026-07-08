@@ -60,14 +60,9 @@ class Application(Container):
         self.instance(Application, self)
         if "config" not in self._instances:
             self.instance("config", Repository())
-        # registries populated by ServiceProvider integration verbs
+        # capability registries live in the container under namespaced string keys
+        # (see registry()) — the kernel object itself carries only bootstrap wiring
         self.route_files: list[str] = []
-        self.migration_paths: list[str] = []
-        self.view_namespaces: dict[str, str] = {}
-        self.translation_namespaces: dict[str, str] = {}
-        self.command_classes: list[Any] = []
-        self.console_commands: dict[str, Any] = {}  # name -> ClosureCommand (routes/console.py)
-        self.published: dict[str, dict[str, str]] = {}
         self.app_provider_classes: list[type] = []
         self.registered_provider_types: set[type] = set()
         self._deferred: dict[Any, Any] = {}
@@ -83,6 +78,40 @@ class Application(Container):
         self._builder_middlewares: list[Any] = []
         self._builder_exceptions: Callable[[Any], Any] | None = None
 
+    #: The capability registry keys flush() preserves (capability-owned state must
+    #: survive a container flush the same way the old kernel attributes did).
+    _REGISTRY_KEYS = (
+        "views.namespaces",
+        "database.migration_paths",
+        "localization.namespaces",
+        "console.commands",
+        "console.closure_commands",
+        "console.published",
+    )
+
+    def registry(self, key: str, factory: Callable[[], Any]) -> Any:
+        """A capability registry stored in the container under a namespaced string key,
+        created on first use — the seam provider verbs write to and capabilities read from."""
+        if not self.bound(key):
+            self.instance(key, factory())
+        return self.make(key)
+
+    def environment(self, *names: str) -> str | bool:
+        """No args → the current environment name (``config('app.env')``). With args → whether
+        the current environment matches any of them (``fnmatch`` patterns allowed)."""
+        import fnmatch
+
+        current = str(self.make("config").get("app.env", "local"))
+        if not names:
+            return current
+        return any(fnmatch.fnmatchcase(current, name) for name in names)
+
+    def is_local(self) -> bool:
+        return self.environment("local") is True
+
+    def is_production(self) -> bool:
+        return self.environment("production") is True
+
     @property
     def booted_provider_count(self) -> int:
         """Count of providers actually booted (the eager set). Deferred providers are registered but
@@ -96,6 +125,12 @@ class Application(Container):
 
     # --- providers ---------------------------------------------------------
     def register(self, provider: ServiceProvider) -> ServiceProvider:
+        # declarative class-level bindings register first, so register() can build on
+        # them (getattr: duck-typed test providers need not subclass ServiceProvider)
+        for abstract, concrete in getattr(type(provider), "bindings", {}).items():
+            self.bind(abstract, concrete)
+        for abstract, concrete in getattr(type(provider), "singletons", {}).items():
+            self.singleton(abstract, concrete)
         provider.register()
         self._providers.append(provider)
         self.registered_provider_types.add(type(provider))
@@ -123,12 +158,15 @@ class Application(Container):
         providers — so an ``Application`` stays usable after a flush (a bare ``Container.flush()``
         would wipe the ``app``/``Container``/``Application``/``config`` self-bindings and leave it
         unresolvable). Registries (route_files, etc.) are left intact — flush is container-scoped."""
+        kept = {k: self.make(k) for k in self._REGISTRY_KEYS if self.bound(k)}
         super().flush()
         self._deferred.clear()
         self.instance("app", self)
         self.instance(Container, self)
         self.instance(Application, self)
         self.instance("config", Repository())
+        for key, registry in kept.items():  # registries outlive a flush, as documented
+            self.instance(key, registry)
 
     def _resolve(self, abstract: Any, params: dict[str, Any] | None = None) -> Any:
         key = self._alias_of(abstract)
@@ -199,11 +237,12 @@ class Application(Container):
     def _register_translation_namespaces(self) -> None:
         """Apply provider-registered translation namespaces (``load_translations_from``) to the
         bound translator, so packages' ``pkg::group.key`` translations resolve at runtime."""
-        if not self.translation_namespaces or not self.bound("translator"):
+        namespaces: dict[str, str] = self.registry("localization.namespaces", dict)
+        if not namespaces or not self.bound("translator"):
             return
         register = getattr(self.make("translator"), "add_namespace", None)
         if callable(register):
-            for namespace, path in self.translation_namespaces.items():
+            for namespace, path in namespaces.items():
                 register(namespace, path)
 
     async def _boot_provider(self, provider: ServiceProvider) -> None:

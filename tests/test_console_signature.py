@@ -98,7 +98,9 @@ def test_default_value_argument_is_used_when_omitted(app: Application) -> None:
     from arvel import Console
 
     Console.command("ping {name=world}", ping)
-    command = LazyGroup._closure_command("ping", app.console_commands["ping"])
+    command = LazyGroup._closure_command(
+        "ping", app.registry("console.closure_commands", dict)["ping"]
+    )
     result = CliRunner().invoke(command, [])
     assert result.exit_code == 0, result.output
     assert seen == ["world"]

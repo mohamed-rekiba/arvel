@@ -11,11 +11,13 @@ Grounded in knowledge/port/03-application-providers-bootstrap.md + DR-0005/DR-00
 
 from __future__ import annotations
 
+import builtins
 import os
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 _MISSING: Any = object()
+_T = TypeVar("_T")
 
 # env literal coercion.
 _ENV_LITERALS: dict[str, Any] = {
@@ -28,6 +30,14 @@ _ENV_LITERALS: dict[str, Any] = {
     "empty": "",
     "(empty)": "",
 }
+
+
+class ConfigTypeError(TypeError):
+    """A typed getter found a value of the wrong type (or nothing at all)."""
+
+    def __init__(self, key: str, expected: str, value: Any) -> None:
+        found = "missing" if value is _MISSING else type(value).__name__
+        super().__init__(f"config [{key}] expected {expected}, got {found}")
 
 
 class Repository:
@@ -66,6 +76,38 @@ class Repository:
     def has(self, key: str) -> bool:
         return self.get(key, _MISSING) is not _MISSING
 
+    # --- typed getters: exact type or a loud error, never a silent None ---------
+    def string(self, key: str, default: str | None = None) -> str:
+        return self._typed(key, default, str)
+
+    def integer(self, key: str, default: int | None = None) -> int:
+        return self._typed(key, default, int)
+
+    def float(self, key: str, default: float | None = None) -> float:
+        value: Any = self.get(key, _MISSING if default is None else default)
+        if type(value) is int:  # ints widen losslessly; bools don't qualify
+            return builtins.float(value)
+        if type(value) is builtins.float:
+            return value
+        raise ConfigTypeError(key, "float", value)
+
+    def boolean(self, key: str, default: bool | None = None) -> bool:
+        return self._typed(key, default, bool)
+
+    def array(self, key: str, default: list[Any] | None = None) -> list[Any]:
+        value: Any = self.get(key, _MISSING if default is None else default)
+        if type(value) is list:
+            return cast("list[Any]", value)
+        if type(value) is tuple:
+            return list(cast("tuple[Any, ...]", value))
+        raise ConfigTypeError(key, "list", value)
+
+    def _typed(self, key: str, default: _T | None, expected: type[_T]) -> _T:
+        value: Any = self.get(key, _MISSING if default is None else default)
+        if type(value) is expected:  # exact match: no bool-as-int, no subclass surprises
+            return cast("_T", value)
+        raise ConfigTypeError(key, expected.__name__, value)
+
     def all(self) -> Mapping[str, Any]:
         """A deep-copy **snapshot** of the whole tree — mutating the result never touches the
         repository (config is read-only at runtime; change it via ``set``)."""
@@ -78,12 +120,22 @@ class Repository:
         return f"Repository(keys={sorted(self._data)})"
 
 
-def config(key: str | None = None, default: Any = None) -> Any:
-    """Read configuration: ``config()`` → the repository; ``config('app.name')`` → a value."""
+def config(
+    key: str | Mapping[str, Any] | None = None,
+    default: Any = None,
+) -> Any:
+    """Configuration access: ``config()`` → the repository; ``config('app.name')`` → a value;
+    ``config({'app.name': 'x'})`` → set each dotted key."""
     from arvel.kernel.globals import app
 
     repo = app().make("config")
-    return repo if key is None else repo.get(key, default)
+    if key is None:
+        return repo
+    if isinstance(key, Mapping):
+        for dotted, value in key.items():
+            repo.set(dotted, value)
+        return None
+    return repo.get(key, default)
 
 
 def config_default(key: str, fallback: Any) -> Any:

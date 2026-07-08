@@ -43,11 +43,11 @@ def test_verbs_record_into_registries() -> None:
     app = Application()
     RecordingProvider(app).register()
     assert app.route_files == ["routes/web.py"]
-    assert app.migration_paths == ["db/migrations"]
-    assert app.view_namespaces == {"app": "resources/views"}
-    assert app.translation_namespaces == {"app": "lang"}
-    assert app.command_classes == ["cmd-a", "cmd-b"]
-    assert app.published["config"] == {"src/cfg.py": "config/cfg.py"}
+    assert app.registry("database.migration_paths", list) == ["db/migrations"]
+    assert app.registry("views.namespaces", dict) == {"app": "resources/views"}
+    assert app.registry("localization.namespaces", dict) == {"app": "lang"}
+    assert app.registry("console.commands", list) == ["cmd-a", "cmd-b"]
+    assert app.registry("console.published", dict)["config"] == {"src/cfg.py": "config/cfg.py"}
     assert isinstance(app.make(Widget), Widget)
 
 

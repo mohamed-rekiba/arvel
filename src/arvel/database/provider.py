@@ -60,5 +60,5 @@ class DatabaseServiceProvider(ServiceProvider):
         if not app.bound("migrations"):
             from arvel.database.migrations import discover_migrations
 
-            paths = [*app.migration_paths, "database/migrations"]
+            paths = [*app.registry("database.migration_paths", list), "database/migrations"]
             app.instance("migrations", discover_migrations(paths, app.base_path))

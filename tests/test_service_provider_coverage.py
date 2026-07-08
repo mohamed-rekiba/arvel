@@ -37,8 +37,13 @@ def test_load_config_file_rejects_non_py(tmp_path: Path) -> None:
 
 
 class _App:
+    """Duck-typed stand-in exposing just the registry seam the verbs write to."""
+
     def __init__(self) -> None:
-        self.published: dict[str, dict[str, str]] = {}
+        self._registries: dict[str, Any] = {}
+
+    def registry(self, key: str, factory: Any) -> Any:
+        return self._registries.setdefault(key, factory())
 
 
 def test_publishes_and_publishes_migrations() -> None:
@@ -48,5 +53,5 @@ def test_publishes_and_publishes_migrations() -> None:
     provider = P(_App())  # type: ignore[arg-type]
     provider.publishes({"src/a": "dst/a"}, tag="config")
     provider.publishes_migrations({"src/m": "db/m"})
-    assert provider.app.published["config"] == {"src/a": "dst/a"}
-    assert provider.app.published["migrations"] == {"src/m": "db/m"}
+    assert provider.app.registry("console.published", dict)["config"] == {"src/a": "dst/a"}
+    assert provider.app.registry("console.published", dict)["migrations"] == {"src/m": "db/m"}
