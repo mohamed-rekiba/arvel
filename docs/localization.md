@@ -19,7 +19,7 @@ active locale per request.
 
 Put translations under a `lang/` directory, one file per locale (JSON or grouped):
 
-```json
+```jsonc
 // lang/en.json
 { "welcome": "Welcome, :name", "messages": { "saved": "Saved!" } }
 
@@ -63,7 +63,7 @@ This writes `en/validation.json`, `auth.json`, and `http.json` under `lang/` (or
 the framework defaults **key by key** (a one-level-deep merge), so you can change a single message
 without re-declaring the rest:
 
-```json
+```jsonc
 // lang/en/validation.json — override just one rule; the other defaults still apply
 { "required": "Please provide a value for {field}." }
 ```

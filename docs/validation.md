@@ -8,7 +8,7 @@ an age that's a number in range. arvel gives you two complementary ways to enfor
 input becomes a clean `422` your app renders for the right client automatically.
 
 This page covers both, plus custom rules, custom and localized messages, and how errors reach a
-browser form versus an API. Validation is part of the **core** — no extra to install.
+browser form versus an API. Validation is part of the **core** — nothing to install.
 
 ## The Validator
 
@@ -216,7 +216,7 @@ per locale under `lang/`:
 arvel vendor:publish --tag=lang     # writes lang/en/validation.json (+ auth.json, http.json)
 ```
 
-```json
+```jsonc
 // lang/es/validation.json — with the locale set to "es", a failing `required` yields this
 { "required": "El campo {field} es obligatorio." }
 ```

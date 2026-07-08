@@ -2,11 +2,11 @@
 
 Two problems the ORM handles at the connection level, below the query builder: keeping a group of
 writes **all-or-nothing**, and reading a **large result set** without loading it all into memory at
-once. Both go through the `db` connection manager (`app.make("db")`, or the `DB` facade), so they
+once. Both go through the `db` connection manager (`app("db")`, or the `DB` facade), so they
 compose with everything the builder does — a model save inside a transaction rolls back with it, a
 streamed query honors your `where`/`order` clauses.
 
-The examples below use a `db` handle — resolve it with `db = app.make("db")`, take it as a
+The examples below use a `db` handle — resolve it with `db = app("db")`, take it as a
 constructor dependency, or reach for the `DB` facade (`DB.transaction()`), whichever fits the layer
 you're in.
 
