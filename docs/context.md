@@ -15,6 +15,10 @@ Context.get("request_id")            # "abc123"
 Context.all()                        # {"request_id": "abc123"}
 Context.has("request_id")            # True
 Context.forget("request_id")
+
+Context.add({"tenant": "acme", "plan": "pro"})   # bulk add
+Context.forget(["tenant", "plan"])                # bulk forget (unknown keys are a no-op)
+Context.add_if("request_id", "r-2")               # only when absent
 ```
 
 `Context` is a **static namespace** — like `Str`/`Number`, you never instantiate it.
@@ -53,6 +57,10 @@ Context.has_hidden("internal_trace_id")     # True
 "internal_trace_id" not in Context.all()    # True
 ```
 
+Every visible operation has a hidden twin — `add_hidden_if`, `forget_hidden`, `pull_hidden`,
+`only_hidden` / `except_hidden`, `missing_hidden`, `push_hidden` / `pop_hidden` /
+`hidden_stack_contains` — same semantics, separate store.
+
 ## Scoping
 
 `scope(**adds)` layers extra values on top of the current context for the duration of a `with`
@@ -71,6 +79,14 @@ Context.has("request_id")        # False — restored
 
 This is the idiom for "run this block as if these values were set, without permanently mutating
 the outer context" — e.g. running a sub-task on behalf of a different tenant.
+
+To overlay the hidden channel too (or pass a prebuilt mapping), use the named forms — both
+channels restore on exit:
+
+```python
+with Context.scope(data={"tenant": "beta"}, hidden={"internal_trace_id": "t-9"}):
+    ...
+```
 
 ## Task isolation
 
