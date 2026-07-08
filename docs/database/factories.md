@@ -1,7 +1,11 @@
 # Factories
 
-Generate model instances for tests and seeders. Subclass `Factory`, set `model`, and implement
-`definition()` (use `self.faker` for fake data):
+A test that needs "a user" shouldn't have to spell out every non-null column just to get one. A
+factory is a recipe for a valid model: it fills in sensible fake data for every field, so your test
+overrides only the one or two attributes it actually cares about. The same recipes seed a development
+database with realistic data. Define the recipe once; call it a thousand times.
+
+Subclass `Factory`, set `model`, and implement `definition()` (use `self.faker` for fake data):
 
 ```python
 from arvel.database import Factory
@@ -85,3 +89,38 @@ await (
     .create()
 )
 ```
+
+## In a test
+
+The payoff shows up in a test: state the one thing under test, let the factory handle the rest.
+
+```python
+async def test_admins_can_publish():
+    admin = await UserFactory().create(role="admin")
+    post  = await PostFactory().for_(admin, "author").create(published=False)
+
+    await publish(post, actor=admin)
+
+    assert (await post.fresh()).published is True
+```
+
+Nothing here spells out the user's email or the post's body — the factory's `definition()` supplied
+valid values, and the test reads as a statement of intent, not a pile of setup.
+
+## Common mistakes & gotchas
+
+- **A factory that's never imported.** Registration happens at class-definition time. If a test uses
+  `Post.factory()` but nothing imported `PostFactory`, the lookup fails — import it (a
+  `factories/__init__.py` that imports each one is the usual fix).
+- **`has`/`for_` on `make`.** Relationship wiring only runs on `create`/`create_many` — there's no
+  persisted parent for `make` to point a foreign key at.
+- **Non-unique fake data.** `self.faker.name()` can repeat; use `self.faker.unique.email()` for
+  columns with a unique constraint, or a `sequence` for guaranteed-distinct values across a batch.
+- **Mutating a factory in place.** `state`/`count`/`sequence` return a *copy* — assign or chain the
+  result; the original factory is unchanged.
+
+## See also
+
+- [Migrations & Schema](migrations.md) — seeders and `db:seed`, where factories generate bulk rows.
+- [Relationships](relationships.md) — the relation methods `has`/`for_` derive foreign keys from.
+- [Testing](../testing.md) — the test harness factories are built for.

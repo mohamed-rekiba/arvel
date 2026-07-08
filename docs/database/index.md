@@ -50,8 +50,8 @@ class Account(Model):           # totally guarded — no __fillable__
 Account().fill({"name": "x"})   # MassAssignmentException: Add [name] to the __fillable__ property …
 ```
 
-Declare `__fillable__` to opt fields in. A model that *does* set `__fillable__` keeps 's
-lenient behavior — an unlisted key is silently ignored (not raised), so passing a request body with
+Declare `__fillable__` to opt fields in. A model that *does* set `__fillable__` stays lenient about
+extras — an unlisted key is silently ignored (not raised), so passing a request body with
 extra fields is safe. `MassAssignmentException` is a programmer error (a missing `__fillable__`), not
 user input — it is not a `ValidationException` and renders as a 500, not a 422.
 
@@ -76,8 +76,8 @@ replicating
 `creating`/`updating`/`saving`/`deleting`/`restoring` are **cancelable**: an observer returning
 `False` aborts the operation and the calling method (`save`/`delete`/`restore`) returns `False` —
 the row is left exactly as it was on disk. `created`/`updated` only fire when there was actually a
-row to write (an insert, or an update on a genuinely dirty model); `saved` always fires, matching
-(and this cast's prior, narrower behavior) even on a clean no-op `save()`.
+row to write (an insert, or an update on a genuinely dirty model); `saved` always fires — even on a
+clean no-op `save()`.
 
 ```python
 class PostObserver:
@@ -90,7 +90,7 @@ Post.observe(PostObserver())
 ```
 
 Only the hooks an observer defines are wired — see [Events](../events.md#model-observers) for the
-registration mechanics (`Model.observe`, the halting/cancel semantics shared with `Event::until`).
+registration mechanics (`Model.observe`, the halting/cancel semantics shared with `Event.until`).
 
 !!! note "`replicate()` stays synchronous"
     `post.replicate()` keeps its plain, non-`async` signature — the `replicating`

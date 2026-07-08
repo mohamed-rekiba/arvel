@@ -1,6 +1,57 @@
 # Migrations & Schema
 
-In a migration's blueprint, declare columns with the builder:
+A migration is version control for your database schema. Instead of hand-editing tables and hoping
+every environment matches, you describe each change as a small Python class with an `up` (apply) and a
+`down` (revert), commit it, and every machine runs the same ordered set of changes to arrive at the
+same schema. arvel's migrations run on Alembic under the hood but you write against a fluent schema
+builder that renders correct DDL for **PostgreSQL, MySQL, and SQLite** from one definition.
+
+## Your first migration
+
+Generate a migration with the CLI. A name of the form `create_<table>_table` scaffolds a create/drop
+stub for you:
+
+```bash
+arvel make:migration create_posts_table
+# → database/migrations/2026_07_08_120000_create_posts_table.py
+```
+
+That gives you a `Migration` subclass with a `define(t)` blueprint. Fill in the columns:
+
+```python
+from arvel.database import Migration
+
+
+class CreatePostsTable(Migration):
+    def up(self, schema):
+        def define(t):
+            t.id()
+            t.foreign_id("user_id")
+            t.string("title")
+            t.text("body")
+            t.boolean("published").default(False)
+            t.timestamps()
+
+        schema.create("posts", define)
+
+    def down(self, schema):
+        schema.drop("posts")
+```
+
+Then apply it — and roll it back if you need to:
+
+```bash
+arvel migrate                  # apply every pending migration, in order
+arvel migrate:rollback         # undo the last batch
+```
+
+`schema.create(name, define)` builds a new table from the blueprint; `schema.table(name, define)`
+**adds** columns to an existing one; `schema.drop(name)` drops it. Any name that *isn't*
+`create_<table>_table` (e.g. `add_slug_to_posts`) scaffolds a generic `up`/`down` stub instead.
+
+## The column builder
+
+Inside `define(t)`, declare columns with the blueprint `t`:
 
 ```python
 t.id()
@@ -20,10 +71,10 @@ t.timestamp("published_at").nullable()        # DateTime
 Cross-dialect types render natively where it matters (real `UNSIGNED` / `LONGTEXT` / `MEDIUMTEXT`
 on MySQL; portable equivalents elsewhere), so a ported migration runs unchanged.
 
-A model's own `__fields__` follow the same convention: a `str` field becomes `VARCHAR(255)`
- and a `datetime` field a real timezone-aware `DateTime` — so the
-table is valid DDL on **every** dialect, including MySQL (which rejects a length-less `VARCHAR`). For
-a longer column declare the type explicitly, e.g. `__fields__ = {"body": sa.Text()}`.
+A model's own `__fields__` follow the same convention: a `str` field becomes `VARCHAR(255)` and a
+`datetime` field a real timezone-aware `DateTime` — so the table is valid DDL on **every** dialect,
+including MySQL (which rejects a length-less `VARCHAR`). For a longer column declare the type
+explicitly, e.g. `__fields__ = {"body": sa.Text()}`.
 
 
 ## Soft deletes, ids, pruning
@@ -49,7 +100,7 @@ await Session.prune()              # delete prunable() rows (pair with schedule:
 ## Evolving a table
 
 `Schema` (the object your migration's `up`/`down` receive) also modifies an *existing* table —
-`renameColumn`/`change`/`dropForeign`/`dropIndex`/`dropUnique`/`rename`, over Alembic:
+`rename_column`/`change_column`/`drop_foreign`/`drop_index`/`drop_unique`/`rename`, over Alembic:
 
 ```python
 def up(self, schema):
@@ -94,3 +145,36 @@ class DatabaseSeeder(Seeder):
         with WithoutModelEvents():          # bulk-insert without firing creating/created/saved
             await UserFactory().count(1000).create()
 ```
+
+Register the entry seeder on your app and run it with `arvel db:seed` (or `migrate:fresh --seed`).
+See [Factories](factories.md) for generating the rows a seeder inserts.
+
+## Common mistakes & gotchas
+
+- **Editing an applied migration instead of adding a new one.** Once a migration has run somewhere,
+  change the schema with a *new* migration — editing the old file won't re-run on machines that
+  already applied it.
+- **No `down`.** A migration without a working `down` can't be rolled back — `migrate:rollback` and
+  `migrate:refresh` depend on it. Make `down` the exact inverse of `up`.
+- **`schema.table` for a column change.** `schema.table(name, define)` only *adds* columns. To
+  rename, retype, or drop, use `rename_column`/`change_column`/`drop_column` (or `execute` for
+  anything they don't cover).
+- **A length-less string on MySQL.** A bare `str` field renders `VARCHAR(255)`; MySQL rejects a
+  `VARCHAR` with no length, so declare `sa.Text()` explicitly for long columns.
+- **`migrate:fresh` on production.** It drops every table. It's a development/testing convenience —
+  never point it at data you care about.
+
+## How it works
+
+Each `Migration` subclass records its `name` (the file stem) in a migrations table; `migrate` applies
+the ones not yet recorded, in filename (timestamp) order, and `migrate:rollback` reverses the last
+batch by calling `down`. The `Schema` object wraps an Alembic `Operations` instance, so every builder
+call compiles to real DDL for the active dialect — and the Postgres-only features degrade with a
+warning (see [SQL Views & Functions](sql-views.md)) rather than crashing a sqlite/mysql run.
+
+## See also
+
+- [Casts & Serialization](casts.md) — how a column's stored type maps to a Python type.
+- [Factories](factories.md) · [Console](../console.md) — seeding, and the `migrate*`/`db:seed` commands.
+- [SQL Views & Functions](sql-views.md) — creating views, materialized views, and functions in a migration.
+- [Relationships](relationships.md) — the foreign keys `t.foreign_id`/`t.morphs` set up.

@@ -20,9 +20,9 @@ correlated to the trace it happened in.
 - [Logs](#logs)
 - [Delivery: push vs pull](#delivery-push-vs-pull)
 - [Sending to Grafana](#sending-to-grafana)
-- [Errors → Sentry](#errors--sentry)
+- [Errors → Sentry](#errors-sentry)
 - [Security](#security)
-- [Common mistakes & gotchas](#common-mistakes--gotchas)
+- [Common mistakes & gotchas](#common-mistakes-gotchas)
 
 ## Quick start
 

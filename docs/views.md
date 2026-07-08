@@ -75,7 +75,7 @@ Like the rest of the flash, old input lives for exactly one request. **Password 
 
 ## Sharing data with every view
 
-Register globals once (e.g. from a service provider's `boot`) — the `View::share`:
+Register globals once (e.g. from a service provider's `boot`) with `View.share`:
 
 ```python
 app.make("view").share(app_name="Arvel", year=2026)

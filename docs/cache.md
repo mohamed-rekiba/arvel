@@ -83,7 +83,7 @@ await cache().decrement("stock:sku-1", 3)            # mirrors `increment`
 ```
 
 `add` is **atomic** — on Redis it's a single `SET NX`, so concurrent callers racing to seed the
-same key never both "win" (`Cache::add` parity).
+same key never both "win": exactly one `Cache.add` returns `True`.
 
 ## Stale-while-revalidate with `flexible`
 
