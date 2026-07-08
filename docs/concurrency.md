@@ -73,6 +73,32 @@ await ticker_task
 # even though two genuinely CPU-bound functions were running concurrently
 ```
 
+## A worked example: assembling a dashboard
+
+The everyday use of the default `"async"` driver is fanning out independent I/O and waiting on all of
+it once, instead of `await`-ing each call in series. A dashboard that needs three unrelated things —
+the user's orders, their unread notifications, and a billing summary — shouldn't pay for them one
+after another:
+
+```python
+from functools import partial
+from arvel.support import Concurrency
+
+async def dashboard(request, user):
+    orders, unread, billing = await Concurrency.run([
+        partial(Order.where(user_id=user.id).get),      # DB query
+        partial(notifications.unread_count, user),       # cache/DB
+        partial(billing_api.summary, user.account_id),   # HTTP call
+    ])
+    return {"orders": orders, "unread": unread, "billing": billing}
+```
+
+The three calls run concurrently and the results come back **in the order you listed them** —
+`orders`, `unread`, `billing` — no matter which finishes first, so you can unpack them positionally.
+The total wait is roughly the slowest single call, not the sum of all three. Because the default
+driver awaits coroutines directly and pushes plain sync callables onto a thread, you can mix an async
+DB query, a sync cache read, and an HTTP call in one batch without thinking about which is which.
+
 ## Common mistakes & gotchas
 
 - **Using `driver="process"` with a lambda or closure.** It'll fail with a pickling error — see

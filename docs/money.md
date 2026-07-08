@@ -95,6 +95,32 @@ So a price stored once (minor units + currency) renders correctly for every user
 included — with no locale threading through your code. The `Number` helpers (`Number.currency`,
 `Number.format`) follow the same active-locale rule — see [Helpers](helpers.md).
 
+## A worked example: an invoice with tax and a split
+
+The pieces come together in the kind of arithmetic that quietly loses money when you do it with
+floats: a bill, a percentage tax, and an even split. Say three people share a $58.40 meal with 8.25%
+tax. Every step stays in exact minor units, and the shares reconcile to the penny:
+
+```python
+from arvel.support import Money
+
+meal  = Money.of("58.40", "USD")
+tax   = meal.times("0.0825")          # $4.82  — rounded half-up, still exact minor units
+total = meal + tax                    # $63.22
+
+shares = total.allocate_to(3)         # [$21.08, $21.07, $21.07]
+assert sum(s.amount for s in shares) == total.amount     # sums back to 6322 cents, exactly
+
+for s in shares:
+    print(s.format())                 # locale-aware: "$21.08", "$21.07", "$21.07"
+```
+
+Nothing here ever touches a binary float, so no penny evaporates in a rounding step. The one leftover
+cent from dividing `$63.22` by three lands on the first share (`allocate_to` gives the remainder to
+the earliest slots), which is why the three parts add back to the original total instead of drifting a
+cent short. Ratio-weighted splits — say a 30/70 revenue share — work the same way with
+`allocate([3, 7])`.
+
 ## Common mistakes & gotchas
 
 - **`Money(1999, ...)` vs `Money.of("19.99", ...)`.** The constructor takes **minor** units (cents);
