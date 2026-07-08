@@ -325,8 +325,8 @@ worker picks up a job, it runs under that job's `tries`/`backoff`/`timeout`/`fai
 
 ### Worker flags
 
-`QueueManager.work(...)` (what `queue:work` calls) takes lifecycle flags
-parity, for a custom worker entrypoint/supervisor script:
+`QueueManager.work(...)` (what `queue:work` calls) takes the same lifecycle flags, for a custom
+worker entrypoint/supervisor script:
 
 ```python
 await app.make("queue").work(

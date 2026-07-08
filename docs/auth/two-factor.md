@@ -6,9 +6,9 @@ authentication (2FA) adds *something you have*: a rotating 6-digit code from an 
 
 - `TwoFactor` — the low-level TOTP primitives (secret generation, the `otpauth://` provisioning URI,
   code verification, recovery-code generation). Use these directly if you want full control.
-- The **Fortify-parity lifecycle** (`enable_two_factor`/`confirm_two_factor`/`verify_two_factor`/
+- The **high-level lifecycle** (`enable_two_factor`/`confirm_two_factor`/`verify_two_factor`/
   `disable_two_factor`/`regenerate_recovery_codes`) plus a **login-challenge state machine** — the
-  batteries-included path this page mostly covers, matching Fortify's enable → confirm →
+  batteries-included path this page mostly covers, following the standard enable → confirm →
   challenge flow.
 
 !!! note "Install the extra"
@@ -22,7 +22,7 @@ authentication (2FA) adds *something you have*: a rotating 6-digit code from an 
 
 The lifecycle functions store three plain attributes on the `user` you pass in —
 `two_factor_secret`, `two_factor_recovery_codes` (a list of *hashed* codes), and
-`two_factor_confirmed_at`. Exactly like Fortify, arvel does not encrypt these for you: your
+`two_factor_confirmed_at`. arvel does not encrypt these for you: your
 user model owns that by declaring the model casts (and a migration adding the three nullable
 columns — arvel ships no migration for them, since they live on *your* user model, not a framework
 table):
@@ -167,7 +167,7 @@ codes = TwoFactor.recovery_codes(count=8)                  # fresh one-time code
 `TwoFactor` is a thin wrapper over pyotp (the `[2fa]` extra, imported lazily so it stays out of the
 light core): `generate_secret` makes a base32 TOTP secret, `provisioning_uri` formats the standard
 `otpauth://` URI, `verify` checks a code within `valid_window` time-steps, `recovery_codes` returns
-high-entropy one-time fallbacks. The lifecycle functions layer Fortify's semantics on top: recovery
+high-entropy one-time fallbacks. The lifecycle functions layer the higher-level semantics on top: recovery
 codes are hashed individually (via the resolved `Hasher`, same as a password) so a leaked table
 doesn't expose usable codes; the secret and the recovery-code list are otherwise stored exactly as you
 set them — encryption-at-rest is your user model's `encrypted`/`encrypted:array` casts, not something

@@ -96,6 +96,20 @@ Start at the top and read down, or jump to what you need:
 | [Hashing](../hashing.md) | Hashing passwords — argon2id/bcrypt, rehash-on-login |
 | [Encryption](../encryption.md) | Encrypting arbitrary values — AES-256-GCM, key rotation |
 
+## Common mistakes & gotchas
+
+- **Storing "how they log in" on the `User`.** A `google_id` column on `users` is the trap this
+  section exists to avoid — login methods are [identities](identities.md) linked to a user, so a
+  person can gain or lose one without a migration.
+- **Modeling an IdP's groups as a second concept.** There's one authorization vocabulary — `Role`
+  and `Permission`. An external `groups` claim is *translated* into roles ([IdP → roles](idp-roles.md)),
+  never stored as a competing "group" idea.
+- **Confusing authentication with authorization.** "Are they logged in?" (a guard) and "may they do
+  this?" (a gate/policy) are different questions — checking one when you meant the other is the classic
+  bug. Authentication establishes the user; [authorization](authorization.md) decides what they may do.
+- **Documenting a route as protected without enforcing it.** A `.secure(...)` marker or a lock in the
+  docs is not a guard — the actual check lives in [middleware](providers-and-middleware.md).
+
 ## See also
 
 - [Service Container](../container.md) — guards and the user provider are resolved from the container.
