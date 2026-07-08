@@ -120,7 +120,7 @@ resolves a driver once and caches it. Resolution dispatches to a registered `ext
 exists, else to a `create_<name>_driver` method (`create_session_driver`, `create_local_driver`,
 `create_oidc_driver`); anything unknown raises `MissingExtraError`. The federated drivers do their
 heavy imports **inside** those creators, so importing the guard module never drags pyjwt/httpx into
-the light core — the `import arvel` startup contract (G2) holds.
+the light core — the `import arvel` startup contract holds.
 
 ## See also
 

@@ -361,8 +361,8 @@ Route.public("public", spa_fallback=False)           # static files only, no SPA
 ```
 
 Prefer configuring it once at the app level instead of a route file — `with_public_dir(...)`
-registers it automatically at boot (no route-file code needed at all, same as the own
-webserver-served `public/` needing zero lines in `routes/web.php`):
+registers it automatically at boot, so serving a `public/` directory needs no route-file code at
+all:
 
 ```python
 Application.configure(base_path=".").with_public_dir("public").create()

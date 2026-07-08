@@ -164,10 +164,10 @@ checks three tiers, in order:
        __policy__ = PostPolicy
    ```
 
-3. A **provider-registered convention map** — the closest arvel gets to the automatic
-   `Model` → `ModelPolicy` guess. Python has no PSR-4 class-name convention to exploit, so there's no
-   filesystem/import magic here: your app's `AuthServiceProvider` scans its own `policies/` package
-   and hands the resulting map to `register_policies`:
+3. A **provider-registered convention map** — the closest arvel gets to an automatic
+   `Model` → `ModelPolicy` guess. There's no filesystem/import magic inferring a policy from a class
+   name: your app's `AuthServiceProvider` scans its own `policies/` package and hands the resulting
+   map to `register_policies`:
 
    ```python
    gate.register_policies({Post: PostPolicy, Comment: CommentPolicy})

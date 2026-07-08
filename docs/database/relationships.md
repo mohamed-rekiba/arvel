@@ -44,8 +44,8 @@ posts.to_query() # a fresh Builder: WHERE pk IN (these members' keys)
 `pluck`/`where`/…) — a transform that returns a new collection (`map`, `filter`, …) yields a
 plain `Collection`, not another `ModelCollection`, since the callback's output isn't
 guaranteed to still be models. A **raw** (non-model) table builder's `get()` — no `Model` bound —
-still returns a plain `list[dict]` (typed simplicity; the query builder returns a
-Collection there too, this is an intentional arvel divergence).
+still returns a plain `list[dict]`: a raw builder deliberately doesn't wrap its rows in a
+`Collection`, keeping untyped table reads simple.
 
 **Loaded relations serialize.** Like the `toArray()`, an eager-loaded relation is included
 (nested) in `to_dict()` / a JSON response — a has-many as a list, a has-one/belongs-to as a single
