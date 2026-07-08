@@ -11,7 +11,13 @@ from arvel.http.exceptions import HttpException, abort
 from arvel.http.kernel import HttpKernel
 from arvel.http.middleware import reset_rate_limiter, reset_sessions
 from arvel.http.redirect import Redirect, redirect
-from arvel.http.request import Request, UploadedFile, current_request, current_user
+from arvel.http.request import (
+    Request,
+    RouteMatch,
+    UploadedFile,
+    current_request,
+    current_user,
+)
 from arvel.http.response import FileDownload, Response, StreamValue, response
 
 __all__ = [
@@ -21,6 +27,7 @@ __all__ = [
     "Redirect",
     "Request",
     "Response",
+    "RouteMatch",
     "StreamValue",
     "UploadedFile",
     "abort",
