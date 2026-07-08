@@ -121,15 +121,32 @@ your closure instead of the method:
 app.bind_method([ReportJob, "handle"], lambda job, c: job.handle(c.make(Exporter)))
 ```
 
-## Common mistakes & gotchas
+## Putting it together
 
-- **`singleton` holding request state.** A singleton lives for the whole process — don't store
-  per-request data on it (use `scoped` for that), or requests will see each other's state.
-- **Binding a concrete you could autowire.** If a class has no interface and resolvable
-  dependencies, you don't need to bind it at all — `make` autowires it. Bind only to map an
-  interface, supply config, or control the lifetime.
-- **Circular dependencies.** A → B → A can't be constructed; the container raises rather than
-  looping forever. Break the cycle (often with a lazy lookup or an event).
+The pieces above compose into a pattern you'll use constantly: bind an interface once in a
+provider, depend on that interface everywhere else, and never wire the graph by hand. Say a report
+endpoint needs a database connection and a mailer:
+
+```python
+# in a provider's register()
+app.singleton(Db, lambda c: Db.connect(env("DB_URL")))     # one shared pool
+app.bind(Mailer, SmtpMailer)                                 # interface → implementation
+
+# an app service that declares what it needs — no `make`, no globals
+class ReportService:
+    def __init__(self, db: Db, mailer: Mailer):
+        self.db = db
+        self.mailer = mailer
+
+# a handler that depends on the service
+async def send_report(request, reports: ReportService):     # resolved through the container
+    await reports.mailer.send(await reports.db.fetch_all(...))
+```
+
+When the request arrives, the container resolves `ReportService`, sees it needs a `Db` and a
+`Mailer`, hands it the shared `Db` singleton and a freshly-built `SmtpMailer`, and injects the
+finished service into the handler. You wrote three declarations; the container built the graph.
+Swap `SmtpMailer` for a fake in a test by rebinding `Mailer` — nothing else changes.
 
 ## What autowiring can resolve
 
@@ -146,6 +163,16 @@ app.bind_method([ReportJob, "handle"], lambda job, c: job.handle(c.make(Exporter
 
 This is why the framework's own middleware (e.g. `StartSession`, `ThrottleRequests` — both with
 keyword-only, `Any`-typed ctor params) can be built by the container per request.
+
+## Common mistakes & gotchas
+
+- **`singleton` holding request state.** A singleton lives for the whole process — don't store
+  per-request data on it (use `scoped` for that), or requests will see each other's state.
+- **Binding a concrete you could autowire.** If a class has no interface and resolvable
+  dependencies, you don't need to bind it at all — `make` autowires it. Bind only to map an
+  interface, supply config, or control the lifetime.
+- **Circular dependencies.** A → B → A can't be constructed; the container raises rather than
+  looping forever. Break the cycle (often with a lazy lookup or an event).
 
 ## How it works
 

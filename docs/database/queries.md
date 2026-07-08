@@ -1,7 +1,15 @@
 # Queries
 
-Reading and writing rows, plus reusable query scopes. See also
-[Relationships](relationships.md) for relation queries.
+The query builder is how you read and write rows without hand-writing SQL. Every model exposes it
+— `Post.where(...)`, `Post.find(...)`, `Post.create(...)` — and each method returns the builder
+again, so you compose a query by chaining and only touch the database when you call a *terminal*
+like `get()`, `first()`, or `count()`. Under the hood it compiles to SQLAlchemy Core, so the SQL
+comes out dialect-correct across SQLite, MySQL, and Postgres; you stay in Python and the builder
+handles the rest.
+
+This page covers reading and writing rows, joins and grouped filters, walking large tables with
+chunking and streaming, keyset pagination, and reusable scopes. Relation queries — eager loading
+and aggregates over *related* rows — live in [Relationships](relationships.md).
 
 ## Querying
 
@@ -181,6 +189,17 @@ await Post.published().authored_by(ada).get()   # identical call site
 
 Both styles are equivalent and may be mixed on the same model; `@scope` just frees the name from
 the prefix.
+
+## How it works
+
+Every builder method records a clause and returns the same `Builder` — nothing hits the database
+until a *terminal* runs (`get`/`first`/`count`/`paginate`/`chunk`/`cursor`/…). At that point the
+builder assembles a SQLAlchemy Core statement and hands it to the connection, which is why the SQL
+is dialect-correct: the `upsert` and `having` divergences above are the builder compiling the right
+statement per driver, not leaking the difference up to you. On the way back, `get()` hydrates each
+row into a model through the model's `_hydrate` and wraps them in a
+[`ModelCollection`](relationships.md#model-collection); a raw table builder with no model bound
+skips hydration and returns plain `dict` rows instead.
 
 ## Common mistakes & gotchas
 
