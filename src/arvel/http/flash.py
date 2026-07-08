@@ -81,6 +81,30 @@ class FlashBag:
             return dict(data)
         return data.get(key, default)
 
+    def pull(self, key: str, default: Any = None) -> Any:
+        """Read ``key`` from the session and remove it — a general session op (not scoped to
+        the ``_flash`` bag), e.g. a one-shot value stashed outside the flash lifecycle."""
+        return self._session.pop(key, default)
+
+    def increment(self, key: str, step: int = 1) -> int:
+        """Add ``step`` to the session's integer at ``key`` (starting at 0 when absent) and
+        return the new value. A general session op, same as :meth:`pull`."""
+        value = self._session.get(key, 0) + step
+        self._session[key] = value
+        return cast("int", value)
+
+    def decrement(self, key: str, step: int = 1) -> int:
+        """:meth:`increment` by ``-step``."""
+        return self.increment(key, -step)
+
+    def flash_only(self, data: dict[str, Any], keys: str | list[str]) -> FlashBag:
+        """Flash only the named subset of ``data`` (readable via :meth:`old`) — ``flash_input``
+        narrowed to specific keys, e.g. a form that wants ``old()`` for some fields but not a
+        secret one."""
+        wanted = [keys] if isinstance(keys, str) else keys
+        self.flash_input({k: data[k] for k in wanted if k in data})
+        return self
+
     def keep(self, keys: str | list[str]) -> FlashBag:
         """Re-flash only the named key(s) for one more request — ``.reflash()`` narrowed to
         specific keys. Marks each fresh again (the same bookkeeping :meth:`flash` uses), so the

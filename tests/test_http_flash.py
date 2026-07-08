@@ -34,3 +34,48 @@ def test_clear_empties_flash_and_errors() -> None:
     bag.clear()
     assert bag.all() == {}
     assert bag.errors() == {}
+
+
+def test_pull_returns_and_removes() -> None:
+    session: dict[str, Any] = {"k": "v"}
+    bag = FlashBag(session)
+    assert bag.pull("k") == "v"
+    assert "k" not in session
+    assert bag.pull("k") is None  # already gone
+
+
+def test_pull_default_for_missing_key() -> None:
+    assert FlashBag({}).pull("nope", "fallback") == "fallback"
+
+
+def test_increment_on_an_absent_key_starts_at_the_step() -> None:
+    bag = FlashBag({})
+    assert bag.increment("views") == 1
+    assert bag.increment("views") == 2
+
+
+def test_increment_custom_step() -> None:
+    bag = FlashBag({})
+    assert bag.increment("hits", step=5) == 5
+    assert bag.increment("hits", step=5) == 10
+
+
+def test_decrement_subtracts_the_step() -> None:
+    session: dict[str, Any] = {"credits": 10}
+    bag = FlashBag(session)
+    assert bag.decrement("credits") == 9
+    assert bag.decrement("credits", step=4) == 5
+
+
+def test_flash_only_flashes_the_named_subset_for_old() -> None:
+    session: dict[str, Any] = {}
+    bag = FlashBag(session)
+    bag.flash_only({"name": "ada", "password": "secret", "email": "a@b.com"}, ["name", "email"])
+    assert bag.old() == {"name": "ada", "email": "a@b.com"}
+
+
+def test_flash_only_accepts_a_single_key() -> None:
+    session: dict[str, Any] = {}
+    bag = FlashBag(session)
+    bag.flash_only({"name": "ada", "password": "secret"}, "name")
+    assert bag.old() == {"name": "ada"}

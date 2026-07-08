@@ -76,6 +76,29 @@ def test_failed_authorize_renders_403() -> None:
     assert response.status_code == 403
 
 
+def test_failed_authorize_renders_403_json_message_not_a_redirect() -> None:
+    # H15 render-neutral: AuthorizationException still renders like the old ValidationException(403)
+    # did — a JSON {message} body, never the 419/422 "return to the form" redirect-back.
+    with _client() as client:
+        response = client.post(
+            "/guarded", json={"value": 1}, headers={"accept": "application/json"}
+        )
+    assert response.status_code == 403
+    assert response.json()["message"]
+
+
+def test_failed_authorize_renders_403_html_page_for_a_browser_client() -> None:
+    with _client() as client:
+        response = client.post(
+            "/guarded",
+            json={"value": 1},
+            headers={"accept": "text/html"},
+            follow_redirects=False,
+        )
+    assert response.status_code == 403  # not a 302 — 403 isn't in the redirect-back status set
+    assert "html" in response.headers["content-type"]
+
+
 def test_same_origin_or_root_blocks_backslash_open_redirect() -> None:
     from arvel.http.exceptions import same_origin_or_root
 

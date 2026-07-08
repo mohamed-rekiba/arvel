@@ -8,6 +8,7 @@ state lives in ``ContextVar``s (no per-request rebinding). Grounded in doc 04.
 from __future__ import annotations
 
 import contextvars
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, cast
 
@@ -23,6 +24,34 @@ from arvel.support import current_user as current_user  # noqa: E402  (explicit 
 #: distinguishes "key absent" from "value is present and None" — a plain ``None`` default can't
 #: (has/missing/filled all need that distinction over input()).
 _MISSING: Any = object()
+
+
+@dataclass(frozen=True)
+class RouteMatch:
+    """The matched route for the active request (H4): its name and resolved params (post-binding
+    — a model-bound param carries the resolved model, not the raw path segment). Stashed on the
+    ``Request`` by the kernel's dispatch; read via ``url().current_route()``/
+    ``Router.current_route()``, never constructed directly."""
+
+    name: str | None
+    params: dict[str, Any] = field(default_factory=dict[str, Any])
+
+
+def current_route_match() -> RouteMatch | None:
+    """The active request's matched route, or ``None`` outside a request / before dispatch
+    reaches binding resolution (there's no "current route" yet)."""
+    request = current_request.get(None)
+    if request is None:
+        return None
+    return getattr(request, "_route_match", None)
+
+
+def route_matches_name(match: RouteMatch | None, pattern: str) -> bool:
+    """Whether ``match`` is named and its name fnmatch-globs ``pattern`` — ``False`` for no match
+    or an unnamed route."""
+    import fnmatch
+
+    return match is not None and match.name is not None and fnmatch.fnmatch(match.name, pattern)
 
 
 class Request:
@@ -42,6 +71,9 @@ class Request:
     _json_cache: Any
     #: lazily created by :meth:`merge`/:meth:`merge_if_missing` — absent until first written.
     _input_overlay: dict[str, Any]
+    #: the matched route (H4), set by the kernel once dispatch resolves bindings — absent before
+    #: then / on a request the router never finished matching.
+    _route_match: RouteMatch
 
     def __init__(self, litestar_request: Any) -> None:
         self._r = litestar_request
@@ -167,15 +199,21 @@ class Request:
     async def validate(self, schema: Any) -> Any:
         """Validate the JSON body into ``schema`` (a FormRequest/Struct).
 
-        Raises ``ValidationException`` (→ 422) on bad input, or 403 if the
-        FormRequest's ``authorize()`` returns False.
+        Raises ``ValidationException`` (→ 422) on bad input, or ``AuthorizationException`` (→ 403)
+        if the FormRequest's ``authorize()`` returns False — the same type
+        ``FormRequest.authorized`` raises for the identical outcome (DR-0040).
 
         Validates the (normalized) **body** only: ``merge()`` overlay values appear in
         ``input()``/``all()`` but are deliberately invisible here — validation judges what
         the client actually sent.
         """
         from arvel.localization import trans
-        from arvel.validation import FormRequest, ValidationException, validate
+        from arvel.validation import (
+            AuthorizationException,
+            FormRequest,
+            ValidationException,
+            validate,
+        )
 
         data = await self.json()
         raw_schema: Any = schema  # an un-narrowed Any handle for the generic validate path
@@ -191,7 +229,7 @@ class Request:
             raise
         authorize = getattr(dto, "authorize", None)
         if callable(authorize) and not authorize():
-            raise ValidationException(trans("http.unauthorized"), status=403)
+            raise AuthorizationException(trans("http.unauthorized"))
         return dto
 
     #: input fields never flashed back — keep secrets out of the session.

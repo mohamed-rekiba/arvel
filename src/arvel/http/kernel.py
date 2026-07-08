@@ -25,7 +25,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
 # one compiled route: (methods, path, handler, group, route_middleware, name, security,
-# status_code, wheres, missing_callback, without_middleware)
+# status_code, wheres, missing_callback, without_middleware, domain, scope_bindings, trashed_all,
+# trashed_params)
 _RouteEntry = tuple[
     list[str],
     str,
@@ -38,6 +39,10 @@ _RouteEntry = tuple[
     dict[str, str],
     Any,
     list[Any],
+    str | None,
+    bool,
+    bool,
+    frozenset[str],
 ]
 
 _PARAM = re.compile(r"\{(\w+)(?::(\w+))?(\?)?\}")
@@ -45,6 +50,19 @@ _PARAM = re.compile(r"\{(\w+)(?::(\w+))?(\?)?\}")
 _LITESTAR_CONVERTERS = frozenset(
     {"str", "int", "float", "uuid", "decimal", "date", "datetime", "time", "timedelta", "path"}
 )
+_DOMAIN_PARAM = re.compile(r"\\\{(\w+)\\\}")  # matches a `{name}` segment after re.escape
+
+
+def _compile_domain(pattern: str) -> tuple[re.Pattern[str], frozenset[str]]:
+    """``'{account}.example.com'`` -> a fullmatch regex over the request ``Host`` header (H1) +
+    the param names it captures, compiled once at build. A ``{name}`` segment becomes a named
+    capture group so a match also yields its value, merged into the handler params exactly like a
+    path param."""
+    escaped = re.escape(pattern)
+    names = frozenset(_DOMAIN_PARAM.findall(escaped))
+    source = _DOMAIN_PARAM.sub(lambda m: f"(?P<{m.group(1)}>[^.]+)", escaped)
+    # hostnames are case-insensitive per DNS — a mixed-case literal Host must still match
+    return re.compile(f"^{source}$", re.IGNORECASE), names
 
 
 class _BindingMissing(Exception):
@@ -65,6 +83,9 @@ class HttpKernel:
         self.groups: dict[str, list[Any]] = {"web": [], "api": []}
         self._aliases: dict[str, Any] = {}  # short name -> middleware class
         self.bindings: dict[str, Any] = {}  # route-param -> resolver (model/enum binding)
+        # H5: middleware classes in the relative order they must run, regardless of which tier
+        # (global/group/route) inserted them. Empty = no reordering (insertion order, unchanged).
+        self.middleware_priority: list[Any] = []
 
     # --- middleware group customization ---------------------------
     def append_to_group(self, group: str, *middleware: Any) -> HttpKernel:
@@ -188,6 +209,10 @@ class HttpKernel:
         wheres: dict[str, str] | None = None,
         missing: Any | None = None,
         without_middleware: Sequence[Any] | None = None,
+        domain: str | None = None,
+        scope_bindings: bool = False,
+        trashed_all: bool = False,
+        trashed_params: Sequence[str] | None = None,
     ) -> None:
         self._routes.append(
             (
@@ -202,6 +227,10 @@ class HttpKernel:
                 dict(wheres or {}),
                 missing,
                 list(without_middleware or []),
+                domain,
+                scope_bindings,
+                trashed_all,
+                frozenset(trashed_params or ()),
             )
         )
 
@@ -271,7 +300,7 @@ class HttpKernel:
 
         from arvel.dates import Date
         from arvel.http.exceptions import HttpException, render_exception
-        from arvel.validation import ValidationException
+        from arvel.validation import AuthorizationException, ValidationException
 
         # imported lazily so the http layer takes no hard dependency on the database module
         model_encoder: dict[Any, Callable[[Any], Any]] = {}
@@ -287,34 +316,31 @@ class HttpKernel:
             model_encoder = {}
 
         self._warn_undefined_security()
+        # Litestar can't hold two handlers on the same method+path (an arbitrary constraint of the
+        # underlying router, not something arvel needs) — domain routing (H1) puts two arvel routes
+        # there deliberately, so entries sharing (methods, path) compile onto ONE Litestar handler
+        # that picks among them by Host at request time. The overwhelmingly common case is a group
+        # of exactly one, which costs nothing extra. Domain-specific candidates are tried before a
+        # domain-less (matches-any-host) one at the same path, same "more specific wins" rule
+        # `apply_to` already uses for fallback routes.
+        grouped: dict[tuple[tuple[str, ...], str], list[_RouteEntry]] = {}
+        for entry in self._routes:
+            key = (tuple(entry[0]), entry[1])
+            grouped.setdefault(key, []).append(entry)
+        # merging only makes sense when the candidates differ by domain; two domain-less routes on
+        # the same method+path would silently shadow each other — keep that a loud boot error, as it
+        # was before H1's merge (an accidental duplicate should fail fast, not vanish at runtime).
+        for (methods, path), candidates in grouped.items():
+            if sum(entry[11] is None for entry in candidates) > 1:
+                raise ValueError(
+                    f"duplicate route {methods} {path!r} — two routes share a method+path with no "
+                    "distinguishing domain; give them different paths or a domain= group"
+                )
         handlers = [
             self._make_handler(
-                methods,
-                path,
-                handler,
-                group,
-                middleware,
-                name,
-                security,
-                status_code,
-                HTTPRouteHandler,
-                wheres,
-                missing,
-                without_middleware,
+                sorted(candidates, key=lambda entry: entry[11] is None), HTTPRouteHandler
             )
-            for (
-                methods,
-                path,
-                handler,
-                group,
-                middleware,
-                name,
-                security,
-                status_code,
-                wheres,
-                missing,
-                without_middleware,
-            ) in self._routes
+            for candidates in grouped.values()
         ]
         litestar_app = litestar.Litestar(
             route_handlers=handlers,
@@ -324,6 +350,7 @@ class HttpKernel:
             type_encoders={Date: lambda value: value.to_iso(), **model_encoder},
             exception_handlers={
                 ValidationException: render_exception,
+                AuthorizationException: render_exception,
                 HttpException: render_exception,
                 **extra_exception_handlers,
                 # every other uncaught exception is reported then rendered, not left to Litestar's 500
@@ -355,30 +382,15 @@ class HttpKernel:
         """Warn (at build) when a route's ``.secure(...)`` names a scheme that isn't defined in
         ``config('openapi').security`` — that would emit a dangling ``securitySchemes`` reference (a
         technically-invalid OpenAPI document). Non-fatal: the doc still serves."""
-        secured = {
-            scheme
-            for *_, security, _status, _wheres, _missing, _without in self._routes
-            for scheme in security
-        }
+        secured = {scheme for entry in self._routes for scheme in entry[6]}
         if not secured:
             return
         defined, _ = openapi.security_schemes(openapi.OpenApiSettings().security)
         from arvel.kernel.logging import LogManager
 
         log = LogManager().channel("http")
-        for (
-            _methods,
-            path,
-            _handler,
-            _group,
-            _middleware,
-            name,
-            security,
-            _status,
-            _wheres,
-            _missing,
-            _without,
-        ) in self._routes:
+        for entry in self._routes:
+            path, name, security = entry[1], entry[5], entry[6]
             for scheme in security:
                 if openapi.SECURITY_SCHEME_KEYS.get(scheme, scheme) not in defined:
                     log.warning(
@@ -456,42 +468,84 @@ class HttpKernel:
         schema: dict[str, Any] = self.build().openapi_schema.to_schema()
         return schema
 
-    def _make_handler(
-        self,
-        methods: list[str],
-        path: str,
-        handler: Any,
-        group: str | None,
-        middleware: list[Any],
-        name: str | None,
-        security: list[str],
-        status_code: int | None,
-        route_handler: Any,
-        wheres: dict[str, str],
-        missing: Any,
-        without_middleware: list[Any],
-    ) -> Any:
+    def _make_handler(self, candidates: list[_RouteEntry], route_handler: Any) -> Any:
+        """Compile one or more arvel routes that share a literal (methods, path) into ONE Litestar
+        handler. Almost always a single candidate (the common case, no extra cost); more than one
+        only happens for domain routing (H1), where the extra candidates differ solely by
+        ``domain`` — at request time the adapter picks the first whose ``domain`` matches the
+        ``Host`` header (``candidates`` is pre-sorted domain-specific-first) and dispatches through
+        *that* candidate's own handler/bindings/middleware, injecting the domain's captured params
+        alongside the path params."""
         kernel = self
+        methods, path = candidates[0][0], candidates[0][1]
         litestar_paths, key_fields = self._compile_path(path)
-        return_hint, body = self._handler_io(handler)
+        has_domain = any(entry[11] is not None for entry in candidates)
+        compiled_domains = [
+            _compile_domain(entry[11]) if entry[11] is not None else None for entry in candidates
+        ]
+        domain_regexes = [c[0] if c is not None else None for c in compiled_domains]
+        # a domain-captured name (H1) is resolved from the Host header, not a Litestar path/query
+        # param — excluded from query-param inference the same way a literal `{param}` is.
+        domain_param_names = frozenset(
+            name for c in compiled_domains if c is not None for name in c[1]
+        )
+
+        # OpenAPI/Litestar needs ONE signature for the shared handler: the body of the first
+        # candidate that declares one, and the union of every candidate's query params (by name —
+        # realistic domain variants are the same action for different tenants, so this is exact in
+        # the common case and best-effort in the pathological one where they genuinely diverge).
+        body: tuple[str, Any] | None = None
+        return_hint: Any = Any
+        query_by_name: dict[str, tuple[str, Any, Any]] = {}
+        for index, entry in enumerate(candidates):
+            hint, cand_body = self._handler_io(entry[2])
+            if index == 0:
+                return_hint = hint
+            if body is None and cand_body is not None:
+                body = cand_body
         body_name = body[0] if body is not None else None
-        query_params = self._query_params(handler, litestar_paths[0], body_name)
+        for entry in candidates:
+            for qname, qann, qdefault in self._query_params(
+                entry[2], litestar_paths[0], body_name, domain_param_names
+            ):
+                query_by_name.setdefault(qname, (qname, qann, qdefault))
+        query_params = list(query_by_name.values())
 
         # Litestar reads `__signature__` below to know what to inject and document; split the
         # body back out of the injected kwargs and forward the rest to the handler as query args.
         async def adapter(request: Any, **injected: Any) -> Any:
             body_arg = (body_name, injected.pop(body_name)) if body_name is not None else None
+            host = Request(request).host() if has_domain else None
+            chosen: _RouteEntry | None = None
+            domain_params: dict[str, Any] = {}
+            for entry, regex in zip(candidates, domain_regexes, strict=True):
+                if regex is None:
+                    chosen = entry
+                    break
+                if host is not None:
+                    match = regex.fullmatch(host)
+                    if match is not None:
+                        chosen = entry
+                        domain_params = match.groupdict()
+                        break
+            if chosen is None:
+                kernel._not_found()
             return await kernel._dispatch(
-                handler,
+                chosen[2],
                 request,
-                group,
-                middleware,
+                chosen[3],
+                chosen[4],
                 key_fields,
                 body=body_arg,
                 query=injected,
-                wheres=wheres,
-                missing=missing,
-                without_middleware=without_middleware,
+                wheres=chosen[8],
+                missing=chosen[9],
+                without_middleware=chosen[10],
+                name=chosen[5],
+                domain_params=domain_params,
+                scope_bindings=chosen[12],
+                trashed_all=chosen[13],
+                trashed_params=chosen[14],
             )
 
         sig_params = [inspect.Parameter("request", inspect.Parameter.POSITIONAL_OR_KEYWORD)]
@@ -512,11 +566,17 @@ class HttpKernel:
         adapter.__annotations__ = annotations
 
         # named from the route's name so the OpenAPI operationId/summary are clean, not a mangled fallback
+        name = candidates[0][5]
         safe = re.sub(r"\W+", "_", f"{'_'.join(methods).lower()}{path}")
         adapter.__name__ = re.sub(r"\W+", "_", name) if name else f"arvel_{safe}"
         # carried over so Litestar's use_handler_docstrings can turn it into the OpenAPI description
-        adapter.__doc__ = handler.__doc__
+        adapter.__doc__ = candidates[0][2].__doc__
         # Litestar defaults DELETE to 204 (no body); arvel handlers may return one, so pin it to 200
+        # ponytail: for merged domain candidates the Litestar-level signature — status_code,
+        # security, name/__doc__, and the unioned body/query shape — is taken from the first
+        # candidate. Exact for same-action-different-tenant domain routes (the real use case);
+        # domain variants that need genuinely different OpenAPI metadata should use distinct paths.
+        status_code, security = candidates[0][7], candidates[0][6]
         extra: dict[str, Any] = {}
         if status_code is not None:
             extra["status_code"] = status_code
@@ -554,13 +614,18 @@ class HttpKernel:
 
     @staticmethod
     def _query_params(
-        handler: Any, litestar_path: str, body_name: str | None
+        handler: Any,
+        litestar_path: str,
+        body_name: str | None,
+        extra_excluded: frozenset[str] = frozenset(),
     ) -> list[tuple[str, Any, Any]]:
         """A handler's query parameters: every typed arg that isn't the request (first param), the
-        body, or a path param. Returns ``(name, annotation, default)`` — exposed on the adapter so
-        Litestar documents + injects them (``def index(request, q: str | None = None, page: int = 1)``).
-        Best-effort; degrades to no query params on an unintrospectable handler."""
-        path_names = set(re.findall(r"\{(\w+)", litestar_path))
+        body, a path param, or ``extra_excluded`` (a domain param, H1 — captured from the Host
+        header, not a Litestar-level path/query param). Returns ``(name, annotation, default)`` —
+        exposed on the adapter so Litestar documents + injects them
+        (``def index(request, q: str | None = None, page: int = 1)``). Best-effort; degrades to no
+        query params on an unintrospectable handler."""
+        path_names = set(re.findall(r"\{(\w+)", litestar_path)) | extra_excluded
         try:
             signature = inspect.signature(handler)
             hints = typing.get_type_hints(handler)
@@ -590,9 +655,15 @@ class HttpKernel:
         wheres: dict[str, str] | None = None,
         missing: Any = None,
         without_middleware: Sequence[Any] | None = None,
+        name: str | None = None,
+        domain_params: dict[str, Any] | None = None,
+        scope_bindings: bool = False,
+        trashed_all: bool = False,
+        trashed_params: frozenset[str] = frozenset(),
     ) -> Any:
         import contextlib
 
+        from arvel.http.request import RouteMatch
         from arvel.support import access_token, current_user
 
         request = Request(litestar_request)
@@ -605,11 +676,21 @@ class HttpKernel:
         scope = self.app.scope() if self.app is not None else contextlib.nullcontext()
         try:
             async with scope:
-                params = dict(litestar_request.path_params)
+                # domain params (H1) first so a same-named path param — unlikely, but path wins —
+                # takes precedence; both are captured segments, resolved the same way below.
+                params = dict(domain_params or {})
+                params.update(litestar_request.path_params)
                 self._apply_wheres(params, wheres or {})
                 try:
                     await self._resolve_bindings(params)
-                    await self._resolve_implicit_bindings(handler, params, key_fields or {})
+                    await self._resolve_implicit_bindings(
+                        handler,
+                        params,
+                        key_fields or {},
+                        scope_bindings=scope_bindings,
+                        trashed_all=trashed_all,
+                        trashed_params=trashed_params,
+                    )
                 except _BindingMissing:
                     if missing is None:
                         self._not_found()
@@ -617,6 +698,11 @@ class HttpKernel:
                     if inspect.isawaitable(result):
                         result = await result
                     return await self._to_response(result, request)
+                # H4: the route's final name + resolved params, snapshotted before body/query (not
+                # route params) are folded in below.
+                request._route_match = RouteMatch(  # pyright: ignore[reportPrivateUsage]
+                    name=name, params=dict(params)
+                )
                 if body is not None:
                     params[body[0]] = body[1]
                 if query:
@@ -670,11 +756,30 @@ class HttpKernel:
             excluded = list(without_middleware)
             stack = [m for m in stack if not any(m == exc for exc in excluded)]
         # instantiate once so a terminable middleware shares state between handle() and terminate()
-        instances = [self._make(self.resolve_middleware(m)) for m in stack]
+        resolved = [self.resolve_middleware(m) for m in stack]
+        instances = [self._make(m) for m in self._order_middleware(resolved)]
         result = await self._run_pipeline(instances, request, destination)
         response = await self._to_response(result, request)
         await self._terminate(instances, request, response)
         return response
+
+    def _order_middleware(self, resolved: list[Any]) -> list[Any]:
+        """H5: reorder ``resolved`` (already alias/throttle-resolved, global+group+route already
+        concatenated) so any class named in ``middleware_priority`` runs in that relative order,
+        regardless of which tier inserted it. Middleware absent from the list keeps its original
+        relative order — a stable sort keyed by priority-index-or-last does exactly that. A no-op
+        (returns ``resolved`` unchanged) when the priority list is empty, the default."""
+        if not self.middleware_priority:
+            return resolved
+
+        def rank(mw: Any) -> int:
+            cls = mw if isinstance(mw, type) else type(mw)
+            try:
+                return self.middleware_priority.index(cls)
+            except ValueError:
+                return len(self.middleware_priority)
+
+        return sorted(resolved, key=rank)
 
     async def _run_pipeline(self, instances: list[Any], request: Any, destination: Any) -> Any:
         async def run(index: int, req: Any) -> Any:
@@ -714,7 +819,14 @@ class HttpKernel:
             params[name] = resolved
 
     async def _resolve_implicit_bindings(
-        self, handler: Any, params: dict[str, Any], key_fields: dict[str, str] | None = None
+        self,
+        handler: Any,
+        params: dict[str, Any],
+        key_fields: dict[str, str] | None = None,
+        *,
+        scope_bindings: bool = False,
+        trashed_all: bool = False,
+        trashed_params: frozenset[str] = frozenset(),
     ) -> None:
         """Implicit route-model binding: a path param
         whose handler type hint is a model (duck-typed: has ``resolve_route_binding``)
@@ -722,12 +834,20 @@ class HttpKernel:
         :meth:`_resolve_bindings`). An inline ``{post:slug}`` route-key field (from ``key_fields``)
         overrides the model's default route key. Params already handled by an explicit binding are
         skipped. Duck-typing keeps the HTTP layer from importing the database layer.
+
+        ``scope_bindings`` (H2, a route's ``.scope_bindings()``): once a param resolves to a model,
+        a later param whose model exposes ``resolve_child_route_binding`` (duck-typed) resolves
+        constrained to that parent instead of independently. ``trashed_all``/``trashed_params``
+        (H3, ``.with_trashed()``) pass ``with_trashed=True`` through to a plain (unscoped)
+        ``resolve_route_binding`` for the opted-in param(s) — only when opted in, so a duck-typed
+        resolver that doesn't accept the kwarg (most test doubles) is never broken by it.
         """
         key_fields = key_fields or {}
         try:
             hints = typing.get_type_hints(inspect.unwrap(handler))
         except Exception:  # unresolvable / forward-ref hints: skip implicit binding
             return
+        parent: Any = None
         for name in list(params):
             if name in self.bindings:  # an explicit binding already resolved this param
                 continue
@@ -735,12 +855,19 @@ class HttpKernel:
             resolver = getattr(annotation, "resolve_route_binding", None)
             if resolver is None or not callable(resolver):
                 continue
-            resolved = resolver(params[name], key_fields.get(name))
+            child_resolver = getattr(annotation, "resolve_child_route_binding", None)
+            if scope_bindings and parent is not None and callable(child_resolver):
+                resolved = child_resolver(parent, params[name], key_fields.get(name))
+            elif trashed_all or name in trashed_params:
+                resolved = resolver(params[name], key_fields.get(name), with_trashed=True)
+            else:
+                resolved = resolver(params[name], key_fields.get(name))
             if inspect.isawaitable(resolved):
                 resolved = await resolved
             if resolved is None:
                 raise _BindingMissing(name)
             params[name] = resolved
+            parent = resolved
 
     @staticmethod
     def _not_found() -> typing.NoReturn:

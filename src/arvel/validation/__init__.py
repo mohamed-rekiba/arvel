@@ -73,14 +73,58 @@ def _field_errors(exc: msgspec.ValidationError) -> dict[str, list[str]]:
     return {"_body": [message]}  # payload-level failure (wrong type at the root, etc.)
 
 
+def _field_error(name: str, exc: msgspec.ValidationError) -> tuple[str, str]:
+    """One field's independent-convert failure as ``(dotted_key, message)`` — reuses
+    ``_field_errors``' "at `$...`" parsing, but that path is relative to the field's own value
+    (msgspec never saw the parent struct), so it's rooted at ``name`` instead of ``$``:
+    ``items`` + ``- at \\`$[0].qty\\`` -> ``items.0.qty``, no suffix -> the field name itself."""
+    message = str(exc)
+    at = re.search(r"\s+-\s+at\s+`\$(.*?)`$", message)
+    if not at:
+        return name, message
+    suffix = at.group(1).replace("[", ".").replace("]", "").lstrip(".")
+    key = f"{name}.{suffix}" if suffix else name
+    return key, message[: at.start()].strip()
+
+
+def _aggregate_field_errors(
+    data: Mapping[str, Any],
+    schema: type[msgspec.Struct],
+    exc: msgspec.ValidationError,
+    *,
+    strict: bool,
+) -> dict[str, list[str]]:
+    """Every field converted independently, so a multi-bad-field body reports **all** of them —
+    msgspec's whole-struct ``convert`` is fail-fast and only ever surfaces the first (H9). Falls
+    back to the single-error shape for a root/payload-level failure the per-field loop can't
+    localize (e.g. nothing below came back invalid, yet the whole-struct convert still raised)."""
+    errors: dict[str, list[str]] = {}
+    for f in msgspec.structs.fields(schema):
+        if f.encode_name not in data:
+            if f.required:
+                errors[f.encode_name] = [f"Object missing required field `{f.encode_name}`"]
+            continue
+        try:
+            # per-field, so one bad field can't fail-fast past its siblings; `strict` threaded
+            # through so the coercion matches what the whole-struct convert would have done.
+            msgspec.convert(data[f.encode_name], f.type, strict=strict)
+        except msgspec.ValidationError as field_exc:
+            key, message = _field_error(f.encode_name, field_exc)
+            errors.setdefault(key, []).append(message)
+    return errors or _field_errors(exc)
+
+
 def validate[T: msgspec.Struct](
     data: Mapping[str, Any], schema: type[T], *, strict: bool = False
 ) -> T:
     """Validate+coerce ``data`` into ``schema`` (a msgspec Struct); raise on failure."""
+    payload = dict(data)
     try:
-        return msgspec.convert(dict(data), schema, strict=strict)
+        return msgspec.convert(payload, schema, strict=strict)
     except msgspec.ValidationError as exc:
-        raise ValidationException(_field_errors(exc)) from exc
+        raise ValidationException(
+            _aggregate_field_errors(payload, schema, exc, strict=strict)
+        ) from exc
 
 
 def json_schema(schema: type[msgspec.Struct]) -> dict[str, Any]:
