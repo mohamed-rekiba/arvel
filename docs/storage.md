@@ -235,8 +235,7 @@ teardown) restores every faked disk alongside the regular facade fakes (`Mail`, 
 - **`append`/`prepend` aren't atomic.** Both are a read-modify-write over the whole file — fine
   for logs written from one place, risky under concurrent writers.
 - **`temporary_url` isn't universal.** Only the `s3` driver supports it; calling it on `local`/
-  `gcs`/`azure` raises `UnsupportedDriverOperation` (parity — the same call throws there
-  too).
+  `gcs`/`azure` raises `UnsupportedDriverOperation` rather than hand back a URL it can't sign.
 
 ## How it works
 

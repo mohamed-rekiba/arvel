@@ -95,6 +95,20 @@ So a price stored once (minor units + currency) renders correctly for every user
 included — with no locale threading through your code. The `Number` helpers (`Number.currency`,
 `Number.format`) follow the same active-locale rule — see [Helpers](helpers.md).
 
+## Common mistakes & gotchas
+
+- **`Money(1999, ...)` vs `Money.of("19.99", ...)`.** The constructor takes **minor** units (cents);
+  `.of()` takes **major** units. `Money(1999, "USD")` and `Money.of("19.99", "USD")` are the same
+  amount — mixing them up is off by 100×.
+- **Building `Money` from a `float`.** Pass a string or `Decimal` to `.of()`; a `float` like `19.99`
+  is already imprecise before `Money` ever sees it. The whole point is to never touch binary floats.
+- **Mixing currencies.** Arithmetic and comparison across currencies raise by design — convert to a
+  common currency first; there's no implicit FX.
+- **Splitting with plain division.** Dividing a total in your own code re-introduces lost pennies.
+  Use `allocate`/`allocate_to`, which distribute the remainder so the parts sum back to the original.
+- **Assuming two decimal places.** Precision is per-currency (JPY has none). Don't hardcode `/100` —
+  use `.major()` / `.format()`.
+
 ## See also
 
 - [Helpers](helpers.md) — `Number` for non-currency formatting.

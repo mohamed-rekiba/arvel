@@ -115,3 +115,34 @@ config = {
 
 The `database` driver stores resolved values in a `features` table; a new app ships the migration
 for it, so `arvel migrate` creates it out of the box — no hand-written schema needed.
+
+## Common mistakes & gotchas
+
+- **Expecting a resolver to re-run.** A resolver runs *once per scope*, then the result is stored.
+  Changing the resolver's logic doesn't retroactively re-evaluate stored scopes — `purge` the flag
+  (or `forget` a scope) to force a re-resolve.
+- **Defining flags too late.** Register `Feature.define(...)` in a provider's `boot()`. Define it
+  after the code that checks it runs and the check resolves against an undefined flag.
+- **`activate`/`deactivate` are permanent overrides.** They write straight to the store and bypass
+  the resolver — a forced value sticks until you `forget`/`purge` it, even if the resolver would now
+  say otherwise.
+- **`array` driver in production.** It's in-process and resets every boot — perfect for tests, wrong
+  for a real rollout. Use `database` or `cache` when values must survive a restart.
+- **A global check that should be scoped.** `active("flag")` with no scope resolves the single
+  `__global__` value for everyone; pass the user/team when the flag is meant to vary per scope.
+
+## How it works
+
+`Feature` is a manager over a pluggable store (`array`/`database`/`cache`). `define` registers a
+resolver (a callable or a class with `.resolve`); the first `active`/`value` for a scope runs it and
+writes the result to the store keyed by `(flag, scope)`, and every later check reads the stored value.
+`activate`/`deactivate` write the store directly; `forget`/`purge` evict entries so the resolver runs
+again. Rich (non-boolean) values are stored JSON-encoded, and `active()` is simply the truthiness of
+the resolved value.
+
+## See also
+
+- [Cache](cache.md) — the `cache` driver's backing store, and per-flag tag purging.
+- [Migrations & Schema](database/migrations.md) — the `features` table the `database` driver uses.
+- [Service Providers](providers.md) — where you register flags in `boot()`.
+- [Console](console.md) — `feature:list` / `feature:purge`.

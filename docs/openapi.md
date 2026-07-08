@@ -119,6 +119,20 @@ IdP login like Keycloak — `.secure("oidc")` on the route):
 `.secure()` documents the contract — enforcement still lives in your middleware/handler (e.g. the
 bearer `TokenGuard`). See [Authentication](auth/authentication.md).
 
+## Common mistakes & gotchas
+
+- **`.secure()` doesn't enforce anything.** It *documents* that a route needs a scheme (and adds the
+  lock in the UI). The actual check still lives in your middleware/guard — a route with `.secure()`
+  but no guard is documented as protected while being wide open.
+- **A security scheme that does nothing.** Declaring `security` only *advertises* the scheme; routes
+  opt in with `.secure(...)`. Nothing is required until a route asks for it (or you set `default: True`).
+- **A request body that never appears in the schema.** The body schema comes from a `Schema`-typed
+  handler parameter. A plain `request`-only handler has no documented (or validated) body.
+- **Unnamed routes → ugly client SDKs.** `operationId` is the route name, so an unnamed route gets a
+  generated id. Name your routes for stable, readable generated clients.
+- **Forgetting the `[http]` extra.** The schema and UI serve on Litestar — without `arvel[http]`
+  there's nothing to serve.
+
 ## See also
 
 - [Routing](routing.md) — defining and naming the routes the schema is generated from.

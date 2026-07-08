@@ -178,6 +178,20 @@ app.instance("http", Client(transport=httpx.MockTransport(handler)))
 # code under test that calls `await Http.get(...)` now hits the stub
 ```
 
+## Common mistakes & gotchas
+
+- **Expecting an `httpx.Response`.** A verb returns a `ClientResponse`, not the raw httpx object.
+  Use its accessors (`.status()`, `.json()`), or reach the full httpx surface via `.raw`.
+- **A `404` that doesn't raise.** Only retry-worthy statuses raise once attempts are exhausted; a
+  non-retryable bad status is returned as-is. Call `.throw()` (or `.failed()`) when you want a `4xx`
+  to become an exception.
+- **Redirects silently not followed.** `follow_redirects` is off by default — pass
+  `follow_redirects=True` for an API/CDN that 302s to the real resource.
+- **Treating a `pool` slot as a response.** A failed slot holds the *exception object*, not raised —
+  check `isinstance(slot, Exception)` before using it.
+- **A stray real request in a test.** Under `Http.fake`, an unmatched URL passes through to the real
+  network unless you call `Http.prevent_stray_requests()`. Set it so a missed stub fails loudly.
+
 ## See also
 
 - [Facades](facades.md) — how `Http` resolves the `http` service.
