@@ -100,6 +100,11 @@ can evolve), a random 96-bit nonce, and the AES-256-GCM output (ciphertext with 
 tag appended, as `cryptography`'s `AESGCM` already does). The nonce is fresh per call to
 `encrypt`/`encrypt_string`, so encrypting the same value twice produces different tokens.
 
+!!! note "High-volume nonce budget"
+    Each encryption draws a random 96-bit GCM nonce. Per NIST SP 800-38D, keep a single key under
+    ~2³² encryptions to make a nonce collision negligible — rotate `APP_KEY` (the `previous_keys`
+    mechanism keeps old ciphertext readable) well before that.
+
 ## Common mistakes & gotchas
 
 - **Encrypting a password.** Passwords are *hashed*, never encrypted — encryption is reversible, and
@@ -126,8 +131,3 @@ failed — so `previous_keys` and `rotate` cost nothing on the common (primary-k
 
 - [Hashing](hashing.md) — for passwords; never `encrypt` a password, `Hash.make` it.
 - [Configuration](configuration.md) — where `APP_KEY` is read from.
-
-!!! note "High-volume nonce budget"
-    Each encryption draws a random 96-bit GCM nonce. Per NIST SP 800-38D, keep a single
-    key under ~2^32 encryptions to make nonce collision negligible — rotate `APP_KEY`
-    (the `previous_keys` mechanism keeps old ciphertext readable) well before that.
