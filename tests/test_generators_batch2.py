@@ -99,13 +99,13 @@ def test_generate_test_writes_pytest_discoverable_file(tmp_path: Path) -> None:
 def test_key_generate_sets_app_key_in_dotenv(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from arvel.console.ops import _set_env_var
+    from arvel.console.ops import set_env_var
 
     env = tmp_path / ".env"
     env.write_text("APP_NAME=demo\nAPP_KEY=old\n")
-    _set_env_var(env, "APP_KEY", "fresh-key")
+    set_env_var(env, "APP_KEY", "fresh-key")
     assert "APP_KEY=fresh-key" in env.read_text()
     assert "APP_NAME=demo" in env.read_text()  # other vars preserved
     # appends when absent
-    _set_env_var(env, "EXTRA", "1")
+    set_env_var(env, "EXTRA", "1")
     assert "EXTRA=1" in env.read_text()

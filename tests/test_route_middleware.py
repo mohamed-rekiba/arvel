@@ -8,6 +8,7 @@ from typing import Any
 from litestar.testing import TestClient
 
 from arvel.http import HttpKernel
+from arvel.http.middleware import EncryptCookies
 from arvel.routing import Router
 
 CALLS: list[str] = []
@@ -178,6 +179,13 @@ def test_web_group_runs_real_csrf_end_to_end() -> None:
             200,
             405,
         )  # safe method exempt (or no GET route)
+
+
+def test_use_default_groups_puts_encrypt_cookies_first_in_web() -> None:
+    """H7: EncryptCookies must run before StartSession/ValidateCsrfToken so their cookies go
+    through its codec."""
+    kernel = HttpKernel().use_default_groups()
+    assert kernel.groups["web"][0] is EncryptCookies
 
 
 def test_no_group_no_middleware_is_global_only() -> None:

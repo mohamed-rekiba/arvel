@@ -101,3 +101,14 @@ def test_new_package_absolute_path_names_from_basename(tmp_path: Path) -> None:
     pyproject = (target / "pyproject.toml").read_text()
     assert 'name = "arvel-my-pkg"' in pyproject
     assert (target / "src" / "arvel_my_pkg" / "provider.py").exists()
+
+
+def test_new_app_is_born_with_a_crypto_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    assert runner.invoke(build_cli(), ["new", "keyed"]).exit_code == 0
+    env_file = tmp_path / "keyed" / ".env"
+    assert env_file.is_file()  # .env.example mirrored into a live .env
+    key_line = next(
+        line for line in env_file.read_text().splitlines() if line.startswith("APP_KEY=")
+    )
+    assert len(key_line.removeprefix("APP_KEY=")) >= 40  # a real generated key, not a stub

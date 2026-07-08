@@ -236,7 +236,13 @@ class RememberMe(Middleware):
         if value:
             setter = getattr(response, "set_cookie", None)
             if callable(setter):
-                setter(
+                from arvel.http.middleware import emit_cookie
+
+                # through the one write path so the value encrypts whenever the
+                # cookie codec is active — cookie() decrypts on the way back in
+                emit_cookie(
+                    request,
+                    response,
                     self._cookie,
                     value,
                     max_age=self._ttl,

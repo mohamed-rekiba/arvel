@@ -7,6 +7,7 @@ from typing import Any
 
 from arvel.http import HttpKernel
 from arvel.http.middleware import (
+    EncryptCookies,
     ShareErrorsFromSession,
     StartSession,
     ThrottleRequests,
@@ -21,7 +22,12 @@ class _Custom:
 
 def test_defaults_fill_empty_groups() -> None:
     kernel = HttpKernel().use_default_groups()
-    assert kernel.groups["web"] == [StartSession, ShareErrorsFromSession, ValidateCsrfToken]
+    assert kernel.groups["web"] == [
+        EncryptCookies,  # H7 — first, so every cookie below it goes through its codec
+        StartSession,
+        ShareErrorsFromSession,
+        ValidateCsrfToken,
+    ]
     assert kernel.groups["api"] == [ThrottleRequests]
 
 
@@ -38,4 +44,9 @@ def test_append_to_group_survives_defaults() -> None:
     kernel.append_to_group("api", _Custom)
     kernel.use_default_groups()
     assert kernel.groups["api"] == [_Custom]  # defaults not appended (group non-empty)
-    assert kernel.groups["web"] == [StartSession, ShareErrorsFromSession, ValidateCsrfToken]
+    assert kernel.groups["web"] == [
+        EncryptCookies,
+        StartSession,
+        ShareErrorsFromSession,
+        ValidateCsrfToken,
+    ]

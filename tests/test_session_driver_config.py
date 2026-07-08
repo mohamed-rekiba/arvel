@@ -25,22 +25,22 @@ def _app_with_cache(**session_config: Any) -> Application:
 def test_redis_driver_wires_cache_backed_session() -> None:
     app = _app_with_cache(driver="redis")
     kernel = HttpKernel(app=app).use_default_groups()
-    session_mw = kernel.groups["web"][0]
+    session_mw = kernel.groups["web"][1]  # index 0 is EncryptCookies (H7)
     assert isinstance(session_mw, StartSession)  # a built instance, not the bare class
-    assert kernel.groups["web"][1:] == [ShareErrorsFromSession, ValidateCsrfToken]
+    assert kernel.groups["web"][2:] == [ShareErrorsFromSession, ValidateCsrfToken]
 
 
 def test_default_driver_keeps_in_process_session() -> None:
     app = _app_with_cache()  # driver unset → SessionSettings default ("cookie")
     kernel = HttpKernel(app=app).use_default_groups()
-    assert kernel.groups["web"][0] is StartSession  # still the bare class, unchanged
+    assert kernel.groups["web"][1] is StartSession  # still the bare class, unchanged
 
 
 def test_redis_driver_without_bound_cache_falls_back() -> None:
     app = Application()
     app.make("config").set("session", {"driver": "redis"})  # no CacheServiceProvider registered
     kernel = HttpKernel(app=app).use_default_groups()
-    assert kernel.groups["web"][0] is StartSession  # no "cache" bound → safe fallback, no crash
+    assert kernel.groups["web"][1] is StartSession  # no "cache" bound → safe fallback, no crash
 
 
 async def test_session_actually_persists_via_the_configured_cache() -> None:
@@ -48,7 +48,7 @@ async def test_session_actually_persists_via_the_configured_cache() -> None:
     not StartSession's own in-process dict — the thing this feature actually buys you."""
     app = _app_with_cache(driver="redis", secure=False)
     kernel = HttpKernel(app=app).use_default_groups()
-    session_mw = kernel.groups["web"][0]
+    session_mw = kernel.groups["web"][1]  # index 0 is EncryptCookies (H7)
 
     class Req:
         def __init__(self) -> None:

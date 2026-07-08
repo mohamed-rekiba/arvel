@@ -115,10 +115,15 @@ clean = Validator(data, {
 Rules are just `|`-delimited strings. There's a lot more — custom rules, typed form objects,
 localized messages — in [Validation](validation.md).
 
-For ad-hoc reads without a schema, the request exposes convenience accessors: `await
-request.input("key")` (JSON body first, then query string), `await request.boolean("flag")` (coerces
-`"1"/"true"/"on"/"yes"`), and `request.bearer_token()` (the token from an `Authorization: Bearer`
-header) — alongside the raw `request.json()` / `request.query(...)` / `request.header(...)`.
+For ad-hoc reads without a schema, the request exposes an input bag over the merged query string +
+JSON body (body wins): `await request.input("key")` — with dot-notation into nested bodies,
+`input("address.city")` — or `input()` for the whole merged dict. Around it: `only([...])` /
+`except_([...])`, `has("k")` / `has_any([...])` / `filled("k")` / `missing("k")`, and typed reads
+that coerce or fall back — `string`, `integer`, `boolean` (`"1"/"true"/"on"/"yes"`), `date`, `enum`,
+`collect`. `merge({...})` / `merge_if_missing({...})` layer in extra values (visible to `input()`,
+not to `validate()` — that judges what the client actually sent). `request.bearer_token()` reads an
+`Authorization: Bearer` token. Input arrives **normalized**: strings are trimmed and `""` becomes
+`None` by default (password fields aren't trimmed) — see [Middleware](middleware.md).
 
 ## Rendering a view
 

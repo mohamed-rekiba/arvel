@@ -13,7 +13,7 @@ from typing import Any
 import typer
 
 
-def _set_env_var(path: Path, name: str, value: str) -> None:
+def set_env_var(path: Path, name: str, value: str) -> None:
     """Set ``NAME=value`` in a dotenv file — replace an existing line or append, preserving the rest."""
     lines = path.read_text().splitlines() if path.exists() else []
     prefix = f"{name}="
@@ -35,7 +35,7 @@ def key_generate() -> None:
     from arvel.security import Encrypter
 
     key = Encrypter.generate_key()
-    _set_env_var(Path(".env"), "APP_KEY", key)
+    set_env_var(Path(".env"), "APP_KEY", key)
     typer.echo("APP_KEY set in .env")
 
 

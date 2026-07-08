@@ -167,6 +167,13 @@ Global (every request, on by default):
   10 MiB) with `413`, before the handler runs.
 - **`ValidateHost`** — `400` when the `Host` isn't in `config('app.trusted_hosts')` (a no-op until
   you configure it).
+- **`TrimStrings`** — strips leading/trailing whitespace from every string in the parsed input,
+  recursively; `password`, `password_confirmation`, and `current_password` keys are left untouched
+  (a password reaches validation exactly as typed).
+- **`ConvertEmptyStringsToNull`** — turns every `""` into `None`, recursively. This flips
+  validation outcomes the way you'd want: a `nullable` field submitted empty now passes, a
+  `required` one now fails. Both normalizers feed the single input pipeline, so `validate()` and
+  `request.input(...)` see the same cleaned values.
 - **`MethodOverride`** — HTML form method-spoofing: a `POST` whose form body
   (`application/x-www-form-urlencoded` or `multipart/form-data`) carries `_method=PUT|PATCH|DELETE` is
   routed as that verb, so a `<form method="post">` can reach a PUT/PATCH/DELETE route. Runs at the ASGI
@@ -174,6 +181,12 @@ Global (every request, on by default):
 
 Group / opt-in:
 
+- **`EncryptCookies`** — first in the `web` group: encrypts every outgoing cookie value with the
+  app key and decrypts them on the way in, so a client never sees (or can tamper with) a raw
+  session id. A tampered or undecryptable cookie reads as absent — a fresh session, not an error.
+  The `XSRF-TOKEN` cookie is excepted by design: it's the double-submit CSRF token a SPA must read
+  in JavaScript, not a secret. Cookie encryption is only active when `APP_KEY` is set —
+  `arvel new` generates one, so scaffolded apps have it from the first request.
 - **`ThrottleRequests(max_attempts, decay_seconds)`** — rate-limit per client; over the limit
   raises a `429`. Keyed by `request.ip()` (the first trusted `X-Forwarded-For` hop, else the socket
   peer). The `throttle:<name>` string form runs a different, header-carrying mode instead — see

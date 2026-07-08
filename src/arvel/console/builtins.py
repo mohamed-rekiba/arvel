@@ -194,6 +194,18 @@ def new(
     if auth:
         # overlay the bearer-token auth flow (overwrites routes/api.py, adds the auth test)
         count += _copy_skeleton("auth", target, {"name": pkg_name})
+    # a fresh app is born with working crypto: mirror .env.example into a live .env and
+    # generate APP_KEY now — otherwise the encrypter (cookie encryption, encrypted casts)
+    # is silently inert until someone remembers key:generate
+    from arvel.console.ops import set_env_var
+    from arvel.security import Encrypter
+
+    env_file = target / ".env"
+    example = target / ".env.example"
+    if example.exists() and not env_file.exists():
+        env_file.write_text(example.read_text())
+        count += 1
+    set_env_var(env_file, "APP_KEY", Encrypter.generate_key())
     label = f"{profile}+auth" if auth else profile
     typer.echo(f"[arvel new] created app {pkg_name!r} (profile: {label}, {count} files)")
     typer.echo(f"  cd {name} && uv sync")

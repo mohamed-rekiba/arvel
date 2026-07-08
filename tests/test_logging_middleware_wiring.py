@@ -6,7 +6,13 @@ from __future__ import annotations
 from structlog.testing import capture_logs
 
 from arvel.http import HttpKernel
-from arvel.http.middleware import LocaleMiddleware, RequestContextMiddleware
+from arvel.http.middleware import (
+    ConvertEmptyStringsToNull,
+    LocaleMiddleware,
+    RequestContextMiddleware,
+    TrimStrings,
+    ValidateHost,
+)
 from arvel.kernel.logging import LogManager
 from arvel.telemetry.middleware import TelemetryMiddleware
 
@@ -29,3 +35,17 @@ def test_use_default_global_wires_request_id_first_and_locale() -> None:
     # idempotent — calling again doesn't duplicate
     kernel.use_default_global()
     assert kernel.global_middleware.count(RequestContextMiddleware) == 1
+
+
+def test_use_default_global_wires_normalization_between_host_and_locale() -> None:
+    """H8: TrimStrings, then ConvertEmptyStringsToNull, land after ValidateHost and before
+    LocaleMiddleware (so they run for every request, not just session/CSRF ones)."""
+    kernel = HttpKernel()
+    kernel.use_default_global()
+    order = kernel.global_middleware
+    assert (
+        order.index(ValidateHost)
+        < order.index(TrimStrings)
+        < order.index(ConvertEmptyStringsToNull)
+        < order.index(LocaleMiddleware)
+    )

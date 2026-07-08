@@ -67,6 +67,7 @@ async def test_grouped_middleware_runs_in_pipeline_order() -> None:
 
 def test_use_default_groups_populates_web_and_api() -> None:
     from arvel.http.middleware import (
+        EncryptCookies,
         ShareErrorsFromSession,
         StartSession,
         ThrottleRequests,
@@ -74,5 +75,11 @@ def test_use_default_groups_populates_web_and_api() -> None:
     )
 
     kernel = HttpKernel().use_default_groups()
-    assert kernel.groups["web"] == [StartSession, ShareErrorsFromSession, ValidateCsrfToken]
+    # EncryptCookies first (H7) so every cookie read/written below it goes through its codec.
+    assert kernel.groups["web"] == [
+        EncryptCookies,
+        StartSession,
+        ShareErrorsFromSession,
+        ValidateCsrfToken,
+    ]
     assert kernel.groups["api"] == [ThrottleRequests]

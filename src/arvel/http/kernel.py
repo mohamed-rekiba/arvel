@@ -111,13 +111,16 @@ class HttpKernel:
         """Ensure the framework's default GLOBAL middleware runs, in order: ``RequestContextMiddleware``
         (binds a request id into the log context — first, so every later log carries it), the
         maintenance-mode gate (``PreventRequestsDuringMaintenance`` → 503 while ``arvel down``),
-        ``ValidatePostSize`` (413), ``ValidateHost`` (400), then ``LocaleMiddleware`` (sets the request
-        locale) — all before session/CSRF/throttle. Idempotent. (M3: request-id + locale were defined
-        but wired into no group; now they run for every request.)"""
+        ``ValidatePostSize`` (413), ``ValidateHost`` (400), ``TrimStrings``/``ConvertEmptyStringsToNull``
+        (H8 — global input normalization), then ``LocaleMiddleware`` (sets the request locale) — all
+        before session/CSRF/throttle. Idempotent. (M3: request-id + locale were defined but wired
+        into no group; now they run for every request.)"""
         from arvel.http.maintenance import PreventRequestsDuringMaintenance
         from arvel.http.middleware import (
+            ConvertEmptyStringsToNull,
             LocaleMiddleware,
             RequestContextMiddleware,
+            TrimStrings,
             ValidateHost,
             ValidatePostSize,
         )
@@ -129,6 +132,8 @@ class HttpKernel:
             PreventRequestsDuringMaintenance,
             ValidatePostSize,
             ValidateHost,
+            TrimStrings,
+            ConvertEmptyStringsToNull,
             LocaleMiddleware,
         )
         for index, mw in enumerate(defaults):
@@ -137,10 +142,12 @@ class HttpKernel:
         return self
 
     def use_default_groups(self) -> HttpKernel:
-        """Fill the default ``web`` (session, shared errors, CSRF) and ``api`` (throttle) groups —
-        but only when a group hasn't already been customized, so an app's ``append_to_group`` /
-        ``middleware_group`` done before serve is preserved (merge, not overwrite)."""
+        """Fill the default ``web`` (cookie encryption, session, shared errors, CSRF) and ``api``
+        (throttle) groups — but only when a group hasn't already been customized, so an app's
+        ``append_to_group`` / ``middleware_group`` done before serve is preserved (merge, not
+        overwrite)."""
         from arvel.http.middleware import (
+            EncryptCookies,
             SessionSettings,
             ShareErrorsFromSession,
             StartSession,
@@ -156,8 +163,14 @@ class HttpKernel:
                 section = self.app.make("config").get("session", {})
                 if SessionSettings.from_source(section).driver == "redis":
                     session_mw = StartSession(cache=self.app.make("cache"))
-            # StartSession first (sets request.session); ShareErrorsFromSession reads it.
-            self.groups["web"] = [session_mw, ShareErrorsFromSession, ValidateCsrfToken]
+            # EncryptCookies first (H7 — every cookie read/written below it goes through its
+            # codec); StartSession next (sets request.session); ShareErrorsFromSession reads it.
+            self.groups["web"] = [
+                EncryptCookies,
+                session_mw,
+                ShareErrorsFromSession,
+                ValidateCsrfToken,
+            ]
         if not self.groups.get("api"):
             self.groups["api"] = [ThrottleRequests]
         return self
@@ -753,6 +766,7 @@ class HttpKernel:
             return cast("Any", result)
         if isinstance(result, Response):
             return self._apply_cookies(
+                request,
                 litestar.Response(
                     result.content, status_code=result.status, headers=result.headers
                 ),
@@ -815,22 +829,27 @@ class HttpKernel:
         # no explicit status_code, so the route's method-aware default still applies (e.g. POST -> 201)
         return cast("Any", litestar.Response(result))
 
-    @staticmethod
-    def _apply_cookies(litestar_response: Any, response: Response) -> Any:
+    def _apply_cookies(self, request: Any, litestar_response: Any, response: Response) -> Any:
         """Apply a ``Response``'s queued cookies/expirations to the built Litestar response. A
         ``__Host-``-prefixed name gets ``path="/"``/no ``domain``/``secure=True`` forced — the full
         browser rule that prefix requires (``StartSession`` enforces the same for the session
         cookie). Without the forced ``Secure`` a ``__Host-`` cookie is silently rejected, so it
         overrides even an app whose ``session.secure`` is False; a non-prefixed cookie's unset
-        ``secure`` defers to ``SessionSettings().secure``."""
+        ``secure`` defers to ``SessionSettings().secure``.
+
+        Every cookie value is routed through :func:`~arvel.http.middleware.emit_cookie` (H7) so a
+        queued cookie is encrypted exactly like the session/CSRF cookies are — one codec decision,
+        not a second bespoke path here."""
         if not response.cookies and not response.forgotten_cookies:
             return litestar_response
-        from arvel.http.middleware import SessionSettings
+        from arvel.http.middleware import SessionSettings, emit_cookie
 
         default_secure = SessionSettings().secure
         for cookie in response.cookies:
             host_prefixed = cookie.name.startswith("__Host-")
-            litestar_response.set_cookie(
+            emit_cookie(
+                request,
+                litestar_response,
                 cookie.name,
                 cookie.value,
                 max_age=cookie.max_age,

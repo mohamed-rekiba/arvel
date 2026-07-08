@@ -304,6 +304,114 @@ class ThrottleRequests(Middleware):
             headers.update(success_headers)
 
 
+#: Input-normalization recursion ceiling — a 2-bytes-per-level hostile body fits under
+#: ValidatePostSize yet nests thousands deep; real payloads never approach this.
+_TRANSFORM_MAX_DEPTH = 64
+
+
+class TrimStrings(Middleware):
+    """Strip leading/trailing whitespace from every string in the parsed input, recursively
+    through nested dicts/lists (H8) — global, default-on.
+
+    ``except_`` names are matched on the dict **key**, at any nesting depth: a key in the set is
+    left completely untouched (its subtree isn't recursed into either), so a password field
+    reaches validation exactly as typed."""
+
+    except_: ClassVar[tuple[str, ...]] = ("password", "password_confirmation", "current_password")
+
+    def _transform(self, value: Any, _depth: int = 0) -> Any:
+        # normalization is a convenience, not a boundary — a hostile deeply-nested
+        # subtree is left as-is rather than recursed into a RecursionError 500
+        if _depth > _TRANSFORM_MAX_DEPTH:
+            return value
+        if isinstance(value, dict):
+            return {
+                k: (v if k in self.except_ else self._transform(v, _depth + 1))
+                for k, v in cast("dict[Any, Any]", value).items()
+            }
+        if isinstance(value, list):
+            return [self._transform(v, _depth + 1) for v in cast("list[Any]", value)]
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
+        request._input_transforms.append(self._transform)  # pyright: ignore[reportPrivateUsage]
+        return await call_next(request)
+
+
+class ConvertEmptyStringsToNull(Middleware):
+    """Convert every ``""`` in the parsed input to ``None``, recursively through nested
+    dicts/lists (H8) — global, default-on, runs after :class:`TrimStrings`.
+
+    This flips validation outcomes: a ``nullable`` field submitted as ``""`` now passes (treated
+    as absent), and a ``required`` field submitted as ``""`` now fails (an empty string no longer
+    counts as "provided"). Unlike :class:`TrimStrings` there is no password exception — an
+    empty password becomes ``None`` and fails ``required`` either way."""
+
+    def _transform(self, value: Any, _depth: int = 0) -> Any:
+        if _depth > _TRANSFORM_MAX_DEPTH:
+            return value  # same ceiling as TrimStrings — never recurse into a 500
+        if isinstance(value, dict):
+            return {
+                k: self._transform(v, _depth + 1) for k, v in cast("dict[Any, Any]", value).items()
+            }
+        if isinstance(value, list):
+            return [self._transform(v, _depth + 1) for v in cast("list[Any]", value)]
+        return None if value == "" else value
+
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
+        request._input_transforms.append(self._transform)  # pyright: ignore[reportPrivateUsage]
+        return await call_next(request)
+
+
+class EncryptCookies(Middleware):
+    """Encrypt every outgoing/incoming cookie by default (H7 — first in the web group): a cookie
+    value at rest in the browser is otherwise plaintext even though it's meant to be opaque
+    server state.
+
+    The CSRF double-submit cookie (``XSRF-TOKEN``) is deliberately excepted — it is **not** a
+    secret by design (a decoupled SPA's JS must read it to echo it back as a header), so
+    encrypting it would break the double-submit pattern while protecting nothing.
+
+    Resolves the app's bound ``encrypter`` (:class:`~arvel.security.Encrypter`) and stashes a
+    codec — ``(encrypt, decrypt, except_names)`` — on the request for :meth:`Request.cookie`
+    (reads) and :func:`emit_cookie` (writes) to consult. When no app is running, no encrypter is
+    bound, or ``config('app.key')`` isn't set (the encrypter would fail to construct), nothing is
+    stashed and cookies stay plaintext — encryption is opt-in via having a configured app, not a
+    hard requirement."""
+
+    except_: ClassVar[tuple[str, ...]] = ("XSRF-TOKEN",)
+
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
+        from arvel.kernel import app, has_application
+
+        if has_application() and app().bound("encrypter") and app().config("app.key"):
+            encrypter = app().make("encrypter")
+            request._cookie_codec = (  # pyright: ignore[reportPrivateUsage]
+                encrypter.encrypt_string,
+                encrypter.decrypt_string,
+                self.except_,
+            )
+        return await call_next(request)
+
+
+def emit_cookie(request: Any, response: Any, name: str, value: str, **attrs: Any) -> None:
+    """The one write path for every Set-Cookie (H7): encrypts ``value`` through ``request``'s
+    cookie codec (stashed by :class:`EncryptCookies`) unless ``name`` is excepted or no codec is
+    active, then delegates to ``response.set_cookie``. Every cookie-emitting call site
+    (``StartSession.terminate``, the CSRF ``XSRF-TOKEN`` mirror, the kernel's queued-cookie apply)
+    routes through here, so encrypt-or-not is one decision, not three."""
+    codec = getattr(request, "_cookie_codec", None)
+    if codec is not None:
+        encrypt, _decrypt, except_names = codec
+        if name not in except_names:
+            value = encrypt(value)
+    setter = getattr(response, "set_cookie", None)
+    if callable(setter):
+        setter(name, value, **attrs)
+
+
 class StartSession(Middleware):
     """Attach a mutable ``request.session`` dict loaded from (and persisted to) a store keyed
     by the session cookie (web group). A missing cookie starts a fresh session. The default
@@ -412,17 +520,17 @@ class StartSession(Middleware):
     async def terminate(self, request: Any, response: Any) -> None:
         if not getattr(request, "_session_set_cookie", False):
             return
-        setter = getattr(response, "set_cookie", None)
-        if callable(setter):
-            setter(
-                self._cookie_name,
-                request._session_id,
-                max_age=self._max_age,
-                path="/",
-                httponly=True,
-                secure=self._secure,
-                samesite="lax",
-            )
+        emit_cookie(
+            request,
+            response,
+            self._cookie_name,
+            request._session_id,
+            max_age=self._max_age,
+            path="/",
+            httponly=True,
+            secure=self._secure,
+            samesite="lax",
+        )
 
 
 class ValidateCsrfToken(Middleware):
@@ -568,9 +676,10 @@ class ValidateCsrfToken(Middleware):
         Not ``HttpOnly`` (JS must read it); inherits the session's Secure flag; ``SameSite=Lax``."""
         session = getattr(request, "session", None)
         token = cast("dict[str, Any]", session).get("_token") if isinstance(session, dict) else None
-        setter = getattr(response, "set_cookie", None)
-        if token and callable(setter):
-            setter(
+        if token:
+            emit_cookie(
+                request,
+                response,
                 self.COOKIE,
                 token,
                 max_age=self._max_age,
