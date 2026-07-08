@@ -117,6 +117,67 @@ class AuditedError(Exception):
 expected exceptions. Each exception **instance** is reported at most once, so a retry
 loop re-raising the same instance won't spam your log.
 
+## A domain exception, end to end
+
+The three verbs — `renderable`, `reportable`, `dont_report` — are meant to be used together. Here's a
+realistic case that touches all of them: a checkout that can fail because a card was declined (an
+*expected* business outcome, not a bug) or because an order is in a bad state (something you *do* want
+to hear about).
+
+Start with the exceptions. Give the one you care about a `context()` so its detail lands in the log:
+
+```python
+class PaymentDeclined(Exception):
+    """The card was declined — expected, the user just needs to try another."""
+
+
+class OrderError(Exception):
+    def __init__(self, order_id: int, reason: str) -> None:
+        super().__init__(f"order {order_id}: {reason}")
+        self.order_id = order_id
+
+    def context(self) -> dict[str, object]:
+        return {"order_id": self.order_id}
+```
+
+Then configure the handler once, at bootstrap, to treat each the way it deserves:
+
+```python
+from arvel.http.response import json
+
+def _configure_exceptions(handler):
+    # a declined card isn't a bug — don't log it, don't page anyone
+    handler.dont_report(PaymentDeclined)
+    handler.renderable(PaymentDeclined, lambda e, r: json({"error": "payment_declined"}, 402))
+
+    # an order error IS worth knowing about — capture it, and render a clean 409
+    handler.reportable(OrderError, lambda e: tracker.capture(e))
+    handler.renderable(OrderError, lambda e, r: json({"error": "order_failed"}, 409))
+```
+
+Now your checkout handler just raises — no try/except, no manual response building:
+
+```python
+async def checkout(request, order):
+    if not await gateway.charge(order):
+        raise PaymentDeclined
+    if order.state != "ready":
+        raise OrderError(order.id, f"not ready ({order.state})")
+    return {"status": "ok"}
+```
+
+A declined card returns `402 {"error": "payment_declined"}` and your logs stay quiet. A bad order
+returns `409 {"error": "order_failed"}`, is captured by your tracker, and writes one structured log
+line carrying the `order_id` from `context()`:
+
+```text
+... [error] unhandled_exception error="OrderError('order 42: not ready (draft)')" kind=OrderError order_id=42
+```
+
+Every uncaught exception in the app routes through this same handler, so this configuration governs
+checkout, a background job that retries the charge, and a CLI command that reconciles orders — you
+wrote the policy once.
+
 ## Common mistakes & gotchas
 
 - **Expecting HTML from an API client.** Rendering is API-first: with no `Accept` header you get JSON,

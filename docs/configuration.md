@@ -253,6 +253,22 @@ The framework's own modules ship typed settings built this exact way:
     reads (`app.timezone` in `arvel.dates`, `app.name` in `arvel.contracts`) stay on raw `config()` —
     those modules sit below the settings layer in the import graph and can't depend on it.
 
+## How it works
+
+At boot the application assembles a single configuration `Repository` from layered sources, lowest
+priority first: **package defaults** merged by each provider's `merge_config_from`, then every
+`config/*.py` file loaded under its filename stem, then any **programmatic** `with_config(...)` /
+`config().set(...)`. Each layer is deep-merged onto the ones below, so a higher layer overrides only
+the keys it actually sets — which is exactly the precedence order above. Crucially, `.env` is loaded
+*before* the config directory (no-override: a real environment variable always wins), so the `env(...)`
+calls inside your `config/*.py` files read an environment that's already resolved.
+
+`config("a.b.c")` then just walks that dotted key into the assembled nested dict, returning the default
+on any miss rather than raising. A `Settings` subclass isn't a second store — it's a typed
+[msgspec](https://jcristharif.com/msgspec/) view over the *same* repository: it reads its
+`__config_key__` section, validates and coerces it, and hands back a typed struct. That's why a typed
+setting can never disagree with `config()`; there's one pipeline, and everything reads from it.
+
 ## Common mistakes & gotchas
 
 - **Keys can't contain literal dots.** A dotted key is *always* a path: `config("a.b")` reads `b`
