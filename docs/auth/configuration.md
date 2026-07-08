@@ -122,5 +122,5 @@ Identifier-only, best-effort (a logging failure never breaks an auth decision):
 
 ## See also
 
-- [Authentication](authentication.md) · [Guards & drivers](guards.md) · [Routes & flows](routes-and-flows.md)
-- [Providers & middleware](providers-and-middleware.md) — where these components are wired into the kernel.
+- [Authentication](authentication.md) · [Guards & Drivers](guards.md) · [Routes & Flows](routes-and-flows.md)
+- [Providers & Middleware](providers-and-middleware.md) — where these components are wired into the kernel.

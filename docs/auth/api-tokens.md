@@ -173,6 +173,6 @@ record, stamps `last_used_at` (throttled), and sets a request-scoped `current_ac
 
 ## See also
 
-- [Guards & drivers](guards.md) — the token guard alongside session and OIDC guards.
+- [Guards & Drivers](guards.md) — the token guard alongside session and OIDC guards.
 - [Authentication](authentication.md) — session-based login for browsers.
 - [Authorization](authorization.md) — what the authenticated token-bearer is allowed to do.

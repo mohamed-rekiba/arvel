@@ -397,4 +397,4 @@ Bindings resolve in the kernel before the handler runs.
 - [Middleware](middleware.md) — the web/api groups routes attach to.
 - [Validation](validation.md) — validating request input in handlers.
 - [Views](views.md) — `Route.view(...)`, rendering, and template globals.
-- [OpenAPI & API docs](openapi.md) — the auto-generated schema, request/response models, and auth.
+- [OpenAPI & API Docs](openapi.md) — the auto-generated schema, request/response models, and auth.

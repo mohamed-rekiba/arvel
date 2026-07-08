@@ -117,7 +117,7 @@ async def logout(request):
 
 `login(user, request, *, remember=False)` regenerates the session id **before** writing the user id
 (fixation defence), sets `current_user` for the rest of this request, and — when `remember` — issues a
-rotating remember-me cookie ([Routes & flows](routes-and-flows.md#stay-logged-in-remember-me)).
+rotating remember-me cookie ([Routes & Flows](routes-and-flows.md#stay-logged-in-remember-me)).
 `logout(request)` clears the remember cookie/token, invalidates the session (new id, all data
 dropped), and clears `current_user`.
 
@@ -142,7 +142,7 @@ read it back with — every request but the login one itself looks like a guest.
 ## The local guard
 
 Under the hood, "verify a request by some method" is the job of a **guard** (the full system is in
-[Guards & drivers](guards.md)). The one behind password login is the `local` guard, and you can use
+[Guards & Drivers](guards.md)). The one behind password login is the `local` guard, and you can use
 it directly — it reads `email`/`username` + `password` from the submitted form and returns a
 [`Principal`](guards.md) on success:
 
@@ -253,7 +253,7 @@ non-`password` field).
 
 ## See also
 
-- [Guards & drivers](guards.md) — the engine behind every login method, and how to run several.
-- [Identities & account linking](identities.md) — let one person log in by password *and* SSO.
-- [Single sign-on (OIDC / Keycloak)](sso-oidc.md) — authenticate through an identity provider.
+- [Guards & Drivers](guards.md) — the engine behind every login method, and how to run several.
+- [Identities & Account Linking](identities.md) — let one person log in by password *and* SSO.
+- [Single Sign-On (OIDC / Keycloak)](sso-oidc.md) — authenticate through an identity provider.
 - [Authorization](authorization.md) — once you know *who* they are, decide *what they may do*.

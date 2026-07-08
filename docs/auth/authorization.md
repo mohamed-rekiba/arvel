@@ -269,7 +269,7 @@ in production; impersonation is a privileged action and accountability is requir
   `edit-posts`, `posts.edit`, and `editPost` all meaning the same thing. Pick `resource.action` and
   stick to it (it's also what makes `posts.*` work).
 - **Handing out `*`.** It's total. Don't attach it to anything an IdP claim could map to without
-  vetting (see [Mapping IdP groups to roles](idp-roles.md)).
+  vetting (see [Mapping IdP Groups to Roles](idp-roles.md)).
 - **Forgetting gates receive the user.** `user.can(ability, *args)` calls the gate with that user;
   define callbacks as `(user, *args)`.
 - **Roles vs direct permissions.** Roles are for shared capability sets; a direct
@@ -291,6 +291,6 @@ guest (`user=None`) is only ever handed to a callback whose first parameter's ty
 
 ## See also
 
-- [Mapping IdP groups to roles](idp-roles.md) — roles that come from an identity provider.
+- [Mapping IdP Groups to Roles](idp-roles.md) — roles that come from an identity provider.
 - [Authentication](authentication.md) — establishing the user these checks run against.
-- [Identities & account linking](identities.md) — the identity half of the same user.
+- [Identities & Account Linking](identities.md) — the identity half of the same user.

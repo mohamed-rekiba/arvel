@@ -94,6 +94,6 @@ lifetime, and the next login re-resolves from scratch.
 
 ## See also
 
-- [Authorization: roles & permissions](authorization.md) — what the mapped roles actually grant.
-- [Single sign-on (OIDC / Keycloak)](sso-oidc.md) — where the `groups` claim comes from.
-- [Identities & account linking](identities.md) — the *identity* translation seam this mirrors.
+- [Authorization: Roles & Permissions](authorization.md) — what the mapped roles actually grant.
+- [Single Sign-On (OIDC / Keycloak)](sso-oidc.md) — where the `groups` claim comes from.
+- [Identities & Account Linking](identities.md) — the *identity* translation seam this mirrors.

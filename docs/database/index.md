@@ -107,7 +107,7 @@ registration mechanics (`Model.observe`, the halting/cancel semantics shared wit
 - **[Transactions & Streaming](transactions.md)** — atomic units of work, locks, raw SQL, large-result iteration.
 - **[CTEs & Recursive Queries](ctes.md)** — `WITH` / `WITH RECURSIVE` and referential (self-referencing) trees.
 - **[SQL Views & Functions](sql-views.md)** — views, materialized views, and stored functions.
-- **[JSON, Full-text & Vectors](json-search.md)** — query JSON/JSONB, Postgres full-text, and pgvector columns.
+- **[JSON, Full-Text & Vectors](json-search.md)** — query JSON/JSONB, Postgres full-text, and pgvector columns.
 
 ## Common mistakes & gotchas
 

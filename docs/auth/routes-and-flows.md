@@ -170,7 +170,7 @@ delays eviction rather than logging everyone out), so alert on cache downtime; a
 
 Social / SSO login is a *start* route (redirect to the provider) plus a *callback* route (exchange the
 returned code, validate, resolve, log in), built on `OAuthProvider`. It has its own page —
-**[OAuth2 social login](oauth.md)** — covering provider setup, the redirect/callback routes, the
+**[OAuth2 Social Login](oauth.md)** — covering provider setup, the redirect/callback routes, the
 `state` CSRF check, and completing the login for OIDC vs plain-OAuth providers.
 
 ## Token APIs: access + rotating refresh tokens
@@ -207,7 +207,7 @@ async def refresh(request):
 Pair this with short access-token lifetimes — the shorter the access token, the smaller the window
 between a permission change and the next refresh (the same staleness tradeoff [SSO roles](idp-roles.md)
 have). For minting the access token itself, see [SSO / OIDC](sso-oidc.md) (validating an IdP token) or
-[API tokens](api-tokens.md) (long-lived personal tokens).
+[API Tokens](api-tokens.md) (long-lived personal tokens).
 
 ## Password reset
 
@@ -370,6 +370,6 @@ email changes.
 ## See also
 
 - [Authentication](authentication.md) — the `attempt` / `login` primitives these routes use.
-- [Single sign-on (OIDC / Keycloak)](sso-oidc.md) — minting access tokens from an IdP.
-- [API tokens](api-tokens.md) — long-lived bearer tokens (vs short access + refresh).
-- [Two-factor authentication](two-factor.md) — the step to insert between password and session.
+- [Single Sign-On (OIDC / Keycloak)](sso-oidc.md) — minting access tokens from an IdP.
+- [API Tokens](api-tokens.md) — long-lived bearer tokens (vs short access + refresh).
+- [Two-Factor Authentication](two-factor.md) — the step to insert between password and session.

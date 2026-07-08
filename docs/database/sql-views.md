@@ -142,6 +142,6 @@ rather than formatting the name into a string.
 ## See also
 
 - [Queries](queries.md) — the builder that supplies a view's `query` and `select_raw`.
-- [JSON, Full-text & Vectors](json-search.md) — GIN/GiST indexes and Postgres extensions.
+- [JSON, Full-Text & Vectors](json-search.md) — GIN/GiST indexes and Postgres extensions.
 - [Migrations & Schema](migrations.md) — where views and functions are created.
 - [Transactions & Streaming](transactions.md) — `db.select`/`db.statement` for raw SQL from app code.

@@ -171,7 +171,7 @@ middleware, the group's stack, and any per-route middleware for each route.
 
 ## See also
 
-- [Guards & drivers](guards.md) — what a `user_resolver` typically calls.
+- [Guards & Drivers](guards.md) — what a `user_resolver` typically calls.
 - [Authentication](authentication.md) · [Authorization](authorization.md) — the primitives you wire.
-- [Routes & flows](routes-and-flows.md) — the concrete login/refresh/reset routes.
+- [Routes & Flows](routes-and-flows.md) — the concrete login/refresh/reset routes.
 - [Service Providers](../providers.md) · [Middleware](../middleware.md) — the general mechanisms.

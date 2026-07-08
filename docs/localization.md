@@ -167,7 +167,7 @@ current_locale.set("fr"); product.name                # "Téléphone"  (falls ba
 
 Index a specific locale you filter/sort by with a B-tree expression index —
 `t.btree_index("name->>'en'")` (GIN is for containment search; see
-[JSON, Full-text & Vectors](database/json-search.md)).
+[JSON, Full-Text & Vectors](database/json-search.md)).
 
 ## Common mistakes & gotchas
 

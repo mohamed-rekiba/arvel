@@ -87,7 +87,7 @@ with the `lifespan` async context manager (`async with lifespan(app): ...`) or b
 Three subsystems do the heavy lifting inside that lifecycle, and they each get their own page:
 
 - The **[service container](container.md)** constructs your objects and injects their dependencies.
-- **[Service providers](providers.md)** register and boot every feature, yours and the framework's.
+- **[Service Providers](providers.md)** register and boot every feature, yours and the framework's.
 - **[Facades](facades.md)** give you terse, testable access to the services the container holds.
 
 Read those three next, in that order — they're the working parts of everything above.

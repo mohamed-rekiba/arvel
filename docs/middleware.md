@@ -245,7 +245,7 @@ POST /api/items            # api group — throttled, token-authed, CSRF does no
 Authorization: Bearer 1|abc...
 ```
 
-See [API tokens](auth/api-tokens.md) for issuing tokens.
+See [API Tokens](auth/api-tokens.md) for issuing tokens.
 
 **Decoupled SPA using the session cookie (the `web` group) → the `XSRF-TOKEN` cookie flow.** The
 session-id cookie is `HttpOnly` (JS can't read it), so the web group also sets a **readable

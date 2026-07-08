@@ -82,16 +82,16 @@ Start at the top and read down, or jump to what you need:
 | Page | What you'll learn |
 |------|-------------------|
 | [Authentication](authentication.md) | Passwords, sessions, logging users in and out |
-| [Guards & drivers](guards.md) | The pluggable engine behind every login method |
-| [Identities & account linking](identities.md) | One person, many login methods — safely linked |
-| [Single sign-on (OIDC / Keycloak)](sso-oidc.md) | Log users in through an identity provider |
-| [OAuth2 social login](oauth.md) | "Log in with Google/GitHub/Keycloak" — the redirect/callback flow |
-| [Authorization: roles & permissions](authorization.md) | Roles, permissions, gates, and policies |
-| [Mapping IdP groups to roles](idp-roles.md) | Let Keycloak groups drive arvel roles |
-| [API tokens](api-tokens.md) | Bearer tokens for APIs and machine-to-machine |
-| [Two-factor authentication](two-factor.md) | TOTP second factor + recovery codes |
-| [Routes & flows](routes-and-flows.md) | Wiring login/logout, refresh tokens, password reset, email verification |
-| [Wiring it up: providers & middleware](providers-and-middleware.md) | Registering auth services + protecting routes |
+| [Guards & Drivers](guards.md) | The pluggable engine behind every login method |
+| [Identities & Account Linking](identities.md) | One person, many login methods — safely linked |
+| [Single Sign-On (OIDC / Keycloak)](sso-oidc.md) | Log users in through an identity provider |
+| [OAuth2 Social Login](oauth.md) | "Log in with Google/GitHub/Keycloak" — the redirect/callback flow |
+| [Authorization: Roles & Permissions](authorization.md) | Roles, permissions, gates, and policies |
+| [Mapping IdP Groups to Roles](idp-roles.md) | Let Keycloak groups drive arvel roles |
+| [API Tokens](api-tokens.md) | Bearer tokens for APIs and machine-to-machine |
+| [Two-Factor Authentication](two-factor.md) | TOTP second factor + recovery codes |
+| [Routes & Flows](routes-and-flows.md) | Wiring login/logout, refresh tokens, password reset, email verification |
+| [Wiring It Up: Providers & Middleware](providers-and-middleware.md) | Registering auth services + protecting routes |
 | [Configuration](configuration.md) | Every auth config key, and the security audit-log channel |
 | [Hashing](../hashing.md) | Hashing passwords — argon2id/bcrypt, rehash-on-login |
 | [Encryption](../encryption.md) | Encrypting arbitrary values — AES-256-GCM, key rotation |

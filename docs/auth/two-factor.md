@@ -174,5 +174,5 @@ catches to redirect — no separate persisted "challenge" row.
 ## See also
 
 - [Authentication](authentication.md) — the password step 2FA layers on top of.
-- [Routes & flows](routes-and-flows.md) — wiring the enroll / confirm / challenge steps into real endpoints.
-- [Guards & drivers](guards.md) — where the authenticated session is established.
+- [Routes & Flows](routes-and-flows.md) — wiring the enroll / confirm / challenge steps into real endpoints.
+- [Guards & Drivers](guards.md) — where the authenticated session is established.

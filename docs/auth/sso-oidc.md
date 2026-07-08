@@ -25,7 +25,7 @@ SSO has two distinct jobs, and arvel gives you a piece for each — don't confus
 OIDC is OAuth2 plus an identity layer, so the two work together: `OAuthProvider` runs the redirect
 dance and hands you an `id_token`; the `oidc` guard's verifier validates it. **The rest of this page
 is the validation side.** For the interactive redirect/callback login flow, see
-[OAuth2 social login](oauth.md).
+[OAuth2 Social Login](oauth.md).
 
 ## Configure the guard
 
@@ -86,7 +86,7 @@ async def sso_login(request):
 ```
 
 For the first-time-SSO case to link onto an existing password account, add `"keycloak"` to
-`trusted_email_providers` (see [Identities & account linking](identities.md)) — Keycloak's
+`trusted_email_providers` (see [Identities & Account Linking](identities.md)) — Keycloak's
 `email_verified` claim is what makes that safe.
 
 ## Testing without a network
@@ -128,6 +128,6 @@ verifier, so the OIDC guard never pulls crypto into arvel's light core.
 
 ## See also
 
-- [Guards & drivers](guards.md) — the guard contract the `oidc` driver implements.
-- [Identities & account linking](identities.md) — turning the validated `sub` into a `User`.
-- [Mapping IdP groups to roles](idp-roles.md) — turning the `groups` claim into authorization.
+- [Guards & Drivers](guards.md) — the guard contract the `oidc` driver implements.
+- [Identities & Account Linking](identities.md) — turning the validated `sub` into a `User`.
+- [Mapping IdP Groups to Roles](idp-roles.md) — turning the `groups` claim into authorization.

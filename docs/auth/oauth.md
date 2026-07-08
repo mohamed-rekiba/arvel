@@ -153,7 +153,7 @@ needs your two routes and your `state`/session handling around it.
 
 ## See also
 
-- [Single sign-on (OIDC / Keycloak)](sso-oidc.md) — validating the token this flow obtains.
-- [Identities & account linking](identities.md) — turning the provider's `sub` into a `User`.
-- [Mapping IdP groups to roles](idp-roles.md) — turning the provider's groups into authorization.
-- [Routes & flows](routes-and-flows.md) — where this sits among the other auth routes.
+- [Single Sign-On (OIDC / Keycloak)](sso-oidc.md) — validating the token this flow obtains.
+- [Identities & Account Linking](identities.md) — turning the provider's `sub` into a `User`.
+- [Mapping IdP Groups to Roles](idp-roles.md) — turning the provider's groups into authorization.
+- [Routes & Flows](routes-and-flows.md) — where this sits among the other auth routes.

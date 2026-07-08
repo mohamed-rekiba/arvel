@@ -12,7 +12,7 @@ registering your own.
 
 !!! note "Needs the `[jwt]` extra for OIDC"
     The `session` and password (`local`) guards are **core** — nothing to install. Only the
-    OIDC/Keycloak guard pulls pyjwt: `uv add 'arvel[jwt]'` (full setup on [Single sign-on](sso-oidc.md)).
+    OIDC/Keycloak guard pulls pyjwt: `uv add 'arvel[jwt]'` (full setup on [Single Sign-On](sso-oidc.md)).
 
 ## One contract: `Principal`
 
@@ -30,7 +30,7 @@ p.email_verified    # convenience: a real bool (string "true"/"false" is normali
 ```
 
 A `Principal` says *who the request claims to be* — it is **not** a `User`. Turning a verified
-`Principal` into your `User` row is the next layer's job ([Identities & account linking](identities.md)).
+`Principal` into your `User` row is the next layer's job ([Identities & Account Linking](identities.md)).
 That split is the whole point: guards worry about *proof*, the user provider worries about *identity*.
 
 ## The guard manager
@@ -129,6 +129,6 @@ the light core — the `import arvel` startup contract holds.
 ## See also
 
 - [Authentication](authentication.md) — the `local` guard and the session in practice.
-- [Identities & account linking](identities.md) — turning a `Principal` into a `User`.
-- [Single sign-on (OIDC / Keycloak)](sso-oidc.md) — the `oidc` guard in full.
-- [API tokens](api-tokens.md) — the token guard for bearer-token APIs.
+- [Identities & Account Linking](identities.md) — turning a `Principal` into a `User`.
+- [Single Sign-On (OIDC / Keycloak)](sso-oidc.md) — the `oidc` guard in full.
+- [API Tokens](api-tokens.md) — the token guard for bearer-token APIs.

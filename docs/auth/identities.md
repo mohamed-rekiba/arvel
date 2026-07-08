@@ -119,7 +119,7 @@ are real, persisted rows — unlike IdP-derived [roles](idp-roles.md), which are
 
 ## See also
 
-- [Guards & drivers](guards.md) — where the `Principal` that `resolve` consumes comes from.
-- [Single sign-on (OIDC / Keycloak)](sso-oidc.md) — the federated logins you link.
+- [Guards & Drivers](guards.md) — where the `Principal` that `resolve` consumes comes from.
+- [Single Sign-On (OIDC / Keycloak)](sso-oidc.md) — the federated logins you link.
 - [Authentication](authentication.md) — the `local` credential stored on an identity.
-- [Mapping IdP groups to roles](idp-roles.md) — the *authorization* counterpart to this seam.
+- [Mapping IdP Groups to Roles](idp-roles.md) — the *authorization* counterpart to this seam.
