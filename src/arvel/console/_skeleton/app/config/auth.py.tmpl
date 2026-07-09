@@ -1,13 +1,16 @@
-"""Authentication config — guards + their drivers.
+"""Authentication config.
 
-The `api` guard uses bearer tokens (arvel.auth personal access tokens); the `web` guard uses
-session cookies. Run `arvel new <app> --auth` to scaffold a login + protected route.
+`auth()`/`guard()` resolve the **default guard** below; a guard's name *is* its driver —
+`session` (cookie sessions), `local` (username/password against the DB), or `oidc` (an external
+identity provider, configured under an `oidc` key). Register your own with
+`GuardManager.extend(name, factory)`.
+
+The bearer-token API flow that `arvel new <app> --auth` scaffolds does not go through a guard — its
+routes issue and check personal access tokens directly via `arvel.auth.tokens` — so it needs no
+config here.
 """
 
 config = {
-    "defaults": {"guard": "api"},
-    "guards": {
-        "api": {"driver": "token"},
-        "web": {"driver": "session"},
-    },
+    "default_guard": "session",
+    # "oidc": {"issuer": env("OIDC_ISSUER"), "client_id": env("OIDC_CLIENT_ID"), ...},
 }
