@@ -449,8 +449,21 @@ class HttpKernel:
         return MethodOverride(self.build(lifespan))
 
     def openapi(self) -> dict[str, Any]:
-        """The OpenAPI document Litestar generates from the registered routes (G4)."""
+        """The OpenAPI document Litestar generates from the registered routes (G4).
+
+        Each operation's ``parameters`` list is sorted (by ``in`` then ``name``) so the document is
+        byte-stable across runs — a codegen/CI drift gate diffs a fresh export against the committed
+        one, and Litestar otherwise emits a multi-param route's parameters in set-iteration order."""
         schema: dict[str, Any] = self.build().openapi_schema.to_schema()
+        paths: dict[str, Any] = schema.get("paths", {})
+        for methods in paths.values():
+            for operation in cast("dict[str, Any]", methods).values():
+                if not isinstance(operation, dict):
+                    continue
+                params: Any = cast("dict[str, Any]", operation).get("parameters")
+                if isinstance(params, list):
+                    plist = cast("list[dict[str, Any]]", params)
+                    plist.sort(key=lambda p: (str(p.get("in", "")), str(p.get("name", ""))))
         return schema
 
     def _make_handler(self, candidates: list[_RouteEntry], route_handler: Any) -> Any:
