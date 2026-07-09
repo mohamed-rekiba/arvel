@@ -103,6 +103,19 @@ class Notification:
         opt-out (e.g. a muted digest)."""
         return True
 
+    def middleware(self) -> list[Any]:
+        """Job middleware this notification's queued send runs through — e.g. ``[RateLimited(limiter,
+        key=..., max_attempts=5, decay_seconds=60)]`` (``arvel.queue.middleware``). Empty by default;
+        a subclass overrides to declare per-send middleware, resolving any collaborator (a limiter,
+        say) fresh from the container rather than storing it on ``self`` — an attribute has to
+        survive ``encode_instance``/serialization across the queue, and a live limiter can't.
+
+        **Queued-rail only.** This is consulted by :meth:`SendQueuedNotification.middleware`, which
+        the worker calls before running the job — an inline send (not ``ShouldQueue``, or no queue
+        bound) never builds a job, so this never runs and no throttle applies there. That's the
+        reference's behavior, not a gap: don't fake a synchronous inline throttle to "fix" it."""
+        return []
+
 
 class BroadcastNotification(ShouldBroadcast):
     """The event a notification's ``broadcast`` channel sends: ``to_broadcast()``'s payload, on the notifiable's channel."""
@@ -152,6 +165,30 @@ class SendQueuedNotification(Job):
         manager: NotificationManager = app().make("notifications")
         notification = cast("Notification", await decode_instance(self.notification))
         return await manager.send_now(self.notifiable, notification, channels=self.channels)
+
+    def middleware(self) -> list[Any]:
+        """Surfaces the wrapped notification's own :meth:`Notification.middleware` into the
+        EXISTING job-middleware onion (``Job.middleware()`` -> ``worker._wrap_with_middleware`` ->
+        ``Pipeline`` — E14, unchanged) so a declared ``RateLimited``/etc. runs there. No parallel
+        throttle: this is the entire integration.
+
+        The worker calls a job's ``middleware()`` SYNCHRONOUSLY, before the async ``handle()`` above
+        decodes ``self.notification`` — so this can't call ``self.notification.middleware()`` (still
+        the JSON-safe ``encode_instance`` dict here, not the live object) or ``await`` a decode.
+        Reconstruct synchronously instead: bypass ``__init__`` and restore ``__dict__`` straight from
+        the encoded state, same shape as :func:`~arvel.queue.decode_instance` minus its async
+        model-ref rehydration. So ``middleware()`` sees only JSON-plain state — a Model attribute is
+        still a ``{id}`` ref, a ``datetime`` a dict — it must key on a plain scalar the notification
+        captured in ``__init__``, never on ``self.<model>.id`` (that only works in ``handle()``,
+        which runs after rehydration). The notification's own ``middleware()`` then builds e.g.
+        ``RateLimited`` fresh (resolving its limiter from the container), so nothing live has to
+        have survived serialization."""
+        from arvel.queue import _load  # pyright: ignore[reportPrivateUsage]
+
+        cls = _load(str(self.notification["__class__"]))
+        notification = cls.__new__(cls)
+        notification.__dict__.update(cast("dict[str, Any]", self.notification["__state__"]))
+        return cast("list[Any]", notification.middleware())
 
 
 class _Channel:

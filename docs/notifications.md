@@ -150,18 +150,90 @@ test sends don't error.
 
 ## Worked example: queue it
 
-Notifications are I/O — send them in the background so the request returns immediately:
+Notifications are I/O — send them in the background so the request returns immediately. You don't
+need to hand-wrap a notification in your own `Job`: make it `ShouldQueue` and `send`/`notify`
+enqueues it for you, one job per channel, after the surrounding transaction commits:
 
 ```python
-class SendInvoicePaid(Job):
-    def __init__(self, user, invoice):
-        self.user = user
-        self.invoice = invoice
-    async def handle(self):
-        await self.user.notify(InvoicePaid(self.invoice))
+from arvel.events import ShouldQueue
+from arvel.notifications import Notification
 
-await SendInvoicePaid.dispatch(user, invoice)
+class InvoicePaid(Notification, ShouldQueue):
+    def __init__(self, invoice):
+        self.invoice = invoice
+
+    def via(self, notifiable):
+        return ["mail", "database"]
+
+    def to_mail(self, notifiable):
+        return Mailable().subject("Payment received").html(
+            f"<p>We received your payment of {self.invoice.total}.</p>"
+        )
+
+    def to_array(self, notifiable):
+        return {"invoice_id": self.invoice.id}
+
+await user.notify(InvoicePaid(invoice))   # {"queued": True} — mail + database each their own job
 ```
+
+This is `NotificationManager.send`'s `isinstance(notification, ShouldQueue)` branch — no queue
+bound, or the notification isn't `ShouldQueue`, and it just sends inline instead (same call, no
+code change either side).
+
+To send later rather than now — a reminder, a follow-up nudge — use `manager.later(delay, ...)`
+(`NotificationManager.later`, which schedules through the queue's durable `dispatch_after`) instead
+of `send`, regardless of `ShouldQueue`:
+
+```python
+await NotificationManager().later(3600, user, PaymentReminder(invoice))  # in an hour
+```
+
+### Throttling a queued notification: `middleware()`
+
+A notification can declare its own queued-send middleware — most usefully a rate limit — by
+overriding `Notification.middleware()`. It reuses the same job-middleware onion a hand-written `Job`
+already gets (`Job.middleware()`, `arvel.queue.middleware`), so `RateLimited`/`WithoutOverlapping`/
+`ThrottlesExceptions` all work here too:
+
+```python
+from arvel.http.rate_limiter import RateLimiter
+from arvel.queue.middleware import RateLimited
+
+class PaymentReminder(Notification, ShouldQueue):
+    def __init__(self, invoice):
+        self.invoice = invoice
+        self.invoice_id = invoice.id   # keep a plain scalar for middleware() — see the note below
+
+    def via(self, notifiable):
+        return ["mail"]
+
+    def to_mail(self, notifiable):
+        ...
+
+    def middleware(self):
+        from arvel.kernel import app
+
+        # resolve the limiter fresh here, don't store it on `self` — the notification is
+        # serialized across the queue, and a live limiter can't survive that round trip.
+        limiter = RateLimiter(app().make("cache"))
+        key = f"reminder:{self.invoice_id}"
+        return [RateLimited(limiter, key=key, max_attempts=1, decay_seconds=86400)]
+```
+
+Over the limit, the job is released back onto the queue instead of running — not a failure, just
+deferred until the window clears.
+
+!!! warning "`middleware()` sees only plain state, not rehydrated attributes"
+    `middleware()` runs *before* the job decodes its stored notification, so any attribute is still
+    in its serialized form: a Model is a `{id}` reference, not a live row, and a `datetime` is a
+    dict. Key the limiter on a plain scalar you captured in `__init__` (`self.invoice_id` above),
+    **not** `self.invoice.id` — that works in `to_mail`/`handle` (which run after rehydration) but
+    raises here.
+
+**Queued-rail only.** `middleware()` runs in the worker, wrapping the job's `handle()` — an inline
+send (not `ShouldQueue`, or no queue bound) has no job at all, so nothing ever consults it. A
+rate-limited notification sent inline goes through every time; make it `ShouldQueue` (or send it via
+`later`) if the limit needs to actually bite.
 
 ## Common mistakes & gotchas
 
@@ -175,7 +247,13 @@ await SendInvoicePaid.dispatch(user, invoice)
 
 ## How it works
 
-`NotificationManager.send` asks the notification's `via(notifiable)` for the channel list, checks
+`NotificationManager.send` checks the notification first: `isinstance(notification, ShouldQueue)`
+with a queue bound enqueues one `SendQueuedNotification` job per `via(notifiable)` channel (each
+riding the after-commit seam) and returns `{"queued": True}` immediately; otherwise it falls through
+to `send_now`. `later(delay, notifiable, notification)` always queues, via the same per-channel job,
+but through the queue's durable `dispatch_after` instead of an immediate enqueue.
+
+`send_now` asks the notification's `via(notifiable)` for the channel list, checks
 `should_send(notifiable, channel)` for each (skipping silently on `False`), then dispatches the
 rest: `mail` renders `to_mail()` and hands it to the mail manager; `database` persists a
 `DatabaseNotification` row keyed to the notifiable (or, with no database bound, returns the
@@ -183,6 +261,10 @@ rest: `mail` renders `to_mail()` and hands it to the mail manager; `database` pe
 manager; `apprise` feeds `apprise_urls()` into an Apprise instance (lazily imported) that fans the
 message out to every configured service. Each channel reports its result, keyed by channel — a
 skipped channel has no entry at all.
+
+A queued `SendQueuedNotification` job also surfaces the notification's `middleware()` into the
+worker's job-middleware onion (`Job.middleware()`) before running `send_now` for its one channel —
+covered above under [Throttling a queued notification](#throttling-a-queued-notification-middleware).
 
 ## See also
 
