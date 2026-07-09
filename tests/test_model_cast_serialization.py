@@ -20,13 +20,15 @@ class Doc(Model):
         sa.Column("profile", sa.Text),
         sa.Column("slug", sa.Text),
         sa.Column("price", sa.Text),
+        sa.Column("posted_at", sa.DateTime(timezone=True)),
     )
-    __fillable__: ClassVar = ["tags", "profile", "slug", "price"]
+    __fillable__: ClassVar = ["tags", "profile", "slug", "price", "posted_at"]
     __casts__: ClassVar = {
         "tags": "collection",
         "profile": "object",
         "slug": "stringable",
         "price": "decimal:2",
+        "posted_at": "datetime",
     }
 
 
@@ -46,6 +48,24 @@ def test_to_json_roundtrips_without_repr_garbage() -> None:
     assert loaded["profile"] == {"x": 1}
     assert "Collection(" not in doc.to_json()
     assert "namespace(" not in doc.to_json()
+
+
+def test_to_dict_stringifies_a_datetime_cast_field_to_iso_and_agrees_with_to_json() -> None:
+    # E11-D5: to_serializable's single unwrap point turns a Date into an ISO str, so to_dict
+    # and to_json agree — json_default's Date branch never fires for this field.
+    from arvel.dates import Date
+
+    doc = Doc(
+        tags=[1],
+        profile={"x": 1},
+        slug="s",
+        price="1.5",
+        posted_at=Date.parse("2026-07-01T09:00:00+00:00[UTC]"),
+    )
+    data = doc.to_dict()
+    assert type(data["posted_at"]) is str
+    assert data["posted_at"].startswith("2026-07-01T09:00:00")
+    assert data["posted_at"] == json.loads(doc.to_json())["posted_at"]
 
 
 def _demo() -> None:

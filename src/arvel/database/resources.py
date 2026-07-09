@@ -59,6 +59,33 @@ class ResourceTransformer[M]:
         result: Any = cb(loaded)
         return result
 
+    def when_counted(self, relation: str, cb: Any = None) -> Any:
+        """The eager-loaded ``{relation}_count`` (``Builder.with_count`` labels it into the
+        model's ``_attributes`` — it's not a table column, so its presence there IS the
+        "was it counted" signal), or ``cb(count)`` if given, else ``MISSING`` when not counted."""
+        maybe_attrs = getattr(self.resource, "_attributes", None)
+        if not isinstance(maybe_attrs, dict):
+            return MISSING
+        attrs = cast("dict[str, Any]", maybe_attrs)
+        key = f"{relation}_count"
+        if key not in attrs:
+            return MISSING
+        count: Any = attrs[key]
+        return cb(count) if cb is not None else count
+
+    def when_pivot_loaded(self, cb: Any = None, accessor: str = "pivot") -> Any:
+        """The pivot data a belongs-to-many/morph relation loaded with pivot columns writes to
+        ``_attributes[accessor]`` (``accessor`` matches ``BelongsToMany.as_pivot``, default
+        ``"pivot"``), or ``cb(pivot)`` if given, else ``MISSING`` when no pivot is present."""
+        maybe_attrs = getattr(self.resource, "_attributes", None)
+        if not isinstance(maybe_attrs, dict):
+            return MISSING
+        attrs = cast("dict[str, Any]", maybe_attrs)
+        if accessor not in attrs:
+            return MISSING
+        pivot: Any = attrs[accessor]
+        return cb(pivot) if cb is not None else pivot
+
     def merge_when(self, condition: bool, mapping: dict[str, Any]) -> dict[str, Any]:
         """``mapping`` when ``condition``, else ``{}`` — spread the result
         into ``to_array``'s returned dict, e.g. ``{**self.merge_when(cond, {...}), "id":...}``."""
@@ -149,6 +176,18 @@ def _query_param(request: Any, key: str) -> str | None:
     return str(value) if value is not None else None
 
 
+def _to_many_items(related: Any) -> list[Any] | None:
+    """``related`` as a to-many list, or ``None`` when it's a single related value (a to-one).
+    Recognizes a plain ``list``/``tuple`` (the unit-test FakeModel shape) and a real ORM
+    ``Collection``/``ModelCollection`` (a loaded has-many/belongs-to-many, duck-typed via
+    ``to_list`` — the same convention ``model_casts._as_list`` uses — rather than importing the
+    concrete collection type into this transform layer)."""
+    if isinstance(related, (list, tuple)):
+        return list(cast("tuple[Any, ...]", related))
+    to_list = getattr(related, "to_list", None)
+    return cast("list[Any]", to_list()) if callable(to_list) else None
+
+
 def _requested_fields(request: Any, resource_type: str) -> set[str] | None:
     """The sparse fieldset for ``resource_type`` (``?fields[<type>]=a,b``), or ``None`` when the
     client didn't constrain it. An empty value means "no attributes", per the media-type spec."""
@@ -162,8 +201,9 @@ class JsonApiResource[M](ResourceTransformer[M]):
     """Renders the wrapped model as a JSON:API document: ``data`` with ``type``/``id``/
     ``attributes``, relationship **linkage** for declared relations that are eager-loaded on the
     model (never a lazy load), full related objects under ``included`` when the client asks via
-    ``?include=``, and per-type sparse fieldsets via ``?fields[<type>]=``. First-level include
-    only; unknown include names and unknown field names are ignored."""
+    ``?include=``, and per-type sparse fieldsets via ``?fields[<type>]=``. ``?include=`` supports
+    dot-paths (``author.comments``) recursing through eager-loaded relations to any depth; an
+    unknown include name, an unknown nested segment, and unknown field names are all ignored."""
 
     #: the JSON:API resource ``type`` (plural by convention).
     resource_type: ClassVar[str]
@@ -217,8 +257,8 @@ class JsonApiResource[M](ResourceTransformer[M]):
             if fields is not None and name not in fields:
                 continue
             resource_cls = self.relationships[name]
-            if isinstance(related, (list, tuple)):
-                many: list[Any] = list(cast("tuple[Any, ...]", related))
+            many = _to_many_items(related)
+            if many is not None:
                 linkage[name] = {"data": [resource_cls(m).identifier() for m in many]}
             elif related is None:
                 linkage[name] = {"data": None}
@@ -232,35 +272,59 @@ class JsonApiResource[M](ResourceTransformer[M]):
         self, request: Any | None, seen: set[tuple[str, str]]
     ) -> list[dict[str, Any]]:
         """The ``included`` members this resource contributes for the request's ``?include=``,
-        deduplicated across the document via ``seen``."""
+        deduplicated across the document via ``seen``. A dot-path (``author.comments``) recurses
+        into the related resource for its tail; an unknown/unloaded segment simply isn't yielded
+        by that resource's own ``_loaded_relations()`` — ignored, not an error."""
         raw = _query_param(request, "include")
         if not raw:
             return []
-        wanted = {name.strip() for name in raw.split(",") if name.strip()}
+        paths = {name.strip() for name in raw.split(",") if name.strip()}
+        return self._collect_included(request, paths, seen)
+
+    def _collect_included(
+        self, request: Any | None, paths: set[str], seen: set[tuple[str, str]]
+    ) -> list[dict[str, Any]]:
+        """Group ``paths`` by their head segment (an empty tail marks a leaf), walk each
+        loaded+wanted relation once, and recurse into the related resource with the non-empty
+        tails. ``seen`` is threaded through so dedup — and the cycle guard it doubles as — holds
+        across depth: a node already emitted is neither re-appended nor re-descended, which is
+        what keeps a cyclic loaded graph (author -> posts -> author) from recursing forever."""
+        heads: dict[str, set[str]] = {}
+        for path in paths:
+            head, _, tail = path.partition(".")
+            tails = heads.setdefault(head, set())
+            if tail:
+                tails.add(tail)
         fields = _requested_fields(request, self.resource_type)
         included: list[dict[str, Any]] = []
         for name, related in self._loaded_relations().items():
-            if name not in wanted:
+            if name not in heads:
                 continue
             if fields is not None and name not in fields:
                 # a fieldset that omits the relationship hides it from the whole document —
                 # no linkage and no included members, even when ?include= asks
                 continue
             resource_cls = self.relationships[name]
-            items: list[Any] = (
-                list(cast("tuple[Any, ...]", related))
-                if isinstance(related, (list, tuple))
-                else [related]
-            )
+            items = _to_many_items(related)
+            if items is None:
+                items = [related]
+            tails = heads[name]
             for model in items:
                 if model is None:
                     continue
                 resource = resource_cls(model)
                 key = (resource.resource_type, resource.identifier()["id"])
+                # ponytail: dedup is first-visit-wins, so a resource reached first as a bare leaf
+                # and again via a deeper path drops the deeper path's tail. Unreachable through a
+                # normal `?include=` (a client asks for the deepest path it wants); if two include
+                # paths of different depth ever converge on one resource, merge tails per node
+                # before walking rather than skipping on this seen-check.
                 if key in seen:
                     continue
                 seen.add(key)
                 included.append(resource.resource_object(request))
+                if tails:
+                    included.extend(resource._collect_included(request, tails, seen))
         return included
 
     def to_payload(self, request: Any | None = None) -> dict[str, Any]:

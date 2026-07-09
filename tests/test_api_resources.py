@@ -110,6 +110,50 @@ def test_when_and_when_not_none_strip_missing() -> None:
     assert payload == {"data": {"shown": "yes", "present": "x"}}
 
 
+def test_when_counted_present_only_when_the_count_was_loaded() -> None:
+    from arvel.database.resources import ResourceTransformer
+
+    class Loaded:
+        _attributes: ClassVar = {"posts_count": 3}
+
+    class Uncounted:
+        _attributes: ClassVar = {}
+
+    assert ResourceTransformer(Loaded()).when_counted("posts") == 3
+    assert ResourceTransformer(Uncounted()).when_counted("posts") is MISSING
+    assert ResourceTransformer(Loaded()).when_counted("posts", lambda c: c * 2) == 6
+
+
+def test_when_pivot_loaded_present_only_with_a_pivot() -> None:
+    from arvel.database.resources import ResourceTransformer
+
+    class WithPivot:
+        _attributes: ClassVar = {"pivot": {"note": "x"}}
+
+    class NoPivot:
+        _attributes: ClassVar = {}
+
+    assert ResourceTransformer(WithPivot()).when_pivot_loaded() == {"note": "x"}
+    assert ResourceTransformer(NoPivot()).when_pivot_loaded() is MISSING
+    # honors an overridden accessor (BelongsToMany.as_) rather than hardcoding "pivot"
+    assert ResourceTransformer(WithPivot()).when_pivot_loaded(accessor="assignment") is MISSING
+
+
+def test_when_counted_and_when_pivot_loaded_are_stripped_by_to_payload() -> None:
+    class Counted(JsonResource[dict[str, Any]]):
+        def to_array(self, request: Any | None = None) -> dict[str, Any]:
+            return {"posts_count": self.when_counted("posts")}
+
+    class WithCount:
+        _attributes: ClassVar = {"posts_count": 5}
+
+    class NoCount:
+        _attributes: ClassVar = {}
+
+    assert Counted(WithCount()).to_payload() == {"data": {"posts_count": 5}}  # type: ignore[arg-type]
+    assert Counted(NoCount()).to_payload() == {"data": {}}  # type: ignore[arg-type]
+
+
 def test_collection_wraps_each_item_under_data() -> None:
     class Simple(JsonResource[dict[str, Any]]):
         def to_array(self, request: Any | None = None) -> dict[str, Any]:

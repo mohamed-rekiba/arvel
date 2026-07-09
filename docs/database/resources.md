@@ -39,6 +39,10 @@ async def show(request, post: Post):
   given), or `MISSING` if `relation` wasn't eager-loaded (`Model.with_(...)`). This reads the
   model's loaded-relation bookkeeping directly — it never triggers a lazy query, so a resource is
   safe to serialize outside a request/DB context.
+- **`when_counted(relation, cb=None)`** — the `{relation}_count` value when it was loaded via
+  `Model.with_count(...)`, else `MISSING`. Reads the loaded count directly; never triggers a query.
+- **`when_pivot_loaded(cb=None, accessor="pivot")`** — the pivot row's data when a many-to-many
+  relation carries one, else `MISSING`. Pass `accessor` if you renamed the pivot via `as_pivot`.
 - **`merge_when(condition, mapping)`** — `mapping` when `condition`, else `{}`; spread it into
   `to_array`'s returned dict: `{**self.merge_when(is_admin, {"email": ...}), "id": ...}`.
 
@@ -148,8 +152,10 @@ async def show(request, post_id: int):
 ```
 
 The rules mirror `when_loaded`: relationship linkage renders only for relations you actually
-eager-loaded (never a lazy fetch), `?include=` adds the full objects under `included`
-(first-level, deduplicated), and sparse fieldsets drop unknown names silently.
+eager-loaded (never a lazy fetch), `?include=` adds the full objects under `included`, and sparse
+fieldsets drop unknown names silently. Compound (dot-path) includes recurse — `?include=author.comments`
+returns the author *and* its comments, deduplicated across the document; an unknown segment at any
+depth is ignored, and a relation that wasn't eager-loaded contributes nothing (still no lazy fetch).
 `PostResource.collection(models_or_paginator)` builds the collection document — a paginator
 contributes JSON:API `links` and `meta`. Validation failures return the spec's error objects
 (`errors[].source.pointer` → `/data/attributes/<field>`) when the client's `Accept` asks for

@@ -121,6 +121,99 @@ def test_to_many_relationship_linkage() -> None:
     assert [item["id"] for item in doc["included"]] == ["1", "2"]
 
 
+class CommentResource(JsonApiResource[FakeModel]):
+    resource_type = "comments"
+
+
+class AuthorWithComments(JsonApiResource[FakeModel]):
+    resource_type = "authors"
+    relationships = {"comments": CommentResource}
+
+
+class PostWithNestedAuthor(JsonApiResource[FakeModel]):
+    resource_type = "posts"
+    relationships = {"author": AuthorWithComments}
+
+
+def test_nested_include_recurses_into_the_related_resource() -> None:
+    comments = [FakeModel({"id": 1, "body": "nice"}), FakeModel({"id": 2, "body": "cool"})]
+    author = FakeModel({"id": 3, "name": "Ada"}, {"comments": comments})
+    post = FakeModel({"id": 7, "title": "Hello"}, {"author": author})
+    doc = PostWithNestedAuthor(post).to_payload(FakeRequest({"include": "author.comments"}))
+    assert [m["type"] for m in doc["included"]] == ["authors", "comments", "comments"]
+
+
+def test_nested_include_dedup_across_depth() -> None:
+    comments = [FakeModel({"id": 1, "body": "nice"})]
+    author = FakeModel({"id": 3, "name": "Ada"}, {"comments": comments})
+    post = FakeModel({"id": 7, "title": "Hello"}, {"author": author})
+    doc = PostWithNestedAuthor(post).to_payload(FakeRequest({"include": "author,author.comments"}))
+    authors = [m for m in doc["included"] if m["type"] == "authors"]
+    assert len(authors) == 1
+    keys = [(m["type"], m["id"]) for m in doc["included"]]
+    assert len(keys) == len(set(keys))
+
+
+def test_unknown_nested_path_is_ignored_not_an_error() -> None:
+    author = FakeModel({"id": 3, "name": "Ada"})  # no `comments` relation loaded/declared
+    post = FakeModel({"id": 7, "title": "Hello"}, {"author": author})
+    doc = PostWithNestedAuthor(post).to_payload(FakeRequest({"include": "author.unicorns"}))
+    assert [m["type"] for m in doc["included"]] == ["authors"]  # no exception, no `unicorns`
+
+
+def test_unknown_top_level_relation_in_nested_path_yields_empty_included() -> None:
+    post = FakeModel({"id": 7, "title": "Hello"})  # no `ghost` relation at all
+    doc = PostWithNestedAuthor(post).to_payload(FakeRequest({"include": "ghost.comments"}))
+    assert "included" not in doc
+
+
+def test_no_lazy_load_nested_segment_not_eager_loaded_contributes_nothing() -> None:
+    author = FakeModel({"id": 3, "name": "Ada"})  # `comments` NOT eager-loaded on the author
+    post = FakeModel({"id": 7, "title": "Hello"}, {"author": author})
+    doc = PostWithNestedAuthor(post).to_payload(FakeRequest({"include": "author.comments"}))
+    assert [m["type"] for m in doc["included"]] == ["authors"]  # no comments, no DB query
+
+
+def test_first_level_include_parity_preserved() -> None:
+    # a bare ?include=author still yields exactly one included member (the author) — its own
+    # `comments` relation being loaded only surfaces as linkage, not a second included member,
+    # since the client didn't ask for the nested path
+    author = FakeModel({"id": 3, "name": "Ada"}, {"comments": [FakeModel({"id": 1, "body": "x"})]})
+    post = FakeModel({"id": 7, "title": "Hello"}, {"author": author})
+    doc = PostWithNestedAuthor(post).to_payload(FakeRequest({"include": "author"}))
+    assert len(doc["included"]) == 1
+    assert doc["included"][0]["type"] == "authors"
+    assert doc["included"][0]["attributes"] == {"name": "Ada"}
+
+
+def test_cyclic_loaded_include_graph_terminates() -> None:
+    author = FakeModel({"id": 3, "name": "Ada"})
+    post = FakeModel({"id": 7, "title": "Hello"})
+
+    class AuthorCycle(JsonApiResource[FakeModel]):
+        resource_type = "authors"
+        relationships: Any = {}
+
+    class SelfPost(JsonApiResource[FakeModel]):
+        resource_type = "posts"
+        relationships = {"author": AuthorCycle}
+
+    AuthorCycle.relationships = {"posts": SelfPost}
+
+    # a back-referencing loaded graph: author.posts -> [post], post.author -> the SAME author
+    author._relations["posts"] = [post]
+    post._relations["author"] = author
+
+    # a deep dot-path that would walk the cycle repeatedly without the seen-node guard
+    included = AuthorCycle(author)._collect_included(
+        None, {"posts.author.posts.author.posts"}, set()
+    )
+    keys = [(m["type"], m["id"]) for m in included]
+    assert len(keys) == len(set(keys))  # deduplicated, and it returned at all
+    assert ("posts", "7") in keys
+    assert ("authors", "3") in keys
+
+
 def test_included_deduplicates_by_type_and_id() -> None:
     author = FakeModel({"id": 3, "name": "Ada"})
     posts = [_post(author=author), _post(author=author)]

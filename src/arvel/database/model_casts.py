@@ -40,13 +40,18 @@ def json_default(value: Any) -> Any:
 
 def to_serializable(value: Any) -> Any:
     """Unwrap a cast-get result to a JSON-native value for ``to_dict``:
-    ``collection`` -> list, ``object`` -> dict, ``stringable`` -> str, ``Decimal`` -> str.
-    Read-path only; ``_cast_set`` already unwraps for the write path."""
+    ``collection`` -> list, ``object`` -> dict, ``stringable`` -> str, ``Decimal`` -> str,
+    a datetime-cast ``Date`` -> ISO string (the same serializer ``json_default`` falls back to,
+    so ``to_dict``/``to_json`` agree and ``json_default`` never fires for this field). Read-path
+    only; ``_cast_set`` already unwraps for the write path."""
     from decimal import Decimal
     from types import SimpleNamespace
 
+    from arvel.dates import Date
     from arvel.support import Collection, Stringable
 
+    if isinstance(value, Date):
+        return value.to_iso()
     if isinstance(value, Collection):
         return cast("list[Any]", value.to_list())
     if isinstance(value, SimpleNamespace):
