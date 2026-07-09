@@ -103,6 +103,31 @@ class Schema:
     def drop(self, name: str) -> None:
         self._op.drop_table(name)
 
+    def has_table(self, name: str) -> bool:
+        """Whether ``name`` exists. Fresh inspector every call (DR-0044) — a cached one would
+        miss a table created/dropped earlier in the same migration."""
+        import sqlalchemy as sa
+
+        return bool(sa.inspect(self._op.get_bind()).has_table(name))
+
+    def has_column(self, table: str, column: str) -> bool:
+        """Whether ``column`` exists on ``table``; ``False`` (never a raise) when ``table`` itself
+        is absent — ``get_columns`` raises on a non-existent table, so check existence first. One
+        inspector serves both reads here (no DDL runs between them); DR-0044's "fresh per call"
+        rule is about *across*-call staleness, not this single method."""
+        import sqlalchemy as sa
+
+        inspector = sa.inspect(self._op.get_bind())
+        if not inspector.has_table(table):
+            return False
+        return column in {c["name"] for c in inspector.get_columns(table)}
+
+    def drop_if_exists(self, name: str) -> None:
+        """Idempotent drop: a no-op when ``name`` is already absent. Contrast with plain ``drop``,
+        which raises on an absent table — that raise stays as-is, deliberately."""
+        if self.has_table(name):
+            self.drop(name)
+
     def rename(self, old_table: str, new_table: str) -> None:
         """Rename a table."""
         self._op.rename_table(old_table, new_table)

@@ -116,6 +116,22 @@ def down(self, schema):
     ...
 ```
 
+### Conditional & idempotent steps
+
+`has_table(name)` and `has_column(table, column)` let a migration branch on what's actually there,
+and `drop_if_exists(name)` drops a table only when it exists (plain `drop` raises on a missing one).
+Each reads the live schema fresh, so a check right after a `create` in the same migration sees the
+new table:
+
+```python
+def up(self, schema):
+    if not schema.has_table("settings"):
+        schema.create("settings", lambda t: (t.id(), t.string("key"), t.json("value")))
+    if not schema.has_column("users", "timezone"):
+        schema.table("users", lambda t: t.string("timezone").nullable())
+    schema.drop_if_exists("legacy_sessions")   # no-op if it was never there
+```
+
 `change_column`'s kwargs (`type=`, `nullable=`, `default=`, `comment=`) are independent — pass only
 the ones you're changing. **SQLite** has no in-place `ALTER COLUMN`/`DROP CONSTRAINT`, so
 `rename_column`/`change_column`/`drop_foreign`/`drop_unique` route through Alembic's
