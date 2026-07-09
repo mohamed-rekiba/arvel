@@ -251,6 +251,31 @@ def test_cli_call_unknown_command_raises(app: Application) -> None:
         Cli.call("totally-unknown-command")
 
 
+async def test_cli_call_trap_degrades_to_a_no_op_off_the_main_thread(app: Application) -> None:
+    # `Cli.call`, invoked synchronously from inside a running loop (as here), bridges through
+    # `_run_to_completion`'s worker thread — a fresh loop *not* on the main thread, where
+    # `loop.add_signal_handler` can't install (E16's top risk). `trap()` must degrade to a silent
+    # no-op there, not crash — the command still runs and returns 0.
+    import signal
+
+    from arvel.console import Command
+    from arvel.console.kernel import Cli
+
+    seen: dict[str, object] = {}
+
+    class Watcher(Command):
+        signature = "off-thread-trap"
+
+        async def handle(self) -> None:
+            self.trap(signal.SIGTERM, lambda: None)  # off-thread install: no-op, no raise
+            seen["ran"] = True
+
+    app.registry("console.commands", list).append(Watcher)
+    exit_code = Cli.call("off-thread-trap")
+    assert exit_code == 0
+    assert seen == {"ran": True}
+
+
 async def test_cli_call_works_from_inside_a_running_event_loop(app: Application) -> None:
     # the production path: Cli.call from a request/scheduled task (async) — the sync-body tests
     # masked that the app-command path did asyncio.run() and crashed inside a running loop.

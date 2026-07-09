@@ -71,19 +71,11 @@ async def tick_loop(schedule: Any, *, interval: float = 60.0, stop: Any = None) 
     import contextlib
     import signal
 
+    from arvel.support.signals import signal_traps
+
     finish = stop if stop is not None else asyncio.Event()
-    loop = asyncio.get_running_loop()
-    handled_signals: list[signal.Signals] = []
-    for sig_num in (signal.SIGTERM, signal.SIGINT):
-        with contextlib.suppress(NotImplementedError, RuntimeError):
-            loop.add_signal_handler(sig_num, finish.set)
-            handled_signals.append(sig_num)
-    try:
+    with signal_traps({signal.SIGTERM: finish.set, signal.SIGINT: finish.set}):
         while not finish.is_set():
             await _run_due(schedule)
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(finish.wait(), timeout=interval)
-    finally:
-        for sig_num in handled_signals:
-            with contextlib.suppress(NotImplementedError, RuntimeError):
-                loop.remove_signal_handler(sig_num)

@@ -223,9 +223,12 @@ def run_command_class(cls: Any, **cli_kwargs: Any) -> None:
 
         instance = cls()
         instance.bind_parsed(cli_kwargs)
-        result = app.call((instance, "handle"))
-        if inspect.isawaitable(result):
-            result = await result
+        try:
+            result = app.call((instance, "handle"))
+            if inspect.isawaitable(result):
+                result = await result
+        finally:
+            instance._close_traps()  # restore any Command.trap()s this run installed (E16)
         # a returned int is the exit code, like a process's return status
         if isinstance(result, int) and not isinstance(result, bool) and result != 0:
             raise typer.Exit(code=result)
@@ -245,9 +248,12 @@ async def run_command_class_async(cls: Any, **cli_kwargs: Any) -> None:
 
         instance = cls()
         instance.bind_parsed(cli_kwargs)
-        result = app.call((instance, "handle"))
-        if inspect.isawaitable(result):
-            result = await result
+        try:
+            result = app.call((instance, "handle"))
+            if inspect.isawaitable(result):
+                result = await result
+        finally:
+            instance._close_traps()  # restore any Command.trap()s this run installed (E16)
         if isinstance(result, int) and not isinstance(result, bool) and result != 0:
             raise typer.Exit(code=result)
 

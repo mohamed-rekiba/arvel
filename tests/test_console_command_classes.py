@@ -68,3 +68,58 @@ def test_argument_and_option_default_to_none_when_unset(app: Application) -> Non
 
     run_command_class(Notify, user="Ada")
     assert seen == {"force": None, "missing": None}
+
+
+# -- Command.trap (E16) -------------------------------------------------------------------
+
+
+def test_trap_fires_mid_run_and_the_command_exits_cleanly(app: Application) -> None:
+    """A command registering a SIGTERM trap: delivering the signal mid-run invokes the handler,
+    and the command still exits cleanly (no crash, no leaked traceback)."""
+    import asyncio
+    import os
+    import signal
+
+    seen: dict[str, object] = {}
+
+    class Watcher(Command):
+        async def handle(self) -> None:
+            flag = asyncio.Event()
+            self.trap(signal.SIGTERM, flag.set)
+            os.kill(os.getpid(), signal.SIGTERM)
+            await asyncio.wait_for(flag.wait(), timeout=2)
+            seen["ran"] = True
+
+    run_command_class(Watcher)  # raises on any exception/timeout — a clean run is the assertion
+    assert seen == {"ran": True}
+
+
+def test_trap_is_removed_to_default_after_the_command_exits(app: Application) -> None:
+    """After the command returns, the loop no longer holds its handler — the OS-level signal
+    disposition is back to default, not leaked past this run."""
+    import signal
+
+    class Watcher(Command):
+        async def handle(self) -> None:
+            self.trap(signal.SIGTERM, lambda: None)
+
+    run_command_class(Watcher)
+    assert signal.getsignal(signal.SIGTERM) == signal.SIG_DFL
+
+
+def test_no_trap_command_behaves_exactly_as_today(app: Application) -> None:
+    seen: dict[str, object] = {}
+
+    class Plain(Command):
+        async def handle(self) -> None:
+            seen["ran"] = True
+
+    run_command_class(Plain)
+    assert seen == {"ran": True}
+
+
+def test_close_traps_is_a_no_op_when_no_trap_was_registered() -> None:
+    """A command that never calls `trap()` never opens an ExitStack — closing is a no-op."""
+    command = Command()
+    command._close_traps()  # must not raise
+    assert command._trap_scope is None

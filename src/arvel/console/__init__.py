@@ -9,10 +9,13 @@ the command body. Grounded in knowledge/port/13-console.md.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import TYPE_CHECKING, Any, NoReturn, TextIO
 
 if TYPE_CHECKING:
+    import contextlib
+    import signal
+
     import typer
 
     from arvel.console.prompts import Prompter
@@ -111,6 +114,7 @@ class Command:
         self._prompter = prompter
         self._arguments: dict[str, Any] = {}
         self._options: dict[str, Any] = {}
+        self._trap_scope: contextlib.ExitStack | None = None  # lazy — no-trap commands open none
 
     async def handle(self, *deps: Any) -> Any:  # DI-injected by the kernel
         raise NotImplementedError
@@ -183,6 +187,28 @@ class Command:
     def fail(self, message: str) -> NoReturn:
         """Abort the command with ``message`` and exit code 1."""
         raise CommandFailed(message)
+
+    # -- signal traps (E16) --------------------------------------------------
+    def trap(self, sig: signal.Signals, handler: Callable[[], Any]) -> None:
+        """Install ``handler`` for ``sig`` for the rest of this command's run — installs
+        *immediately* (called from inside ``handle()``, where a running loop already exists on
+        Unix), via the same shared mechanism ``queue:work``/``schedule:run`` use
+        (:func:`arvel.support.signals.signal_traps`). Restored when this run's ``handle()``
+        returns (the kernel closes the trap scope in ``finally`` — see
+        ``console.kernel.run_command_class``)."""
+        import contextlib
+
+        from arvel.support.signals import signal_traps
+
+        if self._trap_scope is None:
+            self._trap_scope = contextlib.ExitStack()
+        self._trap_scope.enter_context(signal_traps({sig: handler}))
+
+    def _close_traps(self) -> None:
+        """Restore every trap this run installed. A command that never called :meth:`trap` never
+        opened a scope — a no-op, so its behavior is unchanged."""
+        if self._trap_scope is not None:
+            self._trap_scope.close()
 
     def argument(self, name: str) -> Any:
         return self._arguments.get(name)

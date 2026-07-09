@@ -603,10 +603,11 @@ class JobWorker:
         outstanding tasks once its stop event is set, rather than cancelling them).
         """
         import asyncio
-        import contextlib
         import signal
 
         from taskiq import InMemoryBroker
+
+        from arvel.support.signals import signal_traps
 
         self.ensure_task()  # register the wrapper task on the broker
         broker = self._get_broker()
@@ -627,45 +628,37 @@ class JobWorker:
         )
         self._worker_stop = finish
 
-        loop = asyncio.get_running_loop()
-        handled_signals: list[signal.Signals] = []
-        for sig_num in (signal.SIGTERM, signal.SIGINT):
-            with contextlib.suppress(NotImplementedError, RuntimeError):
-                loop.add_signal_handler(sig_num, finish.set)
-                handled_signals.append(sig_num)
-
         watchers = (
             [asyncio.create_task(_stop_after(finish, max_time))] if max_time is not None else []
         )
         if memory is not None:
             watchers.append(asyncio.create_task(_stop_on_memory(finish, memory, release_interval)))
 
-        releaser = asyncio.create_task(self._release_loop(release_interval, finish))
-        try:
-            if isinstance(broker, InMemoryBroker):
-                # runs jobs inline on dispatch and can't be listened to; just wait for a stop condition.
-                await finish.wait()
-            else:
-                from taskiq.receiver import Receiver
+        with signal_traps({signal.SIGTERM: finish.set, signal.SIGINT: finish.set}):
+            releaser = asyncio.create_task(self._release_loop(release_interval, finish))
+            try:
+                if isinstance(broker, InMemoryBroker):
+                    # runs jobs inline on dispatch and can't be listened to; just wait for a stop
+                    # condition.
+                    await finish.wait()
+                else:
+                    from taskiq.receiver import Receiver
 
-                await Receiver(broker).listen(finish)  # cooperative: drains in-flight work
-        finally:
-            # `finish.set()` covers exiting via an external `task.cancel()` too (not just a worker
-            # flag) — either way, `_release_loop` then notices cooperatively (never mid-DB-call,
-            # which a raw `.cancel()` could interrupt and wedge the connection) and returns on its
-            # own, almost always within one tick. The timeout is a last-resort fallback for a truly
-            # stuck DB call — same as an unconditional `.cancel()` would risk, just the rare case
-            # now instead of the common one.
-            finish.set()
-            with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(releaser, timeout=release_interval + 1.0)
-            for watcher in watchers:
-                watcher.cancel()
-            for sig_num in handled_signals:
-                with contextlib.suppress(NotImplementedError, RuntimeError):
-                    loop.remove_signal_handler(sig_num)
-            self._worker_options = None
-            self._worker_stop = None
+                    await Receiver(broker).listen(finish)  # cooperative: drains in-flight work
+            finally:
+                # `finish.set()` covers exiting via an external `task.cancel()` too (not just a
+                # worker flag) — either way, `_release_loop` then notices cooperatively (never
+                # mid-DB-call, which a raw `.cancel()` could interrupt and wedge the connection)
+                # and returns on its own, almost always within one tick. The timeout is a
+                # last-resort fallback for a truly stuck DB call — same as an unconditional
+                # `.cancel()` would risk, just the rare case now instead of the common one.
+                finish.set()
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(releaser, timeout=release_interval + 1.0)
+                for watcher in watchers:
+                    watcher.cancel()
+                self._worker_options = None
+                self._worker_stop = None
 
 
 __all__ = [
