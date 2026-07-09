@@ -509,6 +509,22 @@ class Arr:
         return [pool.pop(secrets.randbelow(len(pool))) for _ in range(number)]
 
 
+def app_url(path: str = "") -> str:
+    """Join ``path`` onto ``config('app.url')`` — the one absolute-URL joiner every call site
+    (``routing._absolute``, ``views._url``) delegates to (H16). Reproduces the shared logic
+    byte-for-byte: the base is ``config('app.url')`` when a bound app has one, else ``""``,
+    stripped of a trailing slash; ``path`` is prefixed with a single leading slash (empty stays
+    empty); an empty result joins to ``"/"``."""
+    from arvel.kernel.globals import app, has_application
+
+    base = ""
+    if has_application() and app().bound("config"):
+        base = str(app("config").get("app.url", "") or "")
+    base = base.rstrip("/")
+    suffix = ("/" + path.lstrip("/")) if path else ""
+    return (base + suffix) if base else (suffix or "/")
+
+
 def cache() -> Any:
     """The default cache driver, so you ``await cache().get("k")`` / ``await cache().put("k", v)``
     instead of building ``CacheManager().driver()`` by hand. Resolves the app-bound ``CacheManager``

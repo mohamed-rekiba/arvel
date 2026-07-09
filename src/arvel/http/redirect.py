@@ -1,7 +1,7 @@
 """arvel.http.redirect — the fluent ``Redirect`` value.
 
-A ``Redirect`` carries where to go plus what to flash; the kernel's conversion funnel
-(``HttpKernel._to_response``) turns it into a 302 (or the given status) and writes the
+A ``Redirect`` carries where to go plus what to flash; the response-conversion funnel
+(``arvel.http.responder.to_response``) turns it into a 302 (or the given status) and writes the
 flash/old-input/errors through the **same** session machinery ``ShareErrorsFromSession`` and
 ``render_exception``'s redirect-back path already use (``arvel.http.flash.FlashBag``,
 ``Request._flash_old_input``) — no second flash implementation.

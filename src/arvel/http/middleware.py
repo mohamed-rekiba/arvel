@@ -76,9 +76,6 @@ class SessionSettings(Settings):
     trusted_origins: list[str] = msgspec.field(default_factory=_empty_str_list)
 
 
-# Shared across the per-request middleware instances the kernel builds: name:client -> (count, window_start).
-_THROTTLE_HITS: dict[str, tuple[int, float]] = {}
-
 # per-request rate-limit headers to attach to an allowed response — a ContextVar (not instance
 # state) because a throttle middleware instance is shared across concurrent requests.
 _RATE_LIMIT_HEADERS: ContextVar[dict[str, str] | None] = ContextVar(
@@ -86,6 +83,21 @@ _RATE_LIMIT_HEADERS: ContextVar[dict[str, str] | None] = ContextVar(
 )
 # Default in-process session store (session id -> data). Apps swap in a cache-backed store.
 _SESSIONS: dict[str, dict[str, Any]] = {}
+
+# H14: the process-global fallback window for a cache-less plain ``ThrottleRequests`` — the
+# array-cache-backed counterpart to the old monotonic dict (DR-0041). Rebuilt lazily so it needs
+# no app/config; dropping the reference (see `reset_rate_limiter`) is how it's cleared.
+_default_limiter_cache: Any = None
+
+
+def _default_limiter() -> Any:
+    global _default_limiter_cache
+    if _default_limiter_cache is None:
+        from arvel.cache import CacheManager
+        from arvel.http.rate_limiter import RateLimiter
+
+        _default_limiter_cache = RateLimiter(CacheManager().create_array_driver())
+    return _default_limiter_cache
 
 
 def reset_rate_limiter() -> None:
@@ -95,8 +107,12 @@ def reset_rate_limiter() -> None:
     it leaks across the multiple app instances a test suite builds in a single process, so the api
     throttle eventually 429s spuriously mid-suite. Call this between tests (an autouse fixture) to
     isolate each test. No effect on a cache-backed (distributed) limiter — clear that store instead.
+
+    H14: retargeted from the old monotonic dict's ``.clear()`` to dropping the process-global
+    array-cache limiter — the next use lazily rebuilds a fresh, empty one.
     """
-    _THROTTLE_HITS.clear()
+    global _default_limiter_cache
+    _default_limiter_cache = None
 
 
 def reset_sessions() -> None:
@@ -134,21 +150,23 @@ def _default_segment(request: Any) -> str:
 class ThrottleRequests(Middleware):
     """Rate-limit by client: at most ``max_attempts`` per ``decay_seconds`` window (api group).
 
-        By default state lives in a process-shared dict keyed by ``name:client``. Pass a ``cache``
-        (a ``CacheRepository``) to count over a shared backend instead — that makes limiting
-        **distributed** across processes/hosts (e.g. Redis). A 429 ``ValidationException`` is raised
-        when the limit is exceeded.
+    By default state lives in the process-global array-cache limiter (:func:`_default_limiter`).
+    Pass a ``cache`` (a ``CacheRepository``) to count over a shared backend instead — that makes
+    limiting **distributed** across processes/hosts (e.g. Redis).
 
-        Pass ``limiter_name`` instead (what the ``throttle:<name>`` route-middleware string builds,
-        e.g. ``Route.get(...).middleware("throttle:api")``) to rate-limit via a **named limiter**
-        registered on the app's ``limiter`` (:class:`~arvel.http.rate_limiter.RateLimiter`) with
-        ``RateLimiter.for_(name, resolver)``: ``resolver(request)`` returns a
-    :class:`~arvel.http.rate_limiter.Limit`, a ``list[Limit]``, or ``None`` (unlimited). A limit
-        with no explicit ``.by(key)`` segments by:func:`_default_segment` (user id, else IP). Over any
-        limit renders a 429 with ``Retry-After``/``X-RateLimit-Limit``/``X-RateLimit-Remaining``
-        headers (or the limit's own ``.response(cb)`` builder); a successful response carries the
-        ``X-RateLimit-*`` headers too. This named-limiter mode never raises — it returns the response
-        directly, so it (unlike the plain mode above) needs no exception-header plumbing.
+    Pass ``limiter_name`` instead (what the ``throttle:<name>`` route-middleware string builds,
+    e.g. ``Route.get(...).middleware("throttle:api")``) to rate-limit via a **named limiter**
+    registered on the app's ``limiter`` (:class:`~arvel.http.rate_limiter.RateLimiter`) with
+    ``RateLimiter.for_(name, resolver)``: ``resolver(request)`` returns a
+    :class:`~arvel.http.rate_limiter.Limit`, a ``list[Limit]``, or ``None`` (unlimited).
+
+    Both modes count through the same fixed-window ``RateLimiter`` (DR-0041 — H14) and share ONE
+    429 decision: a limit's own ``.response(cb)`` builder wins when set; otherwise
+    ``HttpException(429)`` is raised carrying ``Retry-After``/``X-RateLimit-Limit``/
+    ``X-RateLimit-Remaining``/``X-RateLimit-Reset``, so ``render_exception`` content-negotiates the
+    body exactly like every other framework error (422/403/404/…). A limit with no explicit
+    ``.by(key)`` segments by :func:`_default_segment` (user id, else IP). A successful response
+    carries the ``X-RateLimit-*`` headers too (applied in :meth:`terminate`).
     """
 
     def __init__(
@@ -163,75 +181,21 @@ class ThrottleRequests(Middleware):
         self.max_attempts = max_attempts
         self.decay_seconds = decay_seconds
         self.name = name
-        self._cache = cache  # CacheRepository for distributed limiting; None → in-process
+        self._cache = cache  # CacheRepository for distributed limiting; None → process-global array
         self._limiter_name = limiter_name
 
-    async def _hit(self, key: str) -> int:
-        """Increment the window counter for ``key`` and return the new count."""
-        if self._cache is not None:  # distributed: atomic incr in the cache, TTL on first hit
-            count = await self._cache.increment(key)
-            if count == 1:
-                await self._cache.expire(key, self.decay_seconds)
-            return int(count)
-        import time
+    def _plain_limiter(self) -> Any:
+        """The ``RateLimiter`` a cache-less plain instance counts through: an explicit ``cache=``
+        wraps directly; otherwise the process-global array-cache default (DR-0041)."""
+        from arvel.http.rate_limiter import RateLimiter
 
-        now = time.monotonic()
-        count, start = _THROTTLE_HITS.get(key, (0, now))
-        if now - start >= self.decay_seconds:
-            count, start = 0, now
-        count += 1
-        _THROTTLE_HITS[key] = (count, start)
-        return count
-
-    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
-        if self._limiter_name is not None:
-            return await self._handle_named(request, call_next)
-        # user-then-IP (the same segmentation named limiters use) so authenticated users behind a
-        # shared IP get independent buckets, not one shared with every user on that IP.
-        key = f"{self.name}:{_default_segment(request)}"
-        count = await self._hit(key)
-        if count > self.max_attempts:
-            await self._plain_over_limit(key)  # raises HttpException(429) with rate-limit headers
-        _RATE_LIMIT_HEADERS.set(
-            {
-                "X-RateLimit-Limit": str(self.max_attempts),
-                "X-RateLimit-Remaining": str(max(self.max_attempts - count, 0)),
-            }
-        )
-        return await call_next(request)
-
-    async def _retry_after(self, key: str) -> int:
-        """Seconds until this window resets. Exact for the in-process store; for the distributed
-        cache we bound it by the decay window (the key's TTL guarantees a reset within it)."""
         if self._cache is not None:
-            return self.decay_seconds
-        import time
+            return RateLimiter(self._cache)
+        return _default_limiter()
 
-        entry = _THROTTLE_HITS.get(key)
-        if entry is None:
-            return self.decay_seconds
-        _, start = entry
-        return max(int(start + self.decay_seconds - time.monotonic()), 0)
-
-    async def _plain_over_limit(self, key: str) -> Any:
-        import time
-
-        from arvel.http.exceptions import HttpException
-        from arvel.localization import trans
-
-        retry_after = await self._retry_after(key)
-        raise HttpException(
-            429,
-            trans("http.too_many_requests"),
-            headers={
-                "Retry-After": str(retry_after),
-                "X-RateLimit-Limit": str(self.max_attempts),
-                "X-RateLimit-Remaining": "0",
-                "X-RateLimit-Reset": str(int(time.time()) + retry_after),
-            },
-        )
-
-    async def _handle_named(self, request: Any, call_next: Any) -> Any:
+    async def _resolve_named(self, request: Any) -> list[Limit] | None:
+        """The named-limiter's registered resolver: a ``Limit``/``list[Limit]``/``None`` (opts this
+        request out — unlimited)."""
         from arvel.kernel import app, has_application
 
         if not has_application() or not app().bound("limiter"):
@@ -248,32 +212,53 @@ class ThrottleRequests(Middleware):
         resolved: Limit | list[Limit] | None = resolver(request)
         if inspect.isawaitable(resolved):
             resolved = await resolved
-        if resolved is None:  # the resolver opted this request out — unlimited
-            return await call_next(request)
-        limits: list[Limit] = resolved if isinstance(resolved, list) else [resolved]
+        if resolved is None:
+            return None
+        return resolved if isinstance(resolved, list) else [resolved]
+
+    async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
+        from arvel.http.rate_limiter import Limit
+
+        limits: list[Limit]
+        if self._limiter_name is not None:
+            from arvel.kernel import app
+
+            resolved = await self._resolve_named(request)
+            if resolved is None:  # the resolver opted this request out — unlimited
+                return await call_next(request)
+            limits = resolved
+            limiter = app().make("limiter")
+            scope = self._limiter_name
+        else:
+            limiter = self._plain_limiter()
+            limits = [Limit(self.max_attempts, self.decay_seconds)]
+            scope = self.name
 
         remaining = 0
         for limit in limits:
-            key = f"{self._limiter_name}:{limit.decay_seconds}:{limit.key or _default_segment(request)}"
+            key = f"{scope}:{limit.decay_seconds}:{limit.key or _default_segment(request)}"
             # atomic increment-then-compare (not attempts()-then-hit()): two concurrent requests
             # both reading "under limit" before either increments would let more than
             # max_attempts through — increment_with_ttl folds the check into the same atomic op.
             count = await limiter.hit_with_ttl(key, limit.decay_seconds)
             if count > limit.max_attempts:
                 retry_after = await limiter.available_in(key)
-                return await self._too_many_attempts_response(request, limit, retry_after)
+                return await self._over_limit(request, limit, retry_after)
             remaining = max(limit.max_attempts - count, 0)
 
         _RATE_LIMIT_HEADERS.set(
             {
                 "X-RateLimit-Limit": str(limits[-1].max_attempts),
-                "X-RateLimit-Remaining": str(max(remaining, 0)),
+                "X-RateLimit-Remaining": str(remaining),
             }
         )
         return await call_next(request)
 
     @staticmethod
-    async def _too_many_attempts_response(request: Any, limit: Limit, retry_after: int) -> Any:
+    async def _over_limit(request: Any, limit: Limit, retry_after: int) -> Any:
+        """The one 429 decision both modes share (DR-0041): a custom ``Limit.response(callback)``
+        wins; otherwise raise ``HttpException(429)`` carrying the rate-limit headers so
+        ``render_exception`` content-negotiates the body like every other framework error."""
         if limit.response_callback is not None:
             result = limit.response_callback(request)
             if inspect.isawaitable(result):
@@ -281,12 +266,12 @@ class ThrottleRequests(Middleware):
             return result
         import time
 
-        from arvel.http.response import Response
+        from arvel.http.exceptions import HttpException
         from arvel.localization import trans
 
-        return Response(
-            {"message": trans("http.too_many_requests")},
-            status=429,
+        raise HttpException(
+            429,
+            trans("http.too_many_requests"),
             headers={
                 "Retry-After": str(retry_after),
                 "X-RateLimit-Limit": str(limit.max_attempts),

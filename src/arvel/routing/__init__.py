@@ -629,15 +629,12 @@ class Router:
 
 
 def _absolute(path: str) -> str:
-    """Join ``path`` onto ``config('app.url')``."""
-    from arvel.kernel import app, has_application
+    """Join ``path`` onto ``config('app.url')`` — delegates to the one joiner (H16),
+    ``arvel.support.helpers.app_url``. Kept as a name so routing's many internal callers
+    (``_UrlGenerator``, ``route()``) are untouched."""
+    from arvel.support.helpers import app_url
 
-    base = ""
-    if has_application() and app().bound("config"):
-        base = str(app("config").get("app.url", "") or "")
-    base = base.rstrip("/")
-    suffix = ("/" + path.lstrip("/")) if path else ""
-    return (base + suffix) if base else (suffix or "/")
+    return app_url(path)
 
 
 class _UrlGenerator:

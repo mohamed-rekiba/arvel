@@ -100,7 +100,14 @@ class RateLimiter:
         :meth:`~arvel.cache.CacheRepository.increment_with_ttl`, so a caller that must decide
         "over limit?" from the returned count (rather than a separate ``attempts`` read first)
         never races a concurrent hit between the check and the increment."""
-        return int(await self._cache.increment_with_ttl(key, 1, decay_seconds))
+        count = int(await self._cache.increment_with_ttl(key, 1, decay_seconds))
+        if decay_seconds <= 0:
+            # cashews reads a non-positive `expire` as no-expiry (same convention
+            # `CacheRepository.put`/`.add` special-case), so a zero-length window would otherwise
+            # persist forever instead of resetting — evict right after this hit's count is read,
+            # so the next call starts fresh (a zero decay window never accumulates).
+            await self._cache.forget(key)
+        return count
 
     async def too_many_attempts(self, key: str, max_attempts: int) -> bool:
         """Whether ``key`` has already reached ``max_attempts`` within its current window."""

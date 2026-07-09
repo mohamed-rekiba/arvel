@@ -62,10 +62,11 @@ def _route(name: str, **params: Any) -> str:
 
 
 def _url(path: str = "") -> str:
-    """Template ``url('/login')`` helper — joins ``config('app.url')`` with ``path``."""
-    base = str(_config("app.url", "") or "").rstrip("/")
-    suffix = ("/" + path.lstrip("/")) if path else ""
-    return (base + suffix) if base else (suffix or "/")
+    """Template ``url('/login')`` helper — delegates to the one joiner (H16),
+    ``arvel.support.helpers.app_url``."""
+    from arvel.support.helpers import app_url
+
+    return app_url(path)
 
 
 def _csrf_token() -> str:

@@ -3,7 +3,7 @@
 Handlers may return a plain ``dict``/``list``/``str`` (Litestar serializes it), a
 ``JsonResource``/``ResourceCollection``, or one of the value objects here (an explicit
 ``Response``, a ``FileDownload``, a ``StreamValue``, or an ``http.redirect.Redirect``); the
-kernel's single conversion funnel (``HttpKernel._to_response``) turns each into a
+one conversion funnel (``arvel.http.responder.to_response``) turns each into a
 ``litestar.Response`` in the serve path (Litestar imported there, not here).
 """
 

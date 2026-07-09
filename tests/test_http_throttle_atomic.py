@@ -9,9 +9,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from arvel.cache import CacheManager
+from arvel.http.exceptions import HttpException
 from arvel.http.middleware import MethodOverride, ThrottleRequests
 from arvel.http.rate_limiter import Limit, RateLimiter
-from arvel.http.response import Response
 from arvel.kernel import Application, set_application
 
 
@@ -36,6 +36,8 @@ def _app_with_array_cache() -> Application:
 
 
 async def test_concurrent_burst_lets_exactly_n_through() -> None:
+    # H14 (DR-0041): the no-callback over-limit path raises HttpException(429), so a blocked
+    # call surfaces as an exception from gather, not a returned Response.
     app = _app_with_array_cache()
     set_application(app)
     n = 10
@@ -45,9 +47,9 @@ async def test_concurrent_burst_lets_exactly_n_through() -> None:
         async def call() -> Any:
             return await ThrottleRequests(limiter_name="burst").handle(FakeRequest(), _ok)
 
-        results = await asyncio.gather(*(call() for _ in range(n * 3)))
+        results = await asyncio.gather(*(call() for _ in range(n * 3)), return_exceptions=True)
         passed = [r for r in results if r == "ok"]
-        blocked = [r for r in results if isinstance(r, Response)]
+        blocked = [r for r in results if isinstance(r, HttpException)]
         assert len(passed) == n
         assert len(blocked) == n * 3 - n
         assert all(r.status == 429 for r in blocked)
@@ -65,13 +67,13 @@ async def test_concurrent_burst_headers_stay_correct() -> None:
         async def call() -> Any:
             return await ThrottleRequests(limiter_name="burst2").handle(FakeRequest(), _ok)
 
-        results = await asyncio.gather(*(call() for _ in range(n * 2)))
-        blocked = [r for r in results if isinstance(r, Response)]
+        results = await asyncio.gather(*(call() for _ in range(n * 2)), return_exceptions=True)
+        blocked = [r for r in results if isinstance(r, HttpException)]
         assert len(blocked) == n
         for r in blocked:
-            assert r.headers["X-RateLimit-Limit"] == str(n)
-            assert r.headers["X-RateLimit-Remaining"] == "0"
-            assert int(r.headers["Retry-After"]) >= 0
+            assert r.response_headers["X-RateLimit-Limit"] == str(n)
+            assert r.response_headers["X-RateLimit-Remaining"] == "0"
+            assert int(r.response_headers["Retry-After"]) >= 0
     finally:
         set_application(None)
 

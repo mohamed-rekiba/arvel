@@ -10,6 +10,7 @@ from litestar.testing import TestClient
 
 from arvel.cache import CacheManager
 from arvel.http import HttpKernel
+from arvel.http.exceptions import HttpException
 from arvel.http.middleware import ThrottleRequests
 from arvel.http.rate_limiter import Limit, RateLimiter
 from arvel.kernel import Application, set_application
@@ -69,7 +70,9 @@ async def test_unlimited_resolver_passes_through() -> None:
         set_application(None)
 
 
-async def test_too_many_attempts_returns_429_response_with_headers() -> None:
+async def test_too_many_attempts_raises_429_with_headers() -> None:
+    # H14 (DR-0041): named mode's no-callback over-limit path raises HttpException(429) carrying
+    # the rate-limit headers, same as plain mode — render_exception content-negotiates the body.
     app = _app_with_cache()
     app.make("limiter").for_("api", lambda request: Limit.per_minute(2))
     set_application(app)
@@ -78,14 +81,12 @@ async def test_too_many_attempts_returns_429_response_with_headers() -> None:
         assert await mw.handle(FakeRequest(), _ok) == "ok"
         assert await mw.handle(FakeRequest(), _ok) == "ok"
 
-        from arvel.http.response import Response
-
-        response = await ThrottleRequests(limiter_name="api").handle(FakeRequest(), _ok)
-        assert isinstance(response, Response)
-        assert response.status == 429
-        assert response.headers["X-RateLimit-Limit"] == "2"
-        assert response.headers["X-RateLimit-Remaining"] == "0"
-        assert int(response.headers["Retry-After"]) > 0
+        with pytest.raises(HttpException) as exc:
+            await ThrottleRequests(limiter_name="api").handle(FakeRequest(), _ok)
+        assert exc.value.status == 429
+        assert exc.value.response_headers["X-RateLimit-Limit"] == "2"
+        assert exc.value.response_headers["X-RateLimit-Remaining"] == "0"
+        assert int(exc.value.response_headers["Retry-After"]) > 0
     finally:
         set_application(None)
 
@@ -111,10 +112,9 @@ async def test_default_segment_is_per_user_then_per_ip() -> None:
         # same user, different IP -> still the SAME bucket (keyed by user id, not IP)
         token = current_user.set(User(id=1))
         try:
-            from arvel.http.response import Response
-
-            result = await ThrottleRequests(limiter_name="api").handle(FakeRequest("9.9.9.9"), _ok)
-            assert isinstance(result, Response) and result.status == 429
+            with pytest.raises(HttpException) as exc:
+                await ThrottleRequests(limiter_name="api").handle(FakeRequest("9.9.9.9"), _ok)
+            assert exc.value.status == 429
         finally:
             current_user.reset(token)
 
@@ -139,10 +139,9 @@ async def test_by_key_overrides_the_default_segment() -> None:
             == "ok"
         )
 
-        from arvel.http.response import Response
-
-        result = await ThrottleRequests(limiter_name="tenant").handle(FakeRequest("2.2.2.2"), _ok)
-        assert isinstance(result, Response) and result.status == 429
+        with pytest.raises(HttpException) as exc:
+            await ThrottleRequests(limiter_name="tenant").handle(FakeRequest("2.2.2.2"), _ok)
+        assert exc.value.status == 429
     finally:
         set_application(None)
 
