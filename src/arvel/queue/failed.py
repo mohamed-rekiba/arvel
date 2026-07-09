@@ -36,7 +36,8 @@ class FailedJob(HasUuids, Model):
     async def retry(self) -> Any:
         """Re-dispatch the serialized job and delete this record."""
         from arvel.kernel import app, has_application
-        from arvel.queue import QueueManager, deserialize_instance
+        from arvel.queue import QueueManager
+        from arvel.queue.serialization import deserialize_instance
 
         job = await deserialize_instance(self.payload)
         manager = (
@@ -45,3 +46,21 @@ class FailedJob(HasUuids, Model):
         result = await manager.push_instance(job)
         await self.delete()
         return result
+
+
+async def failed_jobs() -> list[FailedJob]:
+    """The failed-job records, newest first — the ``QueueManager.failed_jobs()`` admin surface."""
+    return list(await FailedJob.order_by("failed_at", "desc").get())
+
+
+async def retry_failed(failed_id: str | None = None) -> list[FailedJob]:
+    """Re-dispatch failed jobs — one by id, or every one. Returns
+    the records that were retried (each is re-pushed and its record deleted)."""
+    if failed_id is None:
+        jobs = list(await FailedJob.get())
+    else:
+        found = await FailedJob.find(failed_id)
+        jobs = [found] if found is not None else []
+    for job in jobs:
+        await job.retry()
+    return jobs

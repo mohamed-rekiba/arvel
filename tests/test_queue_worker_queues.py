@@ -80,22 +80,22 @@ async def test_direct_invoke_drops_a_job_on_a_queue_this_worker_does_not_consume
     from arvel.queue import _WorkerOptions  # pyright: ignore[reportPrivateUsage]
 
     manager, db = await _setup()
-    manager._worker_options = _WorkerOptions(
+    manager._worker._worker_options = _WorkerOptions(
         max_jobs=None, rest=0.0, stop_when_empty=False, queues=["high"]
     )
     try:
-        result = await manager._invoke(Tick("skipped"))
+        result = await manager._worker._invoke(Tick("skipped"))
         assert result is None
         assert PROCESSED == []
     finally:
-        manager._worker_options = None
+        manager._worker._worker_options = None
         set_application(None)
         await db.dispose()
 
 
 async def test_filtered_delivery_without_a_db_runs_rather_than_drops() -> None:
     """No durable store and no other consumer (the inline broker is the sole executor) — an
-    already-acked filtered delivery must run here, not vanish (DR-0036)."""
+    already-acked filtered delivery must run here, not vanish (DR-0049)."""
     from arvel.queue import _WorkerOptions  # pyright: ignore[reportPrivateUsage]
 
     PROCESSED.clear()
@@ -103,14 +103,14 @@ async def test_filtered_delivery_without_a_db_runs_rather_than_drops() -> None:
     manager = QueueManager(app, broker=InMemoryBroker())
     app.instance("queue", manager)
     set_application(app)
-    manager._worker_options = _WorkerOptions(
+    manager._worker._worker_options = _WorkerOptions(
         max_jobs=None, rest=0.0, stop_when_empty=False, queues=["emails"]
     )
     try:
-        await manager._invoke(Tick("stray"), queue_label="reports")
+        await manager._worker._invoke(Tick("stray"), queue_label="reports")
         assert PROCESSED == ["stray"]  # run, not dropped — nothing durable to park into
     finally:
-        manager._worker_options = None
+        manager._worker._worker_options = None
         set_application(None)
 
 
@@ -133,15 +133,15 @@ async def test_filtered_broker_delivery_is_parked_not_lost() -> None:
 
     manager, db = await _setup()
     try:
-        manager._worker_options = _WorkerOptions(
+        manager._worker._worker_options = _WorkerOptions(
             max_jobs=None, rest=0.0, stop_when_empty=False, queues=["emails"]
         )
-        result = await manager._invoke(Tick("stray"), queue_label="reports")
+        result = await manager._worker._invoke(Tick("stray"), queue_label="reports")
         assert result is None
         assert PROCESSED == []  # not executed by this worker
         parked = await QueuedJob.get()
         assert len(parked) == 1 and parked[0].queue == "reports"  # durable, not lost
     finally:
-        manager._worker_options = None
+        manager._worker._worker_options = None
         set_application(None)
         await db.dispose()

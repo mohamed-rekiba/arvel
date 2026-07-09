@@ -3,12 +3,12 @@
 Job middleware wraps a job's `handle()` the same way HTTP middleware wraps a request: each pipe
 decides whether/when to call `next_`. It's the exact `arvel.support.pipeline.Pipeline` onion shape
 (`(value, next)`), reused as-is — no new pipeline machinery. `Job.middleware()` returns the list;
-the worker (`QueueManager._invoke`) runs `handle()` through it.
+the worker (`JobWorker._invoke`) runs `handle()` through it.
 
 A middleware that wants the job **not** to run right now (a lock already held, a rate limit hit)
 raises :class:`JobShouldBeReleased` — a `BaseException`, not `Exception`, so it passes straight
 through `run_job_with_retries`'s `except Exception` (a release is not a failed attempt; it must
-never count against `tries`) up to `QueueManager._invoke`, which re-enqueues the job after the
+never count against `tries`) up to `JobWorker._invoke`, which re-enqueues the job after the
 given delay instead of running it.
 """
 

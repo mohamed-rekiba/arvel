@@ -48,7 +48,7 @@ class MiddlewareJob(Job):
 async def test_job_middleware_pipeline_runs_in_onion_order() -> None:
     ORDER.clear()
     manager = QueueManager(Application(), broker=InMemoryBroker(await_inplace=True))
-    await manager._invoke(MiddlewareJob())
+    await manager._worker._invoke(MiddlewareJob())
     assert ORDER == ["a-before", "b-before", "handle", "b-after", "a-after"]
 
 
@@ -59,7 +59,7 @@ async def test_a_job_with_no_middleware_still_runs() -> None:
 
     ORDER.clear()
     manager = QueueManager(Application(), broker=InMemoryBroker(await_inplace=True))
-    await manager._invoke(Plain())
+    await manager._worker._invoke(Plain())
     assert ORDER == ["plain"]
 
 

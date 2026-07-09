@@ -37,7 +37,7 @@ async def test_job_execution_emits_consumer_span() -> None:
     from opentelemetry.trace import SpanKind
 
     exporter = _capture_spans()
-    await _manager()._invoke(_Greet())
+    await _manager()._worker._invoke(_Greet())
     span = next(s for s in exporter.get_finished_spans() if s.name == "job _Greet")
     assert span.kind == SpanKind.CONSUMER
     assert span.attributes["code.function"] == "_Greet"
@@ -50,7 +50,7 @@ async def test_job_span_nests_under_dispatching_trace() -> None:
     exporter = _capture_spans()
     parent = trace.get_tracer_provider().get_tracer("t").start_span("request")
     with trace.use_span(parent, end_on_exit=True):
-        await _manager()._invoke(_Greet())  # inline execution → nests under the request
+        await _manager()._worker._invoke(_Greet())  # inline execution → nests under the request
     job = next(s for s in exporter.get_finished_spans() if s.name == "job _Greet")
     assert job.parent is not None
     assert job.parent.span_id == parent.get_span_context().span_id
@@ -72,7 +72,7 @@ async def test_job_span_links_to_dispatching_trace_across_the_broker() -> None:
 
     # "worker side": a fresh context with no ambient span — only the payload carries the link
     job = await deserialize_instance(payload)
-    await _manager()._invoke(job)
+    await _manager()._worker._invoke(job)
 
     span = next(s for s in exporter.get_finished_spans() if s.name == "job _Greet")
     assert span.parent is not None
@@ -87,5 +87,5 @@ async def test_no_span_and_result_unchanged_when_tracing_disabled(
     import arvel.telemetry
 
     monkeypatch.setattr(arvel.telemetry, "is_tracing_enabled", lambda: False)
-    result = await _manager()._invoke(_Greet())
+    result = await _manager()._worker._invoke(_Greet())
     assert result == "done"  # transparent: runs and returns, no span machinery

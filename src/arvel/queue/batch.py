@@ -108,7 +108,7 @@ class Batch:
 
     async def cancel(self) -> None:
         """Mark the batch cancelled (idempotent) — remaining queued jobs no-op instead of running
-        (see `is_batch_cancelled`, checked by `QueueManager._invoke` before each batched job)."""
+        (see `is_batch_cancelled`, checked by `JobWorker._invoke` before each batched job)."""
         await _cancel_batch_once(self.id)
 
 

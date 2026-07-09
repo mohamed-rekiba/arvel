@@ -82,14 +82,14 @@ async def test_rest_pauses_after_each_job() -> None:
     from arvel.queue import _WorkerOptions  # pyright: ignore[reportPrivateUsage]
 
     manager, db = await _setup()
-    manager._worker_options = _WorkerOptions(max_jobs=None, rest=0.2, stop_when_empty=False)
+    manager._worker._worker_options = _WorkerOptions(max_jobs=None, rest=0.2, stop_when_empty=False)
     try:
         started = time.monotonic()
-        await manager._invoke(Tick(1))
+        await manager._worker._invoke(Tick(1))
         assert time.monotonic() - started >= 0.2
         assert PROCESSED == [1]
     finally:
-        manager._worker_options = None
+        manager._worker._worker_options = None
         set_application(None)
         await db.dispose()
 
@@ -100,11 +100,11 @@ async def test_stop_event_ends_the_run_gracefully() -> None:
     try:
         task = asyncio.create_task(manager.work(release_interval=0.02))
         for _ in range(50):
-            if manager._worker_stop is not None:
+            if manager._worker._worker_stop is not None:
                 break
             await asyncio.sleep(0.01)
-        assert manager._worker_stop is not None
-        manager._worker_stop.set()
+        assert manager._worker._worker_stop is not None
+        manager._worker._worker_stop.set()
         await asyncio.wait_for(task, timeout=5)
     finally:
         set_application(None)
