@@ -14,14 +14,24 @@ import copy
 import fnmatch
 import inspect
 import json as _json
+import os
+import re
 import weakref
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 import httpx
+from anyio import open_file
 
 from arvel.support import Sleep
 from arvel.telemetry import span
+
+#: A registered ``macro()`` callback — the ``PendingRequest``/``Client`` it's bound to is always
+#: the first positional argument (see ``PendingRequest.__getattr__``, DR-0043).
+type ClientMacro = Callable[..., object]
+
+#: A ``{name}`` URL-parameter token — anything but a literal ``/`` inside the braces.
+_URL_PARAM_RE = re.compile(r"\{[^/{}]+\}")
 
 # --- exceptions -----------------------------------------------------------------
 
@@ -160,6 +170,10 @@ class PendingRequest:
     return a clone (immutable-ish fluent chain — safe to reuse a builder across several
     independently-configured calls, e.g. inside ``Http.pool``); ``get``/``post``/… send ``self``."""
 
+    # class-level: a macro registered on any instance is visible on a freshly constructed one
+    # (DR-0043). Peripheral to a single request, so it isn't reset by `_clone()`.
+    _macros: ClassVar[dict[str, ClientMacro]] = {}
+
     def __init__(
         self, transport: Any = None, *, shared_client: httpx.AsyncClient | None = None
     ) -> None:
@@ -179,6 +193,10 @@ class PendingRequest:
         self._files: list[tuple[str, Any]] = []
         self._auth: httpx.Auth | None = None
         self._raw_body: bytes | str | None = None
+        self._follow_redirects: bool = True  # parity default: httpx's own default is no-follow
+        self._verify: bool = True
+        self._sink: str | os.PathLike[str] | None = None
+        self._url_parameters: dict[str, object] = {}
 
     def _clone(self) -> PendingRequest:
         clone = copy.copy(self)
@@ -307,6 +325,50 @@ class PendingRequest:
     def accept_json(self) -> PendingRequest:
         return self.accept("application/json")
 
+    def without_redirects(self) -> PendingRequest:
+        """Don't follow ``3xx`` redirects (the default, absent this call, now **follows** —
+        parity; httpx's own default is no-follow)."""
+        clone = self._clone()
+        clone._follow_redirects = False
+        return clone
+
+    def without_verify(self) -> PendingRequest:
+        """Skip TLS certificate verification. ``verify`` is construction-only on httpx, so this
+        forces the request off the shared keep-alive client onto a per-call one (``_send_once``)."""
+        clone = self._clone()
+        clone._verify = False
+        return clone
+
+    def sink(self, path: str | os.PathLike[str]) -> PendingRequest:
+        """Stream the response body straight to ``path`` instead of buffering it in memory; the
+        returned ``ClientResponse`` still has its status/headers, but the body is on disk."""
+        clone = self._clone()
+        clone._sink = path
+        return clone
+
+    def with_url_parameters(self, params: Mapping[str, object]) -> PendingRequest:
+        """Merge ``{name: value}`` substitutions for ``{name}`` tokens in the request URL, applied
+        once at the top of ``request()``. A token left unfilled raises ``ValueError`` — never sent
+        as a literal ``{name}``."""
+        clone = self._clone()
+        clone._url_parameters = {**self._url_parameters, **dict(params)}
+        return clone
+
+    @classmethod
+    def macro(cls, name: str, fn: ClientMacro) -> None:
+        """Register ``fn`` under ``name`` so ``.<name>(...)`` calls it with the pending request
+        bound as the first argument — on this instance and any future one (DR-0043)."""
+        cls._macros[name] = fn
+
+    def __getattr__(self, name: str) -> Callable[..., object]:
+        # only fires for a *missing* attribute, so a real builder is never shadowed; reads the
+        # class-level dict (not `self._macros`) so it can't recurse during `copy.copy`/unpickling.
+        try:
+            fn = type(self)._macros[name]
+        except KeyError:
+            raise AttributeError(name) from None
+        return lambda *args, **kwargs: fn(self, *args, **kwargs)
+
     # -- sending ----------------------------------------------------------------
 
     def _effective_timeout(self) -> httpx.Timeout | float:
@@ -322,6 +384,22 @@ class PendingRequest:
         ):
             return f"{self._base_url.rstrip('/')}/{url.lstrip('/')}"
         return url
+
+    def _apply_url_parameters(self, url: str) -> str:
+        """Substitute ``{name}`` tokens from ``with_url_parameters(...)`` into ``url``. Raises
+        ``ValueError`` on any token left unfilled — never sends a literal ``{name}``.
+
+        Values are injected verbatim (no percent-encoding — the caller owns path safety) and in a
+        single pass, so a value that itself looks like ``{other}`` is never re-substituted."""
+        params = self._url_parameters
+
+        def _sub(match: re.Match[str]) -> str:
+            key = match.group(0)[1:-1]
+            if key not in params:
+                raise ValueError(f"Missing URL parameter(s) in {url!r}")
+            return str(params[key])
+
+        return _URL_PARAM_RE.sub(_sub, url)
 
     def _prepare_body(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         if self._send_mode == "form" and "json" in kwargs and "data" not in kwargs:
@@ -345,15 +423,43 @@ class PendingRequest:
         send_kwargs = dict(kwargs)
         if self._auth is not None:
             send_kwargs.setdefault("auth", self._auth)
-        if self._shared_client is not None:
+        send_kwargs["follow_redirects"] = self._follow_redirects
+        # `verify` is construction-only on httpx (not a per-request kwarg): a no-verify send can't
+        # reuse the shared client (built with the default verify=True) and drops to a per-call one.
+        if self._shared_client is not None and self._verify is not False:
             send_kwargs.setdefault("timeout", self._effective_timeout())
-            return await self._shared_client.request(method, self._resolve_url(url), **send_kwargs)
+            resolved = self._resolve_url(url)
+            if self._sink is not None:
+                return await self._stream_to_sink(
+                    self._shared_client, method, resolved, send_kwargs, self._sink
+                )
+            return await self._shared_client.request(method, resolved, **send_kwargs)
         async with httpx.AsyncClient(
             base_url=self._base_url,
             timeout=self._effective_timeout(),
             transport=self._transport,
+            verify=self._verify,
         ) as client:
+            if self._sink is not None:
+                return await self._stream_to_sink(client, method, url, send_kwargs, self._sink)
             return await client.request(method, url, **send_kwargs)
+
+    @staticmethod
+    async def _stream_to_sink(
+        client: httpx.AsyncClient,
+        method: str,
+        url: str,
+        send_kwargs: dict[str, Any],
+        path: str | os.PathLike[str],
+    ) -> httpx.Response:
+        """Stream the response body straight to ``path`` (``client.stream`` + ``aiter_bytes``, no
+        full-body buffering); the blocking write is offloaded to a worker thread by
+        ``anyio.open_file`` (same ``to_thread.run_sync`` pattern used elsewhere in the codebase)."""
+        async with client.stream(method, url, **send_kwargs) as response:
+            async with await open_file(path, "wb") as fh:
+                async for chunk in response.aiter_bytes():
+                    await fh.write(chunk)
+            return response
 
     def _backoff_seconds(self, attempt: int) -> float:
         """Seconds to sleep after the just-completed (1-based) ``attempt``, before the next one."""
@@ -408,6 +514,7 @@ class PendingRequest:
         return last_response
 
     async def request(self, method: str, url: str, **kwargs: Any) -> ClientResponse:
+        url = self._apply_url_parameters(url)  # pre-send; before base-url join, ahead of any retry
         kwargs = self._prepare_body(dict(kwargs))
         call_headers: dict[str, str] = kwargs.pop("headers", None) or {}
         headers = {**self._headers, **call_headers}
@@ -693,6 +800,32 @@ class Client:
     def accept_json(self) -> PendingRequest:
         return self._pending().accept_json()
 
+    def without_redirects(self) -> PendingRequest:
+        return self._pending().without_redirects()
+
+    def without_verify(self) -> PendingRequest:
+        return self._pending().without_verify()
+
+    def sink(self, path: str | os.PathLike[str]) -> PendingRequest:
+        return self._pending().sink(path)
+
+    def with_url_parameters(self, params: Mapping[str, object]) -> PendingRequest:
+        return self._pending().with_url_parameters(params)
+
+    def macro(self, name: str, fn: ClientMacro) -> None:
+        """Register a macro (delegates to the one class-level registry on ``PendingRequest`` —
+        DR-0043), so ``Http.<name>(...)`` and ``pending.<name>(...)`` both reach it."""
+        PendingRequest.macro(name, fn)
+
+    def __getattr__(self, name: str) -> Callable[..., object]:
+        """Forward an unknown attribute to a fresh pending request — the seam that makes
+        ``Http.<macro>(...)`` work (``PendingRequest.__getattr__`` resolves it or raises)."""
+        # a private/dunder name is never a macro; raise before touching _pending() (which reads
+        # underscore attrs) so a pre-init lookup can't recurse
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return cast("Callable[..., object]", getattr(self._pending(), name))
+
     # -- verbs ------------------------------------------------------------------
 
     async def get(self, url: str, **kwargs: Any) -> ClientResponse:
@@ -795,6 +928,7 @@ class Client:
 
 __all__ = [
     "Client",
+    "ClientMacro",
     "ClientResponse",
     "FakeResponse",
     "FakeSequenceExhausted",
