@@ -13,6 +13,7 @@ link / confirm) are app-side. Grounded in knowledge/port/15 + projects/arvel/spe
 from __future__ import annotations
 
 import hashlib
+import hmac
 from typing import Any
 
 DEFAULT_TTL_SECONDS = 3600  # 60 minutes
@@ -52,6 +53,8 @@ def verify_email_token(
     parts = str(value).split(":", 2)
     if len(parts) != 3 or parts[0] != "verify" or not parts[1]:
         return None
-    if parts[2] != _email_hash(current_email):
+    # constant-time: defense-in-depth (this runs after the MAC has already authenticated the
+    # payload, so the exposure is low, but the compare is free to harden anyway — DR-0046)
+    if not hmac.compare_digest(parts[2], _email_hash(current_email)):
         return None
     return parts[1]

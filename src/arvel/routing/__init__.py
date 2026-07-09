@@ -566,26 +566,45 @@ class Router:
 
     def has_valid_signature(self, url: str, *, key: str | None = None) -> bool:
         """Verify a ``signed_url`` (integrity + ``expires`` not in the past). ``key`` defaults to the
-        app key."""
+        app key.
+
+        Reconstructs the exact string ``signed_url`` signed by removing only the trailing
+        ``signature=`` query segment — never by reserializing the query (DR-0047: that reorders
+        and re-encodes, so the reconstructed base would no longer be byte-identical to what was
+        signed, and every signature would fail).
+        """
         import time
+        from urllib.parse import urlsplit, urlunsplit
 
-        from arvel.security import Signer
+        from arvel.security import SignatureInvalid, Signer
 
-        if "signature=" not in url:
+        try:
+            split = urlsplit(url)
+        except ValueError:  # malformed URL (e.g. an invalid IPv6 host) — fail closed, never raise
             return False
+        segments = split.query.split("&") if split.query else []
+        if not segments or not segments[-1].startswith("signature="):
+            return False
+        token = segments[-1][len("signature=") :]  # raw — signed_url appends it unencoded
+        remaining = segments[:-1]
+        base = urlunsplit(
+            (split.scheme, split.netloc, split.path, "&".join(remaining), split.fragment)
+        )
         key = self._signing_key(key)
-        base, _, token = url.rpartition("signature=")
-        base = base.rstrip("?&")
         try:
             if Signer(key).unsign(token) != base:
                 return False
-        except Exception:
+        except SignatureInvalid:
             return False
         marker = "expires="
-        if marker in base:
-            expires = int(base.rpartition(marker)[2].split("&")[0])
-            if expires < int(time.time()):
-                return False
+        for segment in remaining:
+            if segment.startswith(marker):
+                try:
+                    expires = int(segment[len(marker) :])
+                except ValueError:
+                    return False
+                if expires < int(time.time()):
+                    return False
         return True
 
     def apply_to(self, kernel: HttpKernel) -> None:

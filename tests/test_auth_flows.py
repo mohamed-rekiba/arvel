@@ -5,6 +5,8 @@ Password-reset moved to a stored broker (``arvel.auth.password_reset`` — see
 
 from __future__ import annotations
 
+import inspect
+
 from arvel.auth.flows import DEFAULT_TTL_SECONDS, email_verification_token, verify_email_token
 
 SIG = "unit-test-signing-value"
@@ -42,3 +44,8 @@ def test_expired_token_rejected() -> None:
     token = email_verification_token(42, "ada@example.com", SIG)
     # max_age=-1: any elapsed age is "too old" — deterministic without manipulating the clock
     assert verify_email_token(token, "ada@example.com", SIG, max_age=-1) is None
+
+
+def test_email_hash_compare_is_constant_time() -> None:
+    """DR-0046 hardening: the hash equality check is ``hmac.compare_digest``, not ``!=``."""
+    assert "hmac.compare_digest" in inspect.getsource(verify_email_token)
