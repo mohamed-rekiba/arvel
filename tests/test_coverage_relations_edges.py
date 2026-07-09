@@ -151,6 +151,11 @@ class ShopZ(Model):
     __fillable__ = ["name"]
 
     def featured_items(self) -> object:
+        # D7: `.where()` is now the full-builder proxy, not a relation-level accumulator — a
+        # pivot-specific fluent method (`with_pivot`) can no longer be chained *after* it (that
+        # ordering note lives in the E12 architecture doc). Any related-model filter (e.g.
+        # "visible") is expressed at the call site now (`.where(...)`, or a `with_()` constrain
+        # callback for eager loading) rather than baked into the relation definition.
         return (
             self.belongs_to_many(
                 ItemZ,
@@ -159,7 +164,6 @@ class ShopZ(Model):
                 related_pivot_key="itemz_id",
             )
             .where_pivot("active", 1)
-            .where("visible", "=", 1)
             .with_pivot("added_by")
         )
 
@@ -215,7 +219,10 @@ async def test_belongs_to_many_eager_load_honors_pivot_where_and_related_where()
         await shop.featured_items().attach(hidden.id, active=1, added_by="ada")
         await shop.featured_items().attach(stale.id, active=0, added_by="bob")
 
-        shops = await ShopZ.query().with_("featured_items").get()
+        # D7: the related-model filter no longer bakes into the relation definition — narrow the
+        # eager load with a constrain callback instead (same combined pivot + related filtering,
+        # expressed at the call site rather than on featured_items() itself).
+        shops = await ShopZ.query().with_(featured_items=lambda q: q.where("visible", "=", 1)).get()
         names = sorted(i.name for i in shops[0].relation("featured_items"))
         assert names == ["keep"]  # only active pivot + visible related row survives both filters
         by_name = {i.name: i for i in shops[0].relation("featured_items")}
@@ -244,7 +251,7 @@ async def test_belongs_to_many_eager_load_short_circuits_on_null_parent_key() ->
         await db.dispose()
 
 
-async def test_belongs_to_many_has_and_with_count_use_pivot_and_related_constraints() -> None:
+async def test_belongs_to_many_has_and_with_count_use_pivot_constraints() -> None:
     db = await _setup_shop()
     try:
         shop = await ShopZ.create(name="s1")
@@ -255,10 +262,13 @@ async def test_belongs_to_many_has_and_with_count_use_pivot_and_related_constrai
         await shop.featured_items().attach(hidden.id, active=1)
 
         with_any = [s.name for s in await ShopZ.query().has("featured_items").order_by("id").get()]
-        assert with_any == ["s1"]  # exists_clause(callback=None) honors pivot+related wheres
+        assert with_any == ["s1"]  # exists_clause(callback=None) honors the pivot where
 
+        # D7: `has()`/`with_count()` take no callback, and the relation no longer bakes in a
+        # related-model where() (that's the proxy's job now) — so both attachments count,
+        # regardless of `visible` (2, not the pre-D7 visible-only 1).
         counted = await ShopZ.query().with_count("featured_items").order_by("id").get()
-        assert [s.featured_items_count for s in counted] == [1, 0]  # aggregate honors both wheres
+        assert [s.featured_items_count for s in counted] == [2, 0]
         assert empty_shop.name == "s2"
     finally:
         await db.dispose()
@@ -274,9 +284,9 @@ async def test_belongs_to_many_order_by_count_and_detach_all() -> None:
         await shop.featured_items().attach(b.id, active=1)
 
         ordered = [i.name for i in await shop.featured_items().order_by("name").get()]
-        assert ordered == ["apple", "banana"]  # BelongsToMany.order_by chains a related_constraint
+        assert ordered == ["apple", "banana"]  # order_by proxies to the pivot-scoped Builder (D7)
 
-        assert await shop.featured_items().count() == 2  # count() honors pivot+related wheres
+        assert await shop.featured_items().count() == 2  # count() honors the pivot where
 
         await shop.featured_items().detach()  # no related_id: detach every attachment
         assert list(await shop.featured_items().get()) == []

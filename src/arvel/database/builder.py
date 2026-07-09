@@ -13,7 +13,7 @@ import re
 from typing import TYPE_CHECKING, Any, Literal, Self, cast
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable, Sequence
+    from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 
     from sqlalchemy import Select
 
@@ -110,6 +110,10 @@ class Builder[M = dict[str, Any]]:
         self._lock: str | None = None
         self._aggregates: list[Any] = []  # labeled scalar subqueries (with_count/with_sum)
         self._unions: list[tuple[str, Any]] = []  # ("union" | "union_all", other's SELECT core)
+        # DR-0045: a pivot relation's deferred async prefetch (applies its WHERE IN in place,
+        # exactly once, at the first leaf terminal) — inert for every non-pivot query.
+        self._async_prepare: Callable[[], Awaitable[None]] | None = None
+        self._prepared = False
 
     def __getattr__(self, name: str) -> Any:
         # local scopes: a model method `scope_<name>` becomes callable as `.<name>(...)`
@@ -534,6 +538,10 @@ class Builder[M = dict[str, Any]]:
         chunk (sync or async). Keyset pagination on the primary key — stable under inserts."""
         import inspect
 
+        # DR-0045: run the deferred pivot prefetch (if any) BEFORE snapshotting _wheres, so the
+        # snapshot every page restores from already carries the pivot WHERE IN — otherwise the
+        # once-guard blocks it from ever being re-applied and page 2+ loses the parent scope.
+        await self._ensure_prepared()
         key = column or (
             cast("Any", self._model).__primary_key__ if self._model is not None else "id"
         )
@@ -571,6 +579,9 @@ class Builder[M = dict[str, Any]]:
         (prefer ``chunk_by_id``/``cursor`` for a frequently-written table)."""
         import inspect
 
+        # DR-0045: same as chunk_by_id — prepare before the loop so every page is scoped by
+        # design, not because chunk() happens to never reset _wheres between pages.
+        await self._ensure_prepared()
         page = 0
         base_limit, base_offset = self._limit, self._offset
         try:
@@ -1038,11 +1049,20 @@ class Builder[M = dict[str, Any]]:
             raise RuntimeError("Builder has no connection resolver bound.")
         return self._resolver
 
+    async def _ensure_prepared(self) -> None:
+        """Run the deferred async prefetch (DR-0045), exactly once. A pivot relation's ``query()``
+        binds ``_async_prepare`` to mutate this same builder in place (e.g. ``where_in`` the
+        pivot-derived related ids) before the first leaf terminal compiles/executes."""
+        if self._async_prepare is not None and not self._prepared:
+            self._prepared = True
+            await self._async_prepare()
+
     async def get(self) -> ModelCollection[M]:
         """Every matching row. A **hydrating** (model-bound) query returns an
         :class:`~arvel.database.collection.ModelCollection` (doc B3); a raw table builder (no
                 ``hydrate``) returns a plain ``list[dict]`` — the query builder returns a Collection
                 too, but arvel keeps raw rows as plain dicts (typed simplicity over exact parity)."""
+        await self._ensure_prepared()
         rows = await self._require_resolver().fetch_all(self.to_select())
         records = [dict(row) for row in rows]
         if self._hydrate is None:
@@ -1099,6 +1119,7 @@ class Builder[M = dict[str, Any]]:
 
     async def cursor(self) -> AsyncIterator[M]:
         """Stream results one model at a time (low memory; server-side cursor)."""
+        await self._ensure_prepared()
         rows: Any = self._require_resolver().stream(self.to_select())
         async for row in rows:
             yield (await _maybe_await(self._hydrate(row))) if self._hydrate is not None else row
@@ -1136,6 +1157,7 @@ class Builder[M = dict[str, Any]]:
             await self._eager_load_path(nested, segments[1:])
 
     async def first(self) -> M | None:
+        await self._ensure_prepared()
         row = await self._require_resolver().fetch_one(self.to_select())
         if row is None:
             return None
@@ -1287,6 +1309,7 @@ class Builder[M = dict[str, Any]]:
     async def count(self) -> int:
         import sqlalchemy as sa
 
+        await self._ensure_prepared()
         if self._joins or self._group_by or self._havings or self._distinct:
             # a plain count(*) over the base table would drop the join/group/distinct shaping and
             # report a wrong total (esp. for paginate); count rows of the real result instead.
@@ -1301,6 +1324,7 @@ class Builder[M = dict[str, Any]]:
     async def _aggregate(self, fn: str, column: str) -> Any:
         import sqlalchemy as sa
 
+        await self._ensure_prepared()  # DR-0045 — count()'s sibling; sum/avg/min/max route here
         stmt = sa.select(getattr(sa.func, fn)(self._table.c[column]))
         expr = self._where_expression()
         if expr is not None:
@@ -1322,6 +1346,7 @@ class Builder[M = dict[str, Any]]:
     async def exists(self) -> bool:
         import sqlalchemy as sa
 
+        await self._ensure_prepared()
         # a scalar EXISTS — no row fetch, no model hydration, no `retrieved` event
         stmt = sa.select(sa.exists(self._select_core()))
         return bool(await self._require_resolver().scalar(stmt))

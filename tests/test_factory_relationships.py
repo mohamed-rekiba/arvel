@@ -51,6 +51,173 @@ async def _db() -> ConnectionResolver:
     return db
 
 
+# --- has_attached: belongs-to-many + morph-to-many pivot seeding (D4) --------------------------
+class RoleH(Model):
+    __fields__: ClassVar[dict[str, Any]] = {"name": str}
+    __fillable__: ClassVar[list[str]] = ["name"]
+
+
+class UserH(Model):
+    __fields__: ClassVar[dict[str, Any]] = {"name": str}
+    __fillable__: ClassVar[list[str]] = ["name"]
+
+    def roles(self) -> Any:
+        return self.belongs_to_many(
+            RoleH, pivot="roleh_userh", foreign_pivot_key="userh_id", related_pivot_key="roleh_id"
+        )
+
+
+class RoleHFactory(Factory[RoleH]):
+    model = RoleH
+
+    def definition(self) -> dict[str, Any]:
+        return {"name": "editor"}
+
+
+class UserHFactory(Factory[UserH]):
+    model = UserH
+
+    def definition(self) -> dict[str, Any]:
+        return {"name": "ada"}
+
+
+_roleh_userh = sa.Table(
+    "roleh_userh",
+    sa.MetaData(),
+    sa.Column("userh_id", sa.Integer),
+    sa.Column("roleh_id", sa.Integer),
+    sa.Column("level", sa.Integer),
+)
+
+
+async def _db_pivot() -> ConnectionResolver:
+    db = ConnectionResolver()
+    for model in (UserH, RoleH):
+        model.set_connection(db)
+        await db.execute(sa.schema.CreateTable(model.__table__))
+    await db.execute(sa.schema.CreateTable(_roleh_userh))
+    return db
+
+
+async def _pivot_rows(db: ConnectionResolver, user_id: Any) -> list[dict[str, Any]]:
+    rows = await db.fetch_all(sa.select(_roleh_userh).where(_roleh_userh.c.userh_id == user_id))
+    return [dict(r) for r in rows]
+
+
+async def test_has_attached_creates_related_and_pivot_rows_with_data() -> None:
+    db = await _db_pivot()
+    try:
+        user = await UserHFactory().has_attached(RoleHFactory(), "roles", {"level": 2}).create()
+        roles = await user.roles().get()
+        assert len(roles) == 1  # (a) the related row exists
+
+        pivot = await _pivot_rows(db, user.id)
+        assert len(pivot) == 1  # (b) a pivot row links user -> role
+        assert pivot[0] == {"userh_id": user.id, "roleh_id": roles[0].id, "level": 2}  # (c)
+    finally:
+        await db.dispose()
+
+
+async def test_has_attached_with_count_creates_n_related_and_pivot_rows() -> None:
+    db = await _db_pivot()
+    try:
+        user = await (
+            UserHFactory().has_attached(RoleHFactory(), "roles", {"level": 2}, count=3).create()
+        )
+        roles = await user.roles().get()
+        assert len(roles) == 3
+
+        pivot = await _pivot_rows(db, user.id)
+        assert len(pivot) == 3
+        assert all(row["level"] == 2 for row in pivot)
+        assert {row["roleh_id"] for row in pivot} == {r.id for r in roles}
+    finally:
+        await db.dispose()
+
+
+async def test_has_attached_with_a_count_batch_uses_its_count() -> None:
+    db = await _db_pivot()
+    try:
+        user = await (
+            UserHFactory().has_attached(RoleHFactory().count(2), "roles", {"level": 1}).create()
+        )
+        assert len(await _pivot_rows(db, user.id)) == 2
+    finally:
+        await db.dispose()
+
+
+async def test_has_attached_without_pivot_data_writes_only_fk_columns() -> None:
+    db = await _db_pivot()
+    try:
+        user = await UserHFactory().has_attached(RoleHFactory(), "roles").create()
+        pivot = await _pivot_rows(db, user.id)
+        assert len(pivot) == 1
+        assert pivot[0]["level"] is None  # no extra pivot column written
+    finally:
+        await db.dispose()
+
+
+class TagH(Model):
+    __fields__: ClassVar[dict[str, Any]] = {"name": str}
+    __fillable__: ClassVar[list[str]] = ["name"]
+
+
+class PostH(Model):
+    __fields__: ClassVar[dict[str, Any]] = {"title": str}
+    __fillable__: ClassVar[list[str]] = ["title"]
+
+    def tags(self) -> Any:
+        return self.morph_to_many(TagH, "taggableh")
+
+
+class TagHFactory(Factory[TagH]):
+    model = TagH
+
+    def definition(self) -> dict[str, Any]:
+        return {"name": "python"}
+
+
+class PostHFactory(Factory[PostH]):
+    model = PostH
+
+    def definition(self) -> dict[str, Any]:
+        return {"title": "hello"}
+
+
+_taggableh = sa.Table(
+    "taggablehs",  # default pivot name: Str.plural(morph name) ("taggableh" -> "taggablehs")
+    sa.MetaData(),
+    sa.Column("taggableh_id", sa.Integer),
+    sa.Column("taggableh_type", sa.String),
+    sa.Column("tag_h_id", sa.Integer),  # default related_pivot_key: snake(TagH) + "_id"
+)
+
+
+async def _db_morph_pivot() -> ConnectionResolver:
+    db = ConnectionResolver()
+    for model in (PostH, TagH):
+        model.set_connection(db)
+        await db.execute(sa.schema.CreateTable(model.__table__))
+    await db.execute(sa.schema.CreateTable(_taggableh))
+    return db
+
+
+async def test_has_attached_works_for_morph_to_many() -> None:
+    db = await _db_morph_pivot()
+    try:
+        post = await PostHFactory().has_attached(TagHFactory(), "tags").create()
+        tags = await post.tags().get()
+        assert len(tags) == 1  # the related row exists
+
+        rows = await db.fetch_all(sa.select(_taggableh).where(_taggableh.c.taggableh_id == post.id))
+        rows = [dict(r) for r in rows]
+        assert len(rows) == 1
+        assert rows[0]["taggableh_type"]  # polymorphic type discriminator was written
+        assert rows[0]["tag_h_id"] == tags[0].id
+    finally:
+        await db.dispose()
+
+
 async def test_has_creates_related_rows_with_fk_set() -> None:
     db = await _db()
     try:

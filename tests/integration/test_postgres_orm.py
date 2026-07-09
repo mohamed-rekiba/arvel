@@ -13,7 +13,7 @@ from typing import Any, ClassVar
 import pytest
 import sqlalchemy as sa
 
-from arvel.database import Builder, ConnectionResolver, Model
+from arvel.database import Builder, ConnectionResolver, Factory, Model
 from arvel.database.collection import ModelCollection
 from arvel.database.relations import SyncResult
 from arvel.events import Dispatcher
@@ -370,4 +370,314 @@ async def test_all_and_relation_get_return_model_collection_on_postgres(
         assert isinstance(await Builder(Sku.__table__, db).where_null("sku").get(), list)
     finally:
         await db.execute(sa.schema.DropTable(Sku.__table__))
+        await db.dispose()
+
+
+# --- E12: D4 has_attached (factory pivot seeding) + D7 relation-proxy symmetry ------------------
+
+
+class PgRole(Model):
+    __table_name__ = "pg_e12_roles"
+    __fields__: ClassVar = {"name": str}
+    __fillable__: ClassVar = ["name"]
+    __timestamps__ = False
+
+
+class PgUser(Model):
+    __table_name__ = "pg_e12_users"
+    __fields__: ClassVar = {"name": str}
+    __fillable__: ClassVar = ["name"]
+    __timestamps__ = False
+
+    def roles(self) -> Any:
+        return self.belongs_to_many(
+            PgRole,
+            pivot="pg_e12_role_user",
+            foreign_pivot_key="user_id",
+            related_pivot_key="role_id",
+        )
+
+
+class PgRoleFactory(Factory[PgRole]):
+    model = PgRole
+
+    def definition(self) -> dict[str, Any]:
+        return {"name": "editor"}
+
+
+class PgUserFactory(Factory[PgUser]):
+    model = PgUser
+
+    def definition(self) -> dict[str, Any]:
+        return {"name": "ada"}
+
+
+_pg_role_user = sa.Table(
+    "pg_e12_role_user",
+    sa.MetaData(),
+    sa.Column("user_id", sa.Integer),
+    sa.Column("role_id", sa.Integer),
+    sa.Column("level", sa.Integer),
+)
+
+
+async def _setup_pg_pivot(db: ConnectionResolver) -> None:
+    for model in (PgUser, PgRole):
+        model.set_connection(db)
+        await db.execute(sa.schema.CreateTable(model.__table__))
+    await db.execute(sa.schema.CreateTable(_pg_role_user))
+
+
+async def _teardown_pg_pivot(db: ConnectionResolver) -> None:
+    await db.execute(sa.schema.DropTable(_pg_role_user))
+    await db.execute(sa.schema.DropTable(PgUser.__table__))
+    await db.execute(sa.schema.DropTable(PgRole.__table__))
+
+
+async def test_has_attached_seeds_related_and_pivot_rows_on_postgres(postgres_url: str) -> None:
+    """D4: `has_attached` creates the related rows AND the pivot rows, writing pivot_data."""
+    db = ConnectionResolver({"default": {"url": postgres_url}})
+    await _setup_pg_pivot(db)
+    try:
+        user = await (
+            PgUserFactory().has_attached(PgRoleFactory(), "roles", {"level": 2}, count=3).create()
+        )
+
+        roles = await PgRole.all()
+        assert len(roles) == 3  # (a) the related rows exist
+
+        pivot_rows = [
+            dict(r)
+            for r in await db.fetch_all(
+                sa.select(_pg_role_user).where(_pg_role_user.c.user_id == user.id)
+            )
+        ]
+        assert len(pivot_rows) == 3  # (b) a pivot row per created role
+        assert all(row["level"] == 2 for row in pivot_rows)  # (c) pivot column read from the DB
+        assert {row["role_id"] for row in pivot_rows} == {r.id for r in roles}
+    finally:
+        await _teardown_pg_pivot(db)
+        await db.dispose()
+
+
+async def test_belongs_to_many_proxy_full_builder_scoped_on_postgres(postgres_url: str) -> None:
+    """D7: a BelongsToMany proxy answers where_in/pluck/where_pivot+where/count/first, scoped to
+    the parent's attached rows — asserted against a hand-computed expectation from the same DB."""
+    db = ConnectionResolver({"default": {"url": postgres_url}})
+    await _setup_pg_pivot(db)
+    try:
+        user = await PgUser.create(name="ada")
+        other = await PgUser.create(name="bob")
+        a = await PgRole.create(name="admin")
+        b = await PgRole.create(name="editor")
+        c = await PgRole.create(name="viewer")
+        outside = await PgRole.create(name="outsider")
+        await user.roles().attach(a.id)
+        await user.roles().attach(b.id)
+        await user.roles().attach(c.id)
+        await other.roles().attach(outside.id)  # a different parent's attachment
+
+        # where_in ∩ attached, scoped to `user` — `outside` is a valid role id but attached to
+        # `other`, never `user`, so it's absent even though it's in the id filter.
+        got = await user.roles().where_in("id", [a.id, c.id, outside.id]).pluck("name")
+        assert sorted(got) == ["admin", "viewer"]
+
+        # where_pivot composes with the proxied builder
+        await user.roles().detach()
+        await user.roles().attach(a.id)
+        await user.roles().attach(b.id, level=2)
+        active = await user.roles().where_pivot("level", 2).where("name", "=", "editor").count()
+        assert active == 1
+
+        # first() (previously silently broken — base Relation.first() filtered the related table
+        # by a pivot column it doesn't have)
+        first = await user.roles().order_by("name").first()
+        assert first is not None and first.name == "admin"
+
+        # an unattached parent yields [], not the whole related table
+        lonely = await PgUser.create(name="lonely")
+        assert await lonely.roles().where_in("id", [a.id]).get() == []
+    finally:
+        await _teardown_pg_pivot(db)
+        await db.dispose()
+
+
+async def test_belongs_to_many_proxy_chunk_and_each_stay_scoped_across_pages_on_postgres(
+    postgres_url: str,
+) -> None:
+    """Regression (QA, real Postgres): chunk_by_id/chunk/each over a pivot proxy must stay
+    parent-scoped on EVERY page, not just the first. Root cause: chunk_by_id/chunk snapshot
+    _wheres/_limit/_offset before their first get() — the pivot WHERE IN only lands in _wheres
+    *during* that first get() (via _ensure_prepared), so an early snapshot predates it, and the
+    once-guard then blocks it from ever being re-applied on later pages. Repro that leaked:
+    attached {1,3,5}, unattached {2,4,6} -> chunk_by_id(2) yielded [[1,3],[4,5],[6]]."""
+    db = ConnectionResolver({"default": {"url": postgres_url}})
+    await _setup_pg_pivot(db)
+    try:
+        user = await PgUser.create(name="ada")
+        roles = [await PgRole.create(name=f"role{i}") for i in range(1, 7)]  # ids 1..6, in order
+        attached = [roles[0], roles[2], roles[4]]  # roles 1, 3, 5
+        attached_ids = {r.id for r in attached}
+        for role in attached:
+            await user.roles().attach(role.id)
+        # roles 2, 4, 6 stay unattached — exactly the ids the leak surfaced
+
+        seen_by_id: list[Any] = []
+        await user.roles().order_by("id").chunk_by_id(2, lambda rows: seen_by_id.extend(rows))
+        assert {r.id for r in seen_by_id} == attached_ids
+        assert len(seen_by_id) == 3  # no dup, no leak, spans 2 pages (size=2, 3 rows)
+
+        seen_chunk: list[Any] = []
+        await user.roles().order_by("id").chunk(2, lambda rows: seen_chunk.extend(rows))
+        assert {r.id for r in seen_chunk} == attached_ids
+        assert len(seen_chunk) == 3
+
+        seen_each: list[Any] = []
+        await user.roles().order_by("id").each(lambda r: seen_each.append(r), chunk_size=2)
+        assert {r.id for r in seen_each} == attached_ids
+        assert len(seen_each) == 3
+
+        # an unattached parent chunked yields nothing, on every path
+        lonely = await PgUser.create(name="lonely")
+        empty: list[Any] = []
+        await lonely.roles().chunk_by_id(2, lambda rows: empty.extend(rows))
+        await lonely.roles().chunk(2, lambda rows: empty.extend(rows))
+        await lonely.roles().each(lambda r: empty.append(r))
+        assert empty == []
+    finally:
+        await _teardown_pg_pivot(db)
+        await db.dispose()
+
+
+async def test_belongs_to_many_proxy_aggregates_stay_scoped_on_postgres(postgres_url: str) -> None:
+    """Regression (review, real Postgres): sum/avg/min/max over a deferred-pivot proxy must be
+    parent-scoped, not the whole related table. Root cause: the shared ``_aggregate()`` (backing
+    all four) never called ``_ensure_prepared()``, unlike its sibling ``count()`` — so
+    ``.sum("id")`` etc. ran against every related row. Repro: user attached to roles {1,2} of 4 ->
+    sum("id") was 10 (1+2+3+4) instead of 3; max("id") was 4, a different parent's row."""
+    db = ConnectionResolver({"default": {"url": postgres_url}})
+    await _setup_pg_pivot(db)
+    try:
+        user = await PgUser.create(name="ada")
+        roles = [await PgRole.create(name=f"role{i}") for i in range(1, 5)]  # ids 1..4
+        await user.roles().attach(roles[0].id)
+        await user.roles().attach(roles[1].id)
+        # roles 3, 4 stay unattached — a leaking aggregate would pull them into sum/avg/max/min
+
+        assert await user.roles().sum("id") == roles[0].id + roles[1].id
+        assert await user.roles().avg("id") == pytest.approx((roles[0].id + roles[1].id) / 2)
+        assert await user.roles().max("id") == roles[1].id
+        assert await user.roles().min("id") == roles[0].id
+
+        lonely = await PgUser.create(name="lonely")
+        assert await lonely.roles().sum("id") is None  # SQL SUM/MIN/MAX over 0 rows -> NULL
+    finally:
+        await _teardown_pg_pivot(db)
+        await db.dispose()
+
+
+class PgTagM(Model):
+    __table_name__ = "pg_e12_tags"
+    __fields__: ClassVar = {"name": str}
+    __fillable__: ClassVar = ["name"]
+    __timestamps__ = False
+
+    def posts(self) -> Any:
+        return self.morphed_by_many(PgPostM, "pg_e12_taggable")
+
+
+class PgPostM(Model):
+    __table_name__ = "pg_e12_posts"
+    __fields__: ClassVar = {"title": str}
+    __fillable__: ClassVar = ["title"]
+    __timestamps__ = False
+
+    def tags(self) -> Any:
+        return self.morph_to_many(PgTagM, "pg_e12_taggable")
+
+
+class PgTagMFactory(Factory[PgTagM]):
+    model = PgTagM
+
+    def definition(self) -> dict[str, Any]:
+        return {"name": "python"}
+
+
+class PgPostMFactory(Factory[PgPostM]):
+    model = PgPostM
+
+    def definition(self) -> dict[str, Any]:
+        return {"title": "hello"}
+
+
+_pg_e12_taggable = sa.Table(
+    "pg_e12_taggables",
+    sa.MetaData(),
+    sa.Column("pg_e12_taggable_id", sa.Integer),
+    sa.Column("pg_e12_taggable_type", sa.String),
+    sa.Column("pg_tag_m_id", sa.Integer),
+)
+
+
+async def test_morph_to_many_has_attached_and_proxy_scoped_on_postgres(postgres_url: str) -> None:
+    """D4 (morph_to_many) + D7 (MorphToMany/MorphedByMany proxy symmetry)."""
+    db = ConnectionResolver({"default": {"url": postgres_url}})
+    for model in (PgPostM, PgTagM):
+        model.set_connection(db)
+        await db.execute(sa.schema.CreateTable(model.__table__))
+    await db.execute(sa.schema.CreateTable(_pg_e12_taggable))
+    try:
+        # D4: has_attached on a morph_to_many relation
+        post = await PgPostMFactory().has_attached(PgTagMFactory(), "tags").create()
+        tags = await post.tags().get()
+        assert len(tags) == 1
+        pivot_rows = [
+            dict(r)
+            for r in await db.fetch_all(
+                sa.select(_pg_e12_taggable).where(_pg_e12_taggable.c.pg_e12_taggable_id == post.id)
+            )
+        ]
+        assert len(pivot_rows) == 1
+        assert pivot_rows[0]["pg_e12_taggable_type"]  # the polymorphic discriminator was written
+        assert pivot_rows[0]["pg_tag_m_id"] == tags[0].id
+
+        # D7: MorphToMany + MorphedByMany proxy the full builder, scoped by id AND morph type
+        other_post = await PgPostM.create(title="other")
+        rust = await PgTagM.create(name="rust")
+        await other_post.tags().attach(rust.id)
+
+        names = await post.tags().where_in("id", [tags[0].id, rust.id]).pluck("name")
+        assert names == [tags[0].name]  # rust belongs to `other_post`, excluded by the pivot scope
+
+        by_tag = await tags[0].posts().where_in("id", [post.id, other_post.id]).pluck("title")
+        assert by_tag == [post.title]  # other_post never attached to this tag
+    finally:
+        await db.execute(sa.schema.DropTable(_pg_e12_taggable))
+        await db.execute(sa.schema.DropTable(PgPostM.__table__))
+        await db.execute(sa.schema.DropTable(PgTagM.__table__))
+        await db.dispose()
+
+
+async def test_morph_to_many_proxy_aggregates_stay_scoped_on_postgres(postgres_url: str) -> None:
+    """Same aggregate-scope regression as the belongs-to-many case, over a morph_to_many proxy —
+    the shared ``_aggregate()`` fix covers every pivot shape at the one root."""
+    db = ConnectionResolver({"default": {"url": postgres_url}})
+    for model in (PgPostM, PgTagM):
+        model.set_connection(db)
+        await db.execute(sa.schema.CreateTable(model.__table__))
+    await db.execute(sa.schema.CreateTable(_pg_e12_taggable))
+    try:
+        post = await PgPostM.create(title="hello")
+        tags = [await PgTagM.create(name=f"tag{i}") for i in range(1, 5)]  # ids 1..4
+        await post.tags().attach(tags[0].id)
+        await post.tags().attach(tags[1].id)
+        # tags 3, 4 stay unattached
+
+        assert await post.tags().sum("id") == tags[0].id + tags[1].id
+        assert await post.tags().max("id") == tags[1].id
+        assert await post.tags().min("id") == tags[0].id
+    finally:
+        await db.execute(sa.schema.DropTable(_pg_e12_taggable))
+        await db.execute(sa.schema.DropTable(PgPostM.__table__))
+        await db.execute(sa.schema.DropTable(PgTagM.__table__))
         await db.dispose()

@@ -67,6 +67,9 @@ post = await PostFactory().for_(UserFactory(), "user").create()
 # has-many: after creating the parent, create `count` related rows with the FK set
 user = await UserFactory().has(PostFactory(), "posts", 3).create()
 user = await UserFactory().has(PostFactory().count(3), "posts").create()   # same thing
+
+# belongs-to-many: create related rows AND their pivot rows (pass pivot column values)
+user = await UserFactory().has_attached(RoleFactory(), "roles", {"level": 2}).create()
 ```
 
 `recycle` reuses given instance(s) for any `for_` needing that model class, instead of creating a

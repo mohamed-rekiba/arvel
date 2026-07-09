@@ -11,7 +11,10 @@ Grounded in knowledge/port/07-orm-active-record.md.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _morph_type(model: Any) -> str:
@@ -30,6 +33,34 @@ def _pk_type(model: Any, key: str) -> Any:
         return model.__table__.c[key].type
     except AttributeError, KeyError:
         return sa.Integer()
+
+
+def _deferred_pivot_query(relation: Any) -> Any:
+    """A fresh, **unconstrained** related Builder carrying ``relation``'s pivot-prefetch hook —
+    the two-stage ``query()`` shared by the three pivot relation shapes (``BelongsToMany``/
+    ``MorphToMany``/``MorphedByMany``). The pivot ``WHERE IN`` is applied in place at terminal
+    time by ``relation._apply_pivot_scope`` (DR-0045), so the returned Builder still composes
+    with the full proxy surface."""
+    from functools import partial
+
+    builder = relation.related.query()
+    builder._async_prepare = partial(relation._apply_pivot_scope, builder)
+    return builder
+
+
+class FullBuilderProxy:
+    """One ``__getattr__`` proxying any unknown attribute to ``self.query()`` — so a mixing-in
+    relation exposes the **full** Builder, scoped to the parent. Mixed into the six shapes with a
+    coherent related-query surface (D7); ``query`` itself is provided by the relation shape, never
+    by this mixin, so list it **after** the shape in the MRO (``class X(Relation, FullBuilderProxy)``)."""
+
+    query: Callable[[], Any]  # provided by the mixing-in relation shape — annotation only
+
+    def __getattr__(self, name: str) -> Any:
+        # never proxy internals/dunders (avoids recursion); real attrs resolve before this fires
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return getattr(self.query(), name)
 
 
 @dataclass(frozen=True)
@@ -129,15 +160,9 @@ class Relation:
         )
 
 
-class HasOneOrMany(Relation):
+class HasOneOrMany(Relation, FullBuilderProxy):
     """has-one / has-many: the child carries the foreign key. A relation **is** a query builder: it proxies ``where``/``order_by``/``count``/… to its FK-constrained query, and
     ``create``/``save`` set the foreign key to the parent automatically."""
-
-    def __getattr__(self, name: str) -> Any:
-        # never proxy internals/dunders (avoids recursion); real attrs resolve before this fires
-        if name.startswith("_"):
-            raise AttributeError(name)
-        return getattr(self.query(), name)
 
     async def create(self, **attributes: Any) -> Any:
         """Create + persist a related child with the foreign key set to the parent."""
@@ -164,9 +189,12 @@ class HasOne(HasOneOrMany):
         return await self.first()
 
 
-class BelongsToMany(Relation):
+class BelongsToMany(Relation, FullBuilderProxy):
     """Many-to-many through a pivot table. Resolved with two queries (pivot → WHERE IN)
-    so no SQL join is required; supports attach/detach/sync."""
+    so no SQL join is required; supports attach/detach/sync. ``query()`` returns a related
+    Builder carrying a deferred async pivot prefetch (DR-0045), so — like ``HasOneOrMany`` —
+    the relation proxies the **full** Builder (``where_in``/``pluck``/``order_by``/…), scoped to
+    the parent's attached rows."""
 
     def __init__(
         self,
@@ -187,7 +215,6 @@ class BelongsToMany(Relation):
         self._pivot_columns: list[str] = []
         self._pivot_accessor = "pivot"
         self._pivot_wheres: list[tuple[str, Any]] = []
-        self._related_constraints: list[Any] = []  # where/order_by on the related model query
 
     def with_pivot(self, *columns: str) -> BelongsToMany:
         """Include extra pivot columns, exposed on each result's pivot accessor."""
@@ -204,24 +231,31 @@ class BelongsToMany(Relation):
         self._pivot_wheres.append((column, value))
         return self
 
-    def where(self, *args: Any) -> BelongsToMany:
-        """Constrain the **related** model query.
-        Applied to the second-stage related-model fetch, within the pivot-filtered set."""
+    def query(self) -> Any:
+        """A fresh, unconstrained related Builder carrying the deferred pivot prefetch — the
+        full-builder proxy path (D7). Pivot-specific fluent methods (``where_pivot``/
+        ``with_pivot``/``as_``) must be called first: once a Builder method (``where``/
+        ``order_by``/…) resolves through here, you're on the Builder, not the relation."""
+        return _deferred_pivot_query(self)
 
-        def constrain(query: Any) -> None:
-            query.where(*args)
+    async def _pivot_rows(self) -> Any:
+        """This parent's pivot rows, honoring ``where_pivot()`` — the one pre-query shared by the
+        proxy's async prefetch hook and the native ``get()``/``count()`` path (DR-0045)."""
+        query = self._pivot_query().where(self.foreign_pivot_key, "=", self._parent_id())
+        for column, value in self._pivot_wheres:
+            query = query.where(column, "=", value)
+        return await query.get()
 
-        self._related_constraints.append(constrain)
-        return self
-
-    def order_by(self, column: str, direction: str = "asc") -> BelongsToMany:
-        """Order the related models (applied to the related-model fetch)."""
-
-        def constrain(query: Any) -> None:
-            query.order_by(column, direction)
-
-        self._related_constraints.append(constrain)
-        return self
+    async def _apply_pivot_scope(self, builder: Any) -> None:
+        """The deferred async prefetch: narrow ``builder`` in place to just the attached related
+        ids — no attachments forces ``1 = 0`` so an unattached parent yields ``[]``, never the
+        whole related table."""
+        rows = await self._pivot_rows()
+        ids = list({row[self.related_pivot_key] for row in rows})
+        if ids:
+            builder.where_in(self.related_key, ids)
+        else:
+            builder.where_raw("1 = 0")
 
     def _pivot_table(self) -> Any:
         import sqlalchemy as sa
@@ -242,30 +276,17 @@ class BelongsToMany(Relation):
     def _parent_id(self) -> Any:
         return self.parent._attributes[self.parent_key]
 
-    async def _attached_related(self) -> tuple[Any, dict[Any, Any]]:
-        """The related-model query scoped to currently-attached ids — honoring where_pivot() and
-        the related where()/order_by() constraints — plus the pivot rows keyed by related id.
-        Returns ``(None, {})`` when nothing is attached. Shared by get() and count() so a count
-        filters exactly like a fetch."""
-        query = self._pivot_query().where(self.foreign_pivot_key, "=", self._parent_id())
-        for column, value in self._pivot_wheres:
-            query = query.where(column, "=", value)
-        rows = await query.get()
-        by_related = {row[self.related_pivot_key]: row for row in rows}
-        if not by_related:
-            return None, {}
-        models_query = self.related.where_in(self.related_key, list(by_related))
-        for constrain in self._related_constraints:  # where()/order_by() on the related model
-            constrain(models_query)
-        return models_query, by_related
-
     async def get(self) -> Any:
+        """The attached related models, honoring ``where_pivot()`` — enriched with each model's
+        pivot accessor when ``with_pivot()`` columns were requested (kept on this native path
+        only; the proxied ``.where(...).get()`` doesn't enrich, D7's accepted narrowing)."""
         from arvel.database.collection import ModelCollection
 
-        models_query, by_related = await self._attached_related()
-        if models_query is None:
+        rows = await self._pivot_rows()
+        by_related = {row[self.related_pivot_key]: row for row in rows}
+        if not by_related:
             return ModelCollection[Any]()
-        models = await models_query.get()
+        models = await self.related.where_in(self.related_key, list(by_related)).get()
         if self._pivot_columns:  # attach the requested pivot data to each model
             for model in models:
                 pivot_row = by_related.get(model._attributes[self.related_key])
@@ -298,8 +319,6 @@ class BelongsToMany(Relation):
         by_related_id: dict[Any, Any] = {}
         if all_related_ids:
             models_query = self.related.where_in(self.related_key, all_related_ids)
-            for related_constrain in self._related_constraints:
-                related_constrain(models_query)
             if constrain is not None:
                 constrain(models_query)
             for model in await models_query.get():
@@ -326,17 +345,15 @@ class BelongsToMany(Relation):
             parent._relations[name] = ModelCollection(matched)
 
     def _related_where(self, callback: Any = None) -> Any:
-        """The combined related-table WHERE from the relation's chained ``where()`` constraints
-        plus an optional extra callback — so where_has/with_count filter exactly like a fetch."""
-        if callback is None and not self._related_constraints:
+        """The related-table WHERE from an extra callback — so where_has/with_count filter exactly
+        like a fetch. (D7: the relation no longer accumulates its own where()/order_by() — that's
+        the proxy's job now — so this only ever reflects the caller's explicit callback.)"""
+        if callback is None:
             return None
         from arvel.database.builder import Builder
 
         constrained = Builder(self.related.__table__, model=self.related)
-        for related_constrain in self._related_constraints:
-            related_constrain(constrained)
-        if callback is not None:
-            callback(constrained)
+        callback(constrained)
         return constrained.combined_where()
 
     def exists_clause(self, parent_table: Any, callback: Any = None) -> Any:
@@ -466,10 +483,12 @@ class BelongsToMany(Relation):
         return await self.sync(mapping, detaching=detaching)
 
     async def count(self) -> int:
-        """Number of related models currently attached (honors where()/where_pivot()) — a COUNT
-        query, not a full load."""
-        models_query, _ = await self._attached_related()
-        return 0 if models_query is None else await models_query.count()
+        """Number of related models currently attached (honors ``where_pivot()``) — a COUNT
+        query, not a full load. (Use the proxy — ``rel.where(...).count()`` — to also narrow by
+        a related-model column, D7.)"""
+        rows = await self._pivot_rows()
+        ids = list({row[self.related_pivot_key] for row in rows})
+        return 0 if not ids else await self.related.where_in(self.related_key, ids).count()
 
     async def toggle(self, related_ids: list[Any]) -> dict[str, list[Any]]:
         """Attach the ids that are missing and detach the ones already present (``toggle``); returns the changes map ``{"attached": [...], "detached": [...]}``."""
@@ -604,19 +623,19 @@ class HasOneThrough(HasManyThrough):
         return rows[0] if rows else None
 
 
-class MorphMany(Relation):
+class MorphMany(Relation, FullBuilderProxy):
     """Polymorphic one-to-many: children carry ``{name}_type`` + ``{name}_id``."""
 
     def __init__(self, parent: Any, related: Any, name: str, local_key: str = "id") -> None:
         super().__init__(parent, related, f"{name}_id", local_key)
         self.morph_name = name
 
-    async def get(self) -> Any:
-        return await (
-            self.related.where(f"{self.morph_name}_type", "=", _morph_type(type(self.parent)))
-            .where(f"{self.morph_name}_id", "=", self.parent._attributes[self.local_key])
-            .get()
-        )
+    def query(self) -> Any:
+        # overrides Relation.query(): also filter by {name}_type, which the base query() omits —
+        # get() is now just the inherited Relation.get() = self.query().get() (D7)
+        return self.related.where(
+            f"{self.morph_name}_type", "=", _morph_type(type(self.parent))
+        ).where(f"{self.morph_name}_id", "=", self.parent._attributes[self.local_key])
 
     def _eager_query(self, keys: list[Any]) -> Any:
         # also filter by parent type, so children of a different model sharing an id aren't mis-attached
@@ -685,7 +704,7 @@ class MorphOne(MorphMany):
         return results[0] if results else None
 
 
-class MorphToMany(Relation):
+class MorphToMany(Relation, FullBuilderProxy):
     """Polymorphic many-to-many (e.g. a Post ``morph_to_many`` Tags via ``taggables``)."""
 
     def __init__(self, parent: Any, related: Any, name: str, pivot: str | None = None) -> None:
@@ -695,6 +714,29 @@ class MorphToMany(Relation):
         self.morph_name = name
         self.pivot = pivot or Str.plural(name)
         self.related_pivot_key = f"{Str.snake(related.__name__)}_id"
+        self.related_key = related.__primary_key__
+
+    def query(self) -> Any:
+        """A fresh, unconstrained related Builder carrying the deferred pivot prefetch (D7)."""
+        return _deferred_pivot_query(self)
+
+    async def _pivot_rows(self) -> Any:
+        """This parent's pivot rows — the one pre-query shared by the proxy's async prefetch
+        hook and the native ``get()`` path (DR-0045)."""
+        return await (
+            self._pivot_query()
+            .where(f"{self.morph_name}_id", "=", self._parent_id())
+            .where(f"{self.morph_name}_type", "=", _morph_type(type(self.parent)))
+            .get()
+        )
+
+    async def _apply_pivot_scope(self, builder: Any) -> None:
+        rows = await self._pivot_rows()
+        ids = list({row[self.related_pivot_key] for row in rows})
+        if ids:
+            builder.where_in(self.related_key, ids)
+        else:
+            builder.where_raw("1 = 0")
 
     def _pivot_table(self) -> Any:
         import sqlalchemy as sa
@@ -725,21 +767,16 @@ class MorphToMany(Relation):
         )
 
     async def get(self) -> Any:
-        rows = await (
-            self._pivot_query()
-            .where(f"{self.morph_name}_id", "=", self._parent_id())
-            .where(f"{self.morph_name}_type", "=", _morph_type(type(self.parent)))
-            .get()
-        )
-        related_ids = [row[self.related_pivot_key] for row in rows]
+        rows = await self._pivot_rows()
+        related_ids = list({row[self.related_pivot_key] for row in rows})
         if not related_ids:
             from arvel.database.collection import ModelCollection
 
             return ModelCollection[Any]()
-        return await self.related.where_in(self.related.__primary_key__, related_ids).get()
+        return await self.related.where_in(self.related_key, related_ids).get()
 
 
-class MorphedByMany(Relation):
+class MorphedByMany(Relation, FullBuilderProxy):
     """Inverse polymorphic many-to-many (e.g. a Tag ``morphed_by_many`` Posts)."""
 
     def __init__(self, parent: Any, related: Any, name: str, pivot: str | None = None) -> None:
@@ -749,6 +786,29 @@ class MorphedByMany(Relation):
         self.morph_name = name
         self.pivot = pivot or Str.plural(name)
         self.parent_pivot_key = f"{Str.snake(type(parent).__name__)}_id"
+        self.related_key = related.__primary_key__
+
+    def query(self) -> Any:
+        """A fresh, unconstrained related Builder carrying the deferred pivot prefetch (D7)."""
+        return _deferred_pivot_query(self)
+
+    async def _pivot_rows(self) -> Any:
+        """This parent's pivot rows — the one pre-query shared by the proxy's async prefetch
+        hook and the native ``get()`` path (DR-0045)."""
+        return await (
+            self._pivot_query()
+            .where(self.parent_pivot_key, "=", self.parent._attributes[self.parent.__primary_key__])
+            .where(f"{self.morph_name}_type", "=", _morph_type(self.related))
+            .get()
+        )
+
+    async def _apply_pivot_scope(self, builder: Any) -> None:
+        rows = await self._pivot_rows()
+        ids = list({row[f"{self.morph_name}_id"] for row in rows})
+        if ids:
+            builder.where_in(self.related_key, ids)
+        else:
+            builder.where_raw("1 = 0")
 
     def _pivot_query(self) -> Any:
         import sqlalchemy as sa
@@ -767,21 +827,16 @@ class MorphedByMany(Relation):
         return Builder(table, self.related._resolve())
 
     async def get(self) -> Any:
-        rows = await (
-            self._pivot_query()
-            .where(self.parent_pivot_key, "=", self.parent._attributes[self.parent.__primary_key__])
-            .where(f"{self.morph_name}_type", "=", _morph_type(self.related))
-            .get()
-        )
-        related_ids = [row[f"{self.morph_name}_id"] for row in rows]
+        rows = await self._pivot_rows()
+        related_ids = list({row[f"{self.morph_name}_id"] for row in rows})
         if not related_ids:
             from arvel.database.collection import ModelCollection
 
             return ModelCollection[Any]()
-        return await self.related.where_in(self.related.__primary_key__, related_ids).get()
+        return await self.related.where_in(self.related_key, related_ids).get()
 
 
-class BelongsTo(Relation):
+class BelongsTo(Relation, FullBuilderProxy):
     """Child belongs to an owner (child carries the foreign key → owner's key). Like the other
     relations it **is** a query builder — ``where``/``order_by``/… proxy to the FK-constrained owner
     query — and ``associate``/``dissociate`` set/clear the child's foreign key."""
@@ -789,12 +844,6 @@ class BelongsTo(Relation):
     def __init__(self, parent: Any, related: Any, foreign_key: str, owner_key: str) -> None:
         super().__init__(parent, related, foreign_key, owner_key)
         self.owner_key = owner_key
-
-    def __getattr__(self, name: str) -> Any:
-        # proxies to the owner query; never internals/dunders (avoids recursion)
-        if name.startswith("_"):
-            raise AttributeError(name)
-        return getattr(self.query(), name)
 
     def _parent_value(self) -> Any:
         return self.parent._attributes.get(self.foreign_key)

@@ -88,6 +88,12 @@ await user.roles().where_pivot("assigned_by", "admin").count()
 await user.roles().where("active", "=", True).get() # constrain the related model
 ```
 
+A many-to-many relation is a full query builder over the related model, scoped to the parent —
+`where_in`, `pluck`, `sum`, `chunk`, and the rest all apply the pivot constraint, so
+`user.roles().pluck("name")` returns only *this* user's role names. (The `with_pivot` accessor data
+rides the native `get()`/eager-load path; a bare `.where(...).get()` returns the scoped models
+without it.)
+
 ### `sync` — diff-based, pivot-preserving
 
 `sync`/`sync_without_detaching`/`sync_with_pivot_values` are **diff-based**, not

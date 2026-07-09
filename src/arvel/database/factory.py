@@ -72,6 +72,7 @@ class Factory[M: Model]:
         self._after_creating: list[Callable[[M], Any]] = []
         self._for: list[tuple[Factory[Any] | Model, str, str | None]] = []
         self._has: list[tuple[Factory[Any], str, int, str | None]] = []
+        self._has_attached: list[tuple[Factory[Any], str, int, dict[str, Any] | None]] = []
         self._recycled: dict[type, list[Model]] = {}
 
     @property
@@ -155,6 +156,30 @@ class Factory[M: Model]:
         )
         clone = copy.copy(self)
         clone._has = [*self._has, (factory, relation, resolved_count, foreign_key)]
+        return clone
+
+    def has_attached(
+        self,
+        related: Factory[Any] | FactoryBatch[Any],
+        relation: str,
+        pivot_data: dict[str, Any] | None = None,
+        count: int = 1,
+    ) -> Factory[M]:
+        """A copy of this factory that, after creating the parent, also creates ``count``
+        ``related`` rows and **attaches** each to the parent through the belongs-to-many /
+        morph-to-many ``relation`` (a method on the *parent* model, e.g.
+        ``def roles(self): return self.belongs_to_many(Role)``), writing ``pivot_data`` onto every
+        pivot row it inserts (reuses ``attach``, so extra pivot columns are declared same as a
+        direct ``attach(id, **pivot_data)`` call). ``related`` may be a bare factory (paired with
+        ``count``) or a ``count()`` batch — its count then wins, exactly like :meth:`has`. Only
+        wired on ``create``/``create_many`` (there's no parent row to attach from ``make``)."""
+        factory, resolved_count = (
+            (related.factory, related.count)
+            if isinstance(related, FactoryBatch)
+            else (related, count)
+        )
+        clone = copy.copy(self)
+        clone._has_attached = [*self._has_attached, (factory, relation, resolved_count, pivot_data)]
         return clone
 
     def trashed(self) -> Factory[M]:
@@ -256,6 +281,17 @@ class Factory[M: Model]:
             else:
                 await related_factory.count(count).create(**{fk: value})
 
+    async def _resolve_has_attached(self, parent: Any) -> None:
+        for related_factory, relation, count, pivot_data in self._has_attached:
+            rel = getattr(parent, relation)()
+            rows = (
+                [await related_factory.create()]
+                if count == 1
+                else await related_factory.count(count).create()
+            )
+            for row in rows:
+                await rel.attach(row._attributes[rel.related_key], **(pivot_data or {}))
+
     def make(self, **overrides: Any) -> M:
         """Build one unsaved model instance. ``after_making`` callbacks run here too, but must be
         **sync** — an async callback only actually runs (awaited) via ``create``/``create_many``."""
@@ -288,6 +324,7 @@ class Factory[M: Model]:
         for callback in self._after_creating:
             await self._run_hook(callback, instance)
         await self._resolve_has(instance)
+        await self._resolve_has_attached(instance)
         return instance
 
     def count(self, count: int) -> FactoryBatch[M]:

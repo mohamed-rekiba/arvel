@@ -71,3 +71,26 @@ async def test_where_pivot_filters_by_pivot_column() -> None:
         assert {r.name for r in recent} == {"late"}
     finally:
         await db.dispose()
+
+
+async def test_belongs_to_many_proxy_async_prefetch_runs_once_across_two_terminals() -> None:
+    """The DR-0045 once-guard: a proxied builder awaited twice (``get()`` then ``count()``) only
+    runs the pivot pre-query once, and both terminals still see the correctly pivot-scoped
+    result — not an empty/unscoped one from a dropped or doubled prefetch."""
+    db = await _setup()
+    try:
+        user = await Userx.create(name="ada")
+        role = await Rolex.create(name="editor")
+        await user.roles().attach(role.id, assigned_at="2026-01-01")
+
+        builder = user.roles().where_in("id", [role.id])
+        assert builder._prepared is False
+
+        first = await builder.get()
+        assert builder._prepared is True
+        assert [m.name for m in first] == ["editor"]
+
+        second = await builder.count()  # same builder, second terminal
+        assert second == 1  # still scoped correctly — the prefetch didn't re-run or vanish
+    finally:
+        await db.dispose()
