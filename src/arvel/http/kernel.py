@@ -581,7 +581,18 @@ class HttpKernel:
         elif "DELETE" in methods:
             extra["status_code"] = 200
         if name:
-            extra["operation_id"] = name
+            if len(methods) > 1:
+                # a merged multi-method route (e.g. resource `update` = PUT+PATCH) shares one
+                # handler; Litestar invokes a callable operation_id once per HTTP method, so this
+                # disambiguates without splitting the handler — a plain string would collide.
+                def _per_method_operation_id(
+                    handler: Any, http_method: Any, path: Any, _base: str = name
+                ) -> str:
+                    return f"{_base}_{http_method.value.lower()}"
+
+                extra["operation_id"] = _per_method_operation_id
+            else:
+                extra["operation_id"] = name
         if security:
             extra["security"] = [{openapi.SECURITY_SCHEME_KEYS.get(s, s): []} for s in security]
         route_path = litestar_paths[0] if len(litestar_paths) == 1 else litestar_paths

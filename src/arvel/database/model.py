@@ -418,6 +418,27 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         return cls.__primary_key__
 
     @classmethod
+    def _coerce_route_key(cls, column: str, value: Any) -> Any:
+        """Coerce a raw route-param value to the key column's Python type — int-only.
+
+        A resource route (``resource()``) emits no ``:int`` path converter, so an int-key
+        column can receive the raw string ``"5"``; Postgres rejects ``bigint = varchar`` with a
+        500 where SQLite silently accepts it. Coerce only when the column's type is genuinely
+        ``int`` — string/UUID/ULID/slug keys (``python_type is str``) pass through untouched, and
+        an already-int value (a hand-written ``{id:int}`` route) is a no-op. The type probe
+        degrades to no coercion on any failure (unknown column, exotic type), so it never
+        introduces a new fault. Raises ``ValueError``/``TypeError`` on a non-coercible value
+        (e.g. ``int("abc")``) — callers turn that into a binding miss.
+        """
+        try:
+            python_type = cls.__table__.c[column].type.python_type
+        except Exception:
+            return value
+        if python_type is int and not isinstance(value, int):
+            return int(value)
+        return value
+
+    @classmethod
     async def resolve_route_binding(
         cls, value: Any, field: str | None = None, *, with_trashed: bool = False
     ) -> Self | None:
@@ -432,6 +453,10 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         soft-deleted row still binds.
         """
         column = field or cls.get_route_key_name()
+        try:
+            value = cls._coerce_route_key(column, value)
+        except (ValueError, TypeError):
+            return None
         query = cls.with_trashed() if with_trashed else cls.query()
         found: Self | None = await query.where(column, "=", value).first()
         return found
@@ -454,6 +479,10 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         if relation_method is None or not callable(relation_method):
             return await cls.resolve_route_binding(value, field)
         column = field or cls.get_route_key_name()
+        try:
+            value = cls._coerce_route_key(column, value)
+        except (ValueError, TypeError):
+            return None
         relation: Any = relation_method()
         found: Self | None = await relation.where(column, "=", value).first()
         return found
