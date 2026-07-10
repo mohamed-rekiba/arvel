@@ -679,6 +679,11 @@ class HttpKernel:
                 params = dict(domain_params or {})
                 params.update(litestar_request.path_params)
                 self._apply_wheres(params, wheres or {})
+                # a missing bound model is not rendered here: doing so would 404 before the
+                # pipeline (and Authenticate) ever runs, letting a guest tell an existing id from
+                # a nonexistent one with zero credentials (DR-0054). The outcome is deferred to
+                # `_handle`'s destination, which only renders it once auth/authz have passed.
+                binding_missing = False
                 try:
                     await self._bindings.resolve_explicit(params)
                     await self._bindings.resolve_implicit(
@@ -690,14 +695,10 @@ class HttpKernel:
                         trashed_params=trashed_params,
                     )
                 except BindingMissing:
-                    if missing is None:
-                        self._not_found()
-                    result = missing(request)
-                    if inspect.isawaitable(result):
-                        result = await result
-                    return await to_response(result, request)
+                    binding_missing = True
                 # H4: the route's final name + resolved params, snapshotted before body/query (not
-                # route params) are folded in below.
+                # route params) are folded in below. On a miss these are the raw, unresolved
+                # params — harmless, since the handler never runs on that path.
                 request._route_match = RouteMatch(  # pyright: ignore[reportPrivateUsage]
                     name=name, params=dict(params)
                 )
@@ -707,7 +708,14 @@ class HttpKernel:
                     params.update(query)
 
                 return await self._handle(
-                    handler, request, params, group, route_middleware, without_middleware
+                    handler,
+                    request,
+                    params,
+                    group,
+                    route_middleware,
+                    without_middleware,
+                    binding_missing=binding_missing,
+                    missing=missing,
                 )
         finally:
             current_user.reset(user_token)
@@ -731,8 +739,19 @@ class HttpKernel:
         group: str | None,
         route_middleware: Sequence[Any] | None,
         without_middleware: Sequence[Any] | None = None,
+        binding_missing: bool = False,
+        missing: Any = None,
     ) -> Any:
         async def destination(req: Any) -> Any:
+            if binding_missing:
+                # rendered here rather than in _dispatch so it runs *after* every middleware —
+                # Authenticate/Authorize have already had their say by the time we get here.
+                if missing is None:
+                    self._not_found()
+                result = missing(request)
+                if inspect.isawaitable(result):
+                    result = await result
+                return result
             target = handler
             if isinstance(target, type):  # an invokable controller class — instantiate via the
                 # container (DI for its constructor), same as `_make` does for middleware.
