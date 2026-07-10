@@ -103,12 +103,26 @@ class Notification:
         opt-out (e.g. a muted digest)."""
         return True
 
-    def middleware(self) -> list[Any]:
+    def middleware(self, notifiable: Any = None, channels: list[str] | None = None) -> list[Any]:
         """Job middleware this notification's queued send runs through — e.g. ``[RateLimited(limiter,
         key=..., max_attempts=5, decay_seconds=60)]`` (``arvel.queue.middleware``). Empty by default;
         a subclass overrides to declare per-send middleware, resolving any collaborator (a limiter,
         say) fresh from the container rather than storing it on ``self`` — an attribute has to
         survive ``encode_instance``/serialization across the queue, and a live limiter can't.
+
+        ``notifiable`` is the job's own live, rehydrated recipient (:meth:`SendQueuedNotification.
+        middleware` passes its ``self.notifiable`` through) — safe to key a throttle on
+        ``notifiable.id`` so e.g. two recipients get independent counters, not a shared one.
+        ``channels`` is the SINGLE channel THIS job carries (``SendQueuedNotification`` is one job
+        per channel — see its own docstring) — a throttle keyed only on notifiable+notification
+        would otherwise share one counter across a notification's mail AND database jobs, starving
+        one of them on every send (not just a flapping burst): with ``max_attempts=1`` the mail and
+        database job for the SAME send race for the one slot, so only one channel would ever
+        deliver. Fold ``channels`` into the key (e.g. ``f"...:{channels[0]}"``) to give each channel
+        its own independent counter — the reference queued-notification hook receives both for
+        exactly this reason. Both default to ``None`` so existing zero/one-arg overrides and direct
+        calls keep working; guard the ``None`` case (an on-demand send, or a recipient deleted
+        between enqueue and run).
 
         **Queued-rail only.** This is consulted by :meth:`SendQueuedNotification.middleware`, which
         the worker calls before running the job — an inline send (not ``ShouldQueue``, or no queue
@@ -188,7 +202,16 @@ class SendQueuedNotification(Job):
         cls = _load(str(self.notification["__class__"]))
         notification = cls.__new__(cls)
         notification.__dict__.update(cast("dict[str, Any]", self.notification["__state__"]))
-        return cast("list[Any]", notification.middleware())
+        # self.notifiable is the job's OWN top-level attribute — already rehydrated to a live
+        # model by deserialize_instance before the worker ever calls middleware() (see
+        # worker.py's _run_job: deserialize_any runs, then _invoke -> _wrap_with_middleware calls
+        # this). Passing it through costs no new fetch and serializes nothing new; it just lets a
+        # notification's middleware() key a throttle on the live recipient (e.g. notifiable.id)
+        # instead of only the notification's own JSON-plain scalars. self.channels is likewise this
+        # job's own attribute (the single channel it carries) — passed through so a throttle can be
+        # keyed per channel too, not shared across a send's mail+database jobs (see middleware()'s
+        # own docstring for why that sharing would starve one of them).
+        return cast("list[Any]", notification.middleware(self.notifiable, self.channels))
 
 
 class _Channel:

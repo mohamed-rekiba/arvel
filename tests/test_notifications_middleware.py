@@ -51,7 +51,7 @@ class Throttled(Notification, ShouldQueue):
     def to_array(self, notifiable: Any) -> dict[str, Any]:
         return {"msg": "hi"}
 
-    def middleware(self) -> list[Any]:
+    def middleware(self, notifiable: Any = None, channels: list[str] | None = None) -> list[Any]:
         return [RateLimited(RateLimiter(app().make("cache")), "throttle-key", max_attempts=2)]
 
 
@@ -61,7 +61,7 @@ class TwoChannelThrottled(Throttled):
     def via(self, notifiable: Any) -> list[str]:
         return ["database", "mail"]
 
-    def middleware(self) -> list[Any]:
+    def middleware(self, notifiable: Any = None, channels: list[str] | None = None) -> list[Any]:
         return [RateLimited(RateLimiter(app().make("cache")), "two-channel-key", max_attempts=2)]
 
 
@@ -84,7 +84,7 @@ class InlineThrottled(Notification):
     def to_array(self, notifiable: Any) -> dict[str, Any]:
         return {"msg": "hi"}
 
-    def middleware(self) -> list[Any]:
+    def middleware(self, notifiable: Any = None, channels: list[str] | None = None) -> list[Any]:
         return [RateLimited(RateLimiter(app().make("cache")), "inline-key", max_attempts=1)]
 
 
@@ -265,7 +265,7 @@ class ScalarKeyedReminder(Notification, ShouldQueue):
     def to_array(self, notifiable: Any) -> dict[str, Any]:
         return {"invoice": self.invoice_id}
 
-    def middleware(self) -> list[Any]:
+    def middleware(self, notifiable: Any = None, channels: list[str] | None = None) -> list[Any]:
         return [
             RateLimited(
                 RateLimiter(app().make("cache")), f"reminder:{self.invoice_id}", max_attempts=1
@@ -287,3 +287,88 @@ async def test_middleware_keyed_on_an_init_scalar_survives_sync_reconstruction()
         assert mw[0].key == "reminder:42"  # the scalar came through the reconstruction
     finally:
         set_application(None)
+
+
+class PerRecipientThrottled(Notification, ShouldQueue):
+    """DR-0059: keys the limiter on the LIVE notifiable's id (not just an __init__ scalar) AND the
+    job's own channel — the capability the framework change adds. `notifiable` is the job's own
+    `self.notifiable`, already rehydrated to a live model before `middleware()` runs (never the
+    JSON-plain notification's own state, which can't reach the recipient). `channels` is the ONE
+    channel THIS job carries: SendQueuedNotification is one job per channel, so a two-channel
+    notification's mail and database jobs BOTH call this same method — without the channel in the
+    key they'd share one counter and, at max_attempts=1, only one channel would ever deliver, even
+    for a single (non-repeated) send."""
+
+    def via(self, notifiable: Any) -> list[str]:
+        return ["database", "mail"]
+
+    def to_array(self, notifiable: Any) -> dict[str, Any]:
+        return {"msg": "restock"}
+
+    def middleware(self, notifiable: Any = None, channels: list[str] | None = None) -> list[Any]:
+        uid = getattr(notifiable, "id", "anon")
+        channel = (channels or ["unknown"])[0]
+        return [
+            RateLimited(
+                RateLimiter(app().make("cache")), f"restock:{uid}:{channel}", max_attempts=1
+            )
+        ]
+
+
+class Recipient:
+    def __init__(self, id: int) -> None:
+        self.id = id
+
+
+async def test_queued_middleware_receives_the_live_notifiable_and_keys_per_recipient() -> None:
+    """The E15/DR-0059 contract: SendQueuedNotification.middleware() passes its OWN already-live
+    self.notifiable into notification.middleware(notifiable) — so two different recipients get two
+    independent RateLimited keys, and the hook actually receives a live object (not a dict ref)."""
+    application = Application()
+    CacheServiceProvider(application).register()
+    set_application(application)
+    try:
+        job_a = SendQueuedNotification(Recipient(1), PerRecipientThrottled(), channels=["database"])
+        job_b = SendQueuedNotification(Recipient(2), PerRecipientThrottled(), channels=["database"])
+        mw_a = job_a.middleware()
+        mw_b = job_b.middleware()
+        assert len(mw_a) == 1 and isinstance(mw_a[0], RateLimited)
+        assert len(mw_b) == 1 and isinstance(mw_b[0], RateLimited)
+        assert mw_a[0].key == "restock:1:database"
+        assert mw_b[0].key == "restock:2:database"
+        assert mw_a[0].key != mw_b[0].key  # distinct recipients -> distinct counters
+
+        # the hook receives the live recipient, not a serialized ref: job_a's own self.notifiable
+        # (never round-tripped through encode/decode in this synchronous path) is what got keyed on.
+        assert job_a.notifiable.id == 1
+    finally:
+        set_application(None)
+
+
+async def test_queued_middleware_receives_the_jobs_own_channel_so_channels_dont_share_a_counter() -> (
+    None
+):
+    """A single send of a 2-channel notification pushes ONE job per channel — both call the SAME
+    notification's middleware(). Without the channel threaded through, they'd collide on one key
+    and, at max_attempts=1, only ONE channel would ever deliver (a real bug this test guards
+    against, not a hypothetical: it broke a pre-existing kit test before this fix)."""
+    application = Application()
+    CacheServiceProvider(application).register()
+    set_application(application)
+    try:
+        db_job = SendQueuedNotification(
+            Recipient(1), PerRecipientThrottled(), channels=["database"]
+        )
+        mail_job = SendQueuedNotification(Recipient(1), PerRecipientThrottled(), channels=["mail"])
+        assert db_job.middleware()[0].key == "restock:1:database"
+        assert mail_job.middleware()[0].key == "restock:1:mail"
+        assert db_job.middleware()[0].key != mail_job.middleware()[0].key
+    finally:
+        set_application(None)
+
+
+async def test_notification_middleware_default_arg_still_accepts_no_notifiable() -> None:
+    """Base default (notifiable=None) keeps a direct, argument-less call working — the widened
+    signature breaks no existing zero-arg caller."""
+    assert Notification().middleware() == []
+    assert Notification().middleware(Recipient(1)) == []

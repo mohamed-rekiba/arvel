@@ -82,7 +82,7 @@ class RateLimited:
     """Caps executions of jobs sharing ``key`` to ``max_attempts`` per ``decay_seconds`` (
     job middleware ``RateLimited``) — over the limit, the job is released back onto the queue
     instead of running. ``limiter`` is duck-typed against
-    :class:`arvel.http.rate_limiter.RateLimiter`'s counting verbs (``too_many_attempts``/``hit``/
+    :class:`arvel.http.rate_limiter.RateLimiter`'s counting verbs (``hit_with_ttl``/
     ``available_in``) rather than imported directly, so this stays a queue→http-free edge."""
 
     def __init__(self, limiter: Any, key: str, max_attempts: int, decay_seconds: int = 60) -> None:
@@ -92,10 +92,16 @@ class RateLimited:
         self.decay_seconds = decay_seconds
 
     async def handle(self, job: Any, next_: Callable[[Any], Awaitable[Any]]) -> Any:
-        if await self._limiter.too_many_attempts(self.key, self.max_attempts):
+        # Atomic increment-then-compare (``hit_with_ttl``), NOT a separate too_many_attempts()
+        # check followed by hit() — a worker runs jobs concurrently (multiple in-flight async
+        # tasks sharing one event loop), so two jobs racing the SAME key could both read "under
+        # the limit" before either recorded its attempt, letting max_attempts+1 through. One
+        # atomic increment closes that window: every attempt counts itself first, then asks
+        # whether ITS OWN resulting count is over the cap.
+        count = await self._limiter.hit_with_ttl(self.key, self.decay_seconds)
+        if count > self.max_attempts:
             wait = await self._limiter.available_in(self.key)
             raise JobShouldBeReleased(wait or self.decay_seconds)
-        await self._limiter.hit(self.key, self.decay_seconds)
         return await next_(job)
 
 

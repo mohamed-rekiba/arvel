@@ -455,7 +455,7 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         column = field or cls.get_route_key_name()
         try:
             value = cls._coerce_route_key(column, value)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return None
         query = cls.with_trashed() if with_trashed else cls.query()
         found: Self | None = await query.where(column, "=", value).first()
@@ -481,7 +481,7 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         column = field or cls.get_route_key_name()
         try:
             value = cls._coerce_route_key(column, value)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return None
         relation: Any = relation_method()
         found: Self | None = await relation.where(column, "=", value).first()
