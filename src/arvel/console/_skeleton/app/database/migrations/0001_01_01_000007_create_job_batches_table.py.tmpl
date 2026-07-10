@@ -10,7 +10,7 @@ class CreateJobBatchesTable(Migration):
             t.integer("total_jobs")
             t.integer("pending_jobs")
             t.integer("failed_jobs")
-            t.json("options")
+            t.text("options")
             t.integer("cancelled_at").nullable()
             t.integer("created_at")
             t.integer("finished_at").nullable()

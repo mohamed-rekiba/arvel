@@ -14,7 +14,7 @@ class CreateActivityLogTable(Migration):
             t.string("causer_type").nullable()
             t.big_integer("causer_id").nullable()
             t.string("event").nullable()
-            t.json("properties").nullable()
+            t.text("properties").nullable()
             t.uuid("batch_uuid").nullable()
             t.timestamps()
 
