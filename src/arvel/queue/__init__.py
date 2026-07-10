@@ -212,7 +212,16 @@ class DurableJobs:
         self, delay: float, job: Job, *, queue: str | None = None, attempts: int = 0
     ) -> Any:
         """Persist a job to the ``jobs`` table with ``available_at = now + delay`` — the durable
-        delayed/retry rail. ``attempts`` carries the real attempt count across a retry-release."""
+        delayed/retry rail. ``attempts`` carries the real attempt count across a retry-release.
+
+        ``available_at`` is an integer unix-second column, so a fractional ``delay`` (a sub-second
+        ``Job.backoff``, e.g. ``0.2``) needs rounding — **up** (``ceil``), never truncation:
+        ``int(0.2)`` floors to ``0``, silently collapsing any positive sub-second delay into "due
+        immediately" and defeating the whole point of a backoff. Rounding up instead guarantees a
+        positive ``delay`` always lands strictly in the future (never earlier than requested); a
+        zero delay stays due now, exactly as ``dispatch_after(0, ...)`` (immediate enqueue) needs.
+        """
+        import math
         import time
 
         from arvel.kernel import app, has_application
@@ -229,7 +238,7 @@ class DurableJobs:
             queue=self._router.label(type(job), queue),
             payload=serialize_instance(job),
             attempts=attempts,
-            available_at=now + int(delay),
+            available_at=now + math.ceil(delay),
             created_at=now,
         )
 
