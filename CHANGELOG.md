@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.59.0](https://github.com/mohamed-rekiba/arvel/compare/v0.58.2...v0.59.0) (2026-07-10)
+
+
+### Features
+
+* a queued notification's middleware() receives the recipient and channels ([5ae588a](https://github.com/mohamed-rekiba/arvel/commit/5ae588a8a354e1a2d9afa32261c07514adbaac03))
+* aggregate all validation errors, session flash verbs, one authorize-fail 403 type ([aee174b](https://github.com/mohamed-rekiba/arvel/commit/aee174be690c4f4729fa4e14165e79c7bd6bd941))
+* complete E6 routing surface — router, model bindings, docs, tests ([fa0955e](https://github.com/mohamed-rekiba/arvel/commit/fa0955ef5e1f9744567ee32934dfc9d821c3d6e8))
+* conditional binds, contextual give_tagged/give_config, variadic injection ([e01cc83](https://github.com/mohamed-rekiba/arvel/commit/e01cc83545b4734628fb5c2bfc54b34c58bc1991))
+* context bulk/conditional ops, full hidden mirror, hidden-aware scope ([f39a9cf](https://github.com/mohamed-rekiba/arvel/commit/f39a9cff928195563dd0eec68a255f6f41d0924d))
+* declarable notification middleware + document the queued/delayed rails ([822f726](https://github.com/mohamed-rekiba/arvel/commit/822f7263f8a358aac5a4bff336aaaa0546436be0))
+* domain routing, scoped/trashed bindings, current-route, middleware priority ([c93b405](https://github.com/mohamed-rekiba/arvel/commit/c93b405bba2101b8f7c226aa8659a6bcce99ce8d))
+* environment matcher, typed config, declarative providers, container-held registries ([6416812](https://github.com/mohamed-rekiba/arvel/commit/641681238d3110c7dbd0e00dcaf471c3c0467d93))
+* exception-handler levels, predicate suppression, throttling, self-handlers, global context ([7a41acb](https://github.com/mohamed-rekiba/arvel/commit/7a41acb3e915df6aa6834d8d8a06d893532428ab))
+* factory has_attached + unify the relation-proxy surface ([e51b3b3](https://github.com/mohamed-rekiba/arvel/commit/e51b3b3005e595c59a3ca7bae507c63e5506d018))
+* HTTP client peripherals — redirect/TLS opt-outs, sink, url params, macros ([453e720](https://github.com/mohamed-rekiba/arvel/commit/453e7205018ca06dcd95d990562c36e861540b85))
+* nested JSON:API includes, when_counted/when_pivot_loaded, to_dict date ISO ([0a5bfda](https://github.com/mohamed-rekiba/arvel/commit/0a5bfda036e0e9b20e06095f1ecfac91a5c09919))
+* per-command console signal traps via one shared helper ([7dbbc4a](https://github.com/mohamed-rekiba/arvel/commit/7dbbc4a0242246dd5b7af7730570349d692dd80f))
+* public channel-auth verify primitive for broadcasting transport ([269dd22](https://github.com/mohamed-rekiba/arvel/commit/269dd2288d6b788e2fe47fbe33041a6d9a8e874f))
+* rich request input surface, input normalization, cookie encryption ([71e019d](https://github.com/mohamed-rekiba/arvel/commit/71e019d4739b4011b706efdb308822bd66583695))
+* route groups can declare an OpenAPI security scheme ([202dd3d](https://github.com/mohamed-rekiba/arvel/commit/202dd3db56eaab49f8c8296392ff500bc4ab2e52))
+* schema introspection — has_table, has_column, drop_if_exists ([7bd81f3](https://github.com/mohamed-rekiba/arvel/commit/7bd81f3a16fedf18e3aab828f21cce6060825e8d))
+
+
+### Bug Fixes
+
+* coerce int route keys in binding; unique operationId per method ([0942b5b](https://github.com/mohamed-rekiba/arvel/commit/0942b5b684e5501099d0c68cec0e16d85579756a))
+* declare json-cast columns TEXT in skeleton migrations (Postgres agreement) ([97fe29b](https://github.com/mohamed-rekiba/arvel/commit/97fe29b1c1d3936430db31d5eec23b59d8251d20))
+* declare query params explicitly instead of the deprecated inferred style ([5e01c19](https://github.com/mohamed-rekiba/arvel/commit/5e01c197754b055423c1657b04dcacaa40c1a400))
+* emit OpenAPI parameters in a stable order ([3ee0b4c](https://github.com/mohamed-rekiba/arvel/commit/3ee0b4cbd64405592788a213308a0c982a2c57e8))
+* harden email-verification binding and signed-URL base reconstruction ([73ecbaf](https://github.com/mohamed-rekiba/arvel/commit/73ecbafaa3de60e68517ce133adceede6509b40c))
+* resolve a missing route-model binding after auth, not before ([27add60](https://github.com/mohamed-rekiba/arvel/commit/27add600c8ff805b3523b44bd4632eca9b10eae2))
+* round a sub-second job backoff up instead of truncating it to zero ([4b01816](https://github.com/mohamed-rekiba/arvel/commit/4b01816b6103a0ca46e169b21c7e00ad8a55decc))
+* scaffold auth config matches what the guard manager actually reads ([2978673](https://github.com/mohamed-rekiba/arvel/commit/29786732c2d2095113221c0a1e3296b7d1def6ca))
+
+
+### Refactors
+
+* extract the queue worker loop and serialization; add fail_on_timeout ([d2725f3](https://github.com/mohamed-rekiba/arvel/commit/d2725f3e32dcfb46888fa0982be2f39817cbf8a6))
+* split the HTTP kernel, unify throttling, consolidate URL joining ([7d92aa3](https://github.com/mohamed-rekiba/arvel/commit/7d92aa31629f269adb983757dfc55aeaba741ff1))
+
 ## [0.58.2](https://github.com/mohamed-rekiba/arvel/compare/v0.58.1...v0.58.2) (2026-07-08)
 
 
