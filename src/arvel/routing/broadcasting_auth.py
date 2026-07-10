@@ -39,6 +39,41 @@ def _sign(channel_name: str, socket_id: str, secret: str) -> str:
     ).hexdigest()
 
 
+def _resolved_secret(secret: str | None) -> str:
+    """``secret`` if given, else ``config('app.key')`` — the same resolution
+    :func:`broadcasting_auth` itself uses (line below), so sign and verify never read the key two
+    different ways."""
+    if secret is not None:
+        return secret
+    from arvel.kernel import app, has_application
+
+    current_app = app() if has_application() else None
+    return str(current_app.config("app.key") or "") if current_app is not None else ""
+
+
+def verify_channel_auth(
+    channel_name: str, socket_id: str, signature: str, *, secret: str | None = None
+) -> bool:
+    """``True`` iff ``signature`` is the ``auth`` token :func:`broadcasting_auth` would mint for
+    this ``(channel_name, socket_id)`` pair — the verify side of :func:`_sign`, so an app-owned
+    realtime transport (DR-0066/DR-0067: arvel deliberately leaves the websocket *server* to the
+    app, but owns sign AND verify) can authorize a subscribe without re-implementing arvel's HMAC
+    construction. ``secret`` defaults to ``config('app.key')``, resolved exactly like the endpoint.
+
+    Constant-time (``hmac.compare_digest``) — this is a security primitive. An empty/misconfigured
+    key never verifies ``True`` (mirrors the endpoint's own refusal to sign under one). A
+    non-ASCII ``signature`` fails closed (``False``) instead of raising — ``compare_digest``
+    itself raises ``TypeError`` comparing non-ASCII ``str``s, and a hostile caller controls this
+    value (a subscribe frame), so it must never be able to crash the caller's handler."""
+    resolved = _resolved_secret(secret)
+    if not resolved:
+        return False
+    if not signature.isascii():
+        return False
+    expected = _sign(channel_name, socket_id, resolved)
+    return hmac.compare_digest(expected, signature)
+
+
 async def broadcasting_auth(request: Any) -> Response:
     """Resolve ``request``'s authenticated user + the requested channel, run its registered
     authorization callback, and return the auth signature (private) or member data (presence).
@@ -55,7 +90,7 @@ async def broadcasting_auth(request: Any) -> Response:
     if outcome is False:
         abort(403)
 
-    secret = str(current_app.config("app.key") or "") if current_app is not None else ""
+    secret = _resolved_secret(None)
     if not secret:
         # an HMAC keyed with "" is forgeable — refuse to hand out a weak signature under a
         # misconfigured (empty) APP_KEY rather than emit one
@@ -66,4 +101,4 @@ async def broadcasting_auth(request: Any) -> Response:
     return Response(content=payload)
 
 
-__all__ = ["broadcasting_auth"]
+__all__ = ["broadcasting_auth", "verify_channel_auth"]

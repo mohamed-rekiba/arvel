@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from arvel.http.kernel import HttpKernel
     from arvel.http.redirect import Redirect
     from arvel.http.request import RouteMatch
+    from arvel.routing.broadcasting_auth import verify_channel_auth as verify_channel_auth
 
 
 _RESOURCE_ACTIONS: list[tuple[str, list[str], str]] = [
@@ -779,4 +780,16 @@ __all__ = [
     "temporary_signed_route",
     "to_route",
     "url",
+    "verify_channel_auth",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    # lazy — `verify_channel_auth` lives in `broadcasting_auth` (routing's own submodule; no DAG
+    # edge), re-exported here as the stable public surface an app-owned realtime transport imports
+    # (DR-0067), so `import arvel.routing` doesn't eagerly pull in the broadcasting/auth wiring.
+    if name == "verify_channel_auth":
+        from arvel.routing.broadcasting_auth import verify_channel_auth
+
+        return verify_channel_auth
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

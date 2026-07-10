@@ -13,7 +13,7 @@ from arvel.broadcasting import BroadcastManager
 from arvel.http import HttpKernel
 from arvel.http.middleware import AuthenticateMiddleware
 from arvel.kernel import set_application
-from arvel.routing.broadcasting_auth import broadcasting_auth
+from arvel.routing.broadcasting_auth import broadcasting_auth, verify_channel_auth
 from arvel.testing import client
 
 
@@ -103,6 +103,66 @@ def test_presence_channel_returns_member_data() -> None:
         assert r.raw.json()["channel_data"] == {"id": "ada", "room": "9"}
     finally:
         set_application(None)
+
+
+def test_verify_channel_auth_accepts_the_signature_the_endpoint_minted() -> None:
+    # DR-0067: an app-owned realtime transport (K9) verifies a subscribe with this, instead of
+    # re-implementing the endpoint's HMAC construction.
+    manager = BroadcastManager()
+    manager.channel("chat.{id}", lambda user, chat_id: user.id == chat_id)
+    kernel = _app_and_kernel(manager)
+    try:
+        with client(kernel.build()) as http:
+            r = http.post(
+                "/broadcasting/auth",
+                headers={"authorization": "Bearer 5"},
+                data={"channel_name": "private-chat.5", "socket_id": "s1"},
+            )
+        auth = r.raw.json()["auth"]
+        assert verify_channel_auth("private-chat.5", "s1", auth) is True
+    finally:
+        set_application(None)
+
+
+def test_verify_channel_auth_rejects_a_tampered_or_mismatched_signature() -> None:
+    from arvel.routing.broadcasting_auth import _sign
+
+    assert verify_channel_auth("private-chat.5", "s1", "not-a-real-hmac", secret="k") is False
+    # a signature minted for a different channel/socket doesn't verify against another pair
+    signed_for_other_channel = _sign("private-chat.6", "s1", "k")
+    assert (
+        verify_channel_auth("private-chat.5", "s1", signed_for_other_channel, secret="k") is False
+    )
+    signed_for_other_socket = _sign("private-chat.5", "s2", "k")
+    assert verify_channel_auth("private-chat.5", "s1", signed_for_other_socket, secret="k") is False
+    # the matching pair, same key, DOES verify
+    signed = _sign("private-chat.5", "s1", "k")
+    assert verify_channel_auth("private-chat.5", "s1", signed, secret="k") is True
+
+
+def test_verify_channel_auth_rejects_an_empty_key() -> None:
+    assert verify_channel_auth("private-chat.5", "s1", "anything", secret="") is False
+
+
+def test_verify_channel_auth_rejects_a_non_ascii_signature_without_raising() -> None:
+    # compare_digest itself raises TypeError on a non-ASCII str; a hostile caller controls this
+    # value (a subscribe frame), so the primitive must fail closed, not crash the caller.
+    assert verify_channel_auth("private-chat.5", "s1", "ünïcödé-sig", secret="k") is False
+
+
+def test_verify_channel_auth_compares_constant_time(monkeypatch: Any) -> None:
+    import hmac as hmac_module
+
+    calls: list[tuple[str, str]] = []
+    real_compare = hmac_module.compare_digest
+
+    def _tracked(a: str, b: str) -> bool:
+        calls.append((a, b))
+        return real_compare(a, b)
+
+    monkeypatch.setattr(hmac_module, "compare_digest", _tracked)
+    verify_channel_auth("private-chat.5", "s1", "whatever", secret="k")
+    assert len(calls) == 1  # the comparison went through hmac.compare_digest, not `==`
 
 
 def test_empty_app_key_refuses_to_sign() -> None:
