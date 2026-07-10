@@ -79,6 +79,26 @@ def test_typed_query_params_are_injected_and_documented() -> None:
     assert all(p["in"] == "query" for p in params)
 
 
+def test_query_params_do_not_use_deprecated_inferred_style() -> None:
+    """The adapter must declare query params explicitly (Annotated[..., Parameter()]), not lean on
+    Litestar inferring them from a bare typed default — the inferred style is deprecated upstream and
+    would warn on every param today and break on the next major. Any such warning fails this test."""
+    import warnings
+
+    from litestar.exceptions import LitestarDeprecationWarning
+
+    async def search(request: Any, q: str | None = None, page: int = 1) -> dict[str, Any]:
+        return {"q": q, "page": page}
+
+    kernel = HttpKernel()
+    kernel.get("/search", search)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", LitestarDeprecationWarning)
+        with TestClient(kernel.build()) as client:
+            assert client.get("/search?q=hat&page=2").json() == {"q": "hat", "page": 2}
+        kernel.openapi()
+
+
 def test_model_not_found_renders_as_404() -> None:
     """find_or_fail/first_or_fail raise ModelNotFound; the kernel renders it as 404."""
     from arvel.database.model import ModelNotFound

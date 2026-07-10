@@ -553,13 +553,20 @@ class HttpKernel:
                 inspect.Parameter(body[0], inspect.Parameter.KEYWORD_ONLY, annotation=body[1])
             )
             annotations[body[0]] = body[1]
+        # Declare query params explicitly rather than letting Litestar infer them from a bare typed
+        # default — the inferred style is deprecated upstream (warns per param, removed next major).
+        from litestar.params import Parameter as _QueryParam
+
+        # subscript Annotated through an Any ref: qann is a runtime value, not a static type
+        annotate: Any = typing.Annotated
         for qname, qann, qdefault in query_params:
+            annotated = annotate[qann, _QueryParam()]
             sig_params.append(
                 inspect.Parameter(
-                    qname, inspect.Parameter.KEYWORD_ONLY, annotation=qann, default=qdefault
+                    qname, inspect.Parameter.KEYWORD_ONLY, annotation=annotated, default=qdefault
                 )
             )
-            annotations[qname] = qann
+            annotations[qname] = annotated
         adapter.__signature__ = inspect.Signature(sig_params, return_annotation=return_hint)  # type: ignore[attr-defined]
         adapter.__annotations__ = annotations
 
