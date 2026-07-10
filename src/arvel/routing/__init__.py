@@ -192,6 +192,7 @@ class Router:
         self._prefix = ""
         self._name_prefix = ""
         self._middleware: list[Any] = []  # middleware from the current group stack
+        self._security: list[str] = []  # OpenAPI security schemes from the current group stack
         self._group: str | None = None  # named group from the current group stack
         self._domain: str | None = None  # host pattern from the current group stack (H1)
         self._bindings: dict[str, Any] = {}
@@ -206,6 +207,7 @@ class Router:
             name=(self._name_prefix + name) if name else None,
             group=self._group,
             middlewares=list(self._middleware),
+            security=list(self._security),
             domain=self._domain,
         )
         self._routes.append(route)
@@ -470,19 +472,32 @@ class Router:
         prefix: str = "",
         name: str = "",
         middleware: Sequence[Any] | None = None,
+        secure: Sequence[str] | None = None,
         group: str | None = None,
         domain: str | None = None,
     ) -> Generator[Router]:
         """Open a route group. ``prefix``/``name`` extend the path and name prefixes;
-        ``middleware`` adds middleware run for every route in the block; ``group`` assigns
-        a named kernel middleware group (e.g. ``"web"``/``"api"``); ``domain`` (H1) constrains
-        every route in the block to a host pattern (may contain a ``{param}`` segment, e.g.
+        ``middleware`` adds middleware run for every route in the block; ``secure`` seeds the
+        OpenAPI security schemes (e.g. ``["bearer"]``) every route in the block requires — the
+        docs-side counterpart to ``middleware``, so a guarded subtree's enforcement and its
+        documentation are declared together and can't drift; ``group`` assigns a named kernel
+        middleware group (e.g. ``"web"``/``"api"``); ``domain`` (H1) constrains every route in
+        the block to a host pattern (may contain a ``{param}`` segment, e.g.
         ``"{account}.example.com"`` — captured into the handler params like a path param).
-        Nested groups compose (outer + inner middleware both run) and restore on exit."""
-        previous = (self._prefix, self._name_prefix, self._middleware, self._group, self._domain)
+        Nested groups compose (outer + inner middleware/security both apply) and restore on
+        exit. A route's own ``.secure(...)`` still extends whatever the group seeded."""
+        previous = (
+            self._prefix,
+            self._name_prefix,
+            self._middleware,
+            self._security,
+            self._group,
+            self._domain,
+        )
         self._prefix += prefix
         self._name_prefix += name
         self._middleware = [*self._middleware, *(middleware or [])]
+        self._security = [*self._security, *(secure or [])]
         if group is not None:
             self._group = group
         if domain is not None:
@@ -494,6 +509,7 @@ class Router:
                 self._prefix,
                 self._name_prefix,
                 self._middleware,
+                self._security,
                 self._group,
                 self._domain,
             ) = previous
