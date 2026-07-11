@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.60.0](https://github.com/mohamed-rekiba/arvel/compare/v0.59.0...v0.60.0) (2026-07-11)
+
+
+### Features
+
+* **dates:** Date.to_iso_string() — the JSON/JS-safe instant form ([523058f](https://github.com/mohamed-rekiba/arvel/commit/523058fe4f36b82214f434f8808142119cf51341))
+* **http:** injected FormRequest bodies run the full validation lifecycle ([9728759](https://github.com/mohamed-rekiba/arvel/commit/972875949ed575baa4e1dd8f8bd5b0e52299f4e5))
+* **orm:** declarative model observers — __observers__ on the model ([a85d6a8](https://github.com/mohamed-rekiba/arvel/commit/a85d6a8b29ce0f55a8efe974297f92c6a7d3193e))
+* **routing:** resource controllers pass as classes, container-instantiated ([4756688](https://github.com/mohamed-rekiba/arvel/commit/47566889ef15cde3a216ccd41528f85011e299f8))
+
+
+### Bug Fixes
+
+* **i18n:** the framework rides its own catalogs — routing 404 + auth scaffold ([cd58dd3](https://github.com/mohamed-rekiba/arvel/commit/cd58dd34088f0ee61dc17ba1079f0d9250b87615))
+
+
+### Documentation
+
+* **console:** make:observer scaffold teaches __observers__, not provider wiring ([80ff447](https://github.com/mohamed-rekiba/arvel/commit/80ff447a2f08537af81cdc1fc177ab431cf54dac))
+* **console:** make:observer table row teaches the declarative __observers__ form ([dba6f53](https://github.com/mohamed-rekiba/arvel/commit/dba6f53626c236767ccd11a0062b9a5bb597c299))
+* cover the round's new capabilities — injected form requests + to_iso_string ([b3fa114](https://github.com/mohamed-rekiba/arvel/commit/b3fa1146b5846eb07bf04317d16eb36e0ce922b7))
+* **validation:** note the injected-lifecycle prepare hook constraint ([23074e5](https://github.com/mohamed-rekiba/arvel/commit/23074e58555d95500ab0cd339bfaca81e83c3c78))
+
 ## [0.59.0](https://github.com/mohamed-rekiba/arvel/compare/v0.58.2...v0.59.0) (2026-07-10)
 
 
