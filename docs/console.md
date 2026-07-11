@@ -59,7 +59,7 @@ absolute (or relative, or trailing-slash) path all work the same way:
 | `make:event <Name>` | scaffold a domain event (`app/events/`) |
 | `make:listener <Name>` | scaffold an event listener (`app/listeners/`; register via `Event.listen`) |
 | `make:cast <Name>` | scaffold a custom attribute cast (`app/casts/`; use in a model's `__casts__`) |
-| `make:observer <Name>` | scaffold a model observer (`app/observers/`; register via `Model.observe()`) |
+| `make:observer <Name>` | scaffold a model observer (`app/observers/`; declare via `__observers__` on the model) |
 | `make:enum <Name>` | scaffold a string-backed enum (`app/enums/`) |
 | `make:exception <Name>` | scaffold an exception class (`app/exceptions/`) |
 | `make:test <Name>` | scaffold a pytest test (`tests/test_<name>.py`) |
