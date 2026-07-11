@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.61.0](https://github.com/mohamed-rekiba/arvel/compare/v0.60.1...v0.61.0) (2026-07-11)
+
+
+### Features
+
+* **routing:** first-class websocket routes + built-in broadcast relay ([9f5906c](https://github.com/mohamed-rekiba/arvel/commit/9f5906c9a2346fbf68e3af0540daae73425917bc))
+
+
+### Bug Fixes
+
+* container treats IO abstract types as non-injectable ([5953b55](https://github.com/mohamed-rekiba/arvel/commit/5953b55393085ae1992b6f3f1b7c625e90d9f8ce))
+* decode the request body in the pipeline, after auth (AR-005/AR-006) ([13986ac](https://github.com/mohamed-rekiba/arvel/commit/13986ac4b1050a4eb8f53c7d52177bb19bd61b04))
+* FormRequest authorize() runs before the semantic rules layer ([d3578bf](https://github.com/mohamed-rekiba/arvel/commit/d3578bf08dfc84fe843b5a553df408b8b56e9e56))
+* invalid-JSON body is a 422, not a 500 (review blocking finding) ([6533063](https://github.com/mohamed-rekiba/arvel/commit/6533063e664aef43739c8018ed6b84a0618c841a))
+* **relay:** dead relay task logs + reports instead of dying silently ([446be83](https://github.com/mohamed-rekiba/arvel/commit/446be8396afb9a53e8a93b3b142276ff989e1bda))
+
+
+### Refactors
+
+* back RBAC roles/permissions with relations, not hand-rolled pivot SQL ([54817a7](https://github.com/mohamed-rekiba/arvel/commit/54817a78ac85fe7f6d404119a4a04acd0e3d2f94))
+* **orm:** morph pivot extras are untyped, matching belongs_to_many ([f022321](https://github.com/mohamed-rekiba/arvel/commit/f022321b7ea394510e6b0e1323f80df8db002043))
+
+
+### Documentation
+
+* **broadcasting:** the built-in websocket relay + Router.websocket ([4b0bcc4](https://github.com/mohamed-rekiba/arvel/commit/4b0bcc4db69e670d5a96ae5244bc8e483d0262dd))
+* **orm:** morph_to_many supports pivot extras + where_pivot scoping ([be947af](https://github.com/mohamed-rekiba/arvel/commit/be947aff4659feb32e8720a619032efbe9f30f5b))
+
 ## [0.60.1](https://github.com/mohamed-rekiba/arvel/compare/v0.60.0...v0.60.1) (2026-07-11)
 
 
