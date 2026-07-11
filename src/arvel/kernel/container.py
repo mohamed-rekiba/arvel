@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextvars
 import functools
 import inspect
+import io
 import typing
 from collections.abc import Callable, Sequence
 from typing import Any, NamedTuple, TypedDict, TypeVar, cast, overload
@@ -19,6 +20,11 @@ from typing import Any, NamedTuple, TypedDict, TypeVar, cast, overload
 T = TypeVar("T")
 
 _PRIMITIVES = (int, float, str, bool, bytes, complex)
+# The IO abstract types are instantiable but produce a useless no-op object, so autowiring one
+# would silently shadow a param's `= None` default with a dead sink. They're never a real binding;
+# treat them as non-injectable so an optional IO param falls to its default (and a required one
+# raises a clear resolution error). Covers both the typing.* forms and the io.IOBase family.
+_NON_INJECTABLE_IO = (typing.IO, typing.TextIO, typing.BinaryIO)
 
 #: Builtin collection types that must never be autowired (make(list) → [] was a silent footgun).
 _UNBUILDABLE_BUILTINS = (list, dict, set, frozenset, tuple)
@@ -660,7 +666,10 @@ class Container:
             return False
         if annotation in _PRIMITIVES:
             return False
-        return inspect.isclass(annotation)
+        if not inspect.isclass(annotation):
+            return False
+        # IO ABCs construct to a no-op object; never autowire them (see _NON_INJECTABLE_IO)
+        return annotation not in _NON_INJECTABLE_IO and not issubclass(annotation, io.IOBase)
 
     @staticmethod
     def _unwrap_optional(annotation: Any) -> tuple[Any, bool]:

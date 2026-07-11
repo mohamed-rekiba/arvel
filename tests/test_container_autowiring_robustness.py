@@ -7,6 +7,8 @@ verified both synthetically and against ``StartSession``/``ThrottleRequests`` vi
 
 from __future__ import annotations
 
+import io
+import typing
 from typing import Any
 
 import pytest
@@ -157,3 +159,33 @@ def test_make_unbound_protocol_raises_resolution_error_not_typeerror() -> None:
     c = Container()
     with pytest.raises(BindingResolutionError):
         c.make(Port)
+
+
+# --- AR-001: IO ABCs are non-injectable (an optional-defaulted IO param takes its default) ----
+# typing.IO/TextIO/BinaryIO (and the io.IOBase family) are technically instantiable but produce a
+# useless no-op object. Autowiring one silently shadowed the param's `= None` default, so a class
+# depending on `out: TextIO | None = None` got a dead sink instead of None — writes went nowhere.
+
+
+def test_optional_textio_param_takes_default_not_a_stub() -> None:
+    class Writer:
+        def __init__(self, out: typing.TextIO | None = None) -> None:
+            self.out = out
+
+    obj = Container().make(Writer)
+    assert obj.out is None  # not a typing.TextIO() stub
+
+
+def test_io_abcs_are_not_injectable() -> None:
+    for io_type in (typing.IO, typing.TextIO, typing.BinaryIO, io.IOBase, io.TextIOBase):
+        assert Container()._is_injectable(io_type) is False, io_type
+
+
+def test_required_textio_param_without_default_raises_not_a_stub() -> None:
+    class NeedsWriter:
+        def __init__(self, out: typing.TextIO) -> None:
+            self.out = out
+
+    # non-injectable + no default → a clear resolution error, never a silent stub
+    with pytest.raises(BindingResolutionError):
+        Container().make(NeedsWriter)
