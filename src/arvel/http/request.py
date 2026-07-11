@@ -188,7 +188,22 @@ class Request:
         cached: Any = getattr(self, "_json_cache", _MISSING)
         if cached is not _MISSING:
             return cached
-        data: Any = await self._r.json()
+        try:
+            data: Any = await self._r.json()
+        except Exception as exc:
+            # A syntactically-invalid JSON body is a client fault → the framework's 422, never a 500.
+            # The transport wraps a msgspec decode error in its own SerializationException; match both
+            # by runtime import (this only runs while serving, so the web engine is already loaded).
+            import msgspec
+            from litestar.exceptions import SerializationException
+
+            if isinstance(exc, (SerializationException, msgspec.DecodeError, ValueError)):
+                from arvel.validation import ValidationException
+
+                raise ValidationException(
+                    {"_body": ["The request body is not valid JSON."]}
+                ) from exc
+            raise
         if data is None:
             data = {}
         for transform in self._input_transforms:

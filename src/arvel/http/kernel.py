@@ -851,6 +851,8 @@ class HttpKernel:
                 # before the semantic rules (AR-004/DR-0072). A plain Schema gets the structural pass.
                 from arvel.validation import FormRequest, validate
 
+                # req.json() raises ValidationException (422) on a syntactically-invalid body — a
+                # client fault, never a 500 through the uncaught handler (see Request.json).
                 data = await req.json()  # arvel Request — applies H8 input normalization too
                 if isinstance(body_struct, type) and issubclass(body_struct, FormRequest):
                     params[body_param] = body_struct.authorized(data)

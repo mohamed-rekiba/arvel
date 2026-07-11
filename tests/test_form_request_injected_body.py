@@ -139,8 +139,17 @@ def test_malformed_body_is_422_not_a_transport_400() -> None:
     kernel = HttpKernel()
     kernel.post("/via-payload", _via_payload)
     with TestClient(kernel.build()) as client:
+        # a type-mismatch (valid JSON, wrong type) → 422
         r = client.post("/via-payload", json={"name": "ada", "qty": "not-an-int"})
         assert r.status_code == 422  # the framework's uniform validation status
+        # syntactically-invalid JSON is also a client fault → 422, NOT a 500 (it must not fall
+        # through the uncaught handler and get reported as a server bug)
+        r = client.post(
+            "/via-payload",
+            content=b"{not valid json",
+            headers={"content-type": "application/json"},
+        )
+        assert r.status_code == 422
 
 
 def test_openapi_request_body_is_served_and_exported() -> None:
