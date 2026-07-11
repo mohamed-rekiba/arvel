@@ -23,7 +23,6 @@ Wire protocol (a subset of the Pusher client protocol, transport-agnostic):
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import secrets
 from typing import Any, cast
@@ -57,13 +56,25 @@ async def broadcast_websocket(socket: Any) -> None:
     subscriptions: dict[str, asyncio.Task[None]] = {}
 
     async def relay_channel(channel: str) -> None:
-        redis = app().make("redis")
-        async for raw in redis.subscribe(f"{CHANNEL_PREFIX}{channel}"):
-            envelope = _parse_object(raw)
-            if envelope is not None and accepts(envelope, socket_id):
-                await outbox.put(
-                    json.dumps({"event": envelope.get("event"), "data": envelope.get("data")})
-                )
+        try:
+            redis = app().make("redis")
+            async for raw in redis.subscribe(f"{CHANNEL_PREFIX}{channel}"):
+                envelope = _parse_object(raw)
+                if envelope is not None and accepts(envelope, socket_id):
+                    await outbox.put(
+                        json.dumps({"event": envelope.get("event"), "data": envelope.get("data")})
+                    )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # a relay task must not die silently (the client would still believe it's subscribed) —
+            # log it and tell the client the channel dropped, so it can resubscribe.
+            from arvel.kernel.logging import LogManager
+
+            LogManager().channel("broadcasting").warning(
+                "broadcast_relay_channel_failed", channel=channel, exc_info=True
+            )
+            outbox.put_nowait(json.dumps({"event": "subscribe_error", "channel": channel}))
 
     def subscribe(text: str) -> None:
         payload = _parse_object(text)
@@ -93,9 +104,9 @@ async def broadcast_websocket(socket: Any) -> None:
         writer.cancel()
         for task in subscriptions.values():
             task.cancel()
-        for task in (*subscriptions.values(), writer):
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+        # gather with return_exceptions so a task that already died with a real error (e.g. a redis
+        # drop) doesn't re-raise out of teardown — cancellation + any residual error are absorbed.
+        await asyncio.gather(*subscriptions.values(), writer, return_exceptions=True)
 
 
 __all__ = ["broadcast_websocket"]

@@ -103,3 +103,31 @@ def test_broadcast_relay_denies_a_private_channel_without_a_valid_token() -> Non
             assert frame == {"event": "subscribe_error", "channel": "private-order.1"}
     finally:
         set_application(None)
+
+
+def test_broadcast_relay_suppresses_the_senders_own_echo() -> None:
+    # a broadcast carrying except_socket_id == this connection's socket_id (to_others) is dropped;
+    # a following broadcast without that exclusion is delivered — proving the relay wires accepts()
+    redis = _FakeRedis()
+    kernel = _relay_kernel(redis)
+    try:
+        with TestClient(kernel.build()) as client, client.websocket_connect("/ws") as ws:
+            hello = json.loads(ws.receive_text())
+            socket_id = hello["socket_id"]
+            # seed AFTER we know socket_id: first frame excludes us (dropped), second is delivered
+            redis.seed(
+                f"{CHANNEL_PREFIX}chat.1",
+                json.dumps({"event": "Mine", "data": {}, "except_socket_id": socket_id}),
+            )
+            redis.seed(
+                f"{CHANNEL_PREFIX}chat.1",
+                json.dumps({"event": "Theirs", "data": {"x": 1}}),
+            )
+            ws.send_text(json.dumps({"event": "subscribe", "channel": "chat.1"}))
+            frame = json.loads(ws.receive_text())
+            assert frame == {
+                "event": "Theirs",
+                "data": {"x": 1},
+            }  # own echo skipped, next delivered
+    finally:
+        set_application(None)
