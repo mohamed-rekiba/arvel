@@ -65,7 +65,8 @@ the hour/minute/second diffs are exact elapsed time. `start_of_week` is Monday-b
 Date.now().start_of_day()
 Date.now().is_weekend()                # per config('app.weekend_days'); defaults to Sat/Sun
 Date.now().is_weekday()                # the inverse
-Date.now().to_iso()                    # "2026-06-22T09:30:00+00:00"
+Date.now().to_iso()                    # "2026-06-22T09:30:00+00:00[UTC]" (RFC 9557)
+Date.now().to_iso_string()             # "2026-06-22T09:30:00Z" — JSON/JS-safe (`toISOString()`); use in API payloads
 Date.now().diff_for_humans()           # "in 3 hours" / "2 days ago"
 Date.parse(a) == Date.parse(b)         # value equality
 Date.from_py(a_stdlib_datetime)        # wrap a stdlib datetime (e.g. a DB value) as a Date

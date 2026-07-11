@@ -269,11 +269,26 @@ class CreatePost(FormRequest):
 post = CreatePost.parse({"title": "Hello World"})   # → slug "hello-world", title trimmed
 ```
 
-One constraint on the **injected** path (a handler typed `data: CreatePost`, where the kernel runs
-this lifecycle for you): `prepare_for_validation` receives the *structurally-decoded* payload, not
-the raw wire body — defaulted optional fields are already materialized, and unknown/extra wire keys
-are gone. A hook that keys on a field outside the struct definition only sees it via the explicit
-`CreatePost.parse(raw)` / `request.validate(CreatePost)` path.
+### Injected form requests
+
+Type-hinting a `FormRequest` as a handler's body param **is** the validation trigger — the kernel
+runs the full lifecycle (`prepare_for_validation` → structural parse → `rules()` →
+`passed_validation` → `authorize()`) before your handler body executes, with the same `422`/`403`
+shapes as `request.validate()`:
+
+```python
+async def store(request, data: CreatePost):   # validated + hooks already run
+    ...                                       # data.slug is set, rules() passed
+```
+
+It runs **after** every middleware, so a validation error can never fire for a caller that
+`Authenticate`/`Authorize` would have rejected. Manual `await request.validate(CreatePost)` remains
+for handlers that don't declare a typed body.
+
+One constraint on the injected path: `prepare_for_validation` receives the *structurally-decoded*
+payload, not the raw wire body — defaulted optional fields are already materialized, and
+unknown/extra wire keys are gone. A hook that keys on a field outside the struct definition only
+sees it via the explicit `CreatePost.parse(raw)` / `request.validate(CreatePost)` path.
 
 ### The `rules()` bridge — semantics on top of types
 
