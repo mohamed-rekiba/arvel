@@ -292,6 +292,110 @@ rescue(lambda: risky(), default=0)                  # swallow exceptions, return
 retry(3, lambda: flaky_call(), sleep=0.5)           # retry up to 3× with a delay
 ```
 
+## Global functions
+
+Lowercase shorthands for the chores you reach for constantly — importable straight off `arvel`.
+Most are one-liners over a facade or the current request; they exist so call sites stay short.
+
+**Debug** — dump a value (or several) while you're chasing something down:
+
+```python
+from arvel import dump, dd
+
+dump(payload)              # pretty-print (rich if installed, else pprint) and RETURN it
+x = dump(compute())        # drops into an expression — returns its single argument
+dd(request(), payload)     # "dump and die" — print, then stop the current unit of work
+```
+
+`dd` is context-aware: inside the interactive `shell` (tinker) it dumps and returns, so your
+session continues; everywhere else it raises `DumpDie`, which the request pipeline renders as a
+debug response (ending that request) and the CLI turns into a clean non-zero exit. Models print
+their stored columns — `User(id=1, email='a@b.com')`.
+
+**Filesystem paths** — resolved against the application root (honouring `with_config_dir` /
+`with_lang_dir` overrides):
+
+```python
+from arvel import base_path, storage_path, config_path, database_path
+
+base_path("routes/web.py")     # "<root>/routes/web.py"
+storage_path("logs/app.log")   # "<root>/storage/logs/app.log"
+config_path()                  # the config dir (override, else "<root>/config")
+database_path("seeders")       # "<root>/database/seeders"
+```
+
+(`app_path`, `public_path`, `resource_path`, `lang_path` complete the set — each joins its
+segment onto the root.)
+
+**Guards & error reporting** — the conditional siblings of `abort` and the exception handler:
+
+```python
+from arvel import abort_if, abort_unless, report, report_if
+
+abort_if(order.locked, 409, "Order is locked")     # raise the HTTP status when truthy
+abort_unless(user.can_edit, 403)                    # …when falsy
+report(caught_exception)                            # log to the bound handler WITHOUT raising
+report_if(rows_dropped, DataLoss(...))              # report only when the condition holds
+```
+
+**Value piping** — run a callback only when there's a value:
+
+```python
+from arvel import transform
+
+transform(request().get("name"), str.upper)              # None input → None
+transform(maybe, expensive, default="n/a")               # blank/None → the default
+```
+
+**Shorthands over facades & the container:**
+
+```python
+from arvel import collect, resolve, event, info, bcrypt, encrypt, decrypt, validator, policy
+
+collect([1, 2, 3]).map(...)          # wrap in a Collection
+resolve(MailManager)                 # container resolve — alias of app(MailManager)
+event(OrderShipped(order))           # dispatch through the event bus
+info("order.paid", id=order.id)      # info-level log line
+digest = bcrypt(password)            # hash with the default hasher
+token = encrypt({"uid": 7}); decrypt(token)      # round-trip via the app key
+validator(data, {"email": "required|email"})     # build a validator
+```
+
+`info(...)` / `logger()` are structured-logging entry points: the **first argument is the event
+name** (rendered as a string), and everything else is **keyword context** (structured fields). So
+pass an object as context, not as the event — and hand the logger something serializable, since a
+raw model logs as its `repr`, not as fields:
+
+```python
+user = await User.first()
+
+logger().info(user)                       # ⚠ the model becomes the event STRING (its repr)
+                                          #   {"event": "User(id=1, name='Super Admin', …)", …}
+
+logger().info("user.loaded", user=user.to_dict())   # ✓ structured — fields under `user`
+info("user.loaded", user=user.to_dict())            # same, via the info() shorthand
+# {"event": "user.loaded", "user": {"id": 1, "name": "Super Admin", …}, "level": "info", …}
+```
+
+(JSON vs the pretty console format is a separate switch — the renderer is JSON only when
+`app.env == "production"`, pretty key=value otherwise.)
+
+**Current-request accessors** — read the in-flight request; safe (return `None`/the default)
+when called outside a request cycle:
+
+```python
+from arvel import request, session, cookie, old
+
+request()                    # the Request, or None off-cycle
+session()                    # the session dict (web group), or None
+cookie("sid", default=None)  # a cookie value
+old("email")                 # flashed old input after a redirect-back
+```
+
+**Small utilities** — `class_basename(obj)` (the class name without its module), `enum_value(x)`
+(a member's `.value`, else `x` unchanged), `literal(name="x", n=1)` (an ad-hoc object with named
+attributes), `noop` (a callable that accepts anything and does nothing), `windows_os()`.
+
 ## Common mistakes & gotchas
 
 - **Treating `Stringable` as a `str`.** It isn't one — it wraps a string. Call `.to_str()` (or

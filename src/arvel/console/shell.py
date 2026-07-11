@@ -47,21 +47,22 @@ def defined_models() -> dict[str, type]:
     return found
 
 
-def import_app_models(app: Any) -> None:
+def import_app_models(app: Any) -> list[tuple[str, str]]:
     """Import the app's models (``app/models/*.py``) so they self-register into the model registry and
-    can be autoloaded. Best-effort: a broken model file is skipped, not fatal to the REPL."""
-    import contextlib
+    can be autoloaded. Best-effort: a broken model file is skipped, not fatal to the REPL — the
+    ``(filename, error)`` of each skipped file is returned so the shell can note it at startup."""
     import importlib.util
     import sys
     from pathlib import Path
 
+    skipped: list[tuple[str, str]] = []
     models_dir = Path(app.base_path) / "app" / "models"
     if not models_dir.is_dir():
-        return
+        return skipped
     for index, file in enumerate(sorted(models_dir.glob("*.py"))):
         if file.name.startswith("_"):
             continue
-        with contextlib.suppress(Exception):
+        try:
             modname = f"_arvel_app_model_{index}"
             spec = importlib.util.spec_from_file_location(modname, file)
             if spec is not None and spec.loader is not None:
@@ -69,11 +70,47 @@ def import_app_models(app: Any) -> None:
                 # __subclasses__ is a weakref list; a GC'd module would drop its model classes from it
                 sys.modules[modname] = module
                 spec.loader.exec_module(module)
+        except Exception as exc:  # a broken model file is skipped, not fatal to the REPL
+            skipped.append((file.name, f"{type(exc).__name__}: {exc}"))
+    return skipped
 
 
-def _launch_repl(namespace: dict[str, Any]) -> None:
+def startup_banner(
+    namespace: dict[str, Any],
+    *,
+    models: list[str],
+    skipped: list[tuple[str, str]],
+    header: str,
+) -> str:
+    """The tinker startup summary — kept short on purpose. The whole arvel surface (facades +
+    helpers) and every model are in scope; ``dir()`` lists them. We advertise it in two lines
+    rather than dumping ~90 names, and — so it isn't silent — flag any model files that were
+    skipped on the way in."""
+    lines = [header, ""]
+    if "app" in namespace:
+        sample = ", ".join(models[:6]) + (", …" if len(models) > 6 else "")
+        detail = f" ({sample})" if models else " (none found in app/models)"
+        lines.append(f"  app + {len(models)} model(s) autoloaded by short name{detail}")
+    # a stable, tiny sample so it's clear the surface is loaded; dir() has the rest
+    picks = [n for n in ("dd", "dump", "collect", "config", "now", "DB", "Auth") if n in namespace]
+    lines.append(f"  arvel surface ready: {', '.join(picks)}, … — dir() lists everything")
+    if skipped:
+        lines.append("")
+        lines.append(f"  ⚠ skipped {len(skipped)} model file(s) that failed to import:")
+        lines.extend(f"      {name} — {err}" for name, err in skipped)
+    return "\n".join(lines) + "\n"
+
+
+def _launch_repl(namespace: dict[str, Any], banner: str) -> None:
     """Drop into IPython (top-level await + autocomplete) when available, else the stdlib REPL."""
     import importlib
+    import os
+
+    # prompt_toolkit sends a Cursor-Position-Request (ESC[6n) at startup and blocks waiting for the
+    # terminal to answer. VS Code's integrated terminal (also tmux/mosh/some SSH) replies slowly, so
+    # the REPL stalls for seconds before the first prompt. A line REPL never needs CPR — opt out so
+    # startup stays sub-second there. ``setdefault`` lets a user who set it explicitly win.
+    os.environ.setdefault("PROMPT_TOOLKIT_NO_CPR", "1")
 
     try:
         ipython = importlib.import_module("IPython")
@@ -82,7 +119,7 @@ def _launch_repl(namespace: dict[str, Any]) -> None:
         import code
 
         code.interact(
-            banner="arvel shell (install arvel[console] for IPython: top-level await + autocomplete)",
+            banner=banner + "(install arvel[console] for IPython: top-level await + autocomplete)",
             local=namespace,
         )
         return
@@ -90,7 +127,7 @@ def _launch_repl(namespace: dict[str, Any]) -> None:
     # IPython/traitlets ship no type stubs; reached via importlib so the dynamic attrs are Any
     config: Any = traitlets_config.Config()
     config.TerminalInteractiveShell.autoawait = True  # top-level await (default on in IPython 9.x)
-    config.TerminalInteractiveShell.banner1 = "arvel shell — IPython · top-level await enabled\n"
+    config.TerminalInteractiveShell.banner1 = banner
     ipython.start_ipython(argv=[], user_ns=namespace, config=config)
 
 
@@ -103,6 +140,7 @@ def shell() -> None:
     from arvel.console.context import in_project
 
     app = None
+    skipped: list[tuple[str, str]] = []
     if in_project():
         from arvel.console.kernel import load_project_app
         from arvel.kernel.bootstrap import bootstrap_app
@@ -110,5 +148,13 @@ def shell() -> None:
         app = load_project_app()
         if app is not None:
             bootstrap_app(app)  # sync: register providers (bindings) + set the app + import routes
-            import_app_models(app)  # register the app's models so they autoload by name
-    _launch_repl(build_namespace(app))
+            skipped = import_app_models(app)  # register the app's models so they autoload by name
+    namespace = build_namespace(app)
+    models = sorted(defined_models()) if app is not None else []
+    header = (
+        "arvel shell — IPython · top-level await enabled"
+        if app is not None
+        else "arvel shell (no project detected — framework surface only)"
+    )
+    banner = startup_banner(namespace, models=models, skipped=skipped, header=header)
+    _launch_repl(namespace, banner)

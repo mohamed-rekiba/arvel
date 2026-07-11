@@ -612,6 +612,13 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
         else:
             self._attributes[key] = self._cast_set(key, value)
 
+    def __repr__(self) -> str:
+        """``User(id=1, email='a@b.com')`` — the stored column values, so a model prints
+        usefully at the REPL, in logs, and under ``dump``/``dd`` instead of ``<User object>``."""
+        attrs = self.__dict__.get("_attributes", {})
+        body = ", ".join(f"{key}={value!r}" for key, value in attrs.items())
+        return f"{type(self).__name__}({body})"
+
     # --- change tracking -----------------------------------------------------
     def is_dirty(self) -> bool:
         return bool(self._attributes != self._original)

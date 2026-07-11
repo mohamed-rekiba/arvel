@@ -19,6 +19,14 @@ class Account(Model):
         return Attribute(get=lambda v, a: f"{a['first_name']} {a['last_name']}", cached=True)
 
 
+def test_repr_shows_stored_attributes() -> None:
+    account = Account()
+    account.fill({"first_name": "Ada", "email": "a@b.com"})
+    # column values, not the bare "<Account object at 0x...>" — usable at the REPL / under dump
+    assert repr(account) == "Account(first_name='Ada', email='a@b.com')"
+    assert repr(Account()) == "Account()"  # no attributes yet
+
+
 def test_mutator_applies_on_set() -> None:
     account = Account()
     account.fill({"email": "  Ada@X.COM "})

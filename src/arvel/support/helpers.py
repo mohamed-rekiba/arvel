@@ -545,3 +545,269 @@ def cache() -> Any:
             "Build the cache directly (arvel.cache.CacheManager) outside an application context."
         )
     return app().make("cache").driver()
+
+
+# =============================================================================
+# Global helper functions — the lowercase shorthands over the framework's
+# facades/objects (grounded in knowledge/port/06-facades.md §helpers). Heavy
+# imports stay function-local so ``import arvel`` remains light (DR-0002/0003).
+# =============================================================================
+
+
+# --- debug: dump / dump-and-die ----------------------------------------------
+def dump(*args: Any) -> Any:
+    """Pretty-print each argument and return them — ``dump(x)`` returns ``x`` and ``dump(a, b)``
+    the tuple, so it drops into an expression without breaking the flow. The dump-and-continue
+    sibling of :func:`dd`. Uses stdlib ``pprint`` (``support`` is a leaf — no ``rich`` dependency);
+    objects render through their ``__repr__`` (models show their columns)."""
+    from pprint import pprint
+
+    for arg in args:
+        pprint(arg)
+    return args[0] if len(args) == 1 else args
+
+
+def _in_interactive_shell() -> bool:
+    """Whether we're inside an interactive REPL — arvel's ``shell`` on IPython, or the stdlib
+    REPL / ``python -i`` (which set ``sys.ps1``). There ``dd`` stops the statement rather than
+    killing the whole session. Reached via importlib since IPython ships no type stubs (as in
+    ``console.shell``)."""
+    import importlib
+    import sys
+
+    try:
+        ipython: Any = importlib.import_module("IPython")
+    except ImportError:
+        return hasattr(sys, "ps1")
+    return ipython.get_ipython() is not None or hasattr(sys, "ps1")
+
+
+class DumpDie(Exception):
+    """Raised by :func:`dd` to stop the current unit of work after dumping. Deliberately an
+    ``Exception`` — **not** ``SystemExit`` — so it flows through the framework's normal exception
+    handling: inside a request it renders as a (debug) response and ends *that request only*, never
+    the server worker; the CLI entrypoint catches it for a clean non-zero exit. In an interactive
+    shell :func:`dd` returns instead of raising. ``sys.exit`` would be wrong here — its
+    ``SystemExit`` is a ``BaseException`` that slips past every ``except Exception`` handler and
+    escapes to the ASGI server."""
+
+
+def dd(*args: Any) -> None:
+    """Dump and die — pretty-print the arguments (see :func:`dump`) then stop the current unit of
+    work. Inside an interactive shell it dumps and returns (your session survives); everywhere else
+    it raises :class:`DumpDie`, which the request pipeline renders as a response and the CLI turns
+    into a clean exit — so it never kills a long-running server."""
+    dump(*args)
+    if _in_interactive_shell():
+        return
+    raise DumpDie(", ".join(repr(arg) for arg in args) or "dd()")
+
+
+# --- filesystem paths (joined onto the application root) ----------------------
+def _app_base() -> str:
+    from arvel.kernel.globals import app, has_application
+
+    return str(app().base_path) if has_application() else "."
+
+
+def _project_path(segment: str, path: str) -> str:
+    """``{base}/{segment}[/{path}]`` — the shared join every path helper below routes through."""
+    import os.path
+
+    root = os.path.join(_app_base(), segment) if segment else _app_base()
+    return os.path.join(root, path) if path else root
+
+
+def base_path(path: str = "") -> str:
+    """The application root directory, with ``path`` joined on."""
+    return _project_path("", path)
+
+
+def app_path(path: str = "") -> str:
+    """The ``app/`` directory (application code), with ``path`` joined on."""
+    return _project_path("app", path)
+
+
+def storage_path(path: str = "") -> str:
+    """The ``storage/`` directory (logs, caches, uploads), with ``path`` joined on."""
+    return _project_path("storage", path)
+
+
+def public_path(path: str = "") -> str:
+    """The ``public/`` directory (web-served assets), with ``path`` joined on."""
+    return _project_path("public", path)
+
+
+def resource_path(path: str = "") -> str:
+    """The ``resources/`` directory (views, un-compiled assets), with ``path`` joined on."""
+    return _project_path("resources", path)
+
+
+def database_path(path: str = "") -> str:
+    """The ``database/`` directory (migrations, seeders, sqlite files), with ``path`` joined on."""
+    return _project_path("database", path)
+
+
+def config_path(path: str = "") -> str:
+    """The config directory (the ``with_config_dir`` override, else ``{base}/config``)."""
+    import os.path
+
+    from arvel.kernel.globals import app, has_application
+
+    directory = getattr(app(), "config_dir", None) if has_application() else None
+    root = directory or _project_path("config", "")
+    return os.path.join(root, path) if path else root
+
+
+def lang_path(path: str = "") -> str:
+    """The translations directory (the ``with_lang_dir`` override, else ``{base}/lang``)."""
+    import os.path
+
+    from arvel.kernel.globals import app, has_application
+
+    directory = getattr(app(), "lang_dir", None) if has_application() else None
+    root = directory or _project_path("lang", "")
+    return os.path.join(root, path) if path else root
+
+
+# NOTE: the http-touching helpers (abort_if/abort_unless and the per-request accessors
+# request/session/cookie/old) live in ``arvel.http.helpers`` — ``support`` is a leaf and must not
+# import ``arvel.http`` (import-linter). They're re-exported on the top-level ``arvel`` surface.
+
+
+# --- report ------------------------------------------------------------------
+def report(exc: BaseException) -> None:
+    """Send ``exc`` to the bound ExceptionHandler without raising it — fire-and-forget logging
+    of a caught error. No-op when no application is bound; never raises."""
+    _report_to_handler(exc)
+
+
+def report_if(condition: Any, exc: BaseException) -> Any:
+    """:func:`report` ``exc`` when ``condition`` is truthy; return ``condition``."""
+    if condition:
+        _report_to_handler(exc)
+    return condition
+
+
+def report_unless(condition: Any, exc: BaseException) -> Any:
+    """:func:`report` ``exc`` when ``condition`` is falsy; return ``condition``."""
+    if not condition:
+        _report_to_handler(exc)
+    return condition
+
+
+def transform(val: Any, callback: Callable[[Any], Any], default: Any = None) -> Any:
+    """Run ``callback(val)`` when ``val`` is :func:`filled`; otherwise return ``default``
+    (resolved if callable). The value-piping sibling of :func:`optional`."""
+    if filled(val):
+        return callback(val)
+    return value(default)
+
+
+# --- shorthands over existing facades / objects ------------------------------
+def collect(items: Any = None) -> Any:
+    """Wrap ``items`` in a :class:`~arvel.support.Collection` — ``collect([1, 2, 3])``."""
+    from arvel.support import Collection
+
+    return Collection([] if items is None else items)
+
+
+def resolve(abstract: Any) -> Any:
+    """Resolve ``abstract`` out of the container — alias of ``app(abstract)``."""
+    from arvel.kernel.globals import app
+
+    return app(abstract)
+
+
+def event(evt: Any, *payload: Any) -> Any:
+    """Dispatch ``evt`` through the event bus — ``Event.dispatch`` shorthand."""
+    from arvel.support.facades import Event
+
+    return Event.dispatch(evt, *payload)
+
+
+def info(message: str, **context: Any) -> None:
+    """Log an info-level line — ``Log.info`` shorthand."""
+    from arvel.support.facades import Log
+
+    Log.info(message, **context)
+
+
+def logger(message: str | None = None, **context: Any) -> Any:
+    """With a ``message``, log it at debug level; with none, return the ``Log`` facade to chain on."""
+    from arvel.support.facades import Log
+
+    if message is None:
+        return Log
+    Log.debug(message, **context)
+    return None
+
+
+def bcrypt(plain: str) -> str:
+    """Hash ``plain`` with the default hasher — ``Hash.make`` shorthand."""
+    from arvel.support.facades import Hash
+
+    return cast("str", Hash.make(plain))
+
+
+def encrypt(val: Any) -> Any:
+    """Encrypt ``val`` with the app key — ``Crypt.encrypt`` shorthand."""
+    from arvel.support.facades import Crypt
+
+    return Crypt.encrypt(val)
+
+
+def decrypt(token: Any) -> Any:
+    """Decrypt a ``Crypt``-issued ``token`` — ``Crypt.decrypt`` shorthand."""
+    from arvel.support.facades import Crypt
+
+    return Crypt.decrypt(token)
+
+
+def validator(data: Any, rules: Any, messages: Any = None, **kwargs: Any) -> Any:
+    """Build a validator — ``Validator.make`` shorthand."""
+    from arvel.support.facades import Validator
+
+    if messages is None:
+        return Validator.make(data, rules, **kwargs)
+    return Validator.make(data, rules, messages, **kwargs)
+
+
+def policy(model: Any) -> Any:
+    """The policy instance registered for ``model`` — ``Gate.resolve_policy`` shorthand."""
+    from arvel.support.facades import Gate
+
+    return Gate.resolve_policy(model)
+
+
+# --- small pure utilities ----------------------------------------------------
+def class_basename(target: Any) -> str:
+    """The class name without its module — ``class_basename(obj)`` or ``class_basename(Cls)``."""
+    cls = target if isinstance(target, type) else type(target)
+    return cls.__name__
+
+
+def enum_value(val: Any) -> Any:
+    """An enum member's ``.value``, or ``val`` unchanged when it isn't an enum member."""
+    import enum
+
+    return val.value if isinstance(val, enum.Enum) else val
+
+
+def literal(**attributes: Any) -> Any:
+    """An ad-hoc object with the given named attributes — ``literal(name="x", n=1).name``."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(**attributes)
+
+
+def noop(*_args: Any, **_kwargs: Any) -> None:
+    """Accept any arguments and do nothing — a placeholder callback."""
+    return None
+
+
+def windows_os() -> bool:
+    """Whether the host OS is Windows."""
+    import os
+
+    return os.name == "nt"

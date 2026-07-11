@@ -249,7 +249,13 @@ def main() -> None:
 
         print_banner(__version__)
         return
-    build_cli()()
+    from arvel.support import DumpDie
+
+    try:
+        build_cli()()
+    except DumpDie:
+        # dd() inside a command already printed the dump; stop with a non-zero status, no traceback
+        sys.exit(1)
 
 
 __all__ = [

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,41 @@ def test_import_app_models_registers_them_for_autoload(tmp_path: Path) -> None:
     app = Application(base_path=str(tmp_path))
     import_app_models(app)  # imports app/models/*.py so they self-register
     assert "Gadget" in build_namespace(app)
+
+
+def test_import_app_models_reports_files_it_skipped(tmp_path: Path) -> None:
+    from arvel.console.shell import import_app_models
+    from arvel.kernel import Application
+
+    models = tmp_path / "app" / "models"
+    models.mkdir(parents=True)
+    (models / "broken.py").write_text("this is not valid python :::")
+    (models / "ok.py").write_text(
+        "from arvel.database import Model\n\n\nclass OkModel(Model):\n    __table_name__ = 'ok'\n"
+    )
+    app = Application(base_path=str(tmp_path))
+    skipped = import_app_models(app)  # broken file is skipped, not fatal
+    assert [name for name, _ in skipped] == ["broken.py"]
+    assert "SyntaxError" in skipped[0][1]
+    assert "OkModel" in build_namespace(app)  # the good one still loaded
+
+
+def test_startup_banner_is_concise_and_notes_skips() -> None:
+    from arvel.console.shell import startup_banner
+
+    namespace = {"app": object(), "User": object, "dd": lambda *a: None, "DB": object}
+    banner = startup_banner(
+        namespace,
+        models=["User"],
+        skipped=[("legacy.py", "ImportError: boom")],
+        header="arvel shell",
+    )
+    assert "1 model(s) autoloaded" in banner and "User" in banner  # models summarised
+    assert "dd" in banner and "DB" in banner and "dir()" in banner  # surface advertised, not dumped
+    assert "skipped 1 model file" in banner and "legacy.py" in banner  # the skip note survives
+    # concise: the surface is *sampled*, not dumped — a full listing would carry these names
+    namespace.update({"windows_os": lambda: False, "resource_path": lambda p="": p})
+    assert "windows_os" not in banner and "resource_path" not in banner
 
 
 def test_lang_list_finds_dir_and_file_locales(tmp_path: Path) -> None:
@@ -104,11 +140,26 @@ def test_launch_repl_uses_ipython_when_available(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(IPython, "start_ipython", fake_start_ipython)
 
     namespace = {"x": 1}
-    _launch_repl(namespace)
+    monkeypatch.delenv("PROMPT_TOOLKIT_NO_CPR", raising=False)
+    _launch_repl(namespace, "banner\n")
 
     assert calls["argv"] == []
     assert calls["user_ns"] is namespace
     assert calls["config"].TerminalInteractiveShell.autoawait is True
+    # opt out of prompt_toolkit's Cursor-Position-Request so startup doesn't stall for seconds on
+    # VS Code / tmux / SSH terminals that answer the query slowly
+    assert os.environ["PROMPT_TOOLKIT_NO_CPR"] == "1"
+
+
+def test_launch_repl_respects_an_explicit_no_cpr_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    import IPython
+
+    from arvel.console.shell import _launch_repl
+
+    monkeypatch.setattr(IPython, "start_ipython", lambda **kw: None)
+    monkeypatch.setenv("PROMPT_TOOLKIT_NO_CPR", "0")  # a user who set it explicitly wins
+    _launch_repl({"x": 1}, "banner\n")
+    assert os.environ["PROMPT_TOOLKIT_NO_CPR"] == "0"
 
 
 def test_launch_repl_falls_back_to_stdlib_repl_without_ipython(
@@ -136,7 +187,7 @@ def test_launch_repl_falls_back_to_stdlib_repl_without_ipython(
     monkeypatch.setattr(code, "interact", fake_interact)
 
     namespace = {"y": 2}
-    _launch_repl(namespace)
+    _launch_repl(namespace, "arvel shell\n")
 
     assert "IPython" in calls["banner"]
     assert calls["local"] is namespace
@@ -150,7 +201,7 @@ def test_shell_command_outside_a_project_launches_with_no_app(
 
     monkeypatch.setattr(arvel.console.context, "in_project", lambda: False)
     launched: dict[str, Any] = {}
-    monkeypatch.setattr(shell_module, "_launch_repl", lambda ns: launched.setdefault("ns", ns))
+    monkeypatch.setattr(shell_module, "_launch_repl", lambda ns, banner: launched.setdefault("ns", ns))
 
     shell_module.shell()
 
@@ -173,9 +224,9 @@ def test_shell_command_inside_a_project_bootstraps_and_autoloads(
     monkeypatch.setattr(
         arvel.kernel.bootstrap, "bootstrap_app", lambda app: bootstrapped.setdefault("app", app)
     )
-    monkeypatch.setattr(shell_module, "import_app_models", lambda app: None)
+    monkeypatch.setattr(shell_module, "import_app_models", lambda app: [])
     launched: dict[str, Any] = {}
-    monkeypatch.setattr(shell_module, "_launch_repl", lambda ns: launched.setdefault("ns", ns))
+    monkeypatch.setattr(shell_module, "_launch_repl", lambda ns, banner: launched.setdefault("ns", ns))
 
     shell_module.shell()
 
@@ -193,7 +244,7 @@ def test_shell_command_in_project_with_no_loadable_app_skips_bootstrap(
     monkeypatch.setattr(arvel.console.context, "in_project", lambda: True)
     monkeypatch.setattr(arvel.console.kernel, "load_project_app", lambda: None)
     launched: dict[str, Any] = {}
-    monkeypatch.setattr(shell_module, "_launch_repl", lambda ns: launched.setdefault("ns", ns))
+    monkeypatch.setattr(shell_module, "_launch_repl", lambda ns, banner: launched.setdefault("ns", ns))
 
     shell_module.shell()  # app is None: bootstrap/import_app_models never run, no crash
 

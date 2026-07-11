@@ -80,6 +80,7 @@ nav = [
     { "Mail" = "mail.md" },
     { "Notifications" = "notifications.md" },
     { "Broadcasting" = "broadcasting.md" },
+    { "Logging" = "logging.md" },
     { "Telemetry" = "telemetry.md" },
     { "Console (CLI)" = "console.md" },
     { "OpenAPI & API Docs" = "openapi.md" },
