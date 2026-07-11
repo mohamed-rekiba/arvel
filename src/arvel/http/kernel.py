@@ -734,6 +734,7 @@ class HttpKernel:
                     without_middleware,
                     binding_missing=binding_missing,
                     missing=missing,
+                    body_param=body[0] if body is not None else None,
                 )
         finally:
             current_user.reset(user_token)
@@ -759,6 +760,7 @@ class HttpKernel:
         without_middleware: Sequence[Any] | None = None,
         binding_missing: bool = False,
         missing: Any = None,
+        body_param: str | None = None,
     ) -> Any:
         async def destination(req: Any) -> Any:
             if binding_missing:
@@ -770,6 +772,27 @@ class HttpKernel:
                 if inspect.isawaitable(result):
                     result = await result
                 return result
+            if body_param is not None:
+                # A FormRequest-typed body runs its full lifecycle on injection (prepare →
+                # rules() → passed_validation → authorize()), matching request.validate().
+                # It runs here — after every middleware, like the binding-miss above — so a
+                # validation 422 can never fire before Authenticate/Authorize (DR-0054's
+                # oracle argument applies to validation too). prepare_for_validation sees the
+                # structurally-decoded payload (msgspec has already parsed the body), not the
+                # raw wire bytes.
+                from arvel.validation import AuthorizationException, FormRequest
+
+                injected = params.get(body_param)
+                if isinstance(injected, FormRequest):
+                    import msgspec
+
+                    from arvel.localization import trans
+
+                    parsed = type(injected).parse(msgspec.to_builtins(injected))
+                    if not parsed.authorize():
+                        # same exception + message as request.validate() — one 403 shape
+                        raise AuthorizationException(trans("http.unauthorized"))
+                    params[body_param] = parsed
             target = handler
             if isinstance(target, type):  # an invokable controller class — instantiate via the
                 # container (DI for its constructor), same as `_make` does for middleware.
