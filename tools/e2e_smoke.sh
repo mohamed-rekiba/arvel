@@ -354,10 +354,10 @@ with TestClient(app=asgi_app) as client:
     schemas = doc.get("components", {}).get("schemas", {})
     assert {"Credentials", "UserOut"} <= set(schemas), f"--auth request/response schemas missing: {list(schemas)}"
     assert doc["paths"]["/api/login"]["post"]["requestBody"]["content"]["application/json"]["schema"]["$ref"].endswith("Credentials"), "login request schema missing"
-    # a login with no/invalid body is a clean 400 (typed body validation), not a 500 AttributeError
-    assert client.post("/api/login").status_code == 400, "empty-body login should be 400 (was 500 None.get)"
-    assert client.post("/api/login", json={"email": "x"}).status_code == 400, "missing-field login should be 400"
-print("   --auth OpenAPI: bearer scheme + Credentials/UserOut schemas; empty-body login -> 400 (not 500)")
+    # a login with no/invalid body is a clean 422 (validation, decoded in the pipeline), not a 500
+    assert client.post("/api/login").status_code == 422, "empty-body login should be 422 (was 500 None.get)"
+    assert client.post("/api/login", json={"email": "x"}).status_code == 422, "missing-field login should be 422"
+print("   --auth OpenAPI: bearer scheme + Credentials/UserOut schemas; empty-body login -> 422 (not 500)")
 PY
 
 echo "== E2E smoke: PASS — scaffold (default + --auth) is recognized, serves web+api routes, shell works, tests pass, migrations+seeder run, scheduler runs due tasks, OpenAPI served, bearer auth enforced =="
