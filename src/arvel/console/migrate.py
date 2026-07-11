@@ -41,11 +41,21 @@ rollback_app = typer.Typer()
 
 
 @rollback_app.command()
-def migrate_rollback() -> None:
+def migrate_rollback(
+    force: bool = typer.Option(
+        False, "--force", help="Skip the confirmation prompt / allow in production."
+    ),
+) -> None:
     """Roll back the bound migrations (reverse order)."""
     from arvel.console.kernel import run_app_command
 
-    run_app_command(_rollback)
+    async def _handler(app: Any) -> None:
+        from arvel.console.guard import confirm_destructive
+
+        confirm_destructive(app, force=force, action="roll back migrations")
+        await _rollback(app)
+
+    run_app_command(_handler)
 
 
 async def _rollback(app: Any) -> None:

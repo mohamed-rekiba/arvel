@@ -40,9 +40,11 @@ def test_force_bypasses_every_check() -> None:
     confirm_destructive(_App("production"), force=True, action="drop all tables")
 
 
-def test_production_refuses_without_force() -> None:
+@pytest.mark.parametrize("env", ["production", "Production", "PRODUCTION", " prod ", "prod"])
+def test_production_refuses_without_force(env: str) -> None:
+    # the hard production refusal engages regardless of case / surrounding whitespace / "prod"
     with pytest.raises(typer.Exit):
-        confirm_destructive(_App("production"), force=False, action="drop all tables")
+        confirm_destructive(_App(env), force=False, action="drop all tables")
 
 
 def test_non_interactive_requires_force(monkeypatch: pytest.MonkeyPatch) -> None:

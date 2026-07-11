@@ -68,7 +68,7 @@ def test_migrate_rollback_reverts() -> None:
     set_application(app)
     try:
         assert runner.invoke(build_cli(), ["migrate"]).exit_code == 0
-        result = runner.invoke(build_cli(), ["migrate:rollback"])
+        result = runner.invoke(build_cli(), ["migrate:rollback", "--force"])
         assert result.exit_code == 0, result.output
         assert "rolled back 1 migration" in result.output
     finally:
@@ -151,6 +151,31 @@ def test_migrate_refresh_without_seed_flag_does_not_seed() -> None:
         result = runner.invoke(build_cli(), ["migrate:refresh", "--force"])
         assert result.exit_code == 0, result.output
         assert ran == []
+    finally:
+        set_application(None)
+
+
+def test_db_wipe_without_force_refuses_before_dropping() -> None:
+    """Wiring proof: the guard runs *before* the drop. A non-interactive db:wipe (CliRunner stdin
+    is not a TTY) refuses with exit 1 and never reaches drop_all — the fix is wired, not just
+    present."""
+    from arvel.kernel import Application, set_application
+
+    calls: list[str] = []
+
+    class SpyMigrator:
+        async def drop_all(self) -> int:
+            calls.append("drop_all")
+            return 0
+
+    app = Application()
+    app.instance("migrator", SpyMigrator())
+    app.instance("migrations", [])
+    set_application(app)
+    try:
+        result = runner.invoke(build_cli(), ["db:wipe"])  # no --force, non-TTY
+        assert result.exit_code == 1, result.output
+        assert calls == []  # guard refused before any drop
     finally:
         set_application(None)
 

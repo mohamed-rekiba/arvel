@@ -21,8 +21,8 @@ def confirm_destructive(app: Any, *, force: bool, action: str) -> None:
     if force:
         return
 
-    env = str(app.config("app.env", "local") or "local")
-    if env == "production":
+    env = str(app.config("app.env", "local") or "local").strip().lower()
+    if env in {"production", "prod"}:
         typer.echo(
             f"Refusing to {action} in production — this is destructive and irreversible. "
             "Re-run with --force if you are certain.",
