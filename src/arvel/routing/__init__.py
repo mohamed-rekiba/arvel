@@ -82,7 +82,11 @@ class Controller:
         """Authorize every resource action against ``model``'s policy automatically (``authorizeResource``): ``index``→``viewAny``, ``show``→``view``, ``store``→``create``,
         ``update``→``update``, ``destroy``→``delete``. Instance abilities authorize against the
         route-bound model; class abilities against the model itself. 403 (``AuthorizationError``)
-        on denial, before the action runs."""
+        on denial, before the action runs.
+
+        Prefer the declarative form — set ``__resource_policy__ = Model`` in the class body,
+        beside ``middleware()`` — over calling this after the class definition; both are
+        equivalent (this method just sets that attribute)."""
         cls.__resource_policy__ = model
 
 
@@ -255,7 +259,15 @@ class Router:
         """
         from arvel.support import Str
 
-        instance = controller() if isinstance(controller, type) else controller
+        if isinstance(controller, type):
+            # `Route::apiResource('posts', PostController::class)` parity: pass the CLASS and
+            # the framework instantiates — through the container when the app is up, so the
+            # controller's constructor dependencies resolve exactly like an invokable handler's.
+            from arvel.kernel.globals import app, has_application
+
+            instance = app().make(controller) if has_application() else controller()
+        else:
+            instance = controller
         controller_middleware = (
             list(instance.middleware()) if hasattr(instance, "middleware") else []
         )

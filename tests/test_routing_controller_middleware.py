@@ -132,3 +132,49 @@ def test_default_controller_middleware_is_empty() -> None:
             return {}
 
     assert Plain.middleware() == []
+
+
+# --- class-passed resource controllers ------------------------------------------------------
+
+
+class WidgetService:
+    def label(self) -> str:
+        return "widget-service"
+
+
+class Widgets(Controller):
+    """A resource controller passed as a CLASS — the router instantiates it, through the
+    container when the app is up, so constructor dependencies resolve."""
+
+    def __init__(self, service: WidgetService) -> None:
+        self.service = service
+
+    async def index(self, request: Any) -> dict[str, Any]:
+        return {"via": self.service.label()}
+
+
+def test_resource_accepts_a_class_and_resolves_constructor_deps() -> None:
+    app = Application()
+    set_application(app)
+    router = Router()
+    router.api_resource("widgets", Widgets)  # the class, not an instance
+    kernel = HttpKernel(app)
+    router.apply_to(kernel)
+    with TestClient(kernel.build()) as client:
+        resp = client.get("/widgets")
+    assert resp.status_code == 200
+    assert resp.json() == {"via": "widget-service"}
+
+
+def test_resource_accepts_a_class_without_an_application() -> None:
+    class Plain(Controller):
+        async def index(self, request: Any) -> dict[str, Any]:
+            return {"ok": True}
+
+    kernel = HttpKernel()
+    router = Router()
+    router.api_resource("plains", Plain)
+    router.apply_to(kernel)
+    with TestClient(kernel.build()) as client:
+        resp = client.get("/plains")
+    assert resp.status_code == 200
