@@ -179,9 +179,9 @@ class FormRequest(msgspec.Struct):
         it runs. Default: no-op."""
 
     @classmethod
-    def parse(cls, data: Mapping[str, Any]) -> Self:
-        prepared = cls.prepare_for_validation(dict(data))
-        instance = validate(prepared, cls)
+    def _apply_semantic_rules(cls, prepared: dict[str, Any]) -> None:
+        """Run the optional ``rules()`` semantic layer over the (structurally-decoded) payload.
+        Raises ``ValidationException`` (422) on a rule failure. A no-op when ``rules()`` is empty."""
         extra_rules = cls.rules()
         if extra_rules:
             validator = Validator(
@@ -190,15 +190,33 @@ class FormRequest(msgspec.Struct):
             cls.with_validator(validator)
             if validator.fails():
                 raise ValidationException(validator.errors())
+
+    @classmethod
+    def parse(cls, data: Mapping[str, Any]) -> Self:
+        prepared = cls.prepare_for_validation(dict(data))
+        instance = validate(prepared, cls)
+        cls._apply_semantic_rules(prepared)
         instance.passed_validation()
         return instance
 
     @classmethod
     def authorized(cls, data: Mapping[str, Any]) -> Self:
-        """Validate (422 on bad input) then check ``authorize()`` (403 if denied)."""
-        instance = cls.parse(data)
+        """The full request lifecycle: structural decode (422) → ``authorize()`` (403) → semantic
+        ``rules()`` (422) → ``passed_validation``.
+
+        ``authorize()`` runs *before* the semantic rules (AR-004/DR-0072) so a denied caller gets a
+        clean 403 instead of a 422 that would leak the endpoint's rule contract to someone who may
+        not use it. Structural decode still precedes ``authorize()`` — it reads a typed instance,
+        and the structural shape is already public via the OpenAPI schema."""
+        from arvel.localization import trans
+
+        prepared = cls.prepare_for_validation(dict(data))
+        instance = validate(prepared, cls)
         if not instance.authorize():
-            raise AuthorizationException()
+            # one localized 403, shared by every authorize-fail entry point (H15/DR-0040)
+            raise AuthorizationException(trans("http.unauthorized"))
+        cls._apply_semantic_rules(prepared)
+        instance.passed_validation()
         return instance
 
     def authorize(self) -> bool:

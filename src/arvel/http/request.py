@@ -219,14 +219,15 @@ class Request:
         raw_schema: Any = schema  # an un-narrowed Any handle for the generic validate path
         try:
             if isinstance(schema, type) and issubclass(schema, FormRequest):
-                # run the full lifecycle — prepare_for_validation, rules(), passed_validation —
-                # not just msgspec's structural pass, which silently skips the semantic hooks.
-                dto = cast("Any", schema.parse(data))
-            else:
-                dto = validate(data, raw_schema)
+                # the full lifecycle: structural (422) → authorize (403) → semantic rules (422) →
+                # passed_validation. authorize runs before the semantic rules (AR-004/DR-0072) so a
+                # denied caller gets a clean 403, not a 422 leaking the endpoint's rule contract.
+                return cast("Any", schema.authorized(data))
+            dto = validate(data, raw_schema)
         except ValidationException:
             self._flash_old_input(data)  # repopulate the redirected-back form via old()
             raise
+        # a plain Schema has no rules() layer to order against — keep the post-structural authorize
         authorize = getattr(dto, "authorize", None)
         if callable(authorize) and not authorize():
             raise AuthorizationException(trans("http.unauthorized"))

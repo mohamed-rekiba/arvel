@@ -54,3 +54,40 @@ async def test_request_validate_and_form_request_authorize_raise_the_same_type()
     assert type(via_request.value) is AuthorizationException
     assert type(via_form_request.value) is AuthorizationException
     assert via_request.value.status == via_form_request.value.status == 403
+
+
+# --- AR-004: authorize() runs before SEMANTIC rules() so a denied caller gets 403, not a 422 -----
+# leaking the endpoint's rule contract. (Structural shape still precedes authorize — authorize reads
+# a typed instance, and the structural schema is already public via OpenAPI; see DR-0072.)
+
+
+class GuardedPost(FormRequest):
+    title: str
+
+    @classmethod
+    def rules(cls) -> dict[str, Any]:
+        return {"title": "min:5"}  # a SEMANTIC rule (not structural) — only rules() enforces it
+
+    def authorize(self) -> bool:
+        return False  # denied regardless of input (e.g. a non-admin caller)
+
+
+def test_denied_caller_gets_403_not_a_422_leaking_the_rule_contract() -> None:
+    # title is structurally valid (a str) but fails the semantic min:5 rule AND the caller is denied.
+    # authorize() must win → 403, without ever surfacing the rule's 422 message.
+    with pytest.raises(AuthorizationException) as exc:
+        GuardedPost.authorized({"title": "ab"})
+    assert exc.value.status == 403
+
+
+async def test_request_validate_denied_before_semantic_rules() -> None:
+    with pytest.raises(AuthorizationException) as exc:
+        await Request(_JsonBody({"title": "ab"})).validate(GuardedPost)
+    assert exc.value.status == 403
+
+
+def test_structurally_invalid_still_422_before_authorize() -> None:
+    # structural failure still precedes authorize (authorize needs a typed instance; structural
+    # shape is public) — the deliberate, documented residual.
+    with pytest.raises(ValidationException):
+        GuardedPost.authorized({})  # missing title entirely → msgspec structural 422

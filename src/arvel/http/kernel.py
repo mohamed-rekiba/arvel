@@ -773,26 +773,19 @@ class HttpKernel:
                     result = await result
                 return result
             if body_param is not None:
-                # A FormRequest-typed body runs its full lifecycle on injection (prepare →
-                # rules() → passed_validation → authorize()), matching request.validate().
-                # It runs here — after every middleware, like the binding-miss above — so a
-                # validation 422 can never fire before Authenticate/Authorize (DR-0054's
-                # oracle argument applies to validation too). prepare_for_validation sees the
-                # structurally-decoded payload (msgspec has already parsed the body), not the
-                # raw wire bytes.
-                from arvel.validation import AuthorizationException, FormRequest
+                # A FormRequest-typed body runs its full lifecycle on injection (structural →
+                # authorize() → rules() → passed_validation), matching request.validate(). It runs
+                # here — after every middleware, like the binding-miss above — so a validation 422
+                # can never fire before Authenticate/Authorize (DR-0054's oracle argument applies to
+                # validation too). authorize() runs before the semantic rules (AR-004/DR-0072) so a
+                # denied caller gets a 403, not a 422 leaking the rule contract.
+                from arvel.validation import FormRequest
 
                 injected = params.get(body_param)
                 if isinstance(injected, FormRequest):
                     import msgspec
 
-                    from arvel.localization import trans
-
-                    parsed = type(injected).parse(msgspec.to_builtins(injected))
-                    if not parsed.authorize():
-                        # same exception + message as request.validate() — one 403 shape
-                        raise AuthorizationException(trans("http.unauthorized"))
-                    params[body_param] = parsed
+                    params[body_param] = type(injected).authorized(msgspec.to_builtins(injected))
             target = handler
             if isinstance(target, type):  # an invokable controller class — instantiate via the
                 # container (DI for its constructor), same as `_make` does for middleware.
