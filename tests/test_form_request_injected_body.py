@@ -83,9 +83,7 @@ def test_injected_form_request_runs_prepare_hook() -> None:
 
 def test_injected_form_request_honours_authorize() -> None:
     with _client() as client:
-        response = client.post(
-            "/denied", json={"value": 1}, headers={"accept": "application/json"}
-        )
+        response = client.post("/denied", json={"value": 1}, headers={"accept": "application/json"})
     assert response.status_code == 403
 
 
