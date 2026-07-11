@@ -149,6 +149,21 @@ parent = await comment.commentable().get() # the owning Post/Video
 In a migration, declare the pair with `t.morphs("commentable")` (or `t.nullable_morphs(...)`)
 — it creates `commentable_id` + `commentable_type` with the names the relations read.
 
+**Polymorphic many-to-many** (`morph_to_many` / `morphed_by_many`) supports the same pivot surface
+as `belongs_to_many` — extra pivot columns and scoped constraints:
+
+```python
+class User(Model, HasRoles):
+    def roles(self): return self.morph_to_many(Role, "model", pivot="model_has_roles")
+
+await user.roles().attach(role.id, team_id=3)          # write an extra pivot column
+await user.roles().where_pivot("team_id", 3).get()     # scope the query by it
+await user.roles().detach(role.id, team_id=3)          # scoped detach
+```
+
+This is exactly how the RBAC `HasRoles` mixin scopes roles per team over `model_has_roles` — the
+framework backs its own roles/permissions with these relations rather than hand-rolled pivot SQL.
+
 
 ## Relationship queries & aggregates
 
