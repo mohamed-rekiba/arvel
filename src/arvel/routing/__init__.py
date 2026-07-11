@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from arvel.http.kernel import HttpKernel
     from arvel.http.redirect import Redirect
     from arvel.http.request import RouteMatch
+    from arvel.routing.broadcast_relay import broadcast_websocket as broadcast_websocket
     from arvel.routing.broadcasting_auth import verify_channel_auth as verify_channel_auth
 
 
@@ -194,6 +195,7 @@ class Router:
 
     def __init__(self) -> None:
         self._routes: list[RouteDefinition] = []
+        self._websockets: list[tuple[str, Any, str | None]] = []  # (path, handler, name)
         self._prefix = ""
         self._name_prefix = ""
         self._middleware: list[Any] = []  # middleware from the current group stack
@@ -217,6 +219,15 @@ class Router:
         )
         self._routes.append(route)
         return route
+
+    def websocket(self, path: str, handler: Any, name: str | None = None) -> None:
+        """Register a websocket route. ``handler`` is ``async def(socket)`` receiving the connection
+        (``accept``/``receive_text``/``send_text``/``iter_data``/``close``). Honors the current
+        prefix/name group; runs outside the HTTP middleware pipeline (a socket has no request cycle).
+        For realtime broadcast fan-out, ``arvel.routing.broadcast_websocket`` is a ready handler."""
+        self._websockets.append(
+            (self._prefix + path, handler, (self._name_prefix + name) if name else None)
+        )
 
     def get(self, path: str, handler: Any, name: str | None = None) -> RouteDefinition:
         return self.add(["GET"], path, handler, name)
@@ -658,6 +669,8 @@ class Router:
                 trashed_all=route.trashed_all,
                 trashed_params=list(route.trashed_params),
             )
+        for path, handler, name in self._websockets:
+            kernel.add_websocket(path, handler, name)
         kernel.bindings.update(self._bindings)
 
     def current_route(self) -> RouteMatch | None:
@@ -789,6 +802,7 @@ __all__ = [
     "ControllerMiddleware",
     "RouteDefinition",
     "Router",
+    "broadcast_websocket",
     "route",
     "temporary_signed_route",
     "to_route",
@@ -798,11 +812,15 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
-    # lazy — `verify_channel_auth` lives in `broadcasting_auth` (routing's own submodule; no DAG
-    # edge), re-exported here as the stable public surface an app-owned realtime transport imports
-    # (DR-0067), so `import arvel.routing` doesn't eagerly pull in the broadcasting/auth wiring.
+    # lazy — `verify_channel_auth`/`broadcast_websocket` live in routing's own submodules (no DAG
+    # edge), re-exported here as the stable public surface a realtime transport imports (DR-0067),
+    # so `import arvel.routing` doesn't eagerly pull in the broadcasting/auth wiring.
     if name == "verify_channel_auth":
         from arvel.routing.broadcasting_auth import verify_channel_auth
 
         return verify_channel_auth
+    if name == "broadcast_websocket":
+        from arvel.routing.broadcast_relay import broadcast_websocket
+
+        return broadcast_websocket
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

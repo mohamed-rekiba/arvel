@@ -74,6 +74,9 @@ class HttpKernel:
         # (methods, path, handler, group, route_middleware, name, security, status_code,
         #  wheres, missing_callback, without_middleware)
         self._routes: list[_RouteEntry] = []
+        # (path, handler, name) websocket routes — registered as Litestar websocket handlers,
+        # outside the HTTP middleware pipeline (a socket has no request/response cycle to wrap).
+        self._websockets: list[tuple[str, Any, str | None]] = []
         self.global_middleware: list[Any] = []
         self.groups: dict[str, list[Any]] = {"web": [], "api": []}
         self._aliases: dict[str, Any] = {}  # short name -> middleware class
@@ -233,6 +236,13 @@ class HttpKernel:
             )
         )
 
+    def add_websocket(self, path: str, handler: Any, name: str | None = None) -> None:
+        """Register a websocket route. ``handler`` is ``async def(socket)`` receiving the connection
+        (Litestar ``WebSocket``: ``accept``/``receive_text``/``send_text``/``iter_data``/``close``).
+        Websocket routes run outside the HTTP middleware pipeline — a socket has no request/response
+        to wrap."""
+        self._websockets.append((path, handler, name))
+
     def get(self, path: str, handler: Any, group: str | None = None) -> None:
         self.add_route(["GET"], path, handler, group)
 
@@ -335,12 +345,15 @@ class HttpKernel:
                     f"duplicate route {methods} {path!r} — two routes share a method+path with no "
                     "distinguishing domain; give them different paths or a domain= group"
                 )
-        handlers = [
+        handlers: list[Any] = [
             self._make_handler(
                 sorted(candidates, key=lambda entry: entry[11] is None), HTTPRouteHandler
             )
             for candidates in grouped.values()
         ]
+        handlers.extend(
+            self._make_websocket_handler(path, fn, name) for path, fn, name in self._websockets
+        )
         litestar_app = litestar.Litestar(
             route_handlers=handlers,
             cors_config=self._cors_config(),
@@ -528,6 +541,22 @@ class HttpKernel:
                     "required": True,
                     "content": {"application/json": {"schema": ref_by_struct[id(struct)]}},
                 }
+
+    def _make_websocket_handler(self, path: str, fn: Any, name: str | None) -> Any:
+        """Adapt an arvel websocket handler onto a Litestar ``WebsocketRouteHandler``. The app
+        handler is ``async def(socket)`` — it receives the raw connection and drives its own
+        accept/receive/send loop (no HTTP middleware pipeline)."""
+        from litestar.handlers import WebsocketRouteHandler
+
+        litestar_path = self._compile_path(path)[0][0]
+
+        async def socket_handler(socket: Any) -> None:
+            await fn(socket)
+
+        socket_handler.__name__ = (
+            re.sub(r"\W+", "_", name) if name else f"ws{re.sub(r'\W+', '_', path)}"
+        )
+        return WebsocketRouteHandler(litestar_path, name=name)(socket_handler)
 
     def _make_handler(self, candidates: list[_RouteEntry], route_handler: Any) -> Any:
         """Compile one or more arvel routes that share a literal (methods, path) into ONE Litestar

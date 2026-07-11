@@ -183,13 +183,18 @@ class LogBroadcaster(Broadcaster):
         self.sent.append((event_name(event), channels_for(event), event))
 
 
+# The redis channel prefix each broadcast is published under — part of the publish wire contract, so
+# a subscriber (the websocket relay) reads the same one rather than re-deriving it.
+CHANNEL_PREFIX = "arvel.broadcasting."
+
+
 class RedisBroadcaster(Broadcaster):
     """Publishes each broadcast event as one JSON message per channel via the container-bound
     ``redis`` connection (story-06's facade — ``RedisConnection.publish``), resolved dynamically
     through the app container rather than importing ``arvel.cache`` directly: broadcasting sits
     below ``arvel.cache`` in the module DAG (G1), so a static import would be a back-edge."""
 
-    _CHANNEL_PREFIX = "arvel.broadcasting."
+    _CHANNEL_PREFIX = CHANNEL_PREFIX
 
     def __init__(self, app: Any) -> None:
         if app is None:
@@ -264,6 +269,7 @@ class BroadcastManager(Manager):
 
 
 __all__ = [
+    "CHANNEL_PREFIX",
     "BroadcastManager",
     "Broadcaster",
     "BroadcastingSettings",
