@@ -269,6 +269,12 @@ class CreatePost(FormRequest):
 post = CreatePost.parse({"title": "Hello World"})   # → slug "hello-world", title trimmed
 ```
 
+One constraint on the **injected** path (a handler typed `data: CreatePost`, where the kernel runs
+this lifecycle for you): `prepare_for_validation` receives the *structurally-decoded* payload, not
+the raw wire body — defaulted optional fields are already materialized, and unknown/extra wire keys
+are gone. A hook that keys on a field outside the struct definition only sees it via the explicit
+`CreatePost.parse(raw)` / `request.validate(CreatePost)` path.
+
 ### The `rules()` bridge — semantics on top of types
 
 `Schema`/`FormRequest` annotations are the **type/shape** layer — msgspec owns them, and for most
