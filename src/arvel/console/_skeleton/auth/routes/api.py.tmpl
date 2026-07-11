@@ -7,6 +7,7 @@ at /schema) AND the request body is validated — a missing or malformed body is
 """
 
 from arvel import Route, Schema, abort
+from arvel.localization import trans
 from arvel.auth.tokens import TokenGuard, create_token
 from arvel.http import Response
 from arvel.security import Hasher
@@ -36,7 +37,7 @@ async def health(request) -> HealthStatus:
 async def login(request, data: Credentials):  # `data: Credentials` → parsed + validated request body
     user = await User.where("email", data.email).first()
     if user is None or not Hasher().check(data.password, user.password):
-        abort(401, "Invalid credentials")
+        abort(401, trans("auth.failed"))
     token, _ = await create_token(user, name="api")
     return Response(content={"token": token}, status=200)
 
@@ -44,7 +45,7 @@ async def login(request, data: Credentials):  # `data: Credentials` → parsed +
 async def me(request) -> UserOut:
     user_id = await TokenGuard().user_id(request)
     if user_id is None:
-        abort(401, "Unauthenticated")
+        abort(401)  # content-negotiated default body
     user = await User.find(user_id)
     return UserOut(id=user.id, name=user.name, email=user.email)
 

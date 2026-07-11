@@ -365,10 +365,11 @@ class Router:
 
             from arvel.http.exceptions import abort
             from arvel.http.response import Response
+            from arvel.localization import trans
 
             tag, value = await run_sync(_locate, rel, fallback)
             if tag == "not_found":
-                abort(404, "Not found")
+                abort(404, trans("http.not_found"))
             if tag == "no_index":
                 abort(500, f"public directory has no index.html — did you build it? ({value})")
             content, name, immutable = value
