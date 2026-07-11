@@ -226,8 +226,34 @@ default = "log"     # "log" (dev/test) or "redis"
 
 The `redis` driver's message body is `{"event", "data", "except_socket_id"}` — the wire name from
 `broadcast_as()`, the payload from `broadcast_with()`, and the socket to skip from `to_others()`.
-The websocket transport that turns those Redis messages into browser deliveries is a separate
-driver extra; core stops at publishing.
+
+## The websocket relay — `broadcast_websocket`
+
+The framework ships the browser-facing transport too: `arvel.routing.broadcast_websocket` is a ready
+websocket handler that subscribes to the Redis broadcasts above and fans them out to browser clients.
+Register it as a websocket route — one line, no app-owned relay:
+
+```python
+from arvel import Route
+from arvel.routing import broadcast_websocket
+
+Route.websocket("/ws", broadcast_websocket)
+```
+
+The client speaks a small Pusher-style protocol: on connect it receives
+`{"event": "connected", "socket_id": "…"}`; it subscribes with
+`{"event": "subscribe", "channel": "…", "auth": "…"}` (the `auth` token — minted by
+`/broadcasting/auth` — is required for a `private-`/`presence-` channel, and a bad one gets
+`{"event": "subscribe_error", …}`); each broadcast then arrives as `{"event": …, "data": …}`,
+honoring `to_others()` against the connection's `socket_id`. The relay reuses `verify_channel_auth`
+(it never re-derives the HMAC) and the `arvel.broadcasting.CHANNEL_PREFIX` wire contract, so it can't
+drift out of sync with the publish/auth halves.
+
+For any other realtime need, `Route.websocket(path, handler)` registers an arbitrary
+`async def(socket)` handler (a raw connection with `accept`/`receive_text`/`send_text`/`iter_data`),
+outside the HTTP middleware pipeline. The production socket-server topology (in-process vs a
+dedicated process behind a load balancer) is still a deployment choice; the relay *logic* is
+framework-provided.
 
 ## Common mistakes & gotchas
 
