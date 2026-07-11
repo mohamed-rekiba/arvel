@@ -201,7 +201,7 @@ _STUBS: dict[str, tuple[str, str]] = {
         "app/observers",
         "from typing import Any\n\n\n"
         "class {name}:\n"
-        '    """A model observer. Register in a provider\'s boot: ``Post.observe({name}())``;\n'
+        '    """A model observer. Declare on the model: ``__observers__ = ({name},)``;\n'
         '    `saving` may return False to cancel the save."""\n\n'
         "    async def saving(self, model: Any) -> Any: ...\n\n"
         "    async def saved(self, model: Any) -> None: ...\n\n"
@@ -436,7 +436,7 @@ make_observer_app = typer.Typer()
 
 @make_observer_app.command()
 def make_observer(name: str) -> None:
-    """Generate a model observer (app/observers/) — register via Model.observe() in a provider boot."""
+    """Generate a model observer (app/observers/) — declare via ``__observers__`` on the model."""
     _run("observer", name)
 
 
