@@ -81,3 +81,10 @@ def test_ordering_a_date_against_a_non_date_is_a_typeerror() -> None:
     ):
         with pytest.raises(TypeError):
             expr()
+
+
+def test_to_iso_string_is_json_safe() -> None:
+    # the JS/JSON-safe instant form: UTC Z, no RFC-9557 [Zone] annotation
+    d = Date.parse("2026-07-11T09:30:00+00:00[UTC]")
+    assert d.to_iso_string() == "2026-07-11T09:30:00Z"
+    assert "[" in d.to_iso()  # the zone-name form stays on to_iso

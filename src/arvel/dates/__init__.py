@@ -215,6 +215,13 @@ class Date:
     def to_iso(self) -> str:
         return self._dt.format_iso()
 
+    def to_iso_string(self) -> str:
+        """The JSON/JS-safe instant form (UTC ``Z``, RFC 3339) — reference parity with
+        ``toISOString()``. ``to_iso`` keeps the full RFC-9557 form with the ``[Zone]``
+        annotation, which JS ``Date`` and most JSON consumers reject; use this one in
+        API payloads."""
+        return self._dt.to_instant().format_iso()
+
     def to_py(self) -> Any:
         return self._dt.to_stdlib()
 
