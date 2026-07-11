@@ -86,7 +86,8 @@ class PostObserver:
     async def deleting(self, post):   # return False to cancel the delete
         return post.is_protected is False
 
-Post.observe(PostObserver())
+class Post(Model):
+    __observers__ = (PostObserver,)   # declarative — wires itself on the first event
 ```
 
 Only the hooks an observer defines are wired — see [Events](../events.md#model-observers) for the

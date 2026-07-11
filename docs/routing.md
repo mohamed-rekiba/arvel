@@ -213,16 +213,20 @@ normally.
 
 ### Authorizing every action at once
 
-Call `authorize_resource(Model)` on the controller and each action is checked against the
-model's [policy](auth/authorization.md) automatically — no per-method `authorize` calls:
+Declare `__resource_policy__` on the controller — beside `middleware()`, where it reads as class
+config — and each action is checked against the model's [policy](auth/authorization.md)
+automatically, no per-method `authorize` calls:
 
 ```python
 class PostController(Controller):
+    __resource_policy__ = Post
+
     async def index(self): ...
     async def show(self, post): ...
-
-PostController.authorize_resource(Post)
 ```
+
+(`PostController.authorize_resource(Post)` after the class body is the equivalent imperative
+form — it just sets that attribute.)
 
 The action → ability map is:
 

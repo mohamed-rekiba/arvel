@@ -68,3 +68,39 @@ async def test_saving_returning_false_cancels_the_save() -> None:
     finally:
         await db.dispose()
         set_application(None)
+
+
+DECLARED_CALLS: list[tuple[str, str]] = []
+
+
+class DeclaredObserver:
+    async def saved(self, model: Any) -> None:
+        DECLARED_CALLS.append(("saved", model.name))
+
+
+class Gizmo(Model):
+    """Declarative observers — no provider boot() / observe() call anywhere."""
+
+    __fields__: ClassVar = {"name": str}
+    __fillable__: ClassVar = ["name"]
+    __timestamps__ = True
+    __observers__: ClassVar = (DeclaredObserver,)
+
+
+async def test_declared_observers_wire_on_first_event() -> None:
+    DECLARED_CALLS.clear()
+    db = ConnectionResolver()
+    app = Application()
+    app.instance("events", Dispatcher())
+    app.instance("db", db)
+    set_application(app)
+    Gizmo.set_connection(db)
+    try:
+        await db.execute(sa.schema.CreateTable(Gizmo.__table__))
+        await Gizmo.create(name="sprocket")  # first event boots __observers__
+        assert ("saved", "sprocket") in DECLARED_CALLS
+        await Gizmo.create(name="cog")  # not double-wired
+        assert DECLARED_CALLS.count(("saved", "cog")) == 1
+    finally:
+        await db.dispose()
+        set_application(None)

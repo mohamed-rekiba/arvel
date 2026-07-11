@@ -149,8 +149,8 @@ for [after-commit dispatch](queues.md#after-commit-dispatch).
 ## Model observers
 
 A model fires lifecycle events — `saving`, `saved`, `deleted`, `restored` — and an **observer** groups
-their handlers for one model in a class. Register it from a provider's
-`boot()`:
+their handlers for one model in a class. Declare it on the model (or register imperatively
+from a provider's `boot()` via `Post.observe(PostObserver())`):
 
 ```python
 class PostObserver:
@@ -159,7 +159,8 @@ class PostObserver:
     async def saved(self, post): ...
     async def deleted(self, post): ...
 
-Post.observe(PostObserver())         # scaffold one with `make:observer`
+class Post(Model):
+    __observers__ = (PostObserver,)  # scaffold one with `make:observer`
 ```
 
 Each method runs when `Post` fires the matching event; only the hooks you define are wired.

@@ -48,13 +48,23 @@ class HasEvents:
         "replicating",
     )
 
+    #: Declarative observers (``ObservedBy`` parity): list observer classes/instances on the
+    #: model — ``__observers__ = (PublishObserver,)`` — and they are wired lazily on the model's
+    #: first fired event, no provider ``boot()`` call needed. ``observe()`` stays for imperative
+    #: registration.
+    __observers__: ClassVar[tuple[Any, ...]] = ()
+    _arvel_observers_booted: ClassVar[bool] = False  # per-class, set in its own __dict__
+
     @classmethod
     def observe(cls, observer: Any) -> None:
         """Register a model observer. For each lifecycle hook the
         observer defines a method for (any subset of:attr:`OBSERVABLE_EVENTS`), wire that method
         to this model's event so it runs when the model fires it. A cancelable hook returning
         ``False`` cancels the operation. Call from a provider's ``boot()`` (the events dispatcher
-        must be bound). No-op without an app/dispatcher."""
+        must be bound). No-op without an app/dispatcher.
+
+        Prefer the declarative form — ``__observers__ = (MyObserver,)`` in the model body —
+        which wires itself on the model's first event."""
         from arvel.kernel import app, has_application
 
         if not (has_application() and app().bound("events")):
@@ -76,8 +86,17 @@ class HasEvents:
         container = app()
         if not container.bound("events"):
             return None
+        cls = type(self)
+        # lazy __observers__ wiring: on the class's first fired event (app + dispatcher are
+        # guaranteed here), so a declared observer never needs a provider boot() call. The flag
+        # lives in the class's own __dict__ — a subclass wires its (inherited) observers under
+        # its own event names.
+        if not cls.__dict__.get("_arvel_observers_booted", False):
+            cls._arvel_observers_booted = True
+            for observer in getattr(cls, "__observers__", ()):
+                cls.observe(observer)
         dispatcher = container.make("events")
-        return await dispatcher.until(f"{type(self).__name__}.{hook}", self)
+        return await dispatcher.until(f"{cls.__name__}.{hook}", self)
 
     def _fire_sync(self, hook: str) -> None:
         """Best-effort dispatch from a **sync** lifecycle point (``replicate()`` keeps its public
