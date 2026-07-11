@@ -191,11 +191,18 @@ class FormRequest(msgspec.Struct):
             if validator.fails():
                 raise ValidationException(validator.errors())
 
+    @staticmethod
+    def _decoded_payload(prepared: dict[str, Any], instance: Any) -> dict[str, Any]:
+        """The payload the semantic ``rules()`` validate: the structurally-decoded instance (so
+        omitted fields carry their defaults and values are coerced to their declared types),
+        overlaid on ``prepared`` so any prepare-added key outside the struct is still visible."""
+        return {**prepared, **msgspec.to_builtins(instance)}
+
     @classmethod
     def parse(cls, data: Mapping[str, Any]) -> Self:
         prepared = cls.prepare_for_validation(dict(data))
         instance = validate(prepared, cls)
-        cls._apply_semantic_rules(prepared)
+        cls._apply_semantic_rules(cls._decoded_payload(prepared, instance))
         instance.passed_validation()
         return instance
 
@@ -215,7 +222,7 @@ class FormRequest(msgspec.Struct):
         if not instance.authorize():
             # one localized 403, shared by every authorize-fail entry point (H15/DR-0040)
             raise AuthorizationException(trans("http.unauthorized"))
-        cls._apply_semantic_rules(prepared)
+        cls._apply_semantic_rules(cls._decoded_payload(prepared, instance))
         instance.passed_validation()
         return instance
 

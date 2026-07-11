@@ -184,7 +184,9 @@ async def test_reference_app_end_to_end(
             ).json()["token"]
             h = {"Authorization": f"Bearer {tok}"}
 
-            assert (await c.post("/projects", json={}, headers=h)).status_code == 400
+            # a missing required field fails validation → 422 (the body is decoded in the request
+            # pipeline, so validation failures are the framework's uniform 422, not a transport 400)
+            assert (await c.post("/projects", json={}, headers=h)).status_code == 422
             for name in ("Alpha", "Beta", "Gamma"):
                 assert (
                     await c.post("/projects", json={"name": name}, headers=h)

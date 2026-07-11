@@ -271,24 +271,35 @@ post = CreatePost.parse({"title": "Hello World"})   # → slug "hello-world", ti
 
 ### Injected form requests
 
-Type-hinting a `FormRequest` as a handler's body param **is** the validation trigger — the kernel
-runs the full lifecycle (`prepare_for_validation` → structural parse → `rules()` →
-`passed_validation` → `authorize()`) before your handler body executes, with the same `422`/`403`
-shapes as `request.validate()`:
+Type-hinting a `FormRequest` (or a plain `Schema`) as a handler's body param **is** the validation
+trigger — the kernel runs the full lifecycle
+(`prepare_for_validation` → structural decode → `authorize()` → `rules()` → `passed_validation`)
+before your handler body executes, with the same `422`/`403` shapes as `request.validate()`:
 
 ```python
-async def store(request, data: CreatePost):   # validated + hooks already run
-    ...                                       # data.slug is set, rules() passed
+async def store(request, payload: CreatePost):   # validated + hooks already run
+    ...                                          # payload.slug is set, rules() passed
 ```
 
-It runs **after** every middleware, so a validation error can never fire for a caller that
-`Authenticate`/`Authorize` would have rejected. Manual `await request.validate(CreatePost)` remains
-for handlers that don't declare a typed body.
+**The body is decoded inside the request pipeline, not by the transport layer** — so it runs *after*
+every middleware. Two consequences:
 
-One constraint on the injected path: `prepare_for_validation` receives the *structurally-decoded*
-payload, not the raw wire body — defaulted optional fields are already materialized, and
-unknown/extra wire keys are gone. A hook that keys on a field outside the struct definition only
-sees it via the explicit `CreatePost.parse(raw)` / `request.validate(CreatePost)` path.
+- **Auth always runs first.** A malformed body on a protected route yields the auth status
+  (`401`/`403`), never a validation error that would leak the route's existence or shape to a caller
+  `Authenticate`/`Authorize` would reject. `authorize()` likewise runs before the semantic `rules()`,
+  so a denied caller gets a clean `403`, not a `422` exposing the rule contract.
+- **A malformed body is always a `422`** (the framework's uniform validation status), for typed
+  bodies and manual `request.validate()` alike — there's no separate transport-level `400`.
+
+The body param can be named anything (`data`, `payload`, `form`, …) — it's matched by its type, not
+its name. Manual `await request.validate(CreatePost)` remains for handlers that don't declare a typed
+body.
+
+One constraint on the injected path: `prepare_for_validation` and `rules()` receive the
+*structurally-decoded* payload, not the raw wire body — defaulted optional fields are already
+materialized, and unknown/extra wire keys are gone. A hook that keys on a field outside the struct
+definition only sees it via the explicit `CreatePost.parse(raw)` / `request.validate(CreatePost)`
+path.
 
 ### The `rules()` bridge — semantics on top of types
 

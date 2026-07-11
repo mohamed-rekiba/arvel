@@ -18,6 +18,7 @@ from arvel.http.middleware import AuthenticateMiddleware
 from arvel.http.response import Response
 from arvel.kernel import set_application
 from arvel.routing import Router
+from arvel.validation import FormRequest
 
 AUTH_HEADER = {"authorization": "Bearer x"}
 
@@ -297,3 +298,40 @@ class ScopedPost(Model):
 
 async def _show_scoped(request: Any, user: ScopedUser, post: ScopedPost) -> dict[str, Any]:
     return {"user": user.name, "post": post.title}
+
+
+# --- AR-005/DR-0074: a typed body is decoded AFTER auth, so a malformed body can't 400 before 401 --
+# (module-level so `get_type_hints` resolves the annotation under `from __future__ import annotations`)
+
+
+class _CreateWidget(FormRequest):
+    name: str
+    qty: int
+
+
+async def _create_widget(request: Any, data: _CreateWidget) -> dict[str, str]:
+    return {"name": data.name}
+
+
+def test_guest_with_malformed_body_gets_401_not_a_validation_400() -> None:
+    """On a protected route the body is decoded in the pipeline, after Authenticate — so a guest
+    sending a structurally-invalid body gets a uniform 401, never a 400 that would reveal the route
+    exists and expects a body of a particular shape (the AR-005 oracle)."""
+    kernel = _authenticated_kernel()
+    try:
+        router = Router()
+        router.post("/widgets", _create_widget).middleware(Authenticate)
+        router.apply_to(kernel)
+        with TestClient(kernel.build()) as client:
+            # malformed body (qty not an int) AND well-formed body both 401 for a guest — uniform
+            assert client.post("/widgets", json={"name": "a", "qty": "x"}).status_code == 401
+            assert client.post("/widgets", json={"name": "a", "qty": 2}).status_code == 401
+            # the authenticated caller gets through to the (valid) body
+            assert (
+                client.post(
+                    "/widgets", json={"name": "a", "qty": 2}, headers=AUTH_HEADER
+                ).status_code
+                == 201
+            )
+    finally:
+        set_application(None)

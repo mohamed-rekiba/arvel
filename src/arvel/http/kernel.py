@@ -344,7 +344,9 @@ class HttpKernel:
         litestar_app = litestar.Litestar(
             route_handlers=handlers,
             cors_config=self._cors_config(),
-            openapi_config=openapi.openapi_config(),
+            # arvel's JSON render plugin injects the request bodies for pipeline-decoded bodies that
+            # Litestar's generator can't see, so the *served* document (and the UI) describe them too.
+            openapi_config=openapi.openapi_config(json_plugin=self._openapi_json_plugin()),
             # serializes Date-typed model fields to ISO-8601 without a SerializationException
             type_encoders={Date: lambda value: value.to_iso(), **model_encoder},
             exception_handlers={
@@ -395,6 +397,23 @@ class HttpKernel:
                     log.warning(
                         "route_security_scheme_undefined", route=name or path, scheme=scheme
                     )
+
+    def _openapi_json_plugin(self) -> Any:
+        """A Litestar ``JsonRenderPlugin`` subclass that renders ``/openapi.json`` through arvel's
+        ``_finalize_openapi`` — so the served schema (and the UI that fetches it) carry the request
+        bodies for pipeline-decoded bodies, exactly like the ``openapi()`` export."""
+        from litestar.openapi.plugins import JsonRenderPlugin
+
+        kernel = self
+
+        class _ArvelJsonRenderPlugin(JsonRenderPlugin):
+            # Litestar's JsonRenderPlugin.render is only partially typed upstream; the override is
+            # signature-compatible (request/schema in, bytes out).
+            def render(self, request: Any, openapi_schema: dict[str, Any]) -> bytes:
+                kernel._finalize_openapi(openapi_schema)  # inject request bodies + sort params
+                return super().render(request, openapi_schema)  # pyright: ignore[reportUnknownMemberType]
+
+        return _ArvelJsonRenderPlugin()
 
     def _handle_uncaught(self, request: Any, exc: BaseException) -> Any:
         """Report (5xx only) via the bound ``ExceptionHandler`` then render: a registered
@@ -449,14 +468,21 @@ class HttpKernel:
         return MethodOverride(self.build(lifespan))
 
     def openapi(self) -> dict[str, Any]:
-        """The OpenAPI document Litestar generates from the registered routes (G4).
+        """The OpenAPI document for the registered routes (G4).
 
-        Each operation's ``parameters`` list is sorted (by ``in`` then ``name``) so the document is
-        byte-stable across runs — a codegen/CI drift gate diffs a fresh export against the committed
-        one, and Litestar otherwise emits a multi-param route's parameters in set-iteration order."""
-        schema: dict[str, Any] = self.build().openapi_schema.to_schema()
-        paths: dict[str, Any] = schema.get("paths", {})
-        for methods in paths.values():
+        Litestar generates the base; arvel adds each route's ``requestBody`` (the request body is
+        decoded in the pipeline, not by Litestar, so it isn't in the handler signature Litestar reads
+        — see ``_make_handler``) and sorts each operation's ``parameters`` (by ``in`` then ``name``)
+        so the document is byte-stable — a codegen/CI drift gate diffs a fresh export against the
+        committed one."""
+        return self._finalize_openapi(self.build().openapi_schema.to_schema())
+
+    def _finalize_openapi(self, schema: dict[str, Any]) -> dict[str, Any]:
+        """Inject request bodies + stable-sort parameters on a generated OpenAPI dict. Shared by the
+        ``openapi()`` export and the served ``openapi.json`` route so both describe the body
+        identically (Litestar can't, since the body isn't a handler param any more)."""
+        self._inject_request_bodies(schema)
+        for methods in schema.get("paths", {}).values():
             for operation in cast("dict[str, Any]", methods).values():
                 if not isinstance(operation, dict):
                     continue
@@ -465,6 +491,43 @@ class HttpKernel:
                     plist = cast("list[dict[str, Any]]", params)
                     plist.sort(key=lambda p: (str(p.get("in", "")), str(p.get("name", ""))))
         return schema
+
+    def _inject_request_bodies(self, schema: dict[str, Any]) -> None:
+        """Add the ``requestBody`` (and its component schema) for every route that declares a typed
+        body. The body is decoded in the dispatch pipeline (not by Litestar), so Litestar never sees
+        it — arvel derives the JSON schema straight from the body struct via msgspec and references it
+        as an OpenAPI component."""
+        import msgspec
+
+        # (openapi_path, method) -> body struct, plus the unique struct set for component generation
+        bodies: dict[tuple[str, str], Any] = {}
+        unique: dict[int, Any] = {}
+        for entry in self._routes:
+            _, body = self._handler_io(entry[2])
+            if body is None:
+                continue
+            struct = body[1]
+            unique[id(struct)] = struct
+            open_path = _PARAM.sub(lambda m: "{" + m.group(1) + "}", entry[1])
+            for method in entry[0]:
+                bodies[(open_path, method.lower())] = struct
+        if not bodies:
+            return
+        structs = list(unique.values())
+        refs, components = msgspec.json.schema_components(
+            structs, ref_template="#/components/schemas/{name}"
+        )
+        ref_by_struct = {id(s): r for s, r in zip(structs, refs, strict=True)}
+        schema.setdefault("components", {}).setdefault("schemas", {}).update(components)
+        for open_path, methods in schema.get("paths", {}).items():
+            for method, operation in cast("dict[str, Any]", methods).items():
+                struct = bodies.get((open_path, method.lower()))
+                if struct is None or not isinstance(operation, dict):
+                    continue
+                operation["requestBody"] = {
+                    "required": True,
+                    "content": {"application/json": {"schema": ref_by_struct[id(struct)]}},
+                }
 
     def _make_handler(self, candidates: list[_RouteEntry], route_handler: Any) -> Any:
         """Compile one or more arvel routes that share a literal (methods, path) into ONE Litestar
@@ -509,10 +572,16 @@ class HttpKernel:
                 query_by_name.setdefault(qname, (qname, qann, qdefault))
         query_params = list(query_by_name.values())
 
-        # Litestar reads `__signature__` below to know what to inject and document; split the
-        # body back out of the injected kwargs and forward the rest to the handler as query args.
+        body_struct = body[1] if body is not None else None
+
+        # Litestar reads `__signature__` below to know what to inject and document. The request body
+        # is deliberately NOT in that signature: it's decoded inside the dispatch pipeline
+        # (`_handle`'s destination), AFTER every middleware — so Authenticate/Authorize run before the
+        # body is ever parsed, and a malformed body can never 400 ahead of a 401 (the same
+        # decode-after-auth invariant DR-0054 binding + DR-0068 validation already hold). The handler
+        # still receives the decoded body under its own param name; `injected` is only query params.
         async def adapter(request: Any, **injected: Any) -> Any:
-            body_arg = (body_name, injected.pop(body_name)) if body_name is not None else None
+            body_arg = (body_name, body_struct) if body_name is not None else None
             host = Request(request).host() if has_domain else None
             chosen: _RouteEntry | None = None
             domain_params: dict[str, Any] = {}
@@ -548,11 +617,9 @@ class HttpKernel:
 
         sig_params = [inspect.Parameter("request", inspect.Parameter.POSITIONAL_OR_KEYWORD)]
         annotations: dict[str, Any] = {"request": Any, "return": return_hint}
-        if body is not None:
-            sig_params.append(
-                inspect.Parameter(body[0], inspect.Parameter.KEYWORD_ONLY, annotation=body[1])
-            )
-            annotations[body[0]] = body[1]
+        # The body is intentionally absent from the Litestar signature (decoded in the pipeline, see
+        # the adapter). Its OpenAPI request body is injected separately in `openapi()` from the known
+        # `body` struct, so the document still describes it without Litestar decoding it up front.
         # Declare query params explicitly rather than letting Litestar infer them from a bare typed
         # default — the inferred style is deprecated upstream (warns per param, removed next major).
         from litestar.params import Parameter as _QueryParam
@@ -720,8 +787,8 @@ class HttpKernel:
                 request._route_match = RouteMatch(  # pyright: ignore[reportPrivateUsage]
                     name=name, params=dict(params)
                 )
-                if body is not None:
-                    params[body[0]] = body[1]
+                # `body` is (param_name, struct_type) — the body is NOT decoded here; it's decoded in
+                # `_handle`'s destination, after the middleware pipeline, so auth runs first.
                 if query:
                     params.update(query)
 
@@ -735,6 +802,7 @@ class HttpKernel:
                     binding_missing=binding_missing,
                     missing=missing,
                     body_param=body[0] if body is not None else None,
+                    body_struct=body[1] if body is not None else None,
                 )
         finally:
             current_user.reset(user_token)
@@ -761,6 +829,7 @@ class HttpKernel:
         binding_missing: bool = False,
         missing: Any = None,
         body_param: str | None = None,
+        body_struct: Any = None,
     ) -> Any:
         async def destination(req: Any) -> Any:
             if binding_missing:
@@ -772,20 +841,21 @@ class HttpKernel:
                 if inspect.isawaitable(result):
                     result = await result
                 return result
-            if body_param is not None:
-                # A FormRequest-typed body runs its full lifecycle on injection (structural →
-                # authorize() → rules() → passed_validation), matching request.validate(). It runs
-                # here — after every middleware, like the binding-miss above — so a validation 422
-                # can never fire before Authenticate/Authorize (DR-0054's oracle argument applies to
-                # validation too). authorize() runs before the semantic rules (AR-004/DR-0072) so a
-                # denied caller gets a 403, not a 422 leaking the rule contract.
-                from arvel.validation import FormRequest
+            if body_param is not None and body_struct is not None:
+                # The request body is decoded HERE — after every middleware — not by the transport
+                # layer up front. So Authenticate/Authorize run before the body is ever parsed: a
+                # malformed body on a protected route yields 401, never a 400 that would leak the
+                # route's existence/shape to a guest (AR-005; same decode-after-auth invariant as the
+                # DR-0054 binding miss above). A FormRequest runs its full lifecycle — structural
+                # (422) → authorize() (403) → semantic rules() (422) → passed_validation, authorize
+                # before the semantic rules (AR-004/DR-0072). A plain Schema gets the structural pass.
+                from arvel.validation import FormRequest, validate
 
-                injected = params.get(body_param)
-                if isinstance(injected, FormRequest):
-                    import msgspec
-
-                    params[body_param] = type(injected).authorized(msgspec.to_builtins(injected))
+                data = await req.json()  # arvel Request — applies H8 input normalization too
+                if isinstance(body_struct, type) and issubclass(body_struct, FormRequest):
+                    params[body_param] = body_struct.authorized(data)
+                else:
+                    params[body_param] = validate(data, cast("Any", body_struct))
             target = handler
             if isinstance(target, type):  # an invokable controller class — instantiate via the
                 # container (DI for its constructor), same as `_make` does for middleware.

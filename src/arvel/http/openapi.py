@@ -118,12 +118,16 @@ def security_schemes(security: dict[str, Any]) -> tuple[dict[str, Any], list[dic
     return schemes, default_security
 
 
-def openapi_config() -> Any:
+def openapi_config(json_plugin: Any = None) -> Any:
     """The OpenAPI document config — a typed view over the ``openapi`` config section
     (:class:`OpenApiSettings`, DR-0016): identity, the served ``path``, the ``ui`` renderer,
     contact/license/servers/tags/external-docs, and ``security`` schemes (the Swagger 'Authorize'
     button). Not Litestar's generic 'Litestar API' default. (Type-safe: msgspec-validated, not raw
-    dict access.)"""
+    dict access.)
+
+    ``json_plugin`` (arvel's ``JsonRenderPlugin`` subclass) renders ``/openapi.json`` — it injects the
+    request bodies for pipeline-decoded bodies that Litestar's generator can't see. Passed by the
+    kernel so both the served JSON and the UI (which fetches it) describe request bodies."""
     from litestar.openapi import OpenAPIConfig
     from litestar.openapi.spec import (
         Components,
@@ -154,9 +158,14 @@ def openapi_config() -> Any:
         kwargs["tags"] = [Tag(**tag) for tag in s.tags]
     if s.external_docs:
         kwargs["external_docs"] = ExternalDocumentation(**s.external_docs)
-    plugin = render_plugin(s.ui)
-    if plugin is not None:
-        kwargs["render_plugins"] = [plugin]
+    plugins: list[Any] = []
+    if json_plugin is not None:
+        plugins.append(json_plugin)  # arvel's JSON renderer injects pipeline-decoded request bodies
+    ui = render_plugin(s.ui)
+    if ui is not None:
+        plugins.append(ui)
+    if plugins:
+        kwargs["render_plugins"] = plugins
     schemes, default_security = security_schemes(s.security)
     if schemes:
         kwargs["components"] = Components(security_schemes=schemes)
