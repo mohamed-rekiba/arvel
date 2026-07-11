@@ -218,3 +218,40 @@ async def test_morph_to_many_attach_and_query_honor_a_pivot_extra() -> None:
         assert {t.name for t in await post.scoped_tags(2).get()} == {"python"}
     finally:
         await db.dispose()
+
+
+async def test_morph_to_many_pivot_extra_may_be_a_string_not_only_int() -> None:
+    # the extra pivot column is untyped (mirrors belongs_to_many), so a string scope works too —
+    # not forced to Integer (AR-002 review nit).
+    md = sa.MetaData()
+    tagged = sa.Table(
+        "str_taggables",
+        md,
+        sa.Column("taggable_type", sa.String),
+        sa.Column("taggable_id", sa.Integer),
+        sa.Column("tag_id", sa.Integer),
+        sa.Column("region", sa.String),
+    )
+
+    class RegionPost(Model):
+        __table_name__ = "region_posts"
+        __fields__ = {"title": str}
+        __fillable__ = ["title"]
+
+        def region_tags(self, region: object = None) -> object:
+            rel = self.morph_to_many(Tag, "taggable", pivot="str_taggables")
+            return rel.where_pivot("region", region) if region is not None else rel
+
+    db = ConnectionResolver()
+    for model in (Tag, RegionPost):
+        model.set_connection(db)
+        await db.execute(sa.schema.CreateTable(model.__table__))
+    await db.execute(sa.schema.CreateTable(tagged))
+    try:
+        post = await RegionPost.create(title="hi")
+        php = await Tag.create(name="php")
+        await post.region_tags().attach(php.id, region="eu")
+        assert {t.name for t in await post.region_tags("eu").get()} == {"php"}
+        assert list(await post.region_tags("us").get()) == []
+    finally:
+        await db.dispose()

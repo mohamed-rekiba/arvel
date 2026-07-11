@@ -764,7 +764,9 @@ class MorphToMany(Relation, FullBuilderProxy):
             sa.Column(f"{self.morph_name}_type", sa.String),
             sa.Column(self.related_pivot_key, _pk_type(self.related, self.related.__primary_key__)),
         ]
-        columns.extend(sa.Column(c, sa.Integer) for c in self._pivot_columns)
+        # untyped extra columns, mirroring BelongsToMany — a pivot extra may be any type (int
+        # team_id, a string tag, …), so don't force Integer.
+        columns.extend(cast("Any", sa.Column(c)) for c in self._pivot_columns)
         return sa.Table(self.pivot, sa.MetaData(), *columns)
 
     def _pivot_query(self) -> Any:
