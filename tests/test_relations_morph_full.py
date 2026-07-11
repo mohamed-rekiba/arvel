@@ -165,3 +165,56 @@ async def test_morph_one() -> None:
         assert image.url == "a.png"
     finally:
         await db.dispose()
+
+
+# --- morph_to_many pivot extras + where_pivot scoping (AR-002: backs the team-scoped RBAC pivot) ---
+
+_scoped_md = sa.MetaData()
+scoped_taggables = sa.Table(
+    "scoped_taggables",
+    _scoped_md,
+    sa.Column("taggable_type", sa.String),
+    sa.Column("taggable_id", sa.Integer),
+    sa.Column("tag_id", sa.Integer),
+    sa.Column("scope", sa.Integer),
+)
+
+
+class ScopedPost(Model):
+    __table_name__ = "scoped_posts"
+    __fields__ = {"title": str}
+    __fillable__ = ["title"]
+
+    def scoped_tags(self, scope: object = None) -> object:
+        rel = self.morph_to_many(Tag, "taggable", pivot="scoped_taggables")
+        return rel.where_pivot("scope", scope) if scope is not None else rel
+
+
+async def test_morph_to_many_attach_and_query_honor_a_pivot_extra() -> None:
+    db = ConnectionResolver()
+    for model in (Tag, ScopedPost):
+        model.set_connection(db)
+        await db.execute(sa.schema.CreateTable(model.__table__))
+    await db.execute(sa.schema.CreateTable(scoped_taggables))
+    try:
+        post = await ScopedPost.create(title="hello")
+        php = await Tag.create(name="php")
+        py = await Tag.create(name="python")
+        # same tag attached under two different scopes; a third scope has none
+        await post.scoped_tags().attach(php.id, scope=1)
+        await post.scoped_tags().attach(py.id, scope=2)
+
+        assert {t.name for t in await post.scoped_tags(1).get()} == {"php"}
+        assert {t.name for t in await post.scoped_tags(2).get()} == {"python"}
+        assert list(await post.scoped_tags(3).get()) == []
+        assert {t.name for t in await post.scoped_tags().get()} == {
+            "php",
+            "python",
+        }  # unscoped: all
+
+        # detach honors the scope: removing scope 1 leaves scope 2 intact
+        await post.scoped_tags().detach(php.id, scope=1)
+        assert list(await post.scoped_tags(1).get()) == []
+        assert {t.name for t in await post.scoped_tags(2).get()} == {"python"}
+    finally:
+        await db.dispose()

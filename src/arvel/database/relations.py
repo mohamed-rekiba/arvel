@@ -715,20 +715,38 @@ class MorphToMany(Relation, FullBuilderProxy):
         self.pivot = pivot or Str.plural(name)
         self.related_pivot_key = f"{Str.snake(related.__name__)}_id"
         self.related_key = related.__primary_key__
+        # extra pivot columns (e.g. a team/tenant scope) written by attach() and filterable by
+        # where_pivot() — the synthetic pivot Table must declare any column being read or written.
+        self._pivot_columns: list[str] = []
+        self._pivot_wheres: list[tuple[str, Any]] = []
+
+    def with_pivot(self, *columns: str) -> MorphToMany:
+        """Declare extra pivot columns (so ``attach``/``where_pivot`` can read+write them)."""
+        self._pivot_columns.extend(c for c in columns if c not in self._pivot_columns)
+        return self
+
+    def where_pivot(self, column: str, value: Any) -> MorphToMany:
+        """Constrain the relation by an extra pivot column (e.g. ``where_pivot('team_id', 3)``)."""
+        if column not in self._pivot_columns:
+            self._pivot_columns.append(column)
+        self._pivot_wheres.append((column, value))
+        return self
 
     def query(self) -> Any:
         """A fresh, unconstrained related Builder carrying the deferred pivot prefetch (D7)."""
         return _deferred_pivot_query(self)
 
     async def _pivot_rows(self) -> Any:
-        """This parent's pivot rows — the one pre-query shared by the proxy's async prefetch
-        hook and the native ``get()`` path (DR-0045)."""
-        return await (
+        """This parent's pivot rows, honoring ``where_pivot()`` — the one pre-query shared by the
+        proxy's async prefetch hook and the native ``get()`` path (DR-0045)."""
+        query = (
             self._pivot_query()
             .where(f"{self.morph_name}_id", "=", self._parent_id())
             .where(f"{self.morph_name}_type", "=", _morph_type(type(self.parent)))
-            .get()
         )
+        for column, value in self._pivot_wheres:
+            query = query.where(column, "=", value)
+        return await query.get()
 
     async def _apply_pivot_scope(self, builder: Any) -> None:
         rows = await self._pivot_rows()
@@ -741,13 +759,13 @@ class MorphToMany(Relation, FullBuilderProxy):
     def _pivot_table(self) -> Any:
         import sqlalchemy as sa
 
-        return sa.Table(
-            self.pivot,
-            sa.MetaData(),
+        columns = [
             sa.Column(f"{self.morph_name}_id", _pk_type(self.parent, self.parent.__primary_key__)),
             sa.Column(f"{self.morph_name}_type", sa.String),
             sa.Column(self.related_pivot_key, _pk_type(self.related, self.related.__primary_key__)),
-        )
+        ]
+        columns.extend(sa.Column(c, sa.Integer) for c in self._pivot_columns)
+        return sa.Table(self.pivot, sa.MetaData(), *columns)
 
     def _pivot_query(self) -> Any:
         from arvel.database.builder import Builder
@@ -757,14 +775,34 @@ class MorphToMany(Relation, FullBuilderProxy):
     def _parent_id(self) -> Any:
         return self.parent._attributes[self.parent.__primary_key__]
 
-    async def attach(self, related_id: Any) -> None:
+    async def attach(self, related_id: Any, **pivot: Any) -> None:
+        """Link the parent to ``related_id`` (Spatie ``attach``), with optional extra pivot
+        columns (e.g. ``attach(role_id, team_id=3)``)."""
+        self._pivot_columns.extend(c for c in pivot if c not in self._pivot_columns)
         await self._pivot_query().insert(
             {
                 f"{self.morph_name}_id": self._parent_id(),
                 f"{self.morph_name}_type": _morph_type(type(self.parent)),
                 self.related_pivot_key: related_id,
+                **pivot,
             }
         )
+
+    async def detach(self, related_id: Any | None = None, **pivot: Any) -> None:
+        """Unlink the parent from ``related_id`` (all related, if ``None``), honoring
+        ``where_pivot()`` scope and any extra pivot columns given (e.g. ``detach(role_id,
+        team_id=3)``)."""
+        self._pivot_columns.extend(c for c in pivot if c not in self._pivot_columns)
+        query = (
+            self._pivot_query()
+            .where(f"{self.morph_name}_id", "=", self._parent_id())
+            .where(f"{self.morph_name}_type", "=", _morph_type(type(self.parent)))
+        )
+        if related_id is not None:
+            query = query.where(self.related_pivot_key, "=", related_id)
+        for column, value in [*self._pivot_wheres, *pivot.items()]:
+            query = query.where(column, "=", value)
+        await query.delete()
 
     async def get(self) -> Any:
         rows = await self._pivot_rows()

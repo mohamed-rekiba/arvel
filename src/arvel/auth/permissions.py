@@ -1,10 +1,12 @@
 """arvel.auth.permissions — RBAC roles & permissions (Spatie's permission parity).
 
-``Role``/``Permission`` are arvel models; the ``HasRoles`` mixin (combined with the app's
-user model) assigns roles, grants direct permissions, and resolves effective permissions
-(direct plus via-role) through the pivot tables ``model_has_roles`` /
-``model_has_permissions`` / ``role_has_permissions``. Built on the ORM (arvel.database —
-a declared layered edge, doc 17). Grounded in knowledge/port/15-auth-authorization.md.
+``Role``/``Permission`` are arvel models; the ``HasRoles`` mixin (combined with the app's user
+model) assigns roles, grants direct permissions, and resolves effective permissions (direct plus
+via-role) through the pivot tables ``model_has_roles`` / ``model_has_permissions`` /
+``role_has_permissions`` — reached through arvel's own relations (``morph_to_many`` for the
+polymorphic model pivots, ``belongs_to_many`` for role↔permission), never hand-rolled pivot SQL.
+Built on the ORM (arvel.database — a declared layered edge, doc 17). Grounded in
+knowledge/port/15-auth-authorization.md.
 """
 
 from __future__ import annotations
@@ -15,41 +17,30 @@ from typing import Any, ClassVar
 from arvel.database import Model
 
 
-def _pivot(name: str, *columns: str) -> Any:
-    import sqlalchemy as sa
-
-    cols: list[Any] = []
-    for column in columns:
-        column_type: Any = sa.Integer if column.endswith("_id") else sa.String
-        cols.append(sa.Column(column, column_type))
-    return sa.Table(name, sa.MetaData(), *cols)
-
-
 class Role(Model):
     __fields__: ClassVar[dict[str, Any]] = {"name": str, "guard_name": str}
     __fillable__: ClassVar[list[str]] = ["name", "guard_name"]
 
-    async def give_permission_to(self, *names: str) -> Role:
-        from arvel.database.builder import Builder
+    def permissions_relation(self) -> Any:
+        """The role↔permission pivot as a ``belongs_to_many`` over ``role_has_permissions``."""
+        return self.belongs_to_many(
+            Permission,
+            pivot="role_has_permissions",
+            foreign_pivot_key="role_id",
+            related_pivot_key="permission_id",
+        )
 
-        pivot = _pivot("role_has_permissions", "role_id", "permission_id")
+    async def give_permission_to(self, *names: str) -> Role:
+        relation = self.permissions_relation()
         for name in names:
             permission = await Permission.where(name=name).first()
             if permission is not None:
-                await Builder(pivot, type(self)._resolve()).insert(
-                    {"role_id": self.id, "permission_id": permission.id}
-                )
+                await relation.attach(permission.id)
         return self
 
     async def permissions(self) -> list[Any]:
         """The permissions granted to this role (Spatie ``$role->permissions``)."""
-        from arvel.database.builder import Builder
-
-        pivot = _pivot("role_has_permissions", "role_id", "permission_id")
-        rows = await Builder(pivot, type(self)._resolve()).where("role_id", "=", self.id).get()
-        ids = [row["permission_id"] for row in rows]
-        result: Sequence[Any] = await Permission.where_in("id", ids).get() if ids else []
-        return list(result)
+        return list(await self.permissions_relation().get())
 
 
 class Permission(Model):
@@ -63,21 +54,17 @@ class HasRoles:
     def _as_model(self) -> Any:
         return self  # at runtime this *is* a Model; typed loosely for the mixin
 
-    def _morph(self) -> tuple[str, Any]:
-        from arvel.database import morph_type_of
+    def _roles_relation(self, *, team: Any = None) -> Any:
+        """The model↔role pivot as a ``morph_to_many`` over ``model_has_roles``, optionally scoped
+        to a team via the extra ``team_id`` pivot column."""
+        relation = self._as_model().morph_to_many(Role, "model", pivot="model_has_roles")
+        if team is not None:
+            relation = relation.where_pivot("team_id", team)
+        return relation
 
-        model = self._as_model()
-        return morph_type_of(type(model)), model._attributes[model.__primary_key__]
-
-    def _connection(self) -> Any:
-        # call Model's _resolve() method, not the same-named _resolver ClassVar (would shadow it)
-        return self._as_model()._resolve()
-
-    def _roles_pivot(self, *, teams: bool) -> Any:
-        cols = ["role_id", "model_type", "model_id"]
-        if teams:
-            cols.append("team_id")
-        return _pivot("model_has_roles", *cols)
+    def _direct_permissions_relation(self) -> Any:
+        """The model↔permission pivot as a ``morph_to_many`` over ``model_has_permissions``."""
+        return self._as_model().morph_to_many(Permission, "model", pivot="model_has_permissions")
 
     def set_idp_roles(self, names: Iterable[str]) -> None:
         """Carry ephemeral IdP-derived role names for this request (DR-0011).
@@ -93,60 +80,25 @@ class HasRoles:
         return set(carried) if carried else set()
 
     async def assign_role(self, *names: str, team: Any = None) -> HasRoles:
-        from arvel.database.builder import Builder
-
-        morph_type, morph_id = self._morph()
-        pivot = self._roles_pivot(teams=team is not None)
+        relation = self._roles_relation()
         for name in names:
             role = await Role.where(name=name).first()
             if role is not None:
-                row: dict[str, Any] = {
-                    "role_id": role.id,
-                    "model_type": morph_type,
-                    "model_id": morph_id,
-                }
-                if team is not None:
-                    row["team_id"] = team
-                await Builder(pivot, self._connection()).insert(row)
+                await relation.attach(role.id, **({"team_id": team} if team is not None else {}))
         self.flush_permission_cache()
         return self
 
     async def remove_role(self, name: str, team: Any = None) -> HasRoles:
         """Revoke a role from this model (Spatie ``removeRole``). No-op if the role isn't assigned."""
-        from arvel.database.builder import Builder
-
-        morph_type, morph_id = self._morph()
         role = await Role.where(name=name).first()
         if role is not None:
-            query = (
-                Builder(self._roles_pivot(teams=team is not None), self._connection())
-                .where("role_id", "=", role.id)
-                .where("model_type", "=", morph_type)
-                .where("model_id", "=", morph_id)
-            )
-            if team is not None:
-                query = query.where("team_id", "=", team)
-            await query.delete()
+            relation = self._roles_relation()
+            await relation.detach(role.id, **({"team_id": team} if team is not None else {}))
         self.flush_permission_cache()
         return self
 
     async def roles(self, team: Any = None) -> list[Any]:
-        from arvel.database.builder import Builder
-
-        morph_type, morph_id = self._morph()
-        query = (
-            Builder(self._roles_pivot(teams=team is not None), self._connection())
-            .where("model_type", "=", morph_type)
-            .where("model_id", "=", morph_id)
-        )
-        if team is not None:
-            query = query.where("team_id", "=", team)
-        rows = await query.get()
-        role_ids = [row["role_id"] for row in rows]
-        if not role_ids:
-            return []
-        result: Sequence[Any] = await Role.where_in("id", role_ids).get()
-        return list(result)
+        return list(await self._roles_relation(team=team).get())
 
     async def has_role(self, name: str, team: Any = None) -> bool:
         if name in self._carried_idp_roles():
@@ -154,43 +106,19 @@ class HasRoles:
         return any(role.name == name for role in await self.roles(team))
 
     async def give_permission_to(self, *names: str) -> HasRoles:
-        from arvel.database.builder import Builder
-
-        morph_type, morph_id = self._morph()
-        pivot = _pivot("model_has_permissions", "permission_id", "model_type", "model_id")
+        relation = self._direct_permissions_relation()
         for name in names:
             permission = await Permission.where(name=name).first()
             if permission is not None:
-                await Builder(pivot, self._connection()).insert(
-                    {"permission_id": permission.id, "model_type": morph_type, "model_id": morph_id}
-                )
+                await relation.attach(permission.id)
         self.flush_permission_cache()
         return self
 
     async def _effective_permission_ids(self) -> set[Any]:
-        from arvel.database.builder import Builder
-
-        morph_type, morph_id = self._morph()
-        direct = await (
-            Builder(
-                _pivot("model_has_permissions", "permission_id", "model_type", "model_id"),
-                self._connection(),
-            )
-            .where("model_type", "=", morph_type)
-            .where("model_id", "=", morph_id)
-            .get()
-        )
-        ids = {row["permission_id"] for row in direct}
-        role_ids = [role.id for role in await self.roles()]
-        if role_ids:
-            via = await (
-                Builder(
-                    _pivot("role_has_permissions", "role_id", "permission_id"), self._connection()
-                )
-                .where_in("role_id", role_ids)
-                .get()
-            )
-            ids |= {row["permission_id"] for row in via}
+        direct = await self._direct_permissions_relation().get()
+        ids = {p.id for p in direct}
+        for role in await self.roles():
+            ids |= {p.id for p in await role.permissions()}
         return ids
 
     def flush_permission_cache(self) -> None:
@@ -213,22 +141,11 @@ class HasRoles:
         return resolved
 
     async def _permission_names_for_role_names(self, names: set[str]) -> set[str]:
-        from arvel.database.builder import Builder
-
         role_records = await Role.where_in("name", list(names)).get()
-        role_ids = [role.id for role in role_records]
-        if not role_ids:
-            return set()
-        via = await (
-            Builder(_pivot("role_has_permissions", "role_id", "permission_id"), self._connection())
-            .where_in("role_id", role_ids)
-            .get()
-        )
-        perm_ids = {row["permission_id"] for row in via}
-        perms: Sequence[Any] = (
-            await Permission.where_in("id", list(perm_ids)).get() if perm_ids else []
-        )
-        return {perm.name for perm in perms}
+        resolved: set[str] = set()
+        for role in role_records:
+            resolved |= {perm.name for perm in await role.permissions()}
+        return resolved
 
     @staticmethod
     def _permission_granted(granted: set[str], name: str) -> bool:
