@@ -24,7 +24,7 @@ def test_db_seed_runs_root_seeder() -> None:
     app.instance("seeder", RootSeeder())
     set_application(app)
     try:
-        result = runner.invoke(build_cli(), ["db:seed"])
+        result = runner.invoke(build_cli(), ["db:seed", "--force"])
         assert result.exit_code == 0
         assert ran == ["seeded"]
     finally:
@@ -46,7 +46,7 @@ def test_db_seed_injects_a_live_console_output_into_the_seeder() -> None:
     app.instance("seeder", seeder)
     set_application(app)
     try:
-        result = runner.invoke(build_cli(), ["db:seed"])
+        result = runner.invoke(build_cli(), ["db:seed", "--force"])
         assert result.exit_code == 0
         assert isinstance(seeder.output, ConsoleOutput)  # runner swapped in a live console
     finally:
@@ -58,7 +58,7 @@ def test_db_seed_without_binding_errors() -> None:
 
     set_application(Application())  # active app, but no 'seeder' bound → binding-missing branch
     try:
-        result = runner.invoke(build_cli(), ["db:seed"])
+        result = runner.invoke(build_cli(), ["db:seed", "--force"])
         assert result.exit_code == 1
         assert "no seeder bound" in result.output
     finally:
@@ -89,7 +89,7 @@ def test_db_seed_runs_seeder_through_full_lifecycle(
     )
     monkeypatch.chdir(root)
     try:
-        result = runner.invoke(build_cli(), ["db:seed"])
+        result = runner.invoke(build_cli(), ["db:seed", "--force"])
         assert result.exit_code == 0, result.output
         assert (root / "seeded.flag").exists()  # booted via the kernel + seeder ran
     finally:

@@ -89,7 +89,7 @@ def test_migrate_fresh_drops_then_remigrates() -> None:
     _, reset = _app_with(CreateWidgets())
     try:
         assert runner.invoke(build_cli(), ["migrate"]).exit_code == 0
-        result = runner.invoke(build_cli(), ["migrate:fresh"])
+        result = runner.invoke(build_cli(), ["migrate:fresh", "--force"])
         assert result.exit_code == 0, result.output
         assert "dropped" in result.output and "migrated 1 migration" in result.output
     finally:
@@ -100,7 +100,7 @@ def test_migrate_refresh_rolls_back_then_remigrates() -> None:
     _, reset = _app_with(CreateWidgets())
     try:
         assert runner.invoke(build_cli(), ["migrate"]).exit_code == 0
-        result = runner.invoke(build_cli(), ["migrate:refresh"])
+        result = runner.invoke(build_cli(), ["migrate:refresh", "--force"])
         assert result.exit_code == 0, result.output
         assert "refreshed 1 migration" in result.output
     finally:
@@ -123,7 +123,7 @@ def test_migrate_refresh_seed_reseeds() -> None:
     set_application(app)
     try:
         assert runner.invoke(build_cli(), ["migrate"]).exit_code == 0
-        result = runner.invoke(build_cli(), ["migrate:refresh", "--seed"])
+        result = runner.invoke(build_cli(), ["migrate:refresh", "--seed", "--force"])
         assert result.exit_code == 0, result.output
         assert "refreshed 1 migration" in result.output
         assert "seeding complete" in result.output
@@ -148,7 +148,7 @@ def test_migrate_refresh_without_seed_flag_does_not_seed() -> None:
     set_application(app)
     try:
         assert runner.invoke(build_cli(), ["migrate"]).exit_code == 0
-        result = runner.invoke(build_cli(), ["migrate:refresh"])
+        result = runner.invoke(build_cli(), ["migrate:refresh", "--force"])
         assert result.exit_code == 0, result.output
         assert ran == []
     finally:
@@ -159,7 +159,7 @@ def test_db_wipe_drops_all_tables() -> None:
     _, reset = _app_with(CreateWidgets())
     try:
         assert runner.invoke(build_cli(), ["migrate"]).exit_code == 0
-        result = runner.invoke(build_cli(), ["db:wipe"])
+        result = runner.invoke(build_cli(), ["db:wipe", "--force"])
         assert result.exit_code == 0, result.output
         assert "dropped" in result.output
     finally:

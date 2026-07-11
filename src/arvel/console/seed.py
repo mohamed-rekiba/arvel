@@ -10,11 +10,21 @@ seed_app = typer.Typer()
 
 
 @seed_app.command()
-def db_seed() -> None:
+def db_seed(
+    force: bool = typer.Option(
+        False, "--force", help="Skip the confirmation prompt / allow in production."
+    ),
+) -> None:
     """Run the application's root database seeder."""
     from arvel.console.kernel import run_app_command
 
-    run_app_command(run_seed)
+    async def _handler(app: Any) -> None:
+        from arvel.console.guard import confirm_destructive
+
+        confirm_destructive(app, force=force, action="run the database seeders")
+        await run_seed(app)
+
+    run_app_command(_handler)
 
 
 async def run_seed(app: Any) -> None:

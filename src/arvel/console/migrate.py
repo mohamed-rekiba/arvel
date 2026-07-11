@@ -58,11 +58,21 @@ fresh_app = typer.Typer()
 
 
 @fresh_app.command()
-def migrate_fresh() -> None:
+def migrate_fresh(
+    force: bool = typer.Option(
+        False, "--force", help="Skip the confirmation prompt / allow in production."
+    ),
+) -> None:
     """Drop all tables, then re-run every migration."""
     from arvel.console.kernel import run_app_command
 
-    run_app_command(_fresh)
+    async def _handler(app: Any) -> None:
+        from arvel.console.guard import confirm_destructive
+
+        confirm_destructive(app, force=force, action="drop all tables and re-migrate")
+        await _fresh(app)
+
+    run_app_command(_handler)
 
 
 async def _fresh(app: Any) -> None:
@@ -78,11 +88,17 @@ refresh_app = typer.Typer()
 @refresh_app.command()
 def migrate_refresh(
     seed: bool = typer.Option(False, "--seed", help="Run the app's seeder after refreshing."),
+    force: bool = typer.Option(
+        False, "--force", help="Skip the confirmation prompt / allow in production."
+    ),
 ) -> None:
     """Roll back all migrations, then re-run them."""
     from arvel.console.kernel import run_app_command
 
     async def _handler(app: Any) -> None:
+        from arvel.console.guard import confirm_destructive
+
+        confirm_destructive(app, force=force, action="roll back and re-run all migrations")
         await _refresh(app, seed=seed)
 
     run_app_command(_handler)
@@ -103,11 +119,21 @@ wipe_app = typer.Typer()
 
 
 @wipe_app.command()
-def db_wipe() -> None:
+def db_wipe(
+    force: bool = typer.Option(
+        False, "--force", help="Skip the confirmation prompt / allow in production."
+    ),
+) -> None:
     """Drop all tables without re-migrating."""
     from arvel.console.kernel import run_app_command
 
-    run_app_command(_wipe)
+    async def _handler(app: Any) -> None:
+        from arvel.console.guard import confirm_destructive
+
+        confirm_destructive(app, force=force, action="drop all tables")
+        await _wipe(app)
+
+    run_app_command(_handler)
 
 
 async def _wipe(app: Any) -> None:
