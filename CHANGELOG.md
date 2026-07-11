@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.60.1](https://github.com/mohamed-rekiba/arvel/compare/v0.60.0...v0.60.1) (2026-07-11)
+
+
+### Bug Fixes
+
+* resolve formatting issues ([506c455](https://github.com/mohamed-rekiba/arvel/commit/506c45571722166ade4cb9693381a03397b0fd43))
+
 ## [0.60.0](https://github.com/mohamed-rekiba/arvel/compare/v0.59.0...v0.60.0) (2026-07-11)
 
 
