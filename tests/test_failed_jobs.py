@@ -105,3 +105,45 @@ async def test_retry_redispatches_and_removes_the_record() -> None:
     finally:
         set_application(None)
         await db.dispose()
+
+
+async def test_retry_grants_a_fresh_attempt_budget() -> None:
+    """`retry()` re-dispatches the job as a NEW run. The exhausted `__arvel_attempts__` the
+    failure record carried must not ride along — with it, a tries=3 job re-entered at its final
+    attempt, ran once, and bounced straight back to failed_jobs with no backoff retries."""
+    app, db = await _setup()
+    try:
+        from taskiq import InMemoryBroker
+
+        from arvel.queue import serialize_instance
+
+        RAN.clear()
+        job = _Ok("fresh")
+        job.__arvel_attempts__ = 3  # what a tries=3 exhaustion persists into the payload
+        await FailedJob.create(
+            queue="default",
+            payload=serialize_instance(job),
+            exception="RuntimeError: boom",
+            failed_at=None,
+        )
+
+        manager = QueueManager(app, broker=InMemoryBroker())
+        pushed: list[Any] = []
+        original_push = manager.push_instance
+
+        async def spying_push(instance: Any) -> Any:
+            pushed.append(instance)
+            return await original_push(instance)
+
+        manager.push_instance = spying_push  # type: ignore[method-assign]
+        app.instance("queue", manager)
+
+        failed = (await FailedJob.all())[0]
+        await failed.retry()
+
+        assert RAN == ["fresh"]
+        assert len(pushed) == 1
+        assert getattr(pushed[0], "__arvel_attempts__", 0) == 0  # a fresh budget, not attempt 3
+    finally:
+        set_application(None)
+        await db.dispose()
