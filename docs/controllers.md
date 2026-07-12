@@ -28,14 +28,23 @@ Route.get("/posts/{post}", PostController().show, name="posts.show")   # {post} 
 
 ## Controller middleware
 
-Attach middleware to every action of a controller by overriding `middleware()`:
+Attach middleware to a **resource controller's** actions by overriding `middleware()` — return
+`ControllerMiddleware` entries (each scopable to specific actions with `only`/`except_`):
 
 ```python
+from arvel.routing import ControllerMiddleware
+
 class PostController(Controller):
     @classmethod
     def middleware(cls):
-        return ["auth"]                 # every action requires authentication
+        return [
+            ControllerMiddleware("auth"),                       # every action
+            ControllerMiddleware("throttle:api", only=("store", "update")),
+        ]
 ```
+
+`middleware()` is consulted by `Route.resource`/`api_resource`; for a plain bound-method route,
+attach middleware on the route itself (see [Middleware](middleware.md)).
 
 ## Resource controllers
 
@@ -51,13 +60,14 @@ Route.resource("posts", PostController)
 | `GET /posts`                   | `index`   | `posts.index`    |
 | `GET /posts/create`            | `create`  | `posts.create`   |
 | `POST /posts`                  | `store`   | `posts.store`    |
-| `GET /posts/{id}`              | `show`    | `posts.show`     |
-| `GET /posts/{id}/edit`         | `edit`    | `posts.edit`     |
-| `PUT/PATCH /posts/{id}`        | `update`  | `posts.update`   |
-| `DELETE /posts/{id}`           | `destroy` | `posts.destroy`  |
+| `GET /posts/{post}`            | `show`    | `posts.show`     |
+| `GET /posts/{post}/edit`       | `edit`    | `posts.edit`     |
+| `PUT/PATCH /posts/{post}`      | `update`  | `posts.update`   |
+| `DELETE /posts/{post}`         | `destroy` | `posts.destroy`  |
 
-Resource routes use an `{id}` segment (the action receives the raw id); a manually-defined route
-can instead name the segment after a model (`{post}`) to get [implicit model binding](routing.md).
+The path segment is the **singularized resource name** (`posts` → `{post}`), which is exactly the
+name [implicit model binding](routing.md) keys on — so `show(self, request, post: Post)` receives
+the loaded model, not a raw id.
 
 For a JSON API, drop the HTML-form actions (`create`/`edit`) with `api=True`, and narrow the set
 with `only`/`except_`:

@@ -42,8 +42,8 @@ await request.boolean("remember")          # "1"/"true"/"on"/"yes" → True
 request.bearer_token()                     # the Authorization: Bearer token, or None
 ```
 
-Input arrives **normalized** — strings are trimmed and `""` becomes `None` by default (password
-fields are exempt), courtesy of the global middleware. See [Middleware](middleware.md).
+Input arrives **normalized** — strings are trimmed (password
+fields are exempt from trimming) and `""` becomes `None`, courtesy of the global middleware. See [Middleware](middleware.md).
 
 ## Form requests
 
