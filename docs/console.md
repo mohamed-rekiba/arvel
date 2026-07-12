@@ -374,7 +374,6 @@ $EDITOR stubs/model.stub      # customize — make:model now uses this
     upgrading, rerun `arvel stub:publish --force` (or hand-edit the escapes away) so your
     published stubs are plain Python again.
 
-
 ## Maintenance mode
 
 `arvel down` / `arvel up` flip the app into/out of maintenance (503) via

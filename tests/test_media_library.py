@@ -14,6 +14,7 @@ from arvel.database import ConnectionResolver, Model
 from arvel.filesystem import Filesystem
 from arvel.kernel.application import Application
 from arvel.media import HasMedia, Image, Media, MediaConversion
+from arvel.support.manager import MissingExtraError
 
 
 class Album(HasMedia, Model):
@@ -47,6 +48,15 @@ class Gallery(HasMedia, Model):
 
     def register_media_conversions(self) -> list[MediaConversion]:
         return [MediaConversion("thumb", width=10, height=10, fmt="PNG")]
+
+
+@pytest.fixture(autouse=True)
+def _clear_model_connections() -> Any:
+    """Every test binds class-level connections; clear them afterwards so no later test can
+    inherit a disposed resolver (order-dependent pollution)."""
+    yield
+    for model in (Media, Album, Doc, PostMedia, Gallery):
+        model.set_connection(None)
 
 
 class _Disks:
@@ -401,7 +411,7 @@ async def test_an_unresolvable_disk_fails_before_any_row_is_written(tmp_path: An
     await db.execute(sa.schema.CreateTable(Album.__table__))
     try:
         album = await Album.create(title="trip")
-        with pytest.raises(Exception, match="nope"):
+        with pytest.raises(MissingExtraError):
             await album.add_media(b"x", file_name="x.txt").to_media_collection(disk="nope")
         assert await Media.all() == []  # no orphaned reservation row
 
@@ -411,6 +421,4 @@ async def test_an_unresolvable_disk_fails_before_any_row_is_written(tmp_path: An
             await album.add_media(b"x", file_name="x.txt").to_media_collection(disk="")
         assert await Media.all() == []
     finally:
-        Media.set_connection(None)  # class-level binding — don't leak a disposed resolver
-        Album.set_connection(None)
         await db.dispose()

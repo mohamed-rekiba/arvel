@@ -203,7 +203,9 @@ class Gate:
                 result = await _maybe_await(pre(user, ability))
             if result is None:
                 # documented order: the policy method decides for its model; a same-named
-                # `define` is only the fallthrough (no policy, or the policy lacks the method)
+                # `define` is only the fallthrough (no policy, or the policy lacks the method).
+                # NB: ANY public callable on the policy matching the ability name is treated as
+                # the ability method — keep policy helpers private (_-prefixed)
                 method = getattr(instance, ability, None) if instance is not None else None
                 check = method if callable(method) else self._abilities.get(ability)
                 if check is None:

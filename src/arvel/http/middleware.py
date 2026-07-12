@@ -735,11 +735,18 @@ class RequestContextMiddleware(Middleware):
 
 class LocaleMiddleware(Middleware):
     """Set the request locale for the call's duration. Precedence: the authenticated user's
-    preferred locale, then the ``Accept-Language`` header (doc 21)."""
+    preferred locale, then the ``Accept-Language`` header (doc 21).
+
+    Under the shipped wiring this middleware runs BEFORE authentication, so its own user branch
+    only fires in standalone/custom wiring — ``AuthenticateMiddleware`` is what applies the
+    user's preference in a real app (it calls :meth:`user_preferred_locale` after resolving
+    the user)."""
 
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         from arvel.localization import current_locale
 
+        # user_preferred_locale() is None under real wiring (the kernel resets current_user
+        # before this runs); AuthenticateMiddleware delivers the user-pref precedence there
         locale = self.user_preferred_locale() or self._from_header(request)
         if not locale:
             return await call_next(request)
