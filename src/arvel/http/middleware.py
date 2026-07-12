@@ -677,7 +677,13 @@ class ValidateCsrfToken(Middleware):
 
 class AuthenticateMiddleware(Middleware):
     """Resolve the request's user via the app's ``user_resolver`` binding and bind it to
-    ``arvel.auth.current_user`` for the request's duration (cleared afterward)."""
+    ``arvel.auth.current_user`` for the request's duration (cleared afterward).
+
+    Also applies the resolved user's preferred locale (doc 21): ``LocaleMiddleware`` runs as an
+    early global — before any authentication — so the user-pref branch of its precedence can only
+    hold if the middleware that *learns* the user applies the preference. Downstream of auth
+    (handlers, views, notifications) sees the user's locale; the header locale set earlier still
+    covers everything before/without a user."""
 
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         import inspect
@@ -690,9 +696,19 @@ class AuthenticateMiddleware(Middleware):
             resolved = app().make("user_resolver")(request)
             user = await resolved if inspect.isawaitable(resolved) else resolved
         token = current_user.set(user)
+        locale_token = None
+        pref = LocaleMiddleware._from_user()  # reads the user just bound above
+        if pref:
+            from arvel.localization import current_locale
+
+            locale_token = current_locale.set(pref)
         try:
             return await call_next(request)
         finally:
+            if locale_token is not None:
+                from arvel.localization import current_locale
+
+                current_locale.reset(locale_token)
             current_user.reset(token)
 
 
