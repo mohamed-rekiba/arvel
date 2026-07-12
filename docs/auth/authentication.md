@@ -26,7 +26,7 @@ class User(Model, Authenticatable):
 [authorization](authorization.md) checks.
 
 !!! warning "Never store a plaintext password"
-    Hash it on the way in and only ever compare hashes. arvel's `Hasher` wraps Argon2 (argon2-cffi, directly — see the hashing guide):
+    Hash it on the way in and only ever compare hashes. arvel's `Hasher` uses Argon2id by default (argon2-cffi, directly); bcrypt is available via `driver="bcrypt"` — see the hashing guide:
 
     ```python
     from arvel.security import Hasher

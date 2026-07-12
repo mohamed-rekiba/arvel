@@ -103,3 +103,36 @@ async def test_auth_without_a_user_pref_keeps_the_header_locale() -> None:
         assert result == "es"
     finally:
         set_application(None)
+
+
+def test_user_pref_survives_the_served_kernel_stack() -> None:
+    """Full-wiring regression guard: the precedence must hold through the BUILT kernel
+    (use_default_global + an app-registered Authenticate global, production order) — a
+    registration-order regression only shows up here, not in hand-composed chains."""
+    from litestar.testing import TestClient
+
+    from arvel.http import HttpKernel
+    from arvel.http.middleware import AuthenticateMiddleware
+    from arvel.kernel import set_application
+    from arvel.kernel.application import Application
+    from arvel.routing import Router
+
+    app = Application()
+    app.instance("user_resolver", lambda request: User(locale="fr"))
+    set_application(app)
+    try:
+
+        async def which_locale(request: Any) -> dict[str, str]:
+            return {"locale": current_locale.get() or ""}
+
+        router = Router()
+        router.get("/which-locale", which_locale)
+        kernel = HttpKernel()
+        kernel.use_default_global()  # Locale lands in the early defaults
+        kernel.global_middleware.append(AuthenticateMiddleware)  # after it, as apps wire it
+        router.apply_to(kernel)
+        with TestClient(kernel.build()) as client:
+            got = client.get("/which-locale", headers={"accept-language": "de-DE,de"})
+            assert got.json()["locale"] == "fr"  # user pref beats the header, full stack
+    finally:
+        set_application(None)

@@ -368,6 +368,13 @@ arvel stub:publish --force    # overwrite already-published stubs
 $EDITOR stubs/model.stub      # customize — make:model now uses this
 ```
 
+!!! warning "Published stubs from older versions"
+    Stubs published before the literal-token renderer may contain `{{ }}` escape artifacts
+    (e.g. `return {{}}`), which are now preserved verbatim into generated files. After
+    upgrading, rerun `arvel stub:publish --force` (or hand-edit the escapes away) so your
+    published stubs are plain Python again.
+
+
 ## Maintenance mode
 
 `arvel down` / `arvel up` flip the app into/out of maintenance (503) via
