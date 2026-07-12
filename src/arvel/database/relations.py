@@ -134,14 +134,18 @@ class Relation:
         callback(constrained)
         return constrained.combined_where()
 
+    def _correlation_conditions(self, parent_table: Any) -> list[Any]:
+        """The WHERE conditions correlating a related row to its parent row — the one seam
+        ``exists_clause``/``aggregate_clause`` share, so a shape that identifies its rows by more
+        than the foreign key (a morph's ``{name}_type``) overrides this once, not both clauses."""
+        related_table = self.related.__table__
+        return [related_table.c[self.foreign_key] == parent_table.c[self.local_key]]
+
     def exists_clause(self, parent_table: Any, callback: Any = None) -> Any:
         """EXISTS(1) correlating this relation's rows to ``parent_table`` (has-many shape)."""
         import sqlalchemy as sa
 
-        related_table = self.related.__table__
-        subquery = sa.select(sa.literal(1)).where(
-            related_table.c[self.foreign_key] == parent_table.c[self.local_key]
-        )
+        subquery = sa.select(sa.literal(1)).where(*self._correlation_conditions(parent_table))
         if callback is not None:
             extra = self._constrained_where(callback)
             if extra is not None:
@@ -152,10 +156,9 @@ class Relation:
         """A correlated scalar subquery of ``aggregate`` over this relation's rows."""
         import sqlalchemy as sa
 
-        related_table = self.related.__table__
         return (
             sa.select(aggregate)
-            .where(related_table.c[self.foreign_key] == parent_table.c[self.local_key])
+            .where(*self._correlation_conditions(parent_table))
             .scalar_subquery()
         )
 
@@ -643,6 +646,15 @@ class MorphMany(Relation, FullBuilderProxy):
             f"{self.morph_name}_type", "=", _morph_type(type(self.parent))
         ).where_in(self.foreign_key, keys)
 
+    def _correlation_conditions(self, parent_table: Any) -> list[Any]:
+        # where_has/with_count correlate on the type discriminator too — same reason as
+        # _eager_query: another morph parent sharing an id must not count/match here
+        related_table = self.related.__table__
+        return [
+            *super()._correlation_conditions(parent_table),
+            related_table.c[f"{self.morph_name}_type"] == _morph_type(type(self.parent)),
+        ]
+
 
 class MorphTo(Relation):
     """Polymorphic inverse: resolve the parent named by ``{name}_type``/``{name}_id``."""
@@ -815,6 +827,91 @@ class MorphToMany(Relation, FullBuilderProxy):
             return ModelCollection[Any]()
         return await self.related.where_in(self.related_key, related_ids).get()
 
+    async def eager_load(self, parents: list[Any], name: str, constrain: Any = None) -> None:
+        # pivot-aware (the base where_in on `{name}_id` targets a column the related table
+        # doesn't have): batch the pivot rows for all parents — type-scoped — then one
+        # related WHERE IN, grouped back per parent. Mirrors BelongsToMany.eager_load.
+        from arvel.database.collection import ModelCollection
+
+        pk = self.parent.__primary_key__
+        parent_ids = [k for p in parents if (k := p._attributes.get(pk)) is not None]
+        if not parent_ids:
+            for parent in parents:
+                parent._relations[name] = ModelCollection[Any]()
+            return
+        pivot_query = (
+            self._pivot_query()
+            .where_in(f"{self.morph_name}_id", parent_ids)
+            .where(f"{self.morph_name}_type", "=", _morph_type(type(self.parent)))
+        )
+        for column, value in self._pivot_wheres:
+            pivot_query = pivot_query.where(column, "=", value)
+        related_ids_by_parent: dict[Any, list[Any]] = {}
+        for row in await pivot_query.get():
+            related_ids_by_parent.setdefault(row[f"{self.morph_name}_id"], []).append(
+                row[self.related_pivot_key]
+            )
+
+        all_related_ids = list({rid for rids in related_ids_by_parent.values() for rid in rids})
+        by_related_id: dict[Any, Any] = {}
+        if all_related_ids:
+            models_query = self.related.where_in(self.related_key, all_related_ids)
+            if constrain is not None:
+                constrain(models_query)
+            for model in await models_query.get():
+                by_related_id[model._attributes[self.related_key]] = model
+
+        for parent in parents:
+            pid = parent._attributes.get(pk)
+            parent._relations[name] = ModelCollection(
+                [
+                    model
+                    for rid in related_ids_by_parent.get(pid, [])
+                    if (model := by_related_id.get(rid)) is not None
+                ]
+            )
+
+    def _pivot_correlation(self, pivot: Any, parent_table: Any) -> list[Any]:
+        conditions = [
+            pivot.c[f"{self.morph_name}_id"] == parent_table.c[self.parent.__primary_key__],
+            pivot.c[f"{self.morph_name}_type"] == _morph_type(type(self.parent)),
+        ]
+        conditions.extend(pivot.c[column] == value for column, value in self._pivot_wheres)
+        return conditions
+
+    def exists_clause(self, parent_table: Any, callback: Any = None) -> Any:
+        import sqlalchemy as sa
+
+        pivot = self._pivot_table()
+        related_table = self.related.__table__
+        subquery = sa.select(sa.literal(1)).where(*self._pivot_correlation(pivot, parent_table))
+        if callback is not None:
+            extra = self._constrained_where(callback)
+            if extra is not None:
+                inner = sa.select(sa.literal(1)).where(
+                    related_table.c[self.related_key] == pivot.c[self.related_pivot_key],
+                    extra,
+                )
+                subquery = subquery.where(sa.exists(inner))
+        return sa.exists(subquery)
+
+    def aggregate_clause(self, parent_table: Any, aggregate: Any) -> Any:
+        import sqlalchemy as sa
+
+        pivot = self._pivot_table()
+        related_table = self.related.__table__
+        return (
+            sa.select(aggregate)
+            .select_from(
+                pivot.join(
+                    related_table,
+                    related_table.c[self.related_key] == pivot.c[self.related_pivot_key],
+                )
+            )
+            .where(*self._pivot_correlation(pivot, parent_table))
+            .scalar_subquery()
+        )
+
 
 class MorphedByMany(Relation, FullBuilderProxy):
     """Inverse polymorphic many-to-many (e.g. a Tag ``morphed_by_many`` Posts)."""
@@ -850,12 +947,10 @@ class MorphedByMany(Relation, FullBuilderProxy):
         else:
             builder.where_raw("1 = 0")
 
-    def _pivot_query(self) -> Any:
+    def _pivot_table(self) -> Any:
         import sqlalchemy as sa
 
-        from arvel.database.builder import Builder
-
-        table = sa.Table(
+        return sa.Table(
             self.pivot,
             sa.MetaData(),
             sa.Column(self.parent_pivot_key, _pk_type(self.parent, self.parent.__primary_key__)),
@@ -864,7 +959,11 @@ class MorphedByMany(Relation, FullBuilderProxy):
             ),
             sa.Column(f"{self.morph_name}_type", sa.String),
         )
-        return Builder(table, self.related._resolve())
+
+    def _pivot_query(self) -> Any:
+        from arvel.database.builder import Builder
+
+        return Builder(self._pivot_table(), self.related._resolve())
 
     async def get(self) -> Any:
         rows = await self._pivot_rows()
@@ -874,6 +973,87 @@ class MorphedByMany(Relation, FullBuilderProxy):
 
             return ModelCollection[Any]()
         return await self.related.where_in(self.related_key, related_ids).get()
+
+    async def eager_load(self, parents: list[Any], name: str, constrain: Any = None) -> None:
+        # inverse pivot shape: this parent's key lives in `{snake(parent)}_id`, the related
+        # (morph) model's id in `{name}_id`, type-scoped to the related class
+        from arvel.database.collection import ModelCollection
+
+        pk = self.parent.__primary_key__
+        parent_ids = [k for p in parents if (k := p._attributes.get(pk)) is not None]
+        if not parent_ids:
+            for parent in parents:
+                parent._relations[name] = ModelCollection[Any]()
+            return
+        pivot_rows = await (
+            self._pivot_query()
+            .where_in(self.parent_pivot_key, parent_ids)
+            .where(f"{self.morph_name}_type", "=", _morph_type(self.related))
+            .get()
+        )
+        related_ids_by_parent: dict[Any, list[Any]] = {}
+        for row in pivot_rows:
+            related_ids_by_parent.setdefault(row[self.parent_pivot_key], []).append(
+                row[f"{self.morph_name}_id"]
+            )
+
+        all_related_ids = list({rid for rids in related_ids_by_parent.values() for rid in rids})
+        by_related_id: dict[Any, Any] = {}
+        if all_related_ids:
+            models_query = self.related.where_in(self.related_key, all_related_ids)
+            if constrain is not None:
+                constrain(models_query)
+            for model in await models_query.get():
+                by_related_id[model._attributes[self.related_key]] = model
+
+        for parent in parents:
+            pid = parent._attributes.get(pk)
+            parent._relations[name] = ModelCollection(
+                [
+                    model
+                    for rid in related_ids_by_parent.get(pid, [])
+                    if (model := by_related_id.get(rid)) is not None
+                ]
+            )
+
+    def _pivot_correlation(self, pivot: Any, parent_table: Any) -> list[Any]:
+        return [
+            pivot.c[self.parent_pivot_key] == parent_table.c[self.parent.__primary_key__],
+            pivot.c[f"{self.morph_name}_type"] == _morph_type(self.related),
+        ]
+
+    def exists_clause(self, parent_table: Any, callback: Any = None) -> Any:
+        import sqlalchemy as sa
+
+        pivot = self._pivot_table()
+        related_table = self.related.__table__
+        subquery = sa.select(sa.literal(1)).where(*self._pivot_correlation(pivot, parent_table))
+        if callback is not None:
+            extra = self._constrained_where(callback)
+            if extra is not None:
+                inner = sa.select(sa.literal(1)).where(
+                    related_table.c[self.related_key] == pivot.c[f"{self.morph_name}_id"],
+                    extra,
+                )
+                subquery = subquery.where(sa.exists(inner))
+        return sa.exists(subquery)
+
+    def aggregate_clause(self, parent_table: Any, aggregate: Any) -> Any:
+        import sqlalchemy as sa
+
+        pivot = self._pivot_table()
+        related_table = self.related.__table__
+        return (
+            sa.select(aggregate)
+            .select_from(
+                pivot.join(
+                    related_table,
+                    related_table.c[self.related_key] == pivot.c[f"{self.morph_name}_id"],
+                )
+            )
+            .where(*self._pivot_correlation(pivot, parent_table))
+            .scalar_subquery()
+        )
 
 
 class BelongsTo(Relation, FullBuilderProxy):
