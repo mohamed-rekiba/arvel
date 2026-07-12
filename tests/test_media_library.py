@@ -411,4 +411,6 @@ async def test_an_unresolvable_disk_fails_before_any_row_is_written(tmp_path: An
             await album.add_media(b"x", file_name="x.txt").to_media_collection(disk="")
         assert await Media.all() == []
     finally:
+        Media.set_connection(None)  # class-level binding — don't leak a disposed resolver
+        Album.set_connection(None)
         await db.dispose()
