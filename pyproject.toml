@@ -102,9 +102,7 @@ dev = [
   "hypothesis>=6.155.7",
 ]
 test-integration = ["testcontainers>=4.14.2"]
-standard = [
-  "arvel[http,server,postgres,redis,queue-redis,view,mail,image,jwt,console]",
-]
+standard = ["arvel[http,server,console]"]
 all = [
   "arvel[http,server,sqlite,postgres,mysql,redis,queue-redis,queue-amqp,view,console,jwt,oidc,oauth,2fa,s3,gcs,azure,supabase,image,video,media,mail,notifications,search,vector,telemetry,i18n]",
 ]
@@ -140,6 +138,10 @@ path = "src/arvel/__init__.py" # reads __version__ (V1: one source of truth)
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/arvel"]
+
+# --- UV --------------------------------------------------------
+[tool.uv]
+compile-bytecode = true
 
 # --- Lint / format --------------------------------------------------------
 [tool.ruff]
@@ -278,10 +280,4 @@ source_modules = [
   "arvel.security",
   "arvel.client",
 ]
-forbidden_modules = [
-  "litestar",
-  "sqlalchemy",
-  "taskiq",
-  "PIL",
-  "rich",
-]
+forbidden_modules = ["litestar", "sqlalchemy", "taskiq", "PIL", "rich"]

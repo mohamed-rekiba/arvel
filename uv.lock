@@ -450,20 +450,9 @@ sqlite = [
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 standard = [
-    { name = "aiosmtplib" },
-    { name = "alembic" },
-    { name = "asyncpg" },
     { name = "granian", extra = ["reload"] },
     { name = "ipython" },
-    { name = "jinja2" },
     { name = "litestar" },
-    { name = "markdown-it-py" },
-    { name = "pillow" },
-    { name = "pyjwt" },
-    { name = "redis" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "taskiq" },
-    { name = "taskiq-redis" },
     { name = "uvicorn" },
 ]
 supabase = [
@@ -495,14 +484,12 @@ requires-dist = [
     { name = "adlfs", marker = "extra == 'azure'", specifier = ">=2026.5.0" },
     { name = "aiosmtplib", marker = "extra == 'all'", specifier = ">=5.1.2" },
     { name = "aiosmtplib", marker = "extra == 'mail'", specifier = ">=5.1.2" },
-    { name = "aiosmtplib", marker = "extra == 'standard'", specifier = ">=5.1.2" },
     { name = "aiosqlite", marker = "extra == 'all'", specifier = ">=0.22.1" },
     { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.22.1" },
     { name = "alembic", marker = "extra == 'all'", specifier = ">=1.18.5" },
     { name = "alembic", marker = "extra == 'mysql'", specifier = ">=1.18.5" },
     { name = "alembic", marker = "extra == 'postgres'", specifier = ">=1.18.5" },
     { name = "alembic", marker = "extra == 'sqlite'", specifier = ">=1.18.5" },
-    { name = "alembic", marker = "extra == 'standard'", specifier = ">=1.18.5" },
     { name = "anyio", specifier = ">=4.14.1" },
     { name = "apprise", marker = "extra == 'all'", specifier = ">=1.11.0" },
     { name = "apprise", marker = "extra == 'notifications'", specifier = ">=1.11.0" },
@@ -510,7 +497,6 @@ requires-dist = [
     { name = "asyncmy", marker = "extra == 'mysql'", specifier = ">=0.2.11" },
     { name = "asyncpg", marker = "extra == 'all'", specifier = ">=0.31.0" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31.0" },
-    { name = "asyncpg", marker = "extra == 'standard'", specifier = ">=0.31.0" },
     { name = "authlib", marker = "extra == 'all'", specifier = ">=1.7.2" },
     { name = "authlib", marker = "extra == 'oauth'", specifier = ">=1.7.2" },
     { name = "av", marker = "extra == 'all'", specifier = ">=17.1.0" },
@@ -540,14 +526,12 @@ requires-dist = [
     { name = "ipython", marker = "extra == 'standard'", specifier = ">=9.15.0" },
     { name = "itsdangerous", specifier = ">=2.2.0" },
     { name = "jinja2", marker = "extra == 'all'", specifier = ">=3.1.6" },
-    { name = "jinja2", marker = "extra == 'standard'", specifier = ">=3.1.6" },
     { name = "jinja2", marker = "extra == 'view'", specifier = ">=3.1.6" },
     { name = "litestar", marker = "extra == 'all'", specifier = ">=2.24.0" },
     { name = "litestar", marker = "extra == 'http'", specifier = ">=2.24.0" },
     { name = "litestar", marker = "extra == 'standard'", specifier = ">=2.24.0" },
     { name = "markdown-it-py", marker = "extra == 'all'", specifier = ">=4.2.0" },
     { name = "markdown-it-py", marker = "extra == 'mail'", specifier = ">=4.2.0" },
-    { name = "markdown-it-py", marker = "extra == 'standard'", specifier = ">=4.2.0" },
     { name = "meilisearch", marker = "extra == 'all'", specifier = ">=0.41.1" },
     { name = "meilisearch", marker = "extra == 'search'", specifier = ">=0.41.1" },
     { name = "moto", marker = "extra == 'dev'", specifier = ">=5.2.2" },
@@ -564,7 +548,6 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'all'", specifier = ">=12.2.0" },
     { name = "pillow", marker = "extra == 'image'", specifier = ">=12.2.0" },
     { name = "pillow", marker = "extra == 'media'", specifier = ">=12.2.0" },
-    { name = "pillow", marker = "extra == 'standard'", specifier = ">=12.2.0" },
     { name = "pip-audit", marker = "extra == 'dev'", specifier = ">=2.10.1" },
     { name = "polyfactory", marker = "extra == 'dev'", specifier = ">=3.3.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.6.0" },
@@ -573,7 +556,6 @@ requires-dist = [
     { name = "pwdlib", extras = ["argon2", "bcrypt"], specifier = ">=0.3.0" },
     { name = "pyjwt", marker = "extra == 'all'", specifier = ">=2.13.0" },
     { name = "pyjwt", marker = "extra == 'jwt'", specifier = ">=2.13.0" },
-    { name = "pyjwt", marker = "extra == 'standard'", specifier = ">=2.13.0" },
     { name = "pyjwt", extras = ["crypto"], marker = "extra == 'all'", specifier = ">=2.13.0" },
     { name = "pyjwt", extras = ["crypto"], marker = "extra == 'oidc'", specifier = ">=2.13.0" },
     { name = "pyotp", marker = "extra == '2fa'", specifier = ">=2.10.0" },
@@ -587,7 +569,6 @@ requires-dist = [
     { name = "python-ulid", specifier = ">=3.1.0" },
     { name = "redis", marker = "extra == 'all'", specifier = ">=8.0.1" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=8.0.1" },
-    { name = "redis", marker = "extra == 'standard'", specifier = ">=8.0.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.20" },
     { name = "s3fs", marker = "extra == 'all'", specifier = ">=2026.6.0" },
     { name = "s3fs", marker = "extra == 's3'", specifier = ">=2026.6.0" },
@@ -597,7 +578,6 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'mysql'", specifier = ">=2.0.51" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'postgres'", specifier = ">=2.0.51" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sqlite'", specifier = ">=2.0.51" },
-    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'standard'", specifier = ">=2.0.51" },
     { name = "structlog", specifier = ">=26.1.0" },
     { name = "supabase", marker = "extra == 'all'", specifier = ">=2.31.0" },
     { name = "supabase", marker = "extra == 'supabase'", specifier = ">=2.31.0" },
@@ -605,12 +585,10 @@ requires-dist = [
     { name = "taskiq", marker = "extra == 'queue'", specifier = ">=0.12.4" },
     { name = "taskiq", marker = "extra == 'queue-amqp'", specifier = ">=0.12.4" },
     { name = "taskiq", marker = "extra == 'queue-redis'", specifier = ">=0.12.4" },
-    { name = "taskiq", marker = "extra == 'standard'", specifier = ">=0.12.4" },
     { name = "taskiq-aio-pika", marker = "extra == 'all'", specifier = ">=0.6.0" },
     { name = "taskiq-aio-pika", marker = "extra == 'queue-amqp'", specifier = ">=0.6.0" },
     { name = "taskiq-redis", marker = "extra == 'all'", specifier = ">=1.2.3" },
     { name = "taskiq-redis", marker = "extra == 'queue-redis'", specifier = ">=1.2.3" },
-    { name = "taskiq-redis", marker = "extra == 'standard'", specifier = ">=1.2.3" },
     { name = "testcontainers", marker = "extra == 'test-integration'", specifier = ">=4.14.2" },
     { name = "typer", specifier = ">=0.26.8" },
     { name = "typing-extensions", specifier = ">=4.0" },
@@ -665,11 +643,11 @@ wheels = [
 
 [[package]]
 name = "asttokens"
-version = "3.0.1"
+version = "3.0.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/be/a5/8e3f9b6771b0b408517c82d97aed8f2036509bc247d46114925e32fe33f0/asttokens-3.0.1.tar.gz", hash = "sha256:71a4ee5de0bde6a31d64f6b13f2293ac190344478f081c3d1bccfcf5eacb0cb7", size = 62308, upload-time = "2025-11-15T16:43:48.578Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/25/1e/faf0f247f6f881b98fc4d6d07e14085cb89d13665084e6d6ac1dc2c03d0b/asttokens-3.0.2.tar.gz", hash = "sha256:3ecdbd8f2cc195f53ccada3a613538bb5f9ef6f6869129f13e03c30a677b8fe2", size = 63136, upload-time = "2026-07-12T03:31:49.084Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/39/e7eaf1799466a4aef85b6a4fe7bd175ad2b1c6345066aa33f1f58d4b18d0/asttokens-3.0.1-py3-none-any.whl", hash = "sha256:15a3ebc0f43c2d0a50eeafea25e19046c68398e487b9f1f5b517f7c0f40f976a", size = 27047, upload-time = "2025-11-15T16:43:16.109Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/2b/04b8a15f3a1c77bc79ddf5c73875327f34b4fa75982df2b76e45e402d364/asttokens-3.0.2-py3-none-any.whl", hash = "sha256:9da13157f5b28becde0bd374fc677dcd3c290614264eff096f167c469cd9f933", size = 28702, upload-time = "2026-07-12T03:31:47.542Z" },
 ]
 
 [[package]]
