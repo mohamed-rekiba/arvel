@@ -517,3 +517,16 @@ async def test_run_due_returns_the_count_that_actually_ran() -> None:
 
     assert ran == ["a", "c"]  # "b" lost the one-server claim and skipped
     assert count == 1
+
+
+def test_cron_stepped_wildcard_day_fields_still_and() -> None:
+    """Vixie rule: DOM/DOW only OR when both are *restricted*, and a field beginning with '*'
+    (including a stepped wildcard like */2) is NOT restricted — it ANDs as usual."""
+    from arvel.queue.scheduler import cron_matches
+
+    even_wednesday = datetime(2026, 1, 14, 0, 0)  # the 14th (even), a Wednesday
+    even_friday = datetime(2026, 1, 16, 0, 0)  # the 16th (even), a Friday
+    odd_friday = datetime(2026, 1, 23, 0, 0)  # the 23rd (odd), a Friday
+    assert not cron_matches("0 0 */2 * 5", even_wednesday)  # even day but not Friday → AND fails
+    assert cron_matches("0 0 */2 * 5", even_friday)
+    assert not cron_matches("0 0 */2 * 5", odd_friday)
