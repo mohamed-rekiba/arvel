@@ -142,9 +142,6 @@ packages = ["src/arvel"]
 # --- UV --------------------------------------------------------
 [tool.uv]
 compile-bytecode = true
-# supply-chain cooldown (same posture as the dependabot cooldown + SHA-pinned actions):
-# wait out newly published package versions before resolving them
-exclude-newer = "7 days"
 
 # --- Lint / format --------------------------------------------------------
 [tool.ruff]
