@@ -132,7 +132,8 @@ temp = router.signed_url("confirm", expires=ts, token=t)   # temporary (expires 
 # manually: verify the RELATIVE path + query exactly as received (what `signed_url` signed;
 # an absolute URL would reconstruct a different base and never verify):
 raw = request.raw.url
-if router.has_valid_signature(f"{raw.path}?{raw.query}"):
+signed = f"{raw.path}?{raw.query}" if raw.query else raw.path
+if router.has_valid_signature(signed):
     ...                                            # signature intact AND not expired
 ```
 
