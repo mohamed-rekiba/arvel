@@ -49,6 +49,10 @@ class Company(Model):
     def photos(self) -> object:
         return self.morph_many(Image, "imageable")
 
+    def tags(self) -> object:
+        # a second morph_to_many parent type, so correlation tests can prove type-scoping
+        return self.morph_to_many(Tag, "taggable")
+
 
 morph_map({"Post": Post, "Account": Account, "Company": Company})
 
@@ -253,5 +257,94 @@ async def test_morph_to_many_pivot_extra_may_be_a_string_not_only_int() -> None:
         await post.region_tags().attach(php.id, region="eu")
         assert {t.name for t in await post.region_tags("eu").get()} == {"php"}
         assert list(await post.region_tags("us").get()) == []
+    finally:
+        await db.dispose()
+
+
+async def test_morph_many_correlations_respect_the_type_discriminator() -> None:
+    """has/where_has/with_count on a morph_many must correlate on BOTH ``{name}_id`` and
+    ``{name}_type`` — a parent must never count another morph type's children that happen to
+    share its primary-key value."""
+    db = await _setup()
+    try:
+        account = await Account.create(name="acc")  # id 1
+        company = await Company.create(name="co")  # id 1 too (own sequence)
+        assert account.id == company.id
+        await Image.create(url="a.png", imageable_type="Company", imageable_id=company.id)
+        await Image.create(url="b.png", imageable_type="Company", imageable_id=company.id)
+
+        accounts = await Account.query().with_count("photos").get()
+        assert accounts[0].photos_count == 0  # the two images belong to the Company
+
+        companies = await Company.query().with_count("photos").get()
+        assert companies[0].photos_count == 2
+
+        assert await Account.query().has("photos").get() == []
+        assert [c.name for c in await Company.query().has("photos").get()] == ["co"]
+
+        # where_has with a callback still type-scopes
+        assert (
+            await Account.query()
+            .where_has("photos", lambda q: q.where("url", "like", "%.png"))
+            .get()
+            == []
+        )
+    finally:
+        await db.dispose()
+
+
+async def test_morph_to_many_eager_load_and_correlations() -> None:
+    """with_/where_has/with_count on a morph_to_many go through the pivot (and its type
+    column) — the documented no-N+1 eager path and the aggregate/existence helpers."""
+    db = await _setup()
+    try:
+        post = await Post.create(title="a")  # id 1
+        await Post.create(title="empty")
+        company = await Company.create(name="co")  # id 1 in its own sequence
+        php = await Tag.create(name="php")
+        py = await Tag.create(name="python")
+        rust = await Tag.create(name="rust")
+        await post.tags().attach(php.id)
+        await post.tags().attach(py.id)
+        await company.tags().attach(rust.id)  # same pivot table, different morph type, same id
+
+        posts = await Post.query().order_by("id").with_("tags").get()
+        assert {t.name for t in posts[0].relation("tags")} == {"php", "python"}  # not rust
+        assert list(posts[1].relation("tags")) == []
+
+        counted = await Post.query().order_by("id").with_count("tags").get()
+        assert [p.tags_count for p in counted] == [2, 0]
+
+        assert [p.title for p in await Post.query().has("tags").get()] == ["a"]
+        assert [p.title for p in await Post.query().doesnt_have("tags").get()] == ["empty"]
+
+        named = await Post.query().where_has("tags", lambda q: q.where("name", "=", "php")).get()
+        assert [p.title for p in named] == ["a"]
+        assert (
+            await Post.query().where_has("tags", lambda q: q.where("name", "=", "rust")).get() == []
+        )
+    finally:
+        await db.dispose()
+
+
+async def test_morphed_by_many_eager_load_and_correlations() -> None:
+    db = await _setup()
+    try:
+        post1 = await Post.create(title="a")
+        post2 = await Post.create(title="b")
+        php = await Tag.create(name="php")
+        await Tag.create(name="lonely")
+        await post1.tags().attach(php.id)
+        await post2.tags().attach(php.id)
+
+        tags = await Tag.query().order_by("id").with_("posts").get()
+        assert {p.title for p in tags[0].relation("posts")} == {"a", "b"}
+        assert list(tags[1].relation("posts")) == []
+
+        counted = await Tag.query().order_by("id").with_count("posts").get()
+        assert [t.posts_count for t in counted] == [2, 0]
+
+        assert [t.name for t in await Tag.query().has("posts").get()] == ["php"]
+        assert [t.name for t in await Tag.query().doesnt_have("posts").get()] == ["lonely"]
     finally:
         await db.dispose()
