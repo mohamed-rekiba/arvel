@@ -111,10 +111,12 @@ class HttpKernel:
         return self
 
     def resolve_middleware(self, reference: Any) -> Any:
-        """Resolve a middleware reference: an alias string -> its class; a ``throttle:<name>``
-        string -> a:class:`~arvel.http.middleware.ThrottleRequests` bound to that named limiter;
-        a generic ``alias:arg1,arg2`` string -> the registered alias class constructed with those
-        (string) args, e.g. ``.alias({"cache.headers": CacheHeaders})`` + ``"cache.headers:60"`` ->
+        """Resolve a middleware reference, in precedence order: the RESERVED ``throttle:<name>``
+        form first -> a:class:`~arvel.http.middleware.ThrottleRequests` bound to that named
+        limiter (checked before the alias branches, so an app's ``throttle`` alias can never
+        shadow it); then an alias string -> its class; then a generic ``alias:arg1,arg2`` string
+        -> the registered alias class constructed with those (string) args, e.g.
+        ``.alias({"cache.headers": CacheHeaders})`` + ``"cache.headers:60"`` ->
         ``CacheHeaders("60")``; else itself."""
         if isinstance(reference, str):
             # the reserved `throttle:<name>` named-limiter form resolves FIRST: with `throttle`
