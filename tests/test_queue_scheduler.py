@@ -201,11 +201,14 @@ def test_environments_gates_by_app_env() -> None:
 
 
 def test_timezone_shifts_the_matched_moment() -> None:
-    """`moment` is treated as UTC; `timezone('...')` re-matches the cron expression against it
-    shifted into that zone."""
+    """An aware `moment` is converted exactly; `timezone('...')` re-matches the cron expression
+    against it shifted into that zone. (A naive moment means host-local wall time — see
+    test_timezone_gate_interprets_a_naive_moment_as_host_local.)"""
+    from datetime import UTC
+
     event = Schedule().call(_noop).daily_at("09:00").timezone("America/New_York")
     # 09:00 America/New_York (UTC-5 in January) is 14:00 UTC.
-    assert event.is_due(datetime(2026, 1, 1, 14, 0))
+    assert event.is_due(datetime(2026, 1, 1, 14, 0, tzinfo=UTC))
     assert not event.is_due(datetime(2026, 1, 1, 9, 0))
 
 
@@ -350,7 +353,7 @@ async def test_maintenance_mode_skips_a_task_that_did_not_opt_in() -> None:
         event = Schedule().call(lambda: ran.append("ran")).every_minute()
         await down()
         try:
-            assert await event.run() is None
+            assert await event.run() is False  # skipped, not run
         finally:
             await up()
         assert ran == []
@@ -449,3 +452,68 @@ async def test_a_slow_scheduled_command_does_not_delay_a_same_tick_sibling() -> 
         assert fast_ran_before_slow_finished == [True]  # ran concurrently, not queued behind
     finally:
         set_application(None)
+
+
+def test_cron_dom_dow_both_restricted_match_as_or() -> None:
+    """Standard cron: when BOTH day-of-month and day-of-week are restricted, the entry fires
+    when EITHER matches ('0 0 13 * 5' = the 13th OR any Friday), not only on their intersection."""
+    from arvel.queue.scheduler import cron_matches
+
+    friday_not_13th = datetime(2026, 1, 16, 0, 0)  # a Friday, the 16th
+    the_13th_not_friday = datetime(2026, 1, 13, 0, 0)  # a Tuesday, the 13th
+    neither = datetime(2026, 1, 14, 0, 0)  # a Wednesday, the 14th
+    assert cron_matches("0 0 13 * 5", friday_not_13th)
+    assert cron_matches("0 0 13 * 5", the_13th_not_friday)
+    assert not cron_matches("0 0 13 * 5", neither)
+
+    # single-restricted stays AND-ed with the rest, exactly as before
+    assert cron_matches("0 0 13 * *", the_13th_not_friday)
+    assert not cron_matches("0 0 13 * *", friday_not_13th)
+    assert cron_matches("0 0 * * 5", friday_not_13th)
+    assert not cron_matches("0 0 * * 5", the_13th_not_friday)
+
+
+def test_timezone_gate_interprets_a_naive_moment_as_host_local() -> None:
+    """`timezone(tz)` shifts *the current moment* into tz. `schedule:run` feeds a naive local
+    `datetime.now()`, so a naive moment means host-local wall time — mislabeling it as UTC fires
+    tasks off by the host's UTC offset on any non-UTC machine."""
+    import os
+    import time
+
+    old_tz = os.environ.get("TZ")
+    os.environ["TZ"] = "Asia/Dubai"  # UTC+4, no DST
+    time.tzset()
+    try:
+        event = Schedule().call(lambda: None).daily_at("09:00").timezone("America/New_York")
+        # 2026-07-08 17:00 Dubai == 13:00 UTC == 09:00 New York (EDT)
+        assert event.is_due(datetime(2026, 7, 8, 17, 0)) is True
+        # 09:00 Dubai == 05:00 UTC == 01:00 New York — must NOT fire
+        assert event.is_due(datetime(2026, 7, 8, 9, 0)) is False
+    finally:
+        if old_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = old_tz
+        time.tzset()
+
+
+async def test_run_due_returns_the_count_that_actually_ran() -> None:
+    """`schedule:run` reports how many ran — a due event that skips (one-server claim already
+    held) must not be counted."""
+    from arvel.cache import CacheManager
+
+    cache = CacheManager().driver("array")
+    ran: list[str] = []
+    moment = datetime(2026, 1, 1, 9, 10)
+
+    claimer = Schedule(cache=cache).call(lambda: ran.append("a")).every_minute()
+    claimer = claimer.on_one_server().name("shared")
+    await claimer.run(moment)  # claims the minute
+
+    schedule = Schedule(cache=cache)
+    schedule.call(lambda: ran.append("b")).every_minute().on_one_server().name("shared")
+    schedule.call(lambda: ran.append("c")).every_minute()
+    count = await schedule.run_due(moment)
+
+    assert ran == ["a", "c"]  # "b" lost the one-server claim and skipped
+    assert count == 1
