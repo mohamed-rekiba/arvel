@@ -85,6 +85,7 @@ config = {
     "env": env("APP_ENV", "local"),
     "debug": env("APP_DEBUG", False),
     "timezone": "UTC",
+    # … the scaffold's file also carries description/version
 }
 ```
 
@@ -101,15 +102,32 @@ A fresh app is configured for **SQLite** out of the box — zero setup, a file a
 arvel migrate                  # create the tables (the scaffold ships migrations)
 ```
 
-Moving to Postgres or MySQL is a `.env` change:
+To move to Postgres, add the extra, point `DATABASE_URL` at your server, and — because the
+fresh scaffold defines a single connection named `sqlite` — either just override its URL, or
+(clearer) add a named connection in `config/database.py` and select it:
 
 ```bash
+uv add 'arvel[postgres]'
+```
+
+```python
+# config/database.py
+config = {
+    "default": env("DB_CONNECTION", "sqlite"),
+    "connections": {
+        "sqlite": {"url": env("DATABASE_URL", "sqlite+aiosqlite:///database/database.sqlite")},
+        "pgsql":  {"url": env("DATABASE_URL", "")},
+    },
+}
+```
+
+```bash
+# .env
 DB_CONNECTION=pgsql
 DATABASE_URL=postgresql+asyncpg://user:pass@localhost/blog
 ```
 
-…plus the matching extra (`uv add 'arvel[postgres]'`). See
-[Database](database/index.md) for connections, and
+See [Database](database/index.md) for connections, and
 [Migrations](database/migrations.md) for the schema builder.
 
 ## The dev server
@@ -120,7 +138,8 @@ arvel serve --reload
 
 Your app is a standard ASGI application (`asgi.py` exposes it), so any ASGI server runs it in
 production — e.g. `granian asgi:asgi_app` or `uvicorn asgi:asgi_app`. Interactive API docs are
-served at `/docs` from the OpenAPI schema your routes generate.
+served at **`/schema`** (raw document at `/schema/openapi.json`) from the OpenAPI your routes
+generate — the path is `config/openapi.py`'s to change.
 
 Two more commands you'll use daily:
 
