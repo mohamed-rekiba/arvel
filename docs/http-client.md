@@ -114,11 +114,11 @@ response.throw()            # raises RequestFailed(response) if failed(); else r
 
 ## Passing httpx options
 
-Any keyword you pass to a verb is forwarded to httpx — e.g. follow redirects (off by default; image
-CDNs and many APIs 302 to the real resource):
+Any keyword you pass to a verb is forwarded to httpx, and a per-call keyword always wins over the
+builder's state — e.g. redirects (followed by default) can be disabled for one request:
 
 ```python
-response = await Http.timeout(15).get(url, follow_redirects=True)
+response = await Http.timeout(15).get(url, follow_redirects=False)  # keep the 302
 ```
 
 ## Concurrent requests — `Http.pool`
@@ -185,8 +185,9 @@ app.instance("http", Client(transport=httpx.MockTransport(handler)))
 - **A `404` that doesn't raise.** Only retry-worthy statuses raise once attempts are exhausted; a
   non-retryable bad status is returned as-is. Call `.throw()` (or `.failed()`) when you want a `4xx`
   to become an exception.
-- **Redirects silently not followed.** `follow_redirects` is off by default — pass
-  `follow_redirects=True` for an API/CDN that 302s to the real resource.
+- **Expecting to see the `3xx` itself.** Redirects are followed by default (an API/CDN that 302s
+  to the real resource just works) — call `.without_redirects()` or pass `follow_redirects=False`
+  when the redirect response is the thing you're asserting on.
 - **Treating a `pool` slot as a response.** A failed slot holds the *exception object*, not raised —
   check `isinstance(slot, Exception)` before using it.
 - **A stray real request in a test.** Under `Http.fake`, an unmatched URL passes through to the real

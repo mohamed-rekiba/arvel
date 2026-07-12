@@ -423,7 +423,9 @@ class PendingRequest:
         send_kwargs = dict(kwargs)
         if self._auth is not None:
             send_kwargs.setdefault("auth", self._auth)
-        send_kwargs["follow_redirects"] = self._follow_redirects
+        # per-call kwarg wins ("any keyword you pass to a verb is forwarded"); the builder state
+        # (follow-by-default / without_redirects()) only fills the gap
+        send_kwargs.setdefault("follow_redirects", self._follow_redirects)
         # `verify` is construction-only on httpx (not a per-request kwarg): a no-verify send can't
         # reuse the shared client (built with the default verify=True) and drops to a per-call one.
         if self._shared_client is not None and self._verify is not False:
