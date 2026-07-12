@@ -1,178 +1,145 @@
 # Getting Started
 
-arvel is an async-first, type-safe Python web framework that ships with the batteries most apps
-need — routing, an ORM, validation, views, queues, mail, and more — without making you wire them
-together. This page takes you from an empty project to a running app that serves a route, validates
-input, renders a view, and has a test. Fifteen minutes, give or take.
+## Meet arvel
 
-By the end you'll have seen the shape of every arvel app: a small core, capabilities you opt into,
-and a single application object that ties them together.
+arvel is an async-first, type-safe web framework for Python — with the batteries most apps need
+already wired: routing, an ORM, validation, views, queues, cache, mail, storage, and a full test
+kit. You opt into capabilities; you don't assemble them.
 
-## Requirements
+Three ideas shape everything:
 
-arvel targets **Python 3.14+** and is async to the core. We recommend
-[uv](https://docs.astral.sh/uv/) for managing dependencies — every example here uses it — but pip
-works too.
+- **A light core, lazy engines.** `import arvel` is fast. Every heavy capability (HTTP, database,
+  queue, …) lives behind an extra and imports its engine lazily, so your install and cold start
+  carry only what you use.
+- **Real engines underneath.** Routes compile onto [Litestar](https://litestar.dev), the ORM speaks
+  SQLAlchemy Core, views render through Jinja2. You write the ergonomic API and keep an
+  inspectable, standard ASGI app — OpenAPI included.
+- **One application object.** A request, a queued job, and a CLI command all run against the same
+  booted application, with the same container, config, and providers.
 
-## Installing
+arvel targets **Python 3.14+**. Examples use [uv](https://docs.astral.sh/uv/), but pip works.
 
-Start with the core, then add what you need:
+## Creating an application
 
-```bash
-uv add arvel                      # the light core — CLI, container, helpers
-uv add 'arvel[standard]'          # the usual web stack: http, db, queue, cache, view, mail, image
-```
+### With the installer
 
-The core is deliberately tiny. Every capability lives behind an **extra** and its heavy engine is
-imported *lazily* — so `import arvel` stays fast, and your dependency graph (and cold start) only
-carries what you actually use:
+Install the arvel CLI once, globally, then scaffold projects with it:
 
 ```bash
-uv add 'arvel[http]'              # serve HTTP            (Litestar)
-uv add 'arvel[postgres]'          # the ORM on Postgres   (SQLAlchemy + asyncpg)
-uv add 'arvel[queue]'             # background jobs        (taskiq)
-uv add 'arvel[view]'              # server-rendered HTML   (Jinja2)
+uv tool install arvel
+arvel new blog
 ```
 
-Reach for `arvel[standard]` when you just want "a normal web app" and don't want to think about it;
-reach for the individual extras when you care about a lean install. Each capability's page lists the
-extra it needs.
-
-## The shape of an app
-
-Everything hangs off one **application** object. You configure it once — its config, the providers
-that register capabilities — and from then on it's what serves requests, runs jobs, and resolves
-dependencies:
-
-```python
-# bootstrap.py
-from arvel import Application
-
-def create_app():
-    return (
-        Application.configure(base_path=".")
-        .with_config(CONFIG)
-        .with_providers([...])        # the capabilities your app uses
-        .create()
-    )
-```
-
-You'll rarely touch the internals — but it helps to know that a request, a queued job, and a CLI
-command all run against this same booted application. (More on how that works in
-[Architecture Concepts](architecture.md).)
-
-## Your first route
-
-Routes map a URL to a handler — an `async` function that returns data. Return a dict and arvel sends
-JSON:
-
-```python
-# app/routes.py
-from arvel import Route
-
-async def hello(request):
-    return {"message": "Hello, arvel"}
-
-Route.get("/", hello, name="home")
-```
-
-Naming a route (`name="home"`) lets you generate URLs to it later instead of hardcoding paths — see
-[Routing](routing.md) for path parameters, route groups, and middleware.
-
-## Serving it
-
-Your app compiles down to a standard ASGI application, so any ASGI server can run it:
-
-```python
-# asgi.py
-from bootstrap import create_app
-
-app = create_app().as_asgi()      # a real litestar.Litestar instance
-```
+`arvel new` generates a complete, runnable app — config, routes, migrations, tests — and finishes
+the chores a fresh app forgets: it copies `.env.example` to a live `.env` **and generates your
+`APP_KEY`**, so encryption (cookies, encrypted casts) works from the first boot. Then:
 
 ```bash
-uvicorn asgi:app --reload
+cd blog
+uv sync                        # install the app's own dependencies
+source .venv/bin/activate
+arvel serve --reload           # http://127.0.0.1:8000
 ```
 
-`as_asgi()` is where arvel's dynamic routes are adapted onto [Litestar](https://litestar.dev) — you
-write the ergonomic API, and you still get a real, inspectable ASGI app (OpenAPI included).
+!!! note "The global CLI is for `new`"
+    Inside a project, always use the **project's own** `arvel` (the one `uv sync` put in
+    `.venv`). The globally-installed tool doesn't carry your app's dependencies, so project
+    commands run from it will fail to import your app.
 
-## Validating input
+Pick an app shape with `--profile`, and add a working bearer-token auth flow with `--auth`:
 
-Never trust what comes in. Describe the rules and let arvel enforce them; on failure it raises a
-`422` with a per-field error map, which the framework renders for you:
+```bash
+arvel new blog --profile web          # api (default) | web | inertia-vue | minimal
+arvel new api --auth                  # login route + token-protected endpoint + tests
+```
+
+### Manually
+
+Prefer to grow a project by hand? Add arvel to any package:
+
+```bash
+uv add 'arvel[standard]'       # the usual web stack: http, server, console, sqlite, view
+uv add arvel                   # or: just the light core (CLI, container, helpers)
+```
+
+Capabilities are extras — add them as you need them; each capability's docs page names its extra:
+
+```bash
+uv add 'arvel[postgres]'       # the ORM on Postgres (SQLAlchemy + asyncpg)
+uv add 'arvel[queue]'          # background jobs (taskiq)
+uv add 'arvel[mail]'           # mail
+```
+
+## Initial configuration
+
+All of an app's configuration lives in `config/` — plain Python modules, one per section
+(`app.py`, `database.py`, `session.py`, …), each reading the environment with sane defaults:
 
 ```python
-from arvel.validation import Validator
+# config/app.py
+from arvel import env
 
-data = await request.json()
-clean = Validator(data, {
-    "email": "required|email",
-    "age":   "nullable|integer|min:18",
-}).validate()                     # -> the validated data, or a 422 on bad input
+config = {
+    "name": env("APP_NAME", "arvel"),
+    "key": env("APP_KEY", ""),      # generated for you by `arvel new`
+    "env": env("APP_ENV", "local"),
+    "debug": env("APP_DEBUG", False),
+    "timezone": "UTC",
+}
 ```
 
-Rules are just `|`-delimited strings. There's a lot more — custom rules, typed form objects,
-localized messages — in [Validation](validation.md).
+Environment-specific values belong in `.env` (never committed — the scaffold's `.gitignore`
+already excludes it); `.env.example` documents what your app expects. If you ever need to rotate
+the key: `arvel key:generate`.
 
-For ad-hoc reads without a schema, the request exposes an input bag over the merged query string +
-JSON body (body wins): `await request.input("key")` — with dot-notation into nested bodies,
-`input("address.city")` — or `input()` for the whole merged dict. Around it: `only([...])` /
-`except_([...])`, `has("k")` / `has_any([...])` / `filled("k")` / `missing("k")`, and typed reads
-that coerce or fall back — `string`, `integer`, `boolean` (`"1"/"true"/"on"/"yes"`), `date`, `enum`,
-`collect`. `merge({...})` / `merge_if_missing({...})` layer in extra values (visible to `input()`,
-not to `validate()` — that judges what the client actually sent). `request.bearer_token()` reads an
-`Authorization: Bearer` token. Input arrives **normalized**: strings are trimmed and `""` becomes
-`None` by default (password fields aren't trimmed) — see [Middleware](middleware.md).
+## Databases & migrations
 
-## Rendering a view
+A fresh app is configured for **SQLite** out of the box — zero setup, a file at
+`database/database.sqlite`:
 
-For server-rendered HTML, return a view. arvel renders it through Jinja2 and turns it into a
-response:
-
-```python
-from arvel import view
-
-async def welcome(request):
-    return await view("welcome", {"user": request.user()}).to_response()
+```bash
+arvel migrate                  # create the tables (the scaffold ships migrations)
 ```
 
-```html
-<!-- resources/views/welcome.html -->
-{% extends "layouts/app.html" %}
-{% block content %}<h1>Hello {{ user.name }}</h1>{% endblock %}
+Moving to Postgres or MySQL is a `.env` change:
+
+```bash
+DB_CONNECTION=pgsql
+DATABASE_URL=postgresql+asyncpg://user:pass@localhost/blog
 ```
 
-## Writing a test
+…plus the matching extra (`uv add 'arvel[postgres]'`). See
+[Database](database/index.md) for connections, and
+[Migrations](database/migrations.md) for the schema builder.
 
-arvel ships a test kit so you can exercise your app like a real client and assert on side effects
-without hitting real services:
+## The dev server
 
-```python
-from arvel.testing import client, fake
-from arvel import Mail
-
-def test_homepage():
-    with client(create_app().as_asgi()) as http:
-        assert http.get("/").status_code == 200
-
-async def test_welcome_email_sent():
-    mail = fake(Mail)                 # swap the mailer for a spy
-    await register(user)
-    mail.assert_sent(WelcomeMail)     # ...and assert what would have been sent
+```bash
+arvel serve --reload
 ```
 
-`fake(...)` replaces a service (mail, queue, storage, …) with an in-memory double for the test, so
-you assert on intent rather than waiting on the network. See [Testing](testing.md) for the full kit.
+Your app is a standard ASGI application (`asgi.py` exposes it), so any ASGI server runs it in
+production — e.g. `granian asgi:asgi_app` or `uvicorn asgi:asgi_app`. Interactive API docs are
+served at `/docs` from the OpenAPI schema your routes generate.
 
-## Where to go next
+Two more commands you'll use daily:
 
-You've now touched routing, validation, views, and testing. From here:
+```bash
+arvel route:list               # every registered route, with names + middleware
+arvel shell                    # an IPython REPL with your app booted and models loaded
+```
 
-- **[Architecture Concepts](architecture.md)** — how arvel stays light, type-safe, and faithful to
-  its engines; the application lifecycle in full.
-- **[Routing](routing.md)** and **[Database & ORM](database/index.md)** — the two you'll live in most.
-- **[The Service Container](container.md)** — how dependencies are wired, and why `fake()` works.
+## Next steps
 
-Each capability has its own page under **The Basics** and **Digging Deeper** — and every one opens
-with the problem it solves before the API, so you can read them in any order.
+Depends on what you're building:
+
+- **An API** — head to [Routing](routing.md), [Validation](validation.md), and
+  [Database & ORM](database/index.md); the `--auth` scaffold shows the bearer-token flow
+  end to end.
+- **A server-rendered app** — [Views](views.md) and [Sessions & Middleware](middleware.md),
+  then the same database pages.
+- **How it all fits** — [Architecture Concepts](architecture.md) and
+  [The Service Container](container.md) explain the application lifecycle and why the test
+  kit's `fake()` works.
+
+Every capability page opens with the problem it solves before the API — read them in any order.
