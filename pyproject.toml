@@ -21,6 +21,10 @@ dependencies = [ # CORE — light, no heavy libs
   "httpx>=0.28.1",
   "anyio>=4.14.1",
   "python-ulid>=3.1.0",
+  # python-ulid 3.1.0 imports typing_extensions at module import but doesn't declare it —
+  # without this, a bare `pip install arvel` can't even `import arvel.support` (the dev
+  # extras masked it). Drop when upstream fixes its metadata.
+  "typing-extensions>=4.0",
   "itsdangerous>=2.2.0",
   "cryptography>=49.0.0",
   "pwdlib[argon2,bcrypt]>=0.3.0",
