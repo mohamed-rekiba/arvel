@@ -8,6 +8,7 @@ just the in-memory hash comparison, is what invalidates it.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from typing import Any, ClassVar
 
@@ -96,6 +97,16 @@ async def test_email_verification_route_rejects_after_email_change_on_postgres(
             # change the email IN THE DB, then replay the SAME (still-fresh) link -> rejected
             alice.email = "alice-new@example.com"
             await alice.save()
+            # visibility barrier: the route reads through its own pooled connection; on slow CI
+            # the replay occasionally raced the write and read the OLD email (200 instead of
+            # 400 — the F-25 flake). Wait until a FRESH query sees the change before replaying.
+            for _ in range(40):
+                fresh = await VerifyUser.find(alice.id)
+                if fresh is not None and fresh.email == "alice-new@example.com":
+                    break
+                await asyncio.sleep(0.05)
+            else:
+                raise AssertionError("email change never became visible to a fresh query")
             replay = await c.get(f"/email/verify/{alice.id}", params={"token": link})
             assert replay.status_code == 400
 

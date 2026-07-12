@@ -141,7 +141,9 @@ class MediaAdder:
         later read config and re-resolve the disk by that stored name, so a placeholder would
         break every downstream path.
 
-        The row is created first (its id names the storage path — ``{collection}/{id}/...``), but
+        The disk is resolved BEFORE the row is written — an unknown/misconfigured disk fails
+        inside the no-orphan guarantee, never after the reservation exists. The row is created
+        first (its id names the storage path — ``{collection}/{id}/...``), but
         it's a reservation, not a commit: if any store write below fails, every file written so
         far is cleaned up and the row itself is deleted, so a disk error never leaves an orphan
         row (with no file) or an orphan file (with no row)."""

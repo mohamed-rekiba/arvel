@@ -685,6 +685,10 @@ class Validator:
 
         # sync rules run here (wildcard custom rules included); non-wildcard custom rules are
         # deferred so they can be awaited below, alongside the async DB rules (unique/exists).
+        # Known quirk: under `bail`, deferral can change WHICH single error a field reports
+        # (a custom rule ordered before a failing string rule loses the race here, because the
+        # string rule already failed in the sync sweep) — the one-error-per-field guarantee
+        # holds on both paths either way.
         self.passes(defer_custom=True)
         for field, ruleset in self.rules.items():
             rules = self._parse_rules(ruleset)
