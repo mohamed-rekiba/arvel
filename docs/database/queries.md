@@ -40,7 +40,30 @@ await Post.where(published=True).pluck("title")             # ["Hello", …] (or
 await Post.where(slug=s).value("title")                     # one column of the first row
 await Post.find_or_fail(1)                                  # ModelNotFound on miss → HTTP 404
 await Post.where(slug=s).first_or_fail()                    # same — no manual `if None: abort(404)`
+await Post.find_many([1, 5, 9])                             # rows whose PK is in the list (misses absent)
+await Post.where(slug=s).sole()                             # exactly one — ModelNotFound on zero,
+                                                            # MultipleRecordsFound on 2+
+await Post.latest().get()                                   # newest first (created_at; pass a column)
+await Post.oldest("published_at").get()                     # the inverse
+await Post.in_random_order().take(3).get()                  # ORDER BY random()
+await Post.order_by("views").reorder("title").get()         # drop accumulated ordering; restart
 ```
+
+More `where` shapes — OR connectors, negation, grouped multi-column tests, and raw predicates:
+
+```python
+await Post.where(published=True).or_where("featured", True).get()
+await Post.where_in("status", ["a"]).or_where_in("status", ["b"]).get()
+await Post.where_not("status", "archived").get()             # NOT — also takes a closure group
+await Post.where_not(lambda q: q.where(draft=True).or_where(hidden=True)).get()
+await Post.where_any(["title", "body"], "like", "%larch%").get()   # col1 LIKE x OR col2 LIKE x
+await Post.where_all(["title", "body"], "like", "%larch%").get()   # ... AND ...
+await Comment.where_belongs_to(post).get()                   # children of this parent model
+await Post.where_exists(subquery).get()                      # WHERE EXISTS (a SQLAlchemy Select)
+await Post.where_raw("char_length(body) > 500").get()        # trusted SQL only — never user input
+```
+
+`or_where_has(relation, callback)` is the OR form of [`where_has`](relationships.md).
 
 `Model.all()`, `Model.query().get()`, and every relation `get()` return an
 [**`ModelCollection`**](relationships.md#model-collection) — a model-aware, list-compatible
@@ -154,6 +177,22 @@ Dialect-correct: Postgres/SQLite compile `ON CONFLICT ... DO UPDATE`; MySQL/Mari
 unrecognized dialect raises `UnsupportedDriverOperation` rather than silently emitting the wrong
 SQL.
 
+The rest of the write family:
+
+```python
+user = await User.update_or_create({"email": e}, {"name": n})  # update the match, else create
+user = await User.first_or_new({"email": e}, {"name": n})      # like first_or_create, but the
+await user.save()                                              # miss is UNSAVED — you persist it
+new_id = await Post.query().insert_get_id({"title": "Hi"})     # insert one row, return its PK
+await Post.query().insert_or_ignore(rows)                      # skip unique/PK violations silently
+await Post.query().truncate()                                  # empty the table (TRUNCATE on
+                                                               # PG/MySQL — resets identity;
+                                                               # DELETE FROM on SQLite)
+```
+
+Bulk `update(...)`/`delete()` return a `WriteResult` — `result.rowcount` is how many rows the
+statement touched.
+
 
 ## Scopes
 
@@ -170,6 +209,7 @@ await Post.published().authored_by(ada).get()
 Post.add_global_scope("not_archived", lambda q: q.where_null("archived_at"))
 await Post.get()                              # archived rows excluded automatically
 await Post.without_global_scope("not_archived").get()
+await Post.without_global_scopes().get()      # skip ALL global scopes for one query
 ```
 
 Prefer to name the method after the scope itself? Decorate it with `@scope` instead of using the
@@ -189,6 +229,24 @@ await Post.published().authored_by(ada).get()   # identical call site
 
 Both styles are equivalent and may be mixed on the same model; `@scope` just frees the name from
 the prefix.
+
+## The query log
+
+For debugging and N+1 hunting, the connection resolver can record every statement it runs:
+
+```python
+db = app.make("db")           # the bound ConnectionResolver
+db.enable_query_log()
+await Post.with_("comments").get()
+for entry in db.get_query_log():      # [{"sql": "...", "time_ms": 1.234}, ...]
+    print(entry["time_ms"], entry["sql"])
+db.flush_query_log()          # clear, keep recording
+db.disable_query_log()        # stop recording
+```
+
+Independently of the log, every executed statement also dispatches a **`QueryExecuted`** event
+(`sql`, `time_ms`, `connection`) through the app's event dispatcher when one is bound — listen
+to it for slow-query alerting or metrics without enabling the log.
 
 ## How it works
 

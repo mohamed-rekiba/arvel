@@ -42,6 +42,7 @@ nav = [
     { "Relationships" = "database/relationships.md" },
     { "Migrations & Schema" = "database/migrations.md" },
     { "Factories & Seeding" = "database/factories.md" },
+    { "Attributes & Accessors" = "database/attributes.md" },
     { "Casts & Serialization" = "database/casts.md" },
     { "API Resources" = "database/resources.md" },
     { "Pagination" = "pagination.md" },

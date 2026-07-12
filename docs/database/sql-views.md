@@ -77,6 +77,7 @@ after a nightly import, or on demand. `refresh_op()` builds the statement; run i
 
 ```python
 await db.execute(MonthlyRevenue().refresh_op())     # REFRESH MATERIALIZED VIEW [CONCURRENTLY]
+await db.refresh_materialized_view("monthly_revenue", concurrently=True)   # same, by name
 ```
 
 `refresh = "concurrently"` builds a `REFRESH … CONCURRENTLY`, which rebuilds the view without blocking
