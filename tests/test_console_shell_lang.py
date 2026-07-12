@@ -201,7 +201,9 @@ def test_shell_command_outside_a_project_launches_with_no_app(
 
     monkeypatch.setattr(arvel.console.context, "in_project", lambda: False)
     launched: dict[str, Any] = {}
-    monkeypatch.setattr(shell_module, "_launch_repl", lambda ns, banner: launched.setdefault("ns", ns))
+    monkeypatch.setattr(
+        shell_module, "_launch_repl", lambda ns, banner: launched.setdefault("ns", ns)
+    )
 
     shell_module.shell()
 
@@ -226,7 +228,9 @@ def test_shell_command_inside_a_project_bootstraps_and_autoloads(
     )
     monkeypatch.setattr(shell_module, "import_app_models", lambda app: [])
     launched: dict[str, Any] = {}
-    monkeypatch.setattr(shell_module, "_launch_repl", lambda ns, banner: launched.setdefault("ns", ns))
+    monkeypatch.setattr(
+        shell_module, "_launch_repl", lambda ns, banner: launched.setdefault("ns", ns)
+    )
 
     shell_module.shell()
 
@@ -244,7 +248,9 @@ def test_shell_command_in_project_with_no_loadable_app_skips_bootstrap(
     monkeypatch.setattr(arvel.console.context, "in_project", lambda: True)
     monkeypatch.setattr(arvel.console.kernel, "load_project_app", lambda: None)
     launched: dict[str, Any] = {}
-    monkeypatch.setattr(shell_module, "_launch_repl", lambda ns, banner: launched.setdefault("ns", ns))
+    monkeypatch.setattr(
+        shell_module, "_launch_repl", lambda ns, banner: launched.setdefault("ns", ns)
+    )
 
     shell_module.shell()  # app is None: bootstrap/import_app_models never run, no crash
 

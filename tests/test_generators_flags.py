@@ -38,9 +38,7 @@ def test_make_controller_resource(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
         assert f"async def {action}" in src
 
 
-def test_make_controller_api_and_invokable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_make_controller_api_and_invokable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _cli(tmp_path, monkeypatch, "make:controller", "ApiC", "--api")
     api = (tmp_path / "app/controllers/api_c.py").read_text()
     assert "async def create" not in api and "async def edit" not in api

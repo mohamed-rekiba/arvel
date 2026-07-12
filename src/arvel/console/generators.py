@@ -343,7 +343,9 @@ def make_model(
     ),
     factory: bool = typer.Option(False, "-f", "--factory", help="Also generate a factory."),
     seeder: bool = typer.Option(False, "-s", "--seed", help="Also generate a seeder."),
-    controller: bool = typer.Option(False, "-c", "--controller", help="Also generate a controller."),
+    controller: bool = typer.Option(
+        False, "-c", "--controller", help="Also generate a controller."
+    ),
     resource: bool = typer.Option(
         False, "-r", "--resource", help="Make the controller resourceful (CRUD)."
     ),
@@ -352,7 +354,10 @@ def make_model(
     ),
     policy: bool = typer.Option(False, "-p", "--policy", help="Also generate a policy."),
     all_: bool = typer.Option(
-        False, "-a", "--all", help="Generate migration, factory, seeder, resource controller + policy."
+        False,
+        "-a",
+        "--all",
+        help="Generate migration, factory, seeder, resource controller + policy.",
     ),
 ) -> None:
     """Generate an Active-Record model (app/models/), with optional companions: -m migration,
