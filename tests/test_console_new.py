@@ -18,7 +18,8 @@ def test_new_scaffolds_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert result.exit_code == 0, result.output
     for rel in ("pyproject.toml", "asgi.py", "app/__init__.py", "routes/web.py"):
         assert (tmp_path / "myapp" / rel).exists(), rel
-    # sqlite ships inside the `standard` extra now — the scaffold depends on standard alone
+    # the dependency rework slimmed the scaffold default to `standard` alone (sqlite is an
+    # explicit opt-in extra now, no longer part of the default scaffold dependency)
     assert (
         'dependencies = ["arvel[standard]"]' in (tmp_path / "myapp" / "pyproject.toml").read_text()
     )

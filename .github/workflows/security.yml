@@ -52,6 +52,10 @@ jobs:
         #   autoescaping Jinja env (e.g. paginator links()) — trusted output, not external input
         # - directly-returned-format-string: fires on any `return f"..."`; the hit is the CSRF
         #   middleware's origin-string helper (compared, never rendered) — arvel has no Flask routes
+        # - uv-missing-dependency-cooldown: the cooldown already lives at the right layer for a
+        #   fully-locked project (dependabot cooldown + every CI install runs --frozen); uv's
+        #   exclude-newer is either a rolling window (permanently desyncs uv.lock from
+        #   `uv lock --check`) or a frozen absolute date (blocks dependabot bumps) — both worse
         run: >-
           semgrep scan --config=auto --error
           --exclude-rule python.lang.security.audit.non-literal-import.non-literal-import
@@ -61,6 +65,7 @@ jobs:
           --exclude-rule python.flask.security.xss.audit.direct-use-of-jinja2.direct-use-of-jinja2
           --exclude-rule python.flask.security.xss.audit.explicit-unescape-with-markup.explicit-unescape-with-markup
           --exclude-rule python.flask.security.audit.directly-returned-format-string.directly-returned-format-string
+          --exclude-rule package_managers.uv.uv-missing-dependency-cooldown.uv-missing-dependency-cooldown
         env:
           SEMGREP_RULES: "p/python p/security-audit p/owasp-top-ten"
 
