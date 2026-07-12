@@ -267,7 +267,7 @@ async def test_named_ability_still_resolves_when_the_policy_lacks_the_method() -
 
 async def test_policy_before_runs_even_when_a_same_named_define_exists() -> None:
     class SuperAdminPolicy:
-        def before(self, user: User, ability: str) -> Optional[bool]:
+        def before(self, user: User, ability: str) -> bool | None:
             return True if user.admin else None
 
         def update(self, user: User, post: Post) -> bool:
