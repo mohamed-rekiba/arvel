@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.63.2](https://github.com/mohamed-rekiba/arvel/compare/v0.63.1...v0.63.2) (2026-07-12)
+
+
+### Documentation
+
+* **orm:** close the coverage gaps — accessors/mutators page + eight page gap-fills ([aa977d2](https://github.com/mohamed-rekiba/arvel/commit/aa977d2dde847339223c76932e04ba03213d94ce))
+* un-splice the drop_all note from the SQLite batch-alter sentence ([1d6fcfa](https://github.com/mohamed-rekiba/arvel/commit/1d6fcfa91975271ec06e385e2823fcb8780ad6a4))
+
 ## [0.63.1](https://github.com/mohamed-rekiba/arvel/compare/v0.63.0...v0.63.1) (2026-07-12)
 
 
