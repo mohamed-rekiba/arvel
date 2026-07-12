@@ -283,6 +283,37 @@ The framework's own modules ship typed settings built this exact way:
     reads (`app.timezone` in `arvel.dates`, `app.name` in `arvel.contracts`) stay on raw `config()` —
     those modules sit below the settings layer in the import graph and can't depend on it.
 
+## Debug mode
+
+`config("app.debug")` (from `APP_DEBUG`) controls how much error detail the app exposes. In
+**local** development, `true` surfaces tracebacks and rich error pages. In **production** it must
+be `false` — a `true` debug flag leaks stack traces, config, and schema to clients. See
+[Error Handling](errors.md).
+
+## Maintenance mode
+
+Take the application offline during a deploy or migration without stopping the server. `arvel down`
+flips a flag (stored in the app's default cache, so a Redis/Valkey store reaches every worker and
+host); every request then gets a **503** with a `Retry-After` header until you run `arvel up`:
+
+```bash
+arvel down                                   # 503 for everyone
+arvel down --message "Back at 14:00 UTC" --retry 120
+arvel up                                     # back online
+```
+
+You can keep working while the public is locked out:
+
+```bash
+arvel down --secret my-token                 # ?secret=my-token grants a bypass cookie
+arvel down --allow 203.0.113.4               # this IP is let through (repeatable)
+arvel down --render maintenance              # pre-render resources/views/maintenance.html
+```
+
+Because the flag lives in the cache, an app using the default in-process cache only takes *its own*
+process offline — use a shared cache store (Redis/Valkey) in production so `down` reaches the
+whole fleet.
+
 ## How it works
 
 At boot the application assembles a single configuration `Repository` from layered sources, lowest
