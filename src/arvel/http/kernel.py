@@ -117,16 +117,20 @@ class HttpKernel:
         (string) args, e.g. ``.alias({"cache.headers": CacheHeaders})`` + ``"cache.headers:60"`` ->
         ``CacheHeaders("60")``; else itself."""
         if isinstance(reference, str):
+            # the reserved `throttle:<name>` named-limiter form resolves FIRST: with `throttle`
+            # also registered as an alias (as the docs show), the generic alias-with-args branch
+            # would construct ThrottleRequests("<name>") — the limiter NAME as the positional
+            # max_attempts — and 500 every request at count-compare time
+            if reference.startswith("throttle:"):
+                from arvel.http.middleware import ThrottleRequests
+
+                return ThrottleRequests(limiter_name=reference.removeprefix("throttle:"))
             name, sep, raw_args = reference.partition(":")
             if sep and name in self._aliases:
                 target = self._aliases[name]
                 return target(*raw_args.split(",")) if isinstance(target, type) else target
             if reference in self._aliases:
                 return self._aliases[reference]
-            if reference.startswith("throttle:"):
-                from arvel.http.middleware import ThrottleRequests
-
-                return ThrottleRequests(limiter_name=reference.removeprefix("throttle:"))
             return reference
         return reference
 

@@ -187,3 +187,19 @@ def test_resolve_middleware_throttle_still_special_cased() -> None:
     kernel = HttpKernel()
     resolved = kernel.resolve_middleware("throttle:api")
     assert isinstance(resolved, ThrottleRequests)
+
+
+def test_throttle_name_form_wins_over_a_registered_throttle_alias() -> None:
+    """Both are documented: `kernel.alias({"throttle": ThrottleRequests})` and the reserved
+    `throttle:<name>` named-limiter form. The generic alias-with-args branch must not swallow
+    the reserved form — it constructed ThrottleRequests("uploads"), passing the limiter NAME as
+    the positional max_attempts and 500ing every request at count-compare time."""
+    from arvel.http import HttpKernel
+    from arvel.http.middleware import ThrottleRequests
+
+    kernel = HttpKernel()
+    kernel.alias({"throttle": ThrottleRequests})
+    resolved = kernel.resolve_middleware("throttle:uploads")
+    assert isinstance(resolved, ThrottleRequests)
+    assert resolved._limiter_name == "uploads"
+    assert resolved.max_attempts != "uploads"  # never the name as a count
