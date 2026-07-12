@@ -151,7 +151,16 @@ class MediaAdder:
         model = self._model
         media_model: type[Media] = model.__media_model__
         disks = app("filesystem")
-        disk_name = disk or disks.default_driver()
+        # only None means "use the default"; an explicit name goes to the manager to validate.
+        # A blank name is rejected HERE: the manager's own `name or default` fallback would
+        # accept it, but the row would then persist disk="" and poison get_url/delete later.
+        if disk is not None and not disk.strip():
+            message = "disk name must not be blank (omit disk= to use the default disk)"
+            raise ValueError(message)
+        disk_name = disks.default_driver() if disk is None else disk
+        # resolve the filesystem BEFORE the row exists: an unknown/misconfigured disk must fail
+        # here, inside the no-orphan guarantee, not after the reservation row was written
+        filesystem = disks.disk(disk_name)
         existing = await model.get_media(collection)
         media = await media_model.create(
             model_type=morph_type_of(type(model)),
@@ -166,7 +175,6 @@ class MediaAdder:
             generated_conversions={},
             order_column=len(existing) + 1,
         )
-        filesystem = disks.disk(disk_name)
         base_dir = f"{collection}/{media.id}"
         written: list[str] = []
         try:

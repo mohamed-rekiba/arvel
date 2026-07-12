@@ -381,3 +381,34 @@ async def test_add_media_without_disk_uses_the_configured_default_disk(tmp_path:
         assert not stored.exists()
     finally:
         await db.dispose()
+
+
+async def test_an_unresolvable_disk_fails_before_any_row_is_written(tmp_path: Any) -> None:
+    """The no-orphan guarantee must cover disk RESOLUTION too: an explicitly bogus disk= used
+    to raise only after the Media row was created (and outside the cleanup scope), leaving an
+    orphaned row with no file."""
+    from arvel.filesystem import FilesystemManager
+
+    app = Application.configure().create()
+    app.make("config").set(
+        "filesystems", {"default": "local", "disks": {"local": {"root": str(tmp_path)}}}
+    )
+    app.instance("filesystem", FilesystemManager())
+    db = ConnectionResolver()
+    Media.set_connection(db)
+    Album.set_connection(db)
+    await db.execute(sa.schema.CreateTable(Media.__table__))
+    await db.execute(sa.schema.CreateTable(Album.__table__))
+    try:
+        album = await Album.create(title="trip")
+        with pytest.raises(Exception, match="nope"):
+            await album.add_media(b"x", file_name="x.txt").to_media_collection(disk="nope")
+        assert await Media.all() == []  # no orphaned reservation row
+
+        # an explicit empty string is INVALID input, not "use the default" — it must fail
+        # loudly (and, per the guarantee above, leave no row)
+        with pytest.raises(ValueError, match="blank"):
+            await album.add_media(b"x", file_name="x.txt").to_media_collection(disk="")
+        assert await Media.all() == []
+    finally:
+        await db.dispose()
