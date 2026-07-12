@@ -75,7 +75,7 @@ redirect().route("posts.index").with_("status", "Post created")  # a one-request
 response.download("invoices/2026-06.pdf")                 # Content-Disposition: attachment
 response.download(path, name="report.pdf")                # override the download filename
 response.file("images/logo.png")                          # inline (rendered in the browser)
-response.stream(generator, headers={...})                 # stream a body chunk by chunk
+response.stream(generator, media_type="text/csv")         # stream a body chunk by chunk
 ```
 
 ## Status codes & headers
