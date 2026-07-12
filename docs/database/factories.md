@@ -25,6 +25,7 @@ UserFactory().raw()                           # just the attribute dict (no mode
 
 ```python
 await UserFactory().count(3).create()                          # 3 persisted users
+UserFactory().make_many(3)                                     # 3 UNSAVED instances (list)
 await UserFactory().state({"admin": True}).create()            # composable; immutable (returns a copy)
 await UserFactory().count(2).sequence({"name": "Alice"}, {"name": "Bob"}).create()
 ```

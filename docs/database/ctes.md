@@ -46,6 +46,21 @@ nums = nums.union_all(sa.select((nums.c.n + 1).label("n")).where(nums.c.n < 10))
 rows = await app("db").fetch_all(sa.select(nums))     # [{"n": 1}, … {"n": 10}]
 ```
 
+The builder wraps that whole dance as **`recursive_cte(name, anchor, recursive)`** — `anchor`
+is a Builder for the seed rows; `recursive` receives the CTE and returns the recursive `Select`
+term; you get the full `WITH RECURSIVE` select back, ready for `db.fetch_all(...)` (or re-source
+a builder onto the CTE with `from_cte(...)` to keep model hydration):
+
+```python
+tbl = Category.__table__
+anchor = Category.where(id=1)                      # the subtree root
+full = anchor.recursive_cte(
+    "tree", anchor,
+    lambda cte: sa.select(tbl).join(cte, tbl.c.parent_id == cte.c.id),
+)
+rows = await db.fetch_all(full)                    # the whole subtree
+```
+
 For the common **referential tree** case there's an ergonomic relation (below); for any
 other recursion, build the CTE by hand and — if you want models back — re-source a builder onto
 it with `Builder.from_cte()`.

@@ -164,6 +164,35 @@ await user.roles().detach(role.id, team_id=3)          # scoped detach
 This is exactly how the RBAC `HasRoles` mixin scopes roles per team over `model_has_roles` — the
 framework backs its own roles/permissions with these relations rather than hand-rolled pivot SQL.
 
+### The morph registry — `morph_map`
+
+The value stored in every `{name}_type` column defaults to the model's **qualified class path**
+(`app.models.post.Post`). That works untouched — but it welds your data to your module layout: a
+rename or move orphans every polymorphic row. Register stable aliases at boot instead:
+
+```python
+from arvel.database import morph_map
+
+morph_map({"post": Post, "video": Video})   # e.g. in a provider's register()
+```
+
+Now `commentable_type` stores `"post"`, and refactors can't strand data. `morph_type_of(Post)`
+returns whatever a model will write (its alias, else the qualified path) — use it when seeding
+or asserting on morph columns by hand. Register aliases **before** any polymorphic write, and
+treat them like migrations: renaming an alias later requires backfilling the old values.
+
+### Touching parents — `__touches__`
+
+A model can bump its parents' `updated_at` whenever it is saved — a comment marking its post as
+freshly active:
+
+```python
+class Comment(Model):
+    __touches__ = ["post"]                    # relation names to touch on save
+
+    def post(self): return self.belongs_to(Post)
+```
+
 
 ## Relationship queries & aggregates
 

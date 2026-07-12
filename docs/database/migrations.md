@@ -65,7 +65,9 @@ t.integer("views").default(0)
 t.unsigned_integer("count")                   # also unsigned_big/small/tiny_integer
 t.boolean("published").default(False);
 t.timestamps()
-t.timestamp("published_at").nullable()        # DateTime
+t.timestamp("published_at").nullable()        # DateTime — .not_null() is the explicit inverse
+t.soft_deletes()                              # nullable deleted_at — the SoftDeletes column
+t.unique_index("email")                       # named-or-derived unique index (multi-column ok)
 ```
 
 Cross-dialect types render natively where it matters (real `UNSIGNED` / `LONGTEXT` / `MEDIUMTEXT`
@@ -134,6 +136,10 @@ def up(self, schema):
 
 `change_column`'s kwargs (`type=`, `nullable=`, `default=`, `comment=`) are independent — pass only
 the ones you're changing. **SQLite** has no in-place `ALTER COLUMN`/`DROP CONSTRAINT`, so
+`Migrator.drop_all()` reflects and drops **every** table (views first on Postgres, with
+CASCADE) — it is what `db:wipe` and `migrate:fresh` run; reach for the commands, not the method,
+outside of harness code.
+
 `rename_column`/`change_column`/`drop_foreign`/`drop_unique` route through Alembic's
 `batch_alter_table` there (it recreates the table under the hood) — the same migration code runs
 unchanged on every dialect. `drop_index`/`rename` (a table rename) are native everywhere, no batch

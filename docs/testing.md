@@ -126,6 +126,30 @@ async def test_create_and_delete(db):
     await assert_database_missing(db, "audit_log", action="purge")
 ```
 
+### Wiring a test database
+
+Tests bind models to a throwaway connection directly — no app container needed:
+
+```python
+from arvel.database import ConnectionResolver
+
+db = ConnectionResolver()                 # in-memory sqlite by default; pass {"default": {"url": ...}}
+Post.set_connection(db)                   # class-level: every Post query uses it
+...
+Post.set_connection(None)                 # clear before dispose — don't leak a dead resolver
+await db.dispose()
+```
+
+For a shared database (e.g. the integration tier's real Postgres), wrap each test in
+**`begin_test_transaction()`** — every query inside runs on one connection whose transaction is
+always rolled back, so the database is untouched between tests:
+
+```python
+async with db.begin_test_transaction():
+    await Post.create(title="scratch")    # visible inside the block…
+# …and gone here: the transaction rolled back on exit
+```
+
 ## Console commands
 
 `cli(app, command, input=None)` runs an app-registered command (a `Command` class on
