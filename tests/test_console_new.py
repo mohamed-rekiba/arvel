@@ -18,11 +18,10 @@ def test_new_scaffolds_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert result.exit_code == 0, result.output
     for rel in ("pyproject.toml", "asgi.py", "app/__init__.py", "routes/web.py"):
         assert (tmp_path / "myapp" / rel).exists(), rel
-    # the dependency rework slimmed the scaffold default to `standard` alone (sqlite is an
-    # explicit opt-in extra now, no longer part of the default scaffold dependency)
-    assert (
-        'dependencies = ["arvel[standard]"]' in (tmp_path / "myapp" / "pyproject.toml").read_text()
-    )
+    # `standard` is deliberately slim (http/server/console); the scaffold adds `sqlite`
+    # explicitly because its generated config defaults to sqlite — without the driver a
+    # fresh `arvel new` + `uv sync` app cannot open its own database
+    assert "arvel[standard,sqlite]" in (tmp_path / "myapp" / "pyproject.toml").read_text()
 
 
 def test_new_web_profile_adds_views(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
