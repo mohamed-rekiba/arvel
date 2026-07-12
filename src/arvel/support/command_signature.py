@@ -75,4 +75,23 @@ def parse_signature(signature: str) -> list[SignatureArg]:
     ]
 
 
-__all__ = ["SignatureArg", "parse_signature"]
+def validate_positional_order(tokens: list[SignatureArg], command: str) -> None:
+    """Reject a required positional after an optional/defaulted/variadic one — the one signature
+    shape the CLI cannot dispatch. Shared by closure registration (raise at ``Console.command``
+    time, per the docs) and the lazy typer builder (class commands), so both surfaces enforce
+    the same rule with the same message."""
+    seen_optional = False
+    for token in tokens:
+        if token.is_option:
+            continue
+        if token.optional or token.default is not None or token.variadic:
+            seen_optional = True
+        elif seen_optional:
+            message = (
+                f"command {command!r}: required argument {{{token.name}}} cannot "
+                f"follow an optional one (an optional positional must come last)"
+            )
+            raise ValueError(message)
+
+
+__all__ = ["SignatureArg", "parse_signature", "validate_positional_order"]

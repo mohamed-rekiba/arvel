@@ -18,7 +18,11 @@ from typing import Any
 
 # The signature grammar moved to `support` (below the layer line) so the test console-runner shares
 # this exact parser instead of copying it — re-exported here for console's existing call sites.
-from arvel.support.command_signature import SignatureArg, parse_signature
+from arvel.support.command_signature import (
+    SignatureArg,
+    parse_signature,
+    validate_positional_order,
+)
 
 __all__ = ["ClosureCommand", "Console", "SignatureArg", "parse_signature"]
 
@@ -30,6 +34,9 @@ class ClosureCommand:
         self.signature = signature.strip()
         self.handler = handler
         self.name = self.signature.split()[0]
+        # raise the one undispatchable signature shape HERE, at registration (docs contract) —
+        # deferred to CLI build time it was caught broadly and the command silently vanished
+        validate_positional_order(self.tokens(), self.name)
 
     def tokens(self) -> list[SignatureArg]:
         """The full typed signature spec — see:func:`parse_signature`."""

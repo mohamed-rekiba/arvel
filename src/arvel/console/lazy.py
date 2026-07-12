@@ -198,14 +198,18 @@ def _signature_typer_params(cmd_name: str, tokens: list[Any]) -> tuple[list[Any]
     """Build the ``inspect.Parameter`` list + annotations for a synthetic Typer callback from parsed
     signature tokens (shared by closure commands and app/provider ``Command`` classes — see
     ``console.closure`` for the grammar). A required positional after an optional one is rejected
-    (an optional positional must come last, same rule enforces)."""
+    (an optional positional must come last, same rule enforces) — via the shared
+    ``validate_positional_order``, so class commands fail with the same message closure
+    registration raises."""
     import inspect
 
     import typer
 
+    from arvel.support.command_signature import validate_positional_order
+
+    validate_positional_order(tokens, cmd_name)
     parameters: list[inspect.Parameter] = []
     annotations: dict[str, Any] = {}
-    seen_optional_positional = False
     for token in tokens:
         if token.is_option:
             decls = [f"--{token.name}", *([f"-{token.shortcut}"] if token.shortcut else [])]
@@ -240,7 +244,6 @@ def _signature_typer_params(cmd_name: str, tokens: list[Any]) -> tuple[list[Any]
                 )
                 annotations[token.name] = bool
         elif token.variadic:  # {arg*} → variadic POSITIONAL (a list; None when omitted)
-            seen_optional_positional = True
             parameters.append(
                 inspect.Parameter(
                     token.name,
@@ -250,7 +253,6 @@ def _signature_typer_params(cmd_name: str, tokens: list[Any]) -> tuple[list[Any]
             )
             annotations[token.name] = list[str]
         elif token.optional:  # {arg?} / {arg=default} → optional POSITIONAL
-            seen_optional_positional = True
             # a plain None default makes Typer render this as an --option instead of a positional arg
             parameters.append(
                 inspect.Parameter(
@@ -261,11 +263,6 @@ def _signature_typer_params(cmd_name: str, tokens: list[Any]) -> tuple[list[Any]
             )
             annotations[token.name] = str
         else:  # {arg} → required positional (Typer enforces; missing → usage error, exit 2)
-            if seen_optional_positional:
-                raise ValueError(
-                    f"command {cmd_name!r}: required argument {{{token.name}}} cannot "
-                    f"follow an optional one (an optional positional must come last)"
-                )
             parameters.append(
                 inspect.Parameter(token.name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
             )

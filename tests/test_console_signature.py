@@ -173,7 +173,12 @@ def test_get_command_degrades_to_none_on_a_malformed_closure_signature(
     from arvel.console.closure import ClosureCommand
     from arvel.console.lazy import LazyGroup
 
-    bad = ClosureCommand("weird {a?} {b}", lambda: None)  # required after optional
+    # registration itself now raises on this shape (see test_console_closure), so simulate a
+    # corrupted/stale registry entry to pin the lazy builder's safety net for build-time failures
+    bad = ClosureCommand.__new__(ClosureCommand)
+    bad.signature = "weird {a?} {b}"  # required after optional
+    bad.handler = lambda: None
+    bad.name = "weird"
     monkeypatch.setattr(kernel_module, "discover_app_commands", lambda: {"weird": bad})
 
     group = LazyGroup(name="arvel")
