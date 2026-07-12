@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING
 
-__version__ = "0.63.0"  # x-release-please-version
+__version__ = "0.63.1"  # x-release-please-version
 
 # name -> (submodule, attribute), resolved lazily by __getattr__ below.
 _LAZY: dict[str, tuple[str, str]] = {

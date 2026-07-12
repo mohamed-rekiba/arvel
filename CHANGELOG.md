@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.63.1](https://github.com/mohamed-rekiba/arvel/compare/v0.63.0...v0.63.1) (2026-07-12)
+
+
+### Bug Fixes
+
+* **ci:** cooldown belongs to the semgrep exclusion list, not uv resolution ([a69e4f7](https://github.com/mohamed-rekiba/arvel/commit/a69e4f7a2a39daa241d15997012912b595bed31d))
+* **ci:** unbreak main — scaffold-deps assertion, throttle time skew, uv cooldown ([7b72142](https://github.com/mohamed-rekiba/arvel/commit/7b7214242b89b72f2d5afd8ac9bb1fe7ee72abb9))
+* **console:** standard carries every engine the scaffold defaults to ([5b3bb25](https://github.com/mohamed-rekiba/arvel/commit/5b3bb25234e7a2aa541bab12ab2083157e3e14d2))
+* **console:** the scaffold ships its own database driver again ([d6087f4](https://github.com/mohamed-rekiba/arvel/commit/d6087f41b28993d8c694ab2e3c796c4748286ec1))
+* **media:** resolve the disk before the reservation row; reject blank disk names ([734345b](https://github.com/mohamed-rekiba/arvel/commit/734345b2281e68ef5e5db95ca04b1e2730a32bd7))
+
 ## [0.63.0](https://github.com/mohamed-rekiba/arvel/compare/v0.62.0...v0.63.0) (2026-07-12)
 
 
