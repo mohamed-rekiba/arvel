@@ -2,7 +2,7 @@
 
 # Reference → Arvel documentation section map
 
-The master index driving the docs rewrite. Every the reference framework doc section is mapped to the Arvel
+The master index driving the docs rewrite. Every reference-framework doc section is mapped to the Arvel
 page(s) that should cover it, with a coverage verdict. Rewrite order follows this file top to
 bottom. **Hygiene:** this ops-repo file names the reference framework; the in-repo `docs/` and `docs/GAPS.md`
 never do (they say "the reference framework").
@@ -12,7 +12,7 @@ Legend:
 - **◐ partial** — exists but missing sub-topics the reference covers; rewrite = restyle + fill.
 - **➕ new** — no Arvel page; the feature exists in code but is undocumented or scattered.
 - **⚠ gap** — the feature itself is missing/incomplete in Arvel → record in `docs/GAPS.md`.
-- **✚ arvel-extra** — Arvel page with no the reference framework equivalent; keep, style to match.
+- **✚ arvel-extra** — Arvel page with no reference-framework equivalent; keep, style to match.
 - **∅ n/a** — reference-only (a first-party product/tool) with no Arvel analogue; skip.
 
 ---
@@ -163,7 +163,7 @@ Proposed `zensical.toml` nav, reorganized from the current tree so the top-level
 ordering match the reference framework: **Getting Started → Architecture Concepts → The Basics → Digging Deeper →
 Security → Database → ORM → Testing**. `(NEW)` = page to create; `(split)` = carve out
 of an existing page; everything else is an existing page re-homed. Arvel-only pages are placed in
-the closest the reference framework group and tagged `[extra]`.
+the closest reference-framework group and tagged `[extra]`.
 
 ```
 Home                              index.md
@@ -290,7 +290,7 @@ About arvel                       about.md
   hashing, password-reset); arvel's richer auth stack (SSO/OIDC/OAuth/2FA/tokens/…) sits below as
   extras.
 - **Arvel-extras** (dates, money, pipeline, features, media, search, telemetry, activitylog,
-  openapi) are retained, each parked in its nearest the reference framework group and tagged.
+  openapi) are retained, each parked in its nearest reference-framework group and tagged.
 
 ## New pages this structure requires
 structure.md, deployment.md, lifecycle.md, frontend.md, csrf.md, controllers.md, requests.md,
