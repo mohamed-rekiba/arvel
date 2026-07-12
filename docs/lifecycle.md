@@ -22,7 +22,7 @@ generates your OpenAPI.
 
 A matched request runs through a **two-tier middleware pipeline** before it reaches your handler:
 
-1. **Global middleware** — runs for every request. The defaults (in order) bind a request id into
+1. **Global middleware** — runs for every request. The defaults (in order) start the telemetry span, bind a request id into
    the log context, gate maintenance mode, validate host and body size, normalize input (trim
    strings, empty-string→null), and set the request locale.
 2. **Group middleware** — runs for the route's group. The `web` group adds cookie encryption,

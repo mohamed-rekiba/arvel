@@ -52,7 +52,7 @@ Legend:
 | Requests | **requests.md** (split from routing) | ◐ Request/input bag well-covered in getting-started+routing; reference dedicates a page |
 | Responses | **responses.md** (new/split) | ◐ Response, redirects, JSON, files — scattered; consolidate |
 | Views | views.md | ✅ verify (Jinja, share, composers?) |
-| Blade Templates | views.md (Jinja section) | ◐ Jinja is the analogue; document directives/inheritance/components |
+| Templates | views.md (Jinja section) | ◐ Jinja is the analogue; document directives/inheritance/components |
 | Asset Bundling (Vite) | views.md frontend / **frontend.md** | ◐ Vite manifest reader exists |
 | URL Generation | routing.md / **urls.md** | ◐ `route()`/`url()`/signed URLs exist; reference dedicates a page |
 | Session | **session.md** (split from middleware) | ◐ StartSession/flash/driver in middleware.md; reference dedicates a page |
@@ -63,7 +63,7 @@ Legend:
 ## Digging Deeper
 | Reference | Arvel target | Verdict |
 |---------|-------------|---------|
-| Artisan Console | console.md | ✅ verify (commands, args/opts, generators, scheduler) |
+| Console | console.md | ✅ verify (commands, args/opts, generators, scheduler) |
 | Broadcasting | broadcasting.md | ✅ verify |
 | Cache | cache.md | ✅ verify (stores, tags, locks, remember) |
 | Collections | helpers.md (Collection split) | ◐ Collection exists; reference dedicates a page |
@@ -114,7 +114,7 @@ Legend:
 | Redis | — | ∅ (cache/queue drivers cover it; no dedicated Redis page) |
 | MongoDB | — | ∅ n/a |
 
-## Eloquent ORM
+## ORM
 | Reference | Arvel target | Verdict |
 |---------|-------------|---------|
 | Getting Started | database/index.md | ✅ verify (model basics) |
@@ -144,7 +144,7 @@ Products with no Arvel core analogue are skipped; the closest Arvel analogues ar
 1. **Getting Started group** — configuration (fill), structure (new), frontend (split), deployment (new). [G-02 done]
 2. **Architecture** — lifecycle (new), container/providers/facades (verify+restyle).
 3. **The Basics A** — routing, middleware, csrf (split), controllers/requests/responses (split).
-4. **The Basics B** — views/blade/frontend, urls (split), session (split), validation, errors, logging.
+4. **The Basics B** — views/templates/frontend, urls (split), session (split), validation, errors, logging.
 5. **Digging Deeper A** — console+scheduling, cache, events, queues, storage, http-client.
 6. **Digging Deeper B** — collections/strings (split), helpers, localization, mail, notifications, broadcasting, processes, concurrency, context, contracts (new), rate-limiting (split), packaging.
 7. **Security** — auth pages, encryption, hashing, email-verify, password-reset (VERIFY/gap).
@@ -161,7 +161,7 @@ ops ledger, `zensical build`, commit. Independent review at batch boundaries; ST
 
 Proposed `zensical.toml` nav, reorganized from the current tree so the top-level groups and their
 ordering match the reference framework: **Getting Started → Architecture Concepts → The Basics → Digging Deeper →
-Security → Database → Eloquent ORM → Testing**. `(NEW)` = page to create; `(split)` = carve out
+Security → Database → ORM → Testing**. `(NEW)` = page to create; `(split)` = carve out
 of an existing page; everything else is an existing page re-homed. Arvel-only pages are placed in
 the closest the reference framework group and tagged `[extra]`.
 
@@ -190,7 +190,7 @@ The Basics
   Requests                        requests.md             (split; input bag lives in routing/getting-started)
   Responses                       responses.md            (NEW/consolidate)
   Views                           views.md
-  Templates                       templates.md            (split from views.md — Jinja = Blade analogue)
+  Templates                       templates.md            (split from views.md — Jinja is the template-engine analogue)
   URL Generation                  urls.md                 (split from routing.md)
   Session                         session.md              (split from middleware.md)
   Validation                      validation.md
@@ -198,7 +198,7 @@ The Basics
   Logging                         logging.md
 
 Digging Deeper
-  Console                         console.md              [the reference framework "Artisan Console"]
+  Console                         console.md              [the reference framework "Console"]
   Task Scheduling                 scheduling.md           (split from console.md)
   Broadcasting                    broadcasting.md
   Cache                           cache.md
@@ -259,7 +259,7 @@ Database
   SQL Views & Functions           database/sql-views.md   [extra]
   JSON, Full-Text & Vectors       database/json-search.md [extra]
 
-Eloquent ORM
+ORM
   Getting Started                 database/index.md (models section) or models.md (split)
   Relationships                   database/relationships.md
   Collections                     database/collections.md  (split from relationships #model-collection)
@@ -280,7 +280,7 @@ About arvel                       about.md
 
 ## Structural deltas from the current nav (what moves)
 - **Configuration** moves The Basics → Getting Started (the reference framework's placement).
-- **Database** splits into **Database** (query builder, migrations, seeding, pagination) + **Eloquent
+- **Database** splits into **Database** (query builder, migrations, seeding, pagination) + **the ORM
   ORM** (models, relationships, casts, resources, factories) — currently one flat group.
 - **The Basics** gains CSRF, Controllers, Requests, Responses, Templates, URLs, Session, Logging
   (mostly splits from routing/middleware/views).
