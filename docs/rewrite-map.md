@@ -86,11 +86,11 @@ Legend:
 | — | dates.md | ✚ arvel-extra (Date/Carbon-analogue) — keep |
 | — | money.md | ✚ arvel-extra — keep |
 | — | pipeline.md | ✚ arvel-extra (the reference framework has Pipeline in helpers) |
-| — | features.md | ✚ arvel-extra (feature flags — the reference framework = Pennant, a package) |
-| — | media.md | ✚ arvel-extra (the reference framework = Spatie package) |
-| — | search.md | ✚ arvel-extra (the reference framework = Scout, a package) |
-| — | telemetry.md | ✚ arvel-extra (the reference framework = Telescope/Pulse, packages) |
-| — | activitylog.md | ✚ arvel-extra (the reference framework = Spatie package) |
+| — | features.md | ✚ arvel-extra (feature flags — the reference framework = a feature-flag package, a package) |
+| — | media.md | ✚ arvel-extra (the reference framework = a third-party package) |
+| — | search.md | ✚ arvel-extra (the reference framework = a search package, a package) |
+| — | telemetry.md | ✚ arvel-extra (the reference framework = a debug package/an app-metrics package, packages) |
+| — | activitylog.md | ✚ arvel-extra (the reference framework = a third-party package) |
 | — | openapi.md | ✚ arvel-extra |
 
 ## Security
@@ -111,7 +111,7 @@ Legend:
 | Pagination | pagination.md | ✅ verify |
 | Migrations | database/migrations.md | ✅ recently gap-filled — restyle |
 | Seeding | database/index or console | ◐ Seeder exists (DR-0034); needs a Seeding section |
-| Redis | — | ∅ (cache/queue drivers cover it; no dedicated Redis page) |
+| a cache/queue backend | — | ∅ (cache/queue drivers cover it; no dedicated a cache/queue backend page) |
 | MongoDB | — | ∅ n/a |
 
 ## ORM
@@ -221,11 +221,11 @@ Digging Deeper
   Dates & Time                    dates.md                [extra]
   Money                           money.md                [extra]
   Pipeline                        pipeline.md             [extra]
-  Feature Flags                   features.md             [extra: the reference framework Pennant]
-  Media Library                   media.md                [extra: the reference framework Spatie]
-  Search                          search.md               [extra: the reference framework Scout]
-  Telemetry                       telemetry.md            [extra: the reference framework Telescope/Pulse]
-  Activity Log                    activitylog.md          [extra: the reference framework Spatie]
+  Feature Flags                   features.md             [extra: the reference framework a feature-flag package]
+  Media Library                   media.md                [extra: the reference framework a third-party]
+  Search                          search.md               [extra: the reference framework a search package]
+  Telemetry                       telemetry.md            [extra: the reference framework a debug package/an app-metrics package]
+  Activity Log                    activitylog.md          [extra: the reference framework a third-party]
   OpenAPI & API Docs              openapi.md              [extra]
 
 Security
@@ -237,10 +237,10 @@ Security
   Password Reset                  auth/password-reset.md      (VERIFY exists → doc or GAP)
   — Arvel auth extras —
   Guards & Drivers                auth/guards.md          [extra]
-  API Tokens                      auth/api-tokens.md      [extra: the reference framework Sanctum]
-  Two-Factor Auth                 auth/two-factor.md      [extra: the reference framework Fortify]
+  API Tokens                      auth/api-tokens.md      [extra: the reference framework a token-auth package]
+  Two-Factor Auth                 auth/two-factor.md      [extra: the reference framework an auth-backend package]
   Single Sign-On (OIDC)           auth/sso-oidc.md        [extra]
-  OAuth2 Social Login             auth/oauth.md           [extra: the reference framework Socialite]
+  OAuth2 Social Login             auth/oauth.md           [extra: the reference framework a social-auth package]
   IdP Groups → Roles              auth/idp-roles.md       [extra]
   Identities & Account Linking    auth/identities.md      [extra]
   Routes & Flows                  auth/routes-and-flows.md [extra]
