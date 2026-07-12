@@ -136,16 +136,18 @@ def up(self, schema):
 
 `change_column`'s kwargs (`type=`, `nullable=`, `default=`, `comment=`) are independent — pass only
 the ones you're changing. **SQLite** has no in-place `ALTER COLUMN`/`DROP CONSTRAINT`, so
-`Migrator.drop_all()` reflects and drops **every** table (views first on Postgres, with
-CASCADE) — it is what `db:wipe` and `migrate:fresh` run; reach for the commands, not the method,
-outside of harness code.
-
 `rename_column`/`change_column`/`drop_foreign`/`drop_unique` route through Alembic's
 `batch_alter_table` there (it recreates the table under the hood) — the same migration code runs
-unchanged on every dialect. `drop_index`/`rename` (a table rename) are native everywhere, no batch
+unchanged on every dialect.
+
+`drop_index`/`rename` (a table rename) are native everywhere, no batch
 mode needed. A constraint's name (for `drop_foreign`/`drop_unique`) is whatever the database
 assigned it (e.g. Postgres's `<table>_<column>_fkey`/`_key` defaults) — inspect the table
 (`\d <table>` / `Inspector.get_foreign_keys`) if you didn't name it explicitly.
+
+`Migrator.drop_all()` reflects and drops **every** table (views first on Postgres, with CASCADE)
+— it is what `db:wipe` and `migrate:fresh` run; reach for the commands, not the method, outside
+of harness code.
 
 ## migrate:refresh / migrate:fresh
 
