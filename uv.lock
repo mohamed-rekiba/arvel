@@ -450,9 +450,13 @@ sqlite = [
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 standard = [
+    { name = "aiosqlite" },
+    { name = "alembic" },
     { name = "granian", extra = ["reload"] },
     { name = "ipython" },
+    { name = "jinja2" },
     { name = "litestar" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "uvicorn" },
 ]
 supabase = [
@@ -486,10 +490,12 @@ requires-dist = [
     { name = "aiosmtplib", marker = "extra == 'mail'", specifier = ">=5.1.2" },
     { name = "aiosqlite", marker = "extra == 'all'", specifier = ">=0.22.1" },
     { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.22.1" },
+    { name = "aiosqlite", marker = "extra == 'standard'", specifier = ">=0.22.1" },
     { name = "alembic", marker = "extra == 'all'", specifier = ">=1.18.5" },
     { name = "alembic", marker = "extra == 'mysql'", specifier = ">=1.18.5" },
     { name = "alembic", marker = "extra == 'postgres'", specifier = ">=1.18.5" },
     { name = "alembic", marker = "extra == 'sqlite'", specifier = ">=1.18.5" },
+    { name = "alembic", marker = "extra == 'standard'", specifier = ">=1.18.5" },
     { name = "anyio", specifier = ">=4.14.1" },
     { name = "apprise", marker = "extra == 'all'", specifier = ">=1.11.0" },
     { name = "apprise", marker = "extra == 'notifications'", specifier = ">=1.11.0" },
@@ -526,6 +532,7 @@ requires-dist = [
     { name = "ipython", marker = "extra == 'standard'", specifier = ">=9.15.0" },
     { name = "itsdangerous", specifier = ">=2.2.0" },
     { name = "jinja2", marker = "extra == 'all'", specifier = ">=3.1.6" },
+    { name = "jinja2", marker = "extra == 'standard'", specifier = ">=3.1.6" },
     { name = "jinja2", marker = "extra == 'view'", specifier = ">=3.1.6" },
     { name = "litestar", marker = "extra == 'all'", specifier = ">=2.24.0" },
     { name = "litestar", marker = "extra == 'http'", specifier = ">=2.24.0" },
@@ -578,6 +585,7 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'mysql'", specifier = ">=2.0.51" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'postgres'", specifier = ">=2.0.51" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sqlite'", specifier = ">=2.0.51" },
+    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'standard'", specifier = ">=2.0.51" },
     { name = "structlog", specifier = ">=26.1.0" },
     { name = "supabase", marker = "extra == 'all'", specifier = ">=2.31.0" },
     { name = "supabase", marker = "extra == 'supabase'", specifier = ">=2.31.0" },
