@@ -177,12 +177,24 @@ class ViewFactory:
         return self
 
     def share(self, **globals_: Any) -> None:
-        """Register globals available to every template."""
+        """Register globals available to every template (app-wide, static — e.g. from a provider's
+        ``boot``). For per-request data (flashed ``errors``/``old``) use :meth:`share_request`."""
         self.env.globals.update(globals_)
 
+    def share_request(self, **values: Any) -> None:
+        """Share values with every template rendered **in the current request/async context** only.
+        Backed by a ``ContextVar`` (``arvel.support.view_shares``), not ``env.globals``, so two
+        in-flight requests can never see each other's flash data."""
+        from arvel.support import view_shares
+
+        view_shares.set({**(view_shares.get() or {}), **values})
+
     async def render(self, view_obj: View) -> str:
+        from arvel.support import view_shares
+
         template = self.env.get_template(view_obj.template)
-        rendered: str = await template.render_async(**view_obj.data)
+        # request-scoped shares sit between env.globals and the view's own data (data wins)
+        rendered: str = await template.render_async({**(view_shares.get() or {}), **view_obj.data})
         return rendered
 
 

@@ -15,8 +15,8 @@ class _ViewSpy:
     def __init__(self) -> None:
         self.shared: dict[str, Any] = {}
 
-    def share(self, **globals_: Any) -> None:
-        self.shared.update(globals_)
+    def share_request(self, **values: Any) -> None:
+        self.shared.update(values)
 
 
 class _Req:

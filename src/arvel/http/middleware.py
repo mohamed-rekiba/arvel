@@ -809,7 +809,7 @@ class ValidateHost(Middleware):
 
 
 class ShareErrorsFromSession(Middleware):
-    """Share session-flashed data as view globals on every request: the validation ``errors`` bag
+    """Share session-flashed data with this request's templates: the validation ``errors`` bag
     and the ``old`` callable for form repopulation. Web group, runs after ``StartSession`` (which sets ``request.session`` and
        ages the flash). No-op when no session or view is bound, so non-view apps are unaffected."""
 
@@ -821,7 +821,9 @@ class ShareErrorsFromSession(Middleware):
             from arvel.http.flash import FlashBag
 
             bag = FlashBag(cast("dict[str, Any]", session))
-            app("view").share(errors=bag.errors(), old=bag.old)
+            # request-scoped, NOT .share(): env.globals is process-wide and would leak this
+            # request's flashed errors/old input into a concurrent request's render
+            app("view").share_request(errors=bag.errors(), old=bag.old)
         return await call_next(request)
 
 

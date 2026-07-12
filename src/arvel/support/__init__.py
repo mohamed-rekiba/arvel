@@ -90,6 +90,12 @@ current_user: contextvars.ContextVar[Any] = contextvars.ContextVar("arvel_user",
 access_token: contextvars.ContextVar[Any] = contextvars.ContextVar(
     "arvel_access_token", default=None
 )
+#: Request-scoped view shares (``dict[str, Any] | None`` — e.g. the flashed ``errors``/``old`` a
+#: middleware exposes to this request's templates). Lives here beside ``current_user`` for the same
+#: DR-0026 reason: ``views`` reads it, ``http`` writes and resets it, and neither may import the
+#: other. Per-request data must never go into the Jinja ``env.globals`` — that is process-shared
+#: and leaks one request's flash into a concurrent request's render.
+view_shares: contextvars.ContextVar[Any] = contextvars.ContextVar("arvel_view_shares", default=None)
 
 _UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
