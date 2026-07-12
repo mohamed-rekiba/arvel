@@ -242,3 +242,38 @@ async def test_nullable_check_is_cached_per_callback() -> None:
     await gate.allows("view", user=None)
     await gate.allows("view", user=None)
     assert len(gate._nullable_cache) == cache_size_after_first == 1
+
+
+class DenyAllPolicy:
+    def update(self, user: User, post: Post) -> bool:
+        return False
+
+
+async def test_policy_method_takes_precedence_over_a_same_named_define() -> None:
+    """Documented resolution order: before → policy method → named ability. A model with a
+    registered policy is decided by the policy; a same-named `define` must not shadow it."""
+    gate = Gate()
+    gate.policy(Post, DenyAllPolicy)
+    gate.define("update", lambda user, post: True)  # would-be permissive shadow
+    assert await gate.allows("update", Post(owner_id=1), user=User(1)) is False
+
+
+async def test_named_ability_still_resolves_when_the_policy_lacks_the_method() -> None:
+    gate = Gate()
+    gate.policy(Post, DenyAllPolicy)  # has no "ship" method
+    gate.define("ship", lambda user, post: True)
+    assert await gate.allows("ship", Post(owner_id=1), user=User(1)) is True
+
+
+async def test_policy_before_runs_even_when_a_same_named_define_exists() -> None:
+    class SuperAdminPolicy:
+        def before(self, user: User, ability: str) -> Optional[bool]:
+            return True if user.admin else None
+
+        def update(self, user: User, post: Post) -> bool:
+            return False
+
+    gate = Gate()
+    gate.policy(Post, SuperAdminPolicy)
+    gate.define("update", lambda user, post: False)
+    assert await gate.allows("update", Post(owner_id=9), user=User(1, admin=True)) is True
