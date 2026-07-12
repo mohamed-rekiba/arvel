@@ -277,3 +277,27 @@ async def test_policy_before_runs_even_when_a_same_named_define_exists() -> None
     gate.policy(Post, SuperAdminPolicy)
     gate.define("update", lambda user, post: False)
     assert await gate.allows("update", Post(owner_id=9), user=User(1, admin=True)) is True
+
+
+async def test_policy_before_alone_grants_without_an_ability_method() -> None:
+    """The model-wide super-admin pattern: a policy carrying only `before()` (no per-ability
+    methods) must still short-circuit for its model — for ANY ability name — and fall through
+    to the named ability (or deny) when `before()` returns None."""
+
+    class AdminOnlyPolicy:
+        def before(self, user: User, ability: str) -> bool | None:
+            return True if user.admin else None
+
+    gate = Gate()
+    gate.policy(Post, AdminOnlyPolicy)
+    post = Post(owner_id=1)
+    assert await gate.allows("publish", post, user=User(1, admin=True)) is True
+    assert (
+        await gate.allows("publish", post, user=User(2, admin=False)) is False
+    )  # no method, no define
+
+    gate.define("publish", lambda user, post: user.id == 7)
+    assert (
+        await gate.allows("publish", post, user=User(7, admin=False)) is True
+    )  # define fallthrough
+    assert await gate.allows("publish", post, user=User(2, admin=False)) is False
