@@ -120,3 +120,17 @@ def test_optional_positional_argument_omitted_or_given(app: Application) -> None
     # and it must NOT have become an option
     assert all(not getattr(p, "is_flag", False) for p in command.params if p.name == "name")
     assert any(type(p).__name__ == "TyperArgument" and p.name == "name" for p in command.params)
+
+
+def test_bad_positional_ordering_raises_at_registration() -> None:
+    """Docs: a required positional after an optional/defaulted/variadic one is a signature
+    error *raised at registration* — not deferred to CLI build time, where it was swallowed
+    and the command silently vanished from the CLI ("No such command")."""
+    with pytest.raises(ValueError, match="cannot follow"):
+        ClosureCommand("greet {name?} {other}", lambda: None)
+    with pytest.raises(ValueError, match="cannot follow"):
+        ClosureCommand("greet {name=x} {other}", lambda: None)
+    with pytest.raises(ValueError, match="cannot follow"):
+        ClosureCommand("greet {names*} {other}", lambda: None)
+    # options after an optional positional are fine — only positionals order-constrain
+    ClosureCommand("greet {name?} {--loud}", lambda: None)
