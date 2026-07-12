@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.62.0](https://github.com/mohamed-rekiba/arvel/compare/v0.61.0...v0.62.0) (2026-07-12)
+
+
+### Features
+
+* **console:** finish generator flags + type-safe stubs (CLI-002/003) ([8e37220](https://github.com/mohamed-rekiba/arvel/commit/8e372204687123a880b490dc314ba065be19126c))
+* **console:** make:model companion generation (CLI-003) ([9142f3c](https://github.com/mohamed-rekiba/arvel/commit/9142f3cc6786707a34b6bc66e1b5dd0d8f5258ae))
+* **helpers,console:** global helpers, Model repr, DumpDie, tinker UX ([5a74279](https://github.com/mohamed-rekiba/arvel/commit/5a74279905566f888d65727f054adda098352450))
+
+
+### Bug Fixes
+
+* **console:** address CLI-001 review nits ([97f75ed](https://github.com/mohamed-rekiba/arvel/commit/97f75edc2a757670cab5dc747b46a23dcab3a7c6))
+* **console:** guard destructive DB commands (CLI-001) ([8432c19](https://github.com/mohamed-rekiba/arvel/commit/8432c190cfa8cece2f395676612c900309386aa8))
+* **e2e:** pass --force to db:seed in the smoke script ([76b5de5](https://github.com/mohamed-rekiba/arvel/commit/76b5de51b812df17f9f950f2b2d1063aaef6fc3c))
+* **orm:** to_dict() serializes enums, nested values, datetime, UUID (deep) ([5f1649d](https://github.com/mohamed-rekiba/arvel/commit/5f1649d8c5abd2f1789d67517314651cd49e0a17))
+* resolve formating issues ([b1fbc38](https://github.com/mohamed-rekiba/arvel/commit/b1fbc38efbd903c4d59863524004fa698a822883))
+
 ## [0.61.0](https://github.com/mohamed-rekiba/arvel/compare/v0.60.1...v0.61.0) (2026-07-11)
 
 
