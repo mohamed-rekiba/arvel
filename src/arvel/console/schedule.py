@@ -21,7 +21,8 @@ async def _run_due(schedule: Any, moment: Any = None) -> int:
 
     # aware local now: timezone() gates convert exactly instead of guessing what naive means
     now = moment if moment is not None else datetime.now().astimezone()
-    return await schedule.run_due(now)  # how many actually ran, not how many were due
+    ran: int = await schedule.run_due(now)  # how many actually ran, not how many were due
+    return ran
 
 
 @schedule_app.command()
