@@ -96,7 +96,8 @@ case "$mig_out" in
   *"migrated $mig_count migration"*) ;;
   *) echo "FAIL: 'arvel migrate' did not apply the $mig_count scaffolded migrations"; printf '%s\n' "$mig_out"; exit 1 ;;
 esac
-seed_out="$(arvel db:seed 2>&1)" || { echo "FAIL: 'arvel db:seed' errored"; printf '%s\n' "$seed_out"; exit 1; }
+# db:seed is destructive-guarded (refuses non-interactively); CI is non-TTY, so pass --force.
+seed_out="$(arvel db:seed --force 2>&1)" || { echo "FAIL: 'arvel db:seed' errored"; printf '%s\n' "$seed_out"; exit 1; }
 case "$seed_out" in
   *"no seeder bound"*) echo "FAIL: db:seed found no bound seeder"; printf '%s\n' "$seed_out"; exit 1 ;;
 esac
