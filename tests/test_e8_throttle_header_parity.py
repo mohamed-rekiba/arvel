@@ -72,10 +72,20 @@ def test_plain_and_named_429_headers_are_field_by_field_identical() -> None:
         for header in _PARITY_HEADERS:
             assert header in plain_blocked.headers
             assert header in named_blocked.headers
-            assert plain_blocked.headers[header] == named_blocked.headers[header], (
-                f"{header} diverged: plain={plain_blocked.headers[header]!r} "
-                f"named={named_blocked.headers[header]!r}"
-            )
+            plain_value = plain_blocked.headers[header]
+            named_value = named_blocked.headers[header]
+            if header in ("retry-after", "x-ratelimit-reset"):
+                # the two responses are produced at two instants: crossing a second boundary
+                # legitimately skews time-derived values by one. Parity = same shape and
+                # window, not the same tick (flaked on CI exactly this way).
+                assert abs(int(plain_value) - int(named_value)) <= 1, (
+                    f"{header} diverged beyond clock skew: plain={plain_value!r} "
+                    f"named={named_value!r}"
+                )
+            else:
+                assert plain_value == named_value, (
+                    f"{header} diverged: plain={plain_value!r} named={named_value!r}"
+                )
         assert plain_blocked.headers["x-ratelimit-limit"] == "1"
         assert plain_blocked.headers["x-ratelimit-remaining"] == "0"
         assert int(plain_blocked.headers["retry-after"]) > 0
