@@ -40,6 +40,10 @@ class FailedJob(HasUuids, Model):
         from arvel.queue.serialization import deserialize_instance
 
         job = await deserialize_instance(self.payload)
+        # a manual retry is a FRESH dispatch with the job's full tries/backoff budget — the
+        # exhausted attempt counter the failure record carried must not ride along (with it,
+        # a tries=3 job re-entered at its final attempt and bounced straight back here)
+        job.__arvel_attempts__ = 0
         manager = (
             app().make("queue") if has_application() and app().bound("queue") else QueueManager()
         )
