@@ -32,7 +32,7 @@ _CASES = {
     "mail": ("app/mail/order_shipped.py", "class OrderShipped(Mailable)"),
     "rule": ("app/rules/uppercase.py", "class Uppercase(Rule)"),
     "seeder": ("database/seeders/post_seeder.py", "class PostSeeder(Seeder)"),
-    "factory": ("database/factories/post_factory.py", "class PostFactory(Factory)"),
+    "factory": ("database/factories/post_factory.py", "class PostFactory(Factory[Any])"),
     "provider": ("app/providers/route_provider.py", "class RouteProvider(ServiceProvider)"),
     "event": ("app/events/order_placed.py", "class OrderPlaced"),
     "listener": ("app/listeners/notify_team.py", "class NotifyTeam"),

@@ -16,22 +16,24 @@ from pathlib import Path
 import typer
 
 _CREATE_MIGRATION = (
-    "from arvel.database import Migration\n\n\n"
+    "from arvel.database import Blueprint, Migration\n"
+    "from arvel.database.migrations import Schema\n\n\n"
     "class {cls}(Migration):\n"
-    "    def up(self, schema):\n"
-    "        def define(t):\n"
+    "    def up(self, schema: Schema) -> None:\n"
+    "        def define(t: Blueprint) -> None:\n"
     "            t.id()\n"
     "            t.timestamps()\n\n"
     '        schema.create("{table}", define)\n\n'
-    "    def down(self, schema):\n"
+    "    def down(self, schema: Schema) -> None:\n"
     '        schema.drop("{table}")\n'
 )
 _GENERIC_MIGRATION = (
-    "from arvel.database import Migration\n\n\n"
+    "from arvel.database import Migration\n"
+    "from arvel.database.migrations import Schema\n\n\n"
     "class {cls}(Migration):\n"
-    "    def up(self, schema):\n"
+    "    def up(self, schema: Schema) -> None:\n"
     "        ...\n\n"
-    "    def down(self, schema):\n"
+    "    def down(self, schema: Schema) -> None:\n"
     "        ...\n"
 )
 
@@ -43,10 +45,13 @@ def _load_stub(base: Path | None, filename: str, fallback: str) -> str:
     return path.read_text() if path.is_file() else fallback
 
 
-def generate_migration(name: str, base: Path | None = None) -> Path:
+def generate_migration(
+    name: str, base: Path | None = None, *, create: str | None = None, table: str | None = None
+) -> Path:
     """Write a timestamped migration ``database/migrations/<ts>_<name>.py`` (
-    ``make:migration``). A ``create_<table>_table`` name gets a create/drop stub; any other name
-    (e.g. ``add_x_to_y``) gets a generic ``up``/``down`` stub (the schema builder has no alter op)."""
+    ``make:migration``). ``--create=<table>`` forces the create/drop stub for that table;
+    ``--table=<table>`` forces the generic (alter) stub against it. Otherwise the stub is inferred
+    from the name: a ``create_<table>_table`` name gets create/drop, any other gets generic."""
     from arvel.support import Str
 
     directory = (base or Path()) / "database" / "migrations"
@@ -57,10 +62,11 @@ def generate_migration(name: str, base: Path | None = None) -> Path:
         message = f"migration {name!r} already exists at {target}"
         raise FileExistsError(message)
     cls = Str.studly(name)
-    created = re.fullmatch(r"create_(\w+?)_table", name)
-    if created:
+    inferred = re.fullmatch(r"create_(\w+?)_table", name)
+    create_table = create or (inferred.group(1) if inferred and not table else None)
+    if create_table:
         template = _load_stub(base, "migration.create.stub", _CREATE_MIGRATION)
-        body = template.format(cls=cls, table=created.group(1))
+        body = template.format(cls=cls, table=create_table)
     else:
         template = _load_stub(base, "migration.generic.stub", _GENERIC_MIGRATION)
         body = template.format(cls=cls)
@@ -72,14 +78,18 @@ def generate_migration(name: str, base: Path | None = None) -> Path:
 _STUBS: dict[str, tuple[str, str]] = {
     "model": (
         "app/models",
-        "from arvel import Model\n\n\nclass {name}(Model):\n    __fillable__: list[str] = []\n",
+        "from typing import ClassVar\n\n"
+        "from arvel import Model\n\n\n"
+        "class {name}(Model):\n"
+        "    __fillable__: ClassVar[list[str]] = []\n",
     ),
     "controller": (
         "app/controllers",
         "from typing import Any\n\n"
+        "from arvel.http import Request\n"
         "from arvel.routing import Controller\n\n\n"
         "class {name}(Controller):\n"
-        "    async def index(self, request: Any) -> dict[str, Any]:\n"
+        "    async def index(self, request: Request) -> dict[str, Any]:\n"
         "        return {{}}\n",
     ),
     # resourceful controllers — method set matches Route.resource's 7 routes (the api variant
@@ -87,33 +97,48 @@ _STUBS: dict[str, tuple[str, str]] = {
     "resource_controller": (
         "app/controllers",
         "from typing import Any\n\n"
+        "from arvel.http import Request\n"
         "from arvel.routing import Controller\n\n\n"
         "class {name}(Controller):\n"
-        "    async def index(self, request: Any) -> Any:\n        return {{}}\n\n"
-        "    async def create(self, request: Any) -> Any:\n        return {{}}\n\n"
-        "    async def store(self, request: Any) -> Any:\n        return {{}}\n\n"
-        "    async def show(self, request: Any, id: str) -> Any:\n        return {{}}\n\n"
-        "    async def edit(self, request: Any, id: str) -> Any:\n        return {{}}\n\n"
-        "    async def update(self, request: Any, id: str) -> Any:\n        return {{}}\n\n"
-        "    async def destroy(self, request: Any, id: str) -> Any:\n        return {{}}\n",
+        "    async def index(self, request: Request) -> dict[str, Any]:\n        return {{}}\n\n"
+        "    async def create(self, request: Request) -> dict[str, Any]:\n        return {{}}\n\n"
+        "    async def store(self, request: Request) -> dict[str, Any]:\n        return {{}}\n\n"
+        "    async def show(self, request: Request, id: str) -> dict[str, Any]:\n        return {{}}\n\n"
+        "    async def edit(self, request: Request, id: str) -> dict[str, Any]:\n        return {{}}\n\n"
+        "    async def update(self, request: Request, id: str) -> dict[str, Any]:\n        return {{}}\n\n"
+        "    async def destroy(self, request: Request, id: str) -> dict[str, Any]:\n        return {{}}\n",
     ),
     "api_controller": (
         "app/controllers",
         "from typing import Any\n\n"
+        "from arvel.http import Request\n"
         "from arvel.routing import Controller\n\n\n"
         "class {name}(Controller):\n"
-        "    async def index(self, request: Any) -> Any:\n        return {{}}\n\n"
-        "    async def store(self, request: Any) -> Any:\n        return {{}}\n\n"
-        "    async def show(self, request: Any, id: str) -> Any:\n        return {{}}\n\n"
-        "    async def update(self, request: Any, id: str) -> Any:\n        return {{}}\n\n"
-        "    async def destroy(self, request: Any, id: str) -> Any:\n        return {{}}\n",
+        "    async def index(self, request: Request) -> dict[str, Any]:\n        return {{}}\n\n"
+        "    async def store(self, request: Request) -> dict[str, Any]:\n        return {{}}\n\n"
+        "    async def show(self, request: Request, id: str) -> dict[str, Any]:\n        return {{}}\n\n"
+        "    async def update(self, request: Request, id: str) -> dict[str, Any]:\n        return {{}}\n\n"
+        "    async def destroy(self, request: Request, id: str) -> dict[str, Any]:\n        return {{}}\n",
+    ),
+    "invokable_controller": (
+        "app/controllers",
+        "from typing import Any\n\n"
+        "from arvel.http import Request\n"
+        "from arvel.routing import Controller\n\n\n"
+        "class {name}(Controller):\n"
+        "    async def __call__(self, request: Request) -> dict[str, Any]:\n"
+        "        return {{}}\n",
     ),
     "middleware": (
         "app/middleware",
+        "from collections.abc import Awaitable, Callable\n"
         "from typing import Any\n\n"
+        "from arvel.http import Request\n"
         "from arvel.http.middleware import Middleware\n\n\n"
         "class {name}(Middleware):\n"
-        "    async def handle(self, request: Any, call_next: Any) -> Any:\n"
+        "    async def handle(\n"
+        "        self, request: Request, call_next: Callable[[Request], Awaitable[Any]]\n"
+        "    ) -> Any:\n"
         "        return await call_next(request)\n",
     ),
     "request": (
@@ -130,21 +155,22 @@ _STUBS: dict[str, tuple[str, str]] = {
     ),
     "policy": (
         "app/policies",
-        "from typing import Any\n\n\n"
+        "from typing import Any\n\n"
+        "from arvel.auth import Authenticatable\n\n\n"
         "class {name}:\n"
-        "    async def view(self, user: Any, model: Any) -> bool:\n"
+        "    async def view(self, user: Authenticatable, model: Any) -> bool:\n"
         "        return False\n\n"
-        "    async def create(self, user: Any) -> bool:\n"
+        "    async def create(self, user: Authenticatable) -> bool:\n"
         "        return False\n",
     ),
     "notification": (
         "app/notifications",
         "from typing import Any\n\n"
-        "from arvel.notifications import Notification\n\n\n"
+        "from arvel.notifications import Notifiable, Notification\n\n\n"
         "class {name}(Notification):\n"
-        "    def via(self, notifiable: Any) -> list[str]:\n"
+        "    def via(self, notifiable: Notifiable) -> list[str]:\n"
         '        return ["mail"]\n\n'
-        "    def to_array(self, notifiable: Any) -> dict[str, Any]:\n"
+        "    def to_array(self, notifiable: Notifiable) -> dict[str, Any]:\n"
         "        return {{}}\n",
     ),
     "mail": (
@@ -174,8 +200,8 @@ _STUBS: dict[str, tuple[str, str]] = {
         "database/factories",
         "from typing import Any\n\n"
         "from arvel.database import Factory\n\n\n"
-        "class {name}(Factory):\n"
-        "    # model = ...  # the model this factory builds\n"
+        "class {name}(Factory[Any]):\n"
+        "    # model = ...  # the model this factory builds (parametrize Factory[YourModel])\n"
         "    def definition(self) -> dict[str, Any]:\n"
         "        return {{}}\n",
     ),
@@ -215,24 +241,25 @@ _STUBS: dict[str, tuple[str, str]] = {
     ),
     "cast": (
         "app/casts",
-        "from typing import Any\n\n\n"
+        "from typing import Any\n\n"
+        "from arvel import Model\n\n\n"
         "class {name}:\n"
         '    """A custom attribute cast. Use via\n'
         '    ``__casts__ = {{"column": {name}()}}``."""\n\n'
-        "    def get(self, model: Any, key: str, value: Any, attributes: dict[str, Any]) -> Any:\n"
+        "    def get(self, model: Model, key: str, value: Any, attributes: dict[str, Any]) -> Any:\n"
         "        return value\n\n"
-        "    def set(self, model: Any, key: str, value: Any, attributes: dict[str, Any]) -> Any:\n"
+        "    def set(self, model: Model, key: str, value: Any, attributes: dict[str, Any]) -> Any:\n"
         "        return value\n",
     ),
     "observer": (
         "app/observers",
-        "from typing import Any\n\n\n"
+        "from arvel import Model\n\n\n"
         "class {name}:\n"
         '    """A model observer. Declare on the model: ``__observers__ = ({name},)``;\n'
         '    `saving` may return False to cancel the save."""\n\n'
-        "    async def saving(self, model: Any) -> Any: ...\n\n"
-        "    async def saved(self, model: Any) -> None: ...\n\n"
-        "    async def deleted(self, model: Any) -> None: ...\n",
+        "    async def saving(self, model: Model) -> bool | None: ...\n\n"
+        "    async def saved(self, model: Model) -> None: ...\n\n"
+        "    async def deleted(self, model: Model) -> None: ...\n",
     ),
     "enum": (
         "app/enums",
@@ -258,7 +285,7 @@ _TEST_STUB = (
 )
 
 
-def generate_test(name: str, base: Path | None = None) -> Path:
+def generate_test(name: str, base: Path | None = None, *, force: bool = False) -> Path:
     """Write ``tests/test_<name>.py``."""
     from arvel.support import Str
 
@@ -266,7 +293,7 @@ def generate_test(name: str, base: Path | None = None) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     slug = Str.snake(name).removeprefix("test_")
     target = directory / f"test_{slug}.py"
-    if target.exists():
+    if target.exists() and not force:
         message = f"test {name!r} already exists at {target}"
         raise FileExistsError(message)
     template = _load_stub(base, "test.stub", _TEST_STUB)
@@ -274,8 +301,9 @@ def generate_test(name: str, base: Path | None = None) -> Path:
     return target
 
 
-def generate(kind: str, name: str, base: Path | None = None) -> Path:
-    """Write the ``kind`` stub for class ``name`` under ``base`` (defaults to cwd)."""
+def generate(kind: str, name: str, base: Path | None = None, *, force: bool = False) -> Path:
+    """Write the ``kind`` stub for class ``name`` under ``base`` (defaults to cwd). ``force``
+    overwrites an existing file instead of raising ``FileExistsError``."""
     from arvel.support import Str
 
     folder, fallback_template = _STUBS[kind]
@@ -284,16 +312,20 @@ def generate(kind: str, name: str, base: Path | None = None) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "__init__.py").touch()
     target = directory / f"{Str.snake(name)}.py"
-    if target.exists():
+    if target.exists() and not force:
         message = f"{kind} {name!r} already exists at {target}"
         raise FileExistsError(message)
     target.write_text(template.format(name=name))
     return target
 
 
-def _run(kind: str, name: str) -> None:
+#: shared ``--force`` option for the generator commands (overwrite an existing file).
+_FORCE = typer.Option(False, "--force", help="Overwrite the file if it already exists.")
+
+
+def _run(kind: str, name: str, *, force: bool = False) -> None:
     try:
-        target = generate(kind, name)
+        target = generate(kind, name, force=force)
     except FileExistsError as exc:
         typer.echo(str(exc))
         raise typer.Exit(1) from exc
@@ -367,118 +399,142 @@ make_controller_app = typer.Typer()
 
 
 @make_controller_app.command()
-def make_controller(name: str) -> None:
-    """Generate a controller (app/controllers/)."""
-    _run("controller", name)
+def make_controller(
+    name: str,
+    resource: bool = typer.Option(
+        False, "-r", "--resource", help="Resourceful controller (7 CRUD actions)."
+    ),
+    api: bool = typer.Option(False, "--api", help="API resource controller (no create/edit)."),
+    invokable: bool = typer.Option(
+        False, "-i", "--invokable", help="Single-action __call__ controller."
+    ),
+    force: bool = _FORCE,
+) -> None:
+    """Generate a controller (app/controllers/): -r resourceful, --api API resource, -i invokable."""
+    kind = (
+        "api_controller"
+        if api
+        else "resource_controller"
+        if resource
+        else "invokable_controller"
+        if invokable
+        else "controller"
+    )
+    _run(kind, name, force=force)
 
 
 make_middleware_app = typer.Typer()
 
 
 @make_middleware_app.command()
-def make_middleware(name: str) -> None:
+def make_middleware(name: str, force: bool = _FORCE) -> None:
     """Generate a middleware (app/middleware/)."""
-    _run("middleware", name)
+    _run("middleware", name, force=force)
 
 
 make_request_app = typer.Typer()
 
 
 @make_request_app.command()
-def make_request(name: str) -> None:
+def make_request(name: str, force: bool = _FORCE) -> None:
     """Generate a FormRequest (app/requests/)."""
-    _run("request", name)
+    _run("request", name, force=force)
 
 
 make_job_app = typer.Typer()
 
 
 @make_job_app.command()
-def make_job(name: str) -> None:
+def make_job(name: str, force: bool = _FORCE) -> None:
     """Generate a queued job (app/jobs/)."""
-    _run("job", name)
+    _run("job", name, force=force)
 
 
 make_policy_app = typer.Typer()
 
 
 @make_policy_app.command()
-def make_policy(name: str) -> None:
+def make_policy(name: str, force: bool = _FORCE) -> None:
     """Generate an authorization policy (app/policies/)."""
-    _run("policy", name)
+    _run("policy", name, force=force)
 
 
 make_notification_app = typer.Typer()
 
 
 @make_notification_app.command()
-def make_notification(name: str) -> None:
+def make_notification(name: str, force: bool = _FORCE) -> None:
     """Generate a notification (app/notifications/)."""
-    _run("notification", name)
+    _run("notification", name, force=force)
 
 
 make_mail_app = typer.Typer()
 
 
 @make_mail_app.command()
-def make_mail(name: str) -> None:
+def make_mail(name: str, force: bool = _FORCE) -> None:
     """Generate a mailable (app/mail/)."""
-    _run("mail", name)
+    _run("mail", name, force=force)
 
 
 make_rule_app = typer.Typer()
 
 
 @make_rule_app.command()
-def make_rule(name: str) -> None:
+def make_rule(name: str, force: bool = _FORCE) -> None:
     """Generate a validation rule (app/rules/)."""
-    _run("rule", name)
+    _run("rule", name, force=force)
 
 
 make_seeder_app = typer.Typer()
 
 
 @make_seeder_app.command()
-def make_seeder(name: str) -> None:
+def make_seeder(name: str, force: bool = _FORCE) -> None:
     """Generate a database seeder (database/seeders/)."""
-    _run("seeder", name)
+    _run("seeder", name, force=force)
 
 
 make_factory_app = typer.Typer()
 
 
 @make_factory_app.command()
-def make_factory(name: str) -> None:
+def make_factory(name: str, force: bool = _FORCE) -> None:
     """Generate a model factory (database/factories/)."""
-    _run("factory", name)
+    _run("factory", name, force=force)
 
 
 make_provider_app = typer.Typer()
 
 
 @make_provider_app.command()
-def make_provider(name: str) -> None:
+def make_provider(name: str, force: bool = _FORCE) -> None:
     """Generate a service provider (app/providers/)."""
-    _run("provider", name)
+    _run("provider", name, force=force)
 
 
 make_command_app = typer.Typer()
 
 
 @make_command_app.command()
-def make_command(name: str) -> None:
+def make_command(name: str, force: bool = _FORCE) -> None:
     """Generate a console command (app/commands/) — register it in a provider's commands()."""
-    _run("command", name)
+    _run("command", name, force=force)
 
 
 make_migration_app = typer.Typer()
 
 
 @make_migration_app.command()
-def make_migration(name: str) -> None:
-    """Generate a timestamped migration (database/migrations/), e.g. create_posts_table."""
+def make_migration(
+    name: str,
+    create: str = typer.Option("", "--create", help="Force a create-table stub for TABLE."),
+    table: str = typer.Option("", "--table", help="Force a generic (alter) stub against TABLE."),
+) -> None:
+    """Generate a timestamped migration (database/migrations/), e.g. create_posts_table.
+    ``--create=<table>`` / ``--table=<table>`` set the stub explicitly instead of inferring it."""
     try:
-        target = generate_migration(name)
+        target = generate_migration(name, create=create or None, table=table or None)
     except FileExistsError as exc:
         typer.echo(str(exc))
         raise typer.Exit(1) from exc
@@ -489,64 +545,64 @@ make_event_app = typer.Typer()
 
 
 @make_event_app.command()
-def make_event(name: str) -> None:
+def make_event(name: str, force: bool = _FORCE) -> None:
     """Generate a domain event class (app/events/)."""
-    _run("event", name)
+    _run("event", name, force=force)
 
 
 make_listener_app = typer.Typer()
 
 
 @make_listener_app.command()
-def make_listener(name: str) -> None:
+def make_listener(name: str, force: bool = _FORCE) -> None:
     """Generate an event listener (app/listeners/) — register via Event.listen(...)."""
-    _run("listener", name)
+    _run("listener", name, force=force)
 
 
 make_cast_app = typer.Typer()
 
 
 @make_cast_app.command()
-def make_cast(name: str) -> None:
+def make_cast(name: str, force: bool = _FORCE) -> None:
     """Generate a custom attribute cast (app/casts/) — use via a model's __casts__."""
-    _run("cast", name)
+    _run("cast", name, force=force)
 
 
 make_observer_app = typer.Typer()
 
 
 @make_observer_app.command()
-def make_observer(name: str) -> None:
+def make_observer(name: str, force: bool = _FORCE) -> None:
     """Generate a model observer (app/observers/) — declare via ``__observers__`` on the model."""
-    _run("observer", name)
+    _run("observer", name, force=force)
 
 
 make_enum_app = typer.Typer()
 
 
 @make_enum_app.command()
-def make_enum(name: str) -> None:
+def make_enum(name: str, force: bool = _FORCE) -> None:
     """Generate a string-backed enum (app/enums/)."""
-    _run("enum", name)
+    _run("enum", name, force=force)
 
 
 make_exception_app = typer.Typer()
 
 
 @make_exception_app.command()
-def make_exception(name: str) -> None:
+def make_exception(name: str, force: bool = _FORCE) -> None:
     """Generate an exception class (app/exceptions/)."""
-    _run("exception", name)
+    _run("exception", name, force=force)
 
 
 make_test_app = typer.Typer()
 
 
 @make_test_app.command()
-def make_test(name: str) -> None:
+def make_test(name: str, force: bool = _FORCE) -> None:
     """Generate a test (tests/test_<name>.py)."""
     try:
-        target = generate_test(name)
+        target = generate_test(name, force=force)
     except FileExistsError as exc:
         typer.echo(str(exc))
         raise typer.Exit(1) from exc
