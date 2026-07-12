@@ -54,3 +54,52 @@ async def test_passthrough_when_nothing_resolves() -> None:
     before = current_locale.get()
     result = await LocaleMiddleware().handle(Req({}), _capture)
     assert result == before  # locale unchanged
+
+
+async def test_user_pref_applies_under_the_real_wiring_order() -> None:
+    """In the shipped wiring LocaleMiddleware (early global) runs BEFORE AuthenticateMiddleware
+    (app-registered global), and the kernel resets current_user at dispatch — so at Locale-time
+    there is never a user and the documented user-pref precedence was dead code. Authenticate now
+    applies the resolved user's preferred locale itself, so the promise holds in the real order."""
+    from arvel.http.middleware import AuthenticateMiddleware
+    from arvel.kernel import set_application
+    from arvel.kernel.application import Application
+
+    app = Application()
+    app.instance("user_resolver", lambda request: User(locale="fr"))
+    set_application(app)
+    try:
+        authenticate = AuthenticateMiddleware()
+
+        async def auth_then_capture(request: Any) -> str:
+            return await authenticate.handle(request, _capture)
+
+        # Locale first (header says de), then Auth resolves the fr-preferring user — as wired
+        result = await LocaleMiddleware().handle(
+            Req({"accept-language": "de-DE,de"}), auth_then_capture
+        )
+        assert result == "fr"
+    finally:
+        set_application(None)
+
+
+async def test_auth_without_a_user_pref_keeps_the_header_locale() -> None:
+    from arvel.http.middleware import AuthenticateMiddleware
+    from arvel.kernel import set_application
+    from arvel.kernel.application import Application
+
+    app = Application()
+    app.instance("user_resolver", lambda request: User(locale=None))
+    set_application(app)
+    try:
+        authenticate = AuthenticateMiddleware()
+
+        async def auth_then_capture(request: Any) -> str:
+            return await authenticate.handle(request, _capture)
+
+        result = await LocaleMiddleware().handle(
+            Req({"accept-language": "es-ES,es"}), auth_then_capture
+        )
+        assert result == "es"
+    finally:
+        set_application(None)
