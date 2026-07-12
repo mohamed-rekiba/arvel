@@ -541,6 +541,9 @@ class Validator:
         self._errors: dict[str, list[str]] = {}
         #: fields dropped from validated() by `exclude`/`exclude_if`/`exclude_unless`
         self._excluded: set[str] = set()
+        #: whether a pass has run — errors()/validated() lazily run one so the documented
+        #: standalone one-liners work without an explicit passes()/validate() first
+        self._ran = False
         #: post-pass hooks registered via `after()`
         self._after: list[Callable[[Validator], None]] = []
         self._connection = connection  # for async DB rules (unique/exists)
@@ -576,6 +579,7 @@ class Validator:
         self._errors.setdefault(field, []).append(message)
 
     def passes(self, *, defer_custom: bool = False) -> bool:
+        self._ran = True
         # defer_custom: skip non-wildcard custom Rule objects so passes_async can run them awaited
         # (a custom rule may need I/O). Wildcard custom rules still run here — the async loop can't
         # resolve a ``a.*.b`` path, so they stay on the sync path.
@@ -690,6 +694,8 @@ class Validator:
             if value is None and "nullable" in rules:
                 continue
             bail = "bail" in rules
+            if bail and field in self._errors:
+                continue  # the sync pass already failed this field; bail = one error, both paths
             for rule in rules:
                 if isinstance(rule, Rule):
                     if "*" in field:
@@ -745,6 +751,8 @@ class Validator:
         return None
 
     def errors(self) -> dict[str, list[str]]:
+        if not self._ran:  # the documented standalone one-liner triggers the (sync) pass itself
+            self.passes()
         return self._errors
 
     def validated(self) -> dict[str, Any]:
@@ -758,6 +766,8 @@ class Validator:
         """
         from arvel.support.helpers import Arr, data_get
 
+        if not self._ran:  # exclusions are only known once a pass has run
+            self.passes()
         result: dict[str, Any] = {}
         for field in self.rules:
             if field in self._excluded:  # `exclude`/`exclude_if`/`exclude_unless` (spec 12 §2)
