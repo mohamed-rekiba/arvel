@@ -77,8 +77,11 @@ def cron_matches(expression: str, moment: datetime) -> bool:
         )
         dom_ok = _field_matches(dom, moment.day)
         # standard cron: when BOTH dom and dow are restricted, the entry fires when EITHER
-        # matches ("0 0 13 * 5" = the 13th OR any Friday); otherwise they AND like every field
-        day_ok = (dom_ok or dow_ok) if (dom != "*" and dow != "*") else (dom_ok and dow_ok)
+        # matches ("0 0 13 * 5" = the 13th OR any Friday); otherwise they AND like every field.
+        # Vixie rule: "restricted" means the field does not BEGIN with '*' — a stepped wildcard
+        # like */2 is still a wildcard, so it ANDs.
+        both_restricted = not dom.startswith("*") and not dow.startswith("*")
+        day_ok = (dom_ok or dow_ok) if both_restricted else (dom_ok and dow_ok)
         return (
             _field_matches(minute, moment.minute)
             and _field_matches(hour, moment.hour)
