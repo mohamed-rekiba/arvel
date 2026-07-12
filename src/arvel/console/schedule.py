@@ -19,10 +19,9 @@ work_app = typer.Typer()
 async def _run_due(schedule: Any, moment: Any = None) -> int:
     from datetime import datetime
 
-    now = moment if moment is not None else datetime.now()
-    due = schedule.due_events(now)
-    await schedule.run_due(now)
-    return len(due)
+    # aware local now: timezone() gates convert exactly instead of guessing what naive means
+    now = moment if moment is not None else datetime.now().astimezone()
+    return await schedule.run_due(now)  # how many actually ran, not how many were due
 
 
 @schedule_app.command()

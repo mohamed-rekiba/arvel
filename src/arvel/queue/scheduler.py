@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import inspect
 from datetime import datetime
-from typing import Any, cast
+from typing import Any
 
 #: `on_one_server`'s claim TTL. The claim is minute-scoped and held (not released) so any later
 #: same-minute tick on another instance skips; the TTL just bounds how long a stale claim lingers
@@ -75,12 +75,15 @@ def cron_matches(expression: str, moment: datetime) -> bool:
         dow_ok = _field_matches(dow, cron_dow, _CRON_DOWS) or (
             cron_dow == 0 and _field_matches(dow, 7, _CRON_DOWS)
         )
+        dom_ok = _field_matches(dom, moment.day)
+        # standard cron: when BOTH dom and dow are restricted, the entry fires when EITHER
+        # matches ("0 0 13 * 5" = the 13th OR any Friday); otherwise they AND like every field
+        day_ok = (dom_ok or dow_ok) if (dom != "*" and dow != "*") else (dom_ok and dow_ok)
         return (
             _field_matches(minute, moment.minute)
             and _field_matches(hour, moment.hour)
-            and _field_matches(dom, moment.day)
             and _field_matches(month, moment.month, _CRON_MONTHS)
-            and dow_ok
+            and day_ok
         )
     except ValueError:
         return False
@@ -230,10 +233,12 @@ class ScheduledEvent:
     def _localized(self, moment: datetime) -> datetime:
         if self._tz is None:
             return moment
-        from arvel.dates import Date
+        from zoneinfo import ZoneInfo
 
-        zoned = Date.from_py(moment, tz="UTC").raw.to_tz(self._tz)
-        return cast("datetime", Date(zoned).to_py())
+        # astimezone: a naive moment is host-local wall time (what `schedule:run`'s
+        # datetime.now() produces) — never relabel it UTC, or every timezone() gate fires
+        # off by the host's UTC offset; an aware moment converts exactly
+        return moment.astimezone(ZoneInfo(self._tz))
 
     @staticmethod
     def _within_time_range(moment: datetime, start: str, end: str) -> bool:
@@ -294,12 +299,15 @@ class ScheduledEvent:
             if inspect.isawaitable(outcome):
                 await outcome
 
-    async def run(self, moment: datetime | None = None) -> Any:
+    async def run(self, moment: datetime | None = None) -> bool:
+        """Run the event; ``True`` when it actually executed, ``False`` on a skipped tick
+        (maintenance mode, a lost one-server claim, an in-flight overlap lock). A raising
+        callback propagates — the event ran and failed, which is the caller's to log/count."""
         release_locks: list[Any] = []  # freed in finally; the one-server claim is NOT (see below)
         ran = False  # set only once past the locks — so before/after/callback all skip a lost tick
         try:
             if not self._even_in_maintenance_mode and await self._in_maintenance_mode():
-                return None  # the app is down for maintenance and this task didn't opt in
+                return False  # the app is down for maintenance and this task didn't opt in
             if self.one_server:
                 # scope the claim to this minute and DON'T release it: a staggered tick that starts
                 # after this one finishes must still find the minute claimed and skip. Releasing on
@@ -309,11 +317,11 @@ class ScheduledEvent:
                     f"schedule:one_server:{self._identity()}:{bucket}", _ONE_SERVER_LOCK_TTL
                 )
                 if not await lock.acquire():
-                    return None  # another instance already ran (or is running) this minute's tick
+                    return False  # another instance already ran (or is running) this minute's tick
             if self.overlap_expire is not None:
                 lock = self._lock(f"schedule:overlap:{self._identity()}", self.overlap_expire)
                 if not await lock.acquire():
-                    return None  # a prior run of this event is still in flight
+                    return False  # a prior run of this event is still in flight
                 release_locks.append(lock)
 
             ran = True
@@ -321,12 +329,12 @@ class ScheduledEvent:
             try:
                 result = self.callback()
                 if inspect.isawaitable(result):
-                    result = await result
+                    await result
             except Exception:
                 await self._fire(self._on_failure)
                 raise
             await self._fire(self._on_success)
-            return result
+            return True
         finally:
             if ran:  # after-hooks fire only when the event actually ran, not on a skipped tick
                 await self._fire(self._after)
@@ -430,19 +438,23 @@ class Schedule:
     def due_events(self, moment: datetime) -> list[ScheduledEvent]:
         return [event for event in self.events if event.is_due(moment)]
 
-    async def run_due(self, moment: datetime) -> None:
+    async def run_due(self, moment: datetime) -> int:
         """Run every due event **concurrently** (6.2a) — one tick's tasks no longer serialize
         behind each other, so a slow one doesn't delay a sibling due in the same minute. A failing
         event is LOGGED and skipped — one bad task must never starve the rest of the schedule (or
-        kill the cron tick)."""
+        kill the cron tick). Returns how many events actually ran (a due event that lost its
+        one-server claim / overlap lock or sat out maintenance mode is not counted)."""
         import asyncio
 
-        await asyncio.gather(*(self._run_one(event, moment) for event in self.due_events(moment)))
+        ran = await asyncio.gather(
+            *(self._run_one(event, moment) for event in self.due_events(moment))
+        )
+        return sum(ran)
 
     @staticmethod
-    async def _run_one(event: ScheduledEvent, moment: datetime) -> None:
+    async def _run_one(event: ScheduledEvent, moment: datetime) -> bool:
         try:
-            await event.run(moment)
+            return await event.run(moment)
         except Exception:
             from arvel.kernel.logging import LogManager
 
@@ -451,3 +463,4 @@ class Schedule:
                 task=getattr(event.callback, "__name__", repr(event.callback)),
                 exc_info=True,
             )
+            return True  # it ran (past every lock) and failed — failure is still a run
