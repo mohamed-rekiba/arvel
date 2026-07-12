@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.63.0](https://github.com/mohamed-rekiba/arvel/compare/v0.62.0...v0.63.0) (2026-07-12)
+
+
+### Features
+
+* enhance the dependencies ([262702e](https://github.com/mohamed-rekiba/arvel/commit/262702eee29cb4edc08ec5da01e4e52b5eac14a3))
+
+
+### Bug Fixes
+
+* **activitylog:** update snapshots honor __log_attributes__ (no excluded-field leak) ([bc8ce78](https://github.com/mohamed-rekiba/arvel/commit/bc8ce789e4d4fb9ed1fc43c4a7059de23c53ee31))
+* annotate the run_due return for strict typing ([94ac857](https://github.com/mohamed-rekiba/arvel/commit/94ac857bd79d6930bcbfae83ab04639d1c8671fd))
+* **auth:** a registered policy method takes precedence over a same-named define ([71e2a9d](https://github.com/mohamed-rekiba/arvel/commit/71e2a9db72b818b8d747789139d83b2334a21d30))
+* **auth:** policy before() fires whenever a policy exists, on one shared instance ([5e96710](https://github.com/mohamed-rekiba/arvel/commit/5e967105444500b2855633dd0ce6237f5ae5aad0))
+* **client:** per-call follow_redirects wins; docs describe the real default ([c792f82](https://github.com/mohamed-rekiba/arvel/commit/c792f82d696a34813a5201dff13d57bbf56159b7))
+* **console:** render stubs by literal token substitution, not str.format ([ac71f14](https://github.com/mohamed-rekiba/arvel/commit/ac71f145950fcd890f9ee0c78d651c1a4e9a2527))
+* **console:** signature-ordering errors raise at registration, not vanish at build ([8dcfa40](https://github.com/mohamed-rekiba/arvel/commit/8dcfa403b0f6e2aaa461aab142dca6c6ccc42c96))
+* **http:** the reserved throttle:&lt;name&gt; form resolves before the generic alias branch ([b2351e1](https://github.com/mohamed-rekiba/arvel/commit/b2351e110f983c2d83d941a2d92d3aba838c3a4f))
+* **http:** the user's preferred locale applies under the real wiring order ([3a99cc1](https://github.com/mohamed-rekiba/arvel/commit/3a99cc18e6aed608cac6429b192cc367f04e1702))
+* **media:** resolve the default disk by its real name, not a 'default' placeholder ([ca1adbc](https://github.com/mohamed-rekiba/arvel/commit/ca1adbc915b162ec04bff67ca15c2f1f254c0819))
+* **notifications:** a bare on-demand apprise route string is one URL, not characters ([232d2df](https://github.com/mohamed-rekiba/arvel/commit/232d2df333dfee224c0222b26034f264272d6a6b))
+* **orm:** morph relations correlate and eager-load with their type discriminator ([f8cceb9](https://github.com/mohamed-rekiba/arvel/commit/f8cceb9810da53abe4321549609acf63cc05c8c4))
+* **packaging:** declare typing-extensions — a bare install couldn't import arvel ([18908f6](https://github.com/mohamed-rekiba/arvel/commit/18908f67c59c4744e6e82f570c67f8dca085d00b))
+* **queue:** a manual retry gets the job's full tries budget ([07eb986](https://github.com/mohamed-rekiba/arvel/commit/07eb986cda12b212ab5d83961c9cd3e921d1bdf5))
+* remove pydantic references and update related documentation ([1afa3c3](https://github.com/mohamed-rekiba/arvel/commit/1afa3c31804ddc014b45fb1fff4b004c95da28b0))
+* **scheduler:** standard cron DOM/DOW OR, exact timezone shifts, honest ran-count ([6708fdf](https://github.com/mohamed-rekiba/arvel/commit/6708fdfd084257650953531b463408b8f80a3ec6))
+* **scheduler:** Vixie star-prefix rule for the DOM/DOW union ([851cde8](https://github.com/mohamed-rekiba/arvel/commit/851cde8302c10502d3da271e71076ad8c603dd5f))
+* **validation:** errors()/validated() run the pass lazily; bail holds on the async path ([0fba2b1](https://github.com/mohamed-rekiba/arvel/commit/0fba2b1c185a32bbc258477d242e51da70e049a3))
+* **views,http:** request-scope the flashed errors/old view shares ([4b57652](https://github.com/mohamed-rekiba/arvel/commit/4b57652313e7e1aff508a09f5ca46d3fe8982f1a))
+
+
+### Refactors
+
+* user_preferred_locale is the public seam Authenticate consumes ([d7fbb2f](https://github.com/mohamed-rekiba/arvel/commit/d7fbb2f342663f4567989752034fa6aa530de96e))
+
+
+### Documentation
+
+* align four stale passages with the shipped behavior ([25eb932](https://github.com/mohamed-rekiba/arvel/commit/25eb932583278f7b3e6982d5b2d9e822e9700ac1))
+* resolve_middleware docstring states the reserved-prefix precedence ([169494a](https://github.com/mohamed-rekiba/arvel/commit/169494acf915741fa098351030efd6ac13e9c944))
+
 ## [0.62.0](https://github.com/mohamed-rekiba/arvel/compare/v0.61.0...v0.62.0) (2026-07-12)
 
 
