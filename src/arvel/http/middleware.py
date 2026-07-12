@@ -697,7 +697,7 @@ class AuthenticateMiddleware(Middleware):
             user = await resolved if inspect.isawaitable(resolved) else resolved
         token = current_user.set(user)
         locale_token = None
-        pref = LocaleMiddleware._from_user()  # reads the user just bound above
+        pref = LocaleMiddleware.user_preferred_locale()  # reads the user just bound above
         if pref:
             from arvel.localization import current_locale
 
@@ -740,7 +740,7 @@ class LocaleMiddleware(Middleware):
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         from arvel.localization import current_locale
 
-        locale = self._from_user() or self._from_header(request)
+        locale = self.user_preferred_locale() or self._from_header(request)
         if not locale:
             return await call_next(request)
         token = current_locale.set(locale)
@@ -750,7 +750,9 @@ class LocaleMiddleware(Middleware):
             current_locale.reset(token)
 
     @staticmethod
-    def _from_user() -> str | None:
+    def user_preferred_locale() -> str | None:
+        """The bound user's preferred locale (``locale``/``preferred_locale``), or ``None``.
+        Public seam: ``AuthenticateMiddleware`` applies it after resolving the user (doc 21)."""
         from arvel.support import current_user
 
         user = current_user.get()
