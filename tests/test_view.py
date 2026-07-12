@@ -53,3 +53,47 @@ def test_share_adds_globals(tmp_path: Path) -> None:
     factory = ViewFactory(str(tmp_path))
     factory.share(app_name="arvel")
     assert factory.env.globals["app_name"] == "arvel"
+
+
+async def test_request_scoped_shares_are_isolated_between_concurrent_renders(
+    tmp_path: Path,
+) -> None:
+    """Flash data (`errors`/`old`) is request-scoped: two in-flight requests sharing through the
+    same bound factory must each render their OWN values, even when their share/render steps
+    interleave. Storing them in `env.globals` leaks one user's flash into another's response."""
+    import asyncio
+
+    (tmp_path / "who.html").write_text("{{ errors['who'] }}")
+    factory = ViewFactory(str(tmp_path))
+
+    a_shared = asyncio.Event()
+    b_shared = asyncio.Event()
+
+    async def request_a() -> str:
+        factory.share_request(errors={"who": "A"})
+        a_shared.set()
+        await b_shared.wait()  # B shares before A renders
+        return await factory.render(View("who.html"))
+
+    async def request_b() -> str:
+        await a_shared.wait()
+        factory.share_request(errors={"who": "B"})
+        b_shared.set()
+        return await factory.render(View("who.html"))
+
+    html_a, html_b = await asyncio.gather(request_a(), request_b())
+    assert html_a == "A"
+    assert html_b == "B"
+
+
+async def test_request_scoped_share_does_not_touch_env_globals(tmp_path: Path) -> None:
+    factory = ViewFactory(str(tmp_path))
+    factory.share_request(errors={"x": ["nope"]})
+    assert "errors" not in factory.env.globals
+
+
+async def test_view_data_overrides_request_scoped_share(tmp_path: Path) -> None:
+    (tmp_path / "v.html").write_text("{{ msg }}")
+    factory = ViewFactory(str(tmp_path))
+    factory.share_request(msg="shared")
+    assert await factory.render(View("v.html", {"msg": "local"})) == "local"

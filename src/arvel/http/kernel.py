@@ -776,14 +776,15 @@ class HttpKernel:
         import contextlib
 
         from arvel.http.request import RouteMatch
-        from arvel.support import access_token, current_user
+        from arvel.support import access_token, current_user, view_shares
 
         request = Request(litestar_request)
         token = current_request.set(request)
-        # reset every request so a stale current_user / access token can never leak across a
-        # request boundary (the execution context is reused between requests)
+        # reset every request so a stale current_user / access token / view share can never leak
+        # across a request boundary (the execution context is reused between requests)
         user_token = current_user.set(None)
         access_token_ctx = access_token.set(None)
+        view_shares_token = view_shares.set(None)
         # a per-request container scope so `scoped` bindings share one instance for the request
         scope = self.app.scope() if self.app is not None else contextlib.nullcontext()
         try:
@@ -836,6 +837,7 @@ class HttpKernel:
         finally:
             current_user.reset(user_token)
             access_token.reset(access_token_ctx)
+            view_shares.reset(view_shares_token)
             current_request.reset(token)
 
     def _apply_wheres(self, params: dict[str, Any], wheres: dict[str, str]) -> None:
