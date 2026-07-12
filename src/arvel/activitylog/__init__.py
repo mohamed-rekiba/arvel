@@ -191,6 +191,11 @@ class LogsActivity(ModelHost):
     async def _fire(self, hook: str) -> Any:
         if hook == "saving":
             dirty: dict[str, Any] = self.get_dirty()
+            # the snapshot is filtered here, once, so BOTH sides of the update record (old +
+            # attributes) honor __log_attributes__ — a change touching only excluded fields
+            # then reads as "nothing logged changed" and writes no row (and never leaks them)
+            if self.__log_attributes__ != ["*"]:
+                dirty = {k: v for k, v in dirty.items() if k in self.__log_attributes__}
             originals: dict[str, Any] = {k: self.get_original(k) for k in dirty}
             self._activity_snapshot = (not self._exists, dirty, originals)
         result: Any = await super()._fire(hook)
