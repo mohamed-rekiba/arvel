@@ -237,3 +237,27 @@ def test_url_parameter_value_is_not_re_substituted() -> None:
 def test_client_underscore_attribute_raises_not_recurses() -> None:
     with pytest.raises(AttributeError):
         Client()._definitely_missing  # underscore names never route to macros
+
+
+async def test_per_call_follow_redirects_kwarg_beats_the_builder_default() -> None:
+    """Docs: any keyword passed to a verb is forwarded to the transport — a per-call
+    ``follow_redirects=False`` must not be clobbered by the builder's follow-by-default."""
+    calls: list[str] = []
+    client = Client(transport=_redirect_transport(calls))
+    try:
+        response = await client.get("https://x.test/a", follow_redirects=False)
+        assert response.status() == 302
+        assert calls == ["/a"]  # the 302 was returned, not followed
+    finally:
+        await client.aclose()
+
+
+async def test_per_call_follow_redirects_kwarg_beats_without_redirects() -> None:
+    calls: list[str] = []
+    client = Client(transport=_redirect_transport(calls))
+    try:
+        response = await client.without_redirects().get("https://x.test/a", follow_redirects=True)
+        assert response.status() == 200
+        assert calls == ["/a", "/b"]  # per-call opt-in wins over the builder toggle
+    finally:
+        await client.aclose()
