@@ -39,26 +39,38 @@ def json_default(value: Any) -> Any:
 
 
 def to_serializable(value: Any) -> Any:
-    """Unwrap a cast-get result to a JSON-native value for ``to_dict``:
-    ``collection`` -> list, ``object`` -> dict, ``stringable`` -> str, ``Decimal`` -> str,
-    a datetime-cast ``Date`` -> ISO string (the same serializer ``json_default`` falls back to,
-    so ``to_dict``/``to_json`` agree and ``json_default`` never fires for this field). Read-path
-    only; ``_cast_set`` already unwraps for the write path."""
+    """Unwrap a cast-get result to a **deeply** JSON-native value for ``to_dict`` — recursing into
+    collections/objects/lists/dicts so a nested ``Date``/``Enum``/``UUID``/… is serialized too, not
+    just the top level. Coverage matches ``json_default`` (the ``to_json`` fallback) so ``to_dict``
+    and ``to_json`` always agree. Read-path only; ``_cast_set`` unwraps for the write path."""
+    import datetime as _dt
+    import uuid as _uuid
     from decimal import Decimal
     from types import SimpleNamespace
 
     from arvel.dates import Date
     from arvel.support import Collection, Stringable
 
+    # enum first: a StrEnum/IntEnum is also a str/int, so unwrap to its scalar value before that
+    if isinstance(value, enum.Enum):
+        return to_serializable(value.value)
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
     if isinstance(value, Date):
         return value.to_iso()
     if isinstance(value, Collection):
-        return cast("list[Any]", value.to_list())
+        return [to_serializable(item) for item in cast("list[Any]", value.to_list())]
     if isinstance(value, SimpleNamespace):
-        return vars(value)
-    if isinstance(value, (Stringable, Decimal)):
+        return {key: to_serializable(val) for key, val in vars(value).items()}
+    if isinstance(value, dict):
+        return {key: to_serializable(val) for key, val in cast("dict[Any, Any]", value).items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [to_serializable(item) for item in cast("list[Any]", value)]
+    if isinstance(value, (_dt.datetime, _dt.date, _dt.time)):
+        return value.isoformat()
+    if isinstance(value, (Stringable, Decimal, _uuid.UUID)):
         return str(value)
-    return value
+    return str(value)  # catch-all, same as json_default — to_dict output is always JSON-native
 
 
 def _to_db_datetime(value: Any) -> Any:
