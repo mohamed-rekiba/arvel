@@ -204,3 +204,32 @@ async def test_without_activity_logging_suppresses_manual_and_auto_then_resumes(
         assert len(rows) == 1 and rows[0].description == "created"
     finally:
         await db.dispose()
+
+
+async def test_update_touching_only_an_excluded_field_writes_no_row() -> None:
+    """`__log_attributes__` + default `__log_only_dirty__`: a save that changed nothing the
+    model logs must not write an "updated" activity — and must never leak the excluded field."""
+    db = await _setup()
+    try:
+        note = await Note.create(title="public", secret="s0")
+        note.secret = "s1"
+        await note.save()
+        updated = await Activity.where(event="updated").get()
+        assert list(updated) == []  # nothing logged changed → no row, no leaked secret
+    finally:
+        await db.dispose()
+
+
+async def test_update_records_only_the_logged_fields_old_and_new() -> None:
+    db = await _setup()
+    try:
+        note = await Note.create(title="t1", secret="s0")
+        note.title = "t2"
+        note.secret = "s1"  # dirty but excluded — must appear in neither old nor attributes
+        await note.save()
+        updated = await Activity.where(event="updated").first()
+        assert updated is not None
+        assert updated.properties["attributes"] == {"title": "t2"}
+        assert updated.properties["old"] == {"title": "t1"}
+    finally:
+        await db.dispose()
