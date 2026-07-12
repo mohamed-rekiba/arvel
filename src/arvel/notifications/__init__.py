@@ -259,6 +259,8 @@ class NotificationManager(Manager):
         async def _send(channel: str, notifiable: Any, notification: Notification) -> Any:
             client = self.apprise()
             urls = self._route(notifiable, channel, None) or notification.apprise_urls(notifiable)
+            if isinstance(urls, str):  # docs: a route is "a URL (or list of URLs)" — a bare
+                urls = [urls]  # string must not iterate character-by-character
             for url in urls:
                 client.add(url)
             message = notification.to_apprise(notifiable)
