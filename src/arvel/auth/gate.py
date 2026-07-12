@@ -184,13 +184,21 @@ class Gate:
         return cached
 
     def _resolve(self, ability: str, args: tuple[Any, ...]) -> Any:
-        if ability in self._abilities:
-            return self._abilities[ability]
+        # documented order: a registered policy method decides for its model; a same-named
+        # `define` is only the fallthrough (an unregistered model / a policy without the method)
         instance = self._policy_instance(args)
         if instance is not None:
             method = getattr(instance, ability, None)
             if callable(method):
                 return method
+        return self._abilities.get(ability)
+
+    def _policy_decider(self, ability: str, args: tuple[Any, ...]) -> Any:
+        """The policy instance that will decide ``ability`` — or ``None`` when resolution falls
+        through to a named ability (no policy for the model, or the policy lacks the method)."""
+        instance = self._policy_instance(args)
+        if instance is not None and callable(getattr(instance, ability, None)):
+            return instance
         return None
 
     async def _raw(self, ability: str, args: tuple[Any, ...], user: Any) -> Any:
@@ -203,12 +211,12 @@ class Gate:
             if result is not None:
                 break
         if result is None:
-            # a policy's own before() runs before its ability methods
-            if ability not in self._abilities:
-                instance = self._policy_instance(args)
-                pre = getattr(instance, "before", None) if instance is not None else None
-                if callable(pre):
-                    result = await _maybe_await(pre(user, ability))
+            # a policy's own before() runs whenever the policy is the decider — a same-named
+            # `define` must not suppress it (it doesn't shadow the policy method either)
+            decider = self._policy_decider(ability, args)
+            pre = getattr(decider, "before", None) if decider is not None else None
+            if callable(pre):
+                result = await _maybe_await(pre(user, ability))
             if result is None:
                 check = self._resolve(ability, args)
                 if check is None:
