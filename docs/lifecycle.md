@@ -40,7 +40,7 @@ that share an execution context.
 Once the pipeline passes control through, arvel resolves the route's parameters — including
 **implicit model binding**, where a `{post}` segment is loaded into a `Post` model — and calls your
 handler. A handler is an `async` function; return a dict (arvel sends JSON), a `Response`, or a view
-(arvel renders HTML). See [Routing](routing.md).
+(arvel renders HTML). See [Routing](routing.md) and [Responses](responses.md).
 
 A deliberate detail: a missing bound model is **not** rendered as a 404 before the pipeline runs.
 Doing so would let an unauthenticated client tell an existing id from a nonexistent one with zero
