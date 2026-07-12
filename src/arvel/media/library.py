@@ -132,9 +132,14 @@ class MediaAdder:
         return ext in self._IMAGE_EXTS
 
     async def to_media_collection(
-        self, collection: str = "default", *, disk: str = "default"
+        self, collection: str = "default", *, disk: str | None = None
     ) -> Media:
-        """Store the file (and its conversions) on ``disk`` and record a:class:`Media` row.
+        """Store the file (and its conversions) on ``disk`` (``None`` = the configured default
+        disk) and record a:class:`Media` row.
+
+        The **resolved** disk name is what's persisted on the row — ``get_url``/``delete_media``
+        later read config and re-resolve the disk by that stored name, so a placeholder would
+        break every downstream path.
 
         The row is created first (its id names the storage path — ``{collection}/{id}/...``), but
         it's a reservation, not a commit: if any store write below fails, every file written so
@@ -145,6 +150,8 @@ class MediaAdder:
 
         model = self._model
         media_model: type[Media] = model.__media_model__
+        disks = app("filesystem")
+        disk_name = disk or disks.default_driver()
         existing = await model.get_media(collection)
         media = await media_model.create(
             model_type=morph_type_of(type(model)),
@@ -153,13 +160,13 @@ class MediaAdder:
             name=self._name,
             file_name=self._file_name,
             mime_type=self._mime_type,
-            disk=disk,
+            disk=disk_name,
             size=len(self._contents),
             custom_properties=self._custom,
             generated_conversions={},
             order_column=len(existing) + 1,
         )
-        filesystem = app("filesystem").disk(disk)
+        filesystem = disks.disk(disk_name)
         base_dir = f"{collection}/{media.id}"
         written: list[str] = []
         try:

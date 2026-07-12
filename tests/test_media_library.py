@@ -50,10 +50,18 @@ class Gallery(HasMedia, Model):
 
 
 class _Disks:
+    """Test double for the FilesystemManager: one in-memory disk named "memory". It mirrors the
+    real manager's contract (a *name is resolved*, the default has a real name) so it can't hide
+    a bad disk sentinel the way an ignore-the-name fake once did."""
+
     def __init__(self, fs: Filesystem) -> None:
         self._fs = fs
 
+    def default_driver(self) -> str:
+        return "memory"
+
     def disk(self, name: str | None = None) -> Filesystem:
+        assert name in (None, "memory"), f"unknown disk {name!r}"
         return self._fs
 
 
@@ -279,6 +287,9 @@ class _FailingDisks:
     def __init__(self, disk: _FailingDisk) -> None:
         self._disk = disk
 
+    def default_driver(self) -> str:
+        return "memory"
+
     def disk(self, name: str | None = None) -> _FailingDisk:
         return self._disk
 
@@ -342,3 +353,31 @@ def test_jpeg_conversion_flattens_rgba_source() -> None:
     out = MediaConversion("web", width=10, height=10, fmt="JPEG").apply(source)
 
     assert PILImage.open(BytesIO(out)).format == "JPEG"
+
+
+async def test_add_media_without_disk_uses_the_configured_default_disk(tmp_path: Any) -> None:
+    """The documented primary path — ``add_media(...).to_media_collection(...)`` with no
+    ``disk=`` — must resolve the *configured* default disk through the real FilesystemManager
+    and persist that disk's real name on the row (so get_url/delete read the right config)."""
+    from arvel.filesystem import FilesystemManager
+
+    app = Application.configure().create()
+    app.make("config").set(
+        "filesystems", {"default": "local", "disks": {"local": {"root": str(tmp_path)}}}
+    )
+    app.instance("filesystem", FilesystemManager())
+    db = ConnectionResolver()
+    Media.set_connection(db)
+    Album.set_connection(db)
+    await db.execute(sa.schema.CreateTable(Media.__table__))
+    await db.execute(sa.schema.CreateTable(Album.__table__))
+    try:
+        album = await Album.create(title="trip")
+        media = await album.add_media(b"hello", file_name="notes.txt").to_media_collection()
+        assert media.disk == "local"  # the resolved disk name, never a "default" placeholder
+        stored = tmp_path / "default" / str(media.id) / "notes.txt"
+        assert stored.exists()
+        assert await album.delete_media(media.id) is True  # delete resolves the same disk
+        assert not stored.exists()
+    finally:
+        await db.dispose()
