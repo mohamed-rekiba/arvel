@@ -2,9 +2,8 @@
 
 A stdlib, dotted-key store implementing ``contracts.ConfigRepository`` — pure-Python,
 nothing heavy. For *typed* settings, subclass ``arvel.kernel.settings.Settings`` — a typed,
-validated **view** over a ``config()`` section, built on **msgspec** (core, no extra; pydantic
-is banned — DR-0005/DR-0016). ``env()`` here reads raw environment variables with -style
-literal coercion.
+validated **view** over a ``config()`` section, built on **msgspec** (core, no extra.
+``env()`` here reads raw environment variables with -style literal coercion.
 
 Grounded in knowledge/port/03-application-providers-bootstrap.md + DR-0005/DR-0016.
 """

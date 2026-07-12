@@ -233,8 +233,7 @@ with defaults, coercion, and IDE autocomplete — define a `Settings` subclass, 
 `__config_key__` at a config section, and **just instantiate it**. Crucially, this is a **typed view
 over `config()`, not a second config source**: the values come from the one pipeline (config files /
 `with_config` / env via config files), so a typed setting can never disagree with `config()`. It's
-built on [msgspec](https://jcristharif.com/msgspec/) (core, fast, no extra dependency; pydantic is
-intentionally not used):
+built on [msgspec](https://msgspec.dev/) (core, fast, no extra dependency):
 
 ```python
 from arvel.kernel import Settings

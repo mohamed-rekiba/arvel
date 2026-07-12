@@ -28,3 +28,4 @@ htmlcov/
 .aios/
 .repowise/
 .vscode/mcp.json
+.mcp.json

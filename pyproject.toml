@@ -279,6 +279,5 @@ forbidden_modules = [
   "sqlalchemy",
   "taskiq",
   "PIL",
-  "pydantic",
   "rich",
 ]

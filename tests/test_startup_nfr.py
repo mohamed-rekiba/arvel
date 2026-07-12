@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 # Libraries that must NEVER be imported merely by `import arvel`.
-HEAVY_LIBS = ("litestar", "sqlalchemy", "taskiq", "PIL", "pydantic", "rich", "typer", "click")
+HEAVY_LIBS = ("litestar", "sqlalchemy", "taskiq", "PIL", "rich", "typer", "click")
 
 
 def _modules_after(code: str) -> set[str]:

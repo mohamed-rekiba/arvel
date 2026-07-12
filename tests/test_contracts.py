@@ -35,7 +35,7 @@ def test_container_declares_resolution_surface() -> None:
 def test_importing_contracts_pulls_no_heavy_libs() -> None:
     script = (
         "import arvel.contracts, sys, json;"
-        "print(json.dumps([m for m in ('litestar','sqlalchemy','taskiq','PIL','pydantic','rich') "
+        "print(json.dumps([m for m in ('litestar','sqlalchemy','taskiq','PIL','msgspec','rich') "
         "if m in sys.modules]))"
     )
     out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, check=True)

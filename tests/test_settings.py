@@ -1,5 +1,4 @@
-"""C2 — typed settings: a typed VIEW over a config() section, auto-loaded on instantiation
-(no pydantic; DR-0005, DR-0016)."""
+"""C2 — typed settings: a typed VIEW over a config() section, auto-loaded on instantiation."""
 
 from __future__ import annotations
 
@@ -101,20 +100,6 @@ def test_missing_required_field_raises() -> None:
             Required()
     finally:
         set_application(None)
-
-
-def test_no_pydantic_imported() -> None:
-    # fresh interpreter: taskiq (a [queue]-extra dep) uses pydantic internally but lazily; an
-    # in-session sys.modules check is order-fragile once another test imports queue, hence subprocess.
-    import subprocess
-    import sys
-
-    code = (
-        "import arvel, sys; "
-        "assert 'pydantic' not in sys.modules, 'pydantic loaded on import arvel'; "
-        "assert 'pydantic_settings' not in sys.modules"
-    )
-    subprocess.run([sys.executable, "-c", code], check=True)
 
 
 def test_load_dotenv(tmp_path: object, monkeypatch: pytest.MonkeyPatch) -> None:

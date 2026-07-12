@@ -1,5 +1,5 @@
 """Typed settings on **msgspec** — a typed, validated *view* over a ``config()`` section that
-**auto-loads on instantiation** (no pydantic; DR-0005, DR-0016).
+**auto-loads on instantiation**.
 
 ``config()`` is the single source of truth (populated from ``config/*.py``, ``with_config``, and the
 environment via ``env()`` calls inside config files). A ``Settings`` subclass is a typed lens over one
