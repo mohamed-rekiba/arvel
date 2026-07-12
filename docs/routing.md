@@ -128,7 +128,11 @@ the URL; an optional `expires` makes them temporary:
 link = router.signed_url("unsubscribe", user=7)            # key defaults to the app key
 temp = router.signed_url("confirm", expires=ts, token=t)   # temporary (expires is a unix ts)
 
-if router.has_valid_signature(request.full_url()):
+# per-route: `.middleware(ValidateSignature)` rejects tampered/expired links with a 403.
+# manually: verify the RELATIVE path + query exactly as received (what `signed_url` signed;
+# an absolute URL would reconstruct a different base and never verify):
+raw = request.raw.url
+if router.has_valid_signature(f"{raw.path}?{raw.query}"):
     ...                                            # signature intact AND not expired
 ```
 

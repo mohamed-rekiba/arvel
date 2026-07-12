@@ -187,15 +187,16 @@ Driver mapping:
 ```python
 Storage.url("avatars/ada.png")   # public URL — a configured `url` prefix always wins
 
-await Storage.temporary_url("invoices/2026-06.pdf", timedelta(minutes=15))   # s3 only: a
+await Storage.temporary_url("invoices/2026-06.pdf", timedelta(minutes=15))   # signed: a
                                                                               # presigned, time-boxed URL
 ```
 
 `url()` resolution order: the disk's configured `url` (`disks.<name>.url`) always wins; otherwise
 `s3` builds an endpoint/bucket/key URL, and other drivers return the full disk path as a
-best-effort identifier. `temporary_url` presigns a time-boxed GET via s3fs and only works on the
-`s3` driver — every other driver raises `UnsupportedDriverOperation` rather than hand back a URL it
-can't actually sign.
+best-effort identifier. `temporary_url` presigns a time-boxed GET on the drivers whose backends can sign: `s3` (via
+s3fs), and `gcs`/`azure` (via their fsspec `sign(...)`). The `local` driver (or any other
+protocol) raises `UnsupportedDriverOperation` rather than hand back a URL it can't actually
+sign.
 
 ## Testing: `Storage.fake`
 
@@ -235,8 +236,9 @@ teardown) restores every faked disk alongside the regular facade fakes (`Mail`, 
   uses path-style addressing so RustFS/R2/Supabase work unchanged.
 - **`append`/`prepend` aren't atomic.** Both are a read-modify-write over the whole file — fine
   for logs written from one place, risky under concurrent writers.
-- **`temporary_url` isn't universal.** Only the `s3` driver supports it; calling it on `local`/
-  `gcs`/`azure` raises `UnsupportedDriverOperation` rather than hand back a URL it can't sign.
+- **`temporary_url` isn't universal.** The signing-capable drivers support it (`s3`, `gcs`,
+  `azure`); calling it on `local` (or any protocol the backend can't sign) raises
+  `UnsupportedDriverOperation` rather than hand back a URL it can't sign.
 
 ## How it works
 

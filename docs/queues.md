@@ -185,10 +185,11 @@ await batch.cancel()      # cancel it yourself — idempotent
 ```
 
 **Atomic counters, not a lost-update race.** Two jobs can settle at the same instant on two
-different workers; `pending_jobs`/`failed_jobs` are updated with a **compare-and-swap retry
-loop** (`UPDATE ... WHERE pending_jobs = <value just read>`, retrying on a zero rowcount — the
-same optimistic-concurrency pattern the worker's delayed-job claim already uses), so a decrement
-is never silently lost and `then`/`catch`/`finally_` each fire **exactly once**, never twice.
+different workers; `pending_jobs`/`failed_jobs` are updated with an **atomic column expression**
+(`UPDATE ... SET pending_jobs = pending_jobs - 1` — the database does the arithmetic, so
+concurrent settles serialize on the row), and the finish/cancel transitions stay guarded by
+`WHERE <timestamp> IS NULL`, so a decrement is never silently lost and `then`/`catch`/`finally_`
+each fire **exactly once**, never twice.
 
 ## Unique jobs
 
