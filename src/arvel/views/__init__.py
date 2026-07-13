@@ -142,6 +142,7 @@ class ViewFactory:
             autoescape=select_autoescape(default=True),
         )
         from arvel.localization import trans, trans_choice
+        from arvel.views.vite import vite
 
         env_globals: dict[str, Any] = self.env.globals
         env_globals.update(
@@ -153,6 +154,7 @@ class ViewFactory:
             route=_route,
             url=_url,
             asset=_asset,
+            vite=vite,
             csrf_token=_csrf_token,
             csrf_field=_csrf_field,
             method_field=_method_field,
