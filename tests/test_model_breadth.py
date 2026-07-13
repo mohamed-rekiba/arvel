@@ -45,6 +45,28 @@ async def test_mass_assignment_guards_non_fillable() -> None:
         await db.dispose()
 
 
+async def test_force_create_sets_a_guarded_field() -> None:
+    # the trusted escape hatch: force_create writes past the fillable guard that create() enforces
+    db = await _setup()
+    try:
+        article = await Article.force_create(title="t", status="draft", views=999)
+        assert article.views == 999  # guarded field IS set via the force path
+        assert article.status is Status.DRAFT  # casts still apply
+    finally:
+        await db.dispose()
+
+
+async def test_force_fill_sets_a_guarded_field_that_fill_would_drop() -> None:
+    db = await _setup()
+    try:
+        guarded = Article().fill({"views": 5})
+        assert "views" not in guarded._attributes  # fill() drops the guarded field
+        forced = Article().force_fill({"views": 5})
+        assert forced.views == 5  # force_fill sets it
+    finally:
+        await db.dispose()
+
+
 async def test_timestamps_set_on_create() -> None:
     db = await _setup()
     try:

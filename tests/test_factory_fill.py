@@ -72,3 +72,34 @@ async def test_trashed_sets_deleted_at_for_soft_delete_model() -> None:
 def test_trashed_raises_for_non_soft_delete_model() -> None:
     with pytest.raises(TypeError, match="SoftDeletes"):
         WidgetFactory().trashed()
+
+
+class Account(Model):
+    __table_name__ = "factory_fill_accounts"
+    __fields__: ClassVar[dict[str, Any]] = {"email": str, "role": str}
+    __fillable__: ClassVar[list[str]] = ["email"]  # 'role' is guarded (trusted-set only)
+
+
+class AccountFactory(Factory[Account]):
+    model = Account
+
+    def definition(self) -> dict[str, Any]:
+        return {"email": "a@x.com", "role": "customer"}
+
+    def admin(self) -> Factory[Account]:
+        return self.state({"role": "admin"})
+
+
+async def test_factory_create_sets_a_guarded_field() -> None:
+    # factories are trusted definitions, so create() force-fills: a guarded field like `role`
+    # comes through, while a plain (request-style) create() still drops it.
+    db = ConnectionResolver()
+    Account.set_connection(db)
+    await db.execute(sa.schema.CreateTable(Account.__table__))
+    try:
+        admin = await AccountFactory().admin().create()
+        assert admin.role == "admin"  # factory set the guarded field
+        plain = await Account.create(email="c@x.com", role="admin")
+        assert "role" not in plain._attributes  # plain create still guards it
+    finally:
+        await db.dispose()

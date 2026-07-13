@@ -317,7 +317,10 @@ class Factory[M: Model]:
         attrs = self._attributes(overrides, index)
         attrs = await self._resolve_for(attrs, overrides)
         instance = self.model()
-        instance.fill(attrs)
+        # Factory definitions/states are trusted code (never request data), so force past the
+        # fillable guard — this lets a factory set a *guarded* field like `role` and matches how
+        # `make()` (which builds via the constructor) already assigns attributes.
+        instance.force_fill(attrs)
         for callback in self._after_making:
             await self._run_hook(callback, instance)
         await instance.save()
