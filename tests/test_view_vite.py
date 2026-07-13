@@ -59,3 +59,31 @@ async def test_manifest_is_read_off_the_event_loop(tmp_path: Path) -> None:
     finally:
         vite_module.run_sync = original
     assert calls
+
+
+async def test_vite_global_renders_unescaped_html(tmp_path: Path, monkeypatch: Any) -> None:
+    """The ``vite()`` template global must return Markup so the trusted tags render as HTML — not
+    escaped into ``&lt;script&gt;`` by the autoescaping environment (the documented usage has no
+    ``| safe``)."""
+    build = tmp_path / "public" / "build"
+    build.mkdir(parents=True)
+    (build / "manifest.json").write_text(
+        json.dumps(
+            {
+                "resources/js/app.js": {
+                    "file": "assets/app.abc123.js",
+                    "css": ["assets/app.def456.css"],
+                }
+            }
+        )
+    )
+    monkeypatch.chdir(tmp_path)
+
+    from arvel.views import ViewFactory
+
+    factory = ViewFactory("resources/views")
+    template = factory.env.from_string('{{ vite("resources/js/app.js") }}')
+    out = await template.render_async()
+
+    assert '<script type="module" src="/build/assets/app.abc123.js"></script>' in out
+    assert "&lt;script" not in out  # would be escaped without the Markup wrapper

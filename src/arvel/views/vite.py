@@ -57,6 +57,11 @@ class Vite:
         return "\n".join(lines)
 
 
-async def vite(*entries: str) -> str:
-    """Template helper: emit asset tags for ``entries`` from the default manifest location."""
-    return await Vite().tags(*entries)
+async def vite(*entries: str) -> Any:
+    """Template helper: emit asset tags for ``entries`` from the default manifest location.
+    Returns ``Markup`` so the (trusted, build-generated) tags render as HTML rather than being
+    escaped by the autoescaping template environment."""
+    from markupsafe import Markup
+
+    # tags are built from the developer's Vite manifest (trusted build output, no user input)
+    return Markup(await Vite().tags(*entries))  # noqa: S704 (trusted build output)  # nosec B704
