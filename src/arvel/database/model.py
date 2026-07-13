@@ -592,6 +592,27 @@ class Model(HasEvents, HasCasts, HasRelationships, SerializesModels, metaclass=M
             raise MassAssignmentException(type(self).__name__, discarded)
         return self
 
+    def force_fill(self, attributes: Mapping[str, Any]) -> Self:
+        """Mass-assign ``attributes`` **past** the ``__fillable__``/``__guarded__`` guard — the
+        deliberate escape hatch for trusted code (seeders, factories, admin provisioning) that
+        legitimately needs to set a guarded field like ``role``. Casts still apply. Only ever pass
+        values you control in code: this is the *intentional* bypass of the mass-assignment
+        protection ``fill()`` gives request data, so a `grep force_fill/force_create` is the complete
+        inventory of where guarded fields get set."""
+        for key, val in attributes.items():
+            self._attributes[key] = self._cast_set(key, val)
+        return self
+
+    @classmethod
+    async def force_create(cls, **attributes: Any) -> Self:
+        """``create()`` that writes past the mass-assignment guard (via :meth:`force_fill`). For
+        trusted code setting guarded fields — ``User.force_create(role=UserRole.ADMIN, ...)``. Never
+        pass request input to it; use plain :meth:`create` for anything derived from a request."""
+        instance = cls()
+        instance.force_fill(attributes)
+        await instance.save()
+        return instance
+
     # --- attribute access ----------------------------------------------------
     def __getattr__(self, item: str) -> Any:
         attributes = self.__dict__.get("_attributes", {})
