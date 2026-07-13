@@ -136,3 +136,74 @@ def test_user_pref_survives_the_served_kernel_stack() -> None:
             assert got.json()["locale"] == "fr"  # user pref beats the header, full stack
     finally:
         set_application(None)
+
+
+# --- an explicit switch outranks the stored preference ---------------------
+@dataclass
+class SwitchReq:
+    headers: dict[str, str]
+    q: dict[str, str] | None = None
+    cookies: dict[str, str] | None = None
+
+    def header(self, name: str) -> str | None:
+        return self.headers.get(name)
+
+    def query(self, key: str, default: Any = None) -> Any:
+        return (self.q or {}).get(key, default)
+
+    def cookie(self, name: str, default: Any = None) -> Any:
+        return (self.cookies or {}).get(name, default)
+
+
+async def test_query_switch_beats_user_pref() -> None:
+    token = current_user.set(User(locale="fr"))
+    try:
+        req = SwitchReq({"accept-language": "de"}, q={"lang": "es"})
+        assert await LocaleMiddleware().handle(req, _capture) == "es"  # switch wins over fr
+    finally:
+        current_user.reset(token)
+
+
+async def test_locale_cookie_switch_beats_user_pref() -> None:
+    token = current_user.set(User(locale="fr"))
+    try:
+        req = SwitchReq({"accept-language": "de"}, cookies={"locale": "it"})
+        assert await LocaleMiddleware().handle(req, _capture) == "it"
+    finally:
+        current_user.reset(token)
+
+
+async def test_switch_normalizes_region_subtag() -> None:
+    req = SwitchReq({}, q={"locale": "pt-BR"})
+    assert await LocaleMiddleware().handle(req, _capture) == "pt"
+
+
+async def test_malicious_switch_value_is_ignored() -> None:
+    # a path-traversal attempt must not become the locale (it feeds translation-file lookups)
+    token = current_user.set(User(locale="fr"))
+    try:
+        req = SwitchReq({"accept-language": "de"}, q={"lang": "../../etc/passwd"})
+        assert await LocaleMiddleware().handle(req, _capture) == "fr"  # falls back to user pref
+    finally:
+        current_user.reset(token)
+
+
+async def test_switch_beats_stored_pref_under_real_wiring() -> None:
+    from arvel.http.middleware import AuthenticateMiddleware
+    from arvel.kernel import set_application
+    from arvel.kernel.application import Application
+
+    app = Application()
+    app.instance("user_resolver", lambda request: User(locale="fr"))
+    set_application(app)
+    try:
+        authenticate = AuthenticateMiddleware()
+
+        async def auth_then_capture(request: Any) -> str:
+            return await authenticate.handle(request, _capture)
+
+        req = SwitchReq({"accept-language": "de"}, cookies={"locale": "es"})
+        # user resolves to fr, but the explicit es switch must win end-to-end
+        assert await LocaleMiddleware().handle(req, auth_then_capture) == "es"
+    finally:
+        set_application(None)
