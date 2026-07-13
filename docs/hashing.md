@@ -82,6 +82,32 @@ manager.check("secret", legacy_bcrypt_hash)        # True — still verifies
 manager.needs_rehash(legacy_bcrypt_hash)            # True — wrong driver, upgrade on next login
 ```
 
+## Importing hashes from another application
+
+Migrating users off another system? Their password hashes come across **as-is** — you never need
+their plaintexts, and you don't force a mass reset. arvel recognizes a hash by its own format, so a
+hash produced elsewhere verifies directly, then upgrades to *your* configured driver and cost on the
+user's next successful login (rehash-on-login).
+
+Copy the existing hash strings into your users' `password` column untouched, and let the normal
+login flow do the rest:
+
+- **bcrypt** hashes verify in any common variant (`$2a$`, `$2b$`, `$2y$`) — the `$2y$` prefix some
+  ecosystems emit is accepted, not rejected.
+- **argon2id** hashes carry their own cost parameters in the string, so a hash made with different
+  `memory_cost`/`time_cost`/`parallelism` still verifies; `needs_rehash` then flags it for upgrade.
+
+```python
+manager = Hasher("argon2id")                       # your configured default
+manager.check("their password", imported_hash)     # True — verifies as-is
+manager.needs_rehash(imported_hash)                 # True — upgrades on next login
+```
+
+Because the upgrade happens only right after a verified login (see *Rehashing without the
+plaintext* above), users migrate transparently as they sign in — no downtime, no reset email. A
+hash belonging to an account that never signs back in stays verifiable indefinitely under its
+original algorithm.
+
 ## Inspecting a hash
 
 ```python
