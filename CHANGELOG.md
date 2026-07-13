@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.63.3](https://github.com/mohamed-rekiba/arvel/compare/v0.63.2...v0.63.3) (2026-07-13)
+
+
+### Documentation
+
+* add the in-repo rewrite map (reference-phrased) so the plan is visible ([4e87332](https://github.com/mohamed-rekiba/arvel/commit/4e87332bca39a5181b53ccc3d4fb5cc49d8f5fda))
+* fix grammar artifacts from the name scrub in rewrite-map ([a8732c9](https://github.com/mohamed-rekiba/arvel/commit/a8732c9a5c8bd59e7ac2e714b8d82565d8de0d1a))
+* fix the responses.md stream() example — media_type, not headers ([ff3b997](https://github.com/mohamed-rekiba/arvel/commit/ff3b997ad6eeded54ee220c964d836328003960b))
+* fix the two runtime-false claims in Getting Started; add gap G-03 ([cdab733](https://github.com/mohamed-rekiba/arvel/commit/cdab7336fc35f54b4f6d81a0370205c03d5873e8))
+* fully scrub reference-framework identifiers from the in-repo map; lifecycle telemetry ([b79a8d4](https://github.com/mohamed-rekiba/arvel/commit/b79a8d4182247eb569ded84a4774019b060683cc))
+* **rewrite 2:** Getting Started group — structure, deployment, frontend, seeding, config fill ([750b1af](https://github.com/mohamed-rekiba/arvel/commit/750b1afe316ca96f1355bb126cf51a7f0dc62729))
+* **rewrite 3:** Architecture — NEW Request Lifecycle page ([2ee7d4c](https://github.com/mohamed-rekiba/arvel/commit/2ee7d4c645336204a0a414ad02c1a4ee9c201699))
+* **rewrite 4:** The Basics — NEW Responses page ([8dc41d5](https://github.com/mohamed-rekiba/arvel/commit/8dc41d5974d5ae99bfb5ff908210f0a287cf6c56))
+* rewrite and restructure the documentation ([2a2c3bf](https://github.com/mohamed-rekiba/arvel/commit/2a2c3bf689b720330b9bbfb0c92cf1383cb9f2cd))
+* rewrite Getting Started in the reference installation shape ([bc8315b](https://github.com/mohamed-rekiba/arvel/commit/bc8315b3ebaee970bcd8880e327816b78ff623ef))
+* scrub reference product names from the map (repo brand-token guard) ([286e30c](https://github.com/mohamed-rekiba/arvel/commit/286e30c81a4ca43919408a662bc83b79de09e81f))
+
 ## [0.63.2](https://github.com/mohamed-rekiba/arvel/compare/v0.63.1...v0.63.2) (2026-07-12)
 
 
