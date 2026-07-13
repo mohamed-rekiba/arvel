@@ -121,7 +121,7 @@ from arvel.http.session import invalidate_session
 
 async def change_password(request):
     user = request.user()
-    user.password = Hasher().make((await request.form())["password"])
+    user.password = (await request.form())["password"]   # the hashed cast hashes it on write
     await user.save()
     await logout_everywhere(user)      # kill every device's persistent re-auth
     invalidate_session(request)        # drop THIS session too — force a fresh login
@@ -220,7 +220,6 @@ migration (`arvel new` ships it, like `users`/`api_tokens`/`failed_jobs`) — no
 
 ```python
 from arvel.auth.password_reset import PasswordBroker, PasswordResetStatus
-from arvel.security import Hasher
 
 async def find_user(email):
     return await User.where(email=email).first()
@@ -238,7 +237,7 @@ async def do_reset(request):
     form = await request.form()
 
     def set_password(user, new_password):
-        user.password = Hasher().make(new_password)   # guarded field — set directly
+        user.password = new_password   # the hashed cast hashes it on write
 
     status = await broker.reset(form["email"], form["token"], form["password"], set_password)
     if status is not PasswordResetStatus.RESET_SUCCESS:

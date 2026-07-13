@@ -1,4 +1,4 @@
-# Authorization: Roles & Permissions
+# Authorization
 
 Authentication told you *who* the user is. Authorization answers the next question: *what are they
 allowed to do?* arvel gives you two complementary tools, and most apps use both:

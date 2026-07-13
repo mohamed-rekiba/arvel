@@ -6,104 +6,16 @@ re-invent them: small, dependency-light utilities for string manipulation, numbe
 array/dict digging, fluent collections, and control-flow sugar. They're plain functions and
 classes — import what you need.
 
-This page covers `Str`, `Number`, `Arr`/`data_get`/`data_set`, `Collection`, and the control-flow
-helpers. They're part of the **core** — nothing to install.
+This page covers `Number`, `Arr`/`data_get`/`data_set`, the control-flow helpers, and the global
+functions; strings and collections have their own pages. They're part of the **core** — nothing to
+install.
 
-## Strings — `Str`
+## Strings & collections
 
-Static one-shots for casing and slugs:
+Two of the largest helper families have their own pages:
 
-```python
-from arvel.support import Str
-
-Str.snake("BlogPost")        # "blog_post"
-Str.camel("blog_post")       # "blogPost"
-Str.studly("blog_post")      # "BlogPost"
-Str.kebab("BlogPost")        # "blog-post"
-Str.slug("Hello, World!")    # "hello-world"
-Str.random(32)               # a cryptographically-random alphanumeric token
-```
-
-(The casing transforms are pure and memoized, so repeated calls on the same input are free.
-`Str.random` is the exception — it returns a fresh value every time.)
-
-More `Str` transforms:
-
-```python
-Str.title("a nice title")        # "A Nice Title"
-Str.headline("create_user")      # "Create User"
-Str.plural("category")           # "categories"
-Str.singular("categories")       # "category"
-Str.upper("ab"); Str.ucfirst("hi")   # "AB" / "Hi"   (also lower / lcfirst)
-Str.mask("secret@x.com", "*", 3)     # "sec*********"
-```
-
-Length & slicing:
-
-```python
-Str.length("abc")                # 3
-Str.substr("hello", 1, 3)        # "ell"
-Str.take("hello", -2)            # "lo"     (positive counts from the start)
-Str.char_at("abc", 1)            # "b"      (None when out of range)
-Str.reverse("abc")               # "cba"
-Str.repeat("ab", 3)              # "ababab"
-Str.words("a b c d", 2)          # "a b..."
-Str.word_count("a b c")          # 3
-```
-
-Whitespace, padding & affixes:
-
-```python
-Str.squish("  a   b  ")          # "a b"
-Str.pad_left("5", 3, "0")        # "005"   (also pad_right / pad_both)
-Str.start("path", "/")           # "/path" (idempotent — no double slash)
-Str.finish("path", "/")          # "path/"
-Str.chop_start("/api/x", "/api") # "/x"    (chop_end trims a suffix)
-Str.wrap("x", "[", "]")          # "[x]"
-```
-
-Search, extract & replace:
-
-```python
-Str.between("[abc]", "[", "]")              # "abc"
-Str.after("App/Models/User", "/")           # "Models/User"  (after_last → "User")
-Str.before("a.b.c", ".")                    # "a"            (before_last → "a.b")
-Str.is_("foo/*", "foo/bar/baz")             # True   (only `*` is a wildcard; else literal)
-Str.contains_all("foo bar", ["foo", "bar"]) # True
-Str.position("hello", "l")                  # 2   (None on miss)
-Str.replace_first("a", "X", "banana")       # "bXnana"   (replace_last → "bananX")
-Str.replace_array("?", ["1", "2"], "? ?")   # "1 2"
-Str.remove("-", "a-b-c")                    # "abc"
-Str.swap({"a": "b", "b": "a"}, "ab")        # "ba"   (single pass, like strtr)
-```
-
-Predicates & generators:
-
-```python
-Str.is_uuid(Str.uuid())          # True   (uuid() generates a v4 UUID)
-Str.is_ulid(Str.ulid())          # True
-Str.is_json('{"a": 1}')          # True
-Str.is_url("https://x.com")      # True
-```
-
-### Fluent strings — `Str.of`
-
-Start a fluent `Stringable` with `Str.of`; every transform above has a fluent counterpart that
-returns a new `Stringable`, so they chain:
-
-```python
-Str.of("  Hello World  ").trim().slug()              # "hello-world"
-Str.of("blog_post").studly()                         # "BlogPost"
-Str.of("the-quick-brown-fox").title()                # "The Quick Brown Fox"
-Str.of("a long sentence ...").limit(10)              # "a long sen..."
-Str.of("admin").when(True, lambda s: s.upper())      # conditional → "ADMIN"
-Str.of("a,b,c").explode(",").map(str.upper).all()    # ['A', 'B', 'C']  → a Collection
-```
-
-`when`/`unless` apply a callback conditionally; `tap` runs a side effect and returns the same
-`Stringable`; `pipe` returns whatever its callback returns; `explode` bridges into a `Collection`.
-Terminal methods (`length`, `is_json`, `char_at`, `contains_all`, …) return plain values. Call
-`.to_str()` (or `str(...)`) to get the plain string back.
+- **[Strings](strings.md)** — `Str` static helpers and the fluent `Str.of(...)` / `Stringable` chain.
+- **[Collections](collections.md)** — the `collect(...)` wrapper and its fluent list API.
 
 ## Numbers — `Number`
 
@@ -174,101 +86,6 @@ Arr.random([1, 2, 3, 4], 2)                  # 2 distinct picks (secrets-backed)
 ```
 
 `keys`/`values`/`divide`, `map_with_keys`, `sort`/`sort_desc`, and `take` round out the set.
-
-## Collections — `Collection`
-
-A fluent, chainable wrapper over a list:
-
-```python
-from arvel.support import Collection
-
-(Collection([1, 2, 3, 4])
-    .filter(lambda n: n % 2 == 0)
-    .map(lambda n: n * 10)
-    .all())                                     # [20, 40]
-```
-
-Beyond `map`/`filter`/`reduce`/`pluck`/`group_by`/`sort`/`sort_by` it carries the everyday
-collection surface:
-
-```python
-Collection([1, 2, 3, 4]).avg()                          # 2.5   (also max/min/sum/count_by)
-Collection([1, 2, 3, 4]).reject(lambda n: n % 2 == 0)   # [1, 3] (inverse of filter)
-yes, no = Collection([1, 2, 3, 4]).partition(lambda n: n % 2 == 0)  # ([2,4], [1,3])
-Collection([1, 2, 3]).implode("-")                      # "1-2-3" (alias: join)
-Collection([1, 2, 3]).pipe(lambda c: c.sum())           # 6
-Collection([1, 2, 3]).when(flag, lambda c: c.reverse()) # conditional transform
-Collection(records).sort_by_desc("score").pluck("name") # order + project
-```
-
-`sum`/`avg` take an optional key **or** callable, the same as `pluck`/`group_by`/`sort_by`:
-
-```python
-Collection([{"n": 1}, {"n": 2}]).sum("n")                    # 3
-Collection([{"n": 1}, {"n": 2}]).avg(lambda r: r["n"])       # 1.5
-Collection([1, 2, 3]).sum()                                  # 6   (no key: sums the items)
-```
-
-`zip`/`combine` pair a collection with other iterables:
-
-```python
-Collection([1, 2, 3]).zip([4, 5, 6])       # Collection of Collections: [1,4], [2,5], [3,6]
-Collection(["a", "b"]).combine([1, 2])     # {"a": 1, "b": 2}   (a plain dict, like key_by/group_by)
-```
-
-`duplicates` returns the items that repeat an earlier value, preserving first-seen order — keyed
-by **list index**:
-
-```python
-Collection([1, 2, 1, 3, 2, 2]).duplicates()          # {2: 1, 4: 2, 5: 2}
-Collection(rows).duplicates("email")                 # by key, same shape
-```
-
-`when_empty`/`when_not_empty` run a callback only in the matching case (`when` semantics:
-the callback's result wins when it returns a `Collection`, otherwise `self` is returned unchanged
-— so both are safe to chain):
-
-```python
-Collection([]).when_empty(lambda c: log.warning("no rows"))       # runs; still get `self` back
-Collection(rows).when_not_empty(lambda c: c.first()).id           # only when non-empty
-```
-
-Filter by an item's key/attribute (same `_get` resolution as `pluck`/`group_by`):
-
-```python
-users = Collection([{"role": "admin"}, {"role": "user"}, {"role": "guest"}])
-users.where_in("role", ["admin", "user"])               # [{admin}, {user}]
-users.where_not_in("role", ["admin"])                   # [{user}, {guest}]
-Collection(rows).where_not_null("deleted_at")           # rows with a value (where_null for None/missing)
-Collection([1, 2, 3, 4, 5]).take(2)                     # [1, 2]  (take(-2) → [4, 5])
-```
-
-`reverse`/`skip`/`slice`/`nth`/`take`, `where`/`where_in`/`where_not_in`/`where_null`/`where_not_null`,
-`merge`/`concat`/`flat_map`, `search`/`value`/`every`, and `tap` round out the set — all returning a
-new `Collection` (or a plain value for terminals).
-
-**No higher-order proxy.** Some collection libraries offer a magic `collection.map.name` shorthand
-that implicitly maps over an attribute. arvel intentionally **doesn't**: a dynamic `__getattr__`
-proxy can't be typed — every call through it would collapse to `Any`, which conflicts with arvel's
-strict-typing mandate. The idiomatic Python replacement is a lambda, and it types end-to-end:
-
-```python
-Collection(users).map(lambda u: u.name)         # typed: Collection[str], not Any
-Collection(users).each(lambda u: u.activate())
-```
-
-For large or streaming sources, `lazy()` gives a **deferred** view — `map`/`filter`/`take`
-don't run until you materialize, and only as many elements as you consume are produced:
-
-```python
-from arvel.support import LazyCollection
-
-(Collection(huge_list).lazy()
-    .map(expensive)            # nothing runs yet
-    .filter(is_valid)
-    .take(10)                  # stops after 10 — the rest is never touched
-    .to_list())
-```
 
 ## Control-flow sugar
 
@@ -356,7 +173,7 @@ collect([1, 2, 3]).map(...)          # wrap in a Collection
 resolve(MailManager)                 # container resolve — alias of app(MailManager)
 event(OrderShipped(order))           # dispatch through the event bus
 info("order.paid", id=order.id)      # info-level log line
-digest = bcrypt(password)            # hash with the default hasher
+digest = bcrypt(password)            # hash with the bcrypt driver (Hash.make for the default)
 token = encrypt({"uid": 7}); decrypt(token)      # round-trip via the app key
 validator(data, {"email": "required|email"})     # build a validator
 ```

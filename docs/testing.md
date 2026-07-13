@@ -13,7 +13,7 @@ This page covers the test client, fakes, database assertions, and freezing time.
     The helpers in `arvel.testing` are **core**. The test client needs `uv add 'arvel[http]'`, and the
     test runner + factories (pytest, pytest-asyncio, polyfactory, faker) come with `'arvel[dev]'`.
 
-## Feature tests with the test client
+## HTTP tests
 
 `client(asgi)` wraps Litestar's `TestClient` over your app, so requests run the actual routing,
 middleware, and handlers — and every verb call (`get`/`post`/`put`/`patch`/`delete`) returns a
@@ -56,7 +56,7 @@ response.assert_header("content-type", "application/json")
 | `assert_see(text)` | the raw body contains `text` |
 | `assert_header(name, value=None)` | the header is present (and, with `value`, matches) |
 
-## Fakes: assert side effects without doing them
+## Mocking
 
 Swap a recording fake behind a facade and assert what *would* have happened — no email sent, no
 job queued, no notification delivered, no real HTTP request made:
@@ -110,7 +110,7 @@ def _isolate():
 
 (No effect on a cache-backed limiter/session store — clear that backend instead.)
 
-## Database assertions
+## Database
 
 Assert rows exist, don't exist, or are soft-deleted — straight against the connection:
 
@@ -150,7 +150,7 @@ async with db.begin_test_transaction():
 # …and gone here: the transaction rolled back on exit
 ```
 
-## Console commands
+## Console tests
 
 `cli(app, command, input=None)` runs an app-registered command (a `Command` class on
 `app.command_classes`, or a `routes/console.py` `Console.command(...)` closure) against a booted
@@ -198,7 +198,7 @@ def test_token_expiry():
         Date.set_test_now(None)
 ```
 
-## How tests are run
+## Running tests
 
 The suite runs under `pytest` (async mode auto). The project's quality gate — `ruff`, `mypy`
 and `pyright` (strict), `import-linter`, `bandit`, the tests, and a line-coverage floor — is one

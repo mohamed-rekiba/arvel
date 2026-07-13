@@ -66,7 +66,7 @@ await Post.where_raw("char_length(body) > 500").get()        # trusted SQL only 
 `or_where_has(relation, callback)` is the OR form of [`where_has`](relationships.md).
 
 `Model.all()`, `Model.query().get()`, and every relation `get()` return an
-[**`ModelCollection`**](relationships.md#model-collection) — a model-aware, list-compatible
+[**`ModelCollection`**](collections.md) — a model-aware, list-compatible
 result set (`load`/`find`/`make_hidden`/`to_query`/…), not a plain `list`.
 
 
@@ -256,7 +256,7 @@ builder assembles a SQLAlchemy Core statement and hands it to the connection, wh
 is dialect-correct: the `upsert` and `having` divergences above are the builder compiling the right
 statement per driver, not leaking the difference up to you. On the way back, `get()` hydrates each
 row into a model through the model's `_hydrate` and wraps them in a
-[`ModelCollection`](relationships.md#model-collection); a raw table builder with no model bound
+[`ModelCollection`](collections.md); a raw table builder with no model bound
 skips hydration and returns plain `dict` rows instead.
 
 ## Common mistakes & gotchas

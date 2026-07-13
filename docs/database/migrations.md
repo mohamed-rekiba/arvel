@@ -157,21 +157,9 @@ arvel migrate:refresh          # roll back every migration, then re-run them
 arvel migrate:refresh --seed   # ...then run the app's bound seeder
 ```
 
-## Seeders
+## Seeding
 
-```python
-from arvel.database import Seeder, WithoutModelEvents
-
-class DatabaseSeeder(Seeder):
-    async def run(self) -> None:
-        await self.call_once(RolesSeeder)   # RolesSeeder.run() only once per process, however
-        await self.call(UsersSeeder)        # many seeders `call_once(RolesSeeder)` themselves
-        with WithoutModelEvents():          # bulk-insert without firing creating/created/saved
-            await UserFactory().count(1000).create()
-```
-
-Register the entry seeder on your app and run it with `arvel db:seed` (or `migrate:fresh --seed`).
-See [Factories](factories.md) for generating the rows a seeder inserts.
+Populate tables with a `Seeder` and `arvel db:seed` — see [Seeding](seeding.md).
 
 ## Common mistakes & gotchas
 

@@ -20,7 +20,7 @@ This page covers how the proxying works, the full set of facades, how they stay 
 fake one in a test, and when to inject the underlying service instead. Facades are part of the
 **core** — nothing to install.
 
-## How a facade works
+## How facades work
 
 Every facade extends a base `Facade` and declares exactly one thing: the container key it stands in
 for, its **accessor**. When you call a method on the facade, it resolves that key from the current
@@ -40,7 +40,7 @@ on every access, against whatever application is bootstrapped right now. That in
 dictionary lookup and buys you two things: a facade always reflects the live application, and swapping
 the backing service (a fake, in a test) is transparent to every call site.
 
-## Available facades
+## Facade class reference
 
 Import any of them straight from the package root — `from arvel import Cache, Auth, DB`:
 
@@ -95,7 +95,7 @@ def test_dashboard_caches_stats():
 assert on. When you need to substitute something more specific, `Cache.swap(obj)` puts any object you
 like behind the facade. Resolved roots reset on application boot, so tests don't leak into each other.
 
-## Facades vs. dependency injection
+## When to use facades
 
 A facade is convenient precisely because it hides a dependency — and that's also its cost. In a
 long-lived **service class**, a hidden dependency is a liability: the class's constructor no longer

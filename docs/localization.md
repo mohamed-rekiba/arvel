@@ -145,8 +145,19 @@ current_locale.set("fr")
 trans("messages.saved")        # "Enregistré !"
 ```
 
-`LocaleMiddleware` sets it from the request's `Accept-Language` header for the duration of each
-request and resets it afterward, so you rarely set it by hand.
+`LocaleMiddleware` sets it for the duration of each request and resets it afterward, so you rarely set
+it by hand. It resolves the locale by **precedence**:
+
+1. **An explicit switch** — a `?lang=` / `?locale=` query param, or a `locale` cookie. This is how a
+   language switcher works: set the `locale` cookie when the user picks a language, and it wins from
+   then on.
+2. **The signed-in user's stored preference** — a `locale` / `preferred_locale` attribute on the user
+   (applied by `AuthenticateMiddleware` once the user is resolved).
+3. **The `Accept-Language` header** — the browser's own preference.
+
+So an active choice always beats a saved preference, which beats the browser default. The switch value
+is sanitized to a bare locale code (`pt-BR` → `pt`), so a crafted `?lang=` can't reach outside your
+`lang/` directory.
 
 ## Translatable model attributes
 
