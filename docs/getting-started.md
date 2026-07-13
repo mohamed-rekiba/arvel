@@ -136,8 +136,9 @@ See [Database](database/index.md) for connections, and
 arvel serve --reload
 ```
 
-Your app is a standard ASGI application (`asgi.py` exposes it), so any ASGI server runs it in
-production — e.g. `granian asgi:asgi_app` or `uvicorn asgi:asgi_app`. Interactive API docs are
+Your app is a standard ASGI application (`asgi.py` exposes it). `arvel serve` runs it on granian
+(shipped with `arvel[server]`) in both dev and production; because it's plain ASGI, any other ASGI
+server works too if you install one. Interactive API docs are
 served at **`/schema`** (raw document at `/schema/openapi.json`) from the OpenAPI your routes
 generate — the path is `config/openapi.py`'s to change.
 

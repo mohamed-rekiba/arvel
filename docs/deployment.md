@@ -23,13 +23,15 @@ arvel serve                            # granian, 127.0.0.1:8000
 arvel serve --host 0.0.0.0 --port 80   # bind for production
 ```
 
-In production, run the server directly under a process manager:
+In production, run granian directly under a process manager:
 
 ```bash
-granian --interface asgi asgi:asgi_app --host 0.0.0.0 --port 8000
-# or
-uvicorn asgi:asgi_app --host 0.0.0.0 --port 8000 --workers 4
+granian --interface asgi asgi:asgi_app --host 0.0.0.0 --port 8000 --workers 4
 ```
+
+`arvel[server]` ships granian for both development and production. Because your app is a standard
+ASGI application, any other ASGI server works too if you prefer one — just install it yourself, e.g.
+`uv add uvicorn` then `uvicorn asgi:asgi_app --host 0.0.0.0 --port 8000 --workers 4`.
 
 ## Server requirements
 
