@@ -85,6 +85,37 @@ Log.with_context(request_id=rid, tenant=tenant.slug)
 Log.clear_context()                        # typically at the end of the request
 ```
 
+**Scoped (a block / one unit of work)** — `bound_context()` is a context manager that binds fields
+for the duration of a `with` block and **restores the prior context on exit** — so it nests cleanly
+and never clobbers surrounding context (unlike `with_context`/`clear_context`, which set/wipe
+globally):
+
+```python
+with Log.bound_context(job_id=job_id):
+    # every log line in here carries job_id; anything already bound (e.g. request_id) survives
+    ...
+# job_id is gone again here
+```
+
+### Request & queue correlation
+
+Two things are wired for you:
+
+- **HTTP** — `RequestContextMiddleware` binds a `request_id` (a `uuidv7`, or an incoming
+  `X-Request-ID`) for every request, so all of a request's log lines share it.
+- **Queue** — when you dispatch a job, the request's **entire bound log context** (its `request_id`
+  plus anything else you bound — `user_id`, `tenant_id`, …) is captured and rides the job across the
+  broker. On the worker the job re-binds all of it, **plus its own fresh `job_id` (a `uuidv7`)**. So
+  a job's logs carry the same context as the request that dispatched it, and you can trace one API
+  request to every queue job it spawned:
+
+  ```
+  {"event": "checkout.start", "request_id": "018f…", "user_id": 42}          # in the request
+  {"event": "SendReceipt.handled", "request_id": "018f…", "user_id": 42, "job_id": "018f…"}  # in the job
+  ```
+
+  Bound values are coerced JSON-safe before they ride the broker, so keep them small identifiers.
+
 To pin a specific *exception type* to a quieter level when it's reported, use the exception handler's
 `level()` — see [Error Handling](errors.md#exception-log-levels).
 

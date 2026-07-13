@@ -72,6 +72,25 @@ The active driver comes from `cache.default` in config (defaults to `array`, the
 store, which needs no extras). Redis is enabled by installing the `[redis]` extra and setting
 `cache.url` to your Redis URL.
 
+### Named stores
+
+For more than one store — say a shared app cache and a separate Redis for throttle counters — name
+them under `stores`, each with its own `driver` (and, for `redis`, its own `url`). Resolve one by
+name with `CacheManager().driver("<name>")`; a store's `driver` is what selects the backend, so two
+stores can share a driver, and a store can be named anything:
+
+```python
+# config/cache.py
+CACHE = {
+    "default": "array",
+    "url": env("REDIS_URL"),                                  # the default redis url
+    "stores": {
+        "sessions": {"driver": "redis", "url": env("SESSION_REDIS_URL")},
+        "throttle": {"driver": "redis"},                      # uses the top-level url
+    },
+}
+```
+
 ## More verbs: add, pull, forever, touch, decrement
 
 ```python

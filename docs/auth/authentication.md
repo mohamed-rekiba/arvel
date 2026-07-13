@@ -66,6 +66,27 @@ async def login(request):
 `attempt` returns `True` only when the user exists **and** the password matches the stored hash; it
 never reveals which half failed (don't leak whether an email is registered).
 
+### Just the password check: `verify_credentials`
+
+When you've already loaded the user yourself (a custom login flow that issues an API token, merges a
+guest cart, …) and only need the password check, use `verify_credentials` — **don't** hand-roll
+`if user is None or not Hasher().check(pw, user.password)`. That idiom leaks two things: it
+short-circuits the hash when the user is missing (an unknown email answers *faster* — a
+user-enumeration timing oracle), and the sync `check` blocks the event loop on Argon2.
+
+```python
+from arvel.auth import verify_credentials
+
+user = await User.where("email", email).first()
+if not await verify_credentials(user, password):     # None user is fine — pass it straight in
+    abort(401, "Invalid credentials")
+# … issue your token / start your session …
+```
+
+`verify_credentials` burns a dummy hash for a missing user (so an unknown email costs the same as a
+wrong password) and runs the verify **off the event loop** (`check_async`). It returns `True` only
+on a real match.
+
 ## The session: who's logged in?
 
 Once someone is authenticated, `AuthManager` exposes the session over a request-scoped

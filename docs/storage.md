@@ -73,6 +73,22 @@ AWS, RustFS, Cloudflare R2, Supabase Storage — not just AWS. The `azure` disk 
 `connection_string` (the form real Azure and the Azurite emulator both use) or `account_name` +
 `account_key`.
 
+A disk is identified by its **name**, and its backend comes from that disk's `driver` key — so a
+disk can be named anything, and two disks can share a driver. Give each disk a `driver`; when it's
+omitted, the disk name *is* the driver (the convention above, where `s3` uses the `s3` driver):
+
+```python
+"disks": {
+    "media":    {"driver": "s3", "bucket": "acme-public",   "url": env("CDN_URL")},   # public CDN
+    "invoices": {"driver": "s3", "bucket": "acme-private"},                             # private, same driver
+    "uploads":  {"driver": "local", "root": "storage/app"},                            # a renamed local disk
+}
+```
+
+`Storage.disk("invoices")` then builds the `s3` backend from the `invoices` config. An unknown disk
+name raises a clear `UnknownDiskError` naming the configured disks — not a misleading "install the
+extra". (The cache manager takes the same `stores.<name>.driver` shape.)
+
 ## Worked example: store an upload
 
 `request.file("avatar")` returns an `UploadedFile` with a `.store()` that writes it to a disk
@@ -173,7 +189,7 @@ Driver mapping:
 |--------|-----------|
 | `local` | file mode: `0o644` (public) / `0o600` (private) |
 | `s3` | the `public-read`/`private` canned ACL (s3fs `chmod`) |
-| `gcs`/`azure` | **best-effort.** Neither exposes a per-object ACL through fsspec — `set_visibility` is a documented no-op and `get_visibility` reports the disk's configured `visibility` default (`disks.<name>.visibility`, `"public"` unless set), not a live per-object read. |
+| `gcs`/`azure` | Neither exposes a per-object ACL through fsspec, so **`set_visibility` raises `UnsupportedDriverOperation`** — it never silently pretends to have privatized an object. Set visibility at the bucket/container level out-of-band. `get_visibility` reports the disk's configured `visibility` default (`disks.<name>.visibility`, `"public"` unless set), not a live per-object read. |
 
 !!! note "Not every S3-compatible store enforces canned ACLs"
     Canned-ACL enforcement varies by S3-compatible implementation — some accept `put_object_acl`

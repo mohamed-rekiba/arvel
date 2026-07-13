@@ -293,7 +293,13 @@ otherwise leak that row forever. `retry_after` (seconds — the `queue.retry_aft
 `90`; override per job with a `retry_after` class attribute) is the **visibility timeout**: once a
 reservation is older than that, `release_due_jobs` reclaims it (clears `reserved_at`) so the next
 pass picks it back up. A worker still legitimately working a job well within `retry_after` is left
-alone.
+alone. (Internally the effective deadline is stamped as `reserved_until` at claim time, so reclaim
+is a single indexed lookup — the per-job `retry_after` override still applies exactly as described.)
+
+A row whose payload can no longer be decoded — a job class renamed or removed between enqueue and
+release — is **quarantined**, not left to block the queue: it's claimed, logged
+(`undeserializable_job`), and left for the visibility timeout to retry or age into failure, while
+the rest of the batch keeps draining.
 
 ### Failed jobs
 
@@ -361,6 +367,16 @@ class SendWelcomeEmail(Job):
         tenant_id = Context.get("tenant")     # the *dispatch-time* value, not whatever's ambient
         ...
 ```
+
+### Log correlation
+
+Separately from `Context`, a job's **logs** are correlated for you. When you dispatch a job, the
+dispatcher's whole bound log context (a request's `request_id`, plus anything else it bound —
+`user_id`, `tenant_id`, …) is captured and re-bound on the worker, and the job also gets its own
+fresh `job_id` (a `uuidv7`). So every log line a job emits carries the `request_id` of the API
+request that spawned it *and* its own `job_id` — you can trace one request to every job it dispatched.
+See [Logging → Request & queue correlation](logging.md#request--queue-correlation). (Use `Context`
+for values your job *logic* reads; this is automatic, for *logs*.)
 
 ## Queued event listeners
 
