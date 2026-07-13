@@ -13,10 +13,10 @@ uses to contribute routes/migrations/views/commands/config, and explains auto-di
 and deferring an expensive provider until it's needed. Providers are part of the **core** — nothing
 to install.
 
-## The two phases: register and boot
+## Writing service providers
 
 Every provider has two methods, and the difference between them is the single most important thing
-to understand about the system:
+to understand about the system: `register` binds, and `boot` wires.
 
 ```python
 from arvel.kernel import ServiceProvider
@@ -31,9 +31,13 @@ class PaymentsServiceProvider(ServiceProvider):
         self.app.make("events").listen(OrderPaid, RecordRevenue)
 ```
 
+### The register method
+
 `register` **only binds**. It runs for every provider first, and while it runs you cannot assume any
 *other* provider's services exist yet — so resolving something in `register` is a bug waiting to
 happen. Do nothing there but hand the container closures.
+
+### The boot method
 
 `boot` runs **after every provider has registered**, so by the time it executes the whole container
 is populated and it's safe to reach across services — listen for another provider's events, read
@@ -105,7 +109,7 @@ the app owns them. A package typically `load_views_from` for the working default
 the same views under a `views` tag, so an app that wants to customize them runs
 `vendor:publish --tag=views` and edits its own copy.
 
-## Auto-discovery
+## Registering providers
 
 You never maintain a list of providers by hand. arvel discovers them through **entry points**: the
 framework, every installed package, and your app each declare their providers under the
@@ -121,7 +125,7 @@ The payoff is the entire ecosystem story: `uv add arvel-stripe` and its provider
 its services, routes, and commands light up with **no edits to your app**. Uninstall it and they're
 gone. There is no central registry to keep in sync.
 
-## Boot order
+### Boot order
 
 Providers load in a deterministic order — **framework first, then packages, then your app** — and
 within that, all `register`s run before any `boot`. Two consequences you can rely on:

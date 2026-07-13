@@ -108,129 +108,13 @@ arvel make:request StorePostRequest
 
 Each generates a version-matched file you then fill in — no boilerplate copied by hand.
 
-## Scheduling
+## Scheduling & seeding
 
-Define recurring work in `routes/console.py` with the `Schedule` facade, then let `schedule:run`
-(driven by a once-a-minute cron entry) fire what's due:
+Two things you drive from the console have their own pages:
 
-```python
-# routes/console.py
-from arvel import Schedule
-
-Schedule.call(prune_tokens).daily_at("02:00")
-Schedule.job(GenerateReport()).hourly()
-Schedule.command("cache:prune-stale").cron("*/15 * * * *").on_one_server()
-```
-
-```bash
-* * * * *  cd /app && arvel schedule:run >> /dev/null 2>&1
-```
-
-`schedule:run` resolves the app's bound `schedule`, runs the events whose cron expression
-matches the current minute, and reports how many ran.
-
-### Frequency helpers, gates, and timezones
-
-Beyond `cron`/`hourly`/`daily`/`daily_at`, the same fluent cadence covers the common cases:
-
-```python
-Schedule.call(archive_old_logs).weekly()                    # Sunday, midnight
-Schedule.call(close_books).monthly()                         # the 1st, midnight
-Schedule.call(reconcile).quarterly()                         # Jan/Apr/Jul/Oct 1st
-Schedule.call(renew_licenses).yearly()                        # Jan 1st, midnight
-Schedule.call(sync_inventory).twice_daily(1, 13)              # 01:00 and 13:00
-Schedule.call(send_report).daily().weekdays()                 # Mon–Fri only
-Schedule.call(backup).daily().weekends()                      # Sat/Sun only
-Schedule.call(poll_api).hourly().between("09:00", "17:00")    # only during business hours
-Schedule.call(flush_cache).hourly().when(lambda: is_low_traffic())
-Schedule.call(cleanup).daily().skip(lambda: is_maintenance_window())
-Schedule.call(nightly_job).daily_at("02:00").environments("production")
-Schedule.call(send_invoices).daily_at("09:00").timezone("America/New_York")
-```
-
-`when`/`skip` take a plain (sync) predicate; `environments(*envs)` gates by `config('app.env')`;
-`timezone(tz)` matches the cron expression against the current moment shifted into `tz` instead
-of as given.
-
-### Hooks
-
-`before`/`after` always run around the task; `on_success`/`on_failure` run based on the outcome
-(`after` still runs even if the task raised):
-
-```python
-(
-    Schedule.command("reports:generate")
-    .daily()
-    .before(lambda: log.info("starting report"))
-    .on_success(lambda: notify_slack("report ready"))
-    .on_failure(lambda: notify_slack("report failed"))
-    .after(lambda: log.info("report task done"))
-)
-```
-
-### `on_one_server` and `without_overlapping` (real locks, not a no-op)
-
-Running `schedule:run` on more than one node? `on_one_server()` makes sure a task fires only
-**once** across all of them — arbitrated by a real `CacheLock`, not a per-process flag:
-
-```python
-Schedule.command("reports:generate").daily().on_one_server()
-```
-
-`without_overlapping(expires=3600)` is the single-node version: it skips a tick while the
-**previous** run of the same task is still in flight (e.g. a slow report that occasionally runs
-past its next scheduled minute), instead of starting a second, overlapping one:
-
-```python
-Schedule.command("reports:generate").every_minute().without_overlapping(expires=1800)
-```
-
-Both lock on the event's identity — its callback's qualified name by default, or an explicit
-`.name("...")` when the callback has none (a lambda/closure) or two events would otherwise
-collide. They need a cache bound — the `QueueServiceProvider` wires the app's cache into
-`Schedule` automatically when one is configured, so this normally needs no extra setup; without a
-cache configured at all, an event using either one fails loudly (logged by `run_due`, same as any
-other failing task) rather than silently skipping the coordination it promised.
-
-## Seeding
-
-A `Seeder` inserts development/test data; `db:seed` runs your root seeder:
-
-```python
-from arvel.database import Seeder
-
-class DatabaseSeeder(Seeder):
-    async def run(self):
-        await self.call(UserSeeder, PostSeeder)   # chain child seeders
-
-class UserSeeder(Seeder):
-    async def run(self):
-        await User.create(name="Ada", email="ada@example.com")
-```
-
-```bash
-arvel db:seed
-```
-
-### Progress + output on a long seed
-
-A big seed (thousands of rows, image downloads) shouldn't run silently. `db:seed` injects a live
-console into your seeder, so a `Seeder` has the same output surface as a command — wrap a slow loop in
-`self.with_progress_bar(...)` and print section headers with `self.line(...)`:
-
-```python
-class DatabaseSeeder(Seeder):
-    async def run(self):
-        self.line("→ products")
-        for row in self.with_progress_bar(catalog, label="products"):
-            product = await Product.create(**row)
-            await download_images(product)      # the loop body may await; the bar advances per item
-```
-
-The bar renders on a terminal and is quiet when output is piped/redirected (no control codes in logs).
-Run outside `db:seed` — in a test or a script — and the output defaults to a silent no-op, so
-`with_progress_bar` just iterates. Child seeders started with `call`/`call_once` inherit the same
-console. (`self.info` and the full `self.output` handle are available too.)
+- **[Task Scheduling](scheduling.md)** — define recurring work in `routes/console.py` with `Schedule`
+  and fire it with `arvel schedule:run` from a once-a-minute cron entry.
+- **[Seeding](database/seeding.md)** — populate the database with a `Seeder` and `arvel db:seed`.
 
 ## Writing your own command
 

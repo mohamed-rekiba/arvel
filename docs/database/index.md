@@ -1,15 +1,15 @@
-# Database & ORM
+# ORM: Getting Started
 
 Talking to a database is where most apps spend their plumbing: fetching rows, mapping them to
 objects, wiring up relationships, and writing the same CRUD over and over. arvel's ORM collapses
 that into the model itself — it's an async **Active-Record**, so a `Post` both *describes* a row and
 *is* how you query, save, and relate it. No separate repository layer, no hand-written SQL for the
-common cases.
+common cases. (For raw connections and SQL, see [Database: Getting Started](getting-started.md).)
 
 It's built on **SQLAlchemy Core**, so every query the builder emits is a real Core construct that
 compiles across **PostgreSQL, MySQL, and SQLite** — you write one expression and it runs on all
-three. This page walks from defining a model and basic queries through relationships and scopes to
-the advanced Postgres features (JSON, full-text, CTEs, views).
+three. This page covers defining a model and its lifecycle events; the rest of the ORM is linked
+below.
 
 !!! note "Needs a database extra"
     Pick the driver for your database: `uv add 'arvel[postgres]'` (asyncpg), `'arvel[mysql]'`

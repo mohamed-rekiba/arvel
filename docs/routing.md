@@ -3,18 +3,15 @@
 Routing is the map of your application — which URL runs which code. arvel lets you draw that map
 with short, expressive definitions (`Route.get("/users/{user}", show)`) and takes care of the rest:
 it compiles them onto [Litestar](https://litestar.dev)'s router, so path parsing, parameter
-coercion, and the OpenAPI schema all come from a real, battle-tested engine — you don't hand-roll
-any of it. Every request then flows through the [middleware](middleware.md) pipeline before reaching
-your handler.
-
-This page covers the whole surface: defining routes, naming them and generating URLs (including
-signed ones), resource controllers, binding path parameters straight to models, grouping, and
-bailing out with an error.
+coercion, and the OpenAPI schema all come from a real, battle-tested engine. Every request then
+flows through the [middleware](middleware.md) pipeline before reaching your handler.
 
 !!! note "Needs the `[http]` extra"
     Routing is part of the core, but *serving* routes runs on Litestar — `uv add 'arvel[http]'`.
 
-## Basic routes
+## Basic routing
+
+The most basic routes accept a URI and a handler (any sync or async callable):
 
 ```python
 from arvel import Route
@@ -22,32 +19,29 @@ from arvel import Route
 Route.get("/", home)
 Route.post("/users", store)
 Route.put("/users/{user}", update)
+Route.patch("/users/{user}", partial_update)
 Route.delete("/users/{user}", destroy)
 Route.match(["GET", "POST"], "/search", search)   # several verbs
 Route.any("/legacy", legacy)                       # all verbs
 ```
 
-A handler is any callable (sync or async); it receives the request and any path params, and
-returns a dict/list/str (Litestar serializes it) or an explicit `Response`.
-
-**Return a model or a collection directly** — the framework serializes an arvel
-`Model`, a list of models, or a paginator of models to JSON via each model's `to_dict()` (hidden
-fields and loaded relations honored):
+A handler receives the request and any path params, and returns a dict/list/str (Litestar
+serializes it) or an explicit `Response`. **Return a model or collection directly** and the
+framework serializes it to JSON via each model's `to_dict()`:
 
 ```python
 async def show(request):
     return await Product.with_("variants").find(request.path_param("id"))   # → a JSON object
 
 async def index(request):
-    return await Product.paginate() # → the paginator JSON shape
+    return await Product.paginate()   # → the paginator JSON shape
 ```
 
-**Pin the response status** with `.status(code)` — handy for a 200 action (login/logout) that
-returns a typed body but isn't *creating* a resource (POST otherwise defaults to 201):
+Pin the response status with `.status(code)` — handy for a 200 action that returns a body but
+isn't creating a resource (POST otherwise defaults to 201):
 
 ```python
-Route.post("/login", login).status(200)        # 200, not the POST-default 201
-Route.post("/orders/{id}/status", transition).status(200)
+Route.post("/login", login).status(200)
 ```
 
 ### Redirect & view routes
@@ -60,302 +54,58 @@ Route.permanent_redirect("/old", "/new")       # 301
 Route.view("/about", "pages.about", {"title": "About"})   # render a view, no controller
 ```
 
-## Named routes & URL generation
+## Route parameters
+
+### Required parameters
+
+Capture a segment of the URI with a `{param}` placeholder; it is passed to the handler by name:
+
+```python
+Route.get("/users/{user}/posts/{post}", show)
+
+async def show(request, user, post):   # names match the placeholders
+    ...
+```
+
+### Optional & catch-all parameters
+
+Use a `:path` converter to capture the rest of the URI (including slashes) — the arvel idiom for an
+optional/catch-all tail:
+
+```python
+Route.get("/files/{path:path}", serve)    # matches /files/a/b/c.txt → path="a/b/c.txt"
+```
+
+### Regular expression constraints
+
+Constrain a parameter to a regex with `.where(param, pattern)`; a request whose segment doesn't
+match simply doesn't match the route:
+
+```python
+Route.get("/users/{user}", show).where("user", r"[0-9]+")     # numeric ids only
+Route.get("/posts/{slug}", show).where("slug", r"[a-z\-]+")
+```
+
+The `{param:int}`, `{param:uuid}`, and other Litestar converters are also available inline for the
+common cases.
+
+## Named routes
 
 Name a route, then reverse it to a URL — so links survive a path change:
 
 ```python
 Route.get("/users/{user}", show, name="users.show")
 
-router.url("users.show", user=7)                   # "/users/7"
+route("users.show", user=7)     # "/users/7"
 ```
 
-Parameters that match a `{placeholder}` fill the path; any **extra** parameters are appended as
-a query string:
+Generating URLs to named routes (query strings, signed and temporary links, the `url()` accessors)
+is covered in [URL Generation](urls.md).
 
-```python
-router.url("users.show", user=7, tab="profile")    # "/users/7?tab=profile"
-```
-
-`router.url()` fails loudly rather than rendering a wrong path: it raises `KeyError` for an unknown
-route name, and `ValueError` if a required path parameter is missing (so a half-built link never
-slips through with a literal `{user}` in it).
-
-### Global URL helpers
-
-Outside a `Router` instance, the same generation is available as plain functions
-`url()`/`route()`/`to_route()`:
-
-```python
-from arvel.routing import route, to_route, url
-
-route("users.show", user=7)                  # "https://example.com/users/7" — absolute by default
-route("users.show", user=7, absolute=False)  # "/users/7" — the bare path
-
-to_route("users.show", user=7)               # a Redirect — sugar for redirect().route(...)
-
-url("/pricing")                              # "https://example.com/pricing" (config('app.url') + path)
-```
-
-`url()` called with **no** argument returns the generator itself, so you can chain the
-request-scoped accessors off it:
-
-```python
-url().current()          # this request's absolute path, no query string
-url().full()              # ...with the query string
-url().previous("/")      # the Referer, or the fallback — never raises
-url().query("/search", {"q": "books"})   # "/search?q=books"
-```
-
-`.current()`/`.full()` need an active request — call them from inside a handler (or anything it
-calls); outside one they raise a `RuntimeError` rather than returning a nonsense path. `.previous()`
-always degrades to its `fallback` instead (no active request, or no Referer header).
-
-A signed URL that expires relative to *now*:
-
-```python
-from arvel.routing import temporary_signed_route
-
-temporary_signed_route("unsubscribe", 3600, user=7)   # valid for the next hour
-```
-
-### Signed URLs
-
-Tamper-evident links (password resets, unsubscribe, email confirmation) carry a signature over
-the URL; an optional `expires` makes them temporary:
-
-```python
-link = router.signed_url("unsubscribe", user=7)            # key defaults to the app key
-temp = router.signed_url("confirm", expires=ts, token=t)   # temporary (expires is a unix ts)
-
-# per-route: `.middleware(ValidateSignature)` rejects tampered/expired links with a 403.
-# manually: verify the RELATIVE path + query exactly as received (what `signed_url` signed;
-# an absolute URL would reconstruct a different base and never verify):
-raw = request.raw.url
-signed = f"{raw.path}?{raw.query}" if raw.query else raw.path
-if router.has_valid_signature(signed):
-    ...                                            # signature intact AND not expired
-```
-
-The signature is an itsdangerous MAC appended as a `signature` query param; verification checks
-both integrity and (if present) that `expires` is still in the future. The signing key defaults to
-the app key (`config('app.key')`); pass `key=` to override (a rotated key invalidates old links).
-
-Protect a route declaratively with the **signed** middleware instead of
-checking by hand:
-
-```python
-from arvel.http.middleware import ValidateSignature
-
-Route.get("/unsubscribe", unsubscribe, name="unsubscribe").middleware(ValidateSignature)
-```
-
-A request to that route without a valid (or with an expired) signature gets a **403** before the
-handler runs.
-
-## Resource controllers
-
-One call registers a controller's RESTful routes:
-
-```python
-Route.resource("posts", PostController)            # 7 routes (with create/edit forms)
-Route.api_resource("posts", PostController)         # 5 routes (no HTML form actions)
-Route.resource("posts", PostController, only=["index", "show"])
-Route.resource("posts", PostController, except_=["destroy"])
-```
-
-| Verb | URI | Action | Name |
-|---|---|---|---|
-| GET | `/posts` | index | `posts.index` |
-| GET | `/posts/create` | create | `posts.create` |
-| POST | `/posts` | store | `posts.store` |
-| GET | `/posts/{post}` | show | `posts.show` |
-| GET | `/posts/{post}/edit` | edit | `posts.edit` |
-| PUT/PATCH | `/posts/{post}` | update | `posts.update` |
-| DELETE | `/posts/{post}` | destroy | `posts.destroy` |
-
-`only` / `except_` trim the set; `api_resource` drops the form-rendering `create`/`edit`.
-
-### Controller middleware
-
-Attach middleware to specific controller actions in one place, instead
-of repeating `.middleware(...)` on every route the controller ends up bound to:
-
-```python
-from arvel.routing import Controller, ControllerMiddleware
-
-class PostController(Controller):
-    @classmethod
-    def middleware(cls) -> list[ControllerMiddleware]:
-        return [
-            ControllerMiddleware(EnsureSubscribed, only=("store", "update", "destroy")),
-            ControllerMiddleware("throttle:uploads", except_=("index", "show")),
-        ]
-```
-
-`Router.resource`/`api_resource` apply each entry to the actions it binds (`only`/`except_` narrow
-it, same semantics as the resource's own `only`/`except_`); a plain `middleware=` string works too
-(an alias, or a `throttle:<name>` reference). No entries (the default) means no extra middleware.
-
-### Invokable controllers
-
-A class with `__call__` is route-bindable directly — no `Controller` base, no per-action dispatch:
-
-```python
-class ShowDashboard:
-    def __init__(self, reports: ReportRepository) -> None:   # constructor deps, container-resolved
-        self.reports = reports
-
-    async def __call__(self, request, team_id: str) -> dict:
-        return {"reports": await self.reports.for_team(team_id)}
-
-Route.get("/teams/{team_id}/dashboard", ShowDashboard)
-```
-
-Pass the **class**, not an instance — the kernel instantiates it via the container per request
-(the same `app.make(...)` path middleware classes go through), so constructor dependencies resolve
-normally.
-
-### Authorizing every action at once
-
-Declare `__resource_policy__` on the controller — beside `middleware()`, where it reads as class
-config — and each action is checked against the model's [policy](auth/authorization.md)
-automatically, no per-method `authorize` calls:
-
-```python
-class PostController(Controller):
-    __resource_policy__ = Post
-
-    async def index(self): ...
-    async def show(self, post): ...
-```
-
-(`PostController.authorize_resource(Post)` after the class body is the equivalent imperative
-form — it just sets that attribute.)
-
-The action → ability map is:
-
-| Action | Ability | Authorized against |
-|---|---|---|
-| `index` | `viewAny` | the model class |
-| `create` / `store` | `create` | the model class |
-| `show` | `view` | the bound instance |
-| `edit` / `update` | `update` | the bound instance |
-| `destroy` | `delete` | the bound instance |
-
-Instance actions authorize against the route-bound model (pair it with
-[route–model binding](#routemodel-binding)); a denied check raises `403` before the action body
-runs.
-
-## Route–model binding
-
-Bind a path param to a model so the handler receives the **resolved instance** (with an
-automatic 404 when it's missing) instead of a raw string id.
-
-### Implicit binding
-
-Type-hint the action parameter with a model and arvel resolves it for you — no registration:
-
-```python
-from app.models import User
-
-async def show(request, user: User):       # {user} -> the User with that id; 404 if none
-    return UserResource(user)
-```
-
-The path param name (`{user}`) must match the argument name (`user`). By default the lookup is by
-primary key; override the column a model binds on with `get_route_key_name`:
-
-```python
-class Post(Model):
-    @classmethod
-    def get_route_key_name(cls) -> str:
-        return "slug"                      # /posts/{post} now resolves Post by slug
-```
-
-Or pick the column inline in the path with `{param:field}` — handy when a model is bound by
-different columns on different routes:
-
-```python
-Route.get("/posts/{post:slug}", show)      # resolves Post by its slug column for this route
-```
-
-(`{x:path}`, `{x:int}`, and the other Litestar converters keep their meaning — only an unknown
-suffix is treated as a route-key column.)
-
-### Explicit binding
-
-When you need a custom resolver, or want to bind without a type hint, register it on the router:
-
-```python
-router.model("user", User)                 # {user} -> resolve User by primary key; 404 on miss
-router.model("post", Post, key="slug")     # bind by a custom column
-router.bind("token", resolve_token)        # arbitrary resolver (sync or async); 404 on None
-router.bind_enum("status", Status)         # coerce {status} to an enum member (404 if invalid)
-```
-
-Explicit bindings take precedence over implicit ones for the same parameter.
-
-### Scoping a nested binding to its parent
-
-`/users/{user}/posts/{post}` resolves `{post}` on its own by default — a post id that belongs to
-someone else still 200s. Opt the route into **parent-scoped** resolution with `.scope_bindings()`:
-
-```python
-async def show(request, user: User, post: Post):
-    return PostResource(post)
-
-Route.get("/users/{user}/posts/{post}", show).scope_bindings()
-```
-
-Once `{user}` resolves, `{post}` resolves through `Post.resolve_child_route_binding`, which looks
-for a relation on `User` named for `Post`'s plural snake name (`Post` -> `posts()`):
-
-```python
-class User(Model):
-    def posts(self):
-        return self.has_many(Post)
-```
-
-A post that exists but isn't in `user.posts()` now 404s instead of resolving globally. A model
-with no matching relation just falls back to the plain lookup, so turning `.scope_bindings()` on
-for a route where it doesn't apply is harmless.
-
-### Binding a soft-deleted row
-
-Route-model binding excludes soft-deleted rows by default (same as any other query). Let a
-specific route's binding include them with `.with_trashed()`:
-
-```python
-Route.get("/posts/{post}", show).with_trashed()          # every bound param on this route
-Route.get("/posts/{post}/comments/{comment}", show).with_trashed("comment")   # just {comment}
-```
-
-## Aborting a request
-
-When a handler needs to bail out with an HTTP error, call `abort()` — it raises an
-`HttpException` the framework renders content-negotiated (JSON for API clients, an error page for
-the browser), exactly like a failed validation:
-
-```python
-from arvel import abort
-
-async def show(request, post):
-    if post.archived:
-        abort(404)                       # → 404 "Not Found"
-    if not request.user.owns(post):
-        abort(403, "That isn't yours.")  # → 403 with your own message
-    return post
-```
-
-With no message, `abort(status)` uses the standard status text (`404` → "Not Found"); pass a
-second argument to override it. Route–model binding already aborts with `404` on a miss, so you
-rarely abort manually for the not-found case.
-
-## Groups
+## Route groups
 
 When a set of routes share a prefix, a name prefix, or the same middleware, declare it once with a
-`group` block instead of repeating yourself on every line:
+`group` block instead of repeating yourself:
 
 ```python
 with router.group(prefix="/admin", name="admin.") as admin:
@@ -363,7 +113,9 @@ with router.group(prefix="/admin", name="admin.") as admin:
     admin.get("/users", users, name="users")               # /admin/users,    "admin.users"
 ```
 
-A group can also attach **middleware** to everything inside it, and assign a named middleware
+### Middleware
+
+A group can attach **middleware** to everything inside it, and assign a named middleware
 [group](middleware.md) (`"web"`/`"api"`) in one place:
 
 ```python
@@ -371,8 +123,8 @@ with router.group(prefix="/admin", middleware=[EnsureAdmin], group="web") as adm
     admin.get("/dashboard", dashboard)     # runs EnsureAdmin + the web group (session + CSRF)
 ```
 
-Groups **nest**, and the prefixes, names, and middleware compose — an inner group runs both its own
-and the outer group's middleware, and everything is restored when the block exits:
+Groups **nest** — prefixes, names, and middleware compose, and an inner group runs both its own and
+the outer group's middleware:
 
 ```python
 with router.group(prefix="/api", group="api") as api:
@@ -380,7 +132,7 @@ with router.group(prefix="/api", group="api") as api:
         v1.get("/stats", stats, name="stats")   # /api/v1/stats, "v1.stats", throttled by "api"
 ```
 
-## Domain routing
+### Subdomain routing
 
 `group(domain=...)` constrains every route in the block to a `Host` header pattern — handy for a
 tenant subdomain or splitting an admin host from the public one:
@@ -389,91 +141,144 @@ tenant subdomain or splitting an admin host from the public one:
 with router.group(domain="{account}.example.com"):
     router.get("/dashboard", dashboard)   # only matches e.g. acme.example.com
 
-async def dashboard(request, account: str):    # {account} injected like a path param
+async def dashboard(request, account: str):   # {account} injected like a path param
     ...
 ```
 
 A request whose `Host` doesn't match renders a plain 404 — never a mis-bind onto the wrong tenant.
-A route with no `domain` matches any host, so most of your routes need nothing extra. Two routes
-*can* share the same path with different domains (dispatch picks the one whose pattern matches);
-declare the most specific domain first if you also register a domain-less catch-all at that path.
+Declare the most specific domain first if you also register a domain-less catch-all at that path.
 
-## Middleware & fallback
+## Route model binding
 
-Assign a route to a middleware [group](middleware.md), and register a catch-all:
+Bind a path param to a model so the handler receives the **resolved instance** (with an automatic
+404 when it's missing) instead of a raw string id.
+
+### Implicit binding
+
+Type-hint the action parameter with a model and arvel resolves it — no registration:
 
 ```python
-Route.get("/dashboard", show, group="web")     # session + CSRF
-Route.get("/api/stats", stats, group="api")    # throttled
-Route.fallback(not_found)                        # matched when nothing else does
+from app.models import User
+
+async def show(request, user: User):       # {user} -> the User with that id; 404 if none
+    return UserResource(user)
 ```
 
-## Current route
+The path param name (`{user}`) must match the argument name (`user`).
 
-Inside a handler (or anything it calls), read the matched route back — its name and resolved
-params (a model-bound param carries the resolved model, not the raw id):
+### Customizing the key
+
+By default the lookup is by primary key. Override the column a model binds on with
+`get_route_key_name`, or pick it inline per route with `{param:field}`:
+
+```python
+class Post(Model):
+    @classmethod
+    def get_route_key_name(cls) -> str:
+        return "slug"                      # /posts/{post} now resolves Post by slug
+
+Route.get("/posts/{post:slug}", show)      # …or just this route, by slug
+```
+
+### Soft-deleted models
+
+Binding excludes soft-deleted rows by default. Let a specific route include them with
+`.with_trashed()`:
+
+```python
+Route.get("/posts/{post}", show).with_trashed()
+Route.get("/posts/{post}/comments/{comment}", show).with_trashed("comment")   # just {comment}
+```
+
+### Scoping nested bindings
+
+`/users/{user}/posts/{post}` resolves `{post}` on its own by default. Opt into **parent-scoped**
+resolution with `.scope_bindings()`, so `{post}` resolves through `User`'s `posts()` relation and a
+post that isn't the user's 404s:
+
+```python
+Route.get("/users/{user}/posts/{post}", show).scope_bindings()
+```
+
+### Missing model behavior
+
+By default a missing bound model aborts with 404. Override that per route with `.missing(callback)`
+to redirect or render something else instead:
+
+```python
+Route.get("/posts/{post}", show).missing(lambda request: redirect("/posts"))
+```
+
+### Explicit binding
+
+When you need a custom resolver or want to bind without a type hint, register it on the router:
+
+```python
+router.model("user", User)                 # {user} -> resolve User by primary key
+router.model("post", Post, key="slug")     # bind by a custom column
+router.bind("token", resolve_token)        # arbitrary resolver (sync or async); 404 on None
+router.bind_enum("status", Status)         # coerce {status} to an enum member (404 if invalid)
+```
+
+Explicit bindings take precedence over implicit ones for the same parameter.
+
+## Fallback routes
+
+Register a catch-all for requests that match no other route:
+
+```python
+Route.fallback(not_found)      # matched only when nothing else does
+```
+
+To serve a `public/` directory as an SPA shell (any non-file path falls back to `index.html`), use
+`Route.public(...)` — or configure it once at boot so no route-file code is needed:
+
+```python
+Route.public("public")                                    # serve ./public at the root
+Route.public("public", spa_fallback=False)                # static files only, no SPA shell
+Application.configure(base_path=".").with_public_dir("public").create()
+```
+
+A more specific route always wins on its own path regardless of registration order.
+
+## Form method spoofing
+
+HTML forms can only send `GET` and `POST`. To route a form submission as `PUT`, `PATCH`, or `DELETE`,
+add a `_method` field — the `MethodOverride` middleware rewrites the method before the router matches:
+
+```html
+<form action="/posts/{{ post.id }}" method="POST">
+  {{ method_field("PUT") }}   <!-- <input type="hidden" name="_method" value="PUT"> -->
+  {{ csrf_field() }}
+</form>
+```
+
+```python
+Route.put("/posts/{post}", update)   # the spoofed POST reaches this route
+```
+
+Only `PUT`/`PATCH`/`DELETE` are spoofable, and only on a `POST` with a form content type
+(urlencoded or multipart).
+
+## Accessing the current route
+
+Inside a handler (or anything it calls), read the matched route back — its name and resolved params
+(a model-bound param carries the resolved model, not the raw id):
 
 ```python
 from arvel import url
 
 async def show(request, post):
-    match = url().current_route()          # RouteMatch(name=..., params={...}) | None
+    match = url().current_route()                     # RouteMatch(name=..., params={...}) | None
     is_admin = url().current_route_named("admin.*")   # fnmatch glob on the name
 ```
 
-`Route.current_route()`/`Route.current_route_named(...)` read the same thing. Both degrade instead
-of raising outside a request (`None`/`False`) — unlike `url().current()`, "no current route" is a
-legitimate state, not a programming error.
-
-## Serving a public/ directory (SPA, static assets)
-
-`Router.public(directory)` serves `directory` as the app's public web root — the `public/`:
-a request whose path matches a real file gets it back as-is (anything under `assets/` is assumed
-content-hashed by a bundler and cached forever; everything else stays revalidate-able), and any
-path that ISN'T a real file falls back to `directory/index.html` so a client-side router (Vue
-Router, React Router, …) decides what it renders:
-
-```python
-Route.public("public")                              # serve ./public at the root
-Route.public("public", path="/app")                 # …or mounted under a sub-path
-Route.public("public", spa_fallback=False)           # static files only, no SPA shell/root claim
-```
-
-Prefer configuring it once at the app level instead of a route file — `with_public_dir(...)`
-registers it automatically at boot, so serving a `public/` directory needs no route-file code at
-all:
-
-```python
-Application.configure(base_path=".").with_public_dir("public").create()
-```
-
-`with_public_dir` takes the same `path`/`spa_fallback` as `Router.public()`:
-`.with_public_dir("public", path="/app", spa_fallback=False)`.
-
-Both registered routes are marked as a fallback, so this is safe to call before or after your
-other routes — a more specific route (`/api/*`, an admin group, …) always wins on its own path
-regardless of registration order.
-
-## Common mistakes & gotchas
-
-- **Reversing an unknown name.** `url("typo")` raises `KeyError` — keep names in sync with
-  definitions; a test that reverses every named route catches drift.
-- **Unbound path param.** `{user}` stays a raw string unless the handler argument is type-hinted
-  with a model (implicit binding) or you register `router.model(...)`/`bind(...)`. For implicit
-  binding the argument **name must match** the placeholder (`{user}` → `user: User`).
-- **Signed link with a different key.** `has_valid_signature` must use the *same* key the URL was
-  signed with; a rotated key invalidates old links (intended).
-
-## How it works
-
-`Route`/`Router` collect `RouteDefinition`s; `apply_to(kernel)` adapts each onto a Litestar
-`HTTPRouteHandler` (arvel `{id}` → Litestar `{id:str}`), so the served app *is* a Litestar app
-and its OpenAPI schema is Litestar-generated from the registered routes — not hand-written.
-Bindings resolve in the kernel before the handler runs.
+`Route.current_route()`/`Route.current_route_named(...)` read the same thing; both degrade to
+`None`/`False` outside a request rather than raising.
 
 ## See also
 
+- [Controllers](controllers.md) — grouping route logic into classes, resource controllers.
+- [URL Generation](urls.md) — reversing named routes, signed and temporary URLs.
 - [Middleware](middleware.md) — the web/api groups routes attach to.
-- [Validation](validation.md) — validating request input in handlers.
-- [Views](views.md) — `Route.view(...)`, rendering, and template globals.
-- [OpenAPI & API Docs](openapi.md) — the auto-generated schema, request/response models, and auth.
+- [Error Handling](errors.md) — `abort()` and rendering HTTP errors from a handler.

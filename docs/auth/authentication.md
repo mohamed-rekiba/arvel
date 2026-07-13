@@ -18,23 +18,29 @@ from arvel.auth import Authenticatable
 
 class User(Model, Authenticatable):
     __fields__   = {"email": str, "name": str, "password": str}
-    __fillable__ = ["email", "name"]          # note: password is NOT mass-assignable
+    __fillable__ = ["email", "name", "password"]
+    __casts__    = {"password": "hashed"}     # auto-hashed whenever it's set
 ```
 
 `Authenticatable` gives every instance `get_auth_identifier()` (the primary key by default) and
 `get_auth_password()` (reads the `password` attribute) — plus `await user.can(...)` for
 [authorization](authorization.md) checks.
 
-!!! warning "Never store a plaintext password"
-    Hash it on the way in and only ever compare hashes. arvel's `Hasher` uses Argon2id by default (argon2-cffi, directly); bcrypt is available via `driver="bcrypt"` — see the hashing guide:
+The **`hashed` cast** is the important part: it hashes the password on every write — including the
+mass-assignment `create` path — so you never call the hasher yourself and a raw password can't reach
+the column:
 
-    ```python
-    from arvel.security import Hasher
+```python
+form = await request.validate(RegisterForm)      # validated {email, name, password}
+user = await User.create(**form)                  # the cast stores password as an Argon2id hash
+```
 
-    user = await User.create(email="ada@example.com", name="Ada")
-    user.password = Hasher().make("correct-horse-battery-staple")  # guarded → set directly
-    await user.save()
-    ```
+arvel's hasher uses Argon2id by default (bcrypt via `driver="bcrypt"`) — see [Hashing](../hashing.md)
+and [Casts & Serialization](../database/casts.md) for the cast itself.
+
+!!! warning "Keep the `hashed` cast"
+    It's what guarantees the column only ever holds a hash. Don't drop it and assign a raw password,
+    and never compare passwords with `==` — let `attempt`/the guard do the (constant-time) comparison.
 
 ## Logging a user in
 
@@ -223,14 +229,29 @@ A locked key fails fast (no password check), each wrong password is counted, a s
 every wrong/locked attempt is audited on the `security` channel (`auth.password_confirm.failed` /
 `.locked`).
 
+## Automatic password rehashing
+
+arvel keeps stored password hashes current for you. When a correct login presents a password whose
+stored hash is outdated — e.g. you later raised the Argon2 cost factor — `attempt` transparently
+re-hashes it with the current parameters and saves. Hashes upgrade themselves as users sign in, with
+no migration:
+
+```python
+await auth.attempt(credentials, find_user)   # a correct login on a stale hash rehashes + persists
+```
+
+It's a no-op for a hash that's already current, a wrong password, or a user that can't persist
+(override `set_auth_password` if your hash lives on a non-`password` field).
+
 ## Common mistakes & gotchas
 
-- **Storing or comparing plaintext.** Always `Hasher().make(...)` on the way in and let `attempt` /
-  the guard do the comparison. Never `==` a password.
+- **Comparing plaintext.** Never `==` a password — let `attempt`/the guard compare against the
+  stored hash. The `hashed` cast handles the write side, so you don't hash by hand either.
 - **Leaking which field was wrong.** `attempt` deliberately returns a single boolean — show one
   "invalid credentials" message, not "no such email" vs "wrong password."
-- **Putting `password` in `__fillable__`.** Keep it out of mass-assignment and set it explicitly,
-  so a stray form field can't overwrite a hash.
+- **A `password` field without the `hashed` cast.** Without it, an assigned password is stored in
+  plaintext. Declare `__casts__ = {"password": "hashed"}` so every write is hashed automatically —
+  then it's safe to keep `password` in `__fillable__` and pass validated input straight to `create`.
 - **Reading `auth.user()` outside a request.** The current user lives in a `ContextVar` scoped to
   the request/task; in a job or CLI command there's no session user — pass the user explicitly.
 - **Expecting `attempt` to persist a cookie for you.** It establishes the in-process session user;
@@ -243,13 +264,8 @@ provider)` resolves the user via your callable, then routes the password check t
 guard** — which compares the submitted secret against the stored hash with `security.Hasher` (Argon2,
 constant-time). On success it calls `login()`, which sets the context variable; `logout()` clears it.
 Because the store is a `ContextVar`, the session is concurrency-safe without any thread-local
-juggling.
-
-**Rehash-on-login:** when a correct login presents a password whose stored hash is outdated (e.g. you
-later raised the Argon2 cost), `attempt` transparently re-hashes it with the current parameters and
-saves — hashes upgrade themselves as users sign in. It's a no-op for a current hash, a wrong
-password, or a user that can't persist (override `set_auth_password` if your hash lives on a
-non-`password` field).
+juggling. Correct logins on stale hashes upgrade transparently (see
+[Automatic password rehashing](#automatic-password-rehashing)).
 
 ## See also
 
