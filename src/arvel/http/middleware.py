@@ -679,11 +679,11 @@ class AuthenticateMiddleware(Middleware):
     """Resolve the request's user via the app's ``user_resolver`` binding and bind it to
     ``arvel.auth.current_user`` for the request's duration (cleared afterward).
 
-    Also applies the resolved user's preferred locale (doc 21): ``LocaleMiddleware`` runs as an
-    early global — before any authentication — so the user-pref branch of its precedence can only
-    hold if the middleware that *learns* the user applies the preference. Downstream of auth
-    (handlers, views, notifications) sees the user's locale; the header locale set earlier still
-    covers everything before/without a user."""
+    Also applies the resolved user's preferred locale (doc 21): ``LocaleMiddleware`` runs
+    as an early global — before any authentication — so the user-pref branch of its precedence can
+    only hold if the middleware that *learns* the user applies the preference. It does so **only when
+    the request carries no explicit switch** (``?lang=`` / a ``locale`` cookie), so an active choice
+    always outranks the stored preference, which in turn outranks ``Accept-Language``."""
 
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         import inspect
@@ -697,7 +697,13 @@ class AuthenticateMiddleware(Middleware):
             user = await resolved if inspect.isawaitable(resolved) else resolved
         token = current_user.set(user)
         locale_token = None
-        pref = LocaleMiddleware.user_preferred_locale()  # reads the user just bound above
+        # Stored preference applies only when the request carries no explicit switch — an active
+        # ?lang=/locale-cookie choice outranks the user's saved locale.
+        pref = (
+            None
+            if LocaleMiddleware.explicit_locale(request)
+            else LocaleMiddleware.user_preferred_locale()  # reads the user just bound above
+        )
         if pref:
             from arvel.localization import current_locale
 
@@ -734,20 +740,25 @@ class RequestContextMiddleware(Middleware):
 
 
 class LocaleMiddleware(Middleware):
-    """Set the request locale for the call's duration. Precedence: the authenticated user's
-    preferred locale, then the ``Accept-Language`` header (doc 21).
+    """Set the request locale for the call's duration. Precedence:
+    an **explicit switch** (``?lang=``/``?locale=`` query param or a ``locale`` cookie), then the
+    authenticated **user's stored preference**, then the ``Accept-Language`` header.
 
-    Under the shipped wiring this middleware runs BEFORE authentication, so its own user branch
-    only fires in standalone/custom wiring — ``AuthenticateMiddleware`` is what applies the
-    user's preference in a real app (it calls :meth:`user_preferred_locale` after resolving
-    the user)."""
+    Under the shipped wiring this middleware runs BEFORE authentication, so the user-preference
+    branch only fires in standalone/custom wiring — ``AuthenticateMiddleware`` applies the stored
+    preference in a real app (it calls :meth:`user_preferred_locale` after resolving the user, but
+    only when no explicit switch is present, so an active choice always wins)."""
 
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         from arvel.localization import current_locale
 
         # user_preferred_locale() is None under real wiring (the kernel resets current_user
-        # before this runs); AuthenticateMiddleware delivers the user-pref precedence there
-        locale = self.user_preferred_locale() or self._from_header(request)
+        # before this runs); AuthenticateMiddleware delivers the user-pref precedence there.
+        locale = (
+            self.explicit_locale(request)
+            or self.user_preferred_locale()
+            or self._from_header(request)
+        )
         if not locale:
             return await call_next(request)
         token = current_locale.set(locale)
@@ -755,6 +766,25 @@ class LocaleMiddleware(Middleware):
             return await call_next(request)
         finally:
             current_locale.reset(token)
+
+    @staticmethod
+    def explicit_locale(request: Any) -> str | None:
+        """An explicitly-chosen locale from the request — a ``?lang=``/``?locale=`` query param or a
+        ``locale`` cookie (a language switcher). **Highest** precedence: an active choice beats the
+        user's stored preference and ``Accept-Language``. Sanitized to a bare primary
+        subtag (it feeds translation-file lookups, so an attacker-supplied value can't traverse paths
+        or inject) -- anything that isn't a 2-8 letter code is ignored."""
+        import re
+
+        raw: Any = None
+        if hasattr(request, "query"):
+            raw = request.query("lang") or request.query("locale")
+        if not raw and hasattr(request, "cookie"):
+            raw = request.cookie("locale")
+        if not raw:
+            return None
+        token = str(raw).split(",")[0].split("-")[0].split("_")[0].strip()
+        return token if re.fullmatch(r"[A-Za-z]{2,8}", token) else None
 
     @staticmethod
     def user_preferred_locale() -> str | None:
