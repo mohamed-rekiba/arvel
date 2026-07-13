@@ -75,22 +75,55 @@ async def _maybe_await(value: Any) -> Any:
     return await value if inspect.isawaitable(value) else value
 
 
+_UNRESOLVED: Any = object()
+
+
+def _annotation_str_is_nullable(raw: Any) -> bool:
+    """Best-effort nullability check on an *unresolved* annotation (a string under
+    ``from __future__ import annotations``, or a live object). ``None`` only when the annotation
+    explicitly admits it — ``X | None`` / ``Optional[X]`` / ``None``; anything else fails closed."""
+    text = raw if isinstance(raw, str) else getattr(raw, "__name__", str(raw))
+    normalized = text.replace(" ", "")
+    return (
+        normalized in ("None", "NoneType")
+        or "|None" in normalized
+        or "None|" in normalized
+        or "Optional[" in normalized
+        or ",None]" in normalized  # Union[X, None]
+        or "[None," in normalized  # Union[None, X]
+    )
+
+
 def _accepts_none(callback: Any) -> bool:
     """Whether ``callback``'s first parameter's type hint admits ``None`` (``X | None`` /
-    ``Optional[X]``) — an unannotated parameter counts as nullable (permissive default; see module
-    docstring). Never raises: any inspection failure (an unresolvable forward reference, an
-    un-introspectable callable) also falls back to permissive."""
+    ``Optional[X]``). An *unannotated* first parameter counts as nullable (permissive default —
+    the plain-lambda case). A parameter annotated with a **non-nullable** type auto-denies the
+    guest — and this holds even when the annotation can't be resolved to a runtime object: under
+    ``from __future__ import annotations`` a ``TYPE_CHECKING``-only model import leaves the hint an
+    unresolvable string, and a security predicate must NOT fall open there. So on a
+    ``get_type_hints`` failure we fall back to the raw signature annotation and treat any present,
+    non-``Optional`` annotation as non-nullable (auto-deny). Only a genuinely absent annotation
+    stays permissive."""
     try:
-        params = list(inspect.signature(callback).parameters)
+        signature = inspect.signature(callback)
     except TypeError, ValueError:
         return True
+    params = list(signature.parameters.values())
     if not params:
         return True
+    first = params[0]
     try:
         hints = typing.get_type_hints(callback)
+        hint: Any = hints.get(first.name, _UNRESOLVED)
     except Exception:
-        return True
-    hint = hints.get(params[0])
+        hint = _UNRESOLVED
+    if hint is _UNRESOLVED:
+        raw = first.annotation
+        if raw is inspect.Parameter.empty:
+            return True  # no annotation at all → permissive (unchanged lambda behavior)
+        return _annotation_str_is_nullable(
+            raw
+        )  # present but unresolved → fail closed unless ?|None
     if hint is None or hint is Any:
         return True  # unannotated, or explicitly untyped (Any accepts None too)
     origin = typing.get_origin(hint)

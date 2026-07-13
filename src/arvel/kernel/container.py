@@ -249,7 +249,7 @@ class Container:
     def extend(self, abstract: Any, closure: Callable[[Any, Container], Any]) -> None:
         """Wrap the resolution of ``abstract`` with ``closure(instance, container)``.
         If ``abstract`` is already resolved as a shared instance, the closure is applied to
-        that instance *immediately* (it will never rebuild), mirroring ``extend``;
+        that instance *immediately* (it will never rebuild);
         otherwise the closure runs at the next build."""
         key = self._alias_of(abstract)
         if key in self._instances:
@@ -258,6 +258,10 @@ class Container:
             self._extenders.setdefault(key, []).append(closure)
 
     def tag(self, abstracts: Sequence[Any], tag: str) -> None:
+        # a str is a Sequence, so tag("abc", "t") would silently tag each character ('a','b','c');
+        # reject it — the caller meant a sequence of abstracts, e.g. tag(["abc"], "t").
+        if isinstance(abstracts, str):
+            raise TypeError("tag() expects a sequence of abstracts, not a single string")
         self._tags.setdefault(tag, []).extend(abstracts)
 
     def tagged(self, tag: str) -> list[Any]:
@@ -341,6 +345,7 @@ class Container:
         self._extenders.clear()
         self._aliases.clear()
         self._tags.clear()
+        self._registered.clear()  # registration-order set is binding-scoped — clear it with the rest
 
     # --- resolution --------------------------------------------------------
     @overload

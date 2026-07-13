@@ -21,7 +21,7 @@ import msgspec
 from anyio.to_thread import run_sync
 
 from arvel.kernel import Settings
-from arvel.support.manager import Manager
+from arvel.support.manager import Manager, MissingExtraError
 
 if TYPE_CHECKING:
     from arvel.dates import Date
@@ -58,6 +58,21 @@ class Visibility(Enum):
 
     PUBLIC = "public"
     PRIVATE = "private"
+
+
+class UnknownDiskError(MissingExtraError):
+    """A storage disk name isn't a configured disk and has no built-in driver of that name.
+
+    Subclasses ``MissingExtraError`` (so existing ``except MissingExtraError`` handlers still catch
+    it) but replaces its misleading "install arvel[<name>]" text with a message that names the
+    configured disks — the common cause is a typo or an unconfigured disk, not a missing extra."""
+
+    def __init__(self, name: str, known: str) -> None:
+        RuntimeError.__init__(
+            self,
+            f"No storage disk {name!r} is configured (filesystems.disks: {known}) and no built-in "
+            f"{name!r} driver exists. Add it under filesystems.disks, or fix the disk name.",
+        )
 
 
 class UnsupportedDriverOperation(RuntimeError):
@@ -194,7 +209,10 @@ class Filesystem:
             contents: bytes | str = file
         else:
             contents = await file.read()
-            extension = getattr(file, "extension", "") or ""
+            # sanitize: a duck-typed .extension may be a raw client filename token containing `/`
+            # or `.`, which would inject path segments into the key. Keep only [A-Za-z0-9].
+            raw_ext = str(getattr(file, "extension", "") or "")
+            extension = "".join(ch for ch in raw_ext if ch.isascii() and ch.isalnum())[:10]
         if name is None:
             from arvel.support import Str
 
@@ -388,9 +406,12 @@ class Filesystem:
 
     async def set_visibility(self, path: str, visibility: Visibility) -> None:
         """Set ``path``'s visibility. ``local``: chmod 0o644/0o600. ``s3``: the ``public-read``/
-        ``private`` canned ACL (via s3fs ``chmod``). ``gcs``/``azure``: best-effort no-op — those
-        drivers expose no per-object ACL through fsspec; visibility there is a bucket/container-level
-        setting configured out-of-band."""
+        ``private`` canned ACL (via s3fs ``chmod``).
+
+        ``gcs``/``azure`` expose no per-object ACL through fsspec, so this **raises**
+        :class:`UnsupportedDriverOperation` there rather than silently doing nothing — code that
+        believes it privatized an object must not be left with a false sense of security. Set
+        visibility at the bucket/container level out-of-band for those backends."""
         full = self._full(path)
 
         def _set() -> None:
@@ -400,7 +421,13 @@ class Filesystem:
             elif self._is("s3", "s3a"):
                 acl = "public-read" if visibility is Visibility.PUBLIC else "private"
                 self._fs.chmod(full, acl)
-            # gcs/azure: documented best-effort no-op (see docstring).
+            else:
+                # never a silent no-op: a caller trusting set_visibility(PRIVATE) to take effect
+                # must hear that it didn't (F-019), rather than believe an object is protected.
+                raise UnsupportedDriverOperation(
+                    f"set_visibility is not supported by the {self._protocol()!r} driver — "
+                    f"configure visibility at the bucket/container level"
+                )
 
         await run_sync(_set)
 
@@ -468,6 +495,22 @@ class FilesystemManager(Manager):
             FilesystemSettings
         ).default  # auto-loads + validates config("filesystems")
 
+    def _make(self, name: str) -> Any:
+        # name → driver indirection: a disk names its backend via `driver`, so `disk("uploads")`
+        # with `{"driver": "local"}` builds the local backend from the `uploads` config section —
+        # not `create_uploads_driver` (which doesn't exist). Falls back to name==driver.
+        if name in self._creators:  # extend()-registered custom driver
+            return self._creators[name](self.app)
+        disks = self._settings(FilesystemSettings).disks
+        driver = disks[name].get("driver", name) if name in disks else name
+        creator = getattr(self, f"create_{driver}_driver", None)
+        if creator is None:
+            if name not in disks:
+                known = ", ".join(sorted(disks)) or "(none configured)"
+                raise UnknownDiskError(name, known)  # clear "unknown disk", not "install extra"
+            raise MissingExtraError(driver)  # the disk's declared driver needs its extra installed
+        return creator(name)
+
     def disk(self, name: str | None = None) -> Filesystem:
         disk: Filesystem = self.driver(name)
         return disk
@@ -491,16 +534,16 @@ class FilesystemManager(Manager):
     def _disk_config(self, name: str) -> dict[str, Any]:
         return self._settings(FilesystemSettings).disks.get(name, {})
 
-    def create_local_driver(self) -> Filesystem:
-        config = self._disk_config("local")
+    def create_local_driver(self, disk: str = "local") -> Filesystem:
+        config = self._disk_config(disk)
         return Filesystem(
             _fsspec().filesystem("file"),
             root=config.get("root", ""),
             url=config.get("url"),
         )
 
-    def create_s3_driver(self) -> Filesystem:
-        config = self._disk_config("s3")
+    def create_s3_driver(self, disk: str = "s3") -> Filesystem:
+        config = self._disk_config(disk)
         client_kwargs = (
             {"endpoint_url": config["endpoint_url"]} if config.get("endpoint_url") else {}
         )
@@ -520,8 +563,8 @@ class FilesystemManager(Manager):
             endpoint_url=config.get("endpoint_url"),
         )
 
-    def create_gcs_driver(self) -> Filesystem:
-        config = self._disk_config("gcs")
+    def create_gcs_driver(self, disk: str = "gcs") -> Filesystem:
+        config = self._disk_config(disk)
         fs = _fsspec().filesystem("gcs", token=config.get("token"))
         return Filesystem(
             fs,
@@ -530,8 +573,8 @@ class FilesystemManager(Manager):
             default_visibility=Visibility(config.get("visibility", "public")),
         )
 
-    def create_azure_driver(self) -> Filesystem:
-        config = self._disk_config("azure")
+    def create_azure_driver(self, disk: str = "azure") -> Filesystem:
+        config = self._disk_config(disk)
         if config.get("connection_string"):  # full conn string (also how Azurite/emulators connect)
             fs = _fsspec().filesystem("az", connection_string=config["connection_string"])
         else:

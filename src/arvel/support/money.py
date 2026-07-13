@@ -22,7 +22,12 @@ class Currency:
     __slots__ = ("code",)
 
     def __init__(self, code: str) -> None:
-        self.code = code.upper()
+        code = code.upper()
+        # ISO-4217 codes are exactly three letters; reject anything else up front so a typo'd
+        # currency ("NOTREAL") fails loudly at construction, not silently at format time.
+        if len(code) != 3 or not (code.isascii() and code.isalpha()):
+            raise ValueError(f"invalid ISO-4217 currency code: {code!r} (expected 3 letters)")
+        self.code = code
 
     def minor_units(self) -> int:
         from babel.numbers import get_currency_precision
@@ -210,4 +215,9 @@ class Money:
         return f"Money({self._amount}, {self._currency.code!r})"
 
     def __str__(self) -> str:
-        return self.format()
+        # __str__ must never raise from a dunder: babel is the optional [i18n] extra, so fall back
+        # to a plain "<major> <code>" form when it isn't installed rather than ImportError.
+        try:
+            return self.format()
+        except ImportError:
+            return f"{self.major()} {self._currency.code}"

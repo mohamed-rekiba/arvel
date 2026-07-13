@@ -97,3 +97,25 @@ def test_order_by_direction_cannot_inject(direction: str) -> None:
     stmt = Builder(users).order_by("id", direction).to_select()
     compiled = str(stmt.compile(dialect=sqlite.dialect()))
     assert compiled.endswith("ORDER BY users.id ASC")
+
+
+def test_group_by_rejects_non_identifier_injection() -> None:
+    """A non-schema group_by column must be a strict identifier or it's rejected (KeyError) —
+    a request-derived name can't reach ``literal_column`` and inject SQL (parity with ``where``)."""
+    try:
+        Builder(users).group_by("id) ; DROP TABLE users --")._group_targets()
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("group_by injection payload was not rejected")
+    # a legitimate aggregate alias still resolves
+    assert str(Builder(users).group_by("total")._group_targets()[0]) == "total"
+
+
+def test_having_rejects_non_identifier_injection() -> None:
+    """``having`` on a non-schema column is guarded the same way as ``group_by``."""
+    try:
+        Builder(users).having("x); DROP TABLE users --", "=", 1)
+    except KeyError:
+        return
+    raise AssertionError("having injection payload was not rejected")

@@ -173,14 +173,26 @@ class Broadcaster:
         raise NotImplementedError
 
 
-class LogBroadcaster(Broadcaster):
-    """A no-network broadcaster that records each broadcast (dev/test default)."""
+#: How many recent broadcasts the log driver retains — it's a dev/test recorder AND the default
+#: driver, so an unconfigured production app that keeps dispatching ShouldBroadcast events must not
+#: grow ``sent`` without bound. Keep only the most recent N.
+LOG_BROADCASTER_HISTORY = 1000
 
-    def __init__(self) -> None:
+
+class LogBroadcaster(Broadcaster):
+    """A no-network broadcaster that records each broadcast (dev/test default).
+
+    ``sent`` stays a plain ``list`` (tests read/compare it directly), but it's **bounded** to the
+    most recent ``history`` entries so an unconfigured production app can't leak memory."""
+
+    def __init__(self, history: int = LOG_BROADCASTER_HISTORY) -> None:
         self.sent: list[tuple[str, list[str], Any]] = []
+        self._history = history
 
     async def broadcast(self, event: Any) -> None:
         self.sent.append((event_name(event), channels_for(event), event))
+        if len(self.sent) > self._history:  # drop the oldest so growth stays bounded
+            del self.sent[0 : len(self.sent) - self._history]
 
 
 # The redis channel prefix each broadcast is published under — part of the publish wire contract, so

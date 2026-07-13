@@ -146,10 +146,16 @@ def _b64d(data: str) -> bytes:
 
 
 class SignatureInvalid(Exception):
-    """A signed value failed verification — tampered, wrong key, or expired.
+    """A signed value failed verification — tampered, wrong key, or malformed.
 
     The module's own vocabulary (like :class:`DecryptionFailed`): callers never
     have to catch the signing library's exception types."""
+
+
+class SignatureExpired(SignatureInvalid):
+    """A signature was valid but has aged past ``max_age`` — distinct from a *tampered* signature so
+    a caller can tell "link expired, request a new one" from "link forged" (a subclass, so code
+    catching :class:`SignatureInvalid` still catches it)."""
 
 
 class Signer:
@@ -162,8 +168,12 @@ class Signer:
         return self._serializer.dumps(value)
 
     def unsign(self, signed: str, max_age: int | None = None) -> Any:
+        from itsdangerous import SignatureExpired as _ItsExpired
+
         try:
             return self._serializer.loads(signed, max_age=max_age)
+        except _ItsExpired as exc:  # valid-but-expired — a distinct, actionable outcome
+            raise SignatureExpired(str(exc)) from exc
         except Exception as exc:
             raise SignatureInvalid(str(exc)) from exc
 
@@ -173,6 +183,7 @@ __all__ = [
     "Encrypter",
     "HashManager",
     "Hasher",
+    "SignatureExpired",
     "SignatureInvalid",
     "Signer",
     "resolve_hasher",
