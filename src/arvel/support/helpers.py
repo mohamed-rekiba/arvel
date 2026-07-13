@@ -744,10 +744,11 @@ def logger(message: str | None = None, **context: Any) -> Any:
 
 
 def bcrypt(plain: str) -> str:
-    """Hash ``plain`` with the default hasher — ``Hash.make`` shorthand."""
-    from arvel.support.facades import Hash
+    """Hash ``plain`` with the **bcrypt** driver — as the name says. For the app's configured default
+    hasher (Argon2id unless changed), use ``Hash.make`` / the ``hashed`` model cast instead."""
+    from arvel.security import Hasher
 
-    return cast("str", Hash.make(plain))
+    return Hasher(driver="bcrypt").make(plain)
 
 
 def encrypt(val: Any) -> Any:

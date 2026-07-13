@@ -100,3 +100,13 @@ def test_noop_swallows_anything() -> None:
 
 def test_windows_os_is_a_bool() -> None:
     assert isinstance(windows_os(), bool)
+
+
+def test_bcrypt_helper_uses_the_bcrypt_driver() -> None:
+    # the helper is named `bcrypt`, so it must produce a bcrypt hash (not the Argon2id default)
+    from arvel.security import Hasher
+    from arvel.support.helpers import bcrypt
+
+    digest = bcrypt("secret-value")
+    assert digest.startswith(("$2a$", "$2b$", "$2y$"))  # bcrypt format, not $argon2
+    assert Hasher(driver="bcrypt").check("secret-value", digest)
