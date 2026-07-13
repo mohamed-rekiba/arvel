@@ -11,6 +11,9 @@ class CreateJobsTable(Migration):
             t.text("payload")
             t.integer("attempts")
             t.integer("reserved_at").nullable()
+            # the effective visibility deadline (reserved_at + the job's retry_after), set at claim
+            # time so the stuck-reclaim is one indexed filter instead of a per-row payload decode
+            t.integer("reserved_until").nullable().index()
             t.integer("available_at")
             t.integer("created_at")
 

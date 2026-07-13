@@ -88,8 +88,12 @@ async def test_per_job_retry_after_overrides_the_queue_config_default() -> None:
         now = int(time.time())
         await manager.dispatch_after(0, QuickTimeout())
         row = (await QueuedJob.all())[0]
-        # 10s old: past QuickTimeout's own 5s override, but well under the 90s config default
-        await QueuedJob.where("id", "=", row.id).update({"reserved_at": now - 10})
+        # Simulate a crashed claim: reserved 10s ago with QuickTimeout's 5s override baked into
+        # reserved_until at claim time (reserved_at + 5 = now - 5, already past) — so it's overdue
+        # under its own override even though the 90s config default hasn't elapsed.
+        await QueuedJob.where("id", "=", row.id).update(
+            {"reserved_at": now - 10, "reserved_until": now - 5}
+        )
 
         released = await manager.release_due_jobs(now=now)
         assert released == 1

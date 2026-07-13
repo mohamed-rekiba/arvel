@@ -18,7 +18,6 @@ a ``JobWorker``) stay here. Every previously-defined-here name is re-exported be
 
 from __future__ import annotations
 
-import contextlib
 from collections.abc import Awaitable, Callable, Iterable
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -243,28 +242,39 @@ class DurableJobs:
         )
 
     async def _reclaim_stuck(self, moment: int) -> None:
-        """Visibility timeout: a row whose ``reserved_at`` predates its ``retry_after`` window
-        means the worker that claimed it died mid-flight — free it so another worker retakes it."""
+        """Visibility timeout: a row whose ``reserved_until`` deadline has passed means the worker
+        that claimed it died mid-flight — free it so another worker retakes it.
+
+        ``reserved_until`` (``reserved_at + effective retry_after``) is computed once at claim time,
+        so this is a single **indexed** filter with no per-row payload decode (F-027) — the reclaim
+        cost is O(actually-stuck), not O(all-reserved)."""
         from arvel.queue.jobs import QueuedJob
 
-        default_retry_after = self._retry_after()
-        stuck = await QueuedJob.where_not_null("reserved_at").get()
-        for row in stuck:
-            reserved_at = row.reserved_at
-            if reserved_at is None:
-                continue
-            retry_after = default_retry_after
-            with contextlib.suppress(Exception):  # an undeserializable row falls back to default
-                job = await deserialize_instance(row.payload)
-                override = getattr(job, "retry_after", None)
-                if override is not None:
-                    retry_after = override
-            if moment - int(reserved_at) >= retry_after:
-                await (
-                    QueuedJob.where("id", "=", row.id)
-                    .where("reserved_at", "=", reserved_at)
-                    .update({"reserved_at": None})
-                )
+        overdue = (
+            await QueuedJob.where_not_null("reserved_until")
+            .where("reserved_until", "<=", moment)
+            .get()
+        )
+        for row in overdue:
+            await (
+                QueuedJob.where("id", "=", row.id)
+                .where("reserved_until", "=", row.reserved_until)  # optimistic: skip if re-claimed
+                .update({"reserved_at": None, "reserved_until": None})
+            )
+        # Legacy safety net: rows reserved before `reserved_until` existed (a migration boundary)
+        # carry a NULL deadline. Reclaim them conservatively at the default window — no decode.
+        legacy = (
+            await QueuedJob.where_not_null("reserved_at")
+            .where_null("reserved_until")
+            .where("reserved_at", "<=", moment - self._retry_after())
+            .get()
+        )
+        for row in legacy:
+            await (
+                QueuedJob.where("id", "=", row.id)
+                .where("reserved_at", "=", row.reserved_at)
+                .update({"reserved_at": None})
+            )
 
     async def release_due(self, now: int | None = None, *, queues: list[str] | None = None) -> int:
         """Reclaim timed-out reservations, then push every due row onto the broker and delete it.
@@ -284,17 +294,23 @@ class DurableJobs:
                 (row for row in due if row.queue in priority), key=lambda r: priority[r.queue]
             )
         released = 0
+        default_retry_after = self._retry_after()
         for row in due:
+            # Deserialize first: the job's own retry_after sets the reservation's visibility deadline
+            # (reserved_until), stamped atomically with the claim so a crash-recovery reclaim needs
+            # no payload decode. A wasted decode on a lost claim is harmless.
+            job = await deserialize_instance(row.payload)
+            override = getattr(job, "retry_after", None)
+            effective = override if override is not None else default_retry_after
             # Atomic claim: rowcount == 1 means this worker won the row; 0 means another already
             # took it — skip to avoid a double-dispatch.
             claim = (
                 await QueuedJob.where("id", "=", row.id)
                 .where_null("reserved_at")
-                .update({"reserved_at": moment})
+                .update({"reserved_at": moment, "reserved_until": moment + int(effective)})
             )
             if claim.rowcount != 1:
                 continue
-            job = await deserialize_instance(row.payload)
             await self._push(job, queue=row.queue)
             await row.delete()
             released += 1

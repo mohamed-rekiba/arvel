@@ -161,7 +161,15 @@ class ContextualBindingBuilder:
 
 class Container:
     """A service container with autowiring, singletons, scopes, contextual
-    bindings, tags, extenders, and resolving hooks."""
+    bindings, tags, extenders, and resolving hooks.
+
+    **Concurrency stance: async-first, not thread-safe.** arvel runs one event loop per worker, and
+    resolution is synchronous (no ``await`` between a shared binding's check-then-cache), so it is
+    safe under cooperative ``asyncio`` concurrency — the loop never interleaves another task mid-
+    resolution. It is **not** guarded for OS threads: resolving the *same* shared binding from two
+    threads at once can double-build it (last writer wins). Per-request isolation uses ``contextvars``
+    (:meth:`scope`), which are async-context-local. If you resolve from a threadpool, either warm the
+    singletons on the main loop first or wrap resolution in your own lock."""
 
     def __init__(self) -> None:
         self._bindings: dict[Any, _Binding] = {}

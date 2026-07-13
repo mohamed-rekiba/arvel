@@ -24,6 +24,7 @@ class QueuedJob(Model):
         "payload": sa.Text(),  # serialized job — exceeds VARCHAR(255); matches the migration's TEXT
         "attempts": int,
         "reserved_at": int,
+        "reserved_until": int,  # effective visibility deadline (reserved_at + retry_after)
         "available_at": int,
         "created_at": int,
     }
@@ -32,6 +33,7 @@ class QueuedJob(Model):
         "payload",
         "attempts",
         "reserved_at",
+        "reserved_until",
         "available_at",
         "created_at",
     ]
@@ -43,3 +45,4 @@ class QueuedJob(Model):
     payload: Any
     queue: Any
     available_at: Any
+    reserved_until: Any

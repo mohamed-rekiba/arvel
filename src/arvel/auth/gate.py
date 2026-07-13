@@ -78,20 +78,46 @@ async def _maybe_await(value: Any) -> Any:
 _UNRESOLVED: Any = object()
 
 
+def _split_top_level(text: str, sep: str) -> list[str]:
+    """Split ``text`` on ``sep`` only at bracket depth 0, so a separator nested inside ``[...]``
+    (e.g. the comma in ``dict[str, int]``) is not a split point."""
+    parts: list[str] = []
+    depth = 0
+    current = ""
+    for ch in text:
+        if ch in "[(":
+            depth += 1
+        elif ch in "])":
+            depth -= 1
+        if ch == sep and depth == 0:
+            parts.append(current)
+            current = ""
+        else:
+            current += ch
+    parts.append(current)
+    return parts
+
+
 def _annotation_str_is_nullable(raw: Any) -> bool:
-    """Best-effort nullability check on an *unresolved* annotation (a string under
-    ``from __future__ import annotations``, or a live object). ``None`` only when the annotation
-    explicitly admits it — ``X | None`` / ``Optional[X]`` / ``None``; anything else fails closed."""
+    """Nullability check on an *unresolved* annotation (a string under ``from __future__ import
+    annotations``, or a live object). Nullable only when the annotation **structurally** admits
+    ``None`` — ``None``/``NoneType``, ``Optional[X]``, a top-level ``X | None`` union, or a
+    ``Union[..., None, ...]`` with ``None`` as a top-level arg. A *nested* ``None`` (``dict[str,
+    None]``) is NOT nullable — the check is bracket-depth-aware, not a substring match. Anything
+    else fails closed."""
     text = raw if isinstance(raw, str) else getattr(raw, "__name__", str(raw))
-    normalized = text.replace(" ", "")
-    return (
-        normalized in ("None", "NoneType")
-        or "|None" in normalized
-        or "None|" in normalized
-        or "Optional[" in normalized
-        or ",None]" in normalized  # Union[X, None]
-        or "[None," in normalized  # Union[None, X]
-    )
+    s = text.replace(" ", "")
+    if s in ("None", "NoneType"):
+        return True
+    if s.startswith("Optional["):
+        return True
+    if any(part in ("None", "NoneType") for part in _split_top_level(s, "|")):
+        return True  # top-level "X | None"
+    if s.startswith("Union[") and s.endswith("]"):
+        args = _split_top_level(s[len("Union[") : -1], ",")
+        if any(arg in ("None", "NoneType") for arg in args):
+            return True
+    return False
 
 
 def _accepts_none(callback: Any) -> bool:

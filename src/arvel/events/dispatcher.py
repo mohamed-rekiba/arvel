@@ -278,8 +278,11 @@ class Dispatcher:
         should = getattr(event, "should_broadcast", None)
         if callable(should) and not should():
             return
-        if getattr(event, "_when", None) is not None:
-            cast("Any", event)._when = None
+        # drop the one-shot broadcast_when() closure via the event's PUBLIC seam — never reach into
+        # broadcasting's private `_when` from here (events sits below broadcasting in the DAG).
+        consume = getattr(event, "consume_broadcast_condition", None)
+        if callable(consume):
+            consume()
         if isinstance(event, ShouldBroadcastNow):
             await self._broadcast_now(event)
             return

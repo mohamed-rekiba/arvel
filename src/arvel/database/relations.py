@@ -331,19 +331,18 @@ class BelongsToMany(Relation, FullBuilderProxy):
             pid = parent._attributes.get(self.parent_key)
             matched: list[Any] = []
             for rid in related_ids_by_parent.get(pid, []):
-                model = by_related_id.get(rid)
-                if model is None:
+                source = by_related_id.get(rid)
+                if source is None:
                     continue
-                # without pivot columns, parents share one hydrated instance — read-path
-                # aliasing, same tradeoff the reference makes
+                # each parent gets its OWN hydrated copy — never a shared instance — so mutating a
+                # related model reached through one parent can't leak into another (F-030).
+                model = self.related(**dict(source._attributes))
+                model._exists = True
                 if self._pivot_columns:
-                    # each parent gets its own hydrated copy so pivot data can't cross parents
-                    model = self.related(**dict(model._attributes))
                     pivot_row = pivot_by_pair[(pid, rid)]
                     model._attributes[self._pivot_accessor] = {
                         col: pivot_row[col] for col in self._pivot_columns
                     }
-                    model._exists = True
                 matched.append(model)
             parent._relations[name] = ModelCollection(matched)
 
@@ -863,13 +862,16 @@ class MorphToMany(Relation, FullBuilderProxy):
 
         for parent in parents:
             pid = parent._attributes.get(pk)
-            parent._relations[name] = ModelCollection(
-                [
-                    model
-                    for rid in related_ids_by_parent.get(pid, [])
-                    if (model := by_related_id.get(rid)) is not None
-                ]
-            )
+            matched: list[Any] = []
+            for rid in related_ids_by_parent.get(pid, []):
+                source = by_related_id.get(rid)
+                if source is None:
+                    continue
+                # each parent gets its own hydrated copy — no cross-parent write-aliasing (F-030)
+                copy = self.related(**dict(source._attributes))
+                copy._exists = True
+                matched.append(copy)
+            parent._relations[name] = ModelCollection(matched)
 
     def _pivot_correlation(self, pivot: Any, parent_table: Any) -> list[Any]:
         conditions = [
@@ -1008,13 +1010,16 @@ class MorphedByMany(Relation, FullBuilderProxy):
 
         for parent in parents:
             pid = parent._attributes.get(pk)
-            parent._relations[name] = ModelCollection(
-                [
-                    model
-                    for rid in related_ids_by_parent.get(pid, [])
-                    if (model := by_related_id.get(rid)) is not None
-                ]
-            )
+            matched: list[Any] = []
+            for rid in related_ids_by_parent.get(pid, []):
+                source = by_related_id.get(rid)
+                if source is None:
+                    continue
+                # each parent gets its own hydrated copy — no cross-parent write-aliasing (F-030)
+                copy = self.related(**dict(source._attributes))
+                copy._exists = True
+                matched.append(copy)
+            parent._relations[name] = ModelCollection(matched)
 
     def _pivot_correlation(self, pivot: Any, parent_table: Any) -> list[Any]:
         return [

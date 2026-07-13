@@ -156,6 +156,12 @@ class InteractsWithSockets:
         ``True`` (checked once, centrally, in ``BroadcastManager.broadcast``)."""
         return self._when() if self._when is not None else True
 
+    def consume_broadcast_condition(self) -> None:
+        """Drop the one-shot ``broadcast_when()`` closure after it's been evaluated — the public
+        seam the dispatcher calls once at dispatch (the closure can't serialize onto the broker).
+        A public method so the events layer never has to reach into this mixin's private ``_when``."""
+        self._when = None
+
 
 def accepts(payload: dict[str, Any], socket_id: str | None) -> bool:
     """Whether a subscriber holding ``socket_id`` should accept a decoded broadcast ``payload`` —
