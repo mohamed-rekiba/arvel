@@ -30,10 +30,11 @@ global, so nothing needs to be passed from the controller:
 </html>
 ```
 
-Pass several entries to bundle more than one:
+You list **JavaScript entry points** — any CSS your JS imports is bundled and its `<link>` tag
+emitted for you, so you don't pass stylesheets separately. Pass several entries for several bundles:
 
 ```html
-{{ vite("resources/css/app.css", "resources/js/app.js") }}
+{{ vite("resources/js/app.js", "resources/js/admin.js") }}
 ```
 
 Each entry is resolved against the built manifest at `public/build/manifest.json`, served under the

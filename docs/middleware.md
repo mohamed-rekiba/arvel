@@ -107,10 +107,11 @@ The `throttle:<name>` form is the built-in example — it selects a named rate l
 
 ## Terminable middleware
 
-Sometimes middleware needs to do work **after** the response has been sent to the browser — writing
-a session, flushing a log. Implement `terminate(request, response)` in addition to `handle`; the
-kernel runs it after the response is built, on the same instance (so state set in `handle` is
-visible in `terminate`):
+Sometimes middleware needs to do work once the response is built — writing a session, flushing a log.
+Implement `terminate(request, response)` in addition to `handle`; the kernel runs it after the response
+is built but **before** it's returned to the ASGI server, on the same instance (so state set in
+`handle` is visible in `terminate`). Because it runs before delivery it adds to request latency — keep
+it light and push anything slow onto the queue:
 
 ```python
 class StoreVisit(Middleware):
@@ -143,8 +144,10 @@ Group / opt-in middleware:
 - **`ShareErrorsFromSession`** — exposes flashed validation `errors` to views (see [Validation](validation.md)).
 - **`ValidateCsrfToken`** — the web group's CSRF guard (see [CSRF Protection](csrf.md)).
 - **`ThrottleRequests`** — the rate limiter (see [Rate Limiting](rate-limiting.md)).
-- **`RequestContext`**, **`Locale`**, **`Authenticate`** — bind a request id, set the locale from
-  `Accept-Language`, and resolve the current user.
+- **`RequestContext`**, **`Locale`**, **`Authenticate`** — bind a request id, resolve the request
+  locale, and resolve the current user. `Locale` picks the locale by precedence: an explicit switch
+  (`?lang=` / a `locale` cookie), then the signed-in user's saved preference, then `Accept-Language`
+  (see [Localization](localization.md)).
 
 ## Common mistakes & gotchas
 

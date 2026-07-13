@@ -113,7 +113,11 @@ class CreatePost(FormRequest):
 
     @classmethod
     def prepare_for_validation(cls, data):
-        data.setdefault("slug", data["title"].lower().replace(" ", "-"))
+        # only derive from title if it's actually present and a string — otherwise leave the
+        # input untouched so a bad/missing title still fails validation with the normal 422
+        title = data.get("title")
+        if isinstance(title, str):
+            data.setdefault("slug", title.lower().replace(" ", "-"))
         return data
 
     def passed_validation(self):

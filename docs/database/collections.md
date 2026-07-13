@@ -41,11 +41,12 @@ users.contains(some_user)   # membership by primary key
 
 ### Eager loading
 
-Load relations for the whole set in **one batched query** — no N+1:
+Load relations for the whole set with **one batched query per relation** (a single `WHERE IN`
+across all members) — no N+1:
 
 ```python
 posts = await Post.all()
-await posts.load("author", "comments")       # batch-load for every post
+await posts.load("author", "comments")       # one batched query for author, one for comments
 await posts.load_missing("author")           # skip any already loaded
 ```
 

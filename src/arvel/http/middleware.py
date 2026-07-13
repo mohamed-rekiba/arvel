@@ -776,15 +776,20 @@ class LocaleMiddleware(Middleware):
         or inject) -- anything that isn't a 2-8 letter code is ignored."""
         import re
 
-        raw: Any = None
+        candidates: list[Any] = []
         if hasattr(request, "query"):
-            raw = request.query("lang") or request.query("locale")
-        if not raw and hasattr(request, "cookie"):
-            raw = request.cookie("locale")
-        if not raw:
-            return None
-        token = str(raw).split(",")[0].split("-")[0].split("_")[0].strip()
-        return token if re.fullmatch(r"[A-Za-z]{2,8}", token) else None
+            candidates += [request.query("lang"), request.query("locale")]
+        if hasattr(request, "cookie"):
+            candidates.append(request.cookie("locale"))
+        # try each candidate in precedence order, returning the first VALID one — a present but
+        # malformed higher-precedence value (e.g. ?lang=../etc) must not shadow a valid cookie.
+        for raw in candidates:
+            if not raw:
+                continue
+            token = str(raw).strip().split(",")[0].split("-")[0].split("_")[0].strip()
+            if re.fullmatch(r"[A-Za-z]{2,8}", token):
+                return token
+        return None
 
     @staticmethod
     def user_preferred_locale() -> str | None:

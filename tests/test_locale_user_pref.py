@@ -207,3 +207,9 @@ async def test_switch_beats_stored_pref_under_real_wiring() -> None:
         assert await LocaleMiddleware().handle(req, auth_then_capture) == "es"
     finally:
         set_application(None)
+
+
+async def test_invalid_query_does_not_shadow_a_valid_cookie() -> None:
+    # a present-but-malformed higher-precedence ?lang= must not block a valid lower-precedence cookie
+    req = SwitchReq({"accept-language": "de"}, q={"lang": "../../etc"}, cookies={"locale": "es"})
+    assert await LocaleMiddleware().handle(req, _capture) == "es"

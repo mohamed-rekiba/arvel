@@ -49,7 +49,8 @@ RateLimiter.for_("api", lambda request: Limit.per_minute(60).by(request.ip()))
 Route.get("/api/posts", index).middleware("throttle:api")
 ```
 
-A request over the limit gets a **429** with `Retry-After` and `X-RateLimit-*` headers.
+By default a request over the limit gets a **429** with `Retry-After` and `X-RateLimit-*` headers —
+unless the limit sets its own `.response(...)` (below), which replaces that default entirely.
 
 ### Building limits
 
@@ -64,8 +65,9 @@ Limit.per_minute(60).by(request.ip())            # segment the window by a key
 Limit.per_minute(5).response(custom_429_handler) # custom over-limit response
 ```
 
-`.by(key)` gives each caller (per IP, per user, per tenant) an independent window; without it, the
-limit is shared across everyone hitting that route.
+`.by(key)` sets the segment explicitly (per IP, per user, per tenant). Without it, the default
+segment is the **authenticated user's id, falling back to the client IP** — so callers already get
+independent windows; use `.by(...)` when you want to key on something else.
 
 ## See also
 

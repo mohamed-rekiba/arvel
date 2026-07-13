@@ -26,6 +26,12 @@ Route.get("/posts", PostController().index, name="posts.index")
 Route.get("/posts/{post}", PostController().show, name="posts.show")   # {post} → implicit Post binding
 ```
 
+This bound-method form constructs the controller **once**, at route-definition time — fine for a
+controller with no constructor dependencies. When a controller needs per-request dependency
+injection, bind it as a class instead (`Route.resource(...)` below, or a
+[single-action controller](#single-action-controllers)), so the container resolves a fresh instance
+per request.
+
 ## Single action controllers
 
 If a controller action is particularly complex, it can be convenient to dedicate an entire class to
@@ -90,11 +96,11 @@ name [implicit model binding](routing.md) keys on — so `show(self, request, po
 the loaded model, not a raw id.
 
 For a JSON API, drop the HTML-form actions (`create`/`edit`) with `api=True`, and narrow the set
-with `only`/`except_`:
+with `only`/`except_`. These are **alternatives** — pick the one call that fits, don't stack them:
 
 ```python
-Route.resource("posts", PostController, api=True)
-Route.resource("posts", PostController, only=["index", "show"])
+Route.resource("posts", PostController, api=True)            # …or
+Route.resource("posts", PostController, only=["index", "show"])   # …or
 Route.resource("posts", PostController, except_=["destroy"])
 ```
 
