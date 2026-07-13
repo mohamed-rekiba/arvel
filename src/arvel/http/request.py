@@ -471,6 +471,18 @@ class Request:
         return fnmatch(self.path().lstrip("/"), pattern)
 
 
+#: Max characters kept from a client-supplied file extension (after alphanumeric filtering).
+_MAX_EXTENSION_LEN = 10
+
+
+def _safe_extension(raw: str) -> str:
+    """A client-supplied extension reduced to a safe ``[A-Za-z0-9]`` token (length-capped), or
+    ``""`` when nothing safe remains. Strips ``/``, ``.``, and every other separator so the value
+    can never inject a path segment when spliced into a storage key."""
+    kept = "".join(ch for ch in raw if ch.isascii() and ch.isalnum())
+    return kept[:_MAX_EXTENSION_LEN]
+
+
 class UploadedFile:
     """A thin wrapper over a framework upload (a Litestar ``UploadFile``) that adds -style
     persistence: ``store()`` writes it to a configured disk via the filesystem manager and
@@ -495,8 +507,15 @@ class UploadedFile:
 
     @property
     def extension(self) -> str:
+        """The upload's extension, **sanitized** — a bare alphanumeric token, never raw client bytes.
+
+        The client filename is untrusted: its raw last-dot token can contain ``/`` (``a.b/c`` →
+        ``b/c``), which, spliced into a storage key, injects path segments and lets the client
+        control the subdirectory + final filename (defeating ``store()``'s random-name defense).
+        Keep only ``[A-Za-z0-9]`` and cap the length; a non-conforming extension is dropped."""
         name = self.client_name or ""
-        return name.rsplit(".", 1)[-1] if "." in name else ""
+        raw = name.rsplit(".", 1)[-1] if "." in name else ""
+        return _safe_extension(raw)
 
     async def read(self) -> bytes:
         return cast("bytes", await self._upload.read())

@@ -19,8 +19,10 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, cast
 
+import msgspec
+
 from arvel.kernel import Settings
-from arvel.support.manager import Manager
+from arvel.support.manager import Manager, MissingExtraError
 from arvel.telemetry import span
 
 # Compare-and-delete: only unlocks when the stored value still matches this holder's owner
@@ -108,6 +110,10 @@ def _unwrap(raw: Any) -> Any:
     return cast("Any", raw)
 
 
+def _no_stores() -> dict[str, dict[str, Any]]:
+    return {}
+
+
 class CacheSettings(Settings):
     """Typed, validated view over the ``cache`` config section (DR-0016).
 
@@ -118,6 +124,10 @@ class CacheSettings(Settings):
     __config_key__ = "cache"
     default: str = "array"
     url: str = "redis://localhost:6379/0"
+    #: Optional named stores → per-store config (``{"driver": ..., "url": ...}``), so two redis
+    #: stores (sessions, throttle) or a renamed store can coexist. A store's ``driver`` selects the
+    #: backend; absent, the store name is the driver (back-compat with the driver==name convention).
+    stores: dict[str, dict[str, Any]] = msgspec.field(default_factory=_no_stores)
 
 
 class LockTimeout(RuntimeError):
@@ -731,6 +741,18 @@ class CacheManager(Manager):
     def default_driver(self) -> str:
         return self._settings(CacheSettings).default  # auto-loads + validates config("cache")
 
+    def _make(self, name: str) -> Any:
+        # name → driver indirection (mirrors FilesystemManager): a named store selects its backend
+        # via `stores.<name>.driver`; absent, the name is the driver (back-compat).
+        if name in self._creators:
+            return self._creators[name](self.app)
+        stores = self._settings(CacheSettings).stores
+        driver = stores[name].get("driver", name) if name in stores else name
+        creator = getattr(self, f"create_{driver}_driver", None)
+        if creator is None:
+            raise MissingExtraError(driver)
+        return creator(name)
+
     def _build(self, url: str, *, driver: str, **backend_options: Any) -> CacheRepository:
         from cashews import Cache
 
@@ -738,13 +760,16 @@ class CacheManager(Manager):
         client.setup(url, **backend_options)
         return CacheRepository(client, driver=driver, redis_url=url if driver == "redis" else None)
 
-    def create_array_driver(self) -> CacheRepository:
+    def create_array_driver(self, store: str | None = None) -> CacheRepository:
         return self._build("mem://", driver="array")
 
-    def create_redis_driver(self) -> CacheRepository:
+    def create_redis_driver(self, store: str | None = None) -> CacheRepository:
         # cashews defaults suppress=True (a dead Redis silently no-ops); we need it to raise,
-        # or cache-dependent correctness (locks, throttles) degrades silently.
-        return self._build(self._settings(CacheSettings).url, driver="redis", suppress=False)
+        # or cache-dependent correctness (locks, throttles) degrades silently. A named store may
+        # carry its own `url` (two redis stores); absent, the top-level `url` applies.
+        settings = self._settings(CacheSettings)
+        url = settings.stores.get(store, {}).get("url", settings.url) if store else settings.url
+        return self._build(url, driver="redis", suppress=False)
 
     async def close(self) -> None:
         """Close every resolved driver's dedicated lock connection — the app's terminating hook
@@ -773,6 +798,10 @@ def cached(fn: Any = None, *, ttl: int | None = None, key: str | None = None) ->
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         from arvel.support import cache
 
+        # WARNING: the auto key uses repr() of the args, so it's only stable for args with a stable
+        # repr (str/int/…). An object without a custom __repr__ embeds its memory address, so the
+        # key differs per instance AND per process — a distributed cache would never hit. Pass an
+        # explicit `key=` when caching over object arguments (e.g. a bound method's `self`).
         cache_key = key or f"{fn.__module__}.{fn.__qualname__}:{args!r}:{sorted(kwargs.items())!r}"
         repo = cache()
         # get() distinguishes a cached None from a miss on its own now (CacheRepository's own

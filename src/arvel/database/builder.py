@@ -184,12 +184,21 @@ class Builder[M = dict[str, Any]]:
         return self._value_comparison(col, operator, value)
 
     def _column_or_literal(self, name: str) -> Any:
-        """``name`` as a real column of this query's table, or — for a ``group_by``/``select_raw``
-        alias like ``"total"`` that isn't a table column — a raw SQL identifier."""
+        """``name`` as a real column of this query's table, or — for a ``group_by``/``having``
+        alias like ``"total"`` that isn't a table column — a raw SQL identifier.
+
+        The non-column fallback is guarded exactly like :meth:`_where_column`: an alias must be a
+        strict identifier, so a request-derived ``group_by``/``having`` column name can't smuggle
+        SQL into a ``literal_column`` (an injection surface ``where``/``order_by`` already close).
+        A genuinely computed expression goes through ``select_raw``/``*_raw`` (trusted SQL)."""
         import sqlalchemy as sa
 
         cols = self._table.c
-        return cast("Any", cols[name] if name in cols else sa.literal_column(name))
+        if name in cols:
+            return cols[name]
+        if not _SAFE_COLUMN.match(name):
+            raise KeyError(name)  # unknown, non-identifier alias = rejected, never interpolated
+        return cast("Any", sa.literal_column(name))
 
     def _column_ref(self, name: str) -> Any:
         """A column reference for ``where_column``/joins: ``"other.col"`` (a joined table) resolves

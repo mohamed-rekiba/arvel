@@ -58,6 +58,14 @@ async def impersonate(request: Any, target: Any, *, ability: str | None = None) 
     session = _session(request)
     impersonator = current_user.get()
     if session is None or impersonator is None or target is None:
+        # every denied attempt is audited (accountability is required) — including degenerate ones.
+        audit(
+            "auth.impersonation.denied",
+            level="warning",
+            impersonator_id=_ident(impersonator) if impersonator is not None else None,
+            target_id=_ident(target) if target is not None else None,
+            reason="no_session" if session is None else "no_current_user_or_target",
+        )
         return False
     if session.get(
         IMPERSONATOR_KEY
@@ -71,9 +79,23 @@ async def impersonate(request: Any, target: Any, *, ability: str | None = None) 
         )
         return False
     if _ident(target) == _ident(impersonator):  # no self-impersonation
+        audit(
+            "auth.impersonation.denied",
+            level="warning",
+            impersonator_id=_ident(impersonator),
+            target_id=_ident(target),
+            reason="self_impersonation",
+        )
         return False
     can = getattr(impersonator, "can", None)  # authorize against the REAL user (fail closed)
     if not callable(can):
+        audit(
+            "auth.impersonation.denied",
+            level="warning",
+            impersonator_id=_ident(impersonator),
+            target_id=_ident(target),
+            reason="no_can_method",
+        )
         return False
     verdict = can(ability, target)
     if inspect.isawaitable(verdict):

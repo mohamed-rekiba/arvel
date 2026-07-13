@@ -51,6 +51,45 @@ async def _dispatch_auth_event(event: Any) -> None:
             LogManager().channel("auth").warning("event_listener_failed", exc_info=True)
 
 
+#: A process-wide dummy digest for the unknown-user path, computed once (lazily) and reused so an
+#: unknown identifier costs exactly ONE hash verification — the same as a wrong password.
+_dummy_hash: str | None = None
+
+
+async def _dummy_digest(hasher: Any) -> str:
+    global _dummy_hash
+    if _dummy_hash is None:
+        _dummy_hash = str(await hasher.make_async("arvel-timing-equalization"))
+    return _dummy_hash
+
+
+async def verify_credentials(user: Any, password: str, *, hasher: Any = None) -> bool:
+    """Timing-safe password check that never reveals whether ``user`` exists — the secure primitive
+    for a "look up the user, then check the password" login.
+
+    A ``None`` user (unknown identifier) still runs one full hash verification against a cached dummy
+    digest, so an unknown identifier costs exactly what a wrong password does — one verify, no user
+    enumeration by response timing. The verify runs **off the event loop** (``check_async``), so a
+    login never blocks the loop on argon2/bcrypt. Returns ``True`` only on a real match.
+
+    Prefer this (or ``AuthManager.attempt``) over an inline ``Hasher().check(pw, user.password)``:
+    the naive form short-circuits the hash when the user is missing (a timing oracle) and blocks
+    the loop with the sync ``check``.
+
+        user = await User.where("email", email).first()
+        if not await verify_credentials(user, password):
+            abort(401, "Invalid credentials")
+    """
+    from arvel.security import resolve_hasher
+
+    hasher = hasher if hasher is not None else resolve_hasher()
+    stored = user.get_auth_password() if user is not None else None
+    if not stored:
+        await hasher.check_async(password, await _dummy_digest(hasher))
+        return False
+    return bool(await hasher.check_async(password, stored))
+
+
 class Authenticatable:
     """Mixin for the app's user model (``class User(Authenticatable, Model)``)."""
 
@@ -214,4 +253,5 @@ __all__ = [
     "Permission",
     "Role",
     "current_user",
+    "verify_credentials",
 ]

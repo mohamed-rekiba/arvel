@@ -113,19 +113,28 @@ class Translator:
             store.setdefault(locale, {}).update(data)
         return self
 
+    def _resolve_line(self, key: str, loc: str) -> str:
+        """The translation line for ``key`` in ``loc`` (then fallback), else ``key`` itself.
+
+        Uses ``is None`` checks, not truthiness: a legitimately **empty** translation ("") is a real
+        value, not a miss, so it must not fall through to the fallback/key (kept ``has()`` and
+        ``get()`` disagreeing)."""
+        line = self._lookup(key, loc)
+        if line is None:
+            line = self._lookup(key, self.fallback)
+        return key if line is None else line
+
     def get(
         self, key: str, replace: Mapping[str, Any] | None = None, locale: str | None = None
     ) -> str:
         loc = locale or current_locale.get()
-        line = self._lookup(key, loc) or self._lookup(key, self.fallback) or key
-        return self._replace(line, replace or {})
+        return self._replace(self._resolve_line(key, loc), replace or {})
 
     def choice(
         self, key: str, n: int, replace: Mapping[str, Any] | None = None, locale: str | None = None
     ) -> str:
         loc = locale or current_locale.get()
-        line = self._lookup(key, loc) or self._lookup(key, self.fallback) or key
-        segment = self._plural(line, n, loc)
+        segment = self._plural(self._resolve_line(key, loc), n, loc)
         return self._replace(segment, {"count": n, "n": n, **(replace or {})})
 
     def has(self, key: str, locale: str | None = None) -> bool:
@@ -174,13 +183,18 @@ class Translator:
         return node if isinstance(node, str) else None
 
     def _replace(self, line: str, replace: Mapping[str, Any]) -> str:
-        # Match whole :key / {key} tokens, not substrings — otherwise a short key (:n) eats a
-        # longer placeholder that starts with it (:nick). :KEY upper-cases the value, :Key
+        # SINGLE pass over the original template — a `{key}` and a `:key` alternation matched in one
+        # re.sub, so a substituted VALUE is never re-scanned as a placeholder: user data containing
+        # `:name` or `{n}` is inserted literally, it can't inject another replacement.
+        # Match whole :key / {key} tokens, not substrings. :KEY upper-cases the value, :Key
         # capitalizes it; an unknown placeholder is left untouched.
         values = {k: str(v) for k, v in replace.items()}
 
-        def colon(match: re.Match[str]) -> str:
-            token = match.group(1)
+        def sub(match: re.Match[str]) -> str:
+            brace = match.group(1)
+            if brace is not None:  # {key} form — exact key, no casing
+                return values.get(brace, match.group(0))
+            token = match.group(2)  # :key form — supports :KEY / :Key casing
             if token in values:  # exact key wins (covers keys that are themselves cased)
                 return values[token]
             lowered = token.lower()
@@ -193,8 +207,7 @@ class Translator:
                 return _ucfirst(val)
             return val
 
-        line = re.sub(r"\{(\w+)\}", lambda m: values.get(m.group(1), m.group(0)), line)
-        return re.sub(r":(\w+)", colon, line)
+        return re.sub(r"\{(\w+)\}|:(\w+)", sub, line)
 
     def _plural(self, line: str, n: int, locale: str) -> str:
         # explicit selectors ({n} exact, [a,b]/[a,*]/[*,b] intervals) win; when none match,

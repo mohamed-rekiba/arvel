@@ -58,8 +58,9 @@ class Application(Container):
         self.instance("app", self)
         self.instance(Container, self)
         self.instance(Application, self)
-        if "config" not in self._instances:
-            self.instance("config", Repository())
+        self.instance(
+            "config", Repository()
+        )  # fresh container: no prior config binding to preserve
         # capability registries live in the container under namespaced string keys
         # (see registry()) — the kernel object itself carries only bootstrap wiring
         self.route_files: list[str] = []
@@ -347,8 +348,8 @@ class ApplicationBuilder:
     ) -> ApplicationBuilder:
         """Serve ``directory`` as the app's public web root — the ``public/`` (see
         ``Router.public()`` for the full rationale). Registers automatically at boot
-        (``RoutingServiceProvider``); no route-file code needed at all, matching how 's
-        own webserver-served ``public/`` needs zero lines in ``routes/web.php``. ``path`` mounts
+        (``RoutingServiceProvider``); no route-file code needed at all — the served ``public/`` needs
+        zero route-file lines. ``path`` mounts
         it under a sub-path (e.g. ``/app``) instead of the root; ``spa_fallback=False`` serves
         only real files (favicon/robots/storage/...) and 404s on an unmatched path instead of
         falling back to ``index.html`` — for an app with no client-side router. Both are the same
@@ -360,7 +361,7 @@ class ApplicationBuilder:
 
     def with_lang_dir(self, directory: str | Path) -> ApplicationBuilder:
         """Load translations from ``directory`` instead of the default ``{base_path}/lang``
-        (e.g. ``resources/lang``, the pre--9 convention) — ``LocalizationServiceProvider``
+        (e.g. ``resources/lang``) — ``LocalizationServiceProvider``
         loads the app's own translations from here, after the framework's bundled defaults."""
         self._lang_dir = str(directory)
         return self

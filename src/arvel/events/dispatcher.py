@@ -68,7 +68,7 @@ class Dispatcher:
 
     def has_listeners(self, event: Any) -> bool:
         """Whether any listener (direct or wildcard) is registered for ``event``
-        ``Event::hasListeners``. Accepts an event class, a string name, or an instance."""
+        Accepts an event class, a string name, or an instance."""
         name = event if isinstance(event, (str, type)) else type(event)
         return bool(self._gather(name))
 
@@ -217,6 +217,13 @@ class Dispatcher:
     def _parse(self, event: Any, payload: tuple[Any, ...]) -> tuple[Any, tuple[Any, ...]]:
         if isinstance(event, str):
             return event, payload
+        if isinstance(event, type):
+            # a class, not an instance: type(event) would be the metaclass, gathering zero
+            # listeners and silently dropping the dispatch. Fail loudly instead.
+            raise TypeError(
+                f"dispatch() expects an event instance, not the class {event.__name__!r} — "
+                f"did you mean dispatch({event.__name__}())?"
+            )
         event_type: Any = cast("Any", type(event))
         return event_type, (event, *payload)
 

@@ -241,11 +241,22 @@ class Collection[T]:
         return Collection(ordered)
 
     def unique(self) -> Collection[T]:
-        seen: list[T] = []
-        for x in self._items:
-            if x not in seen:
-                seen.append(x)
-        return Collection(seen)
+        # O(n) set-based dedup for the common (hashable) case; fall back to the O(n²) linear scan
+        # only when an item is unhashable (dicts/lists) — preserving first-seen order either way.
+        try:
+            seen: set[Any] = set()
+            result: list[T] = []
+            for x in self._items:
+                if x not in seen:
+                    seen.add(x)
+                    result.append(x)
+            return Collection(result)
+        except TypeError:
+            out: list[T] = []
+            for x in self._items:
+                if x not in out:
+                    out.append(x)
+            return Collection(out)
 
     def chunk(self, size: int) -> Collection[list[T]]:
         if size <= 0:

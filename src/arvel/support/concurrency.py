@@ -70,8 +70,12 @@ class Concurrency:
         callables: Sequence[Callable[[], Any]], timeout: float | None = None
     ) -> list[Any]:
         async def call_one(fn: Callable[[], Any]) -> Any:
-            coro = fn() if inspect.iscoroutinefunction(fn) else asyncio.to_thread(fn)
-            return await Concurrency._bounded(coro, timeout)
+            if inspect.iscoroutinefunction(fn):
+                return await Concurrency._bounded(fn(), timeout)
+            # a plain callable may still RETURN an awaitable (a factory / wrapped coroutine); run it
+            # in a thread, then await the result if it turned out to be awaitable — never leak it.
+            result = await Concurrency._bounded(asyncio.to_thread(fn), timeout)
+            return await result if inspect.isawaitable(result) else result
 
         return list(await asyncio.gather(*(call_one(fn) for fn in callables)))
 
