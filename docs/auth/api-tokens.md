@@ -161,6 +161,29 @@ router.post("/posts/{id}", update_post, middleware=[ability("posts.write", "post
   user and apply your normal [authorization](authorization.md) checks — a valid token says *who*, not
   *what they may do*.
 
+## Why opaque tokens, not JWTs?
+
+These tokens are **opaque** — a random lookup key, not a signed JWT carrying claims. That's a
+deliberate choice for first-party auth (your own CLI, mobile app, or SPA):
+
+- **Revocable now.** A token is a row; deleting it logs the client out *immediately* — for "sign out
+  everywhere," a ban, or a leaked credential. A JWT stays valid until its `exp` no matter what, so
+  early revocation means bolting a server-side denylist back on — the very statelessness JWTs exist
+  to provide.
+- **Nothing to leak.** An opaque token exposes no claims (a JWT payload is base64, readable by anyone
+  holding it), and only its hash is stored — a table leak yields neither usable tokens nor user data.
+- **No signing footguns.** No `alg=none`, no HS/RS algorithm confusion, no secret-strength or
+  clock-skew edge cases — there's no signature to get wrong.
+- **You already hit the database.** JWT's payoff is verifying *without* a lookup, which pays off
+  across service boundaries. A single app queries its database every request anyway, so a
+  hashed-token lookup is effectively free.
+
+Reach for a **JWT** when the trade flips — cross-service or third-party verification, where a
+resource server validates a token it did not itself issue. That's [SSO / OIDC](sso-oidc.md): the
+identity provider signs a token with its **private key** and your app verifies it with the
+provider's **public key** (asymmetric — a verifier can validate but can't mint). Same reasoning,
+opposite context.
+
 ## How it works
 
 `create_token` generates a 256-bit secret with `secrets.token_hex(32)` and stores only its SHA-256
