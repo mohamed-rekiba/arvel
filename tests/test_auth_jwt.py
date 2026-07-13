@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from arvel.auth.jwt_guard import Jwt
 
 SIG = "unit-test-signing-value-padded-past-32-bytes"
@@ -48,3 +50,20 @@ def test_expired_token_returns_none() -> None:
 
 def test_tampered_token_returns_none() -> None:
     assert Jwt.decode("not.a.valid-token", SIG) is None
+
+
+def test_mixing_symmetric_and_asymmetric_algorithms_is_refused() -> None:
+    # algorithm-confusion guard: accepting HS* AND RS* at once lets an attacker sign an HS* token
+    # with the (public) RS key. Refuse the mix loudly — a config error, not a bad token.
+    token = Jwt.encode({"sub": "1"}, SIG, ttl=3600)
+    with pytest.raises(ValueError, match="algorithm confusion"):
+        Jwt.decode(token, SIG, algorithms=("RS256", "HS256"))
+
+
+def test_single_family_lists_are_untouched() -> None:
+    # a pinned symmetric list still verifies its own token
+    token = Jwt.encode({"sub": "1"}, SIG, ttl=3600)
+    assert Jwt.decode(token, SIG, algorithms=("HS256",)) is not None
+    # a pinned asymmetric-only list is allowed through the guard (fails later on the HS token's
+    # signature -> None), proving the guard blocks *mixing*, not asymmetric verification itself
+    assert Jwt.decode(token, SIG, algorithms=("RS256", "ES256")) is None
