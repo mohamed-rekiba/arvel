@@ -12,6 +12,24 @@ import time
 from typing import Any
 
 
+def _reject_mixed_algorithm_families(algorithms: tuple[str, ...]) -> None:
+    """Refuse an ``algorithms`` list that mixes symmetric (``HS*``) and asymmetric
+    (``RS*``/``PS*``/``ES*``/``EdDSA``) families. Verifying a token against both at once is the
+    classic algorithm-confusion setup: an attacker takes the asymmetric *public* key (which is not
+    secret) and signs a forged ``HS*`` token with it, and a verifier that also accepts ``HS*`` treats
+    that public key as the HMAC secret and lets it through. Pin one family, so a token can only be
+    what it was signed as."""
+    algs = [a.upper() for a in algorithms]
+    symmetric = any(a.startswith("HS") for a in algs)
+    asymmetric = any(a.startswith(("RS", "PS", "ES", "ED")) for a in algs)
+    if symmetric and asymmetric:
+        raise ValueError(
+            "Jwt.decode: refusing an algorithms list that mixes symmetric (HS*) and asymmetric "
+            "(RS*/PS*/ES*/EdDSA) families — this enables algorithm confusion (an attacker signs an "
+            "HS* token with the public key). Pin a single family, e.g. ('HS256',) or ('RS256',)."
+        )
+
+
 class Jwt:
     """Sign and verify JSON Web Tokens (HS256 by default) over pyjwt."""
 
@@ -37,6 +55,10 @@ class Jwt:
         leeway: float = 0,
     ) -> dict[str, Any] | None:
         import jwt
+
+        # A misconfigured algorithms list is a developer error, not a bad token — raise, don't
+        # return None, so it surfaces loudly instead of silently weakening verification.
+        _reject_mixed_algorithm_families(algorithms)
 
         # exp is always required — a token with no expiry is never valid (fail closed). When an
         # issuer/audience is configured it is both enforced and required to be present.
