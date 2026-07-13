@@ -50,6 +50,15 @@ class LogManager:
         """Clear the ambient log context (call at the end of a request)."""
         structlog.contextvars.clear_contextvars()
 
+    @staticmethod
+    def bound_context(**kw: Any) -> Any:
+        """A **context manager** that binds ``kw`` into the ambient log context and restores the
+        prior context on exit — so every log event inside the ``with`` block carries ``kw``, and
+        anything already bound (e.g. an outer ``request_id``) survives. Prefer this over
+        ``with_context``/``clear_context`` to scope a correlation id to one unit of work (a request,
+        a queue job) without clobbering surrounding context. Nests cleanly."""
+        return structlog.contextvars.bound_contextvars(**kw)
+
     def debug(self, event: str, **kw: Any) -> None:
         self._logger.debug(event, **kw)
 

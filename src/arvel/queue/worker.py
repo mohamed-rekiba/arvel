@@ -436,6 +436,29 @@ class JobWorker:
         return options.rest
 
     async def _invoke(self, job: Job, *, queue_label: str | None = None) -> Any:
+        """Run one job with correlation context bound into the log context for its whole execution,
+        so every log line the job emits is traceable:
+
+        - The dispatcher's ENTIRE bound log context is propagated across the broker and re-bound
+          here — ``request_id`` plus whatever the request bound (``user_id``, ``tenant_id``, …) — so
+          a queue job's logs carry the same context as the API request that dispatched it.
+        - ``job_id`` — a fresh uuid7 for THIS execution (the queue-side counterpart of
+          ``request_id``); it OVERRIDES any inherited ``job_id`` so a child job is never mislabelled
+          with its parent's. ``job`` is the job class name.
+        """
+        import uuid
+
+        from arvel.kernel.logging import LogManager
+
+        # start from the dispatcher's propagated context (request_id, user_id, …), then stamp this
+        # execution's own job_id/job on top (override, so a nested job gets its own, not the parent's)
+        context: dict[str, Any] = dict(getattr(job, "__arvel_log_context__", None) or {})
+        context["job_id"] = str(uuid.uuid7())
+        context["job"] = type(job).__name__
+        with LogManager.bound_context(**context):
+            return await self._invoke_body(job, queue_label=queue_label)
+
+    async def _invoke_body(self, job: Job, *, queue_label: str | None = None) -> Any:
         import asyncio
 
         from arvel.queue.middleware import JobShouldBeReleased, ShouldBeUnique, unique_lock_for

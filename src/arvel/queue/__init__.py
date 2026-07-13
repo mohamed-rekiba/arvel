@@ -110,6 +110,7 @@ class Job:
     __arvel_chain__: list[str] | None = None
     __arvel_chain_catch__: str | None = None
     __arvel_batch__: Any = None
+    __arvel_log_context__: dict[str, Any] | None = None  # dispatcher's bound log context, propagated
 
     async def handle(self) -> Any:
         raise NotImplementedError(f"{type(self).__name__} must implement handle()")

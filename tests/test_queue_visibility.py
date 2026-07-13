@@ -33,6 +33,19 @@ class QuickTimeout(Job):
         RAN.append("quick")
 
 
+#: captured log-context snapshot from ContextProbe.handle (module-level so the job is serializable)
+_CAPTURED: dict[str, object] = {}
+
+
+class ContextProbe(Job):
+    """Records the ambient log context observed while its handle() runs (correlation-id tests)."""
+
+    async def handle(self) -> None:
+        import structlog
+
+        _CAPTURED.update(structlog.contextvars.get_contextvars())
+
+
 async def _setup() -> tuple[QueueManager, ConnectionResolver]:
     RAN.clear()
     app = Application()
@@ -129,5 +142,62 @@ async def test_poison_payload_is_parked_and_does_not_block_the_due_loop() -> Non
         assert len(rows) == 1
         assert rows[0].reserved_until is not None
     finally:
+        set_application(None)
+        await db.dispose()
+
+
+async def test_job_execution_binds_a_uuid7_job_id_into_the_log_context() -> None:
+    """Every queue job runs with a uuid7 `job_id` (+ job name) bound into the log context — the
+    queue-side counterpart of HTTP's request_id — so all of a job's log lines correlate."""
+    import uuid
+
+    import structlog
+
+    captured: dict[str, object] = {}
+
+    class Probe(Job):
+        async def handle(self) -> None:
+            captured.update(structlog.contextvars.get_contextvars())
+
+    manager, db = await _setup()
+    try:
+        await manager._worker._invoke(Probe())  # noqa: SLF001 - exercising the worker entry
+        assert captured.get("job") == "Probe"
+        job_id = captured.get("job_id")
+        assert isinstance(job_id, str)
+        assert uuid.UUID(job_id).version == 7  # a real uuid7, not an arbitrary string
+        assert "request_id" not in captured  # no originating request → no propagated id
+        # the correlation is scoped to the job — cleared after execution
+        assert "job_id" not in structlog.contextvars.get_contextvars()
+    finally:
+        set_application(None)
+        await db.dispose()
+
+
+async def test_full_request_log_context_propagates_into_the_job() -> None:
+    """A job dispatched while the request has bound log context carries ALL of it across the broker:
+    on the worker its log context has request_id + every other bound value (user_id, tenant_id, …),
+    PLUS its own fresh job_id — so the request and the queue jobs it spawned share full context."""
+    import structlog
+
+    from arvel.kernel.logging import LogManager
+    from arvel.queue.serialization import deserialize_instance, serialize_instance
+
+    _CAPTURED.clear()
+    manager, db = await _setup()
+    try:
+        # simulate an in-flight API request with a rich bound log context
+        with LogManager.bound_context(request_id="req-abc-123", user_id=42, tenant_id="acme"):
+            payload = serialize_instance(ContextProbe())  # captures the whole context
+        # ...worker (no ambient context) picks it up and runs it
+        job = await deserialize_instance(payload)
+        await manager._worker._invoke(job)  # noqa: SLF001
+        assert _CAPTURED.get("request_id") == "req-abc-123"
+        assert _CAPTURED.get("user_id") == 42  # arbitrary bound values propagate too
+        assert _CAPTURED.get("tenant_id") == "acme"
+        assert isinstance(_CAPTURED.get("job_id"), str)  # plus its own execution id
+        assert _CAPTURED["job_id"] != "req-abc-123"
+    finally:
+        structlog.contextvars.clear_contextvars()
         set_application(None)
         await db.dispose()

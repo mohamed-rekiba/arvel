@@ -96,7 +96,22 @@ def _trace_carrier() -> dict[str, str]:
 #: Job attributes that are envelope bookkeeping (trace/Context carry-over), not job state — excluded
 #: from `serialize_instance`'s state walk (each is re-applied explicitly on deserialize instead, so a
 #: re-serialized-in-flight job — a chain link, a retry-release — doesn't double them into `state`).
-_ENVELOPE_ATTRS = ("__arvel_trace__", "__arvel_context__")
+_ENVELOPE_ATTRS = ("__arvel_trace__", "__arvel_context__", "__arvel_log_context__")
+
+
+def _log_context_carrier() -> dict[str, Any]:
+    """The ENTIRE bound log context at dispatch time (``request_id`` and whatever else the request
+    bound — ``user_id``, ``tenant_id``, …), so the worker re-binds all of it and a queue job's logs
+    carry the same context as the request that dispatched it. Values are coerced JSON-safe (non-
+    primitives → ``str``) so an exotic bound value can never make the dispatch payload unencodable."""
+    import structlog
+
+    safe: dict[str, Any] = {}
+    for key, value in structlog.contextvars.get_contextvars().items():
+        safe[key] = (
+            value if isinstance(value, (str, int, float, bool)) or value is None else str(value)
+        )
+    return safe
 
 
 def serialize(job_cls: type, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
@@ -111,6 +126,7 @@ def serialize(job_cls: type, args: tuple[Any, ...], kwargs: dict[str, Any]) -> s
             "kwargs": {k: model_ref(v) for k, v in kwargs.items()},
             "_trace": _trace_carrier(),
             "_context": Context.dehydrate(),
+            "_log_context": _log_context_carrier(),
         }
     ).decode()
 
@@ -120,6 +136,9 @@ def _apply_envelope(job: Job, data: dict[str, Any]) -> None:
     worker hydrates the Context from this before running `handle()` (see `JobWorker._invoke`)."""
     job.__arvel_trace__ = data.get("_trace")  # parent trace for the job span
     job.__arvel_context__ = data.get("_context")  # SUPPORT-FOUNDATION carry-over
+    job.__arvel_log_context__ = data.get(
+        "_log_context"
+    )  # the request's full bound log context, if any
 
 
 async def deserialize(payload: str) -> Job:
@@ -150,6 +169,7 @@ def serialize_instance(job: Job) -> str:
             "state": state,
             "_trace": _trace_carrier(),
             "_context": Context.dehydrate(),
+            "_log_context": _log_context_carrier(),
         }
     ).decode()
 
