@@ -45,6 +45,8 @@ built on a [signed URL](../urls.md) so the link is tamper-evident and expiring:
 
    async def verify(request, user_id: int):
        user = await User.find(user_id)
+       if user is None:
+           abort(404)
        await user.mark_email_as_verified()
        return redirect("/dashboard")
 

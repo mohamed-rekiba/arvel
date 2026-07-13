@@ -55,6 +55,12 @@ class VerifyCsrfToken(ValidateCsrfToken):
 
 Patterns are matched against the request path with `fnmatch`.
 
+!!! warning "Exempting a route is not authenticating it"
+    Skipping CSRF only removes the token check — it doesn't make the endpoint safe to call. An exempt
+    route must verify the caller itself: a webhook should check the provider's **signature**, an API
+    endpoint a **bearer token** or **API key**. Never exempt a route that mutates state on the basis
+    of the request alone.
+
 ## Trusted origins
 
 To accept state-changing requests from another origin you control (a separate frontend host), list

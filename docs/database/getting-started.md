@@ -46,14 +46,15 @@ context, so it never reads its own not-yet-replicated write.
 
 ## Running SQL queries
 
-Reach for raw SQL through the `DB` facade. `select` returns rows; parameters are bound (never
-interpolated), so it's injection-safe:
+Reach for raw SQL through the `DB` facade. `select` returns rows; bound **parameters** are never
+interpolated, so a value can't inject SQL. (This protects *values* only — never build table or
+column names, or any other SQL structure, from untrusted input.)
 
 ```python
 from arvel import DB
 
 rows  = await DB.select("SELECT * FROM users WHERE active = :active", {"active": True})
-one   = await DB.fetch_one(users_stmt)
+one   = await DB.select("SELECT * FROM users WHERE id = :id", {"id": 7})
 count = await DB.scalar("SELECT count(*) FROM users")
 ```
 

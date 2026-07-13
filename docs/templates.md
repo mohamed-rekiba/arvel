@@ -105,6 +105,7 @@ These functions are registered on every template — no need to pass them from t
 |----------|---------|
 | `route(name, **params)` / `url(path)` | a URL to a named route / path |
 | `asset(path)` | a URL to a bundled asset (see [Asset Bundling](asset-bundling.md)) |
+| `vite(*entries)` | the hashed `<script>`/`<link>` tags for one or more Vite entries, as trusted `Markup` |
 | `csrf_token()` / `csrf_field()` | the raw CSRF token / a hidden `_token` input |
 | `method_field(method)` | a hidden `_method` input for verb spoofing |
 | `trans(key, **repl)` / `trans_choice(key, n)` | a translated / pluralized string |
