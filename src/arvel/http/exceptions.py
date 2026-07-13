@@ -160,7 +160,12 @@ def render_exception(request: Any, exc: Any, *, debug: bool = False) -> Any:
         return litestar.Response(
             None, status_code=302, headers={"Location": location, **extra_headers}
         )
-    # HTML-accepting client, non-form failure: a minimal error page with the real status
+    # HTML-accepting client, non-form failure. Prefer an app-provided error page
+    # (resources/views/errors/<status>.html, then errors/generic.html); fall back to the built-in.
+    custom = _render_error_view(status, message, debug, extra_headers)
+    if custom is not None:
+        return custom
+
     import html as _html
 
     detail = f"<p>{_html.escape(message)}</p>" if (debug or status < 500) else ""
@@ -171,6 +176,49 @@ def render_exception(request: Any, exc: Any, *, debug: bool = False) -> Any:
     return litestar.Response(
         page, status_code=status, media_type="text/html", headers=extra_headers or None
     )
+
+
+def _render_error_view(
+    status: int, message: str, debug: bool, extra_headers: dict[str, str]
+) -> Any:
+    """Render ``resources/views/errors/<status>.html`` (else ``errors/generic.html``) as the HTML
+    error page, with ``status``/``message``/``debug`` in scope. Returns a ``litestar.Response`` or
+    ``None`` to fall back to the built-in page. Fully guarded: no app, a missing template, or a
+    render error all return ``None`` — the error renderer must never itself raise."""
+    try:
+        import contextlib
+        from pathlib import Path
+
+        import jinja2
+        import litestar
+
+        from arvel.kernel import app, has_application
+
+        paths: Any = "resources/views"
+        with contextlib.suppress(Exception):
+            if has_application() and app().bound("config"):
+                paths = app("config").get("view.paths", "resources/views") or "resources/views"
+        roots = [str(paths)] if isinstance(paths, str) else [str(p) for p in paths]
+
+        # withhold internal detail from a production 5xx, exactly as the built-in page does
+        shown = message if (debug or status < 500) else _status_text(status)
+
+        for name in (f"errors/{status}.html", "errors/generic.html"):
+            if any((Path(root) / name).is_file() for root in roots):
+                env = jinja2.Environment(
+                    loader=jinja2.FileSystemLoader(roots),
+                    autoescape=jinja2.select_autoescape(default=True),
+                )
+                body = env.get_template(name).render(status=status, message=shown, debug=debug)
+                return litestar.Response(
+                    body,
+                    status_code=status,
+                    media_type="text/html",
+                    headers=extra_headers or None,
+                )
+    except Exception:
+        return None
+    return None
 
 
 def same_origin_or_root(target: str, host: str) -> str:
