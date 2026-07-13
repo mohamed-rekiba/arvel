@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.63.4](https://github.com/mohamed-rekiba/arvel/compare/v0.63.3...v0.63.4) (2026-07-13)
+
+
+### Documentation
+
+* explain why API tokens are opaque, not JWTs ([f262f00](https://github.com/mohamed-rekiba/arvel/commit/f262f00974532a4f0d7dcb9486ca6201e28110a9))
+* how to import existing password hashes from another app ([77cc799](https://github.com/mohamed-rekiba/arvel/commit/77cc799dad3861d0418b59f4a892941a3aae50d6))
+
 ## [0.63.3](https://github.com/mohamed-rekiba/arvel/compare/v0.63.2...v0.63.3) (2026-07-13)
 
 
