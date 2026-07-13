@@ -1,0 +1,19 @@
+"""Create the features table."""
+
+from arvel.database import Migration
+
+
+class CreateFeaturesTable(Migration):
+    def up(self, schema):
+        def define(t):
+            t.id()
+            t.string("name")
+            t.string("scope")
+            t.text("value").nullable()
+            t.timestamps()
+            t.unique_index("name", "scope")  # one stored value per flag+scope
+
+        schema.create("features", define)
+
+    def down(self, schema):
+        schema.drop("features")

@@ -1,0 +1,11 @@
+"""Web routes — stateful, browser-facing pages (the "web" group)."""
+
+from arvel import Route, view
+
+
+async def home(request):
+    # renders resources/views/welcome.html (Jinja2)
+    return await view("welcome", {"title": "{{name}}", "tagline": "Your arvel app is running."}).to_response()
+
+
+Route.get("/", home, name="home")

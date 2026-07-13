@@ -6,15 +6,17 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 10
+    # Wait 7 days before proposing an update to a newly published version — a
+    # newly released package can be malicious or unstable (supply-chain window).
+    cooldown:
+      default-days: 7
     labels:
       - dependencies
     commit-message:
       prefix: "chore(deps):"
     groups:
-      pydantic-stack:
-        patterns: ["pydantic*"]
       dev-tooling:
-        patterns: ["ruff", "mypy", "pyright", "pytest*", "coverage*"]
+        patterns: ["ruff", "mypy", "pyright", "pytest*", "coverage*", "bandit", "pip-audit"]
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -22,6 +24,8 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
     labels:
       - ci
     commit-message:

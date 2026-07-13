@@ -1,0 +1,148 @@
+# Feature Flags
+
+Feature flags let you ship code behind a switch — roll a change out to one user, one team, or
+everyone, without a deploy for every flip. arvel's feature-flag module follows one simple
+model: define a flag once with a **resolver**, then ask whether it's active for a given
+**scope** (a user, a team, or nothing at all for a global flag).
+
+A resolver runs **at most once per scope** — the first `active()`/`value()` call for a scope
+resolves it and writes the result to the configured store; every call after that (for that same
+scope) is served straight from the store, not re-computed.
+
+!!! note "Backends"
+    The in-process `array` driver is the default and needs nothing — great for tests. `database`
+    persists resolved values in a `features` table (survives a restart); `cache` stores them in
+    the [cache](cache.md), tagged per flag so purging one flag never touches another's stored
+    values. Set `features.driver`.
+
+## Defining a flag
+
+```python
+from arvel.features import Feature
+
+Feature.define("new-dashboard", lambda scope: scope.is_beta_tester)
+```
+
+The resolver receives whatever `scope` you resolve the flag against and returns `bool | str | Any`
+— a rich value, not just a boolean (see [Rich values](#rich-values) below). Register your flags in
+a service provider's `boot()`, the same place you'd register routes or event listeners.
+
+A **class-based feature** works too — it's instantiated once and dispatched through `.resolve`:
+
+```python
+class NewDashboard:
+    def resolve(self, scope: Any) -> bool:
+        return scope.is_beta_tester
+
+Feature.define("new-dashboard", NewDashboard)
+```
+
+## Checking a flag
+
+```python
+await Feature.active("new-dashboard", user) # bool
+await Feature.inactive("new-dashboard", user) # not active
+await Feature.for_(user).active("new-dashboard") # same thing, scope bound up front
+```
+
+`scope=None` (the default) resolves the flag globally — every caller shares the same stored
+value, keyed by `features.default_scope` (`"__global__"` unless you change it).
+
+## Rich values
+
+A resolver isn't limited to `bool` — return a variant string, a rollout percentage, anything
+JSON-able:
+
+```python
+Feature.define("checkout-variant", lambda scope: "purple" if scope.id % 2 else "orange")
+
+await Feature.value("checkout-variant", user) # "purple" / "orange"
+await Feature.active("checkout-variant", user) # True — active() is just truthiness
+```
+
+## `when` — branch on the resolved value
+
+```python
+await Feature.when("checkout-variant", user,
+    lambda variant: render(variant), # called with the resolved value when active/truthy
+    lambda variant: render_default(), # called when falsy
+)
+```
+
+## Overriding a resolver
+
+`activate`/`deactivate` write directly to the store, bypassing the resolver entirely — useful for
+an admin toggle or a test:
+
+```python
+await Feature.activate("new-dashboard", user) # force it on
+await Feature.deactivate("new-dashboard", user) # force it off
+await Feature.activate("checkout-variant", user, value="purple") # force a rich value
+```
+
+`forget` clears one scope's stored value (the resolver runs again next time it's checked);
+`purge` clears **every** stored scope for a flag — reach for it after changing a resolver's logic:
+
+```python
+await Feature.forget("new-dashboard", user) # this user only
+await Feature.purge("new-dashboard")         # every scope, everywhere
+await Feature.purge()                        # every defined flag — a clean slate
+```
+
+Resolve several flags for one scope in a single call with `values`:
+
+```python
+await Feature.values(scope=user)                 # {name: value} for every defined flag
+await Feature.values(["beta", "gamma"], user)    # just these two
+```
+
+## CLI
+
+```bash
+arvel feature:list # every flag registered via Feature.define()
+arvel feature:purge <name> # clear every stored value for <name>
+```
+
+## Configuration
+
+```python
+# config/features.py
+config = {
+    "driver": "database", # "array" | "database" | "cache"
+    "default_scope": "__global__",
+}
+```
+
+The `database` driver stores resolved values in a `features` table; a new app ships the migration
+for it, so `arvel migrate` creates it out of the box — no hand-written schema needed.
+
+## Common mistakes & gotchas
+
+- **Expecting a resolver to re-run.** A resolver runs *once per scope*, then the result is stored.
+  Changing the resolver's logic doesn't retroactively re-evaluate stored scopes — `purge` the flag
+  (or `forget` a scope) to force a re-resolve.
+- **Defining flags too late.** Register `Feature.define(...)` in a provider's `boot()`. Define it
+  *after* the code that checks it has already run, and that check resolves against an undefined flag.
+- **`activate`/`deactivate` are permanent overrides.** They write straight to the store and bypass
+  the resolver — a forced value sticks until you `forget`/`purge` it, even if the resolver would now
+  say otherwise.
+- **`array` driver in production.** It's in-process and resets every boot — perfect for tests, wrong
+  for a real rollout. Use `database` or `cache` when values must survive a restart.
+- **A global check that should be scoped.** `active("flag")` with no scope resolves the single
+  `__global__` value for everyone; pass the user/team when the flag is meant to vary per scope.
+
+## How it works
+
+`Feature` is a manager over a pluggable store (`array`/`database`/`cache`). `define` registers a
+resolver (a callable or a class with `.resolve`); the first `active`/`value` for a scope runs it and
+writes the result to the store keyed by `(flag, scope)`, and every later check reads the stored value.
+`activate`/`deactivate` write the store directly; `forget`/`purge` evict entries so the resolver runs
+again. Rich (non-boolean) values are stored JSON-encoded, and `active()` is simply the truthiness of
+the resolved value.
+
+## See also
+
+- [Cache](cache.md) — the `cache` driver's backing store, and per-flag tag purging.
+- [Migrations & Schema](database/migrations.md) — the `features` table the `database` driver uses.
+- [Service Providers](providers.md) — where you register flags in `boot()`.
+- [Console](console.md) — `feature:list` / `feature:purge`.

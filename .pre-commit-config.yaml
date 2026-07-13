@@ -1,45 +1,59 @@
+# Pre-commit hooks — the fast gates run on every commit; the full suite (incl. pytest
+# G2/G4) runs in CI + `make check`. Install with: make hooks  (or: pre-commit install)
+minimum_pre_commit_version: "3.5.0"
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
-      - id: check-added-large-files
-        args: [--maxkb=500]
-      - id: check-merge-conflict
-      - id: check-yaml
-        args: [--unsafe]
       - id: check-toml
+      - id: check-yaml
       - id: check-json
       - id: check-ast
+      - id: check-merge-conflict
+      - id: check-added-large-files
       - id: detect-private-key
       - id: no-commit-to-branch
         args: [--branch, main, --branch, master]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.14
+    rev: v0.15.19
     hooks:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
 
+  # Project-configured gates (read pyproject) — run via the local environment.
   - repo: local
     hooks:
       - id: mypy
-        name: mypy --strict
-        entry: uv run mypy packages/arvel/src packages/arvel/tests
+        name: mypy (strict, G3)
+        entry: uv run mypy
         language: system
         types: [python]
         pass_filenames: false
-        require_serial: true
       - id: pyright
-        name: pyright --strict
-        entry: uv run pyright packages/arvel/src packages/arvel/tests
+        name: pyright (strict, G3)
+        entry: uv run pyright
         language: system
         types: [python]
         pass_filenames: false
-        require_serial: true
+      - id: import-linter
+        name: import-linter (architecture + startup NFR, G1/G2)
+        entry: uv run lint-imports
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: bandit
+        name: bandit (security)
+        entry: uv run bandit -q -r src
+        language: system
+        types: [python]
+        pass_filenames: false
 
+  # Secrets scanning — catches committed keys/tokens beyond detect-private-key.
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:

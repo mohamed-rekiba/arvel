@@ -1,0 +1,14 @@
+"""Hashing config — the default password-hashing driver + its cost params.
+
+`argon2id` (the default) needs nothing extra. `bcrypt` is parity with the default and
+useful when migrating hashes from a /PHP app — switching `HASH_DRIVER` still verifies
+existing hashes under either driver (`Hash::check` auto-detects the hash's own format);
+`Hash::needsRehash` flags a hash for upgrade once it isn't the configured driver/params.
+"""
+
+from arvel import env
+
+config = {
+    "driver": env("HASH_DRIVER", "argon2id"),  # "argon2id" | "bcrypt"
+    "options": {},  # e.g. {"time_cost": 4} (argon2id) or {"rounds": 12} (bcrypt)
+}

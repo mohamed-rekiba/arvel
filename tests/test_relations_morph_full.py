@@ -1,0 +1,350 @@
+"""ORM (doc 07) — complete morph set: morph_one + morph_to_many/morphed_by_many. Test-first."""
+
+from __future__ import annotations
+
+import sqlalchemy as sa
+
+from arvel.database import ConnectionResolver, Model, morph_map
+
+
+class Tag(Model):
+    __fields__ = {"name": str}
+    __fillable__ = ["name"]
+
+    def posts(self) -> object:
+        return self.morphed_by_many(Post, "taggable")
+
+
+class Post(Model):
+    __fields__ = {"title": str}
+    __fillable__ = ["title"]
+
+    def tags(self) -> object:
+        return self.morph_to_many(Tag, "taggable")
+
+
+class Image(Model):
+    __fields__ = {"url": str, "imageable_type": str, "imageable_id": int}
+    __fillable__ = ["url", "imageable_type", "imageable_id"]
+
+
+class Account(Model):
+    __fields__ = {"name": str}
+    __fillable__ = ["name"]
+
+    def image(self) -> object:
+        return self.morph_one(Image, "imageable")
+
+    def photos(self) -> object:
+        return self.morph_many(Image, "imageable")
+
+
+class Company(Model):
+    """Exists only to collide ids with ``Account`` (both start a fresh id sequence at 1) — the
+    ``MorphMany`` proxy id/type-collision proof needs two different parent *types* sharing an id."""
+
+    __fields__ = {"name": str}
+    __fillable__ = ["name"]
+
+    def photos(self) -> object:
+        return self.morph_many(Image, "imageable")
+
+    def tags(self) -> object:
+        # a second morph_to_many parent type, so correlation tests can prove type-scoping
+        return self.morph_to_many(Tag, "taggable")
+
+
+morph_map({"Post": Post, "Account": Account, "Company": Company})
+
+_md = sa.MetaData()
+taggables = sa.Table(
+    "taggables",
+    _md,
+    sa.Column("taggable_type", sa.String),
+    sa.Column("taggable_id", sa.Integer),
+    sa.Column("tag_id", sa.Integer),
+)
+
+
+async def _setup() -> ConnectionResolver:
+    db = ConnectionResolver()
+    for model in (Tag, Post, Image, Account, Company):
+        model.set_connection(db)
+        await db.execute(sa.schema.CreateTable(model.__table__))
+    await db.execute(sa.schema.CreateTable(taggables))
+    return db
+
+
+async def test_morph_to_many_attach_and_get() -> None:
+    db = await _setup()
+    try:
+        post = await Post.create(title="hello")
+        php = await Tag.create(name="php")
+        py = await Tag.create(name="python")
+        await post.tags().attach(php.id)
+        await post.tags().attach(py.id)
+        assert {t.name for t in await post.tags().get()} == {"php", "python"}
+    finally:
+        await db.dispose()
+
+
+async def test_morphed_by_many_inverse() -> None:
+    db = await _setup()
+    try:
+        post1 = await Post.create(title="a")
+        post2 = await Post.create(title="b")
+        php = await Tag.create(name="php")
+        await post1.tags().attach(php.id)
+        await post2.tags().attach(php.id)
+        assert {p.title for p in await php.posts().get()} == {"a", "b"}
+    finally:
+        await db.dispose()
+
+
+async def test_morph_to_many_proxy_where_in_and_pluck_scoped() -> None:
+    """D7: MorphToMany exposes the same full-builder proxy surface as belongs_to_many, scoped by
+    both the pivot id AND the morph type."""
+    db = await _setup()
+    try:
+        post = await Post.create(title="hello")
+        other = await Post.create(title="other")
+        php = await Tag.create(name="php")
+        python_tag = await Tag.create(name="python")
+        rust = await Tag.create(name="rust")
+        await post.tags().attach(php.id)
+        await post.tags().attach(python_tag.id)
+        await other.tags().attach(rust.id)  # a different parent's attachment
+
+        names = await post.tags().where_in("id", [php.id, rust.id]).pluck("name")
+        assert names == ["php"]  # rust belongs to `other`, excluded by the pivot scope
+
+        lonely = await Post.create(title="lonely")
+        assert await lonely.tags().where_in("id", [php.id]).get() == []
+    finally:
+        await db.dispose()
+
+
+async def test_morphed_by_many_proxy_where_in_and_pluck_scoped() -> None:
+    db = await _setup()
+    try:
+        post1 = await Post.create(title="a")
+        post2 = await Post.create(title="b")
+        other_post = await Post.create(title="c")
+        php = await Tag.create(name="php")
+        await post1.tags().attach(php.id)
+        await post2.tags().attach(php.id)
+
+        titles = await php.posts().where_in("id", [post1.id, other_post.id]).pluck("title")
+        assert titles == ["a"]  # post2 is attached but excluded by the id filter
+    finally:
+        await db.dispose()
+
+
+async def test_morph_many_proxy_where_in_scoped_by_id_and_type() -> None:
+    """D7: MorphMany's ``query()`` override adds the ``{name}_type`` discriminator its inherited
+    base ``query()`` would omit — a child of a different parent *type* sharing the same id is
+    never returned, even through the where_in proxy."""
+    db = await _setup()
+    try:
+        account = await Account.create(name="ada")
+        company = await Company.create(name="acme")
+        assert company.id == account.id  # the id-collision this test needs (fresh id sequences)
+
+        a_img = await Image.create(url="a.png", imageable_type="Account", imageable_id=account.id)
+        c_img = await Image.create(url="c.png", imageable_type="Company", imageable_id=company.id)
+
+        urls = await account.photos().where_in("id", [a_img.id, c_img.id]).pluck("url")
+        assert urls == ["a.png"]  # c_img shares imageable_id but not imageable_type — excluded
+    finally:
+        await db.dispose()
+
+
+async def test_morph_one() -> None:
+    db = await _setup()
+    try:
+        account = await Account.create(name="ada")
+        await Image.create(url="a.png", imageable_type="Account", imageable_id=account.id)
+        image = await account.image().get()
+        assert image is not None
+        assert image.url == "a.png"
+    finally:
+        await db.dispose()
+
+
+# --- morph_to_many pivot extras + where_pivot scoping (AR-002: backs the team-scoped RBAC pivot) ---
+
+_scoped_md = sa.MetaData()
+scoped_taggables = sa.Table(
+    "scoped_taggables",
+    _scoped_md,
+    sa.Column("taggable_type", sa.String),
+    sa.Column("taggable_id", sa.Integer),
+    sa.Column("tag_id", sa.Integer),
+    sa.Column("scope", sa.Integer),
+)
+
+
+class ScopedPost(Model):
+    __table_name__ = "scoped_posts"
+    __fields__ = {"title": str}
+    __fillable__ = ["title"]
+
+    def scoped_tags(self, scope: object = None) -> object:
+        rel = self.morph_to_many(Tag, "taggable", pivot="scoped_taggables")
+        return rel.where_pivot("scope", scope) if scope is not None else rel
+
+
+async def test_morph_to_many_attach_and_query_honor_a_pivot_extra() -> None:
+    db = ConnectionResolver()
+    for model in (Tag, ScopedPost):
+        model.set_connection(db)
+        await db.execute(sa.schema.CreateTable(model.__table__))
+    await db.execute(sa.schema.CreateTable(scoped_taggables))
+    try:
+        post = await ScopedPost.create(title="hello")
+        php = await Tag.create(name="php")
+        py = await Tag.create(name="python")
+        # same tag attached under two different scopes; a third scope has none
+        await post.scoped_tags().attach(php.id, scope=1)
+        await post.scoped_tags().attach(py.id, scope=2)
+
+        assert {t.name for t in await post.scoped_tags(1).get()} == {"php"}
+        assert {t.name for t in await post.scoped_tags(2).get()} == {"python"}
+        assert list(await post.scoped_tags(3).get()) == []
+        assert {t.name for t in await post.scoped_tags().get()} == {
+            "php",
+            "python",
+        }  # unscoped: all
+
+        # detach honors the scope: removing scope 1 leaves scope 2 intact
+        await post.scoped_tags().detach(php.id, scope=1)
+        assert list(await post.scoped_tags(1).get()) == []
+        assert {t.name for t in await post.scoped_tags(2).get()} == {"python"}
+    finally:
+        await db.dispose()
+
+
+async def test_morph_to_many_pivot_extra_may_be_a_string_not_only_int() -> None:
+    # the extra pivot column is untyped (mirrors belongs_to_many), so a string scope works too —
+    # not forced to Integer (AR-002 review nit).
+    md = sa.MetaData()
+    tagged = sa.Table(
+        "str_taggables",
+        md,
+        sa.Column("taggable_type", sa.String),
+        sa.Column("taggable_id", sa.Integer),
+        sa.Column("tag_id", sa.Integer),
+        sa.Column("region", sa.String),
+    )
+
+    class RegionPost(Model):
+        __table_name__ = "region_posts"
+        __fields__ = {"title": str}
+        __fillable__ = ["title"]
+
+        def region_tags(self, region: object = None) -> object:
+            rel = self.morph_to_many(Tag, "taggable", pivot="str_taggables")
+            return rel.where_pivot("region", region) if region is not None else rel
+
+    db = ConnectionResolver()
+    for model in (Tag, RegionPost):
+        model.set_connection(db)
+        await db.execute(sa.schema.CreateTable(model.__table__))
+    await db.execute(sa.schema.CreateTable(tagged))
+    try:
+        post = await RegionPost.create(title="hi")
+        php = await Tag.create(name="php")
+        await post.region_tags().attach(php.id, region="eu")
+        assert {t.name for t in await post.region_tags("eu").get()} == {"php"}
+        assert list(await post.region_tags("us").get()) == []
+    finally:
+        await db.dispose()
+
+
+async def test_morph_many_correlations_respect_the_type_discriminator() -> None:
+    """has/where_has/with_count on a morph_many must correlate on BOTH ``{name}_id`` and
+    ``{name}_type`` — a parent must never count another morph type's children that happen to
+    share its primary-key value."""
+    db = await _setup()
+    try:
+        account = await Account.create(name="acc")  # id 1
+        company = await Company.create(name="co")  # id 1 too (own sequence)
+        assert account.id == company.id
+        await Image.create(url="a.png", imageable_type="Company", imageable_id=company.id)
+        await Image.create(url="b.png", imageable_type="Company", imageable_id=company.id)
+
+        accounts = await Account.query().with_count("photos").get()
+        assert accounts[0].photos_count == 0  # the two images belong to the Company
+
+        companies = await Company.query().with_count("photos").get()
+        assert companies[0].photos_count == 2
+
+        assert await Account.query().has("photos").get() == []
+        assert [c.name for c in await Company.query().has("photos").get()] == ["co"]
+
+        # where_has with a callback still type-scopes
+        assert (
+            await Account.query()
+            .where_has("photos", lambda q: q.where("url", "like", "%.png"))
+            .get()
+            == []
+        )
+    finally:
+        await db.dispose()
+
+
+async def test_morph_to_many_eager_load_and_correlations() -> None:
+    """with_/where_has/with_count on a morph_to_many go through the pivot (and its type
+    column) — the documented no-N+1 eager path and the aggregate/existence helpers."""
+    db = await _setup()
+    try:
+        post = await Post.create(title="a")  # id 1
+        await Post.create(title="empty")
+        company = await Company.create(name="co")  # id 1 in its own sequence
+        php = await Tag.create(name="php")
+        py = await Tag.create(name="python")
+        rust = await Tag.create(name="rust")
+        await post.tags().attach(php.id)
+        await post.tags().attach(py.id)
+        await company.tags().attach(rust.id)  # same pivot table, different morph type, same id
+
+        posts = await Post.query().order_by("id").with_("tags").get()
+        assert {t.name for t in posts[0].relation("tags")} == {"php", "python"}  # not rust
+        assert list(posts[1].relation("tags")) == []
+
+        counted = await Post.query().order_by("id").with_count("tags").get()
+        assert [p.tags_count for p in counted] == [2, 0]
+
+        assert [p.title for p in await Post.query().has("tags").get()] == ["a"]
+        assert [p.title for p in await Post.query().doesnt_have("tags").get()] == ["empty"]
+
+        named = await Post.query().where_has("tags", lambda q: q.where("name", "=", "php")).get()
+        assert [p.title for p in named] == ["a"]
+        assert (
+            await Post.query().where_has("tags", lambda q: q.where("name", "=", "rust")).get() == []
+        )
+    finally:
+        await db.dispose()
+
+
+async def test_morphed_by_many_eager_load_and_correlations() -> None:
+    db = await _setup()
+    try:
+        post1 = await Post.create(title="a")
+        post2 = await Post.create(title="b")
+        php = await Tag.create(name="php")
+        await Tag.create(name="lonely")
+        await post1.tags().attach(php.id)
+        await post2.tags().attach(php.id)
+
+        tags = await Tag.query().order_by("id").with_("posts").get()
+        assert {p.title for p in tags[0].relation("posts")} == {"a", "b"}
+        assert list(tags[1].relation("posts")) == []
+
+        counted = await Tag.query().order_by("id").with_count("posts").get()
+        assert [t.posts_count for t in counted] == [2, 0]
+
+        assert [t.name for t in await Tag.query().has("posts").get()] == ["php"]
+        assert [t.name for t in await Tag.query().doesnt_have("posts").get()] == ["lonely"]
+    finally:
+        await db.dispose()

@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
+# Least-privilege token — CI only needs to read the repo.
 permissions:
   contents: read
 
@@ -15,338 +15,128 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.14"
-  UV_VERSION: "0.11.16"
 
 jobs:
   lint:
     name: Lint & Format
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
-          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
-      - name: ruff check (workspace)
-        run: uv run ruff check
-      - name: ruff format --check (workspace)
-        run: uv run ruff format --check
+      - name: ruff check
+        run: uv run ruff check src tests
+      - name: ruff format --check
+        run: uv run ruff format --check src tests
 
   typecheck:
-    name: Type Check (mypy + pyright, --strict)
-    runs-on: ubuntu-24.04
+    name: Type Check (mypy + pyright, strict — G3)
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
-          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
       - name: mypy --strict
         run: uv run mypy
       - name: pyright --strict
         run: uv run pyright
 
-  test:
-    name: Tests (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.14"]
+  imports:
+    name: Import Linter (architecture + startup NFR — G1/G2)
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: ${{ env.UV_VERSION }}
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
-          ignore-nothing-to-cache: true
-      - run: uv sync --all-packages --all-extras --frozen
-      - name: pytest with coverage (fail-under = 90)
-        run: >-
-          uv run pytest
-          --cov=arvel
-          --cov-report=term-missing
-          --cov-report=xml
-          -n auto --dist=loadfile
-          --tb=short
+      - run: uv sync --all-extras --frozen
+      - run: uv run lint-imports
+
+  test:
+    name: Tests & Coverage (G2 startup + G4 stack fidelity; line >= 95%)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-extras --frozen
+      - name: pytest + coverage gate
+        run: uv run bash tools/coverage_gate.sh
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: coverage-py${{ matrix.python-version }}
+          name: coverage
           path: coverage.xml
+          if-no-files-found: ignore
           retention-days: 14
-
-  benchmark:
-    name: Smoke Benchmark (perf NFRs)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
-        with:
-          version: ${{ env.UV_VERSION }}
-          python-version: ${{ env.PYTHON_VERSION }}
-          enable-cache: true
-          ignore-nothing-to-cache: true
-      - run: uv sync --all-extras --frozen
-      - name: Run smoke benchmark
-        run: uv run python benchmarks/bench_foundations.py
-        # Non-blocking: regressions surface in PR output but don't fail CI.
-        # Promote to a hard gate once we collect a baseline.
-        continue-on-error: true
 
   integration:
-    name: Integration Tests (Testcontainers emulators)
-    runs-on: ubuntu-24.04
+    name: Integration Tests (Docker / testcontainers)
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
-          ignore-nothing-to-cache: true
-      - run: uv sync --all-packages --all-extras --frozen
-      - name: Cache emulator images
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/arvel-emulator-images.tar
-          key: emulator-images-${{ hashFiles('packages/arvel/tests/integration/emulators/_images.py') }}
-      - name: Load or pull emulator images
-        run: |
-          if [ -f ~/.cache/arvel-emulator-images.tar ]; then
-            docker load -i ~/.cache/arvel-emulator-images.tar
-          else
-            make pull-emulators
-            mkdir -p ~/.cache
-            docker save -o ~/.cache/arvel-emulator-images.tar $(make print-emulators)
-          fi
-      - name: Run integration suite
-        run: make test-integration
-
-  bench-reverb:
-    name: Reverb Benchmarks (perf NFRs — hard gate)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
-        with:
-          version: ${{ env.UV_VERSION }}
-          python-version: ${{ env.PYTHON_VERSION }}
-          enable-cache: true
-          ignore-nothing-to-cache: true
-      - run: uv sync --all-packages --all-extras --frozen
-      - name: Run reverb benchmarks
-        # Hard gate. Thresholds in bench_reverb.py are the code-internal NFR
-        # contract; gate values are 1.5× observed p99. Re-calibrate via
-        # benchmarks/scripts/calibrate_bench_reverb.py if flakes appear;
-        # never reintroduce continue-on-error.
-        run: uv run python benchmarks/bench_reverb.py | tee bench-reverb-output.txt
-      - name: Upload bench output
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: bench-reverb-output
-          path: bench-reverb-output.txt
-          retention-days: 30
-
-  bench-tracemalloc:
-    name: Reverb Tracemalloc Bench (heap-byte gate)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
-        with:
-          version: ${{ env.UV_VERSION }}
-          python-version: ${{ env.PYTHON_VERSION }}
-          enable-cache: true
-          ignore-nothing-to-cache: true
-      - run: uv sync --all-packages --all-extras --frozen
-      - name: Run tracemalloc bench
-        # Companion to bench-reverb; same script, but the tracemalloc gate
-        # (96 MiB heap budget) catches sub-page regressions that ru_maxrss
-        # can miss.
-        run: uv run python benchmarks/bench_reverb.py | tee bench-tracemalloc-output.txt
-      - name: Upload tracemalloc bench output
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: bench-tracemalloc-output
-          path: bench-tracemalloc-output.txt
-          retention-days: 30
-
-  sast:
-    name: SAST (bandit)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
-        with:
-          version: ${{ env.UV_VERSION }}
-          python-version: ${{ env.PYTHON_VERSION }}
-          enable-cache: true
-          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
-      - name: bandit (MEDIUM+ blocks; LOW allowlisted with rationale)
-        # LOW findings are allowed via inline `# nosec[B###]: rationale`;
-        # MEDIUM+ MUST be fixed or surfaced by review. The packaged skeleton
-        # (template code rendered into freshly-scaffolded user projects) is
-        # excluded — it belongs to user code, not Arvel runtime.
-        run: |
-          uv run bandit \
-            -r packages/arvel/src \
-              packages/arvel-permission/src \
-              packages/arvel-image/src \
-            --exclude packages/arvel/src/arvel/_skeleton \
-            --severity-level medium \
-            --confidence-level medium \
-            -f json -o bandit.json
-      - name: Upload bandit report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: bandit-report
-          path: bandit.json
-          retention-days: 30
-
-  sca:
-    name: SCA (pip-audit)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
-        with:
-          version: ${{ env.UV_VERSION }}
-          python-version: ${{ env.PYTHON_VERSION }}
-          enable-cache: true
-          ignore-nothing-to-cache: true
-      - run: uv sync --all-packages --all-extras --frozen
-      - name: pip-audit
-        # --skip-editable skips our own workspace package (arvel), which is
-        # always editable in this monorepo; --strict + --skip-editable is
-        # mutually exclusive, so the gate is the exit code (non-zero on any
-        # unfixed CVE in a third-party dep). Findings with no available fix
-        # go to docs/security/dependency-exceptions.md with a re-eval date.
-        run: >-
-          uv run pip-audit --skip-editable
-          --ignore-vuln PYSEC-2026-89
-          --ignore-vuln PYSEC-2025-183
+      - name: pytest -m integration
+        run: uv run pytest -m integration --tb=short
 
   docs:
-    name: Docs (mkdocs --strict)
-    runs-on: ubuntu-24.04
+    name: Docs build (zensical)
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
-          ignore-nothing-to-cache: true
       - run: uv sync --all-extras --frozen
-      - name: Check contributor-docs links
-        run: uv run python scripts/check_doc_links.py
-      - name: mkdocs build --strict
-        run: uv run mkdocs build --strict --site-dir _site
-      - name: Upload docs site
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: docs-site
-          path: _site/
-          retention-days: 14
+      - name: zensical build
+        run: uv run zensical build
 
-  ecommerce-kit:
-    name: E-commerce Kit (integration tests — PostgreSQL)
-    runs-on: ubuntu-24.04
+  e2e:
+    name: E2E — consume the framework (scaffold → boot → serve → CLI)
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
-          ignore-nothing-to-cache: true
-      - run: uv sync --all-packages --all-extras --frozen
-      - name: Cache testcontainer images
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/testcontainer-images.tar
-          # _images.py is the single source of truth for the pins, so hashing it
-          # auto-invalidates the cache whenever an image tag changes.
-          key: tc-ecommerce-kit-${{ hashFiles('kits/arvel-ecommerce-kit/backend/tests/_images.py') }}
-      - name: Load or pull testcontainer images
-        # Hit: restore from the tarball. Miss: pull in parallel and save so the
-        # next run skips the Docker Hub layer download.
-        run: |
-          if [ -f ~/.cache/testcontainer-images.tar ]; then
-            docker load -i ~/.cache/testcontainer-images.tar
-          else
-            images="$(uv run python kits/arvel-ecommerce-kit/backend/tests/_images.py)"
-            for img in $images; do
-              docker pull --quiet "$img" &
-            done
-            wait
-            mkdir -p ~/.cache
-            docker save -o ~/.cache/testcontainer-images.tar $images
-          fi
-      - name: Run ecommerce-kit integration suite
-        working-directory: kits/arvel-ecommerce-kit/backend
-        env:
-          APP_ENV: testing
-        run: >-
-          uv run --project ../../.. pytest tests/
-          --tb=short -q
-
-  ecommerce-kit-frontend:
-    name: E-commerce Kit Frontend (format + lint + test + build)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24.16.0'
-          cache: 'npm'
-          cache-dependency-path: kits/arvel-ecommerce-kit/frontend/package-lock.json
-      - name: npm ci (ecommerce frontend)
-        working-directory: kits/arvel-ecommerce-kit/frontend
-        run: npm ci
-      - name: Prettier check
-        working-directory: kits/arvel-ecommerce-kit/frontend
-        run: npm run format-check
-      - name: ESLint (max-warnings 0)
-        working-directory: kits/arvel-ecommerce-kit/frontend
-        run: npm run lint
-      - name: Vitest
-        working-directory: kits/arvel-ecommerce-kit/frontend
-        run: npm run test
-      - name: Vite build
-        working-directory: kits/arvel-ecommerce-kit/frontend
-        run: npm run build
+      - run: uv sync --all-extras --frozen
+      # The one check green unit tests can't fake: a real user scaffolds an app, runs the CLI, and
+      # serves a route. Red here means "the framework doesn't work end-to-end" no matter how green
+      # the unit suite is (this is the gap that shipped a non-runnable app under 1200+ green tests).
+      - name: Consumer-path smoke
+        run: uv run bash tools/e2e_smoke.sh
 
   build:
-    name: Build distributions
-    runs-on: ubuntu-24.04
-    needs: [lint, typecheck, test, integration, ecommerce-kit, ecommerce-kit-frontend, docs]
+    name: Build & Check Distribution
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, imports, test, integration, docs, e2e]
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
-          ignore-nothing-to-cache: true
-      - name: Build arvel
-        run: uv build --package arvel --out-dir dist/arvel
-      - name: Upload distributions
-        uses: actions/upload-artifact@v7
+      - name: Build wheel + sdist
+        run: uv build --out-dir dist
+      - name: Validate distribution metadata
+        run: uvx twine check dist/*
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dist
           path: dist/

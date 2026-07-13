@@ -1,0 +1,14 @@
+"""Session config.
+
+`driver`: anything but "redis" keeps arvel's in-process session store (lost on restart, not
+shared across workers). "redis" backs sessions with the app's own bound Cache service — set
+CACHE_STORE=redis too (config/cache.py) and it's the same connection, not a second one.
+"""
+
+from arvel import env
+
+config = {
+    "driver": env("SESSION_DRIVER", "cookie"),  # cookie (in-process) | redis
+    "lifetime": 120, # minutes; x60 for cookie max-age
+    "secure": env("SESSION_SECURE", False),
+}

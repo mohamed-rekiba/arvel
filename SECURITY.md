@@ -1,61 +1,47 @@
 # Security Policy
 
-Arvel takes security seriously. If you find a vulnerability, please follow the disclosure process below.
+arvel is a web framework: its defaults are the security posture of every app built on
+it. We treat secure-by-default as a correctness property and gate every commit on it.
 
-## Supported Versions
+## Supported versions
 
-While the project is pre-1.0 (`0.x`), only the **latest minor release** receives security fixes.
+arvel is pre-1.0 (`0.x`). Security fixes land on `main` and the latest released `0.x`.
+Pin a version and watch releases until 1.0.
 
-| Version | Supported |
-|---------|-----------|
-| 0.x.x   | latest minor only |
+## Reporting a vulnerability
 
-## Reporting a Vulnerability
+**Do not open a public issue for a security report.** Email the maintainer privately
+(or use GitHub's *Report a vulnerability* / private security advisory on the repo).
+Include: affected version, a minimal reproduction, and impact. We aim to acknowledge
+within 72 hours and to ship or document a fix or mitigation before public disclosure.
 
-**Do not open a public GitHub issue for security reports.** Instead, use one of:
+## How we test for security
 
-1. **GitHub Security Advisories** — [Report a vulnerability](https://github.com/<org>/arvel/security/advisories/new) (preferred)
-2. **Email** — `security@<arvel-domain>` (PGP key on request)
+Security is a standing CI gate, not a one-off:
 
-Include:
+- **SAST** — `bandit` runs on every push/PR (blocking).
+- **SCA** — `pip-audit` runs on every push/PR (**blocking**); new high/critical CVEs in
+  dependencies fail the build. See the carve-out below.
+- **Abuse/negative tests** — the suite asserts the framework *refuses* unintended input
+  (injection, traversal, auth bypass, tampered/expired signatures, oversized/malformed
+  payloads), not just happy paths. Input-boundary code is exercised with generated
+  (property-based) inputs, not only hand-picked examples.
 
-- A description of the issue
-- Steps to reproduce, including a minimal repro repository if possible
-- The version of Arvel, Python, and any relevant dependencies
-- The impact you believe the issue has
+Run locally: `make security` (bandit), `make audit` (pip-audit), `make test`,
+`make check` (all gates).
 
-We aim to:
+## Known accepted risks
 
-- Acknowledge receipt within **2 business days**
-- Provide a triage assessment within **5 business days**
-- Ship a fix or workaround for **critical** issues within **48 hours** once reproduced
-- Coordinate disclosure on a mutually agreed timeline
+| ID | Package | Status | Rationale |
+|----|---------|--------|-----------|
+| GHSA-qhqw-rrw9-25rm / CVE-2025-65896 | `asyncmy` (optional `mysql` extra) | Accepted-risk, carved out of the SCA gate | SQL injection via crafted dict keys. **No upstream fix exists** (0.2.11 is latest; all versions affected). `asyncmy` is the DBAPI driver under SQLAlchemy and is **not reachable through arvel's ORM/query-builder** — bind-parameter names are compiler-generated, never user input. Only an app dropping to raw `asyncmy` with user-controlled dict keys is exposed. Revisit when upstream ships a fix or if `aiomysql` becomes the default MySQL driver. |
 
-## Scope
+This is the **only** suppressed finding; any other vulnerability fails the gate.
 
-In scope:
+## Secure-by-default expectations for apps
 
-- The `arvel` framework and its public API
-- The `arvel` CLI (including the `new` command)
-- Default scaffolding produced by `arvel new`
-
-Out of scope:
-
-- Vulnerabilities in third-party packages (please report to those projects directly; Arvel will track CVEs via dependabot + pip-audit)
-- Issues that require local code execution as a precondition
-- Self-XSS / social-engineering scenarios
-
-## Hardening Built In
-
-Arvel already enforces, at every release:
-
-- `bandit` SAST gate (low severity threshold)
-- `pip-audit` SCA gate on the resolved environment
-- `gitleaks` secret scan on every PR and full repo history
-- `semgrep` SAST gate (auto config + OWASP Top 10 + Python)
-- CycloneDX SBOM generated per release artifact
-- Sigstore keyless signing of all PyPI artifacts via Trusted Publishing
-- Dependency updates via Dependabot (weekly)
-- `mypy --strict` and `pyright --strict` parity
-
-See the [DevSecOps pipeline](./.github/workflows/security.yml) for the full gate list.
+- CSRF protection, signed-URL verification, encrypted cookies, and password hashing are
+  on by default — don't disable them without a documented reason.
+- Pass untrusted data as **bound parameters**, never string-formatted into SQL; the
+  query builder does this for you.
+- Keep secrets in environment/config, never in code or commits.

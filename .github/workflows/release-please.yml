@@ -1,12 +1,9 @@
 name: Release Please
 
-# Opens per-package release PRs on every push to `main`. Each workspace
-# package versions independently (see release-please-config.json +
-# release-please-manifest.json). When a release PR is merged, release-please
-# creates a component-prefixed tag (e.g. `arvel-v1.0.1`,
-# `arvel-permission-v0.4.0`) plus a GitHub Release. The companion
-# `publish.yml` workflow then builds the matching package and uploads it to
-# PyPI via Trusted Publishing, and attaches the distribution to the Release.
+# Opens/updates a release PR on every push to `main` (Conventional Commits drive
+# the version bump + CHANGELOG). When the release PR merges, release-please tags
+# `v<version>` and creates a GitHub Release; `publish.yml` then builds + uploads
+# to PyPI via Trusted Publishing.
 
 on:
   push:
@@ -20,86 +17,37 @@ concurrency:
   group: release-please-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  PYTHON_VERSION: "3.14"
-  UV_VERSION: "0.11.16"
-
 jobs:
   release-please:
-    name: Open / update release PRs
-    runs-on: ubuntu-24.04
-    outputs:
-      kit_released: ${{ steps.release.outputs['kits/arvel-ecommerce-kit--release_created'] }}
-      kit_tag: ${{ steps.release.outputs['kits/arvel-ecommerce-kit--tag_name'] }}
+    name: Open / update release PR
+    runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v5.0.0
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
-          # A PAT or GitHub App token is required so the tags release-please
-          # creates trigger publish.yml. Tags pushed with the default
-          # GITHUB_TOKEN do NOT emit events (GitHub blocks recursive runs), so
-          # auto-publish stays dormant until RELEASE_PLEASE_TOKEN is set.
-          # The kit tarball is attached by the archive-kit job below instead of
-          # a tag-triggered workflow, so it lands even on the default token.
+          # A PAT or GitHub App token lets the tag release-please creates trigger
+          # publish.yml — tags pushed with the default GITHUB_TOKEN do NOT emit
+          # events (GitHub blocks recursive runs), so auto-publish stays dormant
+          # until RELEASE_PLEASE_TOKEN is set.
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: .github/release-please-config.json
           manifest-file: .github/release-please-manifest.json
 
-  archive-kit:
-    name: Archive e-commerce kit and attach to its release
-    needs: release-please
-    if: needs.release-please.outputs.kit_released == 'true'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write # attach the archive + checksum to the GitHub Release
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.release-please.outputs.kit_tag }}
-
-      - name: Build kit tarball + checksum
-        id: build
-        run: |
-          set -euo pipefail
-          tag="${{ needs.release-please.outputs.kit_tag }}"
-          version="${tag#arvel-ecommerce-kit-v}"
-          prefix="arvel-ecommerce-kit-${version}"
-          archive="${prefix}.tar.gz"
-          # git archive only ships tracked files (no node_modules / dist / caches)
-          # and hoists the subtree under <prefix>/ so the CLI strips one level.
-          git archive --format=tar.gz --prefix="${prefix}/" \
-            -o "${archive}" HEAD:kits/arvel-ecommerce-kit
-          sha256sum "${archive}" > "${archive}.sha256"
-          echo "archive=${archive}" >> "$GITHUB_OUTPUT"
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-
-      - name: Attach to GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload "${{ steps.build.outputs.tag }}" \
-            "${{ steps.build.outputs.archive }}" \
-            "${{ steps.build.outputs.archive }}.sha256" \
-            --clobber
-
   update-lockfile:
-    name: Regenerate uv.lock on release PRs
+    name: Regenerate uv.lock on the release PR
     needs: release-please
-    # A version bump in any package's pyproject.toml invalidates the shared
-    # uv.lock (it pins every workspace member's version). Every CI job runs
-    # --frozen, so without this each release PR would fail. Because packages
-    # release via separate PRs, regenerate the lockfile on every open
-    # release-please PR branch — not just one.
-    runs-on: ubuntu-24.04
+    # A version bump in pyproject.toml invalidates uv.lock (it pins arvel's own
+    # version). Every CI job runs --frozen, so without this the release PR's CI
+    # would fail. Regenerate the lockfile on the open release-please branch.
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: read
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: ${{ env.UV_VERSION }}
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: "3.14"
       - name: Regenerate uv.lock on each open release PR
         env:
           GH_TOKEN: ${{ github.token }}
@@ -120,8 +68,6 @@ jobs:
             if git diff --quiet uv.lock; then
               echo "uv.lock already up to date on ${branch}"
             else
-              # Fold the lockfile into release-please's own commit instead of
-              # adding a second commit, so the release PR stays one commit.
               git add uv.lock
               git commit --amend --no-edit
               git push --force-with-lease origin "HEAD:${branch}"

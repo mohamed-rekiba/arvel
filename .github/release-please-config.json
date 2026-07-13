@@ -1,89 +1,26 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "python",
-  "separate-pull-requests": true,
-  "include-component-in-tag": true,
-  "pull-request-title-pattern": "chore(${component}): release ${version}",
+  "include-component-in-tag": false,
+  "pull-request-title-pattern": "chore: release ${version}",
   "pull-request-header": ":robot: Release PR opened by release-please",
   "changelog-sections": [
-    {
-      "type": "feat",
-      "section": "Features"
-    },
-    {
-      "type": "fix",
-      "section": "Bug Fixes"
-    },
-    {
-      "type": "perf",
-      "section": "Performance"
-    },
-    {
-      "type": "refactor",
-      "section": "Refactors"
-    },
-    {
-      "type": "docs",
-      "section": "Documentation"
-    },
-    {
-      "type": "test",
-      "section": "Tests",
-      "hidden": true
-    },
-    {
-      "type": "ci",
-      "section": "CI",
-      "hidden": true
-    },
-    {
-      "type": "chore",
-      "section": "Chores",
-      "hidden": true
-    }
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Bug Fixes" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "refactor", "section": "Refactors" },
+    { "type": "docs", "section": "Documentation" },
+    { "type": "test", "section": "Tests", "hidden": true },
+    { "type": "ci", "section": "CI", "hidden": true },
+    { "type": "chore", "section": "Chores", "hidden": true }
   ],
   "packages": {
-    "packages/arvel": {
-      "component": "arvel",
+    ".": {
       "package-name": "arvel",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        {
-          "type": "generic",
-          "path": "src/arvel/__init__.py"
-        }
+        { "type": "generic", "path": "src/arvel/__init__.py" }
       ]
-    },
-    "packages/arvel-permission": {
-      "component": "arvel-permission",
-      "package-name": "arvel-permission",
-      "changelog-path": "CHANGELOG.md"
-    },
-    "packages/arvel-image": {
-      "component": "arvel-image",
-      "package-name": "arvel-image",
-      "changelog-path": "CHANGELOG.md"
-    },
-    "packages/arvel-oauth": {
-      "component": "arvel-oauth",
-      "package-name": "arvel-oauth",
-      "changelog-path": "CHANGELOG.md"
-    },
-    "packages/arvel-search": {
-      "component": "arvel-search",
-      "package-name": "arvel-search",
-      "changelog-path": "CHANGELOG.md"
-    },
-    "packages/arvel-audit": {
-      "component": "arvel-audit",
-      "package-name": "arvel-audit",
-      "changelog-path": "CHANGELOG.md"
-    },
-    "kits/arvel-ecommerce-kit": {
-      "component": "arvel-ecommerce-kit",
-      "package-name": "arvel-ecommerce-kit",
-      "changelog-path": "CHANGELOG.md",
-      "extra-files": ["backend/pyproject.toml"]
     }
   }
 }

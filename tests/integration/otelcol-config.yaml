@@ -1,0 +1,23 @@
+# Minimal OpenTelemetry Collector config for the integration test: receive OTLP/HTTP on 4318 and
+# print received traces + metrics via the debug exporter, so the test can assert receipt from the logs.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      exporters: [debug]

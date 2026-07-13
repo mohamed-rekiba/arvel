@@ -1,69 +1,31 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
 *.egg-info/
-*.egg
-dist/
-build/
-/storage/
-kits/arvel-ecommerce-kit/backend/storage/app/*
 .eggs/
-.tests/
+build/
+dist/
 
-# Virtual environments
+# Environments
 .venv/
 venv/
-ENV/
+.env
 
-# Arvel cache
-.config_cache
-
-# IDE
-.idea/
-# .vscode/
-*.swp
-*.swo
-
-# Linting / Testing
-.ruff_cache/
+# Tooling caches
 .pytest_cache/
-.coverage*
-.vite/
-
-# Local experiments / scratch
-coverage.xml
-coverage/
-htmlcov/
 .mypy_cache/
-.pyright/
-.benchmarks/
+.ruff_cache/
+.coverage
+htmlcov/
+.cache/
 .playwright-mcp/
 
-# SBOM / build scratch
-req-*.txt
-sbom-*.cdx.json
-sbom-*.spdx.json
-
-# Environment
-.env
-.env.*
-!.env.example
-!.env.testing
-!.env.docker
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Database files
-**/*.db
-**/*.db.lock
-**/*.sqlite
-**/*.sqlite3
-
 # MkDocs build output
-/site/
-/_site/
-.cache/
+.site/
+.coverage.json
+.claude/
+
+.aios/
+.repowise/
+.vscode/mcp.json
+.mcp.json

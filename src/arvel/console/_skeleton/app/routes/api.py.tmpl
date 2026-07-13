@@ -1,0 +1,31 @@
+"""API routes — stateless JSON endpoints (the "api" group, URL-prefixed /api).
+
+Type a handler's return with an ``arvel.Schema`` (and add a ``Schema``-typed parameter for the request
+body) and arvel generates the OpenAPI request/response schemas automatically — browse them at /schema.
+"""
+
+from arvel import Route, Schema
+
+
+class HealthStatus(Schema):
+    status: str
+
+
+class EchoIn(Schema):
+    message: str
+
+
+class EchoOut(Schema):
+    echo: str
+
+
+async def health(request) -> HealthStatus:  # typed response → response schema at GET /api/health
+    return HealthStatus(status="ok")
+
+
+async def echo(request, data: EchoIn) -> EchoOut:  # typed body + response → request + response schema
+    return EchoOut(echo=data.message)
+
+
+Route.get("/health", health, name="api.health")
+Route.post("/echo", echo, name="api.echo")
