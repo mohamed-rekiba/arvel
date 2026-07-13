@@ -15,16 +15,16 @@ authors = [{ name = "arvel" }]
 keywords = ["framework", "web", "async", "fullstack", "asgi"]
 dependencies = [ # CORE — light, no heavy libs
   "msgspec>=0.21.1",
-  "whenever>=0.10.0",
+  "whenever>=0.10.2",
   "typer>=0.26.8",
   "structlog>=26.1.0",
   "httpx>=0.28.1",
-  "anyio>=4.14.1",
+  "anyio>=4.14.2",
   "python-ulid>=3.1.0",
   # python-ulid 3.1.0 imports typing_extensions at module import but doesn't declare it —
   # without this, a bare `pip install arvel` can't even `import arvel.support` (the dev
   # extras masked it). Drop when upstream fixes its metadata.
-  "typing-extensions>=4.0",
+  "typing-extensions>=4.16.0",
   "itsdangerous>=2.2.0",
   "cryptography>=49.0.0",
   "pwdlib[argon2,bcrypt]>=0.3.0",
@@ -37,7 +37,7 @@ dependencies = [ # CORE — light, no heavy libs
 
 [project.optional-dependencies]
 http = ["litestar>=2.24.0"]
-server = ["granian[reload]>=2.7.7", "uvicorn>=0.49.0"]
+server = ["granian[reload]>=2.7.9"]
 postgres = ["sqlalchemy[asyncio]>=2.0.51", "alembic>=1.18.5", "asyncpg>=0.31.0"]
 mysql = ["sqlalchemy[asyncio]>=2.0.51", "alembic>=1.18.5", "asyncmy>=0.2.11"]
 sqlite = ["sqlalchemy[asyncio]>=2.0.51", "alembic>=1.18.5", "aiosqlite>=0.22.1"]
@@ -61,45 +61,45 @@ oidc = ["pyjwt[crypto]>=2.13.0"]
 oauth = ["httpx-oauth>=0.17.0", "authlib>=1.7.2"]
 "2fa" = ["pyotp>=2.10.0"]
 s3 = ["s3fs>=2026.6.0"]
-gcs = ["gcsfs>=2026.6.0"]
+gcs = ["gcsfs>=2026.7.0"]
 azure = ["adlfs>=2026.5.0"]
 supabase = ["supabase>=2.31.0"]
-image = ["pillow>=12.2.0"]
-video = ["av>=17.1.0"]
+image = ["pillow>=12.3.0"]
+video = ["av>=18.0.0"]
 media = ["arvel[image]"]
 mail = ["aiosmtplib>=5.1.2", "markdown-it-py>=4.2.0"]
-notifications = ["apprise>=1.11.0"]
-search = ["meilisearch>=0.41.1"]
+notifications = ["apprise>=1.12.0"]
+search = ["meilisearch>=0.42.0"]
 # pgvector powers `t.vector(...)` columns + vector search on Postgres. The Python package
 # provides the SQLAlchemy type; it ALSO requires the Postgres server extension
 # (`CREATE EXTENSION vector;`). Without the package, `t.vector` falls back to a portable JSON column.
-vector = ["pgvector>=0.4.2"]
+vector = ["pgvector>=0.5.0"]
 telemetry = [
   "opentelemetry-sdk>=1.43.0",
-  "opentelemetry-exporter-otlp-proto-http>=1.42.1", # the default OTLP/HTTP push (traces/metrics/logs)
-  "opentelemetry-exporter-prometheus>=0.50b0",      # optional pull mode (the /metrics scrape route)
-  "prometheus-client>=0.20.0",                      # exposition format for the /metrics handler
-  "sentry-sdk>=2.63.0",
+  "opentelemetry-exporter-otlp-proto-http>=1.43.0", # the default OTLP/HTTP push (traces/metrics/logs)
+  "opentelemetry-exporter-prometheus>=0.64b0",      # optional pull mode (the /metrics scrape route)
+  "prometheus-client>=0.25.0",                      # exposition format for the /metrics handler
+  "sentry-sdk>=2.64.0",
 ]
 i18n = ["babel>=2.18.0"]
-docs = ["zensical>=0.0.46"]
+docs = ["zensical>=0.0.50"]
 dev = [
-  "ruff>=0.15.20",
-  "mypy>=2.1.0",
+  "ruff>=0.15.21",
+  "mypy>=2.2.0",
   "pyright>=1.1.411",
   "bandit>=1.9.4",
   "pip-audit>=2.10.1",
   "pre-commit>=4.6.0",
-  "import-linter>=2.12",
+  "import-linter>=2.13",
   "pytest>=9.1.1",
   "pytest-asyncio>=1.4.0",
   "pytest-xdist>=3.8.0",
-  "coverage>=7.14.3",
+  "coverage>=7.15.1",
   "polyfactory>=3.3.0",
-  "faker>=40.23.0",
+  "faker>=40.28.1",
   "moto>=5.2.2",
   "ipython>=9.15.0",
-  "hypothesis>=6.155.7",
+  "hypothesis>=6.156.6",
 ]
 test-integration = ["testcontainers>=4.14.2"]
 standard = ["arvel[http,server,console,sqlite,view]"]
