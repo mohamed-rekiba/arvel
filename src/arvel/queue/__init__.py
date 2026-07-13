@@ -296,21 +296,38 @@ class DurableJobs:
         released = 0
         default_retry_after = self._retry_after()
         for row in due:
-            # Deserialize first: the job's own retry_after sets the reservation's visibility deadline
-            # (reserved_until), stamped atomically with the claim so a crash-recovery reclaim needs
-            # no payload decode. A wasted decode on a lost claim is harmless.
-            job = await deserialize_instance(row.payload)
-            override = getattr(job, "retry_after", None)
-            effective = override if override is not None else default_retry_after
-            # Atomic claim: rowcount == 1 means this worker won the row; 0 means another already
-            # took it — skip to avoid a double-dispatch.
+            # Atomic claim FIRST (rowcount == 1 means this worker won the row; 0 means another took
+            # it — skip, no double-dispatch). Claim with the DEFAULT visibility window, then refine
+            # to the job's own retry_after after decoding. Claiming before the decode is deliberate:
+            # a poison-pill payload (undeserializable) is then PARKED as reserved instead of staying
+            # `available` and re-blocking the whole due-loop on every tick.
             claim = (
                 await QueuedJob.where("id", "=", row.id)
                 .where_null("reserved_at")
-                .update({"reserved_at": moment, "reserved_until": moment + int(effective)})
+                .update(
+                    {"reserved_at": moment, "reserved_until": moment + int(default_retry_after)}
+                )
             )
             if claim.rowcount != 1:
                 continue
+            try:
+                job = await deserialize_instance(row.payload)
+            except Exception:
+                # can't decode this row — leave it parked (reserved) so it doesn't re-block siblings;
+                # the reclaim frees it after the default window and it retries (or ages into failure).
+                from arvel.kernel.logging import LogManager
+
+                LogManager().channel("queue").warning(
+                    "undeserializable_job", job_id=row.id, queue=row.queue, exc_info=True
+                )
+                continue
+            override = getattr(job, "retry_after", None)
+            if override is not None:
+                # refine the visibility deadline to the job's own window (still before any push, so a
+                # crash here only re-queues an unpushed job — never double-executes a running one)
+                await QueuedJob.where("id", "=", row.id).where("reserved_at", "=", moment).update(
+                    {"reserved_until": moment + int(override)}
+                )
             await self._push(job, queue=row.queue)
             await row.delete()
             released += 1

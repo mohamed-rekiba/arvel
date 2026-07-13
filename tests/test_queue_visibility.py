@@ -101,3 +101,33 @@ async def test_per_job_retry_after_overrides_the_queue_config_default() -> None:
     finally:
         set_application(None)
         await db.dispose()
+
+
+async def test_poison_payload_is_parked_and_does_not_block_the_due_loop() -> None:
+    """An undeserializable ("poison") row must be claimed+parked, not left available to re-block the
+    loop every tick — and a good job dispatched alongside it must still run (F-027 regression guard)."""
+    manager, db = await _setup()
+    try:
+        now = int(time.time())
+        # a poison row (garbage payload), due now, unreserved
+        await QueuedJob.create(
+            queue="default",
+            payload="!!not-a-serialized-job!!",
+            attempts=0,
+            reserved_at=None,
+            reserved_until=None,
+            available_at=now,
+            created_at=now,
+        )
+        await manager.dispatch_after(0, Greet(who="ok"))  # a good job, also due now
+
+        released = await manager.release_due_jobs(now=now)
+        assert released == 1  # only the good job was pushed
+        assert RAN == ["ok"]  # good job ran; the poison did not crash the loop
+        # the poison row is parked (claimed) with a visibility deadline, not deleted, not re-run
+        rows = await QueuedJob.where_not_null("reserved_at").get()
+        assert len(rows) == 1
+        assert rows[0].reserved_until is not None
+    finally:
+        set_application(None)
+        await db.dispose()
