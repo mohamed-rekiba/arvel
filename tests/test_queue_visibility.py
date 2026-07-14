@@ -161,7 +161,7 @@ async def test_job_execution_binds_a_uuid7_job_id_into_the_log_context() -> None
 
     manager, db = await _setup()
     try:
-        await manager._worker._invoke(Probe())  # noqa: SLF001 - exercising the worker entry
+        await manager._worker._invoke(Probe())
         assert captured.get("job") == "Probe"
         job_id = captured.get("job_id")
         assert isinstance(job_id, str)
@@ -191,7 +191,7 @@ async def test_full_request_log_context_propagates_into_the_job() -> None:
             payload = serialize_instance(ContextProbe())  # captures the whole context
         # ...worker (no ambient context) picks it up and runs it
         job = await deserialize_instance(payload)
-        await manager._worker._invoke(job)  # noqa: SLF001
+        await manager._worker._invoke(job)
         assert _CAPTURED.get("request_id") == "req-abc-123"
         assert _CAPTURED.get("user_id") == 42  # arbitrary bound values propagate too
         assert _CAPTURED.get("tenant_id") == "acme"

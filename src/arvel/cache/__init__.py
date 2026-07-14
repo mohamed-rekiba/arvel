@@ -17,6 +17,7 @@ import secrets
 import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any, cast
 
 import msgspec
@@ -108,6 +109,17 @@ def _unwrap(raw: Any) -> Any:
         if len(envelope) == 1:
             return envelope[0]
     return cast("Any", raw)
+
+
+class CacheDriver(StrEnum):
+    """The built-in cache backends — a typed set for ``cache.default`` / ``stores.<name>.driver``.
+
+    A ``StrEnum`` (not a ``Literal``): ``CacheDriver.REDIS == "redis"`` flows through the string-keyed
+    driver dispatch, so config gets type-safety while a plain ``str`` still works for a custom driver
+    an ecosystem package registers via ``CacheManager.extend`` — the registry stays open."""
+
+    ARRAY = "array"
+    REDIS = "redis"
 
 
 def _no_stores() -> dict[str, dict[str, Any]]:
@@ -817,6 +829,7 @@ def cached(fn: Any = None, *, ttl: int | None = None, key: str | None = None) ->
 
 
 __all__ = [
+    "CacheDriver",
     "CacheHit",
     "CacheLock",
     "CacheManager",

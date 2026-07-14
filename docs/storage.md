@@ -89,6 +89,19 @@ omitted, the disk name *is* the driver (the convention above, where `s3` uses th
 name raises a clear `UnknownDiskError` naming the configured disks — not a misleading "install the
 extra". (The cache manager takes the same `stores.<name>.driver` shape.)
 
+For type-safety on the `driver`, use the `FilesystemDriver` enum instead of a bare string — it's a
+`StrEnum`, so it's typo-proof and autocompletes while still being a plain `"s3"` under the hood:
+
+```python
+from arvel.filesystem import FilesystemDriver
+
+"disks": {"invoices": {"driver": FilesystemDriver.S3, "bucket": "acme-private"}}
+```
+
+A custom driver registered by an ecosystem package (via `FilesystemManager.extend`) stays a plain
+string — the enum covers the built-ins without closing the registry. (`arvel.cache` has the
+matching `CacheDriver`.)
+
 ## Worked example: store an upload
 
 `request.file("avatar")` returns an `UploadedFile` with a `.store()` that writes it to a disk

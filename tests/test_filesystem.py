@@ -60,3 +60,26 @@ async def test_checksum_matches_hashlib_and_defaults_to_sha256(tmp_path: Path) -
         await disk.checksum("a.txt", algo="md5")
         == hashlib.md5(b"hello world", usedforsecurity=False).hexdigest()
     )
+
+
+def test_filesystem_driver_enum_resolves_and_is_a_str() -> None:
+    """FilesystemDriver is a StrEnum: config can use it for type-safety and it flows through the
+    string-keyed driver dispatch unchanged, while a plain str still works for custom drivers."""
+    from arvel.filesystem import FilesystemDriver
+    from arvel.kernel import Application
+
+    assert FilesystemDriver.S3 == "s3"  # a real str value
+    assert f"create_{FilesystemDriver.S3}_driver" == "create_s3_driver"  # dispatch key
+    app = (
+        Application.configure(".")
+        .with_config(
+            {
+                "filesystems": {
+                    "default": "media",
+                    "disks": {"media": {"driver": FilesystemDriver.LOCAL, "root": "storage/media"}},
+                }
+            }
+        )
+        .create()
+    )
+    assert FilesystemManager(app).disk("media")._root == "storage/media"

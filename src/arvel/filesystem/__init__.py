@@ -14,7 +14,7 @@ import json
 import mimetypes
 from collections.abc import AsyncIterable, AsyncIterator
 from datetime import UTC, datetime, timedelta
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import TYPE_CHECKING, Any
 
 import msgspec
@@ -51,6 +51,20 @@ def _fsspec() -> Any:
     import fsspec
 
     return fsspec
+
+
+class FilesystemDriver(StrEnum):
+    """The built-in storage backends — a typed, autocompleting set for ``disks.<name>.driver``.
+
+    Being a ``StrEnum`` (not a ``Literal``), it flows through the string-keyed driver dispatch as-is
+    (``FilesystemDriver.S3 == "s3"``), so config can use ``{"driver": FilesystemDriver.S3}`` for
+    type-safety while a plain ``str`` still works for a **custom** driver registered by an ecosystem
+    package (via ``FilesystemManager.extend`` / an entry point) — the registry stays open."""
+
+    LOCAL = "local"
+    S3 = "s3"
+    GCS = "gcs"
+    AZURE = "azure"
 
 
 class Visibility(Enum):
@@ -594,9 +608,11 @@ class FilesystemManager(Manager):
 __all__ = [
     "DEFAULT_CHUNK_SIZE",
     "Filesystem",
+    "FilesystemDriver",
     "FilesystemManager",
     "FilesystemSettings",
     "PathTraversalError",
+    "UnknownDiskError",
     "UnsupportedDriverOperation",
     "Visibility",
 ]
