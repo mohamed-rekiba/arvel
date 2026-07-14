@@ -28,6 +28,19 @@ Boot the app (`arvel serve`) and visit **`/schema`** for the UI, or **`/schema/o
 raw document. This dict is a *typed view* (`arvel.http.OpenApiSettings`) — keys are validated through
 msgspec, so a typo or a wrong type is a clear error, not a silent miss.
 
+### Exporting the document to a file
+
+To get the spec **without running a server** — commit it to the repo, diff it in CI, feed it to a
+client generator — use `openapi:export`, which renders it from the compiled app and writes JSON:
+
+```bash
+arvel openapi:export                 # writes openapi.json
+arvel openapi:export docs/api.json   # …or a path you choose
+```
+
+A common CI check is to run it and fail if the committed file changed — so a route change that
+forgot to update the spec is caught in review.
+
 ## Request & response schemas
 
 Schemas come straight from your handler's type hints. Annotate the return value for a **response**

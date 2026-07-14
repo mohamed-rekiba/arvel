@@ -127,7 +127,34 @@ sealing it; `encrypt_string`/`decrypt_string` seal/open raw bytes. Decryption tr
 in order (primary first) and only raises `DecryptionFailed` once every key's AEAD tag check has
 failed — so `previous_keys` and `rotate` cost nothing on the common (primary-key) path.
 
+## Signing (tamper-evident, not secret)
+
+When you don't need to *hide* a value but do need to know it wasn't **tampered with** — a value you
+hand to a client and expect back unchanged — sign it instead of encrypting it. `Signer` appends a
+keyed MAC (via `itsdangerous`); the value stays readable, but any edit invalidates the signature:
+
+```python
+from arvel.security import Signer, SignatureInvalid, SignatureExpired
+
+signer = Signer(config("app.key"))
+token = signer.sign({"order_id": 42})           # readable, but tamper-evident
+
+try:
+    data = signer.unsign(token, max_age=3600)   # optional TTL (seconds)
+except SignatureExpired:
+    ...   # valid signature, but older than max_age — "link expired, request a new one"
+except SignatureInvalid:
+    ...   # forged / corrupted / wrong key
+```
+
+`SignatureExpired` is a subclass of `SignatureInvalid`, so a broad `except SignatureInvalid` still
+catches an expired token — but the distinct type lets you tell "expired" (re-issue) from "tampered"
+(reject) when you care. For signing **URLs** specifically, use the higher-level helpers in
+[URLs → Signed URLs](urls.md#signed-urls), which build on this. Sign when the value is public but
+must be trusted; **encrypt** (above) when it must also be hidden.
+
 ## See also
 
 - [Hashing](hashing.md) — for passwords; never `encrypt` a password, `Hash.make` it.
 - [Configuration](configuration.md) — where `APP_KEY` is read from.
+- [URLs](urls.md) — signed URLs, built on `Signer`.

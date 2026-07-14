@@ -67,6 +67,21 @@ leaked link can't be replayed.
 - Reset is **single-use** and **throttled** — brute-force and replay are both closed off.
 - A successful reset **rotates the remember token**, invalidating other "remember me" sessions.
 
+## Pruning expired tokens
+
+Used and expired reset records aren't cleared automatically. Run `auth:clear-resets` to delete the
+expired ones (keeps the `password_reset_tokens` table small):
+
+```bash
+arvel auth:clear-resets
+```
+
+Schedule it so it runs itself — e.g. daily (see [Scheduling](../scheduling.md)):
+
+```python
+schedule.command("auth:clear-resets").daily()
+```
+
 ## See also
 
 - [Authentication](authentication.md) — the guards a reset restores access to.
