@@ -15,6 +15,7 @@ from __future__ import annotations
 import inspect
 import re
 from contextvars import ContextVar
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, cast
 
 from arvel.kernel import Settings
@@ -23,6 +24,15 @@ from arvel.support.manager import Manager
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Self
+
+
+class BroadcastDriver(StrEnum):
+    """The built-in broadcast drivers — a typed set for ``broadcasting.default``. A ``StrEnum`` (not
+    a ``Literal``): flows through the string-keyed driver dispatch, so a custom driver registered via
+    ``BroadcastManager.extend`` stays a plain ``str`` — the registry stays open."""
+
+    LOG = "log"
+    REDIS = "redis"
 
 
 class BroadcastingSettings(Settings):
@@ -288,6 +298,7 @@ class BroadcastManager(Manager):
 
 __all__ = [
     "CHANNEL_PREFIX",
+    "BroadcastDriver",
     "BroadcastManager",
     "Broadcaster",
     "BroadcastingSettings",

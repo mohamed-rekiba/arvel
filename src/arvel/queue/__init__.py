@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable
 from datetime import datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from arvel.kernel import Settings
@@ -56,6 +57,16 @@ if TYPE_CHECKING:
     from arvel.queue.batch import JobBatch as JobBatch
     from arvel.queue.failed import FailedJob as FailedJob
     from arvel.queue.jobs import QueuedJob as QueuedJob
+
+
+class QueueDriver(StrEnum):
+    """The built-in queue brokers — a typed set for ``queue.default``. A ``StrEnum`` (not a
+    ``Literal``): flows through the string-keyed driver dispatch, so a custom broker registered via
+    ``QueueManager.extend`` stays a plain ``str`` — the registry stays open."""
+
+    MEMORY = "memory"
+    REDIS = "redis"
+    AMQP = "amqp"
 
 
 class QueueSettings(Settings):
@@ -717,6 +728,7 @@ __all__ = [
     "JobBatch",
     "PendingBatch",
     "PendingChain",
+    "QueueDriver",
     "QueueManager",
     "QueueSettings",
     "QueuedJob",

@@ -301,23 +301,43 @@ release — is **quarantined**, not left to block the queue: it's claimed, logge
 (`undeserializable_job`), and left for the visibility timeout to retry or age into failure, while
 the rest of the batch keeps draining.
 
-### Failed jobs
+### Failed jobs — the dead-letter queue (DLQ)
 
-After the retries are exhausted (and `failed()` has run), the worker records the dead job in the
-`failed_jobs` table — the serialized payload, the exception, and when it failed (the scaffold ships
-the migration). Inspect them and re-dispatch later, `queue:retry`-style:
+When a job **exhausts its retries** (or gives up early — `fail_on_timeout`, or a passed
+`retry_until`), the worker runs the job's `failed(exc)` hook and then records it in the
+`failed_jobs` table: the queue, the serialized payload, the exception text, and when it failed. This
+is arvel's **dead-letter queue** — nothing is silently dropped; a dead job waits there for you to
+inspect, fix, and requeue (the scaffold ships the migration).
+
+**From the CLI** (the usual path):
+
+```bash
+arvel queue:failed            # list the dead-letter jobs — id, queue, exception, failed_at
+arvel queue:retry <id>        # re-dispatch one job (fresh tries budget) and remove its record
+arvel queue:retry all         # re-dispatch every dead-letter job
+```
+
+**From code** — `FailedJob` (`arvel.queue.FailedJob`) is an ordinary model, so you inspect and act
+on the DLQ like any table:
 
 ```python
 from arvel.queue import FailedJob
 
-for job in await FailedJob.all():
-    print(job.queue, job.exception, job.failed_at)
+for job in await FailedJob.order_by("failed_at", "desc").get():
+    print(job.id, job.queue, job.exception, job.failed_at)   # triage
 
-await job.retry()   # rebuilds the job, pushes it back onto the queue, and removes the record
+await some_failed_job.retry()      # rebuild + re-push with a full tries budget, then delete the record
+await some_failed_job.delete()     # …or discard it for good once you've decided it's unrecoverable
 ```
 
-Each row is a `FailedJob` (`arvel.queue.FailedJob`). With no database bound the worker still runs
-`failed()` and simply skips persistence — nothing is lost, nothing crashes.
+A retry is a **fresh dispatch** — the exhausted attempt counter is reset, so a requeued job gets its
+whole `tries`/`backoff` budget again (it won't bounce straight back to the DLQ). Fix the root cause
+first (the bug, the missing downstream) — a blind `queue:retry all` just re-fails everything.
+
+Monitor the table's size (a growing DLQ means something downstream is broken) and prune records
+you've resolved with a normal delete. With **no database bound**, the worker still runs `failed()`
+but skips persistence — nothing crashes, but there's no DLQ to retry from, so bind a DB in
+production.
 
 ## Running a worker
 

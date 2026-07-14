@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from email.message import EmailMessage
+from enum import StrEnum
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -45,6 +46,16 @@ class MailerListSettings(msgspec.Struct):
     ``mail.round_robin.mailers``), so their config is reused rather than duplicated."""
 
     mailers: list[str] = msgspec.field(default_factory=list[str])
+
+
+class MailDriver(StrEnum):
+    """The built-in mail transports — a typed set for ``mail.default``. A ``StrEnum`` (not a
+    ``Literal``): flows through the string-keyed driver dispatch, so a custom transport registered
+    via ``MailManager.extend`` stays a plain ``str`` — the registry stays open."""
+
+    SMTP = "smtp"
+    LOG = "log"
+    FAILOVER = "failover"
 
 
 class MailSettings(Settings):
@@ -564,6 +575,7 @@ class MailManager(Manager):
 __all__ = [
     "FailoverTransport",
     "LogTransport",
+    "MailDriver",
     "MailManager",
     "MailSettings",
     "Mailable",

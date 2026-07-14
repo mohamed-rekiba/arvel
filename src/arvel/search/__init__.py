@@ -89,6 +89,15 @@ class _JSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
+class SearchDriver(enum.StrEnum):
+    """The built-in search engines — a typed set for ``search.default``/``driver``. A ``StrEnum``
+    (not a ``Literal``): flows through the string-keyed driver dispatch, so a custom engine
+    registered via ``SearchManager.extend`` stays a plain ``str`` — the registry stays open."""
+
+    ARRAY = "array"
+    MEILISEARCH = "meilisearch"
+
+
 class SearchSettings(Settings):
     """Typed, validated view over the ``search`` config section (DR-0016)."""
 
@@ -723,6 +732,7 @@ __all__ = [
     "MeilisearchEngine",
     "ModelIndexRequested",
     "SearchBuilder",
+    "SearchDriver",
     "SearchEngine",
     "SearchFilter",
     "SearchManager",
