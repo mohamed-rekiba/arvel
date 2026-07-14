@@ -395,7 +395,7 @@ dispatcher's whole bound log context (a request's `request_id`, plus anything el
 `user_id`, `tenant_id`, …) is captured and re-bound on the worker, and the job also gets its own
 fresh `job_id` (a `uuidv7`). So every log line a job emits carries the `request_id` of the API
 request that spawned it *and* its own `job_id` — you can trace one request to every job it dispatched.
-See [Logging → Request & queue correlation](logging.md#request--queue-correlation). (Use `Context`
+See [Logging → Request & queue correlation](logging.md#request-queue-correlation). (Use `Context`
 for values your job *logic* reads; this is automatic, for *logs*.)
 
 ## Queued event listeners

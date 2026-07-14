@@ -97,7 +97,7 @@ with Log.bound_context(job_id=job_id):
 # job_id is gone again here
 ```
 
-### Request & queue correlation
+### Request & queue correlation {#request-queue-correlation}
 
 Two things are wired for you:
 
