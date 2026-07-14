@@ -89,47 +89,13 @@ def _derive_package_name(raw: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", basename.lower()).strip("-")
 
 
-def _pkg_provider(name: str) -> str:
-    cls = "".join(p.capitalize() for p in name.replace("-", "_").split("_")) + "ServiceProvider"
-    return (
-        '"""Service provider — auto-registered via the arvel.providers entry point."""\n\n'
-        "from arvel.kernel import ServiceProvider\n\n\n"
-        f"class {cls}(ServiceProvider):\n"
-        "    def register(self) -> None:\n"
-        f'        self.app.singleton("{name}", lambda c: object())\n\n'
-        "    def boot(self) -> None:\n"
-        "        ...\n"
-    )
-
-
-def _pkg_pyproject(name: str) -> str:
-    mod = "arvel_" + name.replace("-", "_")
-    cls = "".join(p.capitalize() for p in name.replace("-", "_").split("_")) + "ServiceProvider"
-    return (
-        "[project]\n"
-        f'name = "arvel-{name}"\n'
-        'version = "0.1.0"\n'
-        'requires-python = ">=3.14"\n'
-        'dependencies = ["arvel"]\n\n'
-        '[project.entry-points."arvel.providers"]\n'
-        f'{name} = "{mod}.provider:{cls}"\n'
-    )
-
-
-def _write_tree(root: Any, files: dict[str, str]) -> int:
-    for rel, content in files.items():
-        path = root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content)
-    return len(files)
-
-
 def _copy_skeleton(kind: str, target: Any, subs: dict[str, str]) -> int:
     """Copy the packaged skeleton tree ``_skeleton/<kind>`` into ``target``.
 
     Skeleton files are stored as ``.tmpl`` data (so the Python tooling — ruff/mypy/pyright/
     import-linter/pytest — ignores them); on copy the ``.tmpl`` suffix is stripped, a ``dot.`` prefix
-    becomes ``.`` (for dotfiles), and ``{{key}}`` tokens are substituted.
+    becomes ``.`` (for dotfiles), and ``{{key}}`` tokens are substituted — in file contents AND in
+    path segments (so a template dir like ``src/{{mod}}/`` lands as ``src/arvel_stripe/``).
     """
     from pathlib import Path
 
@@ -139,13 +105,14 @@ def _copy_skeleton(kind: str, target: Any, subs: dict[str, str]) -> int:
         if "__pycache__" in src.parts:
             continue
         parts = list(src.relative_to(root).parts)
-        leaf = parts[-1].removesuffix(".tmpl")
-        if leaf.startswith("dot."):
-            leaf = "." + leaf[len("dot.") :]
-        parts[-1] = leaf
+        parts[-1] = parts[-1].removesuffix(".tmpl")
+        # dot. -> . on every segment, so dotted DIRS (dot.github/) work too
+        parts = ["." + p[len("dot.") :] if p.startswith("dot.") else p for p in parts]
         text = src.read_text()
         for key, value in subs.items():
-            text = text.replace("{{" + key + "}}", value)
+            token = "{{" + key + "}}"
+            text = text.replace(token, value)
+            parts = [p.replace(token, value) for p in parts]
         dest = target / Path(*parts)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(text)
@@ -175,14 +142,15 @@ def new(
         raise typer.Exit(1)
 
     if package:
-        files = {
-            "pyproject.toml": _pkg_pyproject(pkg_name),
-            f"src/arvel_{pkg_name.replace('-', '_')}/__init__.py": "",
-            f"src/arvel_{pkg_name.replace('-', '_')}/provider.py": _pkg_provider(pkg_name),
-            "README.md": f"# arvel-{pkg_name}\n\nAn arvel ecosystem package.\n",
-        }
-        count = _write_tree(target, files)
+        mod = "arvel_" + pkg_name.replace("-", "_")
+        cls = "".join(p.capitalize() for p in pkg_name.replace("-", "_").split("_"))
+        count = _copy_skeleton(
+            "package", target, {"name": pkg_name, "mod": mod, "cls": cls}
+        )
         typer.echo(f"[arvel new] created package arvel-{pkg_name} ({count} files)")
+        typer.echo(f"  cd {name} && uv sync")
+        typer.echo("  uv run pytest    # the un-pruned skeleton is green out of the box")
+        typer.echo("  # then delete what you don't need — see README.md")
         return
 
     count = _copy_skeleton("app", target, {"name": pkg_name})

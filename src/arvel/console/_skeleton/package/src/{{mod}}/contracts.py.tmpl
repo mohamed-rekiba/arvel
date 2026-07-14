@@ -1,0 +1,15 @@
+"""Public contract — consumers (and your own drivers) depend on this shape.
+
+Keep it a Protocol: the package stays testable on its own, and a refactor of
+your internals can't break anyone who imported only the contract.
+"""
+
+from __future__ import annotations
+
+from typing import Protocol
+
+
+class {{cls}}Driver(Protocol):
+    """What every {{name}} driver implements."""
+
+    def send(self, message: str) -> str: ...

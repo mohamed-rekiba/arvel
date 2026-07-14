@@ -1,0 +1,26 @@
+"""Package test harness: a booted bare Application with this provider registered.
+
+This is the in-process equivalent of entry-point discovery — no `pip install`
+needed to test the package against arvel.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+
+import pytest
+
+from arvel.kernel import Application
+
+from {{mod}} import {{cls}}
+from {{mod}}.provider import {{cls}}ServiceProvider
+
+
+@pytest.fixture()
+def app() -> Iterator[Application]:
+    application = Application()
+    provider = {{cls}}ServiceProvider(application)
+    provider.register()
+    provider.boot()
+    yield application
+    {{cls}}.clear_swapped()

@@ -50,6 +50,80 @@ def test_new_package_declares_entry_point(tmp_path: Path, monkeypatch: pytest.Mo
     assert (tmp_path / "stripe" / "src" / "arvel_stripe" / "provider.py").exists()
 
 
+def test_new_package_scaffolds_full_skeleton(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--package renders the maximal-subtractive skeleton: every contribution type
+    present as a small working example, the rest discoverable as commented verbs."""
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(build_cli(), ["new", "my-pkg", "--package"])
+    assert result.exit_code == 0, result.output
+    root = tmp_path / "my-pkg"
+    for rel in (
+        "pyproject.toml",
+        "README.md",
+        "src/arvel_my_pkg/__init__.py",
+        "src/arvel_my_pkg/py.typed",
+        "src/arvel_my_pkg/provider.py",
+        "src/arvel_my_pkg/config.py",
+        "src/arvel_my_pkg/contracts.py",
+        "src/arvel_my_pkg/manager.py",
+        "src/arvel_my_pkg/drivers.py",
+        "src/arvel_my_pkg/facade.py",
+        "src/arvel_my_pkg/routes.py",
+        "src/arvel_my_pkg/commands.py",
+        "tests/conftest.py",
+        "tests/test_provider.py",
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+    ):
+        assert (root / rel).exists(), rel
+    pyproject = (root / "pyproject.toml").read_text()
+    assert 'name = "arvel-my-pkg"' in pyproject
+    assert '"arvel.providers"' in pyproject
+    assert "[tool.importlinter]" in pyproject
+    # provider documents every integration verb (commented = inert but discoverable)
+    provider = (root / "src" / "arvel_my_pkg" / "provider.py").read_text()
+    for verb in (
+        "merge_config_from",
+        "load_routes_from",
+        "load_migrations_from",
+        "load_views_from",
+        "load_translations_from",
+        "publishes",
+        "commands",
+    ):
+        assert verb in provider, verb
+    # README carries the keep/delete pruning guide
+    readme = (root / "README.md").read_text()
+    assert "delete" in readme.lower()
+
+
+def test_new_package_generated_tests_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The un-pruned skeleton is green out of the box: its own test suite passes
+    against the current arvel checkout (anti-rot gate for the template)."""
+    import os
+    import subprocess
+    import sys
+
+    monkeypatch.chdir(tmp_path)
+    assert runner.invoke(build_cli(), ["new", "demo", "--package"]).exit_code == 0
+    root = tmp_path / "demo"
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(root / "src")
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests", "-q"],
+        cwd=root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
 def test_new_existing_path_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "taken").mkdir()

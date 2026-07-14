@@ -1,0 +1,25 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.14"]
+        # add the oldest arvel you support to catch compat breaks:
+        # arvel-version: ["", "arvel==<min-supported>"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: uv sync --all-extras
+      - run: uv run ruff check .
+      - run: uv run mypy src
+      - run: uv run lint-imports
+      - run: uv run pytest -q

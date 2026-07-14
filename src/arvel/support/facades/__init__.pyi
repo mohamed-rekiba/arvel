@@ -38,6 +38,7 @@ class Auth(Facade):
     def user(cls) -> Any: ...
 
 class Cache(Facade):
+    extra_package: Any
     @classmethod
     def close(cls) -> Any: ...
     @classmethod
@@ -379,6 +380,7 @@ class Log(Facade):
     def with_context(cls, **kw: Any) -> Any: ...
 
 class Mail(Facade):
+    extra_package: Any
     @classmethod
     def create_failover_driver(cls) -> Any: ...
     @classmethod
@@ -400,6 +402,7 @@ class Mail(Facade):
 
 class Queue(Facade):
     broker: Any
+    extra_package: Any
     @classmethod
     def create_amqp_driver(cls) -> Any: ...
     @classmethod
@@ -526,6 +529,7 @@ class Schedule(Facade):
     def run_due(cls, moment: Any) -> Any: ...
 
 class Storage(Facade):
+    extra_package: Any
     @classmethod
     def create_azure_driver(cls, disk: Any = ...) -> Any: ...
     @classmethod

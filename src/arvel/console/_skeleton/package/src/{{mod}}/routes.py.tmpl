@@ -1,0 +1,23 @@
+"""HTTP routes this package can contribute — inert until wired in provider.boot().
+
+Handlers use the same shapes as app route files: type the response with an
+arvel Schema and it lands in the host app's OpenAPI at /schema.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from arvel import Route, Schema
+
+
+class {{cls}}Status(Schema):
+    package: str
+    status: str
+
+
+async def status(request: Any) -> {{cls}}Status:
+    return {{cls}}Status(package="arvel-{{name}}", status="ok")
+
+
+Route.get("/{{name}}/status", status, name="{{name}}.status")

@@ -18,14 +18,25 @@ _S = TypeVar("_S", bound="Settings")
 
 
 class MissingExtraError(RuntimeError):
-    """Raised when a requested driver's optional dependency isn't installed."""
+    """Raised when a requested driver's optional dependency isn't installed.
 
-    def __init__(self, name: str, extra: str | None = None) -> None:
-        super().__init__(f"No driver {name!r}. Install it with: uv add 'arvel[{extra or name}]'")
+    ``package`` names the distribution carrying the extra — ``"arvel"`` for framework
+    drivers, the package's own name (e.g. ``"arvel-ai"``) for ecosystem packages, so
+    the hint is always the actual fix.
+    """
+
+    def __init__(self, name: str, extra: str | None = None, package: str = "arvel") -> None:
+        super().__init__(
+            f"No driver {name!r}. Install it with: uv add '{package}[{extra or name}]'"
+        )
 
 
 class Manager:
     """Base driver manager: resolves + caches drivers, forwards to the default one."""
+
+    #: The distribution named in a MissingExtraError hint — ecosystem packages
+    #: override this with their own name (e.g. ``"arvel-ai"``).
+    extra_package: str = "arvel"
 
     def __init__(self, app: Any = None) -> None:
         self.app = app
@@ -60,10 +71,12 @@ class Manager:
     def _make(self, name: str) -> Any:
         if name in self._creators:
             return self._creators[name](self.app)
-        creator = getattr(self, f"create_{name}_driver", None)
+        # look up on the class, NOT the instance: an instance getattr for a missing
+        # creator would fall into __getattr__ -> driver() -> _make() and recurse
+        creator = getattr(type(self), f"create_{name}_driver", None)
         if creator is not None:
-            return creator()
-        raise MissingExtraError(name)
+            return creator(self)
+        raise MissingExtraError(name, package=self.extra_package)
 
     def __getattr__(self, item: str) -> Any:
         # Forward unknown attributes to the default driver (Cache.get -> driver().get).

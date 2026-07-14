@@ -1,0 +1,19 @@
+name: release
+
+# Tag vX.Y.Z -> build -> publish to PyPI via trusted publishing (no token secrets;
+# configure the publisher once at pypi.org -> project -> Publishing).
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - uses: pypa/gh-action-pypi-publish@release/v1

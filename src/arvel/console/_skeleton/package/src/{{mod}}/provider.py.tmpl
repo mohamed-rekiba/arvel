@@ -1,0 +1,48 @@
+"""{{cls}}ServiceProvider — auto-registered via the ``arvel.providers`` entry point.
+
+Every integration verb a package can use appears below; the inert ones are
+commented out. Uncomment a verb to activate that contribution; delete what you
+don't need (README.md has the keep/delete guide).
+"""
+
+from __future__ import annotations
+
+from arvel.kernel import ServiceProvider
+
+from .commands import cli
+from .config import DEFAULTS
+from .manager import {{cls}}Manager
+
+
+class {{cls}}ServiceProvider(ServiceProvider):
+    def register(self) -> None:
+        # Package config defaults — the host app's own values win on conflict.
+        self.merge_config_from(DEFAULTS, "{{name}}")
+        self.app.singleton("{{name}}", lambda c: {{cls}}Manager(self.app))
+
+    def boot(self) -> None:
+        # CLI: adds `arvel {{name}}:hello` to the host app's console.
+        self.commands(cli)
+
+        # ---- optional contributions (uncomment to activate, delete if unused) ----
+        # from pathlib import Path
+        # _here = Path(__file__).parent
+        #
+        # HTTP routes this package serves (see routes.py):
+        # self.load_routes_from(str(_here / "routes.py"))
+        #
+        # Migrations the host app runs alongside its own:
+        # self.load_migrations_from(str(_here / "migrations"))
+        #
+        # Namespaced views, rendered as "{{name}}::welcome":
+        # self.load_views_from(str(_here / "views"), "{{name}}")
+        #
+        # Namespaced translations, looked up as "{{name}}::messages.hello":
+        # self.load_translations_from(str(_here / "lang"), "{{name}}")
+        #
+        # Files the host app can copy out and own via `arvel vendor:publish`:
+        # self.publishes({str(_here / "config.py"): "config/{{name}}.py"}, tag="config")
+
+    # Defer this provider — zero boot cost until the first app.make("{{name}}"):
+    # def provides(self) -> list[type | str]:
+    #     return ["{{name}}"]
