@@ -90,6 +90,7 @@ nav = [
     { "AI" = [
       { "Overview & Gateway" = "packages/ai.md" },
       { "MCP Server" = "packages/ai-mcp.md" },
+      { "Workflows" = "packages/ai-workflows.md" },
     ] },
   ] },
 
