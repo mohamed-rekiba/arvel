@@ -74,7 +74,6 @@ nav = [
     { "Money" = "money.md" },
     { "Notifications" = "notifications.md" },
     { "OpenAPI" = "openapi.md" },
-    { "Package Development" = "packaging.md" },
     { "Pipeline" = "pipeline.md" },
     { "Processes" = "processes.md" },
     { "Queues" = "queues.md" },
@@ -83,6 +82,11 @@ nav = [
     { "Strings" = "strings.md" },
     { "Task Scheduling" = "scheduling.md" },
     { "Telemetry" = "telemetry.md" },
+  ] },
+
+  { "Packages" = [
+    { "Getting Started" = "packages/getting-started.md" },
+    { "Package Development" = "packages/development.md" },
   ] },
 
   { "Security" = [

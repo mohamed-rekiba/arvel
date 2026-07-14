@@ -26,7 +26,7 @@ Every capability module lazy-imports its engine *inside* the function that needs
 and the CLI's fast paths stay instant. And this isn't a convention that quietly rots: a startup test
 spawns a fresh interpreter and asserts that nothing heavy is loaded after `import arvel`. The weight is
 opt-in, and the framework fails its own build if that ever stops being true. (The full mechanism —
-extras, the import-linter contracts — is in [Packaging & Extras](packaging.md).)
+extras, the import-linter contracts — is in [Packaging & Extras](packages/development.md).)
 
 ## Best-in-class engines, never reinvented
 
@@ -124,5 +124,5 @@ shared backend; shared *code-derived metadata* doesn't.
 
 - [Service Container](container.md) · [Service Providers](providers.md) · [Facades](facades.md) — the
   three working parts of the lifecycle above.
-- [Packaging & Extras](packaging.md) — how "light by default" is built and enforced in CI.
+- [Packaging & Extras](packages/development.md) — how "light by default" is built and enforced in CI.
 - [Cache](cache.md) · [Queues & Jobs](queues.md) — the shared backends to configure before scaling out.

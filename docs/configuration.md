@@ -348,5 +348,5 @@ setting can never disagree with `config()`; there's one pipeline, and everything
 
 - [Service Providers](providers.md) — `merge_config_from` for package config defaults, and boot-time setup.
 - [Service Container](container.md) — how the `config` repository itself is bound and resolved.
-- [Packaging & Extras](packaging.md) — how a capability's config is published into an app.
+- [Packaging & Extras](packages/development.md) — how a capability's config is published into an app.
 - [Encryption](encryption.md) · [Hashing](hashing.md) — the `app.key` and secrets that config carries.

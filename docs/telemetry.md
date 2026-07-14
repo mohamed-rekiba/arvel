@@ -535,4 +535,4 @@ Everything public in `arvel.telemetry`:
 - [Logging](logging.md) — arvel's `Log`, the request/queue log correlation exported here.
 - [Queues & Jobs](queues.md) — the jobs that show up as `job …` spans.
 - [Database & ORM](database/index.md) — the queries that show up as `db …` spans.
-- [Packaging & Extras](packaging.md) — what the `[telemetry]` extra installs.
+- [Packaging & Extras](packages/development.md) — what the `[telemetry]` extra installs.

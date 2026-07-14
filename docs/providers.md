@@ -182,6 +182,6 @@ of them knowing about each other.
 ## See also
 
 - [Service Container](container.md) — what providers register into, and how bindings resolve.
-- [Packaging & Extras](packaging.md) — shipping your provider as an installable package.
+- [Packaging & Extras](packages/development.md) — shipping your provider as an installable package.
 - [Configuration](configuration.md) — the config `merge_config_from` defaults into.
 - [Console](console.md) — the commands a provider contributes; [Routing](routing.md) — its routes.
