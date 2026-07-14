@@ -20,6 +20,7 @@ from arvel.search import SearchDriver
         (CacheDriver.REDIS, "redis"),
         (QueueDriver.AMQP, "amqp"),
         (MailDriver.SMTP, "smtp"),
+        (MailDriver.ROUND_ROBIN, "round_robin"),
         (SearchDriver.MEILISEARCH, "meilisearch"),
         (BroadcastDriver.LOG, "log"),
     ],

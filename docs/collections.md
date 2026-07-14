@@ -82,6 +82,36 @@ collect(users).every(lambda u: u.active)   # all match?
 collect(users).is_empty()
 ```
 
+## Lazy collections
+
+A `Collection` is eager — each step builds a new list. For a **large or streaming** source (a big
+file, a generator, a paginated API) where you don't want the whole thing in memory, use a
+`LazyCollection`: it chains `map`/`filter`/`each`/`take` as generators and only pulls items as the
+final step consumes them. Start one from a generator/iterable directly, or `.lazy()` off a
+Collection:
+
+```python
+from arvel.support import LazyCollection
+
+def read_rows():                       # a generator — nothing loaded yet
+    with open("huge.csv") as f:
+        yield from f
+
+first_ten_active = (
+    LazyCollection(read_rows)
+    .map(parse)
+    .filter(lambda r: r.active)
+    .take(10)                          # stops reading the file after 10 matches
+    .to_list()
+)
+
+collect(items).lazy().filter(...).first()   # or drop into lazy mode from a Collection
+```
+
+`take`/`first` **short-circuit** — they stop consuming the source as soon as they have enough, so an
+infinite or huge source is fine. Call `.collect()` (or `.to_list()`) to materialize back into an
+eager `Collection`/list once the set is small.
+
 ## See also
 
 - [Strings](strings.md) — the same fluent style over a single string.

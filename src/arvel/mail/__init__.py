@@ -56,6 +56,7 @@ class MailDriver(StrEnum):
     SMTP = "smtp"
     LOG = "log"
     FAILOVER = "failover"
+    ROUND_ROBIN = "round_robin"
 
 
 class MailSettings(Settings):
