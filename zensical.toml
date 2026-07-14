@@ -87,6 +87,10 @@ nav = [
   { "Packages" = [
     { "Getting Started" = "packages/getting-started.md" },
     { "Package Development" = "packages/development.md" },
+    { "AI" = [
+      { "Overview & Gateway" = "packages/ai.md" },
+      { "MCP Server" = "packages/ai-mcp.md" },
+    ] },
   ] },
 
   { "Security" = [
