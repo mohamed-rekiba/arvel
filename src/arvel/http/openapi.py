@@ -158,12 +158,15 @@ def openapi_config(json_plugin: Any = None) -> Any:
         kwargs["tags"] = [Tag(**tag) for tag in s.tags]
     if s.external_docs:
         kwargs["external_docs"] = ExternalDocumentation(**s.external_docs)
+    # Litestar serves render_plugins[0] at the docs *root* (`path`, e.g. /docs), so the human UI must
+    # come first — otherwise /docs returns the raw schema instead of the Swagger/ReDoc page. The JSON
+    # renderer stays registered (it just isn't first), so the raw document is still at <path>/openapi.json.
     plugins: list[Any] = []
-    if json_plugin is not None:
-        plugins.append(json_plugin)  # arvel's JSON renderer injects pipeline-decoded request bodies
     ui = render_plugin(s.ui)
     if ui is not None:
         plugins.append(ui)
+    if json_plugin is not None:
+        plugins.append(json_plugin)  # arvel's JSON renderer injects pipeline-decoded request bodies
     if plugins:
         kwargs["render_plugins"] = plugins
     schemes, default_security = security_schemes(s.security)
