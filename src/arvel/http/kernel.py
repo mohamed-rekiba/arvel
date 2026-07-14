@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 # one compiled route: (methods, path, handler, group, route_middleware, name, security,
 # status_code, wheres, missing_callback, without_middleware, domain, scope_bindings, trashed_all,
-# trashed_params)
+# trashed_params, include_in_schema)
 _RouteEntry = tuple[
     list[str],
     str,
@@ -44,6 +44,7 @@ _RouteEntry = tuple[
     bool,
     bool,
     frozenset[str],
+    bool,
 ]
 
 _PARAM = re.compile(r"\{(\w+)(?::(\w+))?(\?)?\}")
@@ -221,6 +222,7 @@ class HttpKernel:
         scope_bindings: bool = False,
         trashed_all: bool = False,
         trashed_params: Sequence[str] | None = None,
+        include_in_schema: bool = True,
     ) -> None:
         self._routes.append(
             (
@@ -239,6 +241,7 @@ class HttpKernel:
                 scope_bindings,
                 trashed_all,
                 frozenset(trashed_params or ()),
+                include_in_schema,
             )
         )
 
@@ -704,6 +707,8 @@ class HttpKernel:
                 extra["operation_id"] = name
         if security:
             extra["security"] = [{openapi.SECURITY_SCHEME_KEYS.get(s, s): []} for s in security]
+        if not candidates[0][15]:  # .hidden() — keep this route out of the OpenAPI schema
+            extra["include_in_schema"] = False
         route_path = litestar_paths[0] if len(litestar_paths) == 1 else litestar_paths
         return route_handler(path=route_path, http_method=methods, **extra)(adapter)
 

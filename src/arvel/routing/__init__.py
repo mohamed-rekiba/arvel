@@ -130,6 +130,15 @@ class RouteDefinition:
     scoped: bool = False  # `.scope_bindings()` — resolve implicit child bindings within the parent
     trashed_all: bool = False  # `.with_trashed()` with no args — every bound param on this route
     trashed_params: set[str] = field(default_factory=set[str])  # `.with_trashed(*params)`
+    include_in_schema: bool = True  # `.hidden()` drops it from the OpenAPI document
+
+    def hidden(self) -> RouteDefinition:
+        """Keep this route out of the generated OpenAPI document (and the docs UI). For operational
+        endpoints that aren't part of the API contract — health/liveness probes, webhooks, internal
+        callbacks — that orchestrators or infrastructure call, not API clients. The route still
+        works; it just isn't advertised in the schema."""
+        self.include_in_schema = False
+        return self
 
     def status(self, code: int) -> RouteDefinition:
         """Pin this route's success response status. Lets a
@@ -668,6 +677,7 @@ class Router:
                 scope_bindings=route.scoped,
                 trashed_all=route.trashed_all,
                 trashed_params=list(route.trashed_params),
+                include_in_schema=route.include_in_schema,
             )
         for path, handler, name in self._websockets:
             kernel.add_websocket(path, handler, name)
