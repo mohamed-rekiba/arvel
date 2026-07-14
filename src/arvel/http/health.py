@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from arvel.http.response import Response
 from arvel.http.response import json as json_response
 from arvel.validation import Schema
 
@@ -30,6 +29,12 @@ class HealthReport(Schema):
     status: str  # worst-case: ok | degraded | failed
     healthy: bool  # false when a critical resource is down (→ 503)
     resources: dict[str, ResourceHealth]
+
+
+class LivenessStatus(Schema):
+    """The liveness probe's response."""
+
+    status: str
 
 
 async def health(_request: Any = None) -> HealthReport:
@@ -55,7 +60,6 @@ async def health(_request: Any = None) -> HealthReport:
     return json_response(body, status=200 if report.healthy else 503)  # type: ignore[return-value]
 
 
-async def liveness(_request: Any = None) -> Response:
-    """Process-is-alive. No dependency checks — always ``200`` while the worker can serve. Hidden
-    from the OpenAPI schema (infra probe)."""
-    return json_response({"status": "ok"})
+async def liveness(_request: Any = None) -> LivenessStatus:
+    """Process-is-alive. No dependency checks — always ``200`` while the worker can serve."""
+    return LivenessStatus(status="ok")

@@ -72,14 +72,14 @@ class RoutingServiceProvider(ServiceProvider):
             self.app.make("router").get("/metrics", prometheus_metrics, name="telemetry.metrics")
 
         # Health probes (DR-0039): /health is the readiness check — runs every registered resource's
-        # health check in parallel and 503s when a critical one is down (typed, so it shows in the
-        # docs). /livez is a cheap liveness probe, hidden from the schema (infra, not API).
+        # health check in parallel and 503s when a critical one is down; /livez is a cheap liveness
+        # probe (process is up). Both are typed, so their responses show in the docs.
         if self.app.bound("router"):
             from arvel.http.health import health, liveness
 
             router = self.app.make("router")
             router.get("/health", health, name="health")
-            router.get("/livez", liveness, name="health.live").hidden()
+            router.get("/livez", liveness, name="health.live")
 
         # The channel-authorization endpoint (spec 19): needs BOTH the authenticated user (auth)
         # and the channel-callback registry (broadcasting) — routing is the top layer, so it can
