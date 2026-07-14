@@ -208,10 +208,12 @@ class EventDispatcher(Protocol):
 
 
 class HealthStatus(StrEnum):
-    """The outcome of a resource health check, worst-last so ``max`` rolls up an aggregate.
+    """The outcome of a resource health check.
 
     ``OK`` = healthy; ``DEGRADED`` = usable but impaired (a non-critical dependency down, a
-    replica lagging); ``FAILED`` = unusable. The aggregate status is the worst of its members.
+    replica lagging); ``FAILED`` = unusable. The aggregate status is the worst of its members —
+    ranked by an explicit severity map, *not* ``max`` over the enum (a ``StrEnum`` compares by
+    string value, where ``"ok"`` would sort highest).
     """
 
     OK = "ok"

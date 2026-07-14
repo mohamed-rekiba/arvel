@@ -198,3 +198,55 @@ async def test_application_boot_starts_and_terminate_shuts_down_resources() -> N
     assert resource.connected  # startup ran during boot
     await app.terminate()
     assert resource.disconnected  # shutdown ran during terminate
+
+
+async def test_startup_retries_a_transient_check_failure() -> None:
+    """A check that fails once then succeeds within boot_retries is retried, not failed — locks the
+    _retry backoff loop."""
+    attempts = {"n": 0}
+
+    class Flaky:
+        name = "flaky"
+        critical = False
+
+        async def check(self) -> HealthResult:
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                raise RuntimeError("transient")
+            return HealthResult(HealthStatus.OK, detail="recovered")
+
+    manager = ResourceManager(boot_retries=1)
+    manager.register(Flaky())
+    report = await manager.startup()
+    assert attempts["n"] == 2  # failed once, retried once, then succeeded
+    assert report.results["flaky"].status is HealthStatus.OK
+    assert report.ok == 1
+
+
+async def test_health_endpoint_withholds_failure_detail_unless_debug() -> None:
+    """The /health body must not leak a failed resource's raw exception string (internal
+    hostnames/ports) to an unauthenticated caller in production — only under app.debug."""
+    from arvel.http.health import health
+    from arvel.kernel import set_application
+
+    class Down:
+        name = "cache"
+        critical = False
+
+        async def check(self) -> HealthResult:
+            raise RuntimeError("Error 111 connecting to redis-host:6379")
+
+    async def detail_for(debug: bool) -> str | None:
+        app = Application()
+        app.make("config").set("app.debug", debug)
+        set_application(app)
+        try:
+            app.resources.register(Down())
+            resp = await health()
+            return resp.content.resources["cache"].detail
+        finally:
+            set_application(None)
+
+    assert await detail_for(False) is None  # production: withheld
+    shown = await detail_for(True)
+    assert shown is not None and "redis-host" in shown  # debug: shown for local diagnosis

@@ -4,7 +4,12 @@
 ``ResourceManager`` the startup gate uses) in parallel and returns ``503`` when a **critical**
 resource is down (a degraded non-critical one stays ``200``). It's typed, so the response shape shows
 up in the OpenAPI docs. ``/livez`` is a cheap **liveness** probe — the process is up, no dependency
-I/O — and is hidden from the schema (an infra endpoint for orchestrators, not part of the API).
+I/O. Both are typed and appear in the schema.
+
+The failure ``detail`` (an exception string that can carry internal hostnames/ports) is only exposed
+in the body under ``app.debug``; in production the endpoint reports status/latency but withholds the
+raw detail, matching the framework's error-rendering policy. The full detail always goes to the
+server-side log (``resource.check``).
 """
 
 from __future__ import annotations
@@ -42,7 +47,11 @@ async def health(_request: Any = None) -> HealthReport:
     failed (degraded non-criticals included), ``503`` otherwise."""
     from arvel.kernel import app
 
-    report = await app().resources.check_all()
+    application = app()
+    report = await application.resources.check_all()
+    # a failed check's detail is a raw exception string (internal hostnames/ports, maybe a DSN) —
+    # only surface it to the caller under debug; the full detail is always in the server-side log.
+    debug = bool(application.config("app.debug", False))
     body = HealthReport(
         status=str(report.status),
         healthy=report.healthy,
@@ -50,7 +59,7 @@ async def health(_request: Any = None) -> HealthReport:
             name: ResourceHealth(
                 status=str(result.status),
                 latency_ms=round(result.latency_ms, 1),
-                detail=result.detail,
+                detail=result.detail if debug else None,
             )
             for name, result in report.results.items()
         },
