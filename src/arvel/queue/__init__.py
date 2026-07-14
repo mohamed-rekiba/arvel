@@ -121,7 +121,9 @@ class Job:
     __arvel_chain__: list[str] | None = None
     __arvel_chain_catch__: str | None = None
     __arvel_batch__: Any = None
-    __arvel_log_context__: dict[str, Any] | None = None  # dispatcher's bound log context, propagated
+    __arvel_log_context__: dict[str, Any] | None = (
+        None  # dispatcher's bound log context, propagated
+    )
 
     async def handle(self) -> Any:
         raise NotImplementedError(f"{type(self).__name__} must implement handle()")
@@ -337,8 +339,10 @@ class DurableJobs:
             if override is not None:
                 # refine the visibility deadline to the job's own window (still before any push, so a
                 # crash here only re-queues an unpushed job — never double-executes a running one)
-                await QueuedJob.where("id", "=", row.id).where("reserved_at", "=", moment).update(
-                    {"reserved_until": moment + int(override)}
+                await (
+                    QueuedJob.where("id", "=", row.id)
+                    .where("reserved_at", "=", moment)
+                    .update({"reserved_until": moment + int(override)})
                 )
             await self._push(job, queue=row.queue)
             await row.delete()
