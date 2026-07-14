@@ -20,6 +20,13 @@ class {{cls}}ServiceProvider(ServiceProvider):
         self.merge_config_from(DEFAULTS, "{{name}}")
         self.app.singleton("{{name}}", lambda c: {{cls}}Manager(self.app))
 
+        # HTTP routes MUST be contributed here (not in boot): route files load
+        # right after provider registration, while the async boot loop runs
+        # later in the ASGI lifespan. Route files also load by PATH — use
+        # absolute imports inside routes.py, never relative ones.
+        # from pathlib import Path
+        # self.load_routes_from(str(Path(__file__).parent / "routes.py"))
+
     def boot(self) -> None:
         # CLI: adds `arvel {{name}}:hello` to the host app's console.
         self.commands(cli)
@@ -27,9 +34,6 @@ class {{cls}}ServiceProvider(ServiceProvider):
         # ---- optional contributions (uncomment to activate, delete if unused) ----
         # from pathlib import Path
         # _here = Path(__file__).parent
-        #
-        # HTTP routes this package serves (see routes.py):
-        # self.load_routes_from(str(_here / "routes.py"))
         #
         # Migrations the host app runs alongside its own:
         # self.load_migrations_from(str(_here / "migrations"))

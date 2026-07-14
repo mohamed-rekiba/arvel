@@ -77,6 +77,10 @@ registering itself.
 
 - **Forgetting the entry point** — a renamed provider class must be updated in
   `pyproject.toml` under `arvel.providers`, or nothing registers (silently).
+- **Route files wire in `register()`, not `boot()`** — the app loads route
+  files right after provider registration; the async boot loop runs later, so
+  a `boot()`-time `load_routes_from` silently misses the window. And because
+  route files load by path, use absolute imports inside them.
 - **A top-level heavy import** — breaks the host app's startup guarantee; the
   generated import-linter contract fails your CI first. Keep engines inside
   driver methods.
