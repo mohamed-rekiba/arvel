@@ -159,15 +159,15 @@ class ExceptionHandler:
         if write_default and self._logger is not None:
             context = self._merged_context(exc)
             log = getattr(self._logger, self._level_of(exc), self._logger.error)
-            # a 3-tuple, not the bare exception: third-party structlog processors (the telemetry OTel
-            # log bridge) unpack exc_info as (type, value, tb) and choke on an instance
-            log(
-                "unhandled_exception",
-                **context,
-                error=repr(exc),
-                kind=type(exc).__name__,
-                exc_info=(type(exc), exc, exc.__traceback__),
-            )
+            extra: dict[str, Any] = {}
+            # A stack trace only helps for an *unexpected* error. A deliberate HTTP error (abort(),
+            # validation, authorization — anything carrying a status code) is self-explanatory from
+            # its message, so log it as one concise line, not a wall of framework frames. Only a
+            # genuine bug (no status) gets the traceback. The 3-tuple form (not the bare exception)
+            # keeps third-party structlog processors — the telemetry OTel log bridge — from choking.
+            if getattr(exc, "status", None) is None and getattr(exc, "status_code", None) is None:
+                extra["exc_info"] = (type(exc), exc, exc.__traceback__)
+            log("unhandled_exception", **context, error=repr(exc), kind=type(exc).__name__, **extra)
 
     def try_render(self, request: Any, exc: BaseException) -> Any | None:
         """First non-``None`` result from the exception's own ``render(request)`` method, then

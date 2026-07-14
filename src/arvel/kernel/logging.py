@@ -97,7 +97,18 @@ def configure_logging(*, json_logs: bool = False) -> None:
         )
         processors.append(structlog.processors.JSONRenderer())
     else:
-        processors.append(structlog.dev.ConsoleRenderer())
+        # exclude frame locals from the console traceback too (the JSON path already does): dumping
+        # every frame's locals makes a 5xx an unreadable wall AND leaks request data/passwords/tokens
+        # that routinely sit in locals. A bounded width keeps the pretty traceback readable.
+        processors.append(
+            structlog.dev.ConsoleRenderer(
+                exception_formatter=structlog.dev.RichTracebackFormatter(
+                    show_locals=False,  # locals leak request data/tokens and bloat the trace
+                    extra_lines=0,  # just the failing line per frame, not a wall of source context
+                    width=100,
+                )
+            )
+        )
     structlog.configure(processors=processors)
     # e.g. telemetry re-asserts its OTel log bridge, which this rebuild would otherwise drop
     for hook in _post_configure_hooks:
