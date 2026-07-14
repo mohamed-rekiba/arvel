@@ -762,7 +762,7 @@ class CacheManager(Manager):
         driver = stores[name].get("driver", name) if name in stores else name
         creator = getattr(self, f"create_{driver}_driver", None)
         if creator is None:
-            raise MissingExtraError(driver)
+            raise MissingExtraError(driver, package=self.extra_package)
         return creator(name)
 
     def _build(self, url: str, *, driver: str, **backend_options: Any) -> CacheRepository:
