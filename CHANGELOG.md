@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.64.0](https://github.com/mohamed-rekiba/arvel/compare/v0.63.4...v0.64.0) (2026-07-14)
+
+
+### Features
+
+* **filesystem,cache:** typed driver enums (FilesystemDriver / CacheDriver) ([98b4fee](https://github.com/mohamed-rekiba/arvel/commit/98b4feed34c7101361c9a64f1bb954c586d1c8bd))
+* **health:** document /livez in the schema (typed liveness response) ([f836753](https://github.com/mohamed-rekiba/arvel/commit/f8367530a21bfdec17841d1223cac89546f04cd9))
+* **mail:** MailDriver.ROUND_ROBIN + docs: LazyCollection ([f9b49aa](https://github.com/mohamed-rekiba/arvel/commit/f9b49aace10f9df2fea7d14b2f1da2062fbb1a0a))
+* **queue,logging:** propagate request log context into job logs ([52fe883](https://github.com/mohamed-rekiba/arvel/commit/52fe88313041645237284ae81e4eb8fb5fea918d))
+* **queue,mail,search,broadcasting:** typed driver enums + DLQ docs ([b425cb5](https://github.com/mohamed-rekiba/arvel/commit/b425cb5df3a1d89f9998bd49b48cb9c6f5161406))
+* **resources:** unified resource lifecycle & health checks (DR-0039) ([2104ff8](https://github.com/mohamed-rekiba/arvel/commit/2104ff87d6225891858bcb52a6ebb3a7801f78b9))
+* **routing:** .hidden() to exclude a route from OpenAPI; single typed /health ([968585e](https://github.com/mohamed-rekiba/arvel/commit/968585e91fa4bfad6b28aba4ba286f0dd475cd20))
+* **routing:** warn at startup when public_dir is set but index.html is missing ([83bb881](https://github.com/mohamed-rekiba/arvel/commit/83bb8819f22ed22e49e28835935f3803816b166b))
+
+
+### Bug Fixes
+
+* **errors:** keep 5xx logs concise — no stack wall for deliberate HTTP errors ([dc03801](https://github.com/mohamed-rekiba/arvel/commit/dc038014da4be6e0dcdb262d892d07abbf4fcf9a))
+* **errors:** log 5xx server errors (report gap + OTel exc_info bridge) ([9fd3990](https://github.com/mohamed-rekiba/arvel/commit/9fd3990ba191cdb83cb80607804d4d588ba16581))
+* **health:** don't leak failure detail on the public /health endpoint ([6dc6702](https://github.com/mohamed-rekiba/arvel/commit/6dc6702a603eca4c283af83bbeadc5d9178d8755))
+* **openapi:** serve the docs UI at /docs, not the raw schema ([dbdbaf4](https://github.com/mohamed-rekiba/arvel/commit/dbdbaf42afeb38be0fe48f6d768cb281b5626dc4))
+* **queue:** quarantine a poison payload instead of stalling the loop ([5848660](https://github.com/mohamed-rekiba/arvel/commit/5848660f2ce82eca10c429907c0f09b4d7d90509))
+* remediate Python-quality audit findings ([b4e11ec](https://github.com/mohamed-rekiba/arvel/commit/b4e11ec4a2c816bb674213f44190bd296bbc0f8c))
+* remediate remaining audit findings (round 2) ([3f1b94b](https://github.com/mohamed-rekiba/arvel/commit/3f1b94bcafbce113c443bb001f867f90a6eb9651))
+
+
+### Documentation
+
+* **auth:** comprehensive authentication overview ([1743005](https://github.com/mohamed-rekiba/arvel/commit/1743005362c020c90bcad31a7b44a7e84bb5bf55))
+* fill the gaps a coverage audit found (commands + signing) ([0bf62fd](https://github.com/mohamed-rekiba/arvel/commit/0bf62fdb55bb00e87d9e8886e4d8ec188d762d41))
+* fix broken cross-doc anchor (queues → logging correlation) ([3e81524](https://github.com/mohamed-rekiba/arvel/commit/3e8152418bb281686da3e1c78c1ef5b47b398d5a))
+* **telemetry:** comprehensive rewrite ([1168c4f](https://github.com/mohamed-rekiba/arvel/commit/1168c4f5c4195e0e3387d9fe041a6db2b2d77d7e))
+* update for round-2 changes ([6fe2ef1](https://github.com/mohamed-rekiba/arvel/commit/6fe2ef1f82da805ba6102e10e83122d23117028c))
+
 ## [0.63.4](https://github.com/mohamed-rekiba/arvel/compare/v0.63.3...v0.63.4) (2026-07-13)
 
 
