@@ -369,6 +369,18 @@ class Router:
         from pathlib import Path as _Path
 
         root = _Path(directory).resolve()
+        if spa_fallback and not (root / "index.html").is_file():
+            # warn at startup, not just on the first unmatched request (which 500s): spa_fallback
+            # needs an index.html to fall back to, and its absence usually means the frontend isn't
+            # built. A loud boot warning beats a mysterious 500 later.
+            from arvel.kernel.logging import LogManager
+
+            LogManager().channel("routing").warning(
+                "public.missing_index",
+                directory=str(root),
+                hint="spa_fallback is enabled but index.html is missing — build the frontend, or "
+                "pass spa_fallback=False; unmatched routes will 500 until then",
+            )
 
         def _locate(rel: str, fallback: bool) -> tuple[str, Any]:
             """Resolve, traversal-guard, and read in ONE worker-thread hop — every stat and the
