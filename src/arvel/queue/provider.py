@@ -65,4 +65,13 @@ class QueueServiceProvider(ServiceProvider):
         self.app.singleton("broadcast_dispatcher", make_broadcast_dispatcher)
 
     def boot(self) -> None:
-        """No-op."""
+        # Register the queue backing store as a health check (DR-0039). Check-only: the broker
+        # connection is the worker's to own — the web process just verifies reachability.
+        from arvel.queue import QueueSettings
+        from arvel.queue.resource import QueueResource
+
+        settings = QueueSettings()
+        critical = bool(self.app.config("queue.critical", False))
+        self.app.resources.register(
+            QueueResource(settings.default, settings.url, critical=critical)
+        )

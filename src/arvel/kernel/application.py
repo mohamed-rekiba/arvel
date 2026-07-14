@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
     from arvel.contracts import ServiceProvider
+    from arvel.kernel.resources import ResourceManager
     from arvel.kernel.service_provider import ServiceProvider as ProviderBase
 
 #: A provider given to the builder: a ``ServiceProvider`` instance, or its class
@@ -55,6 +56,7 @@ class Application(Container):
         self.bootstrapped = False  # sync bootstrap_app() has run (idempotency guard)
         self._terminating: list[Callable[[], Any]] = []
         self._hooks: dict[str, list[Callable[[Application], Any]]] = {}
+        self._resource_manager: ResourceManager | None = None
         self.instance("app", self)
         self.instance(Container, self)
         self.instance(Application, self)
@@ -203,6 +205,7 @@ class Application(Container):
             await self._boot_provider(provider)
         self._register_translation_namespaces()
         self._apply_builder_overrides()
+        await self._start_resources()
         self._booted = True
         await self._fire("booted")
 
@@ -245,6 +248,29 @@ class Application(Container):
         if callable(register):
             for namespace, path in namespaces.items():
                 register(namespace, path)
+
+    @property
+    def resources(self) -> ResourceManager:
+        """The resource lifecycle & health-check manager (DR-0039). Capability providers register
+        their external dependencies here in ``boot()`` (``app.resources.register(...)``); the manager
+        connects + health-checks them in parallel at boot and disconnects them at shutdown. Created
+        lazily on first access so an app that registers nothing pays nothing."""
+        if self._resource_manager is None:
+            from arvel.kernel.resources import ResourceManager
+
+            self._resource_manager = ResourceManager()
+        return self._resource_manager
+
+    async def _start_resources(self) -> None:
+        """Run the resource startup gate (parallel connect + health-check) after all providers have
+        booted and registered their resources. Registers the parallel shutdown as a ``terminating``
+        callback first, so both a clean shutdown and a boot aborted by a failed critical resource
+        (which routes through ``terminate()``) release the connections."""
+        manager = self._resource_manager
+        if manager is None or not manager.resources:
+            return
+        self.terminating(manager.shutdown)
+        await manager.startup()
 
     async def _boot_provider(self, provider: ServiceProvider) -> None:
         result = self.call((provider, "boot"))

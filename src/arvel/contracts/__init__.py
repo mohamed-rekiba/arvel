@@ -18,6 +18,8 @@ Grounded in knowledge/port/02-container.md and 03-application-providers-bootstra
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, overload, runtime_checkable
 
 T = TypeVar("T")
@@ -205,6 +207,60 @@ class EventDispatcher(Protocol):
     def forget(self, event: Any) -> None: ...
 
 
+class HealthStatus(StrEnum):
+    """The outcome of a resource health check, worst-last so ``max`` rolls up an aggregate.
+
+    ``OK`` = healthy; ``DEGRADED`` = usable but impaired (a non-critical dependency down, a
+    replica lagging); ``FAILED`` = unusable. The aggregate status is the worst of its members.
+    """
+
+    OK = "ok"
+    DEGRADED = "degraded"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True, slots=True)
+class HealthResult:
+    """A single resource's health check outcome — the value a ``Resource.check`` returns and the
+    unit the startup report and ``/health`` endpoint aggregate over."""
+
+    status: HealthStatus
+    latency_ms: float = 0.0
+    #: Human-readable context: ``"PING 2ms"`` on success, an error string on failure.
+    detail: str | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.status is HealthStatus.OK
+
+
+@runtime_checkable
+class Resource(Protocol):
+    """A health-checkable external dependency (database, cache, queue, …). The one contract every
+    resource implements: identity + a health probe. Lifecycle (connect/disconnect) is the separate,
+    optional :class:`ManagedLifecycle` — a resource with nothing to open need not implement it.
+
+    ``critical`` decides startup policy: a failed *critical* resource aborts boot; a failed
+    non-critical one degrades and boot continues. ``name`` is a stable, namespaced identifier
+    (``"database"``, ``"queue:default"``) used in reports and the ``/health`` body.
+    """
+
+    name: str
+    critical: bool
+
+    async def check(self) -> HealthResult: ...
+
+
+@runtime_checkable
+class ManagedLifecycle(Protocol):
+    """Opt-in connect/disconnect for a stateful :class:`Resource`. The manager probes for this
+    (``isinstance``) and only drives lifecycle on resources that declare it — so a resource with
+    no connection to open or close is never forced to stub these."""
+
+    async def connect(self) -> None: ...
+    async def disconnect(self) -> None: ...
+
+
 __all__ = [
     "Abstract",
     "Application",
@@ -214,8 +270,12 @@ __all__ = [
     "Container",
     "EventDispatcher",
     "ExceptionHandler",
+    "HealthResult",
+    "HealthStatus",
     "Logger",
+    "ManagedLifecycle",
     "ModelHost",
+    "Resource",
     "ServiceProvider",
     "Translator",
 ]

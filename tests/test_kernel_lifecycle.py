@@ -35,14 +35,22 @@ async def test_lifespan_loads_dotenv(tmp_path: Path, monkeypatch: pytest.MonkeyP
         set_application(None)
 
 
-async def test_database_provider_registers_graceful_dispose() -> None:
+async def test_database_provider_registers_health_checked_resource() -> None:
+    # DB teardown now rides the resource lifecycle (DatabaseResource.disconnect -> dispose), driven
+    # by the ResourceManager at shutdown — not a bare terminating hook on the provider (DR-0039).
     app = Application()
-    provider = DatabaseServiceProvider(app)
-    provider.register()
-    provider.boot()
-    assert len(app._terminating) == 1
-    await app.terminate()  # disposes pools (no-op when no engines created) without error
-    set_application(None)
+    app.make("config").set(
+        "database",
+        {"default": "pg", "connections": {"pg": {"url": "sqlite+aiosqlite:///:memory:"}}},
+    )
+    set_application(app)
+    try:
+        provider = DatabaseServiceProvider(app)
+        provider.register()
+        provider.boot()
+        assert "database" in [r.name for r in app.resources.resources]
+    finally:
+        set_application(None)
 
 
 def test_database_settings_reads_config_and_preserves_driver_keys() -> None:

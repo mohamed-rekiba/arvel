@@ -48,13 +48,15 @@ class DatabaseServiceProvider(ServiceProvider):
         self.app.singleton("migrator", make_migrator)
 
     def boot(self) -> None:
-        # Graceful shutdown: dispose engine pools when the app terminates.
         app = self.app
 
-        async def dispose_pools() -> None:
-            await app.make("db").dispose()
+        # Register the database as a health-checked resource (DR-0039). It owns its own lifecycle —
+        # connect warms + verifies the pool, disconnect disposes it — so no separate terminating hook.
+        if DatabaseSettings().connections:
+            from arvel.database.resource import DatabaseResource
 
-        app.terminating(dispose_pools)
+            critical = bool(app.config("database.critical", True))
+            app.resources.register(DatabaseResource(app.make("db"), critical=critical))
 
         # runs in boot so every provider's load_migrations_from() has already appended its paths
         if not app.bound("migrations"):

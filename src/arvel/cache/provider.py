@@ -26,13 +26,15 @@ class CacheServiceProvider(ServiceProvider):
         self.app.singleton("redis", make_redis)
 
     def boot(self) -> None:
-        # Graceful shutdown: close pooled redis connections when the app terminates.
+        # Register the cache as a health-checked resource (DR-0039). It owns its lifecycle — a redis
+        # PING for connect/check, and disconnect drains the pooled redis + cache-lock clients — so
+        # the teardown lives with the resource instead of a standalone terminating hook.
         app = self.app
+        from arvel.cache import CacheSettings
+        from arvel.cache.resource import CacheResource
 
-        async def close_redis() -> None:
-            if app.bound("redis"):
-                await app.make("redis").close_all()
-            if app.bound("cache"):
-                await app.make("cache").close()  # drain the cache lock client(s)
-
-        app.terminating(close_redis)
+        driver = CacheSettings().default
+        critical = bool(app.config("cache.critical", False))
+        app.resources.register(
+            CacheResource(driver, app.make("redis"), app.make("cache"), critical=critical)
+        )
