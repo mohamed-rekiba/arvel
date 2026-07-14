@@ -177,6 +177,50 @@ def test_arvel_log_facade_exports_to_otel_with_trace_context() -> None:
         set_application(None)
 
 
+def test_log_with_exc_info_forwards_to_otel_without_crashing() -> None:
+    """A log carrying ``exc_info`` must reach OTel as a real (type, value, tb) tuple — the bridge
+    used to stringify it onto the record, so OTel's ``type, value, tb = record.exc_info`` unpacked a
+    string and raised ``too many values to unpack``. Regression for the 5xx error-logging path."""
+    import structlog
+    from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    import arvel.telemetry
+    from arvel import Log
+    from arvel.kernel import Application, set_application
+    from arvel.kernel.logging import configure_logging
+    from arvel.kernel.provider import KernelServiceProvider
+
+    log_exporter = InMemoryLogRecordExporter()
+    app = Application()
+    KernelServiceProvider(app).register()
+    set_application(app)
+    try:
+        configure_logging()
+        result = configure(exporter=InMemorySpanExporter(), log_exporter=log_exporter)
+        assert result is not None
+
+        try:
+            raise ValueError("boom-in-handler")
+        except ValueError as exc:
+            # must not raise through the OTel bridge (the pre-fix crash was here, at log time)
+            Log.channel("http").error("unhandled_exception", exc_info=exc)
+        result.logger_provider.force_flush()
+
+        record = next(
+            r.log_record
+            for r in log_exporter.get_finished_logs()
+            if r.log_record.body == "unhandled_exception"
+        )
+        # the exception was forwarded, not stringified — OTel extracted its type from a real tuple
+        assert record.attributes is not None
+        assert record.attributes.get("exception.type") == "ValueError"
+    finally:
+        arvel.telemetry._otel_log_handler = None
+        structlog.reset_defaults()
+        set_application(None)
+
+
 def test_tracer_helper_returns_a_usable_tracer() -> None:
     span_tracer = tracer("arvel.test")
     with span_tracer.start_as_current_span("unit"):

@@ -159,7 +159,15 @@ class ExceptionHandler:
         if write_default and self._logger is not None:
             context = self._merged_context(exc)
             log = getattr(self._logger, self._level_of(exc), self._logger.error)
-            log("unhandled_exception", **context, error=repr(exc), kind=type(exc).__name__)
+            # a 3-tuple, not the bare exception: third-party structlog processors (the telemetry OTel
+            # log bridge) unpack exc_info as (type, value, tb) and choke on an instance
+            log(
+                "unhandled_exception",
+                **context,
+                error=repr(exc),
+                kind=type(exc).__name__,
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
 
     def try_render(self, request: Any, exc: BaseException) -> Any | None:
         """First non-``None`` result from the exception's own ``render(request)`` method, then

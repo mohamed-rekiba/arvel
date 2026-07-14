@@ -296,7 +296,9 @@ _LOG_LEVELS = {
     "exception": 40,
 }
 # event-dict keys not worth duplicating as OTel attributes (the body, plus renderer-added fields).
-_SKIP_LOG_KEYS = frozenset({"event", "level", "timestamp"})
+# ``exc_info`` is handled specially below — it must reach the record as a real (type, value, tb)
+# tuple, never a stringified attribute (OTel unpacks ``record.exc_info`` as a 3-tuple).
+_SKIP_LOG_KEYS = frozenset({"event", "level", "timestamp", "exc_info"})
 
 
 def _otel_log_processor(
@@ -318,6 +320,18 @@ def _otel_log_processor(
                 setattr(
                     record, key, value if isinstance(value, (str, int, float, bool)) else str(value)
                 )
+        # exc_info must land on the record as a real (type, value, tb) tuple — OTel unpacks it as
+        # one — so normalize whatever structlog carries (an exception instance, True, or a tuple)
+        # instead of stringifying it like the attributes above (which corrupted it into a crash).
+        exc_info = event_dict.get("exc_info")
+        if exc_info:
+            import sys
+
+            if isinstance(exc_info, BaseException):
+                exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
+            elif exc_info is True:
+                exc_info = sys.exc_info()
+            record.exc_info = exc_info if isinstance(exc_info, tuple) else None
         handler.handle(record)
     return event_dict
 

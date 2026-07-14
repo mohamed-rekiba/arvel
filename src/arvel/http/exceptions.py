@@ -82,6 +82,21 @@ def is_inertia(request: Any) -> bool:
     return str(_headers(request).get("x-inertia") or "").lower() == "true"
 
 
+def _report_server_error(exc: Any) -> None:
+    """Route a 5xx through the app's ``ExceptionHandler.report()`` so it is logged — honoring the
+    app's ``dont_report``/``level`` policy. ``report()`` is idempotent (it marks the exception), so
+    this is safe even when ``_handle_uncaught`` already reported the same exception. Fully guarded:
+    the error renderer must never itself raise. This is the seam that makes 5xx ``HttpException``s
+    (which Litestar routes straight here, bypassing ``_handle_uncaught``) leave a server-side trace."""
+    import contextlib
+
+    with contextlib.suppress(Exception):
+        from arvel.kernel import app, has_application
+
+        if has_application() and app().bound("exceptions"):
+            app().make("exceptions").report(exc)
+
+
 def render_exception(request: Any, exc: Any, *, debug: bool = False) -> Any:
     import litestar
 
@@ -96,6 +111,8 @@ def render_exception(request: Any, exc: Any, *, debug: bool = False) -> Any:
     else:
         detail = getattr(exc, "detail", None)
         message = str(detail) if detail else _status_text(status)
+    if status >= 500:
+        _report_server_error(exc)  # 5xx must leave a server-side trace (idempotent via report())
     headers = _headers(request)
     accept = headers.get("accept")
 

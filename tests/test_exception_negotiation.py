@@ -53,3 +53,27 @@ def test_web_without_referer_redirects_to_root() -> None:
     r = render_exception(Req({"accept": "text/html"}, session={}), _exc())
     assert r.status_code == 302
     assert r.headers["Location"] == "/"
+
+
+def test_5xx_is_reported_but_4xx_is_not() -> None:
+    """render_exception routes a 5xx through the app's ExceptionHandler.report() (so it leaves a
+    server-side log), while a 4xx — an expected client error — stays unreported."""
+    from structlog.testing import capture_logs
+
+    from arvel.http.exceptions import HttpException
+    from arvel.kernel import Application, set_application
+    from arvel.kernel.logging import configure_logging
+    from arvel.kernel.provider import KernelServiceProvider
+
+    app = Application()
+    KernelServiceProvider(app).register()  # binds "log" + "exceptions"
+    set_application(app)
+    try:
+        configure_logging()
+        with capture_logs() as logs:
+            render_exception(Req({"accept": "application/json"}), HttpException(500, "boom"))
+            render_exception(Req({"accept": "application/json"}), HttpException(404, "nope"))
+        events = [log["event"] for log in logs]
+        assert events.count("unhandled_exception") == 1  # the 500 is reported, the 404 is not
+    finally:
+        set_application(None)
