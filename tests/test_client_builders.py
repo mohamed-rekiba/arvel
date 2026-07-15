@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 import pytest
 
-from arvel.client import Client, ClientResponse, RequestFailed
+from arvel.client import Client, ClientResponse, RequestFailed, TransportFailed
 
 
 class _FlakyTransport(httpx.AsyncBaseTransport):
@@ -62,7 +62,8 @@ async def test_retry_retries_connect_errors_by_default() -> None:
 async def test_retry_reraises_the_last_exception_when_exhausted() -> None:
     transport = _FlakyTransport([httpx.ConnectError("boom"), httpx.ConnectError("boom again")])
     client = Client(transport=transport)
-    with pytest.raises(httpx.ConnectError, match="boom again"):
+    # the client wraps the engine's connect error in its own taxonomy (never leaks httpx)
+    with pytest.raises(TransportFailed, match="boom again"):
         await client.retry(2, 0).get("https://x.test/flaky")
     assert transport.calls == 2
 

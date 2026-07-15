@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import httpx
 
-from arvel.client import Client, ClientResponse
+from arvel.client import Client, ClientResponse, TransportFailed
 
 
 def _transport() -> httpx.MockTransport:
@@ -52,7 +52,7 @@ async def test_pool_holds_the_exception_in_its_slot_instead_of_raising() -> None
     )
     assert isinstance(results[0], ClientResponse)
     assert results[0].json()["path"] == "/a"
-    assert isinstance(results[1], httpx.ConnectError)
+    assert isinstance(results[1], TransportFailed)  # wrapped — the pool never leaks httpx
     assert isinstance(results[2], ClientResponse)
     assert results[2].json()["path"] == "/c"
 

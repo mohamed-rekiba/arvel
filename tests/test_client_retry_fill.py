@@ -9,7 +9,13 @@ from typing import Any
 import httpx
 import pytest
 
-from arvel.client import Client, ClientResponse, FakeSequenceExhausted, RequestFailed
+from arvel.client import (
+    Client,
+    ClientResponse,
+    FakeSequenceExhausted,
+    RequestFailed,
+    TransportFailed,
+)
 from arvel.support import Sleep
 
 
@@ -77,7 +83,7 @@ async def test_retry_throw_false_returns_last_response_instead_of_raising() -> N
 async def test_retry_throw_false_still_raises_on_a_connect_error() -> None:
     transport = _FlakyTransport([httpx.ConnectError("boom"), httpx.ConnectError("boom again")])
     client = Client(transport=transport)
-    with pytest.raises(httpx.ConnectError):
+    with pytest.raises(TransportFailed):  # engine connect error, wrapped in arvel's taxonomy
         await client.retry(2, 0, throw=False).get("https://x.test/flaky")
 
 

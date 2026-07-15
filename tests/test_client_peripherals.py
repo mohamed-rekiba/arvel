@@ -18,7 +18,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from arvel.client import Client, PendingRequest
+from arvel.client import Client, PendingRequest, TransportFailed
 
 # --- without_redirects / default-follows -------------------------------------------------
 
@@ -126,7 +126,8 @@ async def test_without_verify_completes_against_a_self_signed_server(
 ) -> None:
     client = Client()  # real network path — no fake, no custom transport
     try:
-        with pytest.raises(httpx.TransportError):  # default verify=True: untrusted cert rejected
+        # default verify=True: untrusted cert rejected — surfaced as arvel's TransportFailed
+        with pytest.raises(TransportFailed):
             await client.get(self_signed_https_url)
         # no-verify succeeds — and it can only succeed by *not* going through the (verify=True)
         # shared client used above, which would reject the same cert the same way.

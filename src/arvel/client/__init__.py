@@ -46,6 +46,18 @@ class RequestFailed(Exception):
         super().__init__(f"HTTP request failed with status {response.status()}")
 
 
+class TransportFailed(Exception):
+    """A request could not be completed at the transport level (connection refused, DNS/TLS
+    failure, too-many-redirects, response-decoding error). arvel's wrapper over the underlying
+    engine's error so consumers never import httpx — the original engine exception is on
+    ``__cause__``. ``RequestFailed`` (a received 4xx/5xx) is *not* a ``TransportFailed``."""
+
+
+class RequestTimedOut(TransportFailed):
+    """A request exceeded its (connect or read) timeout. A ``TransportFailed`` subclass — catch it
+    before ``TransportFailed`` to distinguish timeouts from other transport failures."""
+
+
 class StrayRequest(Exception):
     """Raised when ``Http.fake(...)`` has ``prevent_stray_requests()`` set and a request is made
     to a URL that matches none of the faked patterns."""
@@ -565,12 +577,19 @@ class PendingRequest:
         kwargs = self._prepare_body(dict(kwargs))
         call_headers: dict[str, str] = kwargs.pop("headers", None) or {}
         kwargs["headers"] = {"Accept": "text/event-stream", **self._headers, **call_headers}
-        async with self._open_stream(method, url, kwargs) as response:
-            if response.status_code >= 400:
-                await response.aread()
-                raise RequestFailed(ClientResponse(response))
-            async for event in _parse_sse(response.aiter_lines()):
-                yield event
+        try:
+            async with self._open_stream(method, url, kwargs) as response:
+                if response.status_code >= 400:
+                    await response.aread()
+                    raise RequestFailed(ClientResponse(response))
+                async for event in _parse_sse(response.aiter_lines()):
+                    yield event
+        except httpx.TimeoutException as exc:
+            raise RequestTimedOut(str(exc)) from exc
+        except (
+            httpx.HTTPError
+        ) as exc:  # engine transport error → arvel's taxonomy (never leak httpx)
+            raise TransportFailed(str(exc)) from exc
 
     def _backoff_seconds(self, attempt: int) -> float:
         """Seconds to sleep after the just-completed (1-based) ``attempt``, before the next one."""
@@ -639,7 +658,12 @@ class PendingRequest:
 
                 inject(headers)  # W3C traceparent → the callee continues this trace (distributed)
             kwargs["headers"] = headers
-            raw = await self._send_with_retry(method, url, kwargs)
+            try:
+                raw = await self._send_with_retry(method, url, kwargs)
+            except httpx.TimeoutException as exc:
+                raise RequestTimedOut(str(exc)) from exc
+            except httpx.HTTPError as exc:  # engine transport error → arvel's taxonomy
+                raise TransportFailed(str(exc)) from exc
             if sp is not None:
                 sp.set_attribute("http.response.status_code", raw.status_code)
                 if raw.status_code >= 400:
@@ -1052,6 +1076,8 @@ __all__ = [
     "PoolBuilder",
     "RecordedRequest",
     "RequestFailed",
+    "RequestTimedOut",
     "ServerSentEvent",
     "StrayRequest",
+    "TransportFailed",
 ]

@@ -112,6 +112,28 @@ response.throw()            # raises RequestFailed(response) if failed(); else r
 
 `RequestFailed.response` is the `ClientResponse`, so a handler can inspect `.status()`/`.body()`.
 
+### Exceptions
+
+The client raises its **own** exceptions — it never leaks the underlying httpx type (the same way
+it wraps the response in `ClientResponse`):
+
+| Exception | When |
+|-----------|------|
+| `RequestFailed` | A response arrived with a 4xx/5xx status — via `.throw()`, or an exhausted `retry()`. `.response` is the `ClientResponse`. |
+| `RequestTimedOut` | The request exceeded its connect/read timeout. A subclass of `TransportFailed`. |
+| `TransportFailed` | The request couldn't complete at the transport level — connection refused, DNS/TLS failure, too-many-redirects, decode error. The original engine exception is on `__cause__`. |
+
+```python
+from arvel.client import RequestTimedOut, TransportFailed
+
+try:
+    response = await Http.timeout(5).get(url)
+except RequestTimedOut:
+    ...   # timed out
+except TransportFailed:
+    ...   # any other transport failure (connection/DNS/TLS)
+```
+
 ## Passing httpx options
 
 Any keyword you pass to a verb is forwarded to httpx, and a per-call keyword always wins over the
@@ -156,7 +178,8 @@ async for event in Http.base_url("https://api.example.com").with_token(key).stre
   skipped; the event dispatches on a blank line.
 - `Accept: text/event-stream` is set for you (override via `with_headers`/`headers=`).
 - A **4xx/5xx** status raises `RequestFailed` (the body is read first, so `exc.response` carries
-  status/headers/body) — wrap the `async for` in `try/except RequestFailed` to map the error.
+  status/headers/body); a mid-stream transport failure raises `RequestTimedOut`/`TransportFailed`
+  like any other request — wrap the `async for` to map them.
 - `retry()` is **not** applied to a stream (a half-consumed body can't be transparently retried);
   wrap the whole `async for` yourself for reconnection. Streams aren't span-wrapped.
 - Fake it like any other request — `Http.fake({url: Http.response(body="data: {...}\n\ndata: [DONE]\n\n")})`.
