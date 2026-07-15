@@ -38,7 +38,7 @@ class SecurityServiceProvider(ServiceProvider):
     def register(self) -> None:
         def make_hasher(_app: Container) -> Hasher:
             driver = cast("DriverName", config("hashing.driver", "argon2id"))
-            options = cast("dict[str, int]", config("hashing.options", {}) or {})
+            options = cast("dict[str, int]", config("hashing.options") or {})
             return Hasher(driver, **options)
 
         def make_encrypter(_app: Container) -> Encrypter:
