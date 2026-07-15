@@ -76,6 +76,8 @@ def test_new_package_scaffolds_full_skeleton(
         "tests/test_provider.py",
         ".github/workflows/ci.yml",
         ".github/workflows/release.yml",
+        "Makefile",
+        ".pre-commit-config.yaml",
     ):
         assert (root / rel).exists(), rel
     pyproject = (root / "pyproject.toml").read_text()

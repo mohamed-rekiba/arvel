@@ -23,7 +23,7 @@ build-backend = "hatchling.build"
 packages = ["src/{{mod}}"]
 
 [dependency-groups]
-dev = ["pytest", "ruff", "mypy", "import-linter"]
+dev = ["pytest", "ruff", "mypy", "import-linter", "pre-commit"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

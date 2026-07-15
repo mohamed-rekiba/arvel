@@ -22,6 +22,7 @@ don't need. An un-pruned copy always boots and passes its own CI.
 | `src/{{mod}}/settings.py` | typed config view + defaults (host app values win) |
 | `tests/` | the booted-app fixture is how packages test without an app |
 | CI (`.github/workflows/ci.yml`) | ruff · mypy strict · import-linter · pytest |
+| `Makefile` + `.pre-commit-config.yaml` | `make check` / `make hooks` — the same gates locally |
 
 | Delete freely | When |
 |---|---|
