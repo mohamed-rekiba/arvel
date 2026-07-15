@@ -17,4 +17,5 @@ class User(Authenticatable, Model):
     }
     __fillable__: ClassVar[list[str]] = ["name", "email", "password"]
     __hidden__: ClassVar[list[str]] = ["password"]
-    __casts__: ClassVar[dict[str, Any]] = {"email_verified_at": "datetime", "password": "hashed"}
+    # nosec B105 below: "hashed" is a cast type, not a password
+    __casts__: ClassVar[dict[str, Any]] = {"email_verified_at": "datetime", "password": "hashed"}  # nosec B105

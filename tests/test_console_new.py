@@ -16,7 +16,17 @@ def test_new_scaffolds_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(build_cli(), ["new", "myapp"])
     assert result.exit_code == 0, result.output
-    for rel in ("pyproject.toml", "asgi.py", "app/__init__.py", "routes/web.py"):
+    for rel in (
+        "pyproject.toml",
+        "asgi.py",
+        "app/__init__.py",
+        "routes/web.py",
+        ".github/workflows/ci.yml",
+        ".github/workflows/security.yml",
+        ".github/dependabot.yml",
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        ".gitleaks.toml",
+    ):
         assert (tmp_path / "myapp" / rel).exists(), rel
     # the scaffold must carry every engine its OWN generated code defaults to. `standard`
     # includes sqlite (config/database.py's default DB) and view (the home route renders a

@@ -1,0 +1,13 @@
+title = "{{name}} gitleaks configuration"
+
+# Build on the bundled rule set rather than replacing it.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "False positives"
+# Example keys and tokens in Markdown docs trip the high-entropy / generic-api-key
+# heuristics but aren't real secrets.
+paths = [
+  '''.*\.md$''',
+]
