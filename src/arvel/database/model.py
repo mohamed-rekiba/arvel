@@ -144,9 +144,9 @@ class HasUuids:
     """String primary key generated as a UUIDv7 (time-ordered) on insert."""
 
     def _new_unique_id(self) -> str:
-        import uuid
+        from arvel.support import Str
 
-        return str(uuid.uuid7())
+        return Str.uuid()  # central v7 default (Str.uuid) — swap the version in one place
 
 
 class HasUlids:

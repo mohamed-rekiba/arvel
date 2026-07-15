@@ -15,7 +15,6 @@ table (the :class:`Activity` model).
 from __future__ import annotations
 
 import contextlib
-import uuid
 from collections.abc import Generator
 from contextvars import ContextVar
 from typing import Any, ClassVar, cast
@@ -31,7 +30,9 @@ _disabled: ContextVar[bool] = ContextVar("arvel_activity_disabled", default=Fals
 def activity_batch() -> Generator[str]:
     """Every activity logged inside the block shares one ``batch_uuid``, so a single logical
     operation's audit entries can be retrieved together. Yields the batch id."""
-    batch = str(uuid.uuid4())
+    from arvel.support import Str
+
+    batch = Str.uuid()  # central v7 default; a batch's entries sort by creation
     token = _batch_uuid.set(batch)
     try:
         yield batch

@@ -726,12 +726,11 @@ class RequestContextMiddleware(Middleware):
     """
 
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
-        import uuid
-
         from arvel.kernel.logging import LogManager
+        from arvel.support import Str
 
         incoming = request.header("x-request-id") if hasattr(request, "header") else None
-        request_id = incoming or uuid.uuid7().hex
+        request_id = incoming or Str.uuid()  # central v7 default
         LogManager.with_context(request_id=request_id)
         try:
             return await call_next(request)

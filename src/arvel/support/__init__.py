@@ -876,17 +876,27 @@ class Str:
 
     @staticmethod
     def uuid() -> str:
-        """A random (v4) UUID string."""
-        import uuid as _uuid
-
-        return str(_uuid.uuid4())
-
-    @staticmethod
-    def uuid7() -> str:
-        """A time-ordered (v7) UUID string — sorts chronologically, index-friendly."""
+        """A UUID string — **UUIDv7 by default** (time-ordered: sorts chronologically,
+        index-friendly). Use :meth:`uuid4` for a fully-random id when time-ordering would
+        leak creation time (e.g. an unguessable token)."""
         import uuid as _uuid
 
         return str(_uuid.uuid7())
+
+    @staticmethod
+    def uuid7() -> str:
+        """A time-ordered (v7) UUID string — explicit alias of the default :meth:`uuid`."""
+        import uuid as _uuid
+
+        return str(_uuid.uuid7())
+
+    @staticmethod
+    def uuid4() -> str:
+        """A random (v4) UUID string — no embedded timestamp. Prefer this over the
+        v7 default when the id must not reveal when it was created."""
+        import uuid as _uuid
+
+        return str(_uuid.uuid4())
 
     # --- regex ---------------------------------------------------------------
     @staticmethod

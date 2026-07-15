@@ -260,7 +260,7 @@ class Mailable:
     def _new_cid() -> str:
         import uuid
 
-        return f"{uuid.uuid4().hex}@arvel"
+        return f"{uuid.uuid7().hex}@arvel"
 
     async def resolve_attachments(self) -> None:
         """Load any deferred attachments/inline images into memory off the event loop — a local
