@@ -601,9 +601,10 @@ class Router:
         parity). Raises a clear error if neither is available."""
         if key is not None:
             return key
-        from arvel.kernel import app, has_application
+        from arvel.kernel import has_application
+        from arvel.kernel.config import config
 
-        app_key = app("config").get("app.key") if has_application() else None
+        app_key = config("app.key") if has_application() else None
         if not app_key:
             raise RuntimeError(
                 "signed URLs need a key: pass key=, or set config('app.key') (APP_KEY)."

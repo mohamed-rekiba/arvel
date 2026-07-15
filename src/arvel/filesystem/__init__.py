@@ -522,7 +522,9 @@ class FilesystemManager(Manager):
             if name not in disks:
                 known = ", ".join(sorted(disks)) or "(none configured)"
                 raise UnknownDiskError(name, known)  # clear "unknown disk", not "install extra"
-            raise MissingExtraError(driver, package=self.extra_package)  # the disk's declared driver needs its extra installed
+            raise MissingExtraError(
+                driver, package=self.extra_package
+            )  # the disk's declared driver needs its extra installed
         return creator(name)
 
     def disk(self, name: str | None = None) -> Filesystem:

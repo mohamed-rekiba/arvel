@@ -94,10 +94,11 @@ class Media(Model):
         if path is None:
             return None
         from arvel.kernel import app, has_application
+        from arvel.kernel.config import config
 
         base = ""
         if has_application() and app().bound("config"):
-            base = app("config").get(f"filesystems.disks.{self.disk}.url", "") or ""
+            base = config(f"filesystems.disks.{self.disk}.url", "") or ""
         return f"{base.rstrip('/')}/{path}" if base else path
 
 

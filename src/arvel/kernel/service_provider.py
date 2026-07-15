@@ -78,7 +78,7 @@ def load_config_directory(app: Application, directory: str | None = None) -> Non
     base = Path(directory) if directory is not None else Path(app.base_path) / "config"
     if not base.is_dir():
         return
-    repo = app.make("config")
+    repo = app.config()
     for file in sorted(base.glob("*.py")):
         if file.name.startswith("_"):
             continue
@@ -114,7 +114,7 @@ class ServiceProvider:
         defaults: Mapping[str, Any] = (
             source if isinstance(source, Mapping) else _load_config_file(source)
         )
-        _merge_defaults(self.app.make("config"), key, defaults)
+        _merge_defaults(self.app.config(), key, defaults)
 
     def load_routes_from(self, path: str) -> None:
         self.app.route_files.append(path)

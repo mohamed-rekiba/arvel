@@ -128,10 +128,11 @@ class Request:
         peer is in it; unset/empty trusts none (the secure default — forwarded headers are
         client-spoofable otherwise)."""
         from arvel.kernel import app, has_application
+        from arvel.kernel.config import config
 
         proxies: Any = None
         if has_application() and app().bound("config"):
-            proxies = app("config").get("app.trusted_proxies")
+            proxies = config("app.trusted_proxies")
         if proxies == "*" or proxies == ["*"]:
             return True
         if isinstance(proxies, (list, tuple)):

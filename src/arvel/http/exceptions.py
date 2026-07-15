@@ -214,7 +214,9 @@ def _render_error_view(
         paths: Any = "resources/views"
         with contextlib.suppress(Exception):
             if has_application() and app().bound("config"):
-                paths = app("config").get("view.paths", "resources/views") or "resources/views"
+                from arvel.kernel.config import config
+
+                paths = config("view.paths", "resources/views") or "resources/views"
         roots = [str(paths)] if isinstance(paths, str) else [str(p) for p in paths]
 
         # withhold internal detail from a production 5xx, exactly as the built-in page does

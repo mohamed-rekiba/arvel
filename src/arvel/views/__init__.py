@@ -44,10 +44,11 @@ def _guest() -> bool:
 def _config(key: str, default: Any = None) -> Any:
     """Template ``config('app.name')`` helper — reads the bound config, or ``default``."""
     from arvel.kernel import app, has_application
+    from arvel.kernel.config import config
 
     if not (has_application() and app().bound("config")):
         return default
-    return app("config").get(key, default)
+    return config(key, default)
 
 
 def _route(name: str, **params: Any) -> str:

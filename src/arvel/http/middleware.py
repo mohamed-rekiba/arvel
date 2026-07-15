@@ -816,9 +816,10 @@ def _configured_max_request_size(default: int = 10 * 1024 * 1024) -> int:
     — the one source ``ValidatePostSize`` and ``MethodOverride`` both enforce, so the two never
     disagree on the limit."""
     from arvel.kernel import app, has_application
+    from arvel.kernel.config import config
 
     if has_application() and app().bound("config"):
-        return int(app("config").get("app.max_request_size", default))
+        return int(config("app.max_request_size", default))
     return default
 
 
@@ -857,10 +858,11 @@ class ValidateHost(Middleware):
 
     async def handle(self, request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         from arvel.kernel import app, has_application
+        from arvel.kernel.config import config
 
         allowed: Any = None
         if has_application() and app().bound("config"):
-            allowed = app("config").get("app.trusted_hosts")
+            allowed = config("app.trusted_hosts")
         if isinstance(allowed, (list, tuple)) and allowed and request.host() not in allowed:
             from arvel.http.response import Response
 

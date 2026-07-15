@@ -190,7 +190,7 @@ class HttpKernel:
             # redis sessions share the app's bound "cache" service, so they survive restarts
             if self.app is not None and self.app.bound("cache"):
                 # from_source reads this app's own config section, not the global config()
-                section = self.app.make("config").get("session", {})
+                section = self.app.config("session", {})
                 if SessionSettings.from_source(section).driver == "redis":
                     session_mw = StartSession(cache=self.app.make("cache"))
             # EncryptCookies first (H7 — every cookie read/written below it goes through its
@@ -470,7 +470,7 @@ class HttpKernel:
         max_age). Returns ``None`` (CORS off) when unconfigured."""
         if self.app is None or not self.app.bound("config"):
             return None
-        cfg = self.app.make("config").get("cors")
+        cfg = self.app.config("cors")
         if not isinstance(cfg, dict) or not cfg:
             return None
         from litestar.config.cors import CORSConfig

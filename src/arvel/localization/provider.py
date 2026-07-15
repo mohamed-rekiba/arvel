@@ -27,6 +27,7 @@ _FRAMEWORK_LANG = Path(__file__).parent / "lang"
 class LocalizationServiceProvider(ServiceProvider):
     def register(self) -> None:
         def make_translator(app: Container) -> Translator:
+            # the injected container (not the global app) — config() helper doesn't apply here
             fallback = app.make("config").get("app.fallback_locale", "en")
             return Translator(fallback=fallback)
 

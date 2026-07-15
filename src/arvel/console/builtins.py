@@ -144,9 +144,7 @@ def new(
     if package:
         mod = "arvel_" + pkg_name.replace("-", "_")
         cls = "".join(p.capitalize() for p in pkg_name.replace("-", "_").split("_"))
-        count = _copy_skeleton(
-            "package", target, {"name": pkg_name, "mod": mod, "cls": cls}
-        )
+        count = _copy_skeleton("package", target, {"name": pkg_name, "mod": mod, "cls": cls})
         typer.echo(f"[arvel new] created package arvel-{pkg_name} ({count} files)")
         typer.echo(f"  cd {name} && uv sync")
         typer.echo("  uv run pytest    # the un-pruned skeleton is green out of the box")

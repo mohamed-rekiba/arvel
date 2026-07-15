@@ -515,11 +515,12 @@ def app_url(path: str = "") -> str:
     byte-for-byte: the base is ``config('app.url')`` when a bound app has one, else ``""``,
     stripped of a trailing slash; ``path`` is prefixed with a single leading slash (empty stays
     empty); an empty result joins to ``"/"``."""
+    from arvel.kernel.config import config
     from arvel.kernel.globals import app, has_application
 
     base = ""
     if has_application() and app().bound("config"):
-        base = str(app("config").get("app.url", "") or "")
+        base = str(config("app.url", "") or "")
     base = base.rstrip("/")
     suffix = ("/" + path.lstrip("/")) if path else ""
     return (base + suffix) if base else (suffix or "/")

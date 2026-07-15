@@ -399,7 +399,7 @@ class SearchManager(Manager):
     def create_meilisearch_driver(self) -> MeilisearchEngine:
         config: Mapping[str, Any] = {}
         if self.app is not None and self.app.bound("config"):
-            config = self.app.make("config").get("search.meilisearch", {}) or {}
+            config = self.app.config("search.meilisearch", {}) or {}
         return MeilisearchEngine(**config)
 
 
