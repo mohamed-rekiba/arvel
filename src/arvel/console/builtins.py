@@ -104,7 +104,7 @@ def _copy_skeleton(kind: str, target: Any, subs: dict[str, str]) -> int:
     for src in sorted(root.rglob("*.tmpl")):
         if "__pycache__" in src.parts:
             continue
-        parts = list(src.relative_to(root).parts)
+        parts: list[str] = list(src.relative_to(root).parts)
         parts[-1] = parts[-1].removesuffix(".tmpl")
         # dot. -> . on every segment, so dotted DIRS (dot.github/) work too
         parts = ["." + p[len("dot.") :] if p.startswith("dot.") else p for p in parts]
