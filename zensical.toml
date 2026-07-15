@@ -16,7 +16,7 @@ repo_name = "mohamed-rekiba/arvel"
 copyright = "Copyright © 2026 arvel team. All rights reserved."
 
 extra_css = ["assets/arvel-docs-theme.css"]
-extra_javascript = ["assets/arvel-snake.js"]
+extra_javascript = ["assets/arvel-snake.js", "assets/arvel-nav.js"]
 
 nav = [
   { "Home" = "index.md" },
@@ -149,7 +149,9 @@ features = [
   "content.code.copy",
   "content.tabs.link",
   # "navigation.sections",
-  "navigation.expand",
+  # "navigation.expand" is off: only "Getting Started" opens expanded (still
+  # collapsible), via assets/arvel-nav.js (#__nav_2) — zensical has no
+  # per-section expand option.
   "navigation.instant",
   "navigation.top",
   "navigation.tracking",
