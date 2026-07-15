@@ -32,7 +32,7 @@ def activity_batch() -> Generator[str]:
     operation's audit entries can be retrieved together. Yields the batch id."""
     from arvel.support import Str
 
-    batch = Str.uuid()  # central v7 default; a batch's entries sort by creation
+    batch = Str.uuid()
     token = _batch_uuid.set(batch)
     try:
         yield batch

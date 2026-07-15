@@ -730,7 +730,7 @@ class RequestContextMiddleware(Middleware):
         from arvel.support import Str
 
         incoming = request.header("x-request-id") if hasattr(request, "header") else None
-        request_id = incoming or Str.uuid()  # central v7 default
+        request_id = incoming or Str.uuid()
         LogManager.with_context(request_id=request_id)
         try:
             return await call_next(request)

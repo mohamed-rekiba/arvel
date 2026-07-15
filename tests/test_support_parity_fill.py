@@ -94,7 +94,9 @@ def test_uuid_default_is_version_7() -> None:
 
 def test_uuid4_is_explicit_version_4() -> None:
     value = Str.uuid4()
-    assert re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", value)
+    assert re.fullmatch(
+        r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", value
+    )
 
 
 # --- Str: substr_count / substr_replace / deduplicate / base64 --------------

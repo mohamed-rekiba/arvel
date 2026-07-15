@@ -258,9 +258,9 @@ class Mailable:
 
     @staticmethod
     def _new_cid() -> str:
-        import uuid
+        from arvel.support import Str
 
-        return f"{uuid.uuid7().hex}@arvel"
+        return f"{Str.uuid()}@arvel"
 
     async def resolve_attachments(self) -> None:
         """Load any deferred attachments/inline images into memory off the event loop — a local

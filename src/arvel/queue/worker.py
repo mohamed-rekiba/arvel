@@ -452,7 +452,7 @@ class JobWorker:
         # start from the dispatcher's propagated context (request_id, user_id, …), then stamp this
         # execution's own job_id/job on top (override, so a nested job gets its own, not the parent's)
         context: dict[str, Any] = dict(getattr(job, "__arvel_log_context__", None) or {})
-        context["job_id"] = Str.uuid()  # central v7 default
+        context["job_id"] = Str.uuid()
         context["job"] = type(job).__name__
         with LogManager.bound_context(**context):
             return await self._invoke_body(job, queue_label=queue_label)
