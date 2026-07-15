@@ -132,14 +132,17 @@ token usage as attributes — a no-op unless the `telemetry` extra is configured
 and dispatches events your app can hook:
 
 ```python
+from arvel import Event
 from arvel_ai.events import AiResponseReceived
-app.make("events").listen(AiResponseReceived, audit_ai_usage)
+
+Event.listen(AiResponseReceived, audit_ai_usage)
 ```
 
 ## Common mistakes & gotchas
 
-- **Extras:** the default driver needs `uv add 'arvel-ai[litellm]'`; the
-  openai_compatible driver needs `arvel-ai[httpx]`. A missing engine tells you
+- **Extras:** the default `litellm` driver needs `uv add 'arvel-ai[litellm]'`;
+  the `openai_compatible` driver ships in the base install (its httpx engine is
+  part of arvel core, so there's no extra to add). A missing engine tells you
   exactly that.
 - **Keys live in env vars** — the config holds env var *names*, never values.
 - **`temperature` is passthrough, not stable API** — some providers reject

@@ -58,9 +58,10 @@ ai = {
 `arvel-ai` is the **client** side (start / signal / status). Running the
 workflows needs a Temporal **worker** process that registers the same behaviour
 against Temporal — that's app deployment (see the Temporal Python SDK's worker
-docs). The integration test in the package (`test_workflow_temporal.py`) shows a
-full start → signal → durable-suspend → complete against a real Temporal server
-(`docker-compose.test.yml`).
+docs). The integration test in the package (`test_workflow_temporal.py`) drives a
+full start → signal → durable-suspend → complete against a real Temporal server,
+spun up on demand with testcontainers
+(`AI_INTEGRATION=1 uv run --extra temporal pytest tests/test_workflow_temporal.py`).
 
 ## Common mistakes & gotchas
 
