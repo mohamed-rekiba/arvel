@@ -1,0 +1,38 @@
+# Container image for the {{name}} app. Run `uv lock` and commit uv.lock first (the build is
+# reproducible from it), then: `docker build -t {{name}} .` and `docker run -p 8000:8000 {{name}}`.
+
+# ---- builder: install the locked runtime dependencies ----
+FROM python:3.14-slim-trixie AS builder
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+WORKDIR /app
+
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+
+# Copy only the lockfile + manifest, so this layer stays cached until the deps actually change.
+# --no-dev drops the test tooling; --no-install-project because an app runs from its source tree,
+# it isn't a package to install.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+# ---- runtime: hardened, nonroot ----
+FROM python:3.14-slim-trixie AS runtime
+
+# Strip setuid/setgid bits, drop apt's package-list cache, add a fixed-uid nonroot account.
+RUN find / -xdev -perm /6000 -type f -exec chmod a-s {} + 2>/dev/null; \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* && \
+    groupadd --gid 10001 app && \
+    useradd --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
+
+WORKDIR /app
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
+COPY --chown=app:app . /app
+
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONFAULTHANDLER=1
+
+USER app
+EXPOSE 8000
+CMD ["granian", "--interface", "asgi", "--host", "0.0.0.0", "--port", "8000", "asgi:asgi_app"]

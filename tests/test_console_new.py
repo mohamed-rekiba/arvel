@@ -26,6 +26,8 @@ def test_new_scaffolds_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         ".github/dependabot.yml",
         ".github/PULL_REQUEST_TEMPLATE.md",
         ".gitleaks.toml",
+        "Dockerfile",
+        ".dockerignore",
     ):
         assert (tmp_path / "myapp" / rel).exists(), rel
     # the scaffold must carry every engine its OWN generated code defaults to. `standard`

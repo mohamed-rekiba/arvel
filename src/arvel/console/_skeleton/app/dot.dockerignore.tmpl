@@ -1,0 +1,25 @@
+# Keep the build context (and the image) small and free of local/dev cruft.
+.git/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Secrets and local databases never belong in an image.
+.env
+.env.*
+!.env.example
+*.sqlite
+*.db
+
+# Not needed at runtime.
+.github/
+tests/
+README.md
+Dockerfile
+.dockerignore
+
+# Runtime-written uploads — created in the container, not baked in.
+storage/app/

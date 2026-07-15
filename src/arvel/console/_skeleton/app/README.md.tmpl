@@ -12,6 +12,16 @@ arvel serve            # dev server (granian) — http://127.0.0.1:8000
 arvel serve --reload   # auto-reload on code changes
 ```
 
+## Deploy (Docker)
+
+```
+uv lock                                   # commit uv.lock so the build is reproducible
+docker build -t {{name}} .
+docker run -p 8000:8000 -e APP_KEY=... {{name}}
+```
+
+The image is a hardened, nonroot, multi-stage build; it runs granian on port 8000.
+
 ## Structure
 
 ```
