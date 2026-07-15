@@ -79,6 +79,7 @@ def test_new_package_scaffolds_full_skeleton(
         ".github/workflows/security.yml",
         ".github/dependabot.yml",
         ".github/PULL_REQUEST_TEMPLATE.md",
+        ".gitleaks.toml",
         "Makefile",
         ".pre-commit-config.yaml",
     ):

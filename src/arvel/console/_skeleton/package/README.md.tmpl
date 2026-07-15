@@ -23,6 +23,7 @@ don't need. An un-pruned copy always boots and passes its own CI.
 | `tests/` | the booted-app fixture is how packages test without an app |
 | CI (`.github/workflows/ci.yml`) | ruff · format · mypy strict · import-linter · pytest |
 | Security (`.github/workflows/security.yml`) | bandit · pip-audit · gitleaks, plus a weekly CVE sweep |
+| `.gitleaks.toml` | secret-scan rules (default set + a docs allowlist); used by CI and the pre-commit hook |
 | `.github/dependabot.yml` | keeps deps + actions current, with a 7-day cooldown |
 | `Makefile` + `.pre-commit-config.yaml` | `make check` / `make hooks` — the same gates locally |
 
