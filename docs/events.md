@@ -68,6 +68,33 @@ channel.
 The event's **type** is the channel — listeners registered for `UserRegistered` receive every
 `UserRegistered` instance.
 
+## Auto-discovery — `app/listeners/`
+
+You don't have to wire class listeners by hand. Drop a **listener class** in `app/listeners/`
+with a `handle(self, event: SomeEvent)` method, and it's registered automatically at boot — the
+event it listens for is read from the `handle` type-hint:
+
+```python
+# app/listeners/send_welcome.py
+class SendWelcome:
+    async def handle(self, event: UserRegistered) -> None:   # bound to UserRegistered by the hint
+        await mail_the_user(event.user)
+```
+
+No `Event.listen(...)` call, no provider edit — the same zero-wiring ergonomics `config/` has. The
+scan looks for classes each module *defines* (not ones it imports) that have a callable `handle`;
+string/closure listeners and explicit `Event.listen(...)` calls keep working alongside it.
+
+Turn it off, or point it elsewhere, in config (defaults shown):
+
+```python
+# config/events.py
+events = {
+    "discover": True,                     # False to register every listener by hand
+    "discover_paths": ["app/listeners"],  # dirs scanned, relative to the project root
+}
+```
+
 ## Worked example: fan-out
 
 ```python

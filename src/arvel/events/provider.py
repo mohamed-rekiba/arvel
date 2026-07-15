@@ -1,14 +1,47 @@
-"""EventServiceProvider — binds the dispatcher (auto-discovered via entry point)."""
+"""EventServiceProvider — binds the dispatcher (auto-discovered via entry point) and, at boot,
+auto-discovers class listeners in ``app/listeners/`` the way Laravel discovers ``app/Listeners``
+(DR-0046)."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import importlib
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from arvel.events.dispatcher import Dispatcher
 from arvel.kernel.service_provider import ServiceProvider
 
 if TYPE_CHECKING:
     from arvel.contracts import Container
+
+
+def discover_listeners(app: Any, paths: list[str]) -> list[Any]:
+    """Import every ``*.py`` under each ``paths`` dir (relative to ``base_path``) and return the
+    listener classes they define — those with a callable ``handle``. The dispatcher's ``discover``
+    then binds each to the event in its ``handle(self, event: X)`` type hint. A dir that doesn't
+    exist, or a module that fails to import, is skipped."""
+    found: list[Any] = []
+    for rel in paths:
+        directory = Path(app.base_path) / rel
+        if not directory.is_dir():
+            continue
+        module_prefix = rel.replace("/", ".").replace("\\", ".")
+        for file in sorted(directory.glob("*.py")):
+            if file.stem.startswith("_"):
+                continue
+            try:
+                module = importlib.import_module(f"{module_prefix}.{file.stem}")
+            except ImportError:
+                continue
+            found.extend(
+                obj
+                for obj in vars(module).values()
+                # a class this module actually defines (not one it imported) with a handle()
+                if isinstance(obj, type)
+                and obj.__module__ == module.__name__
+                and callable(getattr(obj, "handle", None))
+            )
+    return found
 
 
 class EventServiceProvider(ServiceProvider):
@@ -19,4 +52,12 @@ class EventServiceProvider(ServiceProvider):
         self.app.singleton("events", make_dispatcher)
 
     def boot(self) -> None:
-        """No-op; app/event providers register listeners."""
+        """Auto-discover class listeners from the configured dirs (default ``app/listeners``),
+        unless turned off with ``config('events.discover', False)``. Explicit ``events.listen(...)``
+        registration keeps working alongside this."""
+        if not self.app.config("events.discover", True):
+            return
+        paths = self.app.config("events.discover_paths", ["app/listeners"])
+        listeners = discover_listeners(self.app, paths)
+        if listeners:
+            self.app.make("events").discover(listeners)

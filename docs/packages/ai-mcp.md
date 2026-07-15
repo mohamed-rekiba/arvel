@@ -8,8 +8,11 @@ agents is a deliberate act.
 
 ## Expose a tool
 
+Drop a decorated function in `app/mcp_tools/` — every `*.py` there is autoloaded at boot (the same
+zero-wiring convention `config/` uses), so the tool is live the moment the file exists:
+
 ```python
-# app/mcp_tools.py
+# app/mcp_tools/order_status.py
 from arvel_ai.mcp import mcp_tool
 
 @mcp_tool(description="Look up an order's status by id")
@@ -24,7 +27,7 @@ ai = {
     "mcp": {
         "enabled": True,
         "public_url": "https://shop.example.com",   # canonical https URL
-        "tools": ["app.mcp_tools"],                  # modules to import at boot
+        # tools autoload from app/mcp_tools/; list extra modules in "tools" if needed
         "auth": {"mode": "token", "token_env": "MCP_TOKEN"},
     },
 }
@@ -83,8 +86,9 @@ any other service is rejected (RFC 8707 binding).
 - **`public_url` is required when enabled** — the metadata document and the
   401 challenge are built from it; a wrong value breaks client login silently.
 - **OIDC needs `arvel[jwt]`** (pyjwt) for JWKS validation.
-- **Forgot to list the module in `mcp.tools`** — the decorator never runs, the
-  tool never appears in `tools/list`.
+- **Tool file outside `app/mcp_tools/`** — it isn't autoloaded, the decorator
+  never runs, and the tool never appears in `tools/list`. Move it into the
+  folder, or list it in `mcp.tools`.
 - **Testing locally:** `npx @modelcontextprotocol/inspector` speaks the same
   protocol; point it at `http://localhost:8000/mcp` with your dev token.
 
