@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.65.0](https://github.com/mohamed-rekiba/arvel/compare/v0.64.0...v0.65.0) (2026-07-15)
+
+
+### Features
+
+* Round out the package skeleton for publishing ([380a08e](https://github.com/mohamed-rekiba/arvel/commit/380a08e2877c3c41ab40f1e92439994066d76384))
+
 ## [0.64.0](https://github.com/mohamed-rekiba/arvel/compare/v0.63.4...v0.64.0) (2026-07-14)
 
 
