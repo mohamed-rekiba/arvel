@@ -135,6 +135,32 @@ responses = await Http.pool(
 # a failed slot holds the *exception object*, not raised — check with isinstance(slot, Exception).
 ```
 
+## Streaming Server-Sent Events — `Http.stream`
+
+For `text/event-stream` APIs (LLM token streams, live feeds), `Http.stream(method, url, **kwargs)`
+yields parsed `ServerSentEvent`s as they arrive — the body is never fully buffered. It returns an
+async generator, so **don't `await` it** — iterate with `async for`:
+
+```python
+async for event in Http.base_url("https://api.example.com").with_token(key).stream(
+    "POST", "/v1/chat/completions", json={"model": "…", "messages": [...], "stream": True}
+):
+    if event.data == "[DONE]":
+        break
+    chunk = json.loads(event.data)   # event.data is the payload after `data:`
+    ...
+```
+
+- Each `ServerSentEvent` has `.data` (payload; multiple `data:` lines are joined with `\n`),
+  `.event` (type, default `"message"`), `.id`, and `.retry`. Comment lines (`:` keep-alives) are
+  skipped; the event dispatches on a blank line.
+- `Accept: text/event-stream` is set for you (override via `with_headers`/`headers=`).
+- A **4xx/5xx** status raises `RequestFailed` (the body is read first, so `exc.response` carries
+  status/headers/body) — wrap the `async for` in `try/except RequestFailed` to map the error.
+- `retry()` is **not** applied to a stream (a half-consumed body can't be transparently retried);
+  wrap the whole `async for` yourself for reconnection. Streams aren't span-wrapped.
+- Fake it like any other request — `Http.fake({url: Http.response(body="data: {...}\n\ndata: [DONE]\n\n")})`.
+
 ## Testing without the network
 
 ### `Http.fake` (recommended — no app wiring needed)

@@ -10,6 +10,7 @@ httpx is core.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import copy
 import fnmatch
 import inspect
@@ -17,7 +18,7 @@ import json as _json
 import os
 import re
 import weakref
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Mapping, Sequence
 from typing import Any, ClassVar, cast
 
 import httpx
@@ -160,6 +161,64 @@ def _default_should_retry(outcome: Exception | ClientResponse) -> bool:
     if isinstance(outcome, Exception):
         return isinstance(outcome, _RETRY_EXCEPTIONS)
     return outcome.server_error()
+
+
+# --- server-sent events (SSE) -------------------------------------------------------
+
+
+class ServerSentEvent:
+    """One event parsed from a ``text/event-stream`` body (WHATWG SSE). ``data`` is the payload
+    with the trailing newline stripped — multiple ``data:`` lines are joined with ``\\n``; ``event``
+    is the event type (default ``"message"``). Yielded by :meth:`PendingRequest.stream`."""
+
+    __slots__ = ("data", "event", "id", "retry")
+
+    def __init__(
+        self,
+        data: str = "",
+        event: str = "message",
+        id: str | None = None,
+        retry: int | None = None,
+    ) -> None:
+        self.data = data
+        self.event = event
+        self.id = id
+        self.retry = retry
+
+    def __repr__(self) -> str:
+        return f"ServerSentEvent(event={self.event!r}, data={self.data!r})"
+
+
+async def _parse_sse(lines: AsyncIterator[str]) -> AsyncIterator[ServerSentEvent]:
+    """Turn an SSE line stream into events. Dispatches the buffered event on a blank line;
+    accumulates multi-line ``data:``; skips comment lines (leading ``:``). ``id`` persists across
+    events per spec; ``event``/``data``/``retry`` reset after each dispatch."""
+    data: list[str] = []
+    event = "message"
+    last_id: str | None = None
+    retry: int | None = None
+    async for line in lines:
+        line = line.rstrip("\r")  # httpx.aiter_lines drops the \n; be defensive on a bare \r
+        if not line:
+            if data or event != "message" or retry is not None:
+                yield ServerSentEvent("\n".join(data), event, last_id, retry)
+            data, event, retry = [], "message", None
+            continue
+        if line.startswith(":"):
+            continue  # comment / keep-alive ping
+        field, _, value = line.partition(":")
+        if value.startswith(" "):
+            value = value[1:]
+        if field == "data":
+            data.append(value)
+        elif field == "event":
+            event = value
+        elif field == "id":
+            last_id = value
+        elif field == "retry" and value.isdigit():
+            retry = int(value)
+    if data:  # a final event not terminated by a trailing blank line
+        yield ServerSentEvent("\n".join(data), event, last_id, retry)
 
 
 # --- request builder ----------------------------------------------------------------
@@ -462,6 +521,56 @@ class PendingRequest:
                 async for chunk in response.aiter_bytes():
                     await fh.write(chunk)
             return response
+
+    @contextlib.asynccontextmanager
+    async def _open_stream(
+        self, method: str, url: str, kwargs: dict[str, Any]
+    ) -> AsyncGenerator[httpx.Response]:
+        """Open a streaming response (``client.stream``), picking the shared keep-alive client or a
+        per-call one exactly like :meth:`_send_once`. The body is *not* buffered — the caller
+        iterates it inside the ``async with``."""
+        send_kwargs = dict(kwargs)
+        if self._auth is not None:
+            send_kwargs.setdefault("auth", self._auth)
+        send_kwargs.setdefault("follow_redirects", self._follow_redirects)
+        if self._shared_client is not None and self._verify is not False:
+            send_kwargs.setdefault("timeout", self._effective_timeout())
+            async with self._shared_client.stream(
+                method, self._resolve_url(url), **send_kwargs
+            ) as response:
+                yield response
+        else:
+            async with (
+                httpx.AsyncClient(
+                    base_url=self._base_url,
+                    timeout=self._effective_timeout(),
+                    transport=self._transport,
+                    verify=self._verify,
+                ) as client,
+                client.stream(method, url, **send_kwargs) as response,
+            ):
+                yield response
+
+    async def stream(self, method: str, url: str, **kwargs: Any) -> AsyncIterator[ServerSentEvent]:
+        """Open a streaming request and yield parsed Server-Sent Events as they arrive — for
+        ``text/event-stream`` APIs (LLM token streams, live feeds). ``Accept: text/event-stream``
+        is set unless you override it via ``with_headers``/``headers=``.
+
+        Raises :class:`RequestFailed` on a 4xx/5xx status (the body is read first, so
+        ``exc.response`` carries status/headers/body). ``retry()`` is *not* applied to a stream — a
+        half-consumed body can't be transparently retried; wrap the whole ``async for`` yourself for
+        reconnection. Streams aren't span-wrapped (a span measures a bounded request, not an
+        open-ended feed)."""
+        url = self._apply_url_parameters(url)
+        kwargs = self._prepare_body(dict(kwargs))
+        call_headers: dict[str, str] = kwargs.pop("headers", None) or {}
+        kwargs["headers"] = {"Accept": "text/event-stream", **self._headers, **call_headers}
+        async with self._open_stream(method, url, kwargs) as response:
+            if response.status_code >= 400:
+                await response.aread()
+                raise RequestFailed(ClientResponse(response))
+            async for event in _parse_sse(response.aiter_lines()):
+                yield event
 
     def _backoff_seconds(self, attempt: int) -> float:
         """Seconds to sleep after the just-completed (1-based) ``attempt``, before the next one."""
@@ -845,6 +954,11 @@ class Client:
     async def delete(self, url: str, **kwargs: Any) -> ClientResponse:
         return await self._pending().delete(url, **kwargs)
 
+    def stream(self, method: str, url: str, **kwargs: Any) -> AsyncIterator[ServerSentEvent]:
+        """Open an SSE stream — see :meth:`PendingRequest.stream`. Returns the async generator
+        directly (no ``await``): ``async for event in Http.stream("POST", url, json=...): ...``."""
+        return self._pending().stream(method, url, **kwargs)
+
     # -- pool ---------------------------------------------------------------------
 
     async def pool(
@@ -938,5 +1052,6 @@ __all__ = [
     "PoolBuilder",
     "RecordedRequest",
     "RequestFailed",
+    "ServerSentEvent",
     "StrayRequest",
 ]
